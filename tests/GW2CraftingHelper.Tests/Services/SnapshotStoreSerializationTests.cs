@@ -65,6 +65,22 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Null(result);
         }
+
+        [Fact]
+        public void Deserialize_WhitespaceOnly_ReturnsNull()
+        {
+            var result = SnapshotHelpers.DeserializeSnapshot("   ");
+
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public void Serialize_NullSnapshot_ReturnsNull()
+        {
+            var result = SnapshotHelpers.SerializeSnapshot(null);
+
+            Assert.Null(result);
+        }
     }
 
 }

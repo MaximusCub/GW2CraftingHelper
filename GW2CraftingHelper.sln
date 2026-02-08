@@ -1,11 +1,9 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.2.11415.280 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModuleTemplate", "ModuleTemplate.csproj", "{FEC31CE0-4539-4A1B-A633-78E3BDBD8C56}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModuleTemplateDeployment", "..\ModuleTemplateDeployment\ModuleTemplateDeployment.csproj", "{154D03E2-A006-46A9-91C3-15A96F7EA4F5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GW2CraftingHelper", "GW2CraftingHelper.csproj", "{FEC31CE0-4539-4A1B-A633-78E3BDBD8C56}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GW2CraftingHelper.Tests", "tests\GW2CraftingHelper.Tests\GW2CraftingHelper.Tests.csproj", "{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
@@ -24,14 +22,6 @@ Global
 		{FEC31CE0-4539-4A1B-A633-78E3BDBD8C56}.Release|Any CPU.ActiveCfg = Release|x64
 		{FEC31CE0-4539-4A1B-A633-78E3BDBD8C56}.Release|x64.ActiveCfg = Release|x64
 		{FEC31CE0-4539-4A1B-A633-78E3BDBD8C56}.Release|x64.Build.0 = Release|x64
-		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Debug|x64.Build.0 = Debug|Any CPU
-		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Release|x64.ActiveCfg = Release|Any CPU
-		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Release|x64.Build.0 = Release|Any CPU
 		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x64.ActiveCfg = Debug|Any CPU

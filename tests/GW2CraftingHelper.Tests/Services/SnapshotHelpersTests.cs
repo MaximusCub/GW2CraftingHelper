@@ -62,6 +62,37 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result);
         }
 
+        [Fact]
+        public void AggregateItems_NullEntriesInList_SkipsNulls()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                new SnapshotItemEntry { ItemId = 1, Name = "A", Count = 5, Source = "Bank" },
+                null,
+                new SnapshotItemEntry { ItemId = 1, Name = "A", Count = 3, Source = "Character:Ranger" }
+            };
+
+            var result = SnapshotHelpers.AggregateItems(items);
+
+            Assert.Single(result);
+            Assert.Equal(8, result[0].Count);
+        }
+
+        [Fact]
+        public void AggregateItems_PrefersNonEmptyName()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                new SnapshotItemEntry { ItemId = 10, Name = "", Count = 2, Source = "Bank" },
+                new SnapshotItemEntry { ItemId = 10, Name = "Gold Ore", Count = 4, Source = "MaterialStorage" }
+            };
+
+            var result = SnapshotHelpers.AggregateItems(items);
+
+            Assert.Single(result);
+            Assert.Equal("Gold Ore", result[0].Name);
+        }
+
         // ── SplitWalletAndCoins ─────────────────────────────────────
 
         [Fact]
@@ -110,6 +141,37 @@ namespace GW2CraftingHelper.Tests.Services
             var (coinCopper, wallet) = SnapshotHelpers.SplitWalletAndCoins(null);
 
             Assert.Equal(0, coinCopper);
+            Assert.Empty(wallet);
+        }
+
+        [Fact]
+        public void SplitWalletAndCoins_NullEntriesInList_SkipsNulls()
+        {
+            var entries = new List<SnapshotWalletEntry>
+            {
+                new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 100 },
+                null,
+                new SnapshotWalletEntry { CurrencyId = 3, CurrencyName = "Gems", Value = 50 }
+            };
+
+            var (coinCopper, wallet) = SnapshotHelpers.SplitWalletAndCoins(entries);
+
+            Assert.Equal(0, coinCopper);
+            Assert.Equal(2, wallet.Count);
+        }
+
+        [Fact]
+        public void SplitWalletAndCoins_MultipleCoinEntries_SumsValues()
+        {
+            var entries = new List<SnapshotWalletEntry>
+            {
+                new SnapshotWalletEntry { CurrencyId = 1, CurrencyName = "Coin", Value = 10000 },
+                new SnapshotWalletEntry { CurrencyId = 1, CurrencyName = "Coin", Value = 5000 }
+            };
+
+            var (coinCopper, wallet) = SnapshotHelpers.SplitWalletAndCoins(entries);
+
+            Assert.Equal(15000, coinCopper);
             Assert.Empty(wallet);
         }
     }

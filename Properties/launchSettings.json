@@ -1,9 +1,0 @@
-﻿{
-  "profiles": {
-    "gw2": {
-      "commandName": "Executable",
-      "executablePath": "C:\\Blish.HUD\\Blish HUD.exe",
-      "commandLineArgs": "--debug --module \"$(ProjectDir)\\$(BaseOutputPath)\\$(Configuration)\\$(TargetFramework)\\$(TargetName).bhm\" --settings \"..\\Settings_$(TargetName)\""
-    }
-  }
-}

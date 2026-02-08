@@ -5,9 +5,9 @@
   "package": "GW2CraftingHelper.dll",
   "manifest_version": 1,
 
-  "description": "Description of your module. Visit https://github.com/blish-hud/manifest.json/blob/master/manifest-v1.md for details about the manifest format.",
+  "description": "Caches and displays GW2 account inventory, wallet, and material storage data.",
   "dependencies": {
-    "bh.blishhud": ">=0.5.2"
+    "bh.blishhud": ">=1.3.0"
   },
   "url": "https://github.com/MaximusCub/GW2CraftingHelper",
   "contributors": [
