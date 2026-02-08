@@ -346,3 +346,24 @@ nul.*
 
 # Ignore Claude's local settings file
 .claude/settings.local.json
+
+# Build outputs
+bin/
+obj/
+
+# VS
+.vs/
+*.user
+*.suo
+
+# NuGet packages folder (if present)
+packages/
+
+# Root-level tool/binary artifacts (mgfxc/SharpDX/etc)
+*.dll
+*.exe
+*.pdb
+*.xml
+*.deps.json
+*.runtimeconfig.json
+*.runtimeconfig.dev.json
