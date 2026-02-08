@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip:*)",
+      "WebSearch",
+      "WebFetch(domain:blishhud.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(dotnet build:*)",
+      "Bash(where:*)",
+      "WebFetch(domain:www.nuget.org)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(powershell -ExecutionPolicy Bypass -File:*)",
+      "Bash(test:*)"
+    ]
+  }
+}

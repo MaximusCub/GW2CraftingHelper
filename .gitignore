@@ -338,3 +338,8 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+
+# Don't mess with "nul" files or variants
+nul
+NUL
+nul.*

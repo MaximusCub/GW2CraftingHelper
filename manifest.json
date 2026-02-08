@@ -1,18 +1,25 @@
 {
-  "name": "$projectname$",
+  "name": "GW2CraftingHelper",
   "version": "0.1.0",
-  "namespace": "$safeprojectname$",
-  "package": "$projectname$.dll",
+  "namespace": "GW2CraftingHelper",
+  "package": "GW2CraftingHelper.dll",
   "manifest_version": 1,
 
   "description": "Description of your module. Visit https://github.com/blish-hud/manifest.json/blob/master/manifest-v1.md for details about the manifest format.",
   "dependencies": {
     "bh.blishhud": ">=0.5.2"
   },
-  "url": "https://github.com/$username$/$safeprojectname$",
+  "url": "https://github.com/MaximusCub/GW2CraftingHelper",
   "contributors": [
     {
-      "name": "$username$"
+      "name": "MaximusCub"
     }
-  ]
+  ],
+  "api_permissions": {
+    "account":     { "optional": false, "details": "Required for account info and coin balance" },
+    "characters":  { "optional": false, "details": "Required to list characters and read their inventories" },
+    "inventories": { "optional": false, "details": "Required for bank, shared inventory, materials, and character bags" },
+    "wallet":      { "optional": false, "details": "Required for wallet currency data" }
+  },
+  "directories": ["data"]
 }
