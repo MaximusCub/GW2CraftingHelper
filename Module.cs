@@ -17,19 +17,15 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace GW2CraftingHelper
 {
-
     [Export(typeof(Blish_HUD.Modules.Module))]
     public class Module : Blish_HUD.Modules.Module
     {
-
         private static readonly Logger Logger = Logger.GetLogger<Module>();
         private static readonly TimeSpan StaleThreshold = TimeSpan.FromMinutes(10);
 
-        #region Service Managers
         internal ContentsManager ContentsManager => this.ModuleParameters.ContentsManager;
         internal DirectoriesManager DirectoriesManager => this.ModuleParameters.DirectoriesManager;
         internal Gw2ApiManager Gw2ApiManager => this.ModuleParameters.Gw2ApiManager;
-        #endregion
 
         private CornerIcon _cornerIcon;
         private StandardWindow _mainWindow;
@@ -170,8 +166,6 @@ namespace GW2CraftingHelper
 
                 Logger.Info("Fetched snapshot CapturedAt={0:o} items={1} wallet={2} coin={3}",
                     snapshot.CapturedAt, snapshot.Items.Count, snapshot.Wallet.Count, snapshot.CoinCopper);
-
-
             }
             catch (OperationCanceledException)
             {

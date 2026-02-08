@@ -1,7 +1,7 @@
 using GW2CraftingHelper.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Views
+namespace GW2CraftingHelper.Tests.Services
 {
 
     public class CoinFormattingTests

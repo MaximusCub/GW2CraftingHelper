@@ -7,7 +7,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
 
-    public class SnapshotStoreSerializationTests
+    public class SnapshotSerializationTests
     {
 
         [Fact]
