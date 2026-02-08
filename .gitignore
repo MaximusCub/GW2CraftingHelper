@@ -343,3 +343,6 @@ healthchecksdb
 nul
 NUL
 nul.*
+
+# Ignore Claude's local settings file
+.claude/settings.local.json

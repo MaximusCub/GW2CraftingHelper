@@ -11,7 +11,9 @@
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(powershell -ExecutionPolicy Bypass -File:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(if not exist \"C:\\\\Dev\\\\Blish\\\\GW2CraftingHelper\\\\Properties\" mkdir \"C:\\\\Dev\\\\Blish\\\\GW2CraftingHelper\\\\Properties\")",
+      "Bash(dotnet test:*)"
     ]
   }
 }

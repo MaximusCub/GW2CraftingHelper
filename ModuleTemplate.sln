@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModuleTemplate", "ModuleTem
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModuleTemplateDeployment", "..\ModuleTemplateDeployment\ModuleTemplateDeployment.csproj", "{154D03E2-A006-46A9-91C3-15A96F7EA4F5}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GW2CraftingHelper.Tests", "tests\GW2CraftingHelper.Tests\GW2CraftingHelper.Tests.csproj", "{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,6 +32,14 @@ Global
 		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Release|x64.ActiveCfg = Release|Any CPU
 		{154D03E2-A006-46A9-91C3-15A96F7EA4F5}.Release|x64.Build.0 = Release|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x64.Build.0 = Debug|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x64.ActiveCfg = Release|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

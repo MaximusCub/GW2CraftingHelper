@@ -2,6 +2,7 @@ using Blish_HUD;
 using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
 using GW2CraftingHelper.Models;
+using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
@@ -240,12 +241,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static string FormatCoin(int copper)
+        internal static string FormatCoin(int copper)
         {
-            int gold = copper / 10000;
-            int silver = (copper % 10000) / 100;
-            int cop = copper % 100;
-            return $"Coin: {gold}g {silver}s {cop}c";
+            return SnapshotHelpers.FormatCoin(copper);
         }
     }
 }

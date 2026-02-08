@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Services {
             try {
                 if (!File.Exists(_filePath)) return null;
                 string json = File.ReadAllText(_filePath);
-                return JsonConvert.DeserializeObject<AccountSnapshot>(json);
+                return Deserialize(json);
             } catch (Exception ex) {
                 Logger.Warn(ex, "Failed to load snapshot from {FilePath}", _filePath);
                 return null;
@@ -31,11 +31,19 @@ namespace GW2CraftingHelper.Services {
             try {
                 string dir = Path.GetDirectoryName(_filePath);
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                string json = JsonConvert.SerializeObject(snapshot, Formatting.Indented);
+                string json = Serialize(snapshot);
                 File.WriteAllText(_filePath, json);
             } catch (Exception ex) {
                 Logger.Warn(ex, "Failed to save snapshot to {FilePath}", _filePath);
             }
+        }
+
+        internal static string Serialize(AccountSnapshot snapshot) {
+            return SnapshotHelpers.SerializeSnapshot(snapshot);
+        }
+
+        internal static AccountSnapshot Deserialize(string json) {
+            return SnapshotHelpers.DeserializeSnapshot(json);
         }
     }
 
