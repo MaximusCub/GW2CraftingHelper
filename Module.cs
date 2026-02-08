@@ -32,10 +32,12 @@ namespace GW2CraftingHelper
         private MainView _mainView;
 
         private SnapshotStore _snapshotStore;
+        private StatusStore _statusStore;
         private Gw2AccountSnapshotService _snapshotService;
         private AccountSnapshot _currentSnapshot;
         private AccountSnapshot _pendingSnapshot;
         private bool _snapshotDirty;
+        private string _lastStatus;
 
         private CancellationTokenSource _refreshCts;
         private bool _refreshInProgress;
@@ -47,8 +49,11 @@ namespace GW2CraftingHelper
 
         protected override void Initialize()
         {
-            _snapshotStore = new SnapshotStore(DirectoriesManager.GetFullDirectoryPath("data"));
+            string dataDir = DirectoriesManager.GetFullDirectoryPath("data");
+            _snapshotStore = new SnapshotStore(dataDir);
+            _statusStore = new StatusStore(dataDir);
             _snapshotService = new Gw2AccountSnapshotService(Gw2ApiManager);
+            _lastStatus = _statusStore.Load();
 
             Texture2D iconTexture;
             try
@@ -80,14 +85,22 @@ namespace GW2CraftingHelper
                 Parent = GameService.Graphics.SpriteScreen
             };
 
-            _cornerIcon.Click += (s, e) => {
+            _cornerIcon.Click += (s, e) =>
+            {
                 if (_mainView == null)
                 {
-                    _mainView = new MainView(_currentSnapshot, RefreshSnapshotAsync);
+                    _mainView = new MainView(
+                        _currentSnapshot,
+                        _lastStatus,
+                        UserRefreshAsync,
+                        ClearCache,
+                        SaveStatus
+                    );
                 }
                 else
                 {
                     _mainView.SetSnapshot(_currentSnapshot);
+                    _mainView.SetStatus(_lastStatus);
                 }
 
                 _mainWindow.ToggleWindow(_mainView);
@@ -102,7 +115,7 @@ namespace GW2CraftingHelper
 
             if (_snapshotService.HasRequiredPermissions())
             {
-                await RefreshSnapshotAsync();
+                await RefreshSnapshotInBackgroundAsync();
             }
         }
 
@@ -113,6 +126,7 @@ namespace GW2CraftingHelper
                 Logger.Info("Applying snapshot to view CapturedAt={0:o}", _pendingSnapshot?.CapturedAt);
                 _snapshotDirty = false;
                 _mainView?.SetSnapshot(_pendingSnapshot);
+                _mainView?.SetStatus(_lastStatus);
             }
 
             if (_refreshInProgress) return;
@@ -120,8 +134,7 @@ namespace GW2CraftingHelper
             if (DateTime.UtcNow - _currentSnapshot.CapturedAt < StaleThreshold) return;
             if (!_snapshotService.HasRequiredPermissions()) return;
 
-            // Fire-and-forget refresh; UI will update if window is open.
-            _ = RefreshSnapshotAsync();
+            _ = RefreshSnapshotInBackgroundAsync();
         }
 
         protected override void Unload()
@@ -139,11 +152,29 @@ namespace GW2CraftingHelper
         {
             if (_snapshotService.HasRequiredPermissions())
             {
-                _ = RefreshSnapshotAsync();
+                _ = RefreshSnapshotInBackgroundAsync();
             }
         }
 
-        private async Task RefreshSnapshotAsync()
+        private async Task<AccountSnapshot> FetchAndSaveSnapshotAsync(CancellationToken ct)
+        {
+            Logger.Info("Refreshing account snapshot...");
+
+            var snapshot = await _snapshotService.FetchSnapshotAsync(ct);
+
+            _currentSnapshot = snapshot;
+            _snapshotStore.Save(snapshot);
+
+            _pendingSnapshot = snapshot;
+            _snapshotDirty = true;
+
+            Logger.Info("Fetched snapshot CapturedAt={0:o} items={1} wallet={2} coin={3}",
+                snapshot.CapturedAt, snapshot.Items.Count, snapshot.Wallet.Count, snapshot.CoinCopper);
+
+            return snapshot;
+        }
+
+        private async Task RefreshSnapshotInBackgroundAsync()
         {
             if (_refreshInProgress) return;
             _refreshInProgress = true;
@@ -154,18 +185,9 @@ namespace GW2CraftingHelper
 
             try
             {
-                Logger.Info("Refreshing account snapshot...");
-
-                var snapshot = await _snapshotService.FetchSnapshotAsync(_refreshCts.Token);
-
-                _currentSnapshot = snapshot;
-                _snapshotStore.Save(snapshot);
-
-                _pendingSnapshot = _currentSnapshot;
-                _snapshotDirty = true;
-
-                Logger.Info("Fetched snapshot CapturedAt={0:o} items={1} wallet={2} coin={3}",
-                    snapshot.CapturedAt, snapshot.Items.Count, snapshot.Wallet.Count, snapshot.CoinCopper);
+                var snapshot = await FetchAndSaveSnapshotAsync(_refreshCts.Token);
+                var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
+                SaveStatus(status);
             }
             catch (OperationCanceledException)
             {
@@ -174,11 +196,50 @@ namespace GW2CraftingHelper
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Failed to refresh account snapshot");
+                var status = $"Refresh failed \u2014 {DateTime.Now:t}";
+                SaveStatus(status);
             }
             finally
             {
                 _refreshInProgress = false;
             }
+        }
+
+        private async Task<AccountSnapshot> UserRefreshAsync()
+        {
+            if (_refreshInProgress) return null;
+            _refreshInProgress = true;
+
+            _refreshCts?.Cancel();
+            _refreshCts?.Dispose();
+            _refreshCts = new CancellationTokenSource();
+
+            try
+            {
+                return await FetchAndSaveSnapshotAsync(_refreshCts.Token);
+            }
+            finally
+            {
+                _refreshInProgress = false;
+            }
+        }
+
+        private void ClearCache()
+        {
+            _refreshCts?.Cancel();
+            _refreshCts?.Dispose();
+            _refreshCts = null;
+            _snapshotStore.Delete();
+            _currentSnapshot = null;
+            _pendingSnapshot = null;
+            _snapshotDirty = false;
+        }
+
+        private void SaveStatus(string status)
+        {
+            _lastStatus = status ?? "";
+            _statusStore.Save(_lastStatus);
+            _mainView?.SetStatus(_lastStatus);
         }
     }
 }

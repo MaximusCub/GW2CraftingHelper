@@ -15,19 +15,33 @@ namespace GW2CraftingHelper.Views
     public class MainView : View
     {
 
+        private static readonly Logger Logger = Logger.GetLogger<MainView>();
+
         private AccountSnapshot _snapshot;
-        private readonly Func<Task> _refreshAsync;
+        private string _initialStatus;
+        private readonly Func<Task<AccountSnapshot>> _refreshAsync;
+        private readonly Action _clearCache;
+        private readonly Action<string> _saveStatus;
 
         private FlowPanel _contentPanel;
         private Dropdown _filterDropdown;
         private Checkbox _aggregateCheckbox;
 
         private Label _coinLabel;
+        private Label _statusLabel;
 
-        public MainView(AccountSnapshot snapshot, Func<Task> refreshAsync)
+        public MainView(
+            AccountSnapshot snapshot,
+            string initialStatus,
+            Func<Task<AccountSnapshot>> refreshAsync,
+            Action clearCache,
+            Action<string> saveStatus)
         {
             _snapshot = snapshot;
+            _initialStatus = initialStatus;
             _refreshAsync = refreshAsync;
+            _clearCache = clearCache;
+            _saveStatus = saveStatus;
         }
 
         public void SetSnapshot(AccountSnapshot snapshot)
@@ -40,6 +54,15 @@ namespace GW2CraftingHelper.Views
             }
 
             RebuildContent();
+        }
+
+        public void SetStatus(string status)
+        {
+            _initialStatus = StatusText.Normalize(status);
+            if (_statusLabel != null)
+            {
+                _statusLabel.Text = _initialStatus;
+            }
         }
 
         protected override void Build(Container buildPanel)
@@ -60,13 +83,22 @@ namespace GW2CraftingHelper.Views
                 Parent = headerPanel
             };
 
-            var statusLabel = new Label()
+            _statusLabel = new Label()
             {
-                Text = "",
+                Text = _initialStatus ?? "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(140, 12),
                 Parent = headerPanel
+            };
+
+            var clearButton = new StandardButton()
+            {
+                Text = "Clear Cache",
+                Size = new Point(100, 30),
+                Location = new Point(buildPanel.ContentRegion.Width - 220, 5),
+                Parent = headerPanel,
+                Enabled = _clearCache != null
             };
 
             var refreshButton = new StandardButton()
@@ -78,26 +110,49 @@ namespace GW2CraftingHelper.Views
                 Enabled = _refreshAsync != null
             };
 
-            refreshButton.Click += async (_, __) => {
+            clearButton.Click += (_, __) =>
+            {
+                _clearCache();
+                SetSnapshot(null);
+                var status = $"Cache Cleared \u2014 {DateTime.Now:t}";
+                SetStatus(status);
+                _saveStatus(status);
+            };
+
+            refreshButton.Click += async (_, __) =>
+            {
                 if (_refreshAsync == null) return;
 
                 refreshButton.Enabled = false;
-                statusLabel.Text = "Refreshing...";
+                clearButton.Enabled = false;
+                SetStatus("Refreshing...");
 
                 try
                 {
-                    await _refreshAsync();
-                    statusLabel.Text = $"Updated {DateTime.Now:t}";
+                    var snapshot = await _refreshAsync();
+                    if (snapshot != null)
+                    {
+                        SetSnapshot(snapshot);
+                        var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
+                        SetStatus(status);
+                        _saveStatus(status);
+                    }
+                    else
+                    {
+                        SetStatus("Refresh in progress...");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    // This writes to the Blish HUD log
-                    Blish_HUD.Logger.GetLogger<MainView>().Warn(ex, "Refresh Now failed");
-                    statusLabel.Text = "Refresh failed (see log)";
+                    Logger.Warn(ex, "Refresh Now failed");
+                    var status = $"Refresh failed \u2014 {DateTime.Now:t}";
+                    SetStatus(status);
+                    _saveStatus(status);
                 }
                 finally
                 {
                     refreshButton.Enabled = true;
+                    clearButton.Enabled = true;
                 }
             };
 

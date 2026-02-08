@@ -53,6 +53,8 @@
     <Compile Include="Services\Gw2AccountSnapshotService.cs" />
     <Compile Include="Services\SnapshotHelpers.cs" />
     <Compile Include="Services\SnapshotStore.cs" />
+    <Compile Include="Services\StatusStore.cs" />
+    <Compile Include="Services\StatusText.cs" />
     <Compile Include="Views\MainView.cs" />
   </ItemGroup>
   <ItemGroup>

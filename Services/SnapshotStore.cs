@@ -1,14 +1,12 @@
 using System;
+using System.Diagnostics;
 using System.IO;
-using Blish_HUD;
 using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
     public class SnapshotStore
     {
-        private static readonly Logger Logger = Logger.GetLogger<SnapshotStore>();
-
         private readonly string _filePath;
 
         public SnapshotStore(string dataDirectoryPath)
@@ -26,7 +24,7 @@ namespace GW2CraftingHelper.Services
             }
             catch (Exception ex)
             {
-                Logger.Warn(ex, "Failed to load snapshot from {FilePath}", _filePath);
+                Debug.WriteLine($"Failed to load snapshot from {_filePath}: {ex.Message}");
                 return null;
             }
         }
@@ -42,7 +40,19 @@ namespace GW2CraftingHelper.Services
             }
             catch (Exception ex)
             {
-                Logger.Warn(ex, "Failed to save snapshot to {FilePath}", _filePath);
+                Debug.WriteLine($"Failed to save snapshot to {_filePath}: {ex.Message}");
+            }
+        }
+
+        public void Delete()
+        {
+            try
+            {
+                if (File.Exists(_filePath)) File.Delete(_filePath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to delete snapshot at {_filePath}: {ex.Message}");
             }
         }
 
