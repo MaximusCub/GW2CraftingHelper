@@ -55,6 +55,10 @@
     <Compile Include="Services\SnapshotStore.cs" />
     <Compile Include="Services\StatusStore.cs" />
     <Compile Include="Services\StatusText.cs" />
+    <Compile Include="Models\RecipeNode.cs" />
+    <Compile Include="Models\RecipeOption.cs" />
+    <Compile Include="Services\IRecipeApiClient.cs" />
+    <Compile Include="Services\RecipeService.cs" />
     <Compile Include="Views\MainView.cs" />
   </ItemGroup>
   <ItemGroup>
