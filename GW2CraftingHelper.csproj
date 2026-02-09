@@ -59,6 +59,9 @@
     <Compile Include="Models\RecipeOption.cs" />
     <Compile Include="Services\IRecipeApiClient.cs" />
     <Compile Include="Services\RecipeService.cs" />
+    <Compile Include="Models\ItemPrice.cs" />
+    <Compile Include="Services\IPriceApiClient.cs" />
+    <Compile Include="Services\TradingPostService.cs" />
     <Compile Include="Views\MainView.cs" />
   </ItemGroup>
   <ItemGroup>
