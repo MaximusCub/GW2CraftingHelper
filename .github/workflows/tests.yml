@@ -16,11 +16,8 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
-
-      - name: Restore packages.config dependencies
-        run: nuget restore ModuleTemplate.sln
+      - name: Restore packages
+        run: nuget restore GW2CraftingHelper.sln
 
       - name: Run tests
         run: dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj -c Release
