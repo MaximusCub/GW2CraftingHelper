@@ -325,6 +325,17 @@ namespace GW2CraftingHelper.Views
             AddCoinSegment(_coinPanel, x, 156902, cop.ToString());
         }
 
+        private static Color GetCoinColor(int assetId)
+        {
+            switch (assetId)
+            {
+                case 156904: return new Color(255, 204, 0);
+                case 156907: return new Color(192, 192, 192);
+                case 156902: return new Color(205, 127, 50);
+                default:     return Color.White;
+            }
+        }
+
         private static int AddCoinSegment(Panel parent, int x, int assetId, string value)
         {
             const int iconSize = 20;
@@ -334,6 +345,7 @@ namespace GW2CraftingHelper.Views
             var label = new Label()
             {
                 Text = value,
+                TextColor = GetCoinColor(assetId),
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(x, 2),
