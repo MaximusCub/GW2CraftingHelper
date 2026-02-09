@@ -1,4 +1,5 @@
 using Blish_HUD;
+using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
 using GW2CraftingHelper.Models;
@@ -27,7 +28,7 @@ namespace GW2CraftingHelper.Views
         private Dropdown _filterDropdown;
         private Checkbox _aggregateCheckbox;
 
-        private Label _coinLabel;
+        private Panel _coinPanel;
         private Label _statusLabel;
 
         public MainView(
@@ -47,12 +48,7 @@ namespace GW2CraftingHelper.Views
         public void SetSnapshot(AccountSnapshot snapshot)
         {
             _snapshot = snapshot;
-
-            if (_coinLabel != null)
-            {
-                _coinLabel.Text = FormatCoin(_snapshot?.CoinCopper ?? 0);
-            }
-
+            UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
             RebuildContent();
         }
 
@@ -186,14 +182,13 @@ namespace GW2CraftingHelper.Views
             _aggregateCheckbox.CheckedChanged += (_, __) => RebuildContent();
 
             // Coin display
-            _coinLabel = new Label()
+            _coinPanel = new Panel()
             {
-                Text = FormatCoin(_snapshot?.CoinCopper ?? 0),
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
+                Size = new Point(buildPanel.ContentRegion.Width, 24),
                 Location = new Point(0, 90),
                 Parent = buildPanel
             };
+            UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
 
             // Scrollable content
             _contentPanel = new FlowPanel()
@@ -247,33 +242,15 @@ namespace GW2CraftingHelper.Views
         {
             if (_snapshot?.Items == null) return;
 
-            IEnumerable<SnapshotItemEntry> items = _snapshot.Items;
-
-            if (aggregate)
-            {
-                items = _snapshot.Items
-                    .GroupBy(i => i.ItemId)
-                    .Select(g => new SnapshotItemEntry
-                    {
-                        ItemId = g.Key,
-                        Name = g.First().Name,
-                        Count = g.Sum(i => i.Count),
-                        Source = "Total"
-                    });
-            }
+            IEnumerable<SnapshotItemEntry> items = aggregate
+                ? SnapshotHelpers.AggregateItems(_snapshot.Items)
+                : _snapshot.Items;
 
             foreach (var item in items)
             {
                 string name = string.IsNullOrEmpty(item.Name) ? item.ItemId.ToString() : item.Name;
                 string text = $"{name} x{item.Count}  ({item.Source})";
-
-                new Label()
-                {
-                    Text = text,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Parent = _contentPanel
-                };
+                CreateRow(item.IconUrl, text);
             }
         }
 
@@ -284,21 +261,94 @@ namespace GW2CraftingHelper.Views
             foreach (var entry in _snapshot.Wallet)
             {
                 string name = string.IsNullOrEmpty(entry.CurrencyName) ? $"Currency #{entry.CurrencyId}" : entry.CurrencyName;
-                string text = $"{name}: {entry.Value}";
-
-                new Label()
-                {
-                    Text = text,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Parent = _contentPanel
-                };
+                string text = $"{name}: {entry.Value:N0}";
+                CreateRow(entry.IconUrl, text);
             }
         }
 
-        internal static string FormatCoin(int copper)
+        private void CreateRow(string iconUrl, string text)
         {
-            return SnapshotHelpers.FormatCoin(copper);
+            int panelWidth = _contentPanel?.Width ?? 400;
+
+            var row = new Panel()
+            {
+                Size = new Point(panelWidth, 36),
+                Parent = _contentPanel
+            };
+
+            AsyncTexture2D icon;
+            if (string.IsNullOrEmpty(iconUrl))
+            {
+                icon = new AsyncTexture2D(ContentService.Textures.Error);
+            }
+            else
+            {
+                icon = GameService.Content.GetRenderServiceTexture(iconUrl);
+            }
+
+            new Panel()
+            {
+                Size = new Point(32, 32),
+                Location = new Point(2, 2),
+                BackgroundTexture = icon,
+                Parent = row
+            };
+
+            new Label()
+            {
+                Text = text,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(40, 6),
+                Parent = row
+            };
+        }
+
+        private void UpdateCoinDisplay(int copper)
+        {
+            if (_coinPanel == null) return;
+
+            foreach (var child in _coinPanel.Children.ToArray())
+            {
+                child.Dispose();
+            }
+
+            if (copper < 0) copper = 0;
+
+            int gold = copper / 10000;
+            int silver = (copper % 10000) / 100;
+            int cop = copper % 100;
+
+            int x = 0;
+            x = AddCoinSegment(_coinPanel, x, 156904, gold.ToString());
+            x = AddCoinSegment(_coinPanel, x, 156907, silver.ToString());
+            AddCoinSegment(_coinPanel, x, 156902, cop.ToString());
+        }
+
+        private static int AddCoinSegment(Panel parent, int x, int assetId, string value)
+        {
+            const int iconSize = 20;
+            const int gap = 2;
+            const int segmentGap = 6;
+
+            var label = new Label()
+            {
+                Text = value,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(x, 2),
+                Parent = parent
+            };
+
+            new Panel()
+            {
+                Size = new Point(iconSize, iconSize),
+                Location = new Point(x + label.Width + gap, 2),
+                BackgroundTexture = AsyncTexture2D.FromAssetId(assetId),
+                Parent = parent
+            };
+
+            return x + label.Width + gap + iconSize + segmentGap;
         }
     }
 }

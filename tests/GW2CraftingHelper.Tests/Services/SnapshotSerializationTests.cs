@@ -81,6 +81,91 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Null(result);
         }
+
+        [Fact]
+        public void Serialize_Deserialize_IconUrl_RoundTrips()
+        {
+            var original = new AccountSnapshot
+            {
+                CapturedAt = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc),
+                CoinCopper = 100,
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry
+                    {
+                        ItemId = 1,
+                        Name = "Copper Ore",
+                        IconUrl = "https://render.guildwars2.com/file/ABC/123.png",
+                        Count = 10,
+                        Source = "Bank"
+                    }
+                },
+                Wallet = new List<SnapshotWalletEntry>
+                {
+                    new SnapshotWalletEntry
+                    {
+                        CurrencyId = 2,
+                        CurrencyName = "Karma",
+                        IconUrl = "https://render.guildwars2.com/file/DEF/456.png",
+                        Value = 5000
+                    }
+                }
+            };
+
+            string json = SnapshotHelpers.SerializeSnapshot(original);
+            var result = SnapshotHelpers.DeserializeSnapshot(json);
+
+            Assert.NotNull(result);
+            Assert.Equal("https://render.guildwars2.com/file/ABC/123.png", result.Items[0].IconUrl);
+            Assert.Equal("https://render.guildwars2.com/file/DEF/456.png", result.Wallet[0].IconUrl);
+        }
+
+        [Fact]
+        public void Serialize_Deserialize_EmptyIconUrl_RoundTrips()
+        {
+            var original = new AccountSnapshot
+            {
+                CapturedAt = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc),
+                CoinCopper = 0,
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry { ItemId = 1, Name = "X", IconUrl = "", Count = 1, Source = "Bank" }
+                },
+                Wallet = new List<SnapshotWalletEntry>
+                {
+                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Y", IconUrl = "", Value = 1 }
+                }
+            };
+
+            string json = SnapshotHelpers.SerializeSnapshot(original);
+            var result = SnapshotHelpers.DeserializeSnapshot(json);
+
+            Assert.NotNull(result);
+            Assert.Equal("", result.Items[0].IconUrl);
+            Assert.Equal("", result.Wallet[0].IconUrl);
+        }
+
+        [Fact]
+        public void Deserialize_OldJsonMissingIconUrl_DefaultsToEmpty()
+        {
+            // Simulate an older snapshot.json that doesn't have the IconUrl field
+            string oldJson = @"{
+                ""CapturedAt"": ""2025-06-15T12:00:00Z"",
+                ""CoinCopper"": 0,
+                ""Items"": [
+                    { ""ItemId"": 1, ""Name"": ""Old Item"", ""Count"": 5, ""Source"": ""Bank"" }
+                ],
+                ""Wallet"": [
+                    { ""CurrencyId"": 2, ""CurrencyName"": ""Karma"", ""Value"": 100 }
+                ]
+            }";
+
+            var result = SnapshotHelpers.DeserializeSnapshot(oldJson);
+
+            Assert.NotNull(result);
+            Assert.Equal("", result.Items[0].IconUrl);
+            Assert.Equal("", result.Wallet[0].IconUrl);
+        }
     }
 
 }

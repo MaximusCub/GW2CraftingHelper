@@ -22,7 +22,12 @@ namespace GW2CraftingHelper.Services
             TokenPermission.Wallet
         };
 
+        private const int ItemBulkLimit = 200;
+
         private readonly Gw2ApiManager _apiManager;
+        private readonly Dictionary<int, (string Name, string IconUrl)> _itemCache = new Dictionary<int, (string, string)>();
+        private readonly Dictionary<int, (string Name, string IconUrl)> _currencyCache = new Dictionary<int, (string, string)>();
+        private readonly object _cacheLock = new object();
 
         public Gw2AccountSnapshotService(Gw2ApiManager apiManager)
         {
@@ -169,7 +174,100 @@ namespace GW2CraftingHelper.Services
                 Logger.Warn(ex, "Failed to fetch character list");
             }
 
+            // Resolve display names and icon URLs
+            await ResolveItemDetailsAsync(snapshot.Items, ct);
+            await ResolveCurrencyDetailsAsync(snapshot.Wallet, ct);
+
             return snapshot;
+        }
+
+        private async Task ResolveItemDetailsAsync(List<SnapshotItemEntry> items, CancellationToken ct)
+        {
+            try
+            {
+                List<int> uncachedIds;
+                lock (_cacheLock)
+                {
+                    uncachedIds = items
+                        .Select(i => i.ItemId)
+                        .Distinct()
+                        .Where(id => !_itemCache.ContainsKey(id))
+                        .ToList();
+                }
+
+                for (int i = 0; i < uncachedIds.Count; i += ItemBulkLimit)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var chunk = uncachedIds.Skip(i).Take(ItemBulkLimit);
+                    var fetched = await _apiManager.Gw2ApiClient.V2.Items.ManyAsync(chunk, ct);
+                    lock (_cacheLock)
+                    {
+                        foreach (var item in fetched)
+                        {
+                            var url = item.Icon.Url;
+                            _itemCache[item.Id] = (item.Name ?? "", url != null ? url.AbsoluteUri : "");
+                        }
+                    }
+                }
+
+                lock (_cacheLock)
+                {
+                    foreach (var entry in items)
+                    {
+                        if (_itemCache.TryGetValue(entry.ItemId, out var cached))
+                        {
+                            entry.Name = cached.Name;
+                            entry.IconUrl = cached.IconUrl;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) when (!(ex is OperationCanceledException))
+            {
+                Logger.Warn(ex, "Failed to resolve item names/icons");
+            }
+        }
+
+        private async Task ResolveCurrencyDetailsAsync(List<SnapshotWalletEntry> wallet, CancellationToken ct)
+        {
+            try
+            {
+                bool needsFetch;
+                lock (_cacheLock)
+                {
+                    needsFetch = _currencyCache.Count == 0;
+                }
+
+                if (needsFetch)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var currencies = await _apiManager.Gw2ApiClient.V2.Currencies.AllAsync(ct);
+                    lock (_cacheLock)
+                    {
+                        foreach (var c in currencies)
+                        {
+                            var url = c.Icon.Url;
+                            _currencyCache[c.Id] = (c.Name ?? "", url != null ? url.AbsoluteUri : "");
+                        }
+                    }
+                }
+
+                lock (_cacheLock)
+                {
+                    foreach (var entry in wallet)
+                    {
+                        if (_currencyCache.TryGetValue(entry.CurrencyId, out var cached))
+                        {
+                            entry.CurrencyName = cached.Name;
+                            entry.IconUrl = cached.IconUrl;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) when (!(ex is OperationCanceledException))
+            {
+                Logger.Warn(ex, "Failed to resolve currency names/icons");
+            }
         }
     }
 }

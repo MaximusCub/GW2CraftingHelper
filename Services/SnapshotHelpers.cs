@@ -38,10 +38,14 @@ namespace GW2CraftingHelper.Services
                     string name = g.Select(x => x.Name).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n))
                                   ?? g.First().Name;
 
+                    string iconUrl = g.Select(x => x.IconUrl).FirstOrDefault(u => !string.IsNullOrWhiteSpace(u))
+                                     ?? g.First().IconUrl;
+
                     return new SnapshotItemEntry
                     {
                         ItemId = g.Key,
                         Name = name,
+                        IconUrl = iconUrl,
                         Count = g.Sum(i => i.Count),
                         Source = "Total"
                     };

@@ -4,6 +4,7 @@ namespace GW2CraftingHelper.Models
     {
         public int    CurrencyId   { get; set; }
         public string CurrencyName { get; set; } = "";
+        public string IconUrl      { get; set; } = "";
         public int    Value        { get; set; }
     }
 }

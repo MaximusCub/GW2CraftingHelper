@@ -93,6 +93,52 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Gold Ore", result[0].Name);
         }
 
+        [Fact]
+        public void AggregateItems_PreservesIconUrl()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                new SnapshotItemEntry { ItemId = 7, Name = "Mithril Ore", IconUrl = "https://render.guildwars2.com/file/ABC/123.png", Count = 10, Source = "Bank" },
+                new SnapshotItemEntry { ItemId = 7, Name = "Mithril Ore", IconUrl = "https://render.guildwars2.com/file/ABC/123.png", Count = 5, Source = "MaterialStorage" }
+            };
+
+            var result = SnapshotHelpers.AggregateItems(items);
+
+            Assert.Single(result);
+            Assert.Equal(15, result[0].Count);
+            Assert.Equal("https://render.guildwars2.com/file/ABC/123.png", result[0].IconUrl);
+        }
+
+        [Fact]
+        public void AggregateItems_PrefersNonEmptyIconUrl()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                new SnapshotItemEntry { ItemId = 8, Name = "Orichalcum", IconUrl = "", Count = 3, Source = "Bank" },
+                new SnapshotItemEntry { ItemId = 8, Name = "Orichalcum", IconUrl = "https://render.guildwars2.com/file/DEF/456.png", Count = 2, Source = "Character:Ranger" }
+            };
+
+            var result = SnapshotHelpers.AggregateItems(items);
+
+            Assert.Single(result);
+            Assert.Equal("https://render.guildwars2.com/file/DEF/456.png", result[0].IconUrl);
+        }
+
+        [Fact]
+        public void AggregateItems_AllEmptyIconUrl_ReturnsEmpty()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                new SnapshotItemEntry { ItemId = 9, Name = "X", IconUrl = "", Count = 1, Source = "Bank" },
+                new SnapshotItemEntry { ItemId = 9, Name = "X", IconUrl = "", Count = 1, Source = "Bank" }
+            };
+
+            var result = SnapshotHelpers.AggregateItems(items);
+
+            Assert.Single(result);
+            Assert.Equal("", result[0].IconUrl);
+        }
+
         // ── SplitWalletAndCoins ─────────────────────────────────────
 
         [Fact]
