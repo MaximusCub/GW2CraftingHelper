@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Blish_HUD;
@@ -30,6 +31,7 @@ namespace GW2CraftingHelper
         private CornerIcon _cornerIcon;
         private StandardWindow _mainWindow;
         private MainView _mainView;
+        private CraftingPlanView _craftingView;
 
         private SnapshotStore _snapshotStore;
         private StatusStore _statusStore;
@@ -38,6 +40,9 @@ namespace GW2CraftingHelper
         private AccountSnapshot _pendingSnapshot;
         private bool _snapshotDirty;
         private string _lastStatus;
+
+        private HttpClient _httpClient;
+        private CraftingPlanPipeline _craftingPipeline;
 
         private CancellationTokenSource _refreshCts;
         private bool _refreshInProgress;
@@ -54,6 +59,16 @@ namespace GW2CraftingHelper
             _statusStore = new StatusStore(dataDir);
             _snapshotService = new Gw2AccountSnapshotService(Gw2ApiManager);
             _lastStatus = _statusStore.Load();
+
+            _httpClient = new HttpClient();
+            var recipeApi = new Gw2RecipeApiClient(_httpClient);
+            var priceApi = new Gw2PriceApiClient(_httpClient);
+            var itemApi = new Gw2ItemApiClient(_httpClient);
+            _craftingPipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
 
             Texture2D iconTexture;
             try
@@ -94,7 +109,8 @@ namespace GW2CraftingHelper
                         _lastStatus,
                         UserRefreshAsync,
                         ClearCache,
-                        SaveStatus
+                        SaveStatus,
+                        SwitchToCraftingView
                     );
                 }
                 else
@@ -137,6 +153,28 @@ namespace GW2CraftingHelper
             _ = RefreshSnapshotInBackgroundAsync();
         }
 
+        private void SwitchToCraftingView()
+        {
+            if (_craftingView == null)
+            {
+                _craftingView = new CraftingPlanView(
+                    (itemId, qty, ct) => _craftingPipeline.GenerateAsync(itemId, qty, ct),
+                    SwitchToSnapshotView
+                );
+            }
+            _mainWindow.Show(_craftingView);
+        }
+
+        private void SwitchToSnapshotView()
+        {
+            if (_mainView != null)
+            {
+                _mainView.SetSnapshot(_currentSnapshot);
+                _mainView.SetStatus(_lastStatus);
+            }
+            _mainWindow.Show(_mainView);
+        }
+
         protected override void Unload()
         {
             Gw2ApiManager.SubtokenUpdated -= OnSubtokenUpdated;
@@ -144,6 +182,7 @@ namespace GW2CraftingHelper
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
 
+            _httpClient?.Dispose();
             _cornerIcon?.Dispose();
             _mainWindow?.Dispose();
         }

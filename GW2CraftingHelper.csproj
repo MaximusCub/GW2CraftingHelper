@@ -67,7 +67,16 @@
     <Compile Include="Models\CurrencyCost.cs" />
     <Compile Include="Models\CraftingPlan.cs" />
     <Compile Include="Services\PlanSolver.cs" />
+    <Compile Include="Models\ItemMetadata.cs" />
+    <Compile Include="Models\CraftingPlanResult.cs" />
+    <Compile Include="Services\IItemApiClient.cs" />
+    <Compile Include="Services\ItemMetadataService.cs" />
+    <Compile Include="Services\CraftingPlanPipeline.cs" />
+    <Compile Include="Services\Gw2RecipeApiClient.cs" />
+    <Compile Include="Services\Gw2PriceApiClient.cs" />
+    <Compile Include="Services\Gw2ItemApiClient.cs" />
     <Compile Include="Views\MainView.cs" />
+    <Compile Include="Views\CraftingPlanView.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">
@@ -141,6 +150,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
     </Reference>

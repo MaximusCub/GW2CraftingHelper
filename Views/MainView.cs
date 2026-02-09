@@ -23,6 +23,7 @@ namespace GW2CraftingHelper.Views
         private readonly Func<Task<AccountSnapshot>> _refreshAsync;
         private readonly Action _clearCache;
         private readonly Action<string> _saveStatus;
+        private readonly Action _switchToCrafting;
 
         private FlowPanel _contentPanel;
         private Dropdown _filterDropdown;
@@ -36,13 +37,15 @@ namespace GW2CraftingHelper.Views
             string initialStatus,
             Func<Task<AccountSnapshot>> refreshAsync,
             Action clearCache,
-            Action<string> saveStatus)
+            Action<string> saveStatus,
+            Action switchToCrafting = null)
         {
             _snapshot = snapshot;
             _initialStatus = initialStatus;
             _refreshAsync = refreshAsync;
             _clearCache = clearCache;
             _saveStatus = saveStatus;
+            _switchToCrafting = switchToCrafting;
         }
 
         public void SetSnapshot(AccountSnapshot snapshot)
@@ -63,10 +66,41 @@ namespace GW2CraftingHelper.Views
 
         protected override void Build(Container buildPanel)
         {
+            int w = buildPanel.ContentRegion.Width;
+
+            // Tab bar
+            var tabPanel = new Panel()
+            {
+                Size = new Point(w, 35),
+                Parent = buildPanel
+            };
+
+            new StandardButton()
+            {
+                Text = "Snapshot",
+                Size = new Point(100, 28),
+                Location = new Point(0, 3),
+                Enabled = false, // current tab
+                Parent = tabPanel
+            };
+
+            if (_switchToCrafting != null)
+            {
+                var craftingTab = new StandardButton()
+                {
+                    Text = "Crafting Plan",
+                    Size = new Point(110, 28),
+                    Location = new Point(105, 3),
+                    Parent = tabPanel
+                };
+                craftingTab.Click += (_, __) => _switchToCrafting();
+            }
+
             // Header row
             var headerPanel = new Panel()
             {
-                Size = new Point(buildPanel.ContentRegion.Width, 40),
+                Size = new Point(w, 40),
+                Location = new Point(0, 40),
                 Parent = buildPanel
             };
 
@@ -92,7 +126,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Clear Cache",
                 Size = new Point(100, 30),
-                Location = new Point(buildPanel.ContentRegion.Width - 220, 5),
+                Location = new Point(w - 220, 5),
                 Parent = headerPanel,
                 Enabled = _clearCache != null
             };
@@ -101,7 +135,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Refresh Now",
                 Size = new Point(100, 30),
-                Location = new Point(buildPanel.ContentRegion.Width - 110, 5),
+                Location = new Point(w - 110, 5),
                 Parent = headerPanel,
                 Enabled = _refreshAsync != null
             };
@@ -155,8 +189,8 @@ namespace GW2CraftingHelper.Views
             // Filter row
             var filterPanel = new Panel()
             {
-                Size = new Point(buildPanel.ContentRegion.Width, 40),
-                Location = new Point(0, 45),
+                Size = new Point(w, 40),
+                Location = new Point(0, 85),
                 Parent = buildPanel
             };
 
@@ -184,8 +218,8 @@ namespace GW2CraftingHelper.Views
             // Coin display
             _coinPanel = new Panel()
             {
-                Size = new Point(buildPanel.ContentRegion.Width, 24),
-                Location = new Point(0, 90),
+                Size = new Point(w, 24),
+                Location = new Point(0, 130),
                 Parent = buildPanel
             };
             UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
@@ -193,8 +227,8 @@ namespace GW2CraftingHelper.Views
             // Scrollable content
             _contentPanel = new FlowPanel()
             {
-                Size = new Point(buildPanel.ContentRegion.Width, buildPanel.ContentRegion.Height - 115),
-                Location = new Point(0, 115),
+                Size = new Point(w, buildPanel.ContentRegion.Height - 160),
+                Location = new Point(0, 158),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
                 Parent = buildPanel
