@@ -62,6 +62,11 @@
     <Compile Include="Models\ItemPrice.cs" />
     <Compile Include="Services\IPriceApiClient.cs" />
     <Compile Include="Services\TradingPostService.cs" />
+    <Compile Include="Models\AcquisitionSource.cs" />
+    <Compile Include="Models\PlanStep.cs" />
+    <Compile Include="Models\CurrencyCost.cs" />
+    <Compile Include="Models\CraftingPlan.cs" />
+    <Compile Include="Services\PlanSolver.cs" />
     <Compile Include="Views\MainView.cs" />
   </ItemGroup>
   <ItemGroup>
