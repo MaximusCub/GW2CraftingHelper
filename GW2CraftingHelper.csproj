@@ -92,6 +92,10 @@
     <Compile Include="Models\UsedMaterial.cs" />
     <Compile Include="Models\ReducedTreeResult.cs" />
     <Compile Include="Services\InventoryReducer.cs" />
+    <Compile Include="Models\RequiredDiscipline.cs" />
+    <Compile Include="Models\RequiredRecipe.cs" />
+    <Compile Include="Services\PlanResultBuilder.cs" />
+    <Compile Include="Services\IAccountRecipeClient.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">

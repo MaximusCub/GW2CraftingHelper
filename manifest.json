@@ -19,7 +19,8 @@
     "account":     { "optional": false, "details": "Required for account info and coin balance" },
     "characters":  { "optional": false, "details": "Required to list characters and read their inventories" },
     "inventories": { "optional": false, "details": "Required for bank, shared inventory, materials, and character bags" },
-    "wallet":      { "optional": false, "details": "Required for wallet currency data" }
+    "wallet":      { "optional": false, "details": "Required for wallet currency data" },
+    "unlocks":     { "optional": true,  "details": "Used to check which recipes your account has learned" }
   },
   "directories": ["data"]
 }

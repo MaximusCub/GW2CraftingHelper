@@ -15,6 +15,8 @@ namespace GW2CraftingHelper.Services
         private readonly ItemMetadataService _itemMetadataService;
         private readonly VendorOfferStore _vendorOfferStore;
         private readonly VendorOfferResolver _resolver;
+        private readonly InventoryReducer _reducer;
+        private readonly IAccountRecipeClient _accountRecipeClient;
 
         public CraftingPlanPipeline(
             RecipeService recipeService,
@@ -22,7 +24,9 @@ namespace GW2CraftingHelper.Services
             PlanSolver solver,
             ItemMetadataService itemMetadataService,
             VendorOfferStore vendorOfferStore = null,
-            VendorOfferResolver resolver = null)
+            VendorOfferResolver resolver = null,
+            InventoryReducer reducer = null,
+            IAccountRecipeClient accountRecipeClient = null)
         {
             _recipeService = recipeService;
             _tradingPostService = tradingPostService;
@@ -30,6 +34,8 @@ namespace GW2CraftingHelper.Services
             _itemMetadataService = itemMetadataService;
             _vendorOfferStore = vendorOfferStore;
             _resolver = resolver;
+            _reducer = reducer;
+            _accountRecipeClient = accountRecipeClient;
         }
 
         public async Task<CraftingPlanResult> GenerateAsync(
@@ -72,6 +78,66 @@ namespace GW2CraftingHelper.Services
                 Plan = plan,
                 ItemMetadata = metadata
             };
+        }
+
+        public async Task<CraftingPlanResult> GenerateStructuredAsync(
+            int targetItemId, int quantity, AccountSnapshot snapshot,
+            CancellationToken ct, IProgress<PlanStatus> progress = null)
+        {
+            // Step 1: Build recipe tree
+            var tree = await _recipeService.BuildTreeAsync(targetItemId, quantity, ct);
+
+            // Step 2: Collect all item IDs from the tree for price lookup
+            var allItemIds = new HashSet<int>();
+            CollectItemIds(tree, allItemIds);
+
+            // Step 3: Fetch TP prices
+            var prices = await _tradingPostService.GetPricesAsync(allItemIds, ct);
+
+            // Step 4: Resolve missing vendor offers (if resolver available)
+            if (_resolver != null && _vendorOfferStore != null)
+            {
+                await _resolver.EnsureVendorOffersAsync(allItemIds, progress, ct);
+            }
+
+            // Step 5: Query vendor offers
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
+            if (_vendorOfferStore != null)
+            {
+                vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
+            }
+
+            // Step 6: Inventory reduction
+            RecipeNode treeUsedForSolve = tree;
+            List<UsedMaterial> usedMaterials = null;
+
+            if (snapshot != null && _reducer != null)
+            {
+                var pool = SnapshotHelpers.AggregateItems(snapshot.Items)
+                    .ToDictionary(e => e.ItemId, e => e.Count);
+                var reduced = _reducer.Reduce(tree, pool);
+                treeUsedForSolve = reduced.ReducedTree;
+                usedMaterials = reduced.UsedMaterials;
+            }
+
+            // Step 7: Solve
+            var plan = _solver.Solve(treeUsedForSolve, prices, vendorOffers);
+
+            // Step 8: Fetch item metadata for all step items + target
+            var metadataIds = new HashSet<int>(plan.Steps.Select(s => s.ItemId));
+            metadataIds.Add(targetItemId);
+            var metadata = await _itemMetadataService.GetMetadataAsync(metadataIds, ct);
+
+            // Step 9: Fetch learned recipe IDs (if permission available)
+            ISet<int> learnedRecipeIds = null;
+            if (_accountRecipeClient != null && _accountRecipeClient.HasRequiredPermission())
+            {
+                learnedRecipeIds = await _accountRecipeClient.GetLearnedRecipeIdsAsync(ct);
+            }
+
+            // Step 10: Build structured result
+            var builder = new PlanResultBuilder();
+            return builder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
         }
 
         private static void CollectItemIds(RecipeNode node, HashSet<int> ids)
