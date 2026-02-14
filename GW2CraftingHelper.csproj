@@ -85,6 +85,10 @@
     <Compile Include="Services\VendorOfferHasher.cs" />
     <Compile Include="Services\VendorOfferLoader.cs" />
     <Compile Include="Services\VendorOfferStore.cs" />
+    <Compile Include="Services\IWikiVendorClient.cs" />
+    <Compile Include="Services\WikiLookupOptions.cs" />
+    <Compile Include="Models\ResolveResult.cs" />
+    <Compile Include="Services\VendorOfferResolver.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">
