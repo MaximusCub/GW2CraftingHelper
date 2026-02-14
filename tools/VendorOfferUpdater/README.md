@@ -15,21 +15,33 @@ dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj
 
 # Custom output path
 dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj /tmp/vendor_offers.json
+
+# Query a specific vendor for validation
+dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj -- --query '[[Has vendor::"Miyani"]]'
 ```
 
-The tool auto-detects the repository root by walking up the directory tree looking for a `.git` folder, then writes to `ref/vendor_offers.json` relative to that root. Pass an explicit path as the first argument to override.
+The tool auto-detects the repository root by walking up the directory tree looking for a `.git` folder, then writes to `ref/vendor_offers.json` relative to that root. Pass an explicit path as the first positional argument to override.
+
+### `--query <condition>`
+
+Overrides the default SMW query condition (`[[Sells item::+]]`) with a custom one. Useful for validating specific vendors without crawling the entire wiki:
+
+```bash
+dotnet run -- --query '[[Has vendor::"Assassin"]]'
+```
 
 ## What it queries
 
-1. **GW2 API** `/v2/currencies` — loads all currency IDs and names so wiki currency strings (e.g. "Laurel", "Gold Coin") can be mapped to numeric IDs.
-2. **GW2 Wiki SMW API** `action=ask` — queries for items that have both a game ID and at least one vendor, pulling:
-   - `Has game id` — item ID
-   - `Sold by` — merchant NPC name(s)
-   - `Has vendor cost` — numeric price
-   - `Has vendor currency` — currency name
-   - `Has vendor quantity` — output count (defaults to 1)
+1. **GW2 API** `/v2/currencies` — loads all currency IDs and names so wiki currency strings (e.g. "Coin", "Volatile Magic") can be mapped to numeric IDs.
+2. **GW2 Wiki SMW API** `action=ask` — queries vendor subobject pages (`[[Sells item::+]]`) and pulls:
+   - `Sells item.Has game id` — item's GW2 game ID (property chain)
+   - `Sells item` — item page name
+   - `Has item quantity` — output count (defaults to 1)
+   - `Has item cost` — record type with `Has item value` (amount) and `Has item currency` (name)
+   - `Has vendor` — NPC vendor page
+   - `Located in` — location pages
 
-   Wiki query: `[[Has game id::+]][[Sold by::+]]`, paginated in batches of 500.
+   Paginated in batches of 500.
 
 ## Rate limiting
 

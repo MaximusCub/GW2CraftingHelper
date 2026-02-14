@@ -5,7 +5,6 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using VendorOfferUpdater.Models;
 
 namespace VendorOfferUpdater
 {
@@ -29,11 +28,19 @@ namespace VendorOfferUpdater
 
         /// <summary>
         /// Queries the wiki for items sold by vendors, returning raw parsed results.
-        /// Pages through results using the continue offset.
+        /// Vendor data lives on subobject pages (e.g. "NPC#vendor1") with properties:
+        ///   Sells item          – the item page
+        ///   Sells item.Has game id – item's GW2 game ID (property chain)
+        ///   Has item quantity    – output count
+        ///   Has item cost        – record: { Has item value, Has item currency }
+        ///   Has vendor           – NPC page
+        ///   Located in           – location pages
         /// </summary>
         public async Task<List<WikiVendorResult>> QueryVendorItemsAsync(
-            CancellationToken ct = default)
+            string queryCondition = null, CancellationToken ct = default)
         {
+            string condition = queryCondition ?? "[[Sells item::+]]";
+
             var allResults = new List<WikiVendorResult>();
             int offset = 0;
 
@@ -41,12 +48,13 @@ namespace VendorOfferUpdater
             {
                 ct.ThrowIfCancellationRequested();
 
-                var query = "[[Has game id::+]][[Sold by::+]]" +
-                    "|?Has game id" +
-                    "|?Sold by" +
-                    "|?Has vendor cost" +
-                    "|?Has vendor currency" +
-                    "|?Has vendor quantity" +
+                var query = condition +
+                    "|?Sells item.Has game id" +
+                    "|?Sells item" +
+                    "|?Has item quantity" +
+                    "|?Has item cost" +
+                    "|?Has vendor" +
+                    "|?Located in" +
                     $"|limit={QueryLimit}" +
                     $"|offset={offset}";
 
@@ -62,6 +70,14 @@ namespace VendorOfferUpdater
                     !queryElement.TryGetProperty("results", out var results))
                 {
                     Console.WriteLine("  No results in response, stopping.");
+                    break;
+                }
+
+                // When there are zero results, the wiki returns an empty array []
+                // instead of an object. Handle both cases.
+                if (results.ValueKind != JsonValueKind.Object)
+                {
+                    Console.WriteLine("  Empty result set, stopping.");
                     break;
                 }
 
@@ -145,69 +161,151 @@ namespace VendorOfferUpdater
 
             var result = new WikiVendorResult { PageName = pageName };
 
-            // Has game id
+            // Sells item.Has game id (property chain result)
             if (printouts.TryGetProperty("Has game id", out var gameIds) &&
                 gameIds.GetArrayLength() > 0)
             {
                 result.GameId = gameIds[0].GetInt32();
             }
 
-            // Sold by
-            if (printouts.TryGetProperty("Sold by", out var soldBy))
+            // Sells item (item page name, for logging)
+            if (printouts.TryGetProperty("Sells item", out var sellsItem) &&
+                sellsItem.GetArrayLength() > 0)
             {
-                foreach (var merchant in soldBy.EnumerateArray())
+                var item = sellsItem[0];
+                if (item.TryGetProperty("fulltext", out var fulltext))
                 {
-                    if (merchant.TryGetProperty("fulltext", out var fulltext))
+                    result.ItemName = fulltext.GetString();
+                }
+            }
+
+            // Has item quantity
+            if (printouts.TryGetProperty("Has item quantity", out var qty) &&
+                qty.GetArrayLength() > 0)
+            {
+                result.OutputQuantity = qty[0].GetInt32();
+            }
+
+            // Has item cost — record type containing nested fields
+            if (printouts.TryGetProperty("Has item cost", out var costArray))
+            {
+                foreach (var costRecord in costArray.EnumerateArray())
+                {
+                    var entry = new WikiCostEntry();
+
+                    if (costRecord.TryGetProperty("Has item value", out var valueObj) &&
+                        valueObj.TryGetProperty("item", out var valueItems) &&
+                        valueItems.GetArrayLength() > 0)
                     {
-                        result.Merchants.Add(fulltext.GetString());
+                        var rawVal = valueItems[0].GetString();
+                        if (int.TryParse(rawVal, out int parsed))
+                        {
+                            entry.Value = parsed;
+                        }
                     }
-                    else if (merchant.ValueKind == JsonValueKind.String)
+
+                    if (costRecord.TryGetProperty("Has item currency", out var currObj) &&
+                        currObj.TryGetProperty("item", out var currItems) &&
+                        currItems.GetArrayLength() > 0)
                     {
-                        result.Merchants.Add(merchant.GetString());
+                        entry.Currency = currItems[0].GetString();
+                    }
+
+                    if (entry.Value > 0)
+                    {
+                        result.CostEntries.Add(entry);
                     }
                 }
             }
 
-            // Has vendor cost
-            if (printouts.TryGetProperty("Has vendor cost", out var vendorCost) &&
-                vendorCost.GetArrayLength() > 0)
+            // Has vendor (NPC page)
+            if (printouts.TryGetProperty("Has vendor", out var vendor) &&
+                vendor.GetArrayLength() > 0)
             {
-                result.VendorCost = vendorCost[0].GetInt32();
-            }
-
-            // Has vendor currency
-            if (printouts.TryGetProperty("Has vendor currency", out var vendorCurrency) &&
-                vendorCurrency.GetArrayLength() > 0)
-            {
-                var currencyVal = vendorCurrency[0];
-                if (currencyVal.TryGetProperty("fulltext", out var currencyText))
+                var v = vendor[0];
+                if (v.TryGetProperty("fulltext", out var vName))
                 {
-                    result.VendorCurrency = currencyText.GetString();
-                }
-                else if (currencyVal.ValueKind == JsonValueKind.String)
-                {
-                    result.VendorCurrency = currencyVal.GetString();
+                    result.MerchantName = vName.GetString();
                 }
             }
 
-            // Has vendor quantity
-            if (printouts.TryGetProperty("Has vendor quantity", out var vendorQty) &&
-                vendorQty.GetArrayLength() > 0)
+            // Located in (location pages)
+            if (printouts.TryGetProperty("Located in", out var locations))
             {
-                result.VendorQuantity = vendorQty[0].GetInt32();
+                foreach (var loc in locations.EnumerateArray())
+                {
+                    if (loc.TryGetProperty("fulltext", out var locName))
+                    {
+                        result.Locations.Add(locName.GetString());
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Resolves a set of item names to their GW2 game IDs by querying the wiki.
+        /// Used for vendor costs that reference items rather than wallet currencies.
+        /// </summary>
+        public async Task<Dictionary<string, int>> ResolveItemGameIdsAsync(
+            IEnumerable<string> itemNames, CancellationToken ct = default)
+        {
+            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var name in itemNames)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var query = $"[[Has canonical name::{name}]][[Has context::Item]]" +
+                    "|?Has game id" +
+                    "|limit=1";
+
+                var url = $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}&format=json";
+
+                Console.WriteLine($"  Resolving item \"{name}\"...");
+
+                var response = await FetchWithRetryAsync(url, ct);
+                using var doc = JsonDocument.Parse(response);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("query", out var queryElement) &&
+                    queryElement.TryGetProperty("results", out var results) &&
+                    results.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var prop in results.EnumerateObject())
+                    {
+                        if (prop.Value.TryGetProperty("printouts", out var printouts) &&
+                            printouts.TryGetProperty("Has game id", out var gameIds) &&
+                            gameIds.GetArrayLength() > 0)
+                        {
+                            result[name] = gameIds[0].GetInt32();
+                        }
+                        break; // only need first result
+                    }
+                }
+
+                await Task.Delay(DelayBetweenRequestsMs, ct);
             }
 
             return result;
         }
     }
 
+    public class WikiCostEntry
+    {
+        public int Value { get; set; }
+        public string Currency { get; set; }
+    }
+
     public class WikiVendorResult
     {
         public string PageName { get; set; }
         public int GameId { get; set; }
-        public List<string> Merchants { get; set; } = new List<string>();
-        public int? VendorCost { get; set; }
-        public string VendorCurrency { get; set; }
-        public int? VendorQuantity { get; set; }
+        public string ItemName { get; set; }
+        public int? OutputQuantity { get; set; }
+        public List<WikiCostEntry> CostEntries { get; set; } = new List<WikiCostEntry>();
+        public string MerchantName { get; set; }
+        public List<string> Locations { get; set; } = new List<string>();
     }
 }
