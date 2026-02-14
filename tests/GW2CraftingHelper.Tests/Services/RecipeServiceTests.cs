@@ -224,5 +224,109 @@ namespace GW2CraftingHelper.Tests.Services
             // 2 crafts * 3 per craft = 6
             Assert.Equal(6, option.Ingredients[0].Quantity);
         }
+
+        [Fact]
+        public async Task RecipeOption_CarriesDisciplinesFromRawRecipe()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(1, 10);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith", "Huntsman" }
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);
+
+            var option = node.Recipes[0];
+            Assert.Equal(2, option.Disciplines.Count);
+            Assert.Contains("Weaponsmith", option.Disciplines);
+            Assert.Contains("Huntsman", option.Disciplines);
+        }
+
+        [Fact]
+        public async Task RecipeOption_CarriesMinRatingAndFlags()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(1, 10);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                Disciplines = new List<string> { "Armorsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);
+
+            var option = node.Recipes[0];
+            Assert.Equal(400, option.MinRating);
+            Assert.Single(option.Flags);
+            Assert.Contains("AutoLearned", option.Flags);
+        }
+
+        [Fact]
+        public async Task RecipeOption_DefaultsWhenFieldsAbsent()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(1, 10);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                }
+                // No Disciplines, MinRating, or Flags set — use defaults
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);
+
+            var option = node.Recipes[0];
+            Assert.Empty(option.Disciplines);
+            Assert.Equal(0, option.MinRating);
+            Assert.Empty(option.Flags);
+        }
+
+        [Fact]
+        public async Task RecipeOption_MissingFlags_DefaultsToNotAutoLearned()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(1, 10);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                Flags = new List<string>()  // empty flags
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);
+
+            var option = node.Recipes[0];
+            Assert.DoesNotContain("AutoLearned", option.Flags);
+        }
     }
 }

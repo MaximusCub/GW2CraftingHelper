@@ -36,8 +36,27 @@ namespace GW2CraftingHelper.Services
             {
                 Id = obj.Value<int>("id"),
                 OutputItemId = obj.Value<int>("output_item_id"),
-                OutputItemCount = obj.Value<int>("output_item_count")
+                OutputItemCount = obj.Value<int>("output_item_count"),
+                MinRating = obj.Value<int?>("min_rating") ?? 0
             };
+
+            var disciplines = obj["disciplines"];
+            if (disciplines != null)
+            {
+                foreach (var d in disciplines)
+                {
+                    recipe.Disciplines.Add(d.Value<string>());
+                }
+            }
+
+            var flags = obj["flags"];
+            if (flags != null)
+            {
+                foreach (var f in flags)
+                {
+                    recipe.Flags.Add(f.Value<string>());
+                }
+            }
 
             var ingredients = obj["ingredients"];
             if (ingredients != null)

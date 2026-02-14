@@ -57,7 +57,10 @@ namespace GW2CraftingHelper.Services
                     {
                         RecipeId = raw.Id,
                         OutputCount = raw.OutputItemCount,
-                        CraftsNeeded = craftsNeeded
+                        CraftsNeeded = craftsNeeded,
+                        Disciplines = new List<string>(raw.Disciplines),
+                        MinRating = raw.MinRating,
+                        Flags = new List<string>(raw.Flags)
                     };
 
                     foreach (var ingredient in raw.Ingredients)
