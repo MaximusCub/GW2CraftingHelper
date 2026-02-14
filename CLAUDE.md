@@ -102,8 +102,38 @@ At the end of the milestone:
 5. Push the branch:
    - `git push -u origin <milestone-branch>`
 6. Create or update a PR targeting the default branch (`master`):
-   - If no PR exists: `gh pr create --base master --head <milestone-branch> --fill`
-   - If a PR already exists: `gh pr view --web` and continue pushing new commits to the same branch.
+
+   - If no PR exists, create it with a structured body (DO NOT use `--fill` blindly).
+   - The PR body MUST follow this template:
+
+     ## Milestone Goal
+     Brief description of what this milestone accomplishes.
+
+     ## What Changed
+     High-level description of changes (grouped logically, not per-file noise).
+
+     ## Validation Performed
+     - Build command run and result
+     - Test command run and result
+     - Any manual validation steps
+
+     ## Repo Invariants Checklist
+     - [ ] No Blish HUD references added to tests
+     - [ ] Tests exercise real production paths
+     - [ ] No fake file I/O tests introduced
+     - [ ] Pricing logic preserves multi-source correctness
+     - [ ] IDs remain internal-only (not displayed)
+
+     ## Risks / Follow-ups
+     Any known tradeoffs, edge cases, or future improvements.
+
+   - Use:
+     `gh pr create --base master --head <milestone-branch> --title "<concise milestone title>" --body-file <tempfile>`
+     (Generate the body content programmatically before calling `gh`.)
+
+   - If a PR already exists:
+     - Update the PR body to reflect the latest state.
+     - Continue pushing commits to the same branch.
 
 #### What to output in the terminal (END OF MILESTONE)
 
