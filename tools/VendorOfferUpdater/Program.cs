@@ -394,7 +394,8 @@ namespace VendorOfferUpdater
         /// Converts a single wiki vendor result to a VendorOffer.
         /// Returns null if any cost line cannot be resolved.
         /// </summary>
-        private static VendorOffer ConvertToOffer(
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static VendorOffer ConvertToOffer(
             WikiVendorResult result,
             Gw2ApiHelper apiHelper,
             Dictionary<string, int> itemIdMap)
