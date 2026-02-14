@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -13,23 +14,27 @@ namespace GW2CraftingHelper.Services
         private readonly PlanSolver _solver;
         private readonly ItemMetadataService _itemMetadataService;
         private readonly VendorOfferStore _vendorOfferStore;
+        private readonly VendorOfferResolver _resolver;
 
         public CraftingPlanPipeline(
             RecipeService recipeService,
             TradingPostService tradingPostService,
             PlanSolver solver,
             ItemMetadataService itemMetadataService,
-            VendorOfferStore vendorOfferStore = null)
+            VendorOfferStore vendorOfferStore = null,
+            VendorOfferResolver resolver = null)
         {
             _recipeService = recipeService;
             _tradingPostService = tradingPostService;
             _solver = solver;
             _itemMetadataService = itemMetadataService;
             _vendorOfferStore = vendorOfferStore;
+            _resolver = resolver;
         }
 
         public async Task<CraftingPlanResult> GenerateAsync(
-            int targetItemId, int quantity, CancellationToken ct)
+            int targetItemId, int quantity, CancellationToken ct,
+            IProgress<PlanStatus> progress = null)
         {
             // Step 1: Build recipe tree
             var tree = await _recipeService.BuildTreeAsync(targetItemId, quantity, ct);
@@ -41,17 +46,23 @@ namespace GW2CraftingHelper.Services
             // Step 3: Fetch TP prices
             var prices = await _tradingPostService.GetPricesAsync(allItemIds, ct);
 
-            // Step 4: Query vendor offers
+            // Step 4: Resolve missing vendor offers (if resolver available)
+            if (_resolver != null && _vendorOfferStore != null)
+            {
+                await _resolver.EnsureVendorOffersAsync(allItemIds, progress, ct);
+            }
+
+            // Step 5: Query vendor offers
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
             if (_vendorOfferStore != null)
             {
                 vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
             }
 
-            // Step 5: Solve
+            // Step 6: Solve
             var plan = _solver.Solve(tree, prices, vendorOffers);
 
-            // Step 6: Fetch item metadata for all step items + target
+            // Step 7: Fetch item metadata for all step items + target
             var metadataIds = new HashSet<int>(plan.Steps.Select(s => s.ItemId));
             metadataIds.Add(targetItemId);
             var metadata = await _itemMetadataService.GetMetadataAsync(metadataIds, ct);
