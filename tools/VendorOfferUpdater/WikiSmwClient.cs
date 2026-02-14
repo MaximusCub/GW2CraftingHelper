@@ -26,6 +26,12 @@ namespace VendorOfferUpdater
             _httpClient = httpClient;
         }
 
+        // Characters used as prefixes when partitioning queries that exceed
+        // the wiki's ~5500 result offset limit.
+        private static readonly string[] PartitionPrefixes =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+                .Select(c => c.ToString()).ToArray();
+
         /// <summary>
         /// Queries the wiki for items sold by vendors, returning raw parsed results.
         /// Vendor data lives on subobject pages (e.g. "NPC#vendor1") with properties:
@@ -35,14 +41,39 @@ namespace VendorOfferUpdater
         ///   Has item cost        – record: { Has item value, Has item currency }
         ///   Has vendor           – NPC page
         ///   Located in           – location pages
+        ///
+        /// The wiki SMW API limits pagination to ~5500 results per query condition.
+        /// When that limit is hit, the query is automatically partitioned by vendor
+        /// name prefix (e.g. [[Has vendor::~A*]]) and each partition is queried
+        /// separately. Partitions that still overflow are split recursively.
         /// </summary>
         public async Task<List<WikiVendorResult>> QueryVendorItemsAsync(
             string queryCondition = null, CancellationToken ct = default)
         {
             string condition = queryCondition ?? "[[Sells item::+]]";
-
             var allResults = new List<WikiVendorResult>();
+            await PaginateConditionAsync(condition, null, allResults, ct);
+            return allResults;
+        }
+
+        private async Task PaginateConditionAsync(
+            string baseCondition,
+            string vendorPrefix,
+            List<WikiVendorResult> allResults,
+            CancellationToken ct)
+        {
+            string condition = baseCondition;
+            if (vendorPrefix != null)
+            {
+                condition += $"[[Has vendor::~{vendorPrefix}*]]";
+            }
+
+            string label = vendorPrefix != null
+                ? $"[prefix={vendorPrefix}]"
+                : "[all]";
+
             int offset = 0;
+            bool hitOffsetLimit = false;
 
             while (true)
             {
@@ -60,7 +91,7 @@ namespace VendorOfferUpdater
 
                 var url = $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}&format=json";
 
-                Console.WriteLine($"  Querying wiki offset={offset}...");
+                Console.WriteLine($"  {label} offset={offset}...");
 
                 var response = await FetchWithRetryAsync(url, ct);
                 using var doc = JsonDocument.Parse(response);
@@ -69,15 +100,12 @@ namespace VendorOfferUpdater
                 if (!root.TryGetProperty("query", out var queryElement) ||
                     !queryElement.TryGetProperty("results", out var results))
                 {
-                    Console.WriteLine("  No results in response, stopping.");
                     break;
                 }
 
-                // When there are zero results, the wiki returns an empty array []
-                // instead of an object. Handle both cases.
+                // Empty results come back as [] instead of {}
                 if (results.ValueKind != JsonValueKind.Object)
                 {
-                    Console.WriteLine("  Empty result set, stopping.");
                     break;
                 }
 
@@ -92,12 +120,18 @@ namespace VendorOfferUpdater
                     }
                 }
 
-                Console.WriteLine($"  Got {batchCount} results (total: {allResults.Count})");
+                Console.WriteLine($"  {label} +{batchCount} (total: {allResults.Count})");
 
-                // Check for continuation
                 if (root.TryGetProperty("query-continue-offset", out var continueOffset))
                 {
-                    offset = continueOffset.GetInt32();
+                    int nextOffset = continueOffset.GetInt32();
+                    if (nextOffset <= offset)
+                    {
+                        // SMW offset limit reached — need to partition further
+                        hitOffsetLimit = true;
+                        break;
+                    }
+                    offset = nextOffset;
                     await Task.Delay(DelayBetweenRequestsMs, ct);
                 }
                 else
@@ -106,7 +140,22 @@ namespace VendorOfferUpdater
                 }
             }
 
-            return allResults;
+            if (hitOffsetLimit)
+            {
+                Console.WriteLine($"  {label} hit offset limit at {allResults.Count} total results, splitting by vendor prefix...");
+
+                // Remove the results we already collected for this condition
+                // since sub-partitions will re-fetch everything under each prefix.
+                // We need to track what was added in THIS call to remove it.
+                // Instead: we collected partial results above; the sub-partitions
+                // will produce duplicates that get deduped by OfferId downstream.
+                // Just proceed with sub-partitions — duplicates are harmless.
+                foreach (var prefix in PartitionPrefixes)
+                {
+                    string subPrefix = (vendorPrefix ?? "") + prefix;
+                    await PaginateConditionAsync(baseCondition, subPrefix, allResults, ct);
+                }
+            }
         }
 
         private async Task<string> FetchWithRetryAsync(string url, CancellationToken ct)
