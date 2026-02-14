@@ -32,7 +32,7 @@ namespace GW2CraftingHelper.Services
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
-            var currencyMap = new Dictionary<int, int>();
+            var currencyMap = new Dictionary<int, long>();
             var craftOrder = new Dictionary<(int, int), int>();
             int craftCounter = 0;
 
@@ -74,7 +74,7 @@ namespace GW2CraftingHelper.Services
             var currencyCosts = new List<CurrencyCost>();
             foreach (var kvp in currencyMap)
             {
-                currencyCosts.Add(new CurrencyCost { CurrencyId = kvp.Key, Amount = kvp.Value });
+                currencyCosts.Add(new CurrencyCost { CurrencyId = kvp.Key, Amount = checked(kvp.Value) });
             }
 
             return new CraftingPlan
@@ -372,7 +372,7 @@ namespace GW2CraftingHelper.Services
             RecipeNode node,
             Dictionary<(int, int), Decision> memo,
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
-            Dictionary<int, int> currencyMap,
+            Dictionary<int, long> currencyMap,
             Dictionary<(int, int), int> craftOrder,
             ref int craftCounter)
         {
@@ -380,7 +380,7 @@ namespace GW2CraftingHelper.Services
             {
                 if (currencyMap.ContainsKey(node.Id))
                 {
-                    currencyMap[node.Id] += node.Quantity;
+                    currencyMap[node.Id] = checked(currencyMap[node.Id] + node.Quantity);
                 }
                 else
                 {
@@ -426,7 +426,7 @@ namespace GW2CraftingHelper.Services
                     {
                         if (currencyMap.ContainsKey(cc.Id))
                         {
-                            currencyMap[cc.Id] += cc.Count;
+                            currencyMap[cc.Id] = checked(currencyMap[cc.Id] + cc.Count);
                         }
                         else
                         {

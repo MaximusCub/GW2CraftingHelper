@@ -41,7 +41,7 @@ namespace VendorOfferUpdater
                 var batchIds = string.Join(",", batch);
                 var url = $"{CurrenciesUrl}?ids={batchIds}";
                 var response = await _httpClient.GetStringAsync(url);
-                var currencies = JsonDocument.Parse(response);
+                using var currencies = JsonDocument.Parse(response);
 
                 foreach (var currency in currencies.RootElement.EnumerateArray())
                 {

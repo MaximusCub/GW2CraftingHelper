@@ -23,8 +23,6 @@ namespace VendorOfferUpdater
         public WikiSmwClient(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "GW2CraftingHelper-VendorOfferUpdater/1.0 (https://github.com/your-repo)");
         }
 
         /// <summary>
@@ -52,7 +50,7 @@ namespace VendorOfferUpdater
                 Console.WriteLine($"  Querying wiki offset={offset}...");
 
                 var response = await _httpClient.GetStringAsync(url);
-                var doc = JsonDocument.Parse(response);
+                using var doc = JsonDocument.Parse(response);
                 var root = doc.RootElement;
 
                 if (!root.TryGetProperty("query", out var queryElement) ||

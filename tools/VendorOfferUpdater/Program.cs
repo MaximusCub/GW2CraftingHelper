@@ -22,6 +22,8 @@ namespace VendorOfferUpdater
             Console.WriteLine();
 
             using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "GW2CraftingHelper-VendorOfferUpdater/1.0");
 
             // Step 1: Load currency mappings from GW2 API
             var apiHelper = new Gw2ApiHelper(httpClient);

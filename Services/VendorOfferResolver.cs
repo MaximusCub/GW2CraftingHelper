@@ -17,6 +17,7 @@ namespace GW2CraftingHelper.Services
         private readonly SemaphoreSlim _concurrencySemaphore;
         private readonly object _rateLock = new object();
         private readonly Stopwatch _stopwatch;
+        private readonly Random _jitterRng = new Random();
         private long _lastRequestMs;
 
         public VendorOfferResolver(
@@ -70,10 +71,7 @@ namespace GW2CraftingHelper.Services
 
             if (allOffers.Count > 0)
             {
-                lock (allOffers)
-                {
-                    _store.AddOffersToOverlay(allOffers);
-                }
+                _store.AddOffersToOverlay(allOffers);
             }
 
             result.OffersAdded = allOffers.Count;
@@ -186,6 +184,10 @@ namespace GW2CraftingHelper.Services
                     }
 
                     delayNeeded = (int)(minDelay - elapsed);
+                    if (_options.JitterMs > 0)
+                    {
+                        delayNeeded += _jitterRng.Next(0, _options.JitterMs);
+                    }
                 }
 
                 await Task.Delay(delayNeeded, ct);
@@ -227,9 +229,9 @@ namespace GW2CraftingHelper.Services
                 OfferId = offerId,
                 OutputItemId = raw.OutputItemId,
                 OutputCount = raw.OutputCount,
-                CostLines = costLines,
+                CostLines = new List<CostLine>(costLines),
                 MerchantName = raw.MerchantName,
-                Locations = locations,
+                Locations = new List<string>(locations),
                 DailyCap = raw.DailyCap,
                 WeeklyCap = raw.WeeklyCap
             };
