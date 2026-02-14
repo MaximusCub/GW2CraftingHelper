@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "recipes": [
+    {
+      "id": -1,
+      "outputItemId": 19673,
+      "outputItemCount": 1,
+      "ingredients": [
+        { "type": "Item", "id": 24295, "count": 250 },
+        { "type": "Item", "id": 24283, "count": 250 },
+        { "type": "Item", "id": 24300, "count": 250 },
+        { "type": "Item", "id": 24277, "count": 250 }
+      ],
+      "comment": "Gift of Magic: 250 Vial of Powerful Blood + 250 Powerful Venom Sac + 250 Elaborate Totem + 250 Pile of Crystalline Dust"
+    },
+    {
+      "id": -2,
+      "outputItemId": 19672,
+      "outputItemCount": 1,
+      "ingredients": [
+        { "type": "Item", "id": 24357, "count": 250 },
+        { "type": "Item", "id": 24289, "count": 250 },
+        { "type": "Item", "id": 24351, "count": 250 },
+        { "type": "Item", "id": 24358, "count": 250 }
+      ],
+      "comment": "Gift of Might: 250 Vicious Fang + 250 Armored Scale + 250 Vicious Claw + 250 Ancient Bone"
+    },
+    {
+      "id": -3,
+      "outputItemId": 19626,
+      "outputItemCount": 1,
+      "ingredients": [
+        { "type": "Item", "id": 19675, "count": 77 },
+        { "type": "Item", "id": 19721, "count": 250 },
+        { "type": "Item", "id": 19673, "count": 1 },
+        { "type": "Item", "id": 19672, "count": 1 }
+      ],
+      "comment": "Gift of Fortune: 77 Mystic Clover + 250 Glob of Ectoplasm + 1 Gift of Magic + 1 Gift of Might"
+    },
+    {
+      "id": -4,
+      "outputItemId": 23045,
+      "outputItemCount": 1,
+      "ingredients": [
+        { "type": "Item", "id": 23041, "count": 1 },
+        { "type": "Item", "id": 23042, "count": 1 },
+        { "type": "Item", "id": 23043, "count": 1 },
+        { "type": "Item", "id": 19983, "count": 250 }
+      ],
+      "comment": "Mystic Salvage Kit: 1 Fine Salvage Kit + 1 Journeyman's Salvage Kit + 1 Master's Salvage Kit + 250 Mystic Forge Stone"
+    }
+  ]
+}
