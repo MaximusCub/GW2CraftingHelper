@@ -307,6 +307,33 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void PartialReduction_NonDivisibleQuantity_RoundsUpPerCraft()
+        {
+            // Root (id=1, qty=1) -> recipe 100 (output 1, crafts 1)
+            //   -> Intermediate (id=500, qty=9) -> recipe 200 (output 3, crafts 3)
+            //     -> Ingredient (id=600, qty=7)
+            //
+            // Own 3 of intermediate (id=500):
+            //   500 qty: 9-3=6, newCrafts=ceil(6/3)=2
+            //   600 perCraft: ceil(7/3)=3, qty=3*2=6
+            //
+            // Bug (floor division): perCraft=7/3=2, qty=2*2=4 (wrong!)
+            var leaf = Leaf(600, 7);
+            var intermediate = Craftable(500, 9, 200, 3, leaf);
+            var root = Craftable(1, 1, 100, 1, intermediate);
+
+            var pool = new Dictionary<int, int> { { 500, 3 } };
+            var result = _reducer.Reduce(root, pool);
+
+            var reducedIntermediate = result.ReducedTree.Recipes[0].Ingredients[0];
+            Assert.Equal(6, reducedIntermediate.Quantity);
+            Assert.Equal(2, reducedIntermediate.Recipes[0].CraftsNeeded);
+
+            var reducedIngredient = reducedIntermediate.Recipes[0].Ingredients[0];
+            Assert.Equal(6, reducedIngredient.Quantity); // ceil(7/3)*2 = 3*2 = 6
+        }
+
+        [Fact]
         public void FullyOwnedIntermediate_NoRecipesOnNode()
         {
             // Item 1 (qty 3) -> recipe 10 -> leaf item 2 (qty 9)

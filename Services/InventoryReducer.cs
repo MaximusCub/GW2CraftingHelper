@@ -77,7 +77,7 @@ namespace GW2CraftingHelper.Services
 
                 foreach (var ingredient in option.Ingredients)
                 {
-                    int perCraft = ingredient.Quantity / origCraftsNeeded;
+                    int perCraft = (ingredient.Quantity + origCraftsNeeded - 1) / origCraftsNeeded;
                     ingredient.Quantity = perCraft * newCraftsNeeded;
 
                     ReduceNode(ingredient, pool, used);
