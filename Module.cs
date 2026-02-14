@@ -43,6 +43,7 @@ namespace GW2CraftingHelper
 
         private HttpClient _httpClient;
         private CraftingPlanPipeline _craftingPipeline;
+        private VendorOfferStore _vendorOfferStore;
 
         private CancellationTokenSource _refreshCts;
         private bool _refreshInProgress;
@@ -64,11 +65,28 @@ namespace GW2CraftingHelper
             var recipeApi = new Gw2RecipeApiClient(_httpClient);
             var priceApi = new Gw2PriceApiClient(_httpClient);
             var itemApi = new Gw2ItemApiClient(_httpClient);
+
+            var vendorLoader = new VendorOfferLoader();
+            _vendorOfferStore = new VendorOfferStore(dataDir, vendorLoader);
+            try
+            {
+                using (var baselineStream = ContentsManager.GetFileStream("vendor_offers.json"))
+                {
+                    _vendorOfferStore.LoadBaseline(baselineStream);
+                }
+            }
+            catch
+            {
+                _vendorOfferStore.LoadBaseline(null);
+            }
+            _vendorOfferStore.LoadOverlay();
+
             _craftingPipeline = new CraftingPlanPipeline(
                 new RecipeService(recipeApi),
                 new TradingPostService(priceApi),
                 new PlanSolver(),
-                new ItemMetadataService(itemApi));
+                new ItemMetadataService(itemApi),
+                _vendorOfferStore);
 
             Texture2D iconTexture;
             try

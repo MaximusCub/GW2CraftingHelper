@@ -12,17 +12,20 @@ namespace GW2CraftingHelper.Services
         private readonly TradingPostService _tradingPostService;
         private readonly PlanSolver _solver;
         private readonly ItemMetadataService _itemMetadataService;
+        private readonly VendorOfferStore _vendorOfferStore;
 
         public CraftingPlanPipeline(
             RecipeService recipeService,
             TradingPostService tradingPostService,
             PlanSolver solver,
-            ItemMetadataService itemMetadataService)
+            ItemMetadataService itemMetadataService,
+            VendorOfferStore vendorOfferStore = null)
         {
             _recipeService = recipeService;
             _tradingPostService = tradingPostService;
             _solver = solver;
             _itemMetadataService = itemMetadataService;
+            _vendorOfferStore = vendorOfferStore;
         }
 
         public async Task<CraftingPlanResult> GenerateAsync(
@@ -38,10 +41,17 @@ namespace GW2CraftingHelper.Services
             // Step 3: Fetch TP prices
             var prices = await _tradingPostService.GetPricesAsync(allItemIds, ct);
 
-            // Step 4: Solve
-            var plan = _solver.Solve(tree, prices);
+            // Step 4: Query vendor offers
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
+            if (_vendorOfferStore != null)
+            {
+                vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
+            }
 
-            // Step 5: Fetch item metadata for all step items + target
+            // Step 5: Solve
+            var plan = _solver.Solve(tree, prices, vendorOffers);
+
+            // Step 6: Fetch item metadata for all step items + target
             var metadataIds = new HashSet<int>(plan.Steps.Select(s => s.ItemId));
             metadataIds.Add(targetItemId);
             var metadata = await _itemMetadataService.GetMetadataAsync(metadataIds, ct);

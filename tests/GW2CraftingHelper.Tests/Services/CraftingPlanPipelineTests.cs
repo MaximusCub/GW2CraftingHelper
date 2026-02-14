@@ -142,5 +142,86 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(result.Plan.Steps);
             Assert.False(result.ItemMetadata.ContainsKey(1));
         }
+
+        [Fact]
+        public async Task VendorOfferAvailable_SolverUsesIt()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1
+
+            var priceApi = new InMemoryPriceApiClient();
+            // TP price is 500
+            priceApi.AddPrice(1, buyUnitPrice: 500, sellUnitPrice: 5000);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Vendor Item", "vendor.png");
+
+            // Vendor offers 1x item for 100 coin — cheaper than TP
+            var tempDir = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
+            System.IO.Directory.CreateDirectory(tempDir);
+            try
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tempDir, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-vendor",
+                        OutputItemId = 1,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 100 }
+                        },
+                        MerchantName = "Test NPC",
+                        Locations = new List<string>()
+                    }
+                });
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store);
+
+                var result = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
+
+                Assert.Single(result.Plan.Steps);
+                Assert.Equal(AcquisitionSource.BuyFromVendor, result.Plan.Steps[0].Source);
+                Assert.Equal(100, result.Plan.TotalCoinCost);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task NullVendorStore_PipelineStillWorks()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Item", "icon.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                null);
+
+            var result = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
+
+            Assert.NotNull(result.Plan);
+            Assert.Single(result.Plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
+        }
     }
 }
