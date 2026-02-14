@@ -89,6 +89,9 @@
     <Compile Include="Services\WikiLookupOptions.cs" />
     <Compile Include="Models\ResolveResult.cs" />
     <Compile Include="Services\VendorOfferResolver.cs" />
+    <Compile Include="Models\UsedMaterial.cs" />
+    <Compile Include="Models\ReducedTreeResult.cs" />
+    <Compile Include="Services\InventoryReducer.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">
