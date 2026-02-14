@@ -83,6 +83,8 @@
     <Compile Include="Models\VendorOfferDataset.cs" />
     <Compile Include="Models\PlanStatus.cs" />
     <Compile Include="Services\VendorOfferHasher.cs" />
+    <Compile Include="Services\VendorOfferLoader.cs" />
+    <Compile Include="Services\VendorOfferStore.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">
