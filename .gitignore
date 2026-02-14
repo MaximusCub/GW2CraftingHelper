@@ -368,6 +368,4 @@ packages/
 *.runtimeconfig.json
 *.runtimeconfig.dev.json
 
-# VendorOfferUpdater intermediate caches
-ref/wiki_vendor_cache.json
 
