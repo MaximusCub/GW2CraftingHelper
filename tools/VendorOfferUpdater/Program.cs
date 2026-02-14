@@ -451,12 +451,14 @@ namespace VendorOfferUpdater
                 .Where(l => !string.IsNullOrEmpty(l))
                 .ToList();
 
+            var offerLocations = locations.Count > 0 ? locations : null;
+
             string offerId = VendorOfferHasher.ComputeOfferId(
                 result.GameId,
                 outputCount,
                 costLines,
                 merchant,
-                locations,
+                offerLocations,
                 null,
                 null);
 
@@ -467,7 +469,7 @@ namespace VendorOfferUpdater
                 OutputCount = outputCount,
                 CostLines = costLines,
                 MerchantName = merchant,
-                Locations = locations.Count > 0 ? locations : null
+                Locations = offerLocations
             };
         }
 
