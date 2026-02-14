@@ -77,6 +77,12 @@
     <Compile Include="Services\Gw2ItemApiClient.cs" />
     <Compile Include="Views\MainView.cs" />
     <Compile Include="Views\CraftingPlanView.cs" />
+    <Compile Include="Models\Gw2Constants.cs" />
+    <Compile Include="Models\CostLine.cs" />
+    <Compile Include="Models\VendorOffer.cs" />
+    <Compile Include="Models\VendorOfferDataset.cs" />
+    <Compile Include="Models\PlanStatus.cs" />
+    <Compile Include="Services\VendorOfferHasher.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">
