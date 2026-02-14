@@ -53,6 +53,8 @@ namespace VendorOfferUpdater
             string outputPath = null;
             string queryCondition = null;
             bool dryRun = false;
+            bool skipItemResolution = false;
+            bool resolveOnly = false;
             int maxDepth = 2;
             int maxRequests = 2000;
             int maxRuntimeMinutes = 30;
@@ -83,6 +85,14 @@ namespace VendorOfferUpdater
                 else if (args[i] == "--delay" && i + 1 < args.Length)
                 {
                     delayMs = int.Parse(args[++i]);
+                }
+                else if (args[i] == "--skip-item-resolution")
+                {
+                    skipItemResolution = true;
+                }
+                else if (args[i] == "--resolve-item-currencies-only")
+                {
+                    resolveOnly = true;
                 }
                 else if (!args[i].StartsWith("--"))
                 {
@@ -128,16 +138,80 @@ namespace VendorOfferUpdater
                 await apiHelper.LoadCurrenciesAsync();
                 Console.WriteLine();
 
-                // Step 2: Query wiki for vendor items
                 var wikiClient = new WikiSmwClient(httpClient);
-                Console.WriteLine("Querying GW2 Wiki for vendor items...");
-                var (wikiResults, queryStats) =
-                    await wikiClient.QueryVendorItemsAsync(queryCondition, queryOptions, ct);
-                Console.WriteLine($"Total wiki results: {wikiResults.Count}");
-                Console.WriteLine();
+                List<WikiVendorResult> wikiResults;
 
-                // Print query summary
-                PrintQuerySummary(queryStats);
+                string wikiCachePath = Path.Combine(
+                    Path.GetDirectoryName(outputPath) ?? ".",
+                    "wiki_vendor_cache.json");
+
+                if (resolveOnly)
+                {
+                    // --resolve-item-currencies-only: load cached wiki results
+                    if (!File.Exists(wikiCachePath))
+                    {
+                        Console.Error.WriteLine(
+                            $"ERROR: Wiki cache not found at {wikiCachePath}.");
+                        Console.Error.WriteLine(
+                            "Run with --skip-item-resolution first to generate it.");
+                        return 1;
+                    }
+
+                    Console.WriteLine($"Loading wiki vendor cache from {wikiCachePath}...");
+                    string cacheJson = await File.ReadAllTextAsync(wikiCachePath);
+                    wikiResults = JsonSerializer.Deserialize<List<WikiVendorResult>>(cacheJson);
+                    Console.WriteLine($"  Loaded {wikiResults.Count} cached wiki results.");
+                    Console.WriteLine();
+                }
+                else
+                {
+                    // Step 2: Query wiki for vendor items
+                    Console.WriteLine("Querying GW2 Wiki for vendor items...");
+                    var (results, queryStats) =
+                        await wikiClient.QueryVendorItemsAsync(queryCondition, queryOptions, ct);
+                    wikiResults = results;
+                    Console.WriteLine($"Total wiki results: {wikiResults.Count}");
+                    Console.WriteLine();
+
+                    // Print query summary
+                    PrintQuerySummary(queryStats);
+
+                    if (queryStats.WasInterrupted)
+                    {
+                        Console.WriteLine(
+                            "WARNING: Query was interrupted by safety limits. " +
+                            "Results are partial. Increase --max-runtime or --max-requests.");
+                        Console.WriteLine();
+                    }
+
+                    // Save wiki results cache for --resolve-item-currencies-only
+                    // Merge with existing cache if present (supports multi-pass querying)
+                    if (File.Exists(wikiCachePath))
+                    {
+                        string existingCacheJson = await File.ReadAllTextAsync(wikiCachePath);
+                        var existing = JsonSerializer.Deserialize<List<WikiVendorResult>>(
+                            existingCacheJson) ?? new List<WikiVendorResult>();
+                        var existingPages = new HashSet<string>(
+                            existing.Select(r => r.PageName), StringComparer.Ordinal);
+                        int added = 0;
+                        foreach (var r in wikiResults)
+                        {
+                            if (!existingPages.Contains(r.PageName))
+                            {
+                                existing.Add(r);
+                                added++;
+                            }
+                        }
+                        Console.WriteLine(
+                            $"Merged wiki cache: {added} new + {existing.Count - added} existing = {existing.Count} total");
+                        wikiResults = existing;
+                    }
+                    string cacheJson = JsonSerializer.Serialize(wikiResults);
+                    await File.WriteAllTextAsync(wikiCachePath, cacheJson);
+                    Console.WriteLine(
+                        $"Saved wiki vendor cache ({wikiResults.Count} results) to {wikiCachePath}");
+                    Console.WriteLine();
+                }
 
                 // Step 3: Resolve item-based currencies via wiki
                 string cachePath = Path.Combine(
@@ -145,43 +219,52 @@ namespace VendorOfferUpdater
                     "item_id_cache.json");
                 var itemIdCache = LoadItemIdCache(cachePath);
 
-                var unknownCurrencyNames = wikiResults
-                    .SelectMany(r => r.CostEntries)
-                    .Select(c => c.Currency)
-                    .Where(name => !string.IsNullOrEmpty(name)
-                        && !apiHelper.ResolveCurrencyId(name).HasValue
-                        && !itemIdCache.ContainsKey(name))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                if (unknownCurrencyNames.Count > 0)
+                if (!skipItemResolution)
                 {
-                    Console.WriteLine(
-                        $"Resolving {unknownCurrencyNames.Count} item-based currencies via wiki...");
-                    var freshResolved =
-                        await wikiClient.ResolveItemGameIdsAsync(unknownCurrencyNames, ct);
-                    Console.WriteLine(
-                        $"  Resolved {freshResolved.Count} of {unknownCurrencyNames.Count} item names.");
+                    var unknownCurrencyNames = wikiResults
+                        .SelectMany(r => r.CostEntries)
+                        .Select(c => c.Currency)
+                        .Where(name => !string.IsNullOrEmpty(name)
+                            && !apiHelper.ResolveCurrencyId(name).HasValue
+                            && !itemIdCache.ContainsKey(name))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
 
-                    foreach (var name in unknownCurrencyNames)
+                    if (unknownCurrencyNames.Count > 0)
                     {
-                        if (freshResolved.TryGetValue(name, out int id))
-                        {
-                            itemIdCache[name] = id;
-                        }
-                        else
-                        {
-                            itemIdCache[name] = -1; // miss sentinel
-                        }
-                    }
+                        Console.WriteLine(
+                            $"Resolving {unknownCurrencyNames.Count} item-based currencies via wiki...");
+                        var freshResolved =
+                            await wikiClient.ResolveItemGameIdsAsync(unknownCurrencyNames, ct);
+                        Console.WriteLine(
+                            $"  Resolved {freshResolved.Count} of {unknownCurrencyNames.Count} item names.");
 
-                    SaveItemIdCache(cachePath, itemIdCache);
-                    Console.WriteLine();
+                        foreach (var name in unknownCurrencyNames)
+                        {
+                            if (freshResolved.TryGetValue(name, out int id))
+                            {
+                                itemIdCache[name] = id;
+                            }
+                            else
+                            {
+                                itemIdCache[name] = -1; // miss sentinel
+                            }
+                        }
+
+                        SaveItemIdCache(cachePath, itemIdCache);
+                        Console.WriteLine();
+                    }
+                    else if (itemIdCache.Count > 0)
+                    {
+                        Console.WriteLine(
+                            $"All item-based currencies resolved from cache ({itemIdCache.Count} entries).");
+                        Console.WriteLine();
+                    }
                 }
-                else if (itemIdCache.Count > 0)
+                else
                 {
                     Console.WriteLine(
-                        $"All item-based currencies resolved from cache ({itemIdCache.Count} entries).");
+                        "Skipping item-based currency resolution (--skip-item-resolution).");
                     Console.WriteLine();
                 }
 

@@ -83,7 +83,16 @@ namespace VendorOfferUpdater
             var allResults = new List<WikiVendorResult>();
             var seenKeys = new HashSet<string>(StringComparer.Ordinal);
 
-            await PaginateConditionAsync(condition, null, 0, allResults, seenKeys, ct);
+            try
+            {
+                await PaginateConditionAsync(condition, null, 0, allResults, seenKeys, ct);
+            }
+            catch (SafetyLimitException ex)
+            {
+                Console.WriteLine($"  SAFETY LIMIT: {ex.Message}");
+                Console.WriteLine($"  Returning {seenKeys.Count} partial results collected so far.");
+                _stats.WasInterrupted = true;
+            }
 
             _stopwatch.Stop();
             _stats.Elapsed = _stopwatch.Elapsed;
@@ -351,9 +360,39 @@ namespace VendorOfferUpdater
                 try
                 {
                     using var response = await _httpClient.GetAsync(url, ct);
+                    int statusCode = (int)response.StatusCode;
 
-                    if ((int)response.StatusCode == 429 ||
-                        (int)response.StatusCode >= 500)
+                    if (statusCode == 403)
+                    {
+                        // 403 is often a temporary block from the wiki.
+                        // Use a long cooldown (30s base) with exponential backoff + jitter.
+                        if (attempt >= MaxRetries)
+                        {
+                            throw new HttpRequestException(
+                                $"HTTP 403 Forbidden after {MaxRetries + 1} attempts. " +
+                                "The wiki may be rate-limiting this IP. " +
+                                "Try increasing --delay or waiting before retrying.");
+                        }
+
+                        int cooldownMs = 30_000 * (1 << attempt);
+                        if (response.Headers.RetryAfter?.Delta is TimeSpan delta403)
+                        {
+                            cooldownMs = Math.Max(cooldownMs, (int)delta403.TotalMilliseconds);
+                        }
+                        // Add jitter: ±10%
+                        int jitter = (int)(cooldownMs * 0.1);
+                        cooldownMs += Random.Shared.Next(-jitter, jitter + 1);
+                        cooldownMs = Math.Max(cooldownMs, 0);
+
+                        Console.WriteLine(
+                            $"    WARNING: HTTP 403 (possible rate-limit block), " +
+                            $"cooling down {cooldownMs / 1000}s " +
+                            $"(attempt {attempt + 1}/{MaxRetries})...");
+                        await Task.Delay(cooldownMs, ct);
+                        continue;
+                    }
+
+                    if (statusCode == 429 || statusCode >= 500)
                     {
                         if (attempt >= MaxRetries)
                         {
@@ -367,7 +406,7 @@ namespace VendorOfferUpdater
                         }
 
                         Console.WriteLine(
-                            $"    HTTP {(int)response.StatusCode}, retrying in {backoffMs}ms " +
+                            $"    HTTP {statusCode}, retrying in {backoffMs}ms " +
                             $"(attempt {attempt + 1}/{MaxRetries})...");
                         await Task.Delay(backoffMs, ct);
                         continue;
@@ -496,8 +535,9 @@ namespace VendorOfferUpdater
 
             int delay = _effectiveDelay > 0 ? _effectiveDelay : 250;
 
-            // Batch into groups to keep URL length reasonable
-            const int batchSize = 50;
+            // Batch into groups — wiki SMW limits query complexity (OR conditions).
+            // 50 items per batch exceeds the wiki's depth limit; 10 is safe.
+            const int batchSize = 10;
 
             for (int i = 0; i < names.Count; i += batchSize)
             {
@@ -512,7 +552,20 @@ namespace VendorOfferUpdater
                 Console.WriteLine(
                     $"  Resolving batch {i / batchSize + 1} ({batch.Count} items)...");
 
-                var response = await FetchWithRetryAsync(url, ct);
+                string response;
+                try
+                {
+                    response = await FetchWithRetryAsync(url, ct);
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.WriteLine(
+                        $"  WARNING: Item resolution interrupted at batch {i / batchSize + 1}: {ex.Message}");
+                    Console.WriteLine(
+                        $"  Returning {result.Count} partial results.");
+                    break;
+                }
+
                 using var doc = JsonDocument.Parse(response);
                 var root = doc.RootElement;
 

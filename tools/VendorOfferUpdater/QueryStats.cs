@@ -13,6 +13,7 @@ namespace VendorOfferUpdater
         public TimeSpan Elapsed { get; set; }
         public List<PartitionStats> Partitions { get; } = new();
         public List<string> NonAlphaVendors { get; } = new();
+        public bool WasInterrupted { get; set; }
     }
 
     public class PartitionStats

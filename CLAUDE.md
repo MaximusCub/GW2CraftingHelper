@@ -87,10 +87,34 @@ When the milestone is fully validated:
   - What changed (high level)
   - Validation performed (what you checked)
   - Remaining **Nice to Have** items (bullet list)
-- Provide a unified diff of all changes (git diff style). Include only the final diff that matches the working tree. You MUST print the actual diff content inline in your message — do not just state the stats or say "see diff". For new files, use `git diff --no-index /dev/null <file>` or print the full file contents. If the diff is very large, split it per-file but still print every line.
+- Provide diffs for all changed and new files, following the rules below.
 - Do NOT commit automatically.
 - Ask for explicit approval to commit ("Reply OK to commit").
 - Only after the user replies OK may you proceed with git commit.
+
+#### Diff rules — code and small files (STRICT)
+
+For `.cs`, `.csproj`, `.md`, `.json` files under 200 KB, and any other human-authored file:
+
+- **FULL UNIFIED DIFF REQUIRED — NO EXCEPTIONS.** Run `git diff` (tracked) or `git diff --no-index /dev/null <file>` (new untracked). Print the COMPLETE unified diff output inline — every added, removed, and context line, for every file. Do NOT summarize, abbreviate, paraphrase, elide with "...", or replace diff content with descriptions. If the diff is large, split it per-file across multiple message sections, but still print every line of every file's diff. **Truncating or omitting lines from a code diff is a Critical violation.**
+
+#### Diff rules — large generated artifacts (PRACTICAL)
+
+For generated data files over 200 KB (e.g. `vendor_offers.json`, large caches):
+
+- Do NOT dump the full inline diff (it is unhelpful multi-MB JSON noise).
+- Instead, provide ALL of the following:
+  - `git diff --stat` line for the file
+  - File size in bytes (`wc -c` or `FileInfo.Length`)
+  - SHA256 hash of the file (`sha256sum` or equivalent)
+  - Whether the file was fully regenerated or partially appended
+  - Whether the output is deterministic (same inputs → same output)
+  - Number of top-level records (e.g. "53,531 offers")
+
+#### Intermediate / cache files
+
+- Intermediate caches (e.g. `wiki_vendor_cache.json`, build artifacts) must NOT be committed unless the user explicitly requests it.
+- If such files exist in the working tree, note them in the summary and confirm they are excluded from the commit.
 
 ### Notes
 
