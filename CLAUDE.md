@@ -87,7 +87,7 @@ When the milestone is fully validated:
   - What changed (high level)
   - Validation performed (what you checked)
   - Remaining **Nice to Have** items (bullet list)
-- Provide a unified diff of all changes (git diff style). Include only the final diff that matches the working tree.
+- Provide a unified diff of all changes (git diff style). Include only the final diff that matches the working tree. You MUST print the actual diff content inline in your message — do not just state the stats or say "see diff". For new files, use `git diff --no-index /dev/null <file>` or print the full file contents. If the diff is very large, split it per-file but still print every line.
 - Do NOT commit automatically.
 - Ask for explicit approval to commit ("Reply OK to commit").
 - Only after the user replies OK may you proceed with git commit.

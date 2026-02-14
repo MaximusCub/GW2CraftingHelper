@@ -31,6 +31,11 @@ namespace VendorOfferUpdater
                 Console.Error.WriteLine("Cancelled.");
                 return 130;
             }
+            catch (SafetyLimitException ex)
+            {
+                Console.Error.WriteLine($"SAFETY LIMIT: {ex.Message}");
+                return 2;
+            }
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"ERROR: Network request failed: {ex.Message}");
@@ -47,6 +52,11 @@ namespace VendorOfferUpdater
         {
             string outputPath = null;
             string queryCondition = null;
+            bool dryRun = false;
+            int maxDepth = 2;
+            int maxRequests = 2000;
+            int maxRuntimeMinutes = 30;
+            int delayMs = 250;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -54,11 +64,40 @@ namespace VendorOfferUpdater
                 {
                     queryCondition = args[++i];
                 }
+                else if (args[i] == "--dry-run")
+                {
+                    dryRun = true;
+                }
+                else if (args[i] == "--max-depth" && i + 1 < args.Length)
+                {
+                    maxDepth = int.Parse(args[++i]);
+                }
+                else if (args[i] == "--max-requests" && i + 1 < args.Length)
+                {
+                    maxRequests = int.Parse(args[++i]);
+                }
+                else if (args[i] == "--max-runtime" && i + 1 < args.Length)
+                {
+                    maxRuntimeMinutes = int.Parse(args[++i]);
+                }
+                else if (args[i] == "--delay" && i + 1 < args.Length)
+                {
+                    delayMs = int.Parse(args[++i]);
+                }
                 else if (!args[i].StartsWith("--"))
                 {
                     outputPath = args[i];
                 }
             }
+
+            var queryOptions = new QueryOptions
+            {
+                MaxPrefixDepth = maxDepth,
+                MaxTotalRequests = maxRequests,
+                MaxRuntime = TimeSpan.FromMinutes(maxRuntimeMinutes),
+                DelayBetweenRequestsMs = delayMs,
+                DryRun = dryRun
+            };
 
             outputPath ??= Path.Combine(FindRepoRoot(), "ref", "vendor_offers.json");
 
@@ -67,6 +106,15 @@ namespace VendorOfferUpdater
             {
                 Console.WriteLine($"Query:  {queryCondition}");
             }
+            if (dryRun)
+            {
+                Console.WriteLine("Mode:   DRY RUN (no HTTP calls to wiki)");
+            }
+            Console.WriteLine(
+                $"Limits: maxDepth={queryOptions.MaxPrefixDepth}, " +
+                $"maxRequests={queryOptions.MaxTotalRequests}, " +
+                $"maxRuntime={queryOptions.MaxRuntime.TotalMinutes:F0}min, " +
+                $"delay={Math.Max(200, queryOptions.DelayBetweenRequestsMs)}ms");
             Console.WriteLine();
 
             using var httpClient = new HttpClient();
@@ -74,138 +122,189 @@ namespace VendorOfferUpdater
                 "GW2CraftingHelper-VendorOfferUpdater/1.0");
 
             // Step 1: Load currency mappings from GW2 API
-            var apiHelper = new Gw2ApiHelper(httpClient);
-            await apiHelper.LoadCurrenciesAsync();
-            Console.WriteLine();
-
-            // Step 2: Query wiki for vendor items
-            var wikiClient = new WikiSmwClient(httpClient);
-            Console.WriteLine("Querying GW2 Wiki for vendor items...");
-            var wikiResults = await wikiClient.QueryVendorItemsAsync(queryCondition, ct);
-            Console.WriteLine($"Total wiki results: {wikiResults.Count}");
-            Console.WriteLine();
-
-            // Step 3: Resolve item-based currencies via wiki
-            // Some vendor costs reference items (e.g. "Piece of Candy Corn") rather
-            // than wallet currencies. Collect unknown names and resolve their game IDs.
-            string cachePath = Path.Combine(
-                Path.GetDirectoryName(outputPath) ?? ".",
-                "item_id_cache.json");
-            var itemIdCache = LoadItemIdCache(cachePath);
-
-            var unknownCurrencyNames = wikiResults
-                .SelectMany(r => r.CostEntries)
-                .Select(c => c.Currency)
-                .Where(name => !string.IsNullOrEmpty(name)
-                    && !apiHelper.ResolveCurrencyId(name).HasValue
-                    && !itemIdCache.ContainsKey(name))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (unknownCurrencyNames.Count > 0)
+            if (!dryRun)
             {
-                Console.WriteLine($"Resolving {unknownCurrencyNames.Count} item-based currencies via wiki...");
-                var freshResolved = await wikiClient.ResolveItemGameIdsAsync(unknownCurrencyNames, ct);
-                Console.WriteLine($"  Resolved {freshResolved.Count} of {unknownCurrencyNames.Count} item names.");
+                var apiHelper = new Gw2ApiHelper(httpClient);
+                await apiHelper.LoadCurrenciesAsync();
+                Console.WriteLine();
 
-                // Merge into cache: hits get their ID, misses get -1
-                foreach (var name in unknownCurrencyNames)
+                // Step 2: Query wiki for vendor items
+                var wikiClient = new WikiSmwClient(httpClient);
+                Console.WriteLine("Querying GW2 Wiki for vendor items...");
+                var (wikiResults, queryStats) =
+                    await wikiClient.QueryVendorItemsAsync(queryCondition, queryOptions, ct);
+                Console.WriteLine($"Total wiki results: {wikiResults.Count}");
+                Console.WriteLine();
+
+                // Print query summary
+                PrintQuerySummary(queryStats);
+
+                // Step 3: Resolve item-based currencies via wiki
+                string cachePath = Path.Combine(
+                    Path.GetDirectoryName(outputPath) ?? ".",
+                    "item_id_cache.json");
+                var itemIdCache = LoadItemIdCache(cachePath);
+
+                var unknownCurrencyNames = wikiResults
+                    .SelectMany(r => r.CostEntries)
+                    .Select(c => c.Currency)
+                    .Where(name => !string.IsNullOrEmpty(name)
+                        && !apiHelper.ResolveCurrencyId(name).HasValue
+                        && !itemIdCache.ContainsKey(name))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (unknownCurrencyNames.Count > 0)
                 {
-                    if (freshResolved.TryGetValue(name, out int id))
+                    Console.WriteLine(
+                        $"Resolving {unknownCurrencyNames.Count} item-based currencies via wiki...");
+                    var freshResolved =
+                        await wikiClient.ResolveItemGameIdsAsync(unknownCurrencyNames, ct);
+                    Console.WriteLine(
+                        $"  Resolved {freshResolved.Count} of {unknownCurrencyNames.Count} item names.");
+
+                    foreach (var name in unknownCurrencyNames)
                     {
-                        itemIdCache[name] = id;
+                        if (freshResolved.TryGetValue(name, out int id))
+                        {
+                            itemIdCache[name] = id;
+                        }
+                        else
+                        {
+                            itemIdCache[name] = -1; // miss sentinel
+                        }
+                    }
+
+                    SaveItemIdCache(cachePath, itemIdCache);
+                    Console.WriteLine();
+                }
+                else if (itemIdCache.Count > 0)
+                {
+                    Console.WriteLine(
+                        $"All item-based currencies resolved from cache ({itemIdCache.Count} entries).");
+                    Console.WriteLine();
+                }
+
+                // Build final map excluding misses
+                var itemIdMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kv in itemIdCache)
+                {
+                    if (kv.Value > 0)
+                    {
+                        itemIdMap[kv.Key] = kv.Value;
+                    }
+                }
+
+                // Step 4: Convert to VendorOffers
+                Console.WriteLine("Converting to vendor offers...");
+                var offers = new List<VendorOffer>();
+                int skippedNoId = 0;
+                int skippedUnresolved = 0;
+
+                foreach (var result in wikiResults)
+                {
+                    if (result.GameId <= 0)
+                    {
+                        skippedNoId++;
+                        continue;
+                    }
+
+                    var offer = ConvertToOffer(result, apiHelper, itemIdMap);
+                    if (offer != null)
+                    {
+                        offers.Add(offer);
                     }
                     else
                     {
-                        itemIdCache[name] = -1; // miss sentinel
+                        skippedUnresolved++;
                     }
                 }
 
-                SaveItemIdCache(cachePath, itemIdCache);
+                Console.WriteLine(
+                    $"  Converted: {offers.Count} offers " +
+                    $"(skipped: {skippedNoId} no game ID, {skippedUnresolved} unresolved cost)");
+
+                // Deduplicate by OfferId
+                var uniqueOffers = offers
+                    .GroupBy(o => o.OfferId)
+                    .Select(g => g.First())
+                    .OrderBy(o => o.OfferId, StringComparer.Ordinal)
+                    .ToList();
+
+                Console.WriteLine($"  Unique offers: {uniqueOffers.Count}");
                 Console.WriteLine();
+
+                // Step 5: Write output
+                var dataset = new VendorOfferDataset
+                {
+                    SchemaVersion = 1,
+                    GeneratedAt = DateTime.UtcNow.ToString("o"),
+                    Source = "gw2wiki-smw",
+                    Offers = uniqueOffers
+                };
+
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = false,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
+
+                string json = JsonSerializer.Serialize(dataset, jsonOptions);
+
+                string dir = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                await File.WriteAllTextAsync(outputPath, json);
+                Console.WriteLine($"Written {uniqueOffers.Count} offers to {outputPath}");
+                Console.WriteLine($"File size: {new FileInfo(outputPath).Length:N0} bytes");
+
+                return 0;
             }
-            else if (itemIdCache.Count > 0)
+            else
             {
-                Console.WriteLine($"All item-based currencies resolved from cache ({itemIdCache.Count} entries).");
+                // Dry-run path: only print plan, no HTTP to wiki
+                var wikiClient = new WikiSmwClient(httpClient);
+                var (_, stats) =
+                    await wikiClient.QueryVendorItemsAsync(queryCondition, queryOptions, ct);
+                return 0;
+            }
+        }
+
+        private static void PrintQuerySummary(QueryStats stats)
+        {
+            Console.WriteLine("=== Query Summary ===");
+            Console.WriteLine($"  HTTP requests:    {stats.TotalHttpRequests}");
+            Console.WriteLine($"  Rows fetched:     {stats.TotalRowsFetched}");
+            Console.WriteLine($"  Distinct results: {stats.DistinctResults}");
+            Console.WriteLine($"  Duplicates:       {stats.DuplicatesDiscarded}");
+            Console.WriteLine($"  Truncated parts:  {stats.TruncatedPartitions}");
+            Console.WriteLine($"  Elapsed:          {stats.Elapsed}");
+
+            if (stats.NonAlphaVendors.Count > 0)
+            {
                 Console.WriteLine();
+                Console.WriteLine(
+                    $"  WARNING: Found {stats.NonAlphaVendors.Count} vendor(s) with " +
+                    "non-alphanumeric names (not covered by prefix partitioning):");
+                foreach (var name in stats.NonAlphaVendors)
+                {
+                    Console.WriteLine($"    - {name}");
+                }
             }
 
-            // Build final map excluding misses
-            var itemIdMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kv in itemIdCache)
+            if (stats.TruncatedPartitions > 0)
             {
-                if (kv.Value > 0)
-                {
-                    itemIdMap[kv.Key] = kv.Value;
-                }
+                Console.WriteLine();
+                Console.WriteLine(
+                    $"  WARNING: Coverage may be incomplete — " +
+                    $"{stats.TruncatedPartitions} partition(s) were truncated at max depth.");
             }
 
-            // Step 4: Convert to VendorOffers
-            Console.WriteLine("Converting to vendor offers...");
-            var offers = new List<VendorOffer>();
-            int skippedNoId = 0;
-            int skippedUnresolved = 0;
-
-            foreach (var result in wikiResults)
-            {
-                if (result.GameId <= 0)
-                {
-                    skippedNoId++;
-                    continue;
-                }
-
-                var offer = ConvertToOffer(result, apiHelper, itemIdMap);
-                if (offer != null)
-                {
-                    offers.Add(offer);
-                }
-                else
-                {
-                    skippedUnresolved++;
-                }
-            }
-
-            Console.WriteLine($"  Converted: {offers.Count} offers (skipped: {skippedNoId} no game ID, {skippedUnresolved} unresolved cost)");
-
-            // Deduplicate by OfferId
-            var uniqueOffers = offers
-                .GroupBy(o => o.OfferId)
-                .Select(g => g.First())
-                .OrderBy(o => o.OfferId, StringComparer.Ordinal)
-                .ToList();
-
-            Console.WriteLine($"  Unique offers: {uniqueOffers.Count}");
             Console.WriteLine();
-
-            // Step 4: Write output
-            var dataset = new VendorOfferDataset
-            {
-                SchemaVersion = 1,
-                GeneratedAt = DateTime.UtcNow.ToString("o"),
-                Source = "gw2wiki-smw",
-                Offers = uniqueOffers
-            };
-
-            var options = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = false,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            };
-
-            string json = JsonSerializer.Serialize(dataset, options);
-
-            string dir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-            {
-                Directory.CreateDirectory(dir);
-            }
-
-            await File.WriteAllTextAsync(outputPath, json);
-            Console.WriteLine($"Written {uniqueOffers.Count} offers to {outputPath}");
-            Console.WriteLine($"File size: {new FileInfo(outputPath).Length:N0} bytes");
-
-            return 0;
         }
 
         /// <summary>

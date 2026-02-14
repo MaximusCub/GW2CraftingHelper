@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,10 +18,15 @@ namespace VendorOfferUpdater
     {
         private const string WikiApiUrl = "https://wiki.guildwars2.com/api.php";
         private const int QueryLimit = 500;
-        private const int DelayBetweenRequestsMs = 1000;
         private const int MaxRetries = 3;
 
         private readonly HttpClient _httpClient;
+
+        // Per-query state (set at the start of each QueryVendorItemsAsync call)
+        private QueryOptions _options;
+        private QueryStats _stats;
+        private Stopwatch _stopwatch;
+        private int _effectiveDelay;
 
         public WikiSmwClient(HttpClient httpClient)
         {
@@ -32,8 +39,18 @@ namespace VendorOfferUpdater
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
                 .Select(c => c.ToString()).ToArray();
 
+        private static readonly string PrintoutSuffix =
+            "|?Sells item.Has game id" +
+            "|?Sells item" +
+            "|?Has item quantity" +
+            "|?Has item cost" +
+            "|?Has vendor" +
+            "|?Located in";
+
         /// <summary>
-        /// Queries the wiki for items sold by vendors, returning raw parsed results.
+        /// Queries the wiki for items sold by vendors, returning raw parsed results
+        /// and query statistics.
+        ///
         /// Vendor data lives on subobject pages (e.g. "NPC#vendor1") with properties:
         ///   Sells item          – the item page
         ///   Sells item.Has game id – item's GW2 game ID (property chain)
@@ -44,22 +61,58 @@ namespace VendorOfferUpdater
         ///
         /// The wiki SMW API limits pagination to ~5500 results per query condition.
         /// When that limit is hit, the query is automatically partitioned by vendor
-        /// name prefix (e.g. [[Has vendor::~A*]]) and each partition is queried
-        /// separately. Partitions that still overflow are split recursively.
+        /// name prefix (e.g. [[Has vendor::~A*]]) with empty prefixes probed and
+        /// skipped. Safety limits prevent runaway execution.
         /// </summary>
-        public async Task<List<WikiVendorResult>> QueryVendorItemsAsync(
-            string queryCondition = null, CancellationToken ct = default)
+        public async Task<(List<WikiVendorResult> Results, QueryStats Stats)> QueryVendorItemsAsync(
+            string queryCondition = null, QueryOptions options = null, CancellationToken ct = default)
         {
+            _options = options ?? new QueryOptions();
+            _effectiveDelay = Math.Max(200, _options.DelayBetweenRequestsMs);
+            _stats = new QueryStats();
+            _stopwatch = Stopwatch.StartNew();
+
             string condition = queryCondition ?? "[[Sells item::+]]";
+
+            if (_options.DryRun)
+            {
+                PrintDryRunPlan(condition);
+                return (new List<WikiVendorResult>(), _stats);
+            }
+
             var allResults = new List<WikiVendorResult>();
-            await PaginateConditionAsync(condition, null, allResults, ct);
-            return allResults;
+            var seenKeys = new HashSet<string>(StringComparer.Ordinal);
+
+            await PaginateConditionAsync(condition, null, 0, allResults, seenKeys, ct);
+
+            _stopwatch.Stop();
+            _stats.Elapsed = _stopwatch.Elapsed;
+            _stats.DistinctResults = seenKeys.Count;
+
+            // Detect non-alphanumeric vendor names in collected results
+            var nonAlpha = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var r in allResults)
+            {
+                if (!string.IsNullOrEmpty(r.MerchantName) &&
+                    !char.IsLetterOrDigit(r.MerchantName[0]))
+                {
+                    nonAlpha.Add(r.MerchantName);
+                }
+            }
+            foreach (var name in nonAlpha.OrderBy(n => n, StringComparer.Ordinal))
+            {
+                _stats.NonAlphaVendors.Add(name);
+            }
+
+            return (allResults, _stats);
         }
 
         private async Task PaginateConditionAsync(
             string baseCondition,
             string vendorPrefix,
+            int depth,
             List<WikiVendorResult> allResults,
+            HashSet<string> seenKeys,
             CancellationToken ct)
         {
             string condition = baseCondition;
@@ -68,30 +121,26 @@ namespace VendorOfferUpdater
                 condition += $"[[Has vendor::~{vendorPrefix}*]]";
             }
 
-            string label = vendorPrefix != null
-                ? $"[prefix={vendorPrefix}]"
-                : "[all]";
+            string label = vendorPrefix ?? "all";
 
-            int offset = 0;
+            int partitionRowsAdded = 0;
+            int partitionHttpRequests = 0;
             bool hitOffsetLimit = false;
+            int offset = 0;
 
             while (true)
             {
-                ct.ThrowIfCancellationRequested();
+                CheckSafetyLimits(ct, label, depth, seenKeys.Count);
 
                 var query = condition +
-                    "|?Sells item.Has game id" +
-                    "|?Sells item" +
-                    "|?Has item quantity" +
-                    "|?Has item cost" +
-                    "|?Has vendor" +
-                    "|?Located in" +
+                    PrintoutSuffix +
                     $"|limit={QueryLimit}" +
                     $"|offset={offset}";
 
                 var url = $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}&format=json";
 
-                Console.WriteLine($"  {label} offset={offset}...");
+                _stats.TotalHttpRequests++;
+                partitionHttpRequests++;
 
                 var response = await FetchWithRetryAsync(url, ct);
                 using var doc = JsonDocument.Parse(response);
@@ -109,30 +158,39 @@ namespace VendorOfferUpdater
                     break;
                 }
 
-                int batchCount = 0;
+                int batchAdded = 0;
                 foreach (var resultProp in results.EnumerateObject())
                 {
                     var parsed = ParseResult(resultProp.Name, resultProp.Value);
-                    if (parsed != null)
+                    if (parsed == null) continue;
+
+                    _stats.TotalRowsFetched++;
+                    string compositeKey = ComputeCompositeKey(parsed);
+                    if (seenKeys.Add(compositeKey))
                     {
                         allResults.Add(parsed);
-                        batchCount++;
+                        partitionRowsAdded++;
+                        batchAdded++;
+                    }
+                    else
+                    {
+                        _stats.DuplicatesDiscarded++;
                     }
                 }
 
-                Console.WriteLine($"  {label} +{batchCount} (total: {allResults.Count})");
+                Console.WriteLine($"  [{label}] offset={offset} +{batchAdded} new");
 
                 if (root.TryGetProperty("query-continue-offset", out var continueOffset))
                 {
                     int nextOffset = continueOffset.GetInt32();
                     if (nextOffset <= offset)
                     {
-                        // SMW offset limit reached — need to partition further
+                        // SMW offset limit reached
                         hitOffsetLimit = true;
                         break;
                     }
                     offset = nextOffset;
-                    await Task.Delay(DelayBetweenRequestsMs, ct);
+                    await Task.Delay(_effectiveDelay, ct);
                 }
                 else
                 {
@@ -140,22 +198,148 @@ namespace VendorOfferUpdater
                 }
             }
 
-            if (hitOffsetLimit)
+            // Record partition stats
+            var pStats = new PartitionStats
             {
-                Console.WriteLine($"  {label} hit offset limit at {allResults.Count} total results, splitting by vendor prefix...");
+                Prefix = vendorPrefix,
+                Depth = depth,
+                RowsAdded = partitionRowsAdded,
+                HttpRequests = partitionHttpRequests
+            };
+            _stats.Partitions.Add(pStats);
 
-                // Remove the results we already collected for this condition
-                // since sub-partitions will re-fetch everything under each prefix.
-                // We need to track what was added in THIS call to remove it.
-                // Instead: we collected partial results above; the sub-partitions
-                // will produce duplicates that get deduped by OfferId downstream.
-                // Just proceed with sub-partitions — duplicates are harmless.
-                foreach (var prefix in PartitionPrefixes)
-                {
-                    string subPrefix = (vendorPrefix ?? "") + prefix;
-                    await PaginateConditionAsync(baseCondition, subPrefix, allResults, ct);
-                }
+            if (!hitOffsetLimit)
+            {
+                Console.WriteLine(
+                    $"  [{label}] done: {partitionRowsAdded} rows in {partitionHttpRequests} requests");
+                return;
             }
+
+            // OVERFLOW — check depth limit
+            if (depth >= _options.MaxPrefixDepth)
+            {
+                Console.WriteLine(
+                    $"  WARNING: Partition [{label}] overflowing at max depth {depth}. " +
+                    $"{partitionRowsAdded} rows collected, remaining truncated.");
+                pStats.WasTruncated = true;
+                _stats.TruncatedPartitions++;
+                return;
+            }
+
+            Console.WriteLine(
+                $"  [{label}] overflow at depth {depth}, probing sub-partitions...");
+
+            // Probe + paginate sub-partitions (KEEP all rows already collected)
+            int skippedEmpty = 0;
+            foreach (var prefix in PartitionPrefixes)
+            {
+                string subPrefix = (vendorPrefix ?? "") + prefix;
+
+                // Probe with limit=1 and no printouts (minimal payload)
+                CheckSafetyLimits(ct, $"probe {subPrefix}", depth + 1, seenKeys.Count);
+
+                string probeCondition = baseCondition + $"[[Has vendor::~{subPrefix}*]]";
+                string probeQuery = probeCondition + "|limit=1|offset=0";
+                string probeUrl =
+                    $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(probeQuery)}&format=json";
+
+                _stats.TotalHttpRequests++;
+
+                string probeResponse = await FetchWithRetryAsync(probeUrl, ct);
+                await Task.Delay(_effectiveDelay, ct);
+
+                bool hasResults = false;
+                using (var probeDoc = JsonDocument.Parse(probeResponse))
+                {
+                    var probeRoot = probeDoc.RootElement;
+                    if (probeRoot.TryGetProperty("query", out var pq) &&
+                        pq.TryGetProperty("results", out var pr) &&
+                        pr.ValueKind == JsonValueKind.Object)
+                    {
+                        // Check if there's at least one result
+                        using var enumerator = pr.EnumerateObject();
+                        hasResults = enumerator.MoveNext();
+                    }
+                }
+
+                if (!hasResults)
+                {
+                    skippedEmpty++;
+                    continue;
+                }
+
+                // Non-empty: paginate fully (re-fetches from offset=0; dedup handles overlap)
+                await PaginateConditionAsync(
+                    baseCondition, subPrefix, depth + 1, allResults, seenKeys, ct);
+            }
+
+            Console.WriteLine(
+                $"  [{label}] sub-partitions done, " +
+                $"{skippedEmpty}/{PartitionPrefixes.Length} empty prefixes skipped");
+        }
+
+        private void CheckSafetyLimits(
+            CancellationToken ct, string label, int depth, int distinctCount)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (_stats.TotalHttpRequests >= _options.MaxTotalRequests)
+            {
+                throw new SafetyLimitException(
+                    $"Exceeded {_options.MaxTotalRequests} request limit " +
+                    $"at partition [{label}] depth={depth}. " +
+                    $"Requests: {_stats.TotalHttpRequests}, " +
+                    $"Rows: {_stats.TotalRowsFetched} ({distinctCount} distinct).");
+            }
+
+            if (_stopwatch.Elapsed >= _options.MaxRuntime)
+            {
+                throw new SafetyLimitException(
+                    $"Exceeded {_options.MaxRuntime.TotalMinutes:F0}min runtime limit " +
+                    $"at partition [{label}] depth={depth}. " +
+                    $"Requests: {_stats.TotalHttpRequests}, " +
+                    $"Rows: {_stats.TotalRowsFetched} ({distinctCount} distinct).");
+            }
+        }
+
+        private void PrintDryRunPlan(string condition)
+        {
+            Console.WriteLine("=== DRY RUN ===");
+            Console.WriteLine($"Base condition: {condition}");
+            Console.WriteLine();
+            Console.WriteLine("Configured caps:");
+            Console.WriteLine($"  Max prefix depth:  {_options.MaxPrefixDepth}");
+            Console.WriteLine($"  Max total requests: {_options.MaxTotalRequests}");
+            Console.WriteLine($"  Max runtime:        {_options.MaxRuntime.TotalMinutes:F0} min");
+            Console.WriteLine($"  Delay between reqs: {_effectiveDelay} ms");
+            Console.WriteLine();
+            Console.WriteLine("Traversal structure:");
+            Console.WriteLine($"  Level 0: 1 root partition");
+            for (int d = 1; d <= _options.MaxPrefixDepth; d++)
+            {
+                int maxPartitions = (int)Math.Pow(PartitionPrefixes.Length, d);
+                Console.WriteLine(
+                    $"  Level {d}: up to {maxPartitions} prefixes " +
+                    $"({PartitionPrefixes.Length} per overflow at level {d - 1})");
+            }
+            Console.WriteLine();
+            Console.WriteLine(
+                "Actual request count is unknown without probing — " +
+                "depends on data distribution.");
+        }
+
+        private static string ComputeCompositeKey(WikiVendorResult r)
+        {
+            string merchant = (r.MerchantName ?? "").Trim();
+            merchant = Regex.Replace(merchant, @"\s+", " ");
+
+            var costs = r.CostEntries
+                .OrderBy(c => c.Currency ?? "", StringComparer.Ordinal)
+                .ThenBy(c => c.Value)
+                .Select(c => $"{c.Value}:{c.Currency ?? ""}")
+                .ToArray();
+
+            return $"{r.GameId}|{r.OutputQuantity ?? 1}|{merchant}|{string.Join(";", costs)}";
         }
 
         private async Task<string> FetchWithRetryAsync(string url, CancellationToken ct)
@@ -182,7 +366,9 @@ namespace VendorOfferUpdater
                             backoffMs = Math.Max(backoffMs, (int)delta.TotalMilliseconds);
                         }
 
-                        Console.WriteLine($"    HTTP {(int)response.StatusCode}, retrying in {backoffMs}ms (attempt {attempt + 1}/{MaxRetries})...");
+                        Console.WriteLine(
+                            $"    HTTP {(int)response.StatusCode}, retrying in {backoffMs}ms " +
+                            $"(attempt {attempt + 1}/{MaxRetries})...");
                         await Task.Delay(backoffMs, ct);
                         continue;
                     }
@@ -193,7 +379,9 @@ namespace VendorOfferUpdater
                 catch (HttpRequestException) when (attempt < MaxRetries)
                 {
                     int backoffMs = 1000 * (1 << attempt);
-                    Console.WriteLine($"    Request failed, retrying in {backoffMs}ms (attempt {attempt + 1}/{MaxRetries})...");
+                    Console.WriteLine(
+                        $"    Request failed, retrying in {backoffMs}ms " +
+                        $"(attempt {attempt + 1}/{MaxRetries})...");
                     await Task.Delay(backoffMs, ct);
                 }
             }
@@ -306,6 +494,8 @@ namespace VendorOfferUpdater
             var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var names = itemNames.ToList();
 
+            int delay = _effectiveDelay > 0 ? _effectiveDelay : 250;
+
             // Batch into groups to keep URL length reasonable
             const int batchSize = 50;
 
@@ -319,7 +509,8 @@ namespace VendorOfferUpdater
 
                 var url = $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}&format=json";
 
-                Console.WriteLine($"  Resolving batch {i / batchSize + 1} ({batch.Count} items)...");
+                Console.WriteLine(
+                    $"  Resolving batch {i / batchSize + 1} ({batch.Count} items)...");
 
                 var response = await FetchWithRetryAsync(url, ct);
                 using var doc = JsonDocument.Parse(response);
@@ -346,7 +537,7 @@ namespace VendorOfferUpdater
 
                 if (i + batchSize < names.Count)
                 {
-                    await Task.Delay(DelayBetweenRequestsMs, ct);
+                    await Task.Delay(delay, ct);
                 }
             }
 
