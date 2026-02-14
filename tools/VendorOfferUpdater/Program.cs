@@ -394,7 +394,8 @@ namespace VendorOfferUpdater
         /// Converts a single wiki vendor result to a VendorOffer.
         /// Returns null if any cost line cannot be resolved.
         /// </summary>
-        private static VendorOffer ConvertToOffer(
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static VendorOffer ConvertToOffer(
             WikiVendorResult result,
             Gw2ApiHelper apiHelper,
             Dictionary<string, int> itemIdMap)
@@ -450,12 +451,14 @@ namespace VendorOfferUpdater
                 .Where(l => !string.IsNullOrEmpty(l))
                 .ToList();
 
+            var offerLocations = locations.Count > 0 ? locations : null;
+
             string offerId = VendorOfferHasher.ComputeOfferId(
                 result.GameId,
                 outputCount,
                 costLines,
                 merchant,
-                locations,
+                offerLocations,
                 null,
                 null);
 
@@ -466,7 +469,7 @@ namespace VendorOfferUpdater
                 OutputCount = outputCount,
                 CostLines = costLines,
                 MerchantName = merchant,
-                Locations = locations.Count > 0 ? locations : null
+                Locations = offerLocations
             };
         }
 
