@@ -10,7 +10,7 @@ namespace VendorOfferUpdater.Tests
 {
     public class ConvertToOfferTests
     {
-        private static async Task<Gw2ApiHelper> CreateLoadedHelper()
+        private static async Task<(Gw2ApiHelper helper, HttpClient httpClient)> CreateLoadedHelper()
         {
             var handler = new FakeHttpHandler();
             handler.MapUrl(
@@ -20,10 +20,10 @@ namespace VendorOfferUpdater.Tests
                 url => url.Contains("/v2/currencies?ids="),
                 "[{\"id\":2,\"name\":\"Karma\"},{\"id\":23,\"name\":\"Spirit Shard\"}]");
 
-            var client = new HttpClient(handler);
-            var helper = new Gw2ApiHelper(client);
+            var httpClient = new HttpClient(handler);
+            var helper = new Gw2ApiHelper(httpClient);
             await helper.LoadCurrenciesAsync();
-            return helper;
+            return (helper, httpClient);
         }
 
         private static WikiVendorResult MakeResult(
@@ -46,7 +46,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task CurrencyCost_ResolvedToCurrencyLine()
         {
-            var helper = await CreateLoadedHelper();
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
             var result = MakeResult(costEntries: new List<WikiCostEntry>
             {
                 new WikiCostEntry { Value = 500, Currency = "Karma" }
@@ -64,7 +65,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task CoinAlias_ResolvedToCurrencyId1()
         {
-            var helper = await CreateLoadedHelper();
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
             var result = MakeResult(costEntries: new List<WikiCostEntry>
             {
                 new WikiCostEntry { Value = 10000, Currency = "Coin" }
@@ -80,7 +82,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task ItemCost_ResolvedToItemLine()
         {
-            var helper = await CreateLoadedHelper();
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
             var itemIdMap = new Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase)
             {
                 ["Glob of Ectoplasm"] = 19721
@@ -102,7 +105,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task EmptyCurrency_DefaultsToCoins()
         {
-            var helper = await CreateLoadedHelper();
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
             var result = MakeResult(costEntries: new List<WikiCostEntry>
             {
                 new WikiCostEntry { Value = 256, Currency = "" }
@@ -118,7 +122,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task UnresolvedCurrency_ReturnsNull()
         {
-            var helper = await CreateLoadedHelper();
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
             var result = MakeResult(costEntries: new List<WikiCostEntry>
             {
                 new WikiCostEntry { Value = 10, Currency = "Unknown Token" }
@@ -134,7 +139,8 @@ namespace VendorOfferUpdater.Tests
         [InlineData("")]
         public async Task NullOrEmptyMerchant_ReturnsNull(string merchantName)
         {
-            var helper = await CreateLoadedHelper();
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
             var result = MakeResult(merchantName: merchantName);
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -148,7 +154,8 @@ namespace VendorOfferUpdater.Tests
         [InlineData(-1)]
         public async Task InvalidOutputQuantity_DefaultsTo1(int? qty)
         {
-            var helper = await CreateLoadedHelper();
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
             var result = MakeResult(outputQuantity: qty);
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -160,7 +167,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task OfferIdIsPopulated()
         {
-            var helper = await CreateLoadedHelper();
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
             var result = MakeResult();
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -172,7 +180,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task EmptyLocations_BecomesNull()
         {
-            var helper = await CreateLoadedHelper();
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
             var result = MakeResult(locations: new List<string>());
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -184,7 +193,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task NonEmptyLocations_Preserved()
         {
-            var helper = await CreateLoadedHelper();
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
             var result = MakeResult(locations: new List<string> { "Lion's Arch", "Divinity's Reach" });
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());

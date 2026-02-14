@@ -26,12 +26,12 @@ namespace VendorOfferUpdater.Tests
             };
         }
 
-        private static (WikiSmwClient client, FakeHttpHandler handler) CreateClient()
+        private static (WikiSmwClient client, FakeHttpHandler handler, HttpClient httpClient) CreateClient()
         {
             var handler = new FakeHttpHandler();
             var httpClient = new HttpClient(handler);
             var client = new WikiSmwClient(httpClient);
-            return (client, handler);
+            return (client, handler, httpClient);
         }
 
         // ── Parsing tests ──────────────────────────────────────────
@@ -39,7 +39,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task SingleResult_ParsesAllFields()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
             string json = new WikiJsonBuilder()
                 .AddResult("NPC#vendor1",
                     gameId: 19685,
@@ -71,7 +72,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task MultipleCostEntries_AllParsed()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
             string json = new WikiJsonBuilder()
                 .AddResult("NPC#v1",
                     gameId: 100,
@@ -91,7 +93,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task ZeroValueCost_Excluded()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
             string json = new WikiJsonBuilder()
                 .AddResult("NPC#v1",
                     gameId: 100,
@@ -112,7 +115,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task EmptyResults_ReturnsEmptyList()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
             handler.Enqueue(WikiJsonBuilder.BuildEmpty());
 
             var (results, _) = await client.QueryVendorItemsAsync(
@@ -126,7 +130,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task Pagination_FollowsContinueOffset()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             // Page 1: one result, continue at offset 500
             string page1 = new WikiJsonBuilder()
@@ -153,7 +158,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task Pagination_DeduplicatesAcrossPages()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             // Same result on both pages (same GameId, vendor, quantity, costs)
             string page1 = new WikiJsonBuilder()
@@ -180,7 +186,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task MaxDepthZero_TruncatesPartition()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             // Return result + stalled continue-offset (triggers overflow)
             string json = new WikiJsonBuilder()
@@ -201,7 +208,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task Overflow_ProbesSubPartitions()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             // Root: result + stalled offset → overflow
             string rootJson = new WikiJsonBuilder()
@@ -246,7 +254,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task MaxTotalRequests_ReturnsPartialWithInterrupted()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             // First request succeeds with continue-offset
             string page1 = new WikiJsonBuilder()
@@ -266,7 +275,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task CancelledToken_ThrowsOperationCanceled()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
             handler.Enqueue(WikiJsonBuilder.BuildEmpty());
 
             using var cts = new CancellationTokenSource();
@@ -281,7 +291,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task Http429_RetriesAndSucceeds()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             // First response: 429
             handler.Enqueue("{}", HttpStatusCode.TooManyRequests);
@@ -306,7 +317,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task DryRun_MakesNoHttpRequests()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             var options = new QueryOptions
             {
@@ -326,7 +338,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task Stats_TracksRequestsAndRows()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             string json = new WikiJsonBuilder()
                 .AddResult("NPC#v1", gameId: 100, vendor: "VendorA")
@@ -346,7 +359,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task NonAlphaVendorNames_Detected()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             string json = new WikiJsonBuilder()
                 .AddResult("NPC#v1", gameId: 100, vendor: "#Special Vendor")
@@ -366,7 +380,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task ResolveItemGameIds_SingleBatch()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             // Need to call QueryVendorItemsAsync first to initialize _effectiveDelay
             handler.Enqueue(WikiJsonBuilder.BuildEmpty());
@@ -391,7 +406,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task ResolveItemGameIds_BatchesOver10()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             // Initialize delay
             handler.Enqueue(WikiJsonBuilder.BuildEmpty());
@@ -426,7 +442,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task ResolveItemGameIds_UnresolvedItem_NotInResult()
         {
-            var (client, handler) = CreateClient();
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
 
             handler.Enqueue(WikiJsonBuilder.BuildEmpty());
             await client.QueryVendorItemsAsync("[[Sells item::+]]", FastOptions());

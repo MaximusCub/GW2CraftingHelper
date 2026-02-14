@@ -10,12 +10,12 @@ namespace VendorOfferUpdater.Tests
 {
     public class Gw2ApiHelperTests
     {
-        private static (Gw2ApiHelper helper, FakeHttpHandler handler) CreateHelper()
+        private static (Gw2ApiHelper helper, FakeHttpHandler handler, HttpClient httpClient) CreateHelper()
         {
             var handler = new FakeHttpHandler();
-            var client = new HttpClient(handler);
-            var helper = new Gw2ApiHelper(client);
-            return (helper, handler);
+            var httpClient = new HttpClient(handler);
+            var helper = new Gw2ApiHelper(httpClient);
+            return (helper, handler, httpClient);
         }
 
         private static void SetupCurrencyResponses(FakeHttpHandler handler, string idsJson, string detailsJson)
@@ -31,7 +31,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task LoadCurrenciesAsync_ParsesApiResponse()
         {
-            var (helper, handler) = CreateHelper();
+            var (helper, handler, httpClient) = CreateHelper();
+            using var _ = httpClient;
             SetupCurrencyResponses(handler,
                 "[2,4,15]",
                 "[{\"id\":2,\"name\":\"Karma\"},{\"id\":4,\"name\":\"Gem\"},{\"id\":15,\"name\":\"Badge of Honor\"}]");
@@ -46,7 +47,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task LoadCurrenciesAsync_BatchesOver200()
         {
-            var (helper, handler) = CreateHelper();
+            var (helper, handler, httpClient) = CreateHelper();
+            using var _ = httpClient;
 
             // Generate 250 IDs
             var ids = Enumerable.Range(1, 250).ToList();
@@ -86,7 +88,8 @@ namespace VendorOfferUpdater.Tests
         [InlineData("Silver")]
         public void CoinAliases_ReturnCurrencyId1(string alias)
         {
-            var (helper, _) = CreateHelper();
+            var (helper, _, httpClient) = CreateHelper();
+            using var __ = httpClient;
             // No LoadCurrenciesAsync needed — aliases are hardcoded
             Assert.Equal(1, helper.ResolveCurrencyId(alias));
         }
@@ -94,7 +97,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void CoinAliases_AreCaseInsensitive()
         {
-            var (helper, _) = CreateHelper();
+            var (helper, _, httpClient) = CreateHelper();
+            using var __ = httpClient;
             Assert.Equal(1, helper.ResolveCurrencyId("coin"));
             Assert.Equal(1, helper.ResolveCurrencyId("COIN"));
             Assert.Equal(1, helper.ResolveCurrencyId("gOLD"));
@@ -103,7 +107,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public async Task ResolveCurrencyId_CaseInsensitiveAfterLoad()
         {
-            var (helper, handler) = CreateHelper();
+            var (helper, handler, httpClient) = CreateHelper();
+            using var _ = httpClient;
             SetupCurrencyResponses(handler,
                 "[2]",
                 "[{\"id\":2,\"name\":\"Karma\"}]");
@@ -117,7 +122,8 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void ResolveCurrencyId_Unknown_ReturnsNull()
         {
-            var (helper, _) = CreateHelper();
+            var (helper, _, httpClient) = CreateHelper();
+            using var __ = httpClient;
             Assert.Null(helper.ResolveCurrencyId("Nonexistent Currency"));
         }
 
@@ -126,7 +132,8 @@ namespace VendorOfferUpdater.Tests
         [InlineData("")]
         public void ResolveCurrencyId_NullOrEmpty_ReturnsNull(string input)
         {
-            var (helper, _) = CreateHelper();
+            var (helper, _, httpClient) = CreateHelper();
+            using var __ = httpClient;
             Assert.Null(helper.ResolveCurrencyId(input));
         }
     }
