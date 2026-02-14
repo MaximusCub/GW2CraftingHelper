@@ -99,6 +99,7 @@
     <Compile Include="Services\IMysticForgeRecipeSource.cs" />
     <Compile Include="Services\FileMysticForgeRecipeSource.cs" />
     <Compile Include="Services\MysticForgeRecipeData.cs" />
+    <Compile Include="Services\CompositeRecipeApiClient.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">
