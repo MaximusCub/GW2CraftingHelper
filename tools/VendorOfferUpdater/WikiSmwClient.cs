@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using VendorOfferUpdater.Models;
 
@@ -30,13 +31,16 @@ namespace VendorOfferUpdater
         /// Queries the wiki for items sold by vendors, returning raw parsed results.
         /// Pages through results using the continue offset.
         /// </summary>
-        public async Task<List<WikiVendorResult>> QueryVendorItemsAsync()
+        public async Task<List<WikiVendorResult>> QueryVendorItemsAsync(
+            CancellationToken ct = default)
         {
             var allResults = new List<WikiVendorResult>();
             int offset = 0;
 
             while (true)
             {
+                ct.ThrowIfCancellationRequested();
+
                 var query = "[[Has game id::+]][[Sold by::+]]" +
                     "|?Has game id" +
                     "|?Sold by" +
@@ -50,7 +54,7 @@ namespace VendorOfferUpdater
 
                 Console.WriteLine($"  Querying wiki offset={offset}...");
 
-                var response = await FetchWithRetryAsync(url);
+                var response = await FetchWithRetryAsync(url, ct);
                 using var doc = JsonDocument.Parse(response);
                 var root = doc.RootElement;
 
@@ -78,7 +82,7 @@ namespace VendorOfferUpdater
                 if (root.TryGetProperty("query-continue-offset", out var continueOffset))
                 {
                     offset = continueOffset.GetInt32();
-                    await Task.Delay(DelayBetweenRequestsMs);
+                    await Task.Delay(DelayBetweenRequestsMs, ct);
                 }
                 else
                 {
@@ -89,13 +93,15 @@ namespace VendorOfferUpdater
             return allResults;
         }
 
-        private async Task<string> FetchWithRetryAsync(string url)
+        private async Task<string> FetchWithRetryAsync(string url, CancellationToken ct)
         {
             for (int attempt = 0; attempt <= MaxRetries; attempt++)
             {
+                ct.ThrowIfCancellationRequested();
+
                 try
                 {
-                    var response = await _httpClient.GetAsync(url);
+                    using var response = await _httpClient.GetAsync(url, ct);
 
                     if ((int)response.StatusCode == 429 ||
                         (int)response.StatusCode >= 500)
@@ -112,7 +118,7 @@ namespace VendorOfferUpdater
                         }
 
                         Console.WriteLine($"    HTTP {(int)response.StatusCode}, retrying in {backoffMs}ms (attempt {attempt + 1}/{MaxRetries})...");
-                        await Task.Delay(backoffMs);
+                        await Task.Delay(backoffMs, ct);
                         continue;
                     }
 
@@ -123,7 +129,7 @@ namespace VendorOfferUpdater
                 {
                     int backoffMs = 1000 * (1 << attempt);
                     Console.WriteLine($"    Request failed, retrying in {backoffMs}ms (attempt {attempt + 1}/{MaxRetries})...");
-                    await Task.Delay(backoffMs);
+                    await Task.Delay(backoffMs, ct);
                 }
             }
 

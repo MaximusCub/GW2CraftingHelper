@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using VendorOfferUpdater.Models;
 
@@ -14,9 +15,21 @@ namespace VendorOfferUpdater
     {
         static async Task<int> Main(string[] args)
         {
+            using var cts = new CancellationTokenSource();
+            Console.CancelKeyPress += (_, e) =>
+            {
+                e.Cancel = true;
+                cts.Cancel();
+            };
+
             try
             {
-                return await RunAsync(args);
+                return await RunAsync(args, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                Console.Error.WriteLine("Cancelled.");
+                return 130;
             }
             catch (HttpRequestException ex)
             {
@@ -30,7 +43,7 @@ namespace VendorOfferUpdater
             }
         }
 
-        private static async Task<int> RunAsync(string[] args)
+        private static async Task<int> RunAsync(string[] args, CancellationToken ct)
         {
             string outputPath = args.Length > 0
                 ? args[0]
@@ -51,7 +64,7 @@ namespace VendorOfferUpdater
             // Step 2: Query wiki for vendor items
             var wikiClient = new WikiSmwClient(httpClient);
             Console.WriteLine("Querying GW2 Wiki for vendor items...");
-            var wikiResults = await wikiClient.QueryVendorItemsAsync();
+            var wikiResults = await wikiClient.QueryVendorItemsAsync(ct);
             Console.WriteLine($"Total wiki results: {wikiResults.Count}");
             Console.WriteLine();
 
