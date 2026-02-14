@@ -16,16 +16,20 @@ namespace GW2CraftingHelper.Services
             var debugLog = new List<string>();
 
             // Debug: reduction summary
-            if (usedMaterials != null && usedMaterials.Count > 0)
+            if (usedMaterials == null)
+            {
+                debugLog.Add("No inventory reduction (snapshot not provided)");
+            }
+            else if (usedMaterials.Count == 0)
+            {
+                debugLog.Add("No inventory reduction (no owned items matched)");
+            }
+            else
             {
                 var parts = usedMaterials
                     .Select(u => $"{u.QuantityUsed} of item {u.ItemId}")
                     .ToList();
                 debugLog.Add($"Reduced: used {usedMaterials.Count} owned items ({string.Join(", ", parts)})");
-            }
-            else
-            {
-                debugLog.Add("No inventory reduction (snapshot not provided)");
             }
 
             // Debug: source decisions
