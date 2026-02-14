@@ -533,7 +533,7 @@ namespace VendorOfferUpdater
             var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var names = itemNames.ToList();
 
-            int delay = _effectiveDelay > 0 ? _effectiveDelay : 250;
+            int delay = _effectiveDelay;
 
             // Batch into groups — wiki SMW limits query complexity (OR conditions).
             // 50 items per batch exceeds the wiki's depth limit; 10 is safe.
