@@ -189,6 +189,7 @@ namespace GW2CraftingHelper.Services
                     {
                         delayNeeded += _jitterRng.Next(0, _options.JitterMs);
                     }
+                    delayNeeded = Math.Max(0, delayNeeded);
                 }
 
                 await Task.Delay(delayNeeded, ct);
