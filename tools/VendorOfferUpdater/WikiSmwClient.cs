@@ -17,6 +17,7 @@ namespace VendorOfferUpdater
         private const string WikiApiUrl = "https://wiki.guildwars2.com/api.php";
         private const int QueryLimit = 500;
         private const int DelayBetweenRequestsMs = 1000;
+        private const int MaxRetries = 3;
 
         private readonly HttpClient _httpClient;
 
@@ -49,7 +50,7 @@ namespace VendorOfferUpdater
 
                 Console.WriteLine($"  Querying wiki offset={offset}...");
 
-                var response = await _httpClient.GetStringAsync(url);
+                var response = await FetchWithRetryAsync(url);
                 using var doc = JsonDocument.Parse(response);
                 var root = doc.RootElement;
 
@@ -86,6 +87,47 @@ namespace VendorOfferUpdater
             }
 
             return allResults;
+        }
+
+        private async Task<string> FetchWithRetryAsync(string url)
+        {
+            for (int attempt = 0; attempt <= MaxRetries; attempt++)
+            {
+                try
+                {
+                    var response = await _httpClient.GetAsync(url);
+
+                    if ((int)response.StatusCode == 429 ||
+                        (int)response.StatusCode >= 500)
+                    {
+                        if (attempt >= MaxRetries)
+                        {
+                            response.EnsureSuccessStatusCode();
+                        }
+
+                        int backoffMs = 1000 * (1 << attempt);
+                        if (response.Headers.RetryAfter?.Delta is TimeSpan delta)
+                        {
+                            backoffMs = Math.Max(backoffMs, (int)delta.TotalMilliseconds);
+                        }
+
+                        Console.WriteLine($"    HTTP {(int)response.StatusCode}, retrying in {backoffMs}ms (attempt {attempt + 1}/{MaxRetries})...");
+                        await Task.Delay(backoffMs);
+                        continue;
+                    }
+
+                    response.EnsureSuccessStatusCode();
+                    return await response.Content.ReadAsStringAsync();
+                }
+                catch (HttpRequestException) when (attempt < MaxRetries)
+                {
+                    int backoffMs = 1000 * (1 << attempt);
+                    Console.WriteLine($"    Request failed, retrying in {backoffMs}ms (attempt {attempt + 1}/{MaxRetries})...");
+                    await Task.Delay(backoffMs);
+                }
+            }
+
+            throw new HttpRequestException($"Failed after {MaxRetries + 1} attempts: {url}");
         }
 
         private static WikiVendorResult ParseResult(string pageName, JsonElement element)

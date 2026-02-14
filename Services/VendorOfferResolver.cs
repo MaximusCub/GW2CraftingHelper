@@ -30,6 +30,7 @@ namespace GW2CraftingHelper.Services
             _options = options ?? new WikiLookupOptions();
             _concurrencySemaphore = new SemaphoreSlim(_options.MaxConcurrentRequests);
             _stopwatch = Stopwatch.StartNew();
+            _lastRequestMs = -_options.MinDelayBetweenRequestsMs;
         }
 
         public async Task<ResolveResult> EnsureVendorOffersAsync(

@@ -14,6 +14,24 @@ namespace VendorOfferUpdater
     {
         static async Task<int> Main(string[] args)
         {
+            try
+            {
+                return await RunAsync(args);
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.Error.WriteLine($"ERROR: Network request failed: {ex.Message}");
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"ERROR: {ex.GetType().Name}: {ex.Message}");
+                return 1;
+            }
+        }
+
+        private static async Task<int> RunAsync(string[] args)
+        {
             string outputPath = args.Length > 0
                 ? args[0]
                 : Path.Combine(FindRepoRoot(), "ref", "vendor_offers.json");
