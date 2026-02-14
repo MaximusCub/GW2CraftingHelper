@@ -79,42 +79,49 @@ After you believe the milestone is complete:
 4. Automatically fix all Critical and Must Fix items.
 5. Repeat the full-change-set review until satisfied that **no Critical** and **no Must Fix** remain.
 
-### Output requirements at the end (before asking for commit approval)
+### Output requirements at the end (PR-based review; no terminal diffs)
 
 When the milestone is fully validated:
 
-- Provide a consolidated summary:
+- Do NOT print full diffs or per-file unified diffs in the terminal output.
+- Do NOT ask the user to approve a commit based on terminal diff output.
+- All review happens via a GitHub Pull Request (PR) in the upstream repo.
+
+#### Required PR workflow (STRICT)
+
+At the end of the milestone:
+
+1. Ensure you are on a dedicated milestone branch (create if needed):
+   - `git switch -c <milestone-branch>` (if branch does not exist)
+   - Branch name must reflect the milestone (e.g. m8-orrax-validation, thread-b-vendor-pricing).
+2. Ensure the working tree is clean except for intentional milestone changes.
+3. Run validation:
+   - `dotnet build GW2CraftingHelper.csproj -p:Platform=x64`
+   - `dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+4. Commit the milestone changes (one or more commits as appropriate).
+5. Push the branch:
+   - `git push -u origin <milestone-branch>`
+6. Create or update a PR targeting the default branch (`master`):
+   - If no PR exists: `gh pr create --base master --head <milestone-branch> --fill`
+   - If a PR already exists: `gh pr view --web` and continue pushing new commits to the same branch.
+
+#### What to output in the terminal (END OF MILESTONE)
+
+Output ONLY the following:
+
+- PR URL
+- A short, consolidated summary:
   - What changed (high level)
-  - Validation performed (what you checked)
-  - Remaining **Nice to Have** items (bullet list)
-- Provide diffs for all changed and new files, following the rules below.
-- Do NOT commit automatically.
-- Ask for explicit approval to commit ("Reply OK to commit").
-- Only after the user replies OK may you proceed with git commit.
+  - Validation performed (build/test commands run and results)
+  - Remaining Nice to Have items (bullets)
+- Any special reviewer notes (risks, follow-ups, migration notes)
 
-#### Diff rules — code and small files (STRICT)
-
-For `.cs`, `.csproj`, `.md`, `.json` files under 200 KB, and any other human-authored file:
-
-- **FULL UNIFIED DIFF REQUIRED — NO EXCEPTIONS.** Run `git diff` (tracked) or `git diff --no-index /dev/null <file>` (new untracked). Print the COMPLETE unified diff output inline — every added, removed, and context line, for every file. Do NOT summarize, abbreviate, paraphrase, elide with "...", or replace diff content with descriptions. If the diff is large, split it per-file across multiple message sections, but still print every line of every file's diff. **Truncating or omitting lines from a code diff is a Critical violation.**
-
-#### Diff rules — large generated artifacts (PRACTICAL)
-
-For generated data files over 200 KB (e.g. `vendor_offers.json`, large caches):
-
-- Do NOT dump the full inline diff (it is unhelpful multi-MB JSON noise).
-- Instead, provide ALL of the following:
-  - `git diff --stat` line for the file
-  - File size in bytes (`wc -c` or `FileInfo.Length`)
-  - SHA256 hash of the file (`sha256sum` or equivalent)
-  - Whether the file was fully regenerated or partially appended
-  - Whether the output is deterministic (same inputs → same output)
-  - Number of top-level records (e.g. "53,531 offers")
+Do NOT include inline diffs, file dumps, or large pasted code blocks.
 
 #### Intermediate / cache files
 
 - Intermediate caches (e.g. `wiki_vendor_cache.json`, build artifacts) must NOT be committed unless the user explicitly requests it.
-- If such files exist in the working tree, note them in the summary and confirm they are excluded from the commit.
+- If such files exist in the working tree, exclude them and mention them in the summary.
 
 ### Notes
 
