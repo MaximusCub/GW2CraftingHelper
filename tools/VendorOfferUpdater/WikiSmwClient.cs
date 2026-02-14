@@ -245,25 +245,32 @@ namespace VendorOfferUpdater
         }
 
         /// <summary>
-        /// Resolves a set of item names to their GW2 game IDs by querying the wiki.
-        /// Used for vendor costs that reference items rather than wallet currencies.
+        /// Resolves item names to GW2 game IDs by querying wiki pages directly.
+        /// Uses the page title as the SMW subject (e.g. [[Piece of Candy Corn]])
+        /// rather than matching on property values, which is more reliable across
+        /// redirects and naming variants.
+        /// Names are batched using [[A||B||C]] OR syntax to minimize requests.
         /// </summary>
         public async Task<Dictionary<string, int>> ResolveItemGameIdsAsync(
             IEnumerable<string> itemNames, CancellationToken ct = default)
         {
             var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var names = itemNames.ToList();
 
-            foreach (var name in itemNames)
+            // Batch into groups to keep URL length reasonable
+            const int batchSize = 50;
+
+            for (int i = 0; i < names.Count; i += batchSize)
             {
                 ct.ThrowIfCancellationRequested();
 
-                var query = $"[[Has canonical name::{name}]][[Has context::Item]]" +
-                    "|?Has game id" +
-                    "|limit=1";
+                var batch = names.Skip(i).Take(batchSize).ToList();
+                var condition = "[[" + string.Join("||", batch) + "]]";
+                var query = condition + "|?Has game id";
 
                 var url = $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}&format=json";
 
-                Console.WriteLine($"  Resolving item \"{name}\"...");
+                Console.WriteLine($"  Resolving batch {i / batchSize + 1} ({batch.Count} items)...");
 
                 var response = await FetchWithRetryAsync(url, ct);
                 using var doc = JsonDocument.Parse(response);
@@ -279,13 +286,19 @@ namespace VendorOfferUpdater
                             printouts.TryGetProperty("Has game id", out var gameIds) &&
                             gameIds.GetArrayLength() > 0)
                         {
-                            result[name] = gameIds[0].GetInt32();
+                            int gameId = gameIds[0].GetInt32();
+                            if (gameId > 0)
+                            {
+                                result[prop.Name] = gameId;
+                            }
                         }
-                        break; // only need first result
                     }
                 }
 
-                await Task.Delay(DelayBetweenRequestsMs, ct);
+                if (i + batchSize < names.Count)
+                {
+                    await Task.Delay(DelayBetweenRequestsMs, ct);
+                }
             }
 
             return result;

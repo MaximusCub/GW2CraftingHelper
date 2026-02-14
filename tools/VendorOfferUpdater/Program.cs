@@ -88,20 +88,56 @@ namespace VendorOfferUpdater
             // Step 3: Resolve item-based currencies via wiki
             // Some vendor costs reference items (e.g. "Piece of Candy Corn") rather
             // than wallet currencies. Collect unknown names and resolve their game IDs.
+            string cachePath = Path.Combine(
+                Path.GetDirectoryName(outputPath) ?? ".",
+                "item_id_cache.json");
+            var itemIdCache = LoadItemIdCache(cachePath);
+
             var unknownCurrencyNames = wikiResults
                 .SelectMany(r => r.CostEntries)
                 .Select(c => c.Currency)
-                .Where(name => !string.IsNullOrEmpty(name) && !apiHelper.ResolveCurrencyId(name).HasValue)
+                .Where(name => !string.IsNullOrEmpty(name)
+                    && !apiHelper.ResolveCurrencyId(name).HasValue
+                    && !itemIdCache.ContainsKey(name))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            var itemIdMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             if (unknownCurrencyNames.Count > 0)
             {
                 Console.WriteLine($"Resolving {unknownCurrencyNames.Count} item-based currencies via wiki...");
-                itemIdMap = await wikiClient.ResolveItemGameIdsAsync(unknownCurrencyNames, ct);
-                Console.WriteLine($"  Resolved {itemIdMap.Count} of {unknownCurrencyNames.Count} item names.");
+                var freshResolved = await wikiClient.ResolveItemGameIdsAsync(unknownCurrencyNames, ct);
+                Console.WriteLine($"  Resolved {freshResolved.Count} of {unknownCurrencyNames.Count} item names.");
+
+                // Merge into cache: hits get their ID, misses get -1
+                foreach (var name in unknownCurrencyNames)
+                {
+                    if (freshResolved.TryGetValue(name, out int id))
+                    {
+                        itemIdCache[name] = id;
+                    }
+                    else
+                    {
+                        itemIdCache[name] = -1; // miss sentinel
+                    }
+                }
+
+                SaveItemIdCache(cachePath, itemIdCache);
                 Console.WriteLine();
+            }
+            else if (itemIdCache.Count > 0)
+            {
+                Console.WriteLine($"All item-based currencies resolved from cache ({itemIdCache.Count} entries).");
+                Console.WriteLine();
+            }
+
+            // Build final map excluding misses
+            var itemIdMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in itemIdCache)
+            {
+                if (kv.Value > 0)
+                {
+                    itemIdMap[kv.Key] = kv.Value;
+                }
             }
 
             // Step 4: Convert to VendorOffers
@@ -250,6 +286,45 @@ namespace VendorOfferUpdater
                 MerchantName = merchant,
                 Locations = locations.Count > 0 ? locations : null
             };
+        }
+
+        private static Dictionary<string, int> LoadItemIdCache(string path)
+        {
+            var cache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (!File.Exists(path))
+            {
+                return cache;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(path);
+                using var doc = JsonDocument.Parse(json);
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    cache[prop.Name] = prop.Value.GetInt32();
+                }
+                Console.WriteLine($"Loaded item ID cache ({cache.Count} entries) from {path}");
+            }
+            catch
+            {
+                // Ignore corrupt cache
+            }
+
+            return cache;
+        }
+
+        private static void SaveItemIdCache(
+            string path, Dictionary<string, int> cache)
+        {
+            var sorted = cache
+                .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(sorted, options);
+            File.WriteAllText(path, json);
+            Console.WriteLine($"  Saved item ID cache ({cache.Count} entries) to {path}");
         }
 
         private static string FindRepoRoot()
