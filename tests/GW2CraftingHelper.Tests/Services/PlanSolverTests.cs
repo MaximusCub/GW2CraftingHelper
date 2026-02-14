@@ -304,5 +304,238 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromTp, step.Source);
             Assert.Equal(500, step.TotalCost);
         }
+
+        // --- Backward-compat regression tests ---
+
+        [Fact]
+        public void ExistingLeafBuyFromTp_WithNullVendorOffers_Unchanged()
+        {
+            var tree = Leaf(1, 5);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, null);
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(500, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void ExistingCraftCheaper_WithEmptyVendorOffers_Unchanged()
+        {
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>();
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers);
+
+            Assert.Equal(2, plan.Steps.Count);
+            Assert.Contains(plan.Steps, s => s.Source == AcquisitionSource.Craft && s.ItemId == 1);
+            Assert.Equal(200, plan.TotalCoinCost);
+        }
+
+        // --- Vendor offer tests ---
+
+        private static VendorOffer CoinVendorOffer(int outputItemId, int coinCost, int outputCount = 1)
+        {
+            return new VendorOffer
+            {
+                OfferId = $"test-{outputItemId}-{coinCost}",
+                OutputItemId = outputItemId,
+                OutputCount = outputCount,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = coinCost }
+                },
+                MerchantName = "TestMerchant",
+                Locations = new List<string> { "TestLoc" }
+            };
+        }
+
+        [Fact]
+        public void VendorCheaperThanTpAndCraft_ChoosesVendor()
+        {
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 400 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 200) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers);
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(200, plan.Steps[0].TotalCost);
+            Assert.Equal(200, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void VendorMoreExpensiveThanTp_ChoosesTp()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 500) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers);
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(200, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void VendorWithCurrencyCost_TracksCurrencyInPlan()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var offer = new VendorOffer
+            {
+                OfferId = "test-mixed",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 100 },
+                    new CostLine { Type = "Currency", Id = 2, Count = 50 }
+                },
+                MerchantName = "Karma Vendor",
+                Locations = new List<string>()
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers);
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(100, plan.Steps[0].TotalCost);
+            Assert.Equal(100, plan.TotalCoinCost);
+            Assert.Single(plan.CurrencyCosts);
+            Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
+            Assert.Equal(50, plan.CurrencyCosts[0].Amount);
+        }
+
+        [Fact]
+        public void VendorOnlyOption_NoTpNoCraft_ChoosesVendor()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 300) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers);
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(300, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void MultipleVendorOffers_PicksCheapest()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    1, new List<VendorOffer>
+                    {
+                        CoinVendorOffer(1, 500),
+                        CoinVendorOffer(1, 100)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers);
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(100, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void VendorOfferWithItemCosts_PricesViaTP()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } },
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+            };
+            var offer = new VendorOffer
+            {
+                OfferId = "test-item-cost",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Item", Id = 42, Count = 5 }
+                },
+                MerchantName = "Barter Vendor",
+                Locations = new List<string>()
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers);
+
+            // Vendor cost = 5 * 10 = 50, TP buy = 200 -> vendor wins
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(50, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void VendorOfferWithOutputCountGreaterThanOne_ScalesCorrectly()
+        {
+            var tree = Leaf(1, 5);
+            var prices = new Dictionary<int, ItemPrice>();
+            // Vendor sells 2 for 100 coin each batch -> need ceil(5/2)=3 batches = 300
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 100, outputCount: 2) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers);
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(300, plan.TotalCoinCost);
+        }
     }
 }

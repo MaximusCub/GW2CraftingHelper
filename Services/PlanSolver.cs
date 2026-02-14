@@ -12,14 +12,23 @@ namespace GW2CraftingHelper.Services
             public AcquisitionSource Source;
             public long? TotalCost;
             public int RecipeId;
+            public List<CostLine> VendorCurrencyCosts;
         }
 
         public CraftingPlan Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
         {
+            return Solve(tree, prices, null);
+        }
+
+        public CraftingPlan Solve(
+            RecipeNode tree,
+            IReadOnlyDictionary<int, ItemPrice> prices,
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers)
+        {
             var memo = new Dictionary<(int, int), Decision>();
 
-            // Pass 1: decide buy vs craft at every node
-            Evaluate(tree, prices, memo);
+            // Pass 1: decide buy vs craft vs vendor at every node
+            Evaluate(tree, prices, vendorOffers, memo);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -55,7 +64,8 @@ namespace GW2CraftingHelper.Services
             long totalCoinCost = 0L;
             foreach (var step in steps)
             {
-                if (step.Source == AcquisitionSource.BuyFromTp)
+                if (step.Source == AcquisitionSource.BuyFromTp ||
+                    step.Source == AcquisitionSource.BuyFromVendor)
                 {
                     totalCoinCost += step.TotalCost;
                 }
@@ -80,6 +90,7 @@ namespace GW2CraftingHelper.Services
         private long? Evaluate(
             RecipeNode node,
             IReadOnlyDictionary<int, ItemPrice> prices,
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             Dictionary<(int, int), Decision> memo)
         {
             if (node.IngredientType == "Currency")
@@ -93,19 +104,40 @@ namespace GW2CraftingHelper.Services
                 return cached.TotalCost;
             }
 
+            long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices);
+
+            // Evaluate vendor offers
+            EvaluateVendorOffers(
+                node, prices, vendorOffers,
+                out long? bestVendorCoinCost,
+                out List<CostLine> bestVendorCurrencyCosts);
+
             // Leaf item: no recipes
             if (node.IsLeaf)
             {
-                long? buyCost = GetBuyCost(node.Id, node.Quantity, prices);
-                if (buyCost.HasValue)
+                var winner = PickCheapest(buyTotalCost, null, bestVendorCoinCost);
+
+                if (winner == AcquisitionSource.BuyFromVendor)
+                {
+                    memo[key] = new Decision
+                    {
+                        Source = AcquisitionSource.BuyFromVendor,
+                        TotalCost = bestVendorCoinCost,
+                        RecipeId = 0,
+                        VendorCurrencyCosts = bestVendorCurrencyCosts
+                    };
+                    return bestVendorCoinCost;
+                }
+
+                if (winner == AcquisitionSource.BuyFromTp)
                 {
                     memo[key] = new Decision
                     {
                         Source = AcquisitionSource.BuyFromTp,
-                        TotalCost = buyCost.Value,
+                        TotalCost = buyTotalCost.Value,
                         RecipeId = 0
                     };
-                    return buyCost.Value;
+                    return buyTotalCost.Value;
                 }
 
                 memo[key] = new Decision
@@ -118,8 +150,6 @@ namespace GW2CraftingHelper.Services
             }
 
             // Has recipes: evaluate each option
-            long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices);
-
             long? bestCraftCost = null;
             int bestRecipeId = 0;
 
@@ -135,7 +165,7 @@ namespace GW2CraftingHelper.Services
                         continue;
                     }
 
-                    long? ingredientCost = Evaluate(ingredient, prices, memo);
+                    long? ingredientCost = Evaluate(ingredient, prices, vendorOffers, memo);
                     if (!ingredientCost.HasValue)
                     {
                         allPriceable = false;
@@ -155,37 +185,26 @@ namespace GW2CraftingHelper.Services
                 }
                 else if (!bestCraftCost.HasValue && bestRecipeId == 0)
                 {
-                    // Track unpriceable craft as fallback if no priceable option yet
                     bestRecipeId = recipe.RecipeId;
                 }
             }
 
-            // Compare buy vs craft
-            if (buyTotalCost.HasValue && bestCraftCost.HasValue)
+            // Three-way comparison: vendor vs TP buy vs craft
+            var source = PickCheapest(buyTotalCost, bestCraftCost, bestVendorCoinCost);
+
+            if (source == AcquisitionSource.BuyFromVendor)
             {
-                if (buyTotalCost.Value <= bestCraftCost.Value)
+                memo[key] = new Decision
                 {
-                    memo[key] = new Decision
-                    {
-                        Source = AcquisitionSource.BuyFromTp,
-                        TotalCost = buyTotalCost.Value,
-                        RecipeId = 0
-                    };
-                    return buyTotalCost.Value;
-                }
-                else
-                {
-                    memo[key] = new Decision
-                    {
-                        Source = AcquisitionSource.Craft,
-                        TotalCost = bestCraftCost.Value,
-                        RecipeId = bestRecipeId
-                    };
-                    return bestCraftCost.Value;
-                }
+                    Source = AcquisitionSource.BuyFromVendor,
+                    TotalCost = bestVendorCoinCost,
+                    RecipeId = 0,
+                    VendorCurrencyCosts = bestVendorCurrencyCosts
+                };
+                return bestVendorCoinCost;
             }
 
-            if (buyTotalCost.HasValue)
+            if (source == AcquisitionSource.BuyFromTp)
             {
                 memo[key] = new Decision
                 {
@@ -196,6 +215,18 @@ namespace GW2CraftingHelper.Services
                 return buyTotalCost.Value;
             }
 
+            if (source == AcquisitionSource.Craft)
+            {
+                memo[key] = new Decision
+                {
+                    Source = AcquisitionSource.Craft,
+                    TotalCost = bestCraftCost,
+                    RecipeId = bestRecipeId
+                };
+                return bestCraftCost;
+            }
+
+            // Fallback: unpriceable craft or unknown
             if (bestRecipeId != 0)
             {
                 memo[key] = new Decision
@@ -214,6 +245,127 @@ namespace GW2CraftingHelper.Services
                 RecipeId = 0
             };
             return null;
+        }
+
+        private static void EvaluateVendorOffers(
+            RecipeNode node,
+            IReadOnlyDictionary<int, ItemPrice> prices,
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
+            out long? bestCoinCost,
+            out List<CostLine> bestCurrencyCosts)
+        {
+            bestCoinCost = null;
+            bestCurrencyCosts = null;
+
+            if (vendorOffers == null ||
+                !vendorOffers.TryGetValue(node.Id, out var offers))
+            {
+                return;
+            }
+
+            foreach (var offer in offers)
+            {
+                if (offer.OutputCount <= 0)
+                {
+                    continue;
+                }
+
+                long coinCost = 0;
+                bool priceable = true;
+                var currencyCosts = new List<CostLine>();
+
+                foreach (var cost in offer.CostLines ?? Enumerable.Empty<CostLine>())
+                {
+                    if (string.Equals(cost.Type, "Currency", StringComparison.Ordinal))
+                    {
+                        if (cost.Id == Gw2Constants.CoinCurrencyId)
+                        {
+                            coinCost += (long)cost.Count;
+                        }
+                        else
+                        {
+                            currencyCosts.Add(cost);
+                        }
+                    }
+                    else if (string.Equals(cost.Type, "Item", StringComparison.Ordinal))
+                    {
+                        if (prices.TryGetValue(cost.Id, out var itemPrice) &&
+                            itemPrice.BuyInstant > 0)
+                        {
+                            coinCost += (long)cost.Count * itemPrice.BuyInstant;
+                        }
+                        else
+                        {
+                            priceable = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (!priceable)
+                {
+                    continue;
+                }
+
+                int unitsNeeded = (int)Math.Ceiling((double)node.Quantity / offer.OutputCount);
+                long totalCoinCost = coinCost * unitsNeeded;
+
+                var scaledCurrencyCosts = new List<CostLine>();
+                foreach (var cc in currencyCosts)
+                {
+                    long scaled = (long)cc.Count * unitsNeeded;
+                    scaledCurrencyCosts.Add(new CostLine
+                    {
+                        Type = cc.Type,
+                        Id = cc.Id,
+                        Count = checked((int)scaled)
+                    });
+                }
+
+                if (!bestCoinCost.HasValue || totalCoinCost < bestCoinCost.Value)
+                {
+                    bestCoinCost = totalCoinCost;
+                    bestCurrencyCosts = scaledCurrencyCosts;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Pick cheapest among TP buy, craft, and vendor (by coin cost).
+        /// Ties: BuyFromVendor beats BuyFromTp beats Craft.
+        /// Returns UnknownSource if none are available.
+        /// </summary>
+        private static AcquisitionSource PickCheapest(
+            long? buyCost, long? craftCost, long? vendorCost)
+        {
+            long? best = null;
+            var source = AcquisitionSource.UnknownSource;
+
+            if (vendorCost.HasValue)
+            {
+                best = vendorCost.Value;
+                source = AcquisitionSource.BuyFromVendor;
+            }
+
+            if (buyCost.HasValue)
+            {
+                if (!best.HasValue || buyCost.Value < best.Value)
+                {
+                    best = buyCost.Value;
+                    source = AcquisitionSource.BuyFromTp;
+                }
+            }
+
+            if (craftCost.HasValue)
+            {
+                if (!best.HasValue || craftCost.Value < best.Value)
+                {
+                    best = craftCost.Value;
+                    source = AcquisitionSource.Craft;
+                }
+            }
+
+            return source;
         }
 
         private void Collect(
@@ -265,6 +417,27 @@ namespace GW2CraftingHelper.Services
                 var stepKey = (node.Id, AcquisitionSource.Craft, decision.RecipeId);
                 AggregateStep(stepMap, stepKey, node, decision);
             }
+            else if (decision.Source == AcquisitionSource.BuyFromVendor)
+            {
+                // Add vendor currency costs to the currency map
+                if (decision.VendorCurrencyCosts != null)
+                {
+                    foreach (var cc in decision.VendorCurrencyCosts)
+                    {
+                        if (currencyMap.ContainsKey(cc.Id))
+                        {
+                            currencyMap[cc.Id] += cc.Count;
+                        }
+                        else
+                        {
+                            currencyMap[cc.Id] = cc.Count;
+                        }
+                    }
+                }
+
+                var stepKey = (node.Id, AcquisitionSource.BuyFromVendor, 0);
+                AggregateStep(stepMap, stepKey, node, decision);
+            }
             else
             {
                 var stepKey = (node.Id, decision.Source, 0);
@@ -284,7 +457,9 @@ namespace GW2CraftingHelper.Services
                 existing.TotalCost = decision.TotalCost.HasValue
                     ? existing.TotalCost + decision.TotalCost.Value
                     : existing.TotalCost;
-                if (existing.Source == AcquisitionSource.BuyFromTp && existing.Quantity > 0)
+                if ((existing.Source == AcquisitionSource.BuyFromTp ||
+                     existing.Source == AcquisitionSource.BuyFromVendor) &&
+                    existing.Quantity > 0)
                 {
                     existing.UnitCost = existing.TotalCost / existing.Quantity;
                 }
@@ -292,7 +467,9 @@ namespace GW2CraftingHelper.Services
             else
             {
                 long unitCost = 0;
-                if (decision.Source == AcquisitionSource.BuyFromTp && node.Quantity > 0 && decision.TotalCost.HasValue)
+                if ((decision.Source == AcquisitionSource.BuyFromTp ||
+                     decision.Source == AcquisitionSource.BuyFromVendor) &&
+                    node.Quantity > 0 && decision.TotalCost.HasValue)
                 {
                     unitCost = decision.TotalCost.Value / node.Quantity;
                 }

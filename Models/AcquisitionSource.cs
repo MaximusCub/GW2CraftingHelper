@@ -5,6 +5,7 @@ namespace GW2CraftingHelper.Models
         BuyFromTp,
         Craft,
         Currency,
+        BuyFromVendor,
         UnknownSource
     }
 }
