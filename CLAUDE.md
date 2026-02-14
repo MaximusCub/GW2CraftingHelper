@@ -153,6 +153,18 @@ Do NOT include inline diffs, file dumps, or large pasted code blocks.
 - Intermediate caches (e.g. `wiki_vendor_cache.json`, build artifacts) must NOT be committed unless the user explicitly requests it.
 - If such files exist in the working tree, exclude them and mention them in the summary.
 
+### Diff rules — code and small files (STRICT)
+
+For NEW files:
+- First run: `git add <file>`
+- Then run: `git diff --cached -- <file>`
+- Print the FULL unified diff from `--cached`.
+- Do NOT use `/dev/null`.
+- Do NOT use `--no-index`.
+
+Never use `/dev/null` in any git command.
+Never use `git diff --no-index` for new files.
+
 ### Notes
 
 - Never skip the immediate review after a file edit.
