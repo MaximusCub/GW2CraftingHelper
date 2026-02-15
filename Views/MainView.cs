@@ -25,9 +25,26 @@ namespace GW2CraftingHelper.Views
         private readonly Action<string> _saveStatus;
         private readonly Action _switchToCrafting;
 
+        // Layout constants
+        private const int TabHeight = 35;
+        private const int HeaderRowY = 40;
+        private const int HeaderHeight = 40;
+        private const int FilterRowY = 85;
+        private const int FilterHeight = 40;
+        private const int CoinRowY = 130;
+        private const int CoinHeight = 24;
+        private const int ContentY = 158;
+        private const int TopRegionHeight = 160;
+
+        // UI controls (stored for resize handler)
+        private Panel _tabPanel;
+        private Panel _headerPanel;
+        private Panel _filterPanel;
         private FlowPanel _contentPanel;
         private Dropdown _filterDropdown;
         private Checkbox _aggregateCheckbox;
+        private StandardButton _clearButton;
+        private StandardButton _refreshButton;
 
         private Panel _coinPanel;
         private Label _statusLabel;
@@ -69,9 +86,9 @@ namespace GW2CraftingHelper.Views
             int w = buildPanel.ContentRegion.Width;
 
             // Tab bar
-            var tabPanel = new Panel()
+            _tabPanel = new Panel()
             {
-                Size = new Point(w, 35),
+                Size = new Point(w, TabHeight),
                 Parent = buildPanel
             };
 
@@ -81,7 +98,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(100, 28),
                 Location = new Point(0, 3),
                 Enabled = false, // current tab
-                Parent = tabPanel
+                Parent = _tabPanel
             };
 
             if (_switchToCrafting != null)
@@ -91,16 +108,16 @@ namespace GW2CraftingHelper.Views
                     Text = "Crafting Plan",
                     Size = new Point(110, 28),
                     Location = new Point(105, 3),
-                    Parent = tabPanel
+                    Parent = _tabPanel
                 };
                 craftingTab.Click += (_, __) => _switchToCrafting();
             }
 
             // Header row
-            var headerPanel = new Panel()
+            _headerPanel = new Panel()
             {
-                Size = new Point(w, 40),
-                Location = new Point(0, 40),
+                Size = new Point(w, HeaderHeight),
+                Location = new Point(0, HeaderRowY),
                 Parent = buildPanel
             };
 
@@ -110,7 +127,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(0, 8),
-                Parent = headerPanel
+                Parent = _headerPanel
             };
 
             _statusLabel = new Label()
@@ -119,28 +136,28 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(140, 12),
-                Parent = headerPanel
+                Parent = _headerPanel
             };
 
-            var clearButton = new StandardButton()
+            _clearButton = new StandardButton()
             {
                 Text = "Clear Cache",
                 Size = new Point(100, 30),
                 Location = new Point(w - 220, 5),
-                Parent = headerPanel,
+                Parent = _headerPanel,
                 Enabled = _clearCache != null
             };
 
-            var refreshButton = new StandardButton()
+            _refreshButton = new StandardButton()
             {
                 Text = "Refresh Now",
                 Size = new Point(100, 30),
                 Location = new Point(w - 110, 5),
-                Parent = headerPanel,
+                Parent = _headerPanel,
                 Enabled = _refreshAsync != null
             };
 
-            clearButton.Click += (_, __) =>
+            _clearButton.Click += (_, __) =>
             {
                 _clearCache();
                 SetSnapshot(null);
@@ -149,12 +166,12 @@ namespace GW2CraftingHelper.Views
                 _saveStatus(status);
             };
 
-            refreshButton.Click += async (_, __) =>
+            _refreshButton.Click += async (_, __) =>
             {
                 if (_refreshAsync == null) return;
 
-                refreshButton.Enabled = false;
-                clearButton.Enabled = false;
+                _refreshButton.Enabled = false;
+                _clearButton.Enabled = false;
                 SetStatus("Refreshing...");
 
                 try
@@ -181,16 +198,16 @@ namespace GW2CraftingHelper.Views
                 }
                 finally
                 {
-                    refreshButton.Enabled = true;
-                    clearButton.Enabled = true;
+                    _refreshButton.Enabled = true;
+                    _clearButton.Enabled = true;
                 }
             };
 
             // Filter row
-            var filterPanel = new Panel()
+            _filterPanel = new Panel()
             {
-                Size = new Point(w, 40),
-                Location = new Point(0, 85),
+                Size = new Point(w, FilterHeight),
+                Location = new Point(0, FilterRowY),
                 Parent = buildPanel
             };
 
@@ -198,7 +215,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(150, 30),
                 Location = new Point(0, 5),
-                Parent = filterPanel
+                Parent = _filterPanel
             };
             _filterDropdown.Items.Add("All");
             _filterDropdown.Items.Add("Items");
@@ -211,15 +228,15 @@ namespace GW2CraftingHelper.Views
                 Text = "Aggregate",
                 Size = new Point(120, 25),
                 Location = new Point(160, 8),
-                Parent = filterPanel
+                Parent = _filterPanel
             };
             _aggregateCheckbox.CheckedChanged += (_, __) => RebuildContent();
 
             // Coin display
             _coinPanel = new Panel()
             {
-                Size = new Point(w, 24),
-                Location = new Point(0, 130),
+                Size = new Point(w, CoinHeight),
+                Location = new Point(0, CoinRowY),
                 Parent = buildPanel
             };
             UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
@@ -227,14 +244,32 @@ namespace GW2CraftingHelper.Views
             // Scrollable content
             _contentPanel = new FlowPanel()
             {
-                Size = new Point(w, buildPanel.ContentRegion.Height - 160),
-                Location = new Point(0, 158),
+                Size = new Point(w, buildPanel.ContentRegion.Height - TopRegionHeight),
+                Location = new Point(0, ContentY),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
                 Parent = buildPanel
             };
 
+            // Subscribe to resize
+            buildPanel.Resized += OnPanelResized;
+
             RebuildContent();
+        }
+
+        private void OnPanelResized(object sender, ResizedEventArgs e)
+        {
+            var container = (Container)sender;
+            int w = container.ContentRegion.Width;
+            int h = container.ContentRegion.Height;
+
+            _tabPanel.Size = new Point(w, TabHeight);
+            _headerPanel.Size = new Point(w, HeaderHeight);
+            _clearButton.Location = new Point(w - 220, 5);
+            _refreshButton.Location = new Point(w - 110, 5);
+            _filterPanel.Size = new Point(w, FilterHeight);
+            _coinPanel.Size = new Point(w, CoinHeight);
+            _contentPanel.Size = new Point(w, h - TopRegionHeight);
         }
 
         private void RebuildContent()
