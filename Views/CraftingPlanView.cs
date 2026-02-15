@@ -319,6 +319,8 @@ namespace GW2CraftingHelper.Views
 
             // Plan header: fixed-height container with vertically centered icon + title
             const int headerHeight = 56;
+            const int headerTopPad = 10;
+            const int headerBottomPad = 4;
             const int iconSize = 32;
             const int iconPad = 8;
 
@@ -330,7 +332,8 @@ namespace GW2CraftingHelper.Views
 
             int totalTitleWidth = iconSize + iconPad + textWidth;
             int startX = System.Math.Max(0, (panelWidth - totalTitleWidth) / 2);
-            int iconY = (headerHeight - iconSize) / 2;
+            int centerRegion = headerHeight - headerTopPad - headerBottomPad;
+            int iconY = headerTopPad + (centerRegion - iconSize) / 2;
             // Anchor text to icon's visual center with -2px optical nudge for descenders
             int textY = iconY + (iconSize - textHeight) / 2 - 2;
 
