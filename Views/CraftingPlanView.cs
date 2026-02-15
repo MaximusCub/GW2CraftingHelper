@@ -254,15 +254,21 @@ namespace GW2CraftingHelper.Views
             {
                 // Show modal confirmation before regenerating
                 _useOwnMaterials = newValue;
+                _ownMaterialsCheckbox.Enabled = false;
                 _modalDialog.Show(
                     "This will regenerate the plan. Continue?",
-                    () => { _ = TriggerGenerate(); },
+                    () =>
+                    {
+                        _ownMaterialsCheckbox.Enabled = true;
+                        _ = TriggerGenerate();
+                    },
                     () =>
                     {
                         _useOwnMaterials = !_useOwnMaterials;
                         _suppressToggle = true;
                         _ownMaterialsCheckbox.Checked = _useOwnMaterials;
                         _suppressToggle = false;
+                        _ownMaterialsCheckbox.Enabled = true;
                     });
                 return;
             }
