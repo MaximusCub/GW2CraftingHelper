@@ -488,5 +488,203 @@ namespace GW2CraftingHelper.Tests.Services
             long expectedTotal = 88L + 296 + 1536 + 250L * 130;
             Assert.Equal(expectedTotal, result.Plan.TotalCoinCost);
         }
+
+        [Fact]
+        public async Task MysticForgeRecipe_NeverMarkedAsMissing()
+        {
+            // MF recipes are inherently available — they must never show IsMissing=true,
+            // even when a learned recipe set is provided that doesn't contain them.
+            var api = new InMemoryRecipeApiClient();
+            var mfData = LoadMfData();
+            var composite = new CompositeRecipeApiClient(api, mfData);
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(MysticSalvageKitId, buyUnitPrice: 100, sellUnitPrice: 9999999);
+            priceApi.AddPrice(FineSalvageKitId, buyUnitPrice: 100, sellUnitPrice: 200);
+            priceApi.AddPrice(JourneymansSalvageKitId, buyUnitPrice: 100, sellUnitPrice: 300);
+            priceApi.AddPrice(MastersSalvageKitId, buyUnitPrice: 100, sellUnitPrice: 400);
+            priceApi.AddPrice(MysticForgeStoneId, buyUnitPrice: 10, sellUnitPrice: 20);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(MysticSalvageKitId, "Mystic Salvage Kit", "icon.png");
+            itemApi.AddItem(FineSalvageKitId, "Fine Salvage Kit", "icon.png");
+            itemApi.AddItem(JourneymansSalvageKitId, "Journeyman's Salvage Kit", "icon.png");
+            itemApi.AddItem(MastersSalvageKitId, "Master's Salvage Kit", "icon.png");
+            itemApi.AddItem(MysticForgeStoneId, "Mystic Forge Stone", "icon.png");
+
+            // Learned set has some positive recipes but NOT the negative MF ID
+            var accountClient = new InMemoryAccountRecipeClient();
+            accountClient.AddLearnedRecipe(9999);
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(composite),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer(),
+                accountRecipeClient: accountClient);
+
+            var result = await pipeline.GenerateStructuredAsync(
+                MysticSalvageKitId, 1, null, CancellationToken.None);
+
+            // MF recipe -4 should be in RequiredRecipes
+            var mfRecipe = result.RequiredRecipes.FirstOrDefault(r => r.RecipeId == -4);
+            Assert.NotNull(mfRecipe);
+
+            // IsMissing must be false — MF recipes don't need unlocking
+            Assert.False(mfRecipe.IsMissing,
+                "Mystic Forge recipes should never be marked as Missing");
+        }
+
+        [Fact]
+        public async Task MysticForgeRecipe_StructuredPipeline_FullResult()
+        {
+            // Verify the full GenerateStructuredAsync path populates
+            // RequiredDisciplines, RequiredRecipes, UsedMaterials, DebugLog
+            var api = new InMemoryRecipeApiClient();
+            var mfData = LoadMfData();
+            var composite = new CompositeRecipeApiClient(api, mfData);
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(MysticSalvageKitId, buyUnitPrice: 100, sellUnitPrice: 9999999);
+            priceApi.AddPrice(FineSalvageKitId, buyUnitPrice: 50, sellUnitPrice: 88);
+            priceApi.AddPrice(JourneymansSalvageKitId, buyUnitPrice: 100, sellUnitPrice: 296);
+            priceApi.AddPrice(MastersSalvageKitId, buyUnitPrice: 200, sellUnitPrice: 1536);
+            priceApi.AddPrice(MysticForgeStoneId, buyUnitPrice: 50, sellUnitPrice: 130);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(MysticSalvageKitId, "Mystic Salvage Kit", "icon.png");
+            itemApi.AddItem(FineSalvageKitId, "Fine Salvage Kit", "icon.png");
+            itemApi.AddItem(JourneymansSalvageKitId, "Journeyman's Salvage Kit", "icon.png");
+            itemApi.AddItem(MastersSalvageKitId, "Master's Salvage Kit", "icon.png");
+            itemApi.AddItem(MysticForgeStoneId, "Mystic Forge Stone", "icon.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(composite),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var result = await pipeline.GenerateStructuredAsync(
+                MysticSalvageKitId, 1, null, CancellationToken.None);
+
+            // Plan is present with steps
+            Assert.NotNull(result.Plan);
+            Assert.True(result.Plan.Steps.Count > 0);
+
+            // MF recipe -4 should be crafted
+            var craftStep = result.Plan.Steps.FirstOrDefault(s =>
+                s.ItemId == MysticSalvageKitId && s.Source == AcquisitionSource.Craft);
+            Assert.NotNull(craftStep);
+            Assert.Equal(-4, craftStep.RecipeId);
+
+            // RequiredDisciplines includes MysticForge
+            Assert.Contains(result.RequiredDisciplines,
+                d => d.Discipline == "MysticForge" && d.MinRating == 0);
+
+            // RequiredRecipes includes MF recipe -4
+            Assert.Contains(result.RequiredRecipes, r => r.RecipeId == -4);
+
+            // No snapshot → UsedMaterials is empty
+            Assert.Empty(result.UsedMaterials);
+
+            // DebugLog is populated
+            Assert.NotNull(result.DebugLog);
+            Assert.True(result.DebugLog.Count > 0);
+        }
+
+        [Fact]
+        public async Task NonForgeRecipe_UnchangedWhenMfDataPresent()
+        {
+            // An API-only recipe for item 500 should behave identically
+            // whether MF data is loaded or not.
+            var apiRecipe = new RawRecipe
+            {
+                Id = 42,
+                OutputItemId = 500,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 600, Count = 3 },
+                    new RawIngredient { Type = "Item", Id = 601, Count = 2 }
+                },
+                Disciplines = new List<string> { "Artificer" },
+                MinRating = 300,
+                Flags = new List<string> { "AutoLearned" }
+            };
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(500, buyUnitPrice: 1000, sellUnitPrice: 50000);
+            priceApi.AddPrice(600, buyUnitPrice: 50, sellUnitPrice: 100);
+            priceApi.AddPrice(601, buyUnitPrice: 30, sellUnitPrice: 80);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(500, "Crafted Widget", "widget.png");
+            itemApi.AddItem(600, "Material A", "a.png");
+            itemApi.AddItem(601, "Material B", "b.png");
+
+            // --- Without MF data ---
+            var apiNoMf = new InMemoryRecipeApiClient();
+            apiNoMf.AddSearchResult(500, 42);
+            apiNoMf.AddRecipe(apiRecipe);
+            var compositeNoMf = new CompositeRecipeApiClient(apiNoMf, MysticForgeRecipeData.Empty);
+
+            var pipelineNoMf = new CraftingPlanPipeline(
+                new RecipeService(compositeNoMf),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var resultNoMf = await pipelineNoMf.GenerateStructuredAsync(
+                500, 1, null, CancellationToken.None);
+
+            // --- With MF data loaded (for different items) ---
+            var apiWithMf = new InMemoryRecipeApiClient();
+            apiWithMf.AddSearchResult(500, 42);
+            apiWithMf.AddRecipe(apiRecipe);
+            var mfData = LoadMfData();
+            var compositeWithMf = new CompositeRecipeApiClient(apiWithMf, mfData);
+
+            var pipelineWithMf = new CraftingPlanPipeline(
+                new RecipeService(compositeWithMf),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var resultWithMf = await pipelineWithMf.GenerateStructuredAsync(
+                500, 1, null, CancellationToken.None);
+
+            // --- Stable invariants ---
+
+            // Same number of steps
+            Assert.Equal(resultNoMf.Plan.Steps.Count, resultWithMf.Plan.Steps.Count);
+
+            // Same target
+            Assert.Equal(resultNoMf.Plan.TargetItemId, resultWithMf.Plan.TargetItemId);
+            Assert.Equal(resultNoMf.Plan.TargetQuantity, resultWithMf.Plan.TargetQuantity);
+
+            // Craft step uses same positive recipe ID
+            var craftNoMf = resultNoMf.Plan.Steps.FirstOrDefault(s => s.Source == AcquisitionSource.Craft);
+            var craftWithMf = resultWithMf.Plan.Steps.FirstOrDefault(s => s.Source == AcquisitionSource.Craft);
+            Assert.NotNull(craftNoMf);
+            Assert.NotNull(craftWithMf);
+            Assert.Equal(42, craftNoMf.RecipeId);
+            Assert.Equal(42, craftWithMf.RecipeId);
+
+            // No negative (MF) recipe IDs appear in steps
+            Assert.DoesNotContain(resultWithMf.Plan.Steps, s => s.RecipeId < 0);
+
+            // Same total cost (deterministic in-memory harness)
+            Assert.Equal(resultNoMf.Plan.TotalCoinCost, resultWithMf.Plan.TotalCoinCost);
+
+            // RequiredDisciplines: Artificer present, MysticForge absent
+            Assert.Contains(resultWithMf.RequiredDisciplines,
+                d => d.Discipline == "Artificer");
+            Assert.DoesNotContain(resultWithMf.RequiredDisciplines,
+                d => d.Discipline == "MysticForge");
+        }
     }
 }

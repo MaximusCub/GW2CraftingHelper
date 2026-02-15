@@ -110,9 +110,18 @@ namespace GW2CraftingHelper.Services
                 }
 
                 bool isAutoLearned = option.Flags.Contains("AutoLearned");
-                bool? isMissing = learnedRecipeIds != null
-                    ? (bool?)!learnedRecipeIds.Contains(step.RecipeId)
-                    : null;
+                bool? isMissing;
+                if (IsMysticForgeRecipeId(step.RecipeId))
+                {
+                    // Mystic Forge recipes are inherently available — no unlock needed
+                    isMissing = false;
+                }
+                else
+                {
+                    isMissing = learnedRecipeIds != null
+                        ? (bool?)!learnedRecipeIds.Contains(step.RecipeId)
+                        : null;
+                }
 
                 requiredRecipes.Add(new RequiredRecipe
                 {
@@ -153,6 +162,11 @@ namespace GW2CraftingHelper.Services
                 RequiredRecipes = requiredRecipes,
                 DebugLog = debugLog
             };
+        }
+
+        private static bool IsMysticForgeRecipeId(int recipeId)
+        {
+            return recipeId < 0;
         }
 
         private static RecipeOption FindRecipeOption(RecipeNode node, int recipeId)
