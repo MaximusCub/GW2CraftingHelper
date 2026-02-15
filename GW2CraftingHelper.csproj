@@ -98,6 +98,7 @@
     <Compile Include="Services\IAccountRecipeClient.cs" />
     <Compile Include="Models\PlanViewModel.cs" />
     <Compile Include="Services\PlanViewModelBuilder.cs" />
+    <Compile Include="Services\Gw2AccountRecipeClient.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">
