@@ -116,8 +116,23 @@ namespace GW2CraftingHelper.Tests.Services
             var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
             var ccRows = summary.Rows.Where(r => r.RowType == PlanRowType.CurrencyCost).ToList();
             Assert.Equal(2, ccRows.Count);
-            Assert.Equal("50x Currency#23", ccRows[0].Label);
-            Assert.Equal("100x Currency#45", ccRows[1].Label);
+            Assert.Equal("50x Spirit Shards", ccRows[0].Label);
+            Assert.Equal("100x Volatile Magic", ccRows[1].Label);
+        }
+
+        [Fact]
+        public void SummarySection_UnknownCurrency_NoIdDisplayed()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 99999, Amount = 10 }
+            });
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("10x Currency", ccRow.Label);
+            Assert.DoesNotContain("99999", ccRow.Label);
         }
 
         // --- Used Materials ---
