@@ -181,11 +181,20 @@ namespace GW2CraftingHelper.Views
             };
             BuildConfirmPanel(_confirmPanel);
 
+            // Separator between controls and plan area
+            new Panel()
+            {
+                Size = new Point(w, 1),
+                Location = new Point(0, 138),
+                BackgroundColor = new Color(100, 100, 100),
+                Parent = buildPanel
+            };
+
             // Scrollable content area for sections
             _contentPanel = new FlowPanel()
             {
                 Size = new Point(w, buildPanel.ContentRegion.Height - 155),
-                Location = new Point(0, 140),
+                Location = new Point(0, 145),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
                 Parent = buildPanel
@@ -327,6 +336,40 @@ namespace GW2CraftingHelper.Views
             }
 
             int panelWidth = _contentPanel.Width;
+
+            // Plan header: title + generated timestamp
+            var headerPanel = new Panel()
+            {
+                Size = new Point(panelWidth, 40),
+                Parent = _contentPanel
+            };
+
+            new Label()
+            {
+                Text = $"{vm.TargetItemName} Crafting Plan",
+                Font = GameService.Content.DefaultFont18,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(4, 4),
+                Parent = headerPanel
+            };
+
+            new Label()
+            {
+                Text = $"Generated: {DateTime.Now:g}",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(panelWidth - 200, 10),
+                Parent = headerPanel
+            };
+
+            // Separator under header
+            new Panel()
+            {
+                Size = new Point(panelWidth, 1),
+                BackgroundColor = new Color(80, 80, 80),
+                Parent = _contentPanel
+            };
 
             foreach (var section in vm.Sections)
             {

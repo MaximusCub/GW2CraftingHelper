@@ -17,6 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\GW2CraftingHelper.csproj">
       <SetPlatform>Platform=x64</SetPlatform>
     </ProjectReference>

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,21 +28,37 @@ namespace GW2CraftingHelper.Services
 
             var ids = string.Join(",", itemIds);
             var url = $"{BaseUrl}/items?ids={ids}";
-            var json = await _http.GetStringAsync(url);
-            var array = JArray.Parse(json);
 
-            var results = new List<RawItem>();
-            foreach (var item in array)
+            using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+            using (var response = await _http.SendAsync(request, ct))
             {
-                results.Add(new RawItem
+                if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    Id = item.Value<int>("id"),
-                    Name = item.Value<string>("name") ?? "",
-                    Icon = item.Value<string>("icon") ?? ""
-                });
-            }
+                    return new List<RawItem>();
+                }
 
-            return results;
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        $"GW2 API error {(int)response.StatusCode} from {url}");
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var array = JArray.Parse(json);
+
+                var results = new List<RawItem>();
+                foreach (var item in array)
+                {
+                    results.Add(new RawItem
+                    {
+                        Id = item.Value<int>("id"),
+                        Name = item.Value<string>("name") ?? "",
+                        Icon = item.Value<string>("icon") ?? ""
+                    });
+                }
+
+                return results;
+            }
         }
     }
 }

@@ -34,7 +34,7 @@ namespace GW2CraftingHelper.Services
                 Quantity = quantity
             };
 
-            if (ingredientType != "Item")
+            if (!string.IsNullOrEmpty(ingredientType) && ingredientType != "Item")
             {
                 return node;
             }
