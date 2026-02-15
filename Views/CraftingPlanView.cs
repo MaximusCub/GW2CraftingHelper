@@ -17,8 +17,18 @@ namespace GW2CraftingHelper.Views
     {
         private static readonly Logger Logger = Logger.GetLogger<CraftingPlanView>();
 
+        // Layout constants
+        private const int TabHeight = 35;
+        private const int InputRowY = 40;
+        private const int ControlsRowY = 78;
+        private const int StatusRowY = 116;
+        private const int SeparatorY = 137;
+        private const int ContentY = 142;
+        private const int TopRegionHeight = 147;
+
         private readonly Func<int, int, bool, CancellationToken, Task<CraftingPlanResult>> _generateAsync;
         private readonly Action _switchToSnapshot;
+        private readonly ModalDialog _modalDialog;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
 
         // Dropdown items: display name -> item ID (IDs are internal-only)
@@ -34,23 +44,32 @@ namespace GW2CraftingHelper.Views
         private int _selectedItemId;
         private int _quantity = 1;
 
-        // UI controls
+        // Suppress flag for checkbox revert
+        private bool _suppressToggle;
+
+        // UI controls (stored for resize handler)
+        private Panel _tabPanel;
+        private Panel _inputPanel;
+        private Panel _controlsPanel;
         private Dropdown _itemDropdown;
         private TextBox _qtyInput;
         private Checkbox _ownMaterialsCheckbox;
         private StandardButton _generateButton;
         private Label _statusLabel;
+        private Panel _separator;
         private FlowPanel _contentPanel;
 
-        // Confirmation panel
-        private Panel _confirmPanel;
+        // Resize tracking
+        private int _lastRenderedWidth;
 
         public CraftingPlanView(
             Func<int, int, bool, CancellationToken, Task<CraftingPlanResult>> generateAsync,
-            Action switchToSnapshot)
+            Action switchToSnapshot,
+            ModalDialog modalDialog)
         {
             _generateAsync = generateAsync;
             _switchToSnapshot = switchToSnapshot;
+            _modalDialog = modalDialog;
             _selectedItemId = ItemChoices.Values.First();
         }
 
@@ -67,9 +86,9 @@ namespace GW2CraftingHelper.Views
             int w = buildPanel.ContentRegion.Width;
 
             // Tab bar
-            var tabPanel = new Panel()
+            _tabPanel = new Panel()
             {
-                Size = new Point(w, 35),
+                Size = new Point(w, TabHeight),
                 Parent = buildPanel
             };
 
@@ -78,7 +97,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Snapshot",
                 Size = new Point(100, 28),
                 Location = new Point(0, 3),
-                Parent = tabPanel
+                Parent = _tabPanel
             };
             snapshotTab.Click += (_, __) => _switchToSnapshot?.Invoke();
 
@@ -88,14 +107,14 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(110, 28),
                 Location = new Point(105, 3),
                 Enabled = false,
-                Parent = tabPanel
+                Parent = _tabPanel
             };
 
             // Input row: dropdown + quantity
-            var inputPanel = new Panel()
+            _inputPanel = new Panel()
             {
-                Size = new Point(w, 35),
-                Location = new Point(0, 40),
+                Size = new Point(w, TabHeight),
+                Location = new Point(0, InputRowY),
                 Parent = buildPanel
             };
 
@@ -103,7 +122,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(200, 28),
                 Location = new Point(0, 3),
-                Parent = inputPanel
+                Parent = _inputPanel
             };
             foreach (var name in ItemChoices.Keys)
             {
@@ -125,7 +144,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(210, 7),
-                Parent = inputPanel
+                Parent = _inputPanel
             };
 
             _qtyInput = new TextBox()
@@ -133,14 +152,14 @@ namespace GW2CraftingHelper.Views
                 Text = "1",
                 Size = new Point(50, 28),
                 Location = new Point(240, 3),
-                Parent = inputPanel
+                Parent = _inputPanel
             };
 
             // Controls row: checkbox + generate button
-            var controlsPanel = new Panel()
+            _controlsPanel = new Panel()
             {
-                Size = new Point(w, 35),
-                Location = new Point(0, 78),
+                Size = new Point(w, TabHeight),
+                Location = new Point(0, ControlsRowY),
                 Parent = buildPanel
             };
 
@@ -149,7 +168,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Use Own Materials",
                 Checked = _useOwnMaterials,
                 Location = new Point(0, 7),
-                Parent = controlsPanel
+                Parent = _controlsPanel
             };
             _ownMaterialsCheckbox.CheckedChanged += OnOwnMaterialsToggled;
 
@@ -158,7 +177,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Generate Plan",
                 Size = new Point(120, 28),
                 Location = new Point(w - 130, 3),
-                Parent = controlsPanel
+                Parent = _controlsPanel
             };
             _generateButton.Click += async (_, __) => await TriggerGenerate();
 
@@ -168,120 +187,85 @@ namespace GW2CraftingHelper.Views
                 Text = "Ready",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 116),
+                Location = new Point(0, StatusRowY),
                 Parent = buildPanel
             };
 
-            // Confirmation panel (hidden by default)
-            _confirmPanel = new Panel()
+            // Static separator between controls and content
+            _separator = new Panel()
             {
-                Size = new Point(w, 35),
-                Location = new Point(0, 116),
-                Visible = false,
+                Size = new Point(w, 2),
+                Location = new Point(0, SeparatorY),
+                BackgroundColor = new Color(180, 180, 180),
                 Parent = buildPanel
             };
-            BuildConfirmPanel(_confirmPanel);
 
             // Scrollable content area for sections
             _contentPanel = new FlowPanel()
             {
-                Size = new Point(w, buildPanel.ContentRegion.Height - 145),
-                Location = new Point(0, 140),
+                Size = new Point(w, buildPanel.ContentRegion.Height - TopRegionHeight),
+                Location = new Point(0, ContentY),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
                 Parent = buildPanel
             };
 
+            // Subscribe to resize
+            buildPanel.Resized += OnPanelResized;
+
             if (_currentPlan != null)
             {
+                _lastRenderedWidth = w;
                 RenderPlan(_currentPlan);
             }
         }
 
-        private void BuildConfirmPanel(Panel parent)
+        private void OnPanelResized(object sender, ResizedEventArgs e)
         {
-            new Label()
-            {
-                Text = "This will regenerate the plan. Continue?",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(0, 7),
-                Parent = parent
-            };
+            var container = (Container)sender;
+            int w = container.ContentRegion.Width;
+            int h = container.ContentRegion.Height;
 
-            var regenBtn = new StandardButton()
-            {
-                Text = "Regenerate",
-                Size = new Point(100, 25),
-                Location = new Point(290, 5),
-                Parent = parent
-            };
-            regenBtn.Click += async (_, __) =>
-            {
-                HideConfirm();
-                await TriggerGenerate();
-            };
+            // Update widths of layout panels
+            _tabPanel.Size = new Point(w, TabHeight);
+            _inputPanel.Size = new Point(w, TabHeight);
+            _controlsPanel.Size = new Point(w, TabHeight);
+            _generateButton.Location = new Point(w - 130, 3);
+            _separator.Size = new Point(w, 2);
+            _contentPanel.Size = new Point(w, h - TopRegionHeight);
 
-            var cancelBtn = new StandardButton()
+            // Re-render plan content when width changes (centered title, right-aligned timestamps)
+            if (_currentPlan != null && w != _lastRenderedWidth)
             {
-                Text = "Cancel",
-                Size = new Point(70, 25),
-                Location = new Point(395, 5),
-                Parent = parent
-            };
-            cancelBtn.Click += (_, __) =>
-            {
-                // Revert checkbox state
-                _useOwnMaterials = !_useOwnMaterials;
-                if (_ownMaterialsCheckbox != null)
-                {
-                    _ownMaterialsCheckbox.CheckedChanged -= OnOwnMaterialsToggled;
-                    _ownMaterialsCheckbox.Checked = _useOwnMaterials;
-                    _ownMaterialsCheckbox.CheckedChanged += OnOwnMaterialsToggled;
-                }
-                HideConfirm();
-            };
+                _lastRenderedWidth = w;
+                RenderPlan(_currentPlan);
+            }
         }
 
         private void OnOwnMaterialsToggled(object sender, CheckChangedEvent e)
         {
+            if (_suppressToggle) return;
+
             bool newValue = e.Checked;
 
             if (_currentPlan != null)
             {
-                // Show confirmation before regenerating
+                // Show modal confirmation before regenerating
                 _useOwnMaterials = newValue;
-                ShowConfirm();
+                _modalDialog.Show(
+                    "This will regenerate the plan. Continue?",
+                    () => { _ = TriggerGenerate(); },
+                    () =>
+                    {
+                        _useOwnMaterials = !_useOwnMaterials;
+                        _suppressToggle = true;
+                        _ownMaterialsCheckbox.Checked = _useOwnMaterials;
+                        _suppressToggle = false;
+                    });
                 return;
             }
 
             _useOwnMaterials = newValue;
-        }
-
-        private void ShowConfirm()
-        {
-            // Show confirmation
-            if (_confirmPanel != null)
-            {
-                _confirmPanel.Visible = true;
-            }
-            if (_statusLabel != null)
-            {
-                _statusLabel.Visible = false;
-            }
-        }
-
-        private void HideConfirm()
-        {
-            // Hide confirmation
-            if (_confirmPanel != null)
-            {
-                _confirmPanel.Visible = false;
-            }
-            if (_statusLabel != null)
-            {
-                _statusLabel.Visible = true;
-            }
         }
 
         private async Task TriggerGenerate()
@@ -305,6 +289,7 @@ namespace GW2CraftingHelper.Views
                 var vm = _vmBuilder.Build(result);
                 _currentPlan = vm;
                 _planGeneratedAt = DateTime.Now;
+                _lastRenderedWidth = _contentPanel?.Width ?? 0;
                 RenderPlan(vm);
                 SetStatus($"Plan generated \u2014 {_planGeneratedAt:MMM d, yyyy h:mm tt}");
             }
@@ -330,11 +315,10 @@ namespace GW2CraftingHelper.Views
 
             int panelWidth = _contentPanel.Width;
 
-            // Separator between controls and plan content
+            // 8px spacer before plan header
             new Panel()
             {
-                Size = new Point(panelWidth, 2),
-                BackgroundColor = new Color(180, 180, 180),
+                Size = new Point(panelWidth, 8),
                 Parent = _contentPanel
             };
 
