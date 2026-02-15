@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,21 +29,37 @@ namespace GW2CraftingHelper.Services
 
             var ids = string.Join(",", itemIds);
             var url = $"{BaseUrl}/commerce/prices?ids={ids}";
-            var json = await _http.GetStringAsync(url);
-            var array = JArray.Parse(json);
 
-            var results = new List<RawPriceEntry>();
-            foreach (var item in array)
+            using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+            using (var response = await _http.SendAsync(request, ct))
             {
-                results.Add(new RawPriceEntry
+                if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    Id = item.Value<int>("id"),
-                    BuyUnitPrice = item["buys"]?.Value<int>("unit_price") ?? 0,
-                    SellUnitPrice = item["sells"]?.Value<int>("unit_price") ?? 0
-                });
-            }
+                    return new List<RawPriceEntry>();
+                }
 
-            return results;
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        $"GW2 API error {(int)response.StatusCode} from {url}");
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var array = JArray.Parse(json);
+
+                var results = new List<RawPriceEntry>();
+                foreach (var item in array)
+                {
+                    results.Add(new RawPriceEntry
+                    {
+                        Id = item.Value<int>("id"),
+                        BuyUnitPrice = item["buys"]?.Value<int>("unit_price") ?? 0,
+                        SellUnitPrice = item["sells"]?.Value<int>("unit_price") ?? 0
+                    });
+                }
+
+                return results;
+            }
         }
     }
 }

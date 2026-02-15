@@ -30,6 +30,11 @@ namespace GW2CraftingHelper.Services
         {
             var url = $"{BaseUrl}/recipes/{recipeId}";
             var json = await _http.GetStringAsync(url);
+            return ParseRecipe(json);
+        }
+
+        internal static RawRecipe ParseRecipe(string json)
+        {
             var obj = JObject.Parse(json);
 
             var recipe = new RawRecipe
@@ -65,7 +70,7 @@ namespace GW2CraftingHelper.Services
                 {
                     recipe.Ingredients.Add(new RawIngredient
                     {
-                        Type = ing.Value<string>("type"),
+                        Type = ing.Value<string>("type") ?? "Item",
                         Id = ing.Value<int>("item_id"),
                         Count = ing.Value<int>("count")
                     });

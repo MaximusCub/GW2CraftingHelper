@@ -29,6 +29,7 @@ namespace GW2CraftingHelper.Views
         };
 
         private PlanViewModel _currentPlan;
+        private DateTime _planGeneratedAt;
         private bool _useOwnMaterials;
         private int _selectedItemId;
         private int _quantity = 1;
@@ -184,7 +185,7 @@ namespace GW2CraftingHelper.Views
             // Scrollable content area for sections
             _contentPanel = new FlowPanel()
             {
-                Size = new Point(w, buildPanel.ContentRegion.Height - 155),
+                Size = new Point(w, buildPanel.ContentRegion.Height - 145),
                 Location = new Point(0, 140),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
@@ -303,8 +304,9 @@ namespace GW2CraftingHelper.Views
 
                 var vm = _vmBuilder.Build(result);
                 _currentPlan = vm;
+                _planGeneratedAt = DateTime.Now;
                 RenderPlan(vm);
-                SetStatus($"Plan generated \u2014 {DateTime.Now:t}");
+                SetStatus($"Plan generated \u2014 {_planGeneratedAt:MMM d, yyyy h:mm tt}");
             }
             catch (Exception ex)
             {
@@ -327,6 +329,90 @@ namespace GW2CraftingHelper.Views
             }
 
             int panelWidth = _contentPanel.Width;
+
+            // Separator between controls and plan content
+            new Panel()
+            {
+                Size = new Point(panelWidth, 2),
+                BackgroundColor = new Color(180, 180, 180),
+                Parent = _contentPanel
+            };
+
+            // Plan header: centered icon + title
+            var titleFont = GameService.Content.DefaultFont18;
+            string titleText = $"{vm.TargetItemName} Crafting Plan";
+            var measured = titleFont.MeasureString(titleText);
+            int textWidth = (int)System.Math.Ceiling(measured.Width);
+
+            const int iconSize = 32;
+            const int iconPad = 8;
+            int totalTitleWidth = iconSize + iconPad + textWidth;
+            int startX = System.Math.Max(0, (panelWidth - totalTitleWidth) / 2);
+
+            var titlePanel = new Panel()
+            {
+                Size = new Point(panelWidth, 40),
+                Parent = _contentPanel
+            };
+
+            // Target item icon
+            AsyncTexture2D titleIcon;
+            if (!string.IsNullOrEmpty(vm.TargetIconUrl))
+            {
+                titleIcon = GameService.Content.GetRenderServiceTexture(vm.TargetIconUrl);
+            }
+            else
+            {
+                titleIcon = new AsyncTexture2D(ContentService.Textures.Error);
+            }
+
+            new Panel()
+            {
+                Size = new Point(iconSize, iconSize),
+                Location = new Point(startX, 4),
+                BackgroundTexture = titleIcon,
+                Parent = titlePanel
+            };
+
+            new Label()
+            {
+                Text = titleText,
+                Font = titleFont,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(startX + iconSize + iconPad, 8),
+                Parent = titlePanel
+            };
+
+            // Generated timestamp: right-aligned
+            var tsPanel = new Panel()
+            {
+                Size = new Point(panelWidth, 22),
+                Parent = _contentPanel
+            };
+
+            string tsText = $"Generated: {_planGeneratedAt:MMM d, yyyy h:mm tt}";
+            var tsFont = GameService.Content.DefaultFont14;
+            var tsMeasured = tsFont.MeasureString(tsText);
+            int tsWidth = (int)System.Math.Ceiling(tsMeasured.Width);
+
+            new Label()
+            {
+                Text = tsText,
+                Font = tsFont,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(System.Math.Max(0, panelWidth - tsWidth - 8), 2),
+                Parent = tsPanel
+            };
+
+            // Separator under header
+            new Panel()
+            {
+                Size = new Point(panelWidth, 2),
+                BackgroundColor = new Color(180, 180, 180),
+                Parent = _contentPanel
+            };
 
             foreach (var section in vm.Sections)
             {
