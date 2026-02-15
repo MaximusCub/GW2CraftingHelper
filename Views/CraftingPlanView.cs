@@ -25,6 +25,7 @@ namespace GW2CraftingHelper.Views
         private const int SeparatorY = 137;
         private const int ContentY = 142;
         private const int TopRegionHeight = 147;
+        private const int RightEdgePadding = 20;
 
         private readonly Func<int, int, bool, CancellationToken, Task<CraftingPlanResult>> _generateAsync;
         private readonly Action _switchToSnapshot;
@@ -176,7 +177,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Generate Plan",
                 Size = new Point(120, 28),
-                Location = new Point(w - 130, 3),
+                Location = new Point(w - 120 - RightEdgePadding, 3),
                 Parent = _controlsPanel
             };
             _generateButton.Click += async (_, __) => await TriggerGenerate();
@@ -194,7 +195,7 @@ namespace GW2CraftingHelper.Views
             // Static separator between controls and content
             _separator = new Panel()
             {
-                Size = new Point(w, 2),
+                Size = new Point(w - RightEdgePadding, 2),
                 Location = new Point(0, SeparatorY),
                 BackgroundColor = new Color(180, 180, 180),
                 Parent = buildPanel
@@ -203,7 +204,7 @@ namespace GW2CraftingHelper.Views
             // Scrollable content area for sections
             _contentPanel = new FlowPanel()
             {
-                Size = new Point(w, buildPanel.ContentRegion.Height - TopRegionHeight),
+                Size = new Point(w - RightEdgePadding, buildPanel.ContentRegion.Height - TopRegionHeight),
                 Location = new Point(0, ContentY),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
@@ -230,9 +231,9 @@ namespace GW2CraftingHelper.Views
             _tabPanel.Size = new Point(w, TabHeight);
             _inputPanel.Size = new Point(w, TabHeight);
             _controlsPanel.Size = new Point(w, TabHeight);
-            _generateButton.Location = new Point(w - 130, 3);
-            _separator.Size = new Point(w, 2);
-            _contentPanel.Size = new Point(w, h - TopRegionHeight);
+            _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
+            _separator.Size = new Point(w - RightEdgePadding, 2);
+            _contentPanel.Size = new Point(w - RightEdgePadding, h - TopRegionHeight);
 
             // Re-render plan content when width changes (centered title, right-aligned timestamps)
             if (_currentPlan != null && w != _lastRenderedWidth)
@@ -289,7 +290,7 @@ namespace GW2CraftingHelper.Views
                 var vm = _vmBuilder.Build(result);
                 _currentPlan = vm;
                 _planGeneratedAt = DateTime.Now;
-                _lastRenderedWidth = _contentPanel?.Width ?? 0;
+                _lastRenderedWidth = (_contentPanel?.Width ?? 0) + RightEdgePadding;
                 RenderPlan(vm);
                 SetStatus($"Plan generated \u2014 {_planGeneratedAt:MMM d, yyyy h:mm tt}");
             }
@@ -315,27 +316,25 @@ namespace GW2CraftingHelper.Views
 
             int panelWidth = _contentPanel.Width;
 
-            // 8px spacer before plan header
-            new Panel()
-            {
-                Size = new Point(panelWidth, 8),
-                Parent = _contentPanel
-            };
+            // Plan header: fixed-height container with vertically centered icon + title
+            const int headerHeight = 48;
+            const int iconSize = 32;
+            const int iconPad = 8;
 
-            // Plan header: centered icon + title
             var titleFont = GameService.Content.DefaultFont18;
             string titleText = $"{vm.TargetItemName} Crafting Plan";
             var measured = titleFont.MeasureString(titleText);
             int textWidth = (int)System.Math.Ceiling(measured.Width);
+            int textHeight = (int)System.Math.Ceiling(measured.Height);
 
-            const int iconSize = 32;
-            const int iconPad = 8;
             int totalTitleWidth = iconSize + iconPad + textWidth;
             int startX = System.Math.Max(0, (panelWidth - totalTitleWidth) / 2);
+            int iconY = (headerHeight - iconSize) / 2;
+            int textY = (headerHeight - textHeight) / 2;
 
             var titlePanel = new Panel()
             {
-                Size = new Point(panelWidth, 40),
+                Size = new Point(panelWidth, headerHeight),
                 Parent = _contentPanel
             };
 
@@ -353,7 +352,7 @@ namespace GW2CraftingHelper.Views
             new Panel()
             {
                 Size = new Point(iconSize, iconSize),
-                Location = new Point(startX, 4),
+                Location = new Point(startX, iconY),
                 BackgroundTexture = titleIcon,
                 Parent = titlePanel
             };
@@ -364,7 +363,7 @@ namespace GW2CraftingHelper.Views
                 Font = titleFont,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(startX + iconSize + iconPad, 8),
+                Location = new Point(startX + iconSize + iconPad, textY),
                 Parent = titlePanel
             };
 

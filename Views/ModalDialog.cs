@@ -24,8 +24,8 @@ namespace GW2CraftingHelper.Views
 
             _window = new StandardWindow(
                 AsyncTexture2D.FromAssetId(155997),
-                new Rectangle(0, 0, 370, 120),
-                new Rectangle(30, 30, 310, 60))
+                new Rectangle(25, 26, 380, 120),
+                new Rectangle(40, 50, 350, 70))
             {
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "Confirm",
@@ -34,12 +34,24 @@ namespace GW2CraftingHelper.Views
                 SavesPosition = true
             };
 
-            // Apply saved position from settings as fallback
+            // Position: use saved if valid and on-screen, otherwise center
+            var screen = GameService.Graphics.SpriteScreen;
+            int screenW = screen.Width;
+            int screenH = screen.Height;
+            int winW = _window.Width;
+            int winH = _window.Height;
+
             if (_settings.ModalDialogX.Value >= 0 && _settings.ModalDialogY.Value >= 0)
             {
+                int x = Math.Min(_settings.ModalDialogX.Value, Math.Max(0, screenW - winW));
+                int y = Math.Min(_settings.ModalDialogY.Value, Math.Max(0, screenH - winH));
+                _window.Location = new Point(x, y);
+            }
+            else
+            {
                 _window.Location = new Point(
-                    _settings.ModalDialogX.Value,
-                    _settings.ModalDialogY.Value);
+                    Math.Max(0, (screenW - winW) / 2),
+                    Math.Max(0, (screenH - winH) / 2));
             }
 
             _window.Moved += OnWindowMoved;
