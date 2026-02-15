@@ -104,6 +104,31 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void SearchByOutput_UnknownItem_ReturnsSameInstance()
+        {
+            var json = @"{
+                ""schemaVersion"": 1,
+                ""recipes"": [
+                    {
+                        ""id"": -1,
+                        ""outputItemId"": 19673,
+                        ""outputItemCount"": 1,
+                        ""ingredients"": [
+                            { ""type"": ""Item"", ""id"": 24295, ""count"": 250 }
+                        ]
+                    }
+                ]
+            }";
+
+            var data = MysticForgeRecipeData.Load(ToStream(json));
+            var first = data.SearchByOutput(99999);
+            var second = data.SearchByOutput(88888);
+
+            Assert.Empty(first);
+            Assert.True(ReferenceEquals(first, second), "Empty results should be the same instance");
+        }
+
+        [Fact]
         public void GetRecipe_UnknownId_ReturnsNull()
         {
             var json = @"{

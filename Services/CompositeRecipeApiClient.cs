@@ -53,18 +53,14 @@ namespace GW2CraftingHelper.Services
             return merged;
         }
 
-        public async Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
+        public Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
         {
             if (recipeId < 0)
             {
-                var mfRecipe = _mfData.GetRecipe(recipeId);
-                if (mfRecipe != null)
-                {
-                    return mfRecipe;
-                }
+                return Task.FromResult(_mfData.GetRecipe(recipeId));
             }
 
-            return await _primary.GetRecipeAsync(recipeId, ct);
+            return _primary.GetRecipeAsync(recipeId, ct);
         }
     }
 }

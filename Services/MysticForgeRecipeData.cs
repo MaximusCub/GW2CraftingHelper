@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +9,8 @@ namespace GW2CraftingHelper.Services
 {
     public class MysticForgeRecipeData
     {
+        private static readonly IReadOnlyList<int> EmptyIds = Array.Empty<int>();
+
         public static readonly MysticForgeRecipeData Empty = new MysticForgeRecipeData(
             new Dictionary<int, RawRecipe>(),
             new Dictionary<int, List<int>>(),
@@ -36,7 +39,7 @@ namespace GW2CraftingHelper.Services
                 return ids;
             }
 
-            return new List<int>();
+            return EmptyIds;
         }
 
         public RawRecipe GetRecipe(int recipeId)

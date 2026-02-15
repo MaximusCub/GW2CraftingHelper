@@ -9,6 +9,25 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
+    /// <summary>
+    /// Records whether GetRecipeAsync was called on the primary client.
+    /// </summary>
+    internal class RecordingRecipeApiClient : IRecipeApiClient
+    {
+        public bool GetRecipeCalled { get; private set; }
+
+        public Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<int>>(new List<int>());
+        }
+
+        public Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
+        {
+            GetRecipeCalled = true;
+            return Task.FromResult<RawRecipe>(null);
+        }
+    }
+
     public class CompositeRecipeApiClientTests
     {
         private static MysticForgeRecipeData LoadMfData(string json)
@@ -174,6 +193,19 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Item", recipe.Ingredients[0].Type);
             Assert.Equal(200, recipe.Ingredients[0].Id);
             Assert.Equal(4, recipe.Ingredients[0].Count);
+        }
+
+        [Fact]
+        public async Task GetRecipe_NegativeIdNotInMf_ReturnsNullWithoutCallingPrimary()
+        {
+            var recorder = new RecordingRecipeApiClient();
+            var mfData = LoadMfData(TwoMfRecipesJson);
+
+            var composite = new CompositeRecipeApiClient(recorder, mfData);
+            var recipe = await composite.GetRecipeAsync(-999, CancellationToken.None);
+
+            Assert.Null(recipe);
+            Assert.False(recorder.GetRecipeCalled, "Primary should not be called for negative IDs");
         }
     }
 }
