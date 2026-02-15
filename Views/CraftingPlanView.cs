@@ -25,7 +25,7 @@ namespace GW2CraftingHelper.Views
         private static readonly Dictionary<string, int> ItemChoices = new Dictionary<string, int>
         {
             { "Zojja's Claymore", 46762 },
-            { "Mithril Ingot", 19685 }
+            { "Mithril Ingot", 19684 }
         };
 
         private PlanViewModel _currentPlan;
