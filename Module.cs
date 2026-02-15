@@ -18,6 +18,21 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace GW2CraftingHelper
 {
+    internal class ContentsManagerRecipeSource : IMysticForgeRecipeSource
+    {
+        private readonly ContentsManager _contents;
+
+        public ContentsManagerRecipeSource(ContentsManager contents)
+        {
+            _contents = contents;
+        }
+
+        public System.IO.Stream Open()
+        {
+            return _contents.GetFileStream("mystic_forge_recipes.json");
+        }
+    }
+
     [Export(typeof(Blish_HUD.Modules.Module))]
     public class Module : Blish_HUD.Modules.Module
     {
@@ -62,7 +77,9 @@ namespace GW2CraftingHelper
             _lastStatus = _statusStore.Load();
 
             _httpClient = new HttpClient();
-            var recipeApi = new Gw2RecipeApiClient(_httpClient);
+            var rawRecipeApi = new Gw2RecipeApiClient(_httpClient);
+            var mfSource = new ContentsManagerRecipeSource(ContentsManager);
+            var recipeApi = RecipeClientFactory.Create(rawRecipeApi, mfSource);
             var priceApi = new Gw2PriceApiClient(_httpClient);
             var itemApi = new Gw2ItemApiClient(_httpClient);
 

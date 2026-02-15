@@ -99,6 +99,11 @@
     <Compile Include="Models\PlanViewModel.cs" />
     <Compile Include="Services\PlanViewModelBuilder.cs" />
     <Compile Include="Services\Gw2AccountRecipeClient.cs" />
+    <Compile Include="Services\IMysticForgeRecipeSource.cs" />
+    <Compile Include="Services\FileMysticForgeRecipeSource.cs" />
+    <Compile Include="Services\MysticForgeRecipeData.cs" />
+    <Compile Include="Services\CompositeRecipeApiClient.cs" />
+    <Compile Include="Services\RecipeClientFactory.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">
@@ -207,6 +212,9 @@
   <ItemGroup>
     <Content Include="ref\icon.png" />
     <Content Include="ref\vendor_offers.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ref\mystic_forge_recipes.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
