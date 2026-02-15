@@ -15,6 +15,7 @@ namespace GW2CraftingHelper.Views
         private readonly StandardWindow _window;
         private readonly ModuleSettings _settings;
         private bool _isShowing;
+        private bool _suppressMoved;
         private Action _onConfirm;
         private Action _onCancel;
 
@@ -101,21 +102,18 @@ namespace GW2CraftingHelper.Views
             int winW = _window.Width;
             int winH = _window.Height;
 
-            if (_settings.ModalDialogX.Value < 0 || _settings.ModalDialogY.Value < 0)
+            int sx = _window.Location.X;
+            int sy = _window.Location.Y;
+            bool fullyVisible = sx >= 0 && sy >= 0
+                && sx + winW <= screenW && sy + winH <= screenH;
+
+            if (!fullyVisible)
             {
-                // No saved position — center on screen
                 _window.Location = new Point(
                     (screenW - winW) / 2,
                     (screenH - winH) / 2);
-            }
-            else
-            {
-                // Clamp existing position so window stays fully on-screen
-                int sx = _window.Location.X;
-                int sy = _window.Location.Y;
-                int clampedX = Math.Min(Math.Max(0, sx), Math.Max(0, screenW - winW));
-                int clampedY = Math.Min(Math.Max(0, sy), Math.Max(0, screenH - winH));
-                _window.Location = new Point(clampedX, clampedY);
+                _settings.ModalDialogX.Value = _window.Location.X;
+                _settings.ModalDialogY.Value = _window.Location.Y;
             }
 
             _window.Show();
@@ -136,6 +134,22 @@ namespace GW2CraftingHelper.Views
 
         private void OnWindowMoved(object sender, MovedEventArgs e)
         {
+            if (_suppressMoved) return;
+
+            var screen = GameService.Graphics.SpriteScreen;
+            int maxX = Math.Max(0, screen.Width - _window.Width);
+            int maxY = Math.Max(0, screen.Height - _window.Height);
+
+            int clampedX = Math.Min(Math.Max(0, e.CurrentLocation.X), maxX);
+            int clampedY = Math.Min(Math.Max(0, e.CurrentLocation.Y), maxY);
+
+            if (clampedX != e.CurrentLocation.X || clampedY != e.CurrentLocation.Y)
+            {
+                _suppressMoved = true;
+                _window.Location = new Point(clampedX, clampedY);
+                _suppressMoved = false;
+            }
+
             _settings.ModalDialogX.Value = _window.Location.X;
             _settings.ModalDialogY.Value = _window.Location.Y;
         }
