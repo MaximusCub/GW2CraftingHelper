@@ -201,10 +201,11 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
-            // Scrollable content area for sections
+            // Scrollable content area — full width so scrollbar sits at the window edge.
+            // Children use (Width - RightEdgePadding) to keep content clear of the scrollbar.
             _contentPanel = new FlowPanel()
             {
-                Size = new Point(w - RightEdgePadding, buildPanel.ContentRegion.Height - TopRegionHeight),
+                Size = new Point(w, buildPanel.ContentRegion.Height - TopRegionHeight),
                 Location = new Point(0, ContentY),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
@@ -233,7 +234,7 @@ namespace GW2CraftingHelper.Views
             _controlsPanel.Size = new Point(w, TabHeight);
             _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
             _separator.Size = new Point(w - RightEdgePadding, 2);
-            _contentPanel.Size = new Point(w - RightEdgePadding, h - TopRegionHeight);
+            _contentPanel.Size = new Point(w, h - TopRegionHeight);
 
             // Re-render plan content when width changes (centered title, right-aligned timestamps)
             if (_currentPlan != null && w != _lastRenderedWidth)
@@ -290,7 +291,7 @@ namespace GW2CraftingHelper.Views
                 var vm = _vmBuilder.Build(result);
                 _currentPlan = vm;
                 _planGeneratedAt = DateTime.Now;
-                _lastRenderedWidth = (_contentPanel?.Width ?? 0) + RightEdgePadding;
+                _lastRenderedWidth = _contentPanel?.Width ?? 0;
                 RenderPlan(vm);
                 SetStatus($"Plan generated \u2014 {_planGeneratedAt:MMM d, yyyy h:mm tt}");
             }
@@ -314,7 +315,7 @@ namespace GW2CraftingHelper.Views
                 child.Dispose();
             }
 
-            int panelWidth = _contentPanel.Width;
+            int panelWidth = _contentPanel.Width - RightEdgePadding;
 
             // Plan header: fixed-height container with vertically centered icon + title
             const int headerHeight = 56;
