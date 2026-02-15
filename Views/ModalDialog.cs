@@ -22,11 +22,15 @@ namespace GW2CraftingHelper.Views
         {
             _settings = settings;
 
+            // Use a 1x1 pixel texture to avoid overflow from large asset textures.
+            // StandardWindow chrome (title bar, borders, close button) uses its own
+            // built-in textures and does not depend on the background parameter.
             _window = new StandardWindow(
-                AsyncTexture2D.FromAssetId(155997),
-                new Rectangle(25, 26, 380, 120),
-                new Rectangle(40, 50, 350, 70))
+                new AsyncTexture2D(ContentService.Textures.Pixel),
+                new Rectangle(0, 0, 400, 150),
+                new Rectangle(10, 35, 380, 105))
             {
+                BackgroundColor = new Color(30, 30, 30),
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "Confirm",
                 Id = WindowId,
