@@ -38,24 +38,27 @@ namespace GW2CraftingHelper.Views
                 SavesPosition = true
             };
 
-            // Position: use saved if valid and on-screen, otherwise center
+            // Position: use saved only if the entire window fits on-screen; otherwise center
             var screen = GameService.Graphics.SpriteScreen;
             int screenW = screen.Width;
             int screenH = screen.Height;
             int winW = _window.Width;
             int winH = _window.Height;
 
-            if (_settings.ModalDialogX.Value >= 0 && _settings.ModalDialogY.Value >= 0)
+            int sx = _settings.ModalDialogX.Value;
+            int sy = _settings.ModalDialogY.Value;
+            bool fullyVisible = sx >= 0 && sy >= 0
+                && sx + winW <= screenW && sy + winH <= screenH;
+
+            if (fullyVisible)
             {
-                int x = Math.Min(_settings.ModalDialogX.Value, Math.Max(0, screenW - winW));
-                int y = Math.Min(_settings.ModalDialogY.Value, Math.Max(0, screenH - winH));
-                _window.Location = new Point(x, y);
+                _window.Location = new Point(sx, sy);
             }
             else
             {
                 _window.Location = new Point(
-                    Math.Max(0, (screenW - winW) / 2),
-                    Math.Max(0, (screenH - winH) / 2));
+                    (screenW - winW) / 2,
+                    (screenH - winH) / 2);
             }
 
             _window.Moved += OnWindowMoved;
