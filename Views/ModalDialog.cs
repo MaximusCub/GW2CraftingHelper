@@ -38,29 +38,6 @@ namespace GW2CraftingHelper.Views
                 SavesPosition = true
             };
 
-            // Position: use saved only if the entire window fits on-screen; otherwise center
-            var screen = GameService.Graphics.SpriteScreen;
-            int screenW = screen.Width;
-            int screenH = screen.Height;
-            int winW = _window.Width;
-            int winH = _window.Height;
-
-            int sx = _settings.ModalDialogX.Value;
-            int sy = _settings.ModalDialogY.Value;
-            bool fullyVisible = sx >= 0 && sy >= 0
-                && sx + winW <= screenW && sy + winH <= screenH;
-
-            if (fullyVisible)
-            {
-                _window.Location = new Point(sx, sy);
-            }
-            else
-            {
-                _window.Location = new Point(
-                    (screenW - winW) / 2,
-                    (screenH - winH) / 2);
-            }
-
             _window.Moved += OnWindowMoved;
         }
 
@@ -116,6 +93,30 @@ namespace GW2CraftingHelper.Views
                 _window.Hide();
                 _onCancel?.Invoke();
             };
+
+            // Ensure the window is fully on-screen before showing
+            var screen = GameService.Graphics.SpriteScreen;
+            int screenW = screen.Width;
+            int screenH = screen.Height;
+            int winW = _window.Width;
+            int winH = _window.Height;
+
+            if (_settings.ModalDialogX.Value < 0 || _settings.ModalDialogY.Value < 0)
+            {
+                // No saved position — center on screen
+                _window.Location = new Point(
+                    (screenW - winW) / 2,
+                    (screenH - winH) / 2);
+            }
+            else
+            {
+                // Clamp existing position so window stays fully on-screen
+                int sx = _window.Location.X;
+                int sy = _window.Location.Y;
+                int clampedX = Math.Min(Math.Max(0, sx), Math.Max(0, screenW - winW));
+                int clampedY = Math.Min(Math.Max(0, sy), Math.Max(0, screenH - winH));
+                _window.Location = new Point(clampedX, clampedY);
+            }
 
             _window.Show();
         }
