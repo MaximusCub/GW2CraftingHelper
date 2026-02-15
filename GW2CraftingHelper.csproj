@@ -96,6 +96,9 @@
     <Compile Include="Models\RequiredRecipe.cs" />
     <Compile Include="Services\PlanResultBuilder.cs" />
     <Compile Include="Services\IAccountRecipeClient.cs" />
+    <Compile Include="Models\PlanViewModel.cs" />
+    <Compile Include="Services\PlanViewModelBuilder.cs" />
+    <Compile Include="Services\Gw2AccountRecipeClient.cs" />
     <Compile Include="Services\IMysticForgeRecipeSource.cs" />
     <Compile Include="Services\FileMysticForgeRecipeSource.cs" />
     <Compile Include="Services\MysticForgeRecipeData.cs" />

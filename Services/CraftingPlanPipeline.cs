@@ -123,9 +123,16 @@ namespace GW2CraftingHelper.Services
             // Step 7: Solve
             var plan = _solver.Solve(treeUsedForSolve, prices, vendorOffers);
 
-            // Step 8: Fetch item metadata for all step items + target
+            // Step 8: Fetch item metadata for all step items + target + used materials
             var metadataIds = new HashSet<int>(plan.Steps.Select(s => s.ItemId));
             metadataIds.Add(targetItemId);
+            if (usedMaterials != null)
+            {
+                foreach (var um in usedMaterials)
+                {
+                    metadataIds.Add(um.ItemId);
+                }
+            }
             var metadata = await _itemMetadataService.GetMetadataAsync(metadataIds, ct);
 
             // Step 9: Fetch learned recipe IDs (if permission available)

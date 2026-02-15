@@ -428,5 +428,76 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains(result.UsedMaterials,
                 u => u.ItemId == 2 && u.QuantityUsed == 1);
         }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_UsedMaterialIds_HaveMetadata()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+
+            // Item 1 -> recipe 10 -> item 2 (intermediate) -> recipe 20 -> item 3
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 500
+            });
+            recipeApi.AddSearchResult(2, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 2,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 2 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50000, sellUnitPrice: 100000);
+            priceApi.AddPrice(2, buyUnitPrice: 10000, sellUnitPrice: 50000);
+            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Final", "f.png");
+            itemApi.AddItem(2, "Intermediate", "m.png");
+            itemApi.AddItem(3, "Raw Mat", "r.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            // Own the intermediate item 2 — it gets pruned from steps but
+            // should still have metadata for display in UsedMaterials section
+            var snapshot = new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry { ItemId = 2, Count = 1 }
+                }
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None);
+
+            // UsedMaterials includes item 2
+            Assert.Contains(result.UsedMaterials, u => u.ItemId == 2);
+
+            // Item 2 should have metadata even though it's not in plan steps
+            Assert.True(result.ItemMetadata.ContainsKey(2),
+                "UsedMaterial item ID should have metadata populated");
+            Assert.Equal("Intermediate", result.ItemMetadata[2].Name);
+        }
     }
 }

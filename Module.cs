@@ -103,7 +103,10 @@ namespace GW2CraftingHelper
                 new TradingPostService(priceApi),
                 new PlanSolver(),
                 new ItemMetadataService(itemApi),
-                _vendorOfferStore);
+                _vendorOfferStore,
+                resolver: null,
+                reducer: new InventoryReducer(),
+                accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager));
 
             Texture2D iconTexture;
             try
@@ -193,7 +196,16 @@ namespace GW2CraftingHelper
             if (_craftingView == null)
             {
                 _craftingView = new CraftingPlanView(
-                    (itemId, qty, ct) => _craftingPipeline.GenerateAsync(itemId, qty, ct),
+                    (itemId, qty, useOwn, ct) =>
+                    {
+                        if (useOwn)
+                        {
+                            return _craftingPipeline.GenerateStructuredAsync(
+                                itemId, qty, _currentSnapshot, ct);
+                        }
+                        return _craftingPipeline.GenerateStructuredAsync(
+                            itemId, qty, null, ct);
+                    },
                     SwitchToSnapshotView
                 );
             }
