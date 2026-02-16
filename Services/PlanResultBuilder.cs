@@ -55,24 +55,60 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // Derive required disciplines from Craft steps
+            // Derive required disciplines from Craft steps.
+            // Goal: produce a minimal, actionable set of disciplines the user needs.
+            // Two-pass approach:
+            //   Pass 1 — single-discipline recipes are must-use (no choice).
+            //   Pass 2 — multi-discipline recipes prefer reusing an already-selected
+            //             discipline; if none overlap, pick alphabetically first
+            //             for determinism.
+            // Max MinRating is tracked per selected discipline.
             var craftSteps = plan.Steps.Where(s => s.Source == AcquisitionSource.Craft).ToList();
-            var disciplineMap = new Dictionary<string, int>();
+            var disciplineMap = new Dictionary<string, int>(); // discipline → max rating
 
+            // Resolve all craft step options up front
+            var stepOptions = new List<RecipeOption>();
             foreach (var step in craftSteps)
             {
                 var option = FindRecipeOption(treeUsedForSolve, step.RecipeId);
-                if (option == null)
+                if (option != null && option.Disciplines.Count > 0)
                 {
-                    continue;
+                    stepOptions.Add(option);
                 }
+            }
 
-                foreach (var disc in option.Disciplines)
+            // Pass 1: single-discipline recipes (must-use)
+            foreach (var option in stepOptions)
+            {
+                if (option.Disciplines.Count == 1)
                 {
+                    var disc = option.Disciplines[0];
                     if (!disciplineMap.ContainsKey(disc) || option.MinRating > disciplineMap[disc])
                     {
                         disciplineMap[disc] = option.MinRating;
                     }
+                }
+            }
+
+            // Pass 2: multi-discipline recipes (prefer reuse, else alphabetically first)
+            foreach (var option in stepOptions)
+            {
+                if (option.Disciplines.Count <= 1)
+                {
+                    continue;
+                }
+
+                // Try to reuse an already-selected discipline
+                var reusable = option.Disciplines
+                    .Where(d => disciplineMap.ContainsKey(d))
+                    .OrderBy(d => d)
+                    .FirstOrDefault();
+
+                var selected = reusable ?? option.Disciplines.OrderBy(d => d).First();
+
+                if (!disciplineMap.ContainsKey(selected) || option.MinRating > disciplineMap[selected])
+                {
+                    disciplineMap[selected] = option.MinRating;
                 }
             }
 

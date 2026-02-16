@@ -116,9 +116,10 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void RequiredDisciplines_MultiDisciplineRecipe_IncludesAll()
+        public void RequiredDisciplines_MultiDisciplineRecipe_SelectsOne()
         {
-            // Recipe craftable by Weaponsmith, Armorsmith, Huntsman, Artificer
+            // Recipe craftable by Weaponsmith, Armorsmith, Huntsman, Artificer.
+            // With no prior single-discipline constraint, picks alphabetically first.
             var tree = TreeWithCraftStep(
                 1, 10, 1,
                 new List<string> { "Weaponsmith", "Armorsmith", "Huntsman", "Artificer" },
@@ -138,10 +139,78 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = new Dictionary<int, ItemMetadata>();
             var result = _builder.Build(plan, tree, metadata, null, null);
 
-            Assert.Equal(4, result.RequiredDisciplines.Count);
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Armorsmith", result.RequiredDisciplines[0].Discipline);
+            Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_MultiDisciplineRecipe_PrefersAlreadySelected()
+        {
+            // Inner recipe is single-discipline Weaponsmith (must-use).
+            // Outer recipe is multi-discipline including Weaponsmith — should reuse it.
+            var innerNode = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Weaponsmith" }, 400, new List<string> { "AutoLearned" },
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Armorsmith", "Weaponsmith" }, 500, new List<string> { "AutoLearned" },
+                Leaf(2, 1), innerNode);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            // Only Weaponsmith needed — reused for the multi-discipline recipe
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
+            Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_TwoMultiDisciplineRecipes_NoOverlap_SelectsTwoDisciplines()
+        {
+            // Two multi-discipline recipes with no overlapping disciplines.
+            // Each picks alphabetically first from its own set.
+            var innerNode = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Leatherworker", "Tailor" }, 300, new List<string>(),
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Armorsmith", "Weaponsmith" }, 500, new List<string>(),
+                Leaf(2, 1), innerNode);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Equal(2, result.RequiredDisciplines.Count);
             var names = result.RequiredDisciplines.Select(d => d.Discipline).OrderBy(d => d).ToList();
-            Assert.Equal(new[] { "Armorsmith", "Artificer", "Huntsman", "Weaponsmith" }, names);
-            Assert.All(result.RequiredDisciplines, d => Assert.Equal(500, d.MinRating));
+            Assert.Equal(new[] { "Armorsmith", "Leatherworker" }, names);
         }
 
         [Fact]
