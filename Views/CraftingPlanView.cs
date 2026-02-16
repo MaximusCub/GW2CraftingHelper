@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Views
         private const int TopRegionHeight = 147;
         private const int RightEdgePadding = 20;
 
-        private readonly Func<int, int, bool, CancellationToken, Task<CraftingPlanResult>> _generateAsync;
+        private readonly Func<int, int, bool, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
         private readonly Action _switchToSnapshot;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
@@ -62,7 +62,7 @@ namespace GW2CraftingHelper.Views
         private int _lastRenderedWidth;
 
         public CraftingPlanView(
-            Func<int, int, bool, CancellationToken, Task<CraftingPlanResult>> generateAsync,
+            Func<int, int, bool, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
             Action switchToSnapshot,
             ModalDialog modalDialog,
             IItemSearchProvider itemSearchProvider)
@@ -312,10 +312,19 @@ namespace GW2CraftingHelper.Views
             _generateButton.Enabled = false;
             SetStatus("Generating...");
 
+            var statusProgress = new Progress<PlanStatus>(ps =>
+            {
+                if (ps != null && !string.IsNullOrEmpty(ps.Message))
+                {
+                    SetStatus(ps.Message);
+                }
+            });
+
             try
             {
                 var result = await _generateAsync(
-                    _selectedItemId, _quantity, _useOwnMaterials, CancellationToken.None);
+                    _selectedItemId, _quantity, _useOwnMaterials,
+                    CancellationToken.None, statusProgress);
 
                 var vm = _vmBuilder.Build(result);
                 _currentPlan = vm;

@@ -204,15 +204,15 @@ namespace GW2CraftingHelper
             if (_craftingView == null)
             {
                 _craftingView = new CraftingPlanView(
-                    (itemId, qty, useOwn, ct) =>
+                    (itemId, qty, useOwn, ct, progress) =>
                     {
                         if (useOwn)
                         {
                             return _craftingPipeline.GenerateStructuredAsync(
-                                itemId, qty, _currentSnapshot, ct);
+                                itemId, qty, _currentSnapshot, ct, progress);
                         }
                         return _craftingPipeline.GenerateStructuredAsync(
-                            itemId, qty, null, ct);
+                            itemId, qty, null, ct, progress);
                     },
                     SwitchToSnapshotView,
                     _modalDialog,
