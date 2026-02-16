@@ -10,6 +10,7 @@ using Blish_HUD.Controls;
 using Blish_HUD.Modules;
 using Blish_HUD.Modules.Managers;
 using Blish_HUD.Settings;
+using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Views;
@@ -214,7 +215,8 @@ namespace GW2CraftingHelper
                             itemId, qty, null, ct);
                     },
                     SwitchToSnapshotView,
-                    _modalDialog
+                    _modalDialog,
+                    new StaticItemSearchProvider()
                 );
             }
             _mainWindow.Show(_craftingView);
