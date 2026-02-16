@@ -112,10 +112,10 @@ namespace GW2CraftingHelper.Services
                     }
                 }
 
-                // Best discipline: prefer already-selected, then highest freq, then alpha
+                // Best discipline: highest coverage, then prefer already-selected, then alpha
                 string best = freq.Keys
-                    .OrderByDescending(d => disciplineMap.ContainsKey(d) ? 1 : 0)
-                    .ThenByDescending(d => freq[d])
+                    .OrderByDescending(d => freq[d])
+                    .ThenByDescending(d => disciplineMap.ContainsKey(d) ? 1 : 0)
                     .ThenBy(d => d)
                     .First();
 
