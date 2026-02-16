@@ -479,6 +479,7 @@ namespace GW2CraftingHelper.Views
                 contentFlow.Visible = !contentFlow.Visible;
                 headerLabel.Text = (contentFlow.Visible ? "\u25BC" : "\u25B6")
                     + " " + section.Title;
+                _contentPanel.Invalidate();
             };
         }
 
