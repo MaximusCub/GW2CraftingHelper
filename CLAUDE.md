@@ -16,6 +16,7 @@
 - Keep edits focused and minimal
 - Avoid unrelated refactors or formatting churn
 - Follow existing patterns in neighboring files before introducing new structure
+- **ASCII only in source files** — all `.cs` files (code, comments, string literals) must use only ASCII characters (U+0000-U+007F). Use ASCII alternatives: `--` not `—` (em-dash), `->` not `→` (arrow), `"` not `"` / `"` (smart quotes). The only exception is string content that must display Unicode to the user at runtime (e.g., GW2 item names from the API).
 
 ---
 
