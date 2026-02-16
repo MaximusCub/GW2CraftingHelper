@@ -57,19 +57,23 @@ namespace GW2CraftingHelper.Services
 
             // Derive required disciplines from Craft steps.
             // Goal: produce a minimal, actionable set of disciplines the user needs.
-            // Two-pass approach:
             //   Pass 1 — single-discipline recipes are must-use (no choice).
-            //   Pass 2 — multi-discipline recipes prefer reusing an already-selected
-            //             discipline; if none overlap, pick alphabetically first
-            //             for determinism.
+            //   Pass 2 — greedy set cover for multi-discipline recipes: iteratively
+            //            pick the discipline covering the most uncovered recipes,
+            //            preferring already-selected disciplines, alpha tie-break.
             // Max MinRating is tracked per selected discipline.
             var craftSteps = plan.Steps.Where(s => s.Source == AcquisitionSource.Craft).ToList();
             var disciplineMap = new Dictionary<string, int>(); // discipline → max rating
 
-            // Resolve all craft step options up front
+            // Resolve craft step options (deduplicated by RecipeId)
+            var seenOptionIds = new HashSet<int>();
             var stepOptions = new List<RecipeOption>();
             foreach (var step in craftSteps)
             {
+                if (!seenOptionIds.Add(step.RecipeId))
+                {
+                    continue;
+                }
                 var option = FindRecipeOption(treeUsedForSolve, step.RecipeId);
                 if (option != null && option.Disciplines.Count > 0)
                 {
@@ -90,26 +94,44 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // Pass 2: multi-discipline recipes (prefer reuse, else alphabetically first)
-            foreach (var option in stepOptions)
+            // Pass 2: greedy set cover for multi-discipline recipes.
+            // Iteratively pick the discipline that covers the most uncovered
+            // recipes, preferring already-selected disciplines, alpha tie-break.
+            var uncovered = new List<RecipeOption>(
+                stepOptions.Where(o => o.Disciplines.Count > 1));
+
+            while (uncovered.Count > 0)
             {
-                if (option.Disciplines.Count <= 1)
+                // Count how many uncovered recipes each discipline covers
+                var freq = new Dictionary<string, int>();
+                foreach (var opt in uncovered)
                 {
-                    continue;
+                    foreach (var d in opt.Disciplines)
+                    {
+                        freq[d] = freq.ContainsKey(d) ? freq[d] + 1 : 1;
+                    }
                 }
 
-                // Try to reuse an already-selected discipline
-                var reusable = option.Disciplines
-                    .Where(d => disciplineMap.ContainsKey(d))
-                    .OrderBy(d => d)
-                    .FirstOrDefault();
+                // Best discipline: prefer already-selected, then highest freq, then alpha
+                string best = freq.Keys
+                    .OrderByDescending(d => disciplineMap.ContainsKey(d) ? 1 : 0)
+                    .ThenByDescending(d => freq[d])
+                    .ThenBy(d => d)
+                    .First();
 
-                var selected = reusable ?? option.Disciplines.OrderBy(d => d).First();
-
-                if (!disciplineMap.ContainsKey(selected) || option.MinRating > disciplineMap[selected])
+                // Track max MinRating across covered recipes for this discipline
+                foreach (var opt in uncovered)
                 {
-                    disciplineMap[selected] = option.MinRating;
+                    if (opt.Disciplines.Contains(best))
+                    {
+                        if (!disciplineMap.ContainsKey(best) || opt.MinRating > disciplineMap[best])
+                        {
+                            disciplineMap[best] = opt.MinRating;
+                        }
+                    }
                 }
+
+                uncovered.RemoveAll(o => o.Disciplines.Contains(best));
             }
 
             var requiredDisciplines = disciplineMap

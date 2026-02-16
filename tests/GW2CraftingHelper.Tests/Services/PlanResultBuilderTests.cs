@@ -116,13 +116,14 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void RequiredDisciplines_MultiDisciplineRecipe_SelectsOne()
+        public void RequiredDisciplines_MultiDisciplineRecipe_SelectsExactlyOne()
         {
-            // Recipe craftable by Weaponsmith, Armorsmith, Huntsman, Artificer.
-            // With no prior single-discipline constraint, picks alphabetically first.
+            // Recipe craftable by four disciplines.
+            // Algorithm must select exactly one from the recipe's allowed set.
+            var allowed = new HashSet<string> { "Weaponsmith", "Armorsmith", "Huntsman", "Artificer" };
             var tree = TreeWithCraftStep(
                 1, 10, 1,
-                new List<string> { "Weaponsmith", "Armorsmith", "Huntsman", "Artificer" },
+                new List<string>(allowed),
                 500, new List<string> { "AutoLearned" },
                 Leaf(2, 1));
 
@@ -140,7 +141,7 @@ namespace GW2CraftingHelper.Tests.Services
             var result = _builder.Build(plan, tree, metadata, null, null);
 
             Assert.Single(result.RequiredDisciplines);
-            Assert.Equal("Armorsmith", result.RequiredDisciplines[0].Discipline);
+            Assert.Contains(result.RequiredDisciplines[0].Discipline, allowed);
             Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
         }
 
@@ -182,11 +183,48 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void RequiredDisciplines_TwoMultiDisciplineRecipes_NoOverlap_SelectsTwoDisciplines()
         {
-            // Two multi-discipline recipes with no overlapping disciplines.
-            // Each picks alphabetically first from its own set.
+            // Two multi-discipline recipes with disjoint discipline sets.
+            // Must select one discipline from each recipe's set.
+            var setA = new HashSet<string> { "Armorsmith", "Weaponsmith" };
+            var setB = new HashSet<string> { "Leatherworker", "Tailor" };
             var innerNode = TreeWithCraftStep(
                 3, 20, 1,
-                new List<string> { "Leatherworker", "Tailor" }, 300, new List<string>(),
+                new List<string>(setB), 300, new List<string>(),
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string>(setA), 500, new List<string>(),
+                Leaf(2, 1), innerNode);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Equal(2, result.RequiredDisciplines.Count);
+            var names = result.RequiredDisciplines.Select(d => d.Discipline).ToList();
+            Assert.Single(names, n => setA.Contains(n));
+            Assert.Single(names, n => setB.Contains(n));
+        }
+
+        [Fact]
+        public void RequiredDisciplines_OverlappingMultiDiscipline_GreedyCoverSelectsShared()
+        {
+            // Recipe A: {Armorsmith, Weaponsmith}, Recipe B: {Weaponsmith, Leatherworker}.
+            // Weaponsmith appears in both — greedy cover picks it alone.
+            var innerNode = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Weaponsmith", "Leatherworker" }, 400, new List<string>(),
                 Leaf(4, 1));
 
             var tree = TreeWithCraftStep(
@@ -208,9 +246,10 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = new Dictionary<int, ItemMetadata>();
             var result = _builder.Build(plan, tree, metadata, null, null);
 
-            Assert.Equal(2, result.RequiredDisciplines.Count);
-            var names = result.RequiredDisciplines.Select(d => d.Discipline).OrderBy(d => d).ToList();
-            Assert.Equal(new[] { "Armorsmith", "Leatherworker" }, names);
+            // Greedy cover: Weaponsmith covers both, max rating = 500
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
+            Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
         }
 
         [Fact]
