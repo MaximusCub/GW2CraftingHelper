@@ -149,7 +149,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void RequiredDisciplines_MultiDisciplineRecipe_PrefersAlreadySelected()
         {
             // Inner recipe is single-discipline Weaponsmith (must-use).
-            // Outer recipe is multi-discipline including Weaponsmith — should reuse it.
+            // Outer recipe is multi-discipline including Weaponsmith - should reuse it.
             var innerNode = TreeWithCraftStep(
                 3, 20, 1,
                 new List<string> { "Weaponsmith" }, 400, new List<string> { "AutoLearned" },
@@ -174,7 +174,7 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = new Dictionary<int, ItemMetadata>();
             var result = _builder.Build(plan, tree, metadata, null, null);
 
-            // Only Weaponsmith needed — reused for the multi-discipline recipe
+            // Only Weaponsmith needed - reused for the multi-discipline recipe
             Assert.Single(result.RequiredDisciplines);
             Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
             Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
@@ -221,7 +221,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void RequiredDisciplines_OverlappingMultiDiscipline_GreedyCoverSelectsShared()
         {
             // Recipe A: {Armorsmith, Weaponsmith}, Recipe B: {Weaponsmith, Leatherworker}.
-            // Weaponsmith appears in both — greedy cover picks it alone.
+            // Weaponsmith appears in both - greedy cover picks it alone.
             var innerNode = TreeWithCraftStep(
                 3, 20, 1,
                 new List<string> { "Weaponsmith", "Leatherworker" }, 400, new List<string>(),
