@@ -54,6 +54,12 @@ namespace GW2CraftingHelper.Contracts
         /// An empty or <c>null</c> query returns all available targets (up to
         /// <paramref name="maxResults"/>).
         /// </summary>
+        /// <remarks>
+        /// Implementations MUST NOT perform an arbitrary search over all GW2
+        /// items. Only items that the <c>CraftingPlanPipeline</c> can resolve
+        /// into a crafting plan may be returned. The provider — not the UI —
+        /// is responsible for guaranteeing plan validity of every result.
+        /// </remarks>
         /// <param name="query">
         /// Case-insensitive substring filter. Empty/null returns all items.
         /// </param>

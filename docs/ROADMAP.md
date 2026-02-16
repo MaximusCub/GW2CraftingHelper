@@ -47,18 +47,14 @@ Work proceeds in three independent lanes. Each lane is a self-contained thread o
 | **2: Backend** | `Services/`, `Models/` (except PlanViewModel), `tests/` | `Views/`, `Module.cs` |
 | **3: Central** | `Contracts/` (shared abstractions), `.csproj` registration, `docs/`, `ref/`, `tools/`, `Module.cs` service composition (small wiring edits only) | Large file rewrites |
 
-### High-Conflict Surfaces (coordinate before editing)
-
-- **`Module.cs`** — service composition + view wiring (Lane 1 owns view wiring, Lane 3 owns service composition)
-- **`Views/CraftingPlanView.cs`** — main plan UI (Lane 1 only)
-- **`GW2CraftingHelper.csproj`** — `<Compile Include>` registration (Lane 3 only)
-
 ### Cross-Lane Policy
 
 1. **Seam interfaces** live in `Contracts/` and are owned by Lane 3 (Central).
 2. Lanes 1 and 2 **consume** seam interfaces but do not modify them without coordinating with Central.
 3. When a lane needs a new shared abstraction, it requests Central to define the seam first.
 4. `Module.cs` edits must be clearly scoped: view wiring (Lane 1) vs service composition (Lane 3).
+5. **Default**: no edits outside lane ownership boundaries.
+6. **Exception**: wiring edits of **≤20 lines** in another lane's file are permitted only when necessary for integration. Each such edit must be explicitly documented in the commit message and noted in this roadmap or the PR body.
 
 ### Thread Startup Procedure
 
@@ -84,11 +80,31 @@ Decouples item selection from `CraftingPlanView`'s hardcoded dictionary. The int
 - **Consumer**: `Views/CraftingPlanView.cs` accepts `IItemSearchProvider` via constructor
 - **Future**: Lane 2 can implement a real GW2 API-backed search provider without touching the view
 
+### Seam Contracts
+
+- `IItemSearchProvider` MUST return only **valid plan targets** — items for which `CraftingPlanPipeline` can generate a crafting plan.
+- A future real provider must index **discipline recipe outputs** AND **Mystic Forge outputs** (including synthetic/special entities if present in the bundled recipe data).
+- The provider is the **sole authority** on plan validity. The UI does not validate whether a returned item is craftable — it trusts the provider.
+
+---
+
+## High-Risk Surfaces
+
+These files are touched by multiple lanes or have outsized blast radius. **Coordinate before editing.**
+
+| File | Risk | Owner(s) |
+|------|------|----------|
+| `Module.cs` | Service composition + view wiring in one file | Lane 1 (view wiring), Lane 3 (service composition) |
+| `Views/CraftingPlanView.cs` | Largest UI file, dropdown/plan rendering, seam consumer | Lane 1 only |
+| `GW2CraftingHelper.csproj` | `<Compile Include>` registration; broken entries break build | Lane 3 only |
+
 ---
 
 ## Milestones
 
 Milestones are planned and filled in as work begins. Each milestone follows this template:
+
+### Milestone Template
 
 ```
 ### M<N>: <Title>
@@ -104,11 +120,13 @@ Milestones are planned and filled in as work begins. Each milestone follows this
 <Lane that owns Module.cs wiring for this milestone>
 
 #### Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
-- [ ] Build passes
-- [ ] Tests pass
+- [ ] <Criterion — must be verifiable in-game or via tests>
+- [ ] <Criterion — must be verifiable in-game or via tests>
+- [ ] Build passes (0 errors, 0 warnings)
+- [ ] All existing tests pass; new tests added where applicable
 ```
+
+> **Note**: Acceptance criteria must be **verifiable** — either via automated tests or observable in-game behavior. Avoid subjective criteria like "works correctly".
 
 ### M9–M12: TBD
 
