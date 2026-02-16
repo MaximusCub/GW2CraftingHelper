@@ -44,10 +44,12 @@ namespace GW2CraftingHelper
         internal Gw2ApiManager Gw2ApiManager => this.ModuleParameters.Gw2ApiManager;
 
         private CornerIcon _cornerIcon;
-        private StandardWindow _mainWindow;
+        private ResizableModuleWindow _mainWindow;
+        private ModalDialog _modalDialog;
         private MainView _mainView;
         private CraftingPlanView _craftingView;
 
+        private ModuleSettings _settings;
         private SnapshotStore _snapshotStore;
         private StatusStore _statusStore;
         private Gw2AccountSnapshotService _snapshotService;
@@ -66,7 +68,10 @@ namespace GW2CraftingHelper
         [ImportingConstructor]
         public Module([Import("ModuleParameters")] ModuleParameters moduleParameters) : base(moduleParameters) { }
 
-        protected override void DefineSettings(SettingCollection settings) { }
+        protected override void DefineSettings(SettingCollection settings)
+        {
+            _settings = new ModuleSettings(settings);
+        }
 
         protected override void Initialize()
         {
@@ -118,7 +123,7 @@ namespace GW2CraftingHelper
                 iconTexture = ContentService.Textures.Error;
             }
 
-            _mainWindow = new StandardWindow(
+            _mainWindow = new ResizableModuleWindow(
                 AsyncTexture2D.FromAssetId(155997),
                 new Rectangle(25, 26, 560, 640),
                 new Rectangle(40, 50, 540, 590)
@@ -129,6 +134,8 @@ namespace GW2CraftingHelper
                 Id = $"{nameof(Module)}_MainWindow_38d37290",
                 SavesPosition = true
             };
+
+            _modalDialog = new ModalDialog(_settings);
 
             _cornerIcon = new CornerIcon()
             {
@@ -206,7 +213,8 @@ namespace GW2CraftingHelper
                         return _craftingPipeline.GenerateStructuredAsync(
                             itemId, qty, null, ct);
                     },
-                    SwitchToSnapshotView
+                    SwitchToSnapshotView,
+                    _modalDialog
                 );
             }
             _mainWindow.Show(_craftingView);
@@ -230,6 +238,7 @@ namespace GW2CraftingHelper
             _refreshCts?.Dispose();
 
             _httpClient?.Dispose();
+            _modalDialog?.Dispose();
             _cornerIcon?.Dispose();
             _mainWindow?.Dispose();
         }
