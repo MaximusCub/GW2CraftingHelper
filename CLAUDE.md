@@ -4,170 +4,339 @@
 
 - Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64`
 - Tests: `dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
-- .csproj uses explicit `<Compile Include>` — new .cs files must be registered
+- `.csproj` uses explicit `<Compile Include>` — new `.cs` files must be registered
 - Changes must be incremental with logical git commits
+- Prefer one commit per logical step (e.g., refactor, behavior change, tests, UI polish)
+
+---
 
 ## Code Style
 
 - Use Allman brace style for C#
+- Keep edits focused and minimal
+- Avoid unrelated refactors or formatting churn
+- Follow existing patterns in neighboring files before introducing new structure
 
-## Repo Invariants
+---
+
+# Repo Invariants (Non-Negotiable)
 
 These rules MUST always be followed. They override any conflicting defaults.
 
-### Testing
+---
 
-- Tests must exercise real production code paths — no contract-mirror or fake logic tests
-- Tests must NEVER reference Blish HUD, Blish HUD.exe, Gw2Sharp, or any UI code; test non-UI logic only
-- No fake file I/O tests — use real SnapshotStore / StatusStore with temp directories
+## Testing
 
-### UI & Display
+- Tests must exercise **real production code paths**
+- No contract-mirror tests
+- No fake logic tests
+- No fake file I/O tests
+- Use real `SnapshotStore` / `StatusStore` with temporary directories when testing storage
+- Tests must NEVER reference:
+  - Blish HUD
+  - BlishHUD.exe
+  - Gw2Sharp
+  - Any UI code
+
+Tests must remain completely Blish-free.
+
+---
+
+## UI & Display
 
 - Item, currency, and vendor IDs are internal-only — never display them to users
 - Coin icons MUST appear to the RIGHT of the number (matching GW2 in-game style):
+
   `123[gold icon] 45[silver icon] 67[copper icon]`
-  This applies everywhere coin amounts are shown: coin panel, tooltips, item values, vendor prices, etc.
-- GW2 coin asset IDs: Gold = 156904, Silver = 156907, Copper = 156902
 
-### Data & APIs
+- This applies everywhere coin amounts are shown: coin panel, tooltips, item values, vendor prices, etc.
+- GW2 coin asset IDs:
+  - Gold = 156904
+  - Silver = 156907
+  - Copper = 156902
 
-- Prefer official GW2 APIs (api.guildwars2.com); do not invent data when APIs are missing
-- gw2efficiency is research-only — the module must NEVER call it at runtime
-- Pricing must preserve multiple sources and avoid invalid currency comparisons
+---
 
-## Self-Review After Every Edit (Edit → Review → Fix Loop)
+## Data & APIs
 
-Goal: Reduce back-and-forth by enforcing an automatic reviewer pass after every file change, plus an end-of-milestone holistic review.
+- Prefer official GW2 APIs (`api.guildwars2.com`)
+- Do not invent data when APIs are missing
+- `gw2efficiency` is research-only — the module must NEVER call it at runtime
+- Pricing logic must preserve multiple sources and avoid invalid currency comparisons
 
-### When to apply
+---
 
-- Apply this rule for any milestone, feature, refactor, or bugfix task that involves code changes.
+# Self-Review After Every Edit (Edit → Review → Fix Loop)
 
-### Operating loop (per file)
+Goal: Reduce back-and-forth by enforcing a deliberate adversarial review mindset after every runtime-affecting change.
 
-Whenever you modify ANY file (code, tests, configs, docs), you MUST immediately switch into **Code Reviewer Mode** before editing any other file.
+---
 
-**Code Reviewer Mode requirements**
+## Code Reviewer Mode — REQUIRED MINDSET SHIFT
 
-1. Review ONLY the changes you just made in that file (plus directly impacted call sites/tests if necessary).
-2. Identify issues and classify each as exactly one of:
-   - **Critical**: correctness, crashes, data loss, security, broken build/tests, wrong behavior, severe regressions.
-   - **Must Fix**: likely bugs, edge-case failures, bad API usage, test gaps that risk regressions, performance traps, maintainability problems that will cause churn soon.
-   - **Nice to Have**: style polish, minor refactors, readability, small optimizations, non-blocking test additions.
+When entering Code Reviewer Mode, you MUST change perspective:
 
-**Fix/check loop**
+- You are no longer the author.
+- You are a skeptical senior engineer reviewing someone else’s pull request.
+- Assume the author made subtle mistakes.
+- Actively try to break the code mentally.
+- Look for edge cases, regressions, and invariant violations.
+- Challenge assumptions.
+- Look for architectural drift.
+- Look for hidden coupling.
+- Look for future merge conflicts.
+- Do NOT defend the implementation.
+- Your job is to find faults.
 
-- You MUST fix all **Critical** and **Must Fix** issues without pausing to ask the user.
-- After fixing, re-run the reviewer pass for that same file.
-- Repeat until there are **zero Critical** and **zero Must Fix** issues remaining for that file.
-- Only then proceed to the next file.
+---
 
-### End-of-milestone validation (whole change set)
+## When to Apply
 
-After you believe the milestone is complete:
+Apply this loop for any change affecting:
 
-1. Switch into Code Reviewer Mode for the entire milestone.
-2. Validate the set of changed files as a group:
-   - cross-file consistency
-   - architecture/structure coherence
-   - public API changes and usage
-   - error handling and logging
-   - unit/integration tests coverage and realism
-   - build/test pass likelihood
-   - risk of regressions
+- Code
+- Tests
+- Config
+- Build behavior
+- Runtime logic
+
+Docs-only changes may skip the strict adversarial pass but must be checked for duplication, contradictions, and stale guidance.
+
+---
+
+## Per-File Review Process
+
+After modifying ANY runtime-affecting file:
+
+1. Pause.
+2. Switch to Code Reviewer Mode.
+3. Review ONLY the file you just changed (plus directly impacted call sites/tests if necessary).
+
+During review, explicitly evaluate:
+
+- What happens with null inputs?
+- What happens with empty collections?
+- What happens with large inputs?
+- What happens under cancellation?
+- What happens under API failure?
+- Could this produce inconsistent state?
+- Could this break existing tests?
+- Does this violate any Repo Invariants?
+- Does this introduce unintended coupling?
+- Does this create future merge hotspots?
+- Is error handling correct and consistent?
+- Are there race conditions?
+- Is duplicated logic introduced?
+- Are tests proving behavior or merely mirroring implementation?
+
+---
+
+## Reviewer Checklist — Best Practices and Performance (Diff-Scoped)
+
+During Code Reviewer Mode, evaluate the change **relative to the existing codebase**. The goal is to prevent introducing new problems, not to redesign the project.
+
+### Standards and Consistency
+
+- Does this follow existing repo patterns (naming, layout, logging, DI usage)?
+- Does this match established structure in neighboring files?
+- Did this introduce a new abstraction, helper, or pattern unnecessarily?
+  - If yes, can it reuse an existing pattern instead?
+
+### Scope Discipline
+
+- Is the change narrowly scoped to the task?
+- Did it sneak in unrelated refactors?
+- Did it expand public surface area without necessity?
+- Did it increase coupling between modules?
+
+### Performance (Regression Prevention Only)
+
+Focus on the delta, not a whole-project performance audit.
+
+- Does this add new work in hot paths (UI render, plan generation loops)?
+- Does it introduce new allocations inside loops?
+- Does it add repeated API/network calls?
+- Does it introduce blocking or long-running work on the UI thread?
+- Does it increase memory retention (unbounded lists, caches, logs)?
+- Does it degrade behavior on low-end systems (polling, timers, excessive updates)?
+
+If a likely regression is detected, it is at least **Must Fix** unless clearly justified.
+
+If performance-sensitive code was touched, the review must include at least one explicit note about allocation/work frequency impact.
+
+### Efficiency Principle
+
+Prefer simple, predictable solutions over clever ones.
+Avoid adding infrastructure or framework-like patterns unless explicitly required by the milestone.
+
+---
+
+## Issue Classification
+
+Every issue must be classified as exactly one of:
+
+- **Critical**
+  - Crashes
+  - Broken build/tests
+  - Incorrect logic
+  - Data corruption
+  - Severe regression
+  - Violates repo invariants
+
+- **Must Fix**
+  - Likely bug
+  - Edge case failure
+  - Test gap that risks regression
+  - Performance trap
+  - Leaky abstraction
+  - Future merge hazard
+  - Misleading API surface
+
+- **Nice to Have**
+  - Minor refactor
+  - Readability improvement
+  - Micro-optimization
+  - Non-blocking polish
+
+---
+
+## Mandatory Fix Loop
+
+- Fix ALL **Critical** issues.
+- Fix ALL **Must Fix** issues.
+- Re-run the review mentally.
+- Repeat until:
+  - Zero Critical
+  - Zero Must Fix
+
+Only then proceed to another file.
+
+---
+
+## End-of-Milestone Adversarial Review
+
+After milestone completion:
+
+1. Review the entire change set as if you are an external reviewer unfamiliar with the code.
+2. Evaluate:
+   - Cross-file consistency
+   - API coherence
+   - Architecture alignment
+   - Test realism (real behavior vs mirrored logic)
+   - Regression risk
+   - Repo invariant compliance
 3. Again classify findings as Critical / Must Fix / Nice to Have.
-4. Automatically fix all Critical and Must Fix items.
-5. Repeat the full-change-set review until satisfied that **no Critical** and **no Must Fix** remain.
+4. Automatically fix all Critical and Must Fix.
+5. Repeat until clean.
 
-### Output requirements at the end (PR-based review; no terminal diffs)
+---
 
-When the milestone is fully validated:
+## Reviewer Integrity Rule
 
-- Do NOT print full diffs or per-file unified diffs in the terminal output.
-- Do NOT ask the user to approve a commit based on terminal diff output.
-- All review happens via a GitHub Pull Request (PR) in the upstream repo.
+If you cannot find at least one Nice to Have item during review of a non-trivial change, assume you did not review deeply enough and review again.
 
-#### Required PR workflow (STRICT)
+The goal is defensive engineering, not perfection.
 
-At the end of the milestone:
+---
 
-1. Ensure you are on a dedicated milestone branch (create if needed):
-   - `git switch -c <milestone-branch>` (if branch does not exist)
-   - Branch name must reflect the milestone (e.g. m8-orrax-validation, thread-b-vendor-pricing).
-2. Ensure the working tree is clean except for intentional milestone changes.
-3. Run validation:
-   - `dotnet build GW2CraftingHelper.csproj -p:Platform=x64`
-   - `dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
-4. Commit the milestone changes (one or more commits as appropriate).
-5. Push the branch:
-   - `git push -u origin <milestone-branch>`
-6. Create or update a PR targeting the default branch (`master`):
+# PR Workflow (STRICT)
 
-   - If no PR exists, create it with a structured body (DO NOT use `--fill` blindly).
-   - The PR body MUST follow this template:
+All review happens via GitHub Pull Requests.
 
-     ## Milestone Goal
-     Brief description of what this milestone accomplishes.
+## Branch
 
-     ## What Changed
-     High-level description of changes (grouped logically, not per-file noise).
+- Create a dedicated milestone branch:
+  `git switch -c <milestone-branch>`
+- Branch name must reflect the milestone.
 
-     ## Validation Performed
-     - Build command run and result
-     - Test command run and result
-     - Any manual validation steps
+## Validation
 
-     ## Repo Invariants Checklist
-     - [ ] No Blish HUD references added to tests
-     - [ ] Tests exercise real production paths
-     - [ ] No fake file I/O tests introduced
-     - [ ] Pricing logic preserves multi-source correctness
-     - [ ] IDs remain internal-only (not displayed)
+Run:
 
-     ## Risks / Follow-ups
-     Any known tradeoffs, edge cases, or future improvements.
+`dotnet build GW2CraftingHelper.csproj -p:Platform=x64`  
+`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
 
-   - Use:
-     `gh pr create --base master --head <milestone-branch> --title "<concise milestone title>" --body-file <tempfile>`
-     (Generate the body content programmatically before calling `gh`.)
+Both must pass before PR creation.
 
-   - If a PR already exists:
-     - Update the PR body to reflect the latest state.
-     - Continue pushing commits to the same branch.
+## Commit & Push
 
-#### What to output in the terminal (END OF MILESTONE)
+- Commit logically grouped changes.
+- Push:
+  `git push -u origin <milestone-branch>`
 
-Output ONLY the following:
+## GitHub CLI (`gh`)
+
+`gh` is installed but NOT on the shell PATH. Always invoke it via its absolute path:
+
+```bash
+"/c/Program Files/GitHub CLI/gh.exe"
+```
+
+Example: `"/c/Program Files/GitHub CLI/gh.exe" pr create ...`
+
+## PR Creation
+
+Use:
+
+`"/c/Program Files/GitHub CLI/gh.exe" pr create --base master --head <milestone-branch> --title "<concise milestone title>" --body-file <tempfile>`
+
+### Required PR Body Template
+
+```
+## Milestone Goal
+Brief description of what this milestone accomplishes.
+
+## What Changed
+High-level summary grouped logically (not per-file noise).
+
+## Validation Performed
+- Build command run and result
+- Test command run and result
+- Manual validation steps (if applicable)
+
+## Repo Invariants Checklist
+- [ ] No Blish HUD references added to tests
+- [ ] Tests exercise real production paths
+- [ ] No fake file I/O tests introduced
+- [ ] Pricing logic preserves multi-source correctness
+- [ ] IDs remain internal-only (not displayed)
+
+## Risks / Follow-ups
+Known tradeoffs, edge cases, or future improvements.
+```
+
+If a PR already exists:
+- Push additional commits to the same branch.
+- Update the PR body to reflect the current state.
+
+---
+
+# Terminal Output Rules (End of Milestone)
+
+At milestone completion, output ONLY:
 
 - PR URL
-- A short, consolidated summary:
+- Short consolidated summary:
   - What changed (high level)
-  - Validation performed (build/test commands run and results)
-  - Remaining Nice to Have items (bullets)
-- Any special reviewer notes (risks, follow-ups, migration notes)
+  - Build/test results
+  - Remaining Nice to Have items
+- Any special reviewer notes
 
 Do NOT include inline diffs, file dumps, or large pasted code blocks.
 
-#### Intermediate / cache files
+---
 
-- Intermediate caches (e.g. `wiki_vendor_cache.json`, build artifacts) must NOT be committed unless the user explicitly requests it.
+## Intermediate / Cache Files
+
+- Intermediate caches (e.g., `wiki_vendor_cache.json`, build artifacts) must NOT be committed unless explicitly requested.
 - If such files exist in the working tree, exclude them and mention them in the summary.
 
-### Diff rules — code and small files (STRICT)
+---
 
-For NEW files:
-- First run: `git add <file>`
-- Then run: `git diff --cached -- <file>`
-- Print the FULL unified diff from `--cached`.
-- Do NOT use `/dev/null`.
-- Do NOT use `--no-index`.
+## Final Notes
 
-Never use `/dev/null` in any git command.
-Never use `git diff --no-index` for new files.
-
-### Notes
-
-- Never skip the immediate review after a file edit.
-- If tests exist for the affected behavior, update/add tests as part of "Must Fix" when needed to prevent regressions.
-- Prefer small, safe edits per loop. Keep changes focused and consistent with existing project style.
-- Do not introduce any Blish HUD/BlishHUD.exe references into tests; keep tests Blish-free and exercise real production code paths (no contract-mirror tests, no fake file I/O tests).
+- Never skip the immediate review after editing a runtime-affecting file.
+- Update/add tests as part of Must Fix when needed to prevent regressions.
+- Keep changes small and focused.
+- Do not introduce any Blish HUD/BlishHUD.exe references into tests.
+- Always preserve real production code path coverage.
