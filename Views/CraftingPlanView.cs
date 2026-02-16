@@ -657,9 +657,12 @@ namespace GW2CraftingHelper.Views
 
         private void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
         {
+            bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
+            int rowHeight = hasSublabel ? 48 : 36;
+
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, 36),
+                Size = new Point(panelWidth, rowHeight),
                 Parent = parent
             };
 
@@ -669,12 +672,13 @@ namespace GW2CraftingHelper.Views
                 ? $" \u2014 {row.StatusTag}"
                 : "";
 
+            int nameY = hasSublabel ? 2 : 6;
             var label = new Label()
             {
                 Text = $"{row.Label}{statusSuffix}",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(42, 6),
+                Location = new Point(42, nameY),
                 Parent = rowPanel
             };
 
@@ -686,6 +690,19 @@ namespace GW2CraftingHelper.Views
             else if (row.StatusTag == "Auto-learned")
             {
                 label.TextColor = new Color(150, 200, 150);
+            }
+
+            if (hasSublabel)
+            {
+                new Label()
+                {
+                    Text = $"  {row.Sublabel}",
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(42, 22),
+                    TextColor = new Color(170, 170, 170),
+                    Parent = rowPanel
+                };
             }
         }
 

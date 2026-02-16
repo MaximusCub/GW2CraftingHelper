@@ -183,9 +183,10 @@ namespace GW2CraftingHelper.Services
                 {
                     var recipe = result.RequiredRecipes
                         .FirstOrDefault(r => r.RecipeId == step.RecipeId);
-                    if (recipe != null && recipe.Disciplines.Count > 0)
+                    if (recipe != null)
                     {
-                        sublabel = $"{recipe.Disciplines[0]} {recipe.MinRating}";
+                        sublabel = FormatDisciplineSublabel(
+                            recipe.Disciplines, recipe.MinRating, result.RequiredDisciplines);
                     }
                 }
 
@@ -256,11 +257,8 @@ namespace GW2CraftingHelper.Services
                     statusTag = "";
                 }
 
-                string sublabel = "";
-                if (recipe.Disciplines.Count > 0)
-                {
-                    sublabel = $"{recipe.Disciplines[0]} {recipe.MinRating}";
-                }
+                string sublabel = FormatDisciplineSublabel(
+                    recipe.Disciplines, recipe.MinRating, result.RequiredDisciplines);
 
                 section.Rows.Add(new PlanRowViewModel
                 {
@@ -362,6 +360,33 @@ namespace GW2CraftingHelper.Services
                 return meta.IconUrl;
             }
             return null;
+        }
+
+        internal static string FormatDisciplineSublabel(
+            List<string> recipeDisciplines,
+            int recipeMinRating,
+            List<RequiredDiscipline> planDisciplines)
+        {
+            if (recipeDisciplines == null || recipeDisciplines.Count == 0)
+            {
+                return "";
+            }
+
+            // Show disciplines relevant to the plan (intersection with RequiredDisciplines)
+            var planDiscNames = planDisciplines != null
+                ? new HashSet<string>(planDisciplines.Select(d => d.Discipline))
+                : new HashSet<string>();
+
+            var relevant = recipeDisciplines.Where(d => planDiscNames.Contains(d)).ToList();
+
+            // Fallback: if no intersection (shouldn't happen), show all recipe disciplines
+            if (relevant.Count == 0)
+            {
+                relevant = recipeDisciplines;
+            }
+
+            relevant.Sort();
+            return $"{string.Join(" / ", relevant)} {recipeMinRating}";
         }
     }
 }
