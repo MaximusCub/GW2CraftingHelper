@@ -253,6 +253,45 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void RequiredDisciplines_MultiDiscipline_PreCoveredByPass1_MaxRating()
+        {
+            // Step 1: single-discipline Weaponsmith at 300 (Pass 1 must-use).
+            // Step 2: multi-discipline {Weaponsmith, Armorsmith, Huntsman} at 500.
+            // Pre-cover should recognize Step 2 is already covered by Weaponsmith
+            // and bump Weaponsmith's MinRating to 500 without adding new disciplines.
+            var innerNode = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Weaponsmith", "Armorsmith", "Huntsman" }, 500,
+                new List<string> { "AutoLearned" },
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith" }, 300,
+                new List<string> { "AutoLearned" },
+                Leaf(2, 1), innerNode);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            // Only Weaponsmith selected; max rating is 500 from the multi-discipline recipe
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
+            Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
+        }
+
+        [Fact]
         public void RequiredDisciplines_ExcludesBuyFromVendorSteps()
         {
             // Craft step for item 1, BuyFromVendor step for item 3
