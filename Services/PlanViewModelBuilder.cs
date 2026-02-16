@@ -382,7 +382,7 @@ namespace GW2CraftingHelper.Services
             // Fallback: if no intersection (shouldn't happen), show all recipe disciplines
             if (relevant.Count == 0)
             {
-                relevant = recipeDisciplines;
+                relevant = new List<string>(recipeDisciplines);
             }
 
             relevant.Sort();
