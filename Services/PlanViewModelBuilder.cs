@@ -273,6 +273,8 @@ namespace GW2CraftingHelper.Services
             return section;
         }
 
+        // TODO: Currency names are sourced from api.guildwars2.com/v2/currencies.
+        // Verify against the official API if broadening coverage beyond this set.
         private static readonly Dictionary<int, string> KnownCurrencyNames = new Dictionary<int, string>
         {
             { 2, "Karma" },
