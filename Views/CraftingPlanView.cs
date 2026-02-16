@@ -224,7 +224,7 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
-            // Scrollable content area — full width so scrollbar sits at the window edge.
+            // Scrollable content area - full width so scrollbar sits at the window edge.
             // Children use (Width - RightEdgePadding) to keep content clear of the scrollbar.
             _contentPanel = new FlowPanel()
             {

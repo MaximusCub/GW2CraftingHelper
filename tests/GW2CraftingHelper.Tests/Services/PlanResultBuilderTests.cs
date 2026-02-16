@@ -90,7 +90,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void RequiredDisciplines_ExcludesNonCraftSteps()
         {
-            // BuyFromTp step for item 2 — its discipline should NOT appear
+            // BuyFromTp step for item 2 - its discipline should NOT appear
             var tree = TreeWithCraftStep(
                 1, 10, 1,
                 new List<string> { "Armorsmith" }, 300, new List<string>(),
@@ -289,6 +289,50 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(result.RequiredDisciplines);
             Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
             Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_PreCover_MultiplePass1Overlap_OnlyHighestRatedBumped()
+        {
+            // Pass 1 selects Weaponsmith (400) and Armorsmith (300).
+            // Multi-disc recipe {Weaponsmith, Armorsmith} at 500 is coverable by either.
+            // Pre-cover should pick Weaponsmith (highest existing rating) and bump only
+            // Weaponsmith to 500. Armorsmith must stay at 300.
+            var node3 = TreeWithCraftStep(
+                5, 30, 1,
+                new List<string> { "Weaponsmith", "Armorsmith" }, 500, new List<string>(),
+                Leaf(6, 1));
+
+            var node2 = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Armorsmith" }, 300, new List<string>(),
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith" }, 400, new List<string>(),
+                Leaf(2, 1), node2, node3);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 },
+                    new PlanStep { ItemId = 5, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 30 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Equal(2, result.RequiredDisciplines.Count);
+            var ws = result.RequiredDisciplines.First(d => d.Discipline == "Weaponsmith");
+            var arm = result.RequiredDisciplines.First(d => d.Discipline == "Armorsmith");
+            Assert.Equal(500, ws.MinRating);
+            Assert.Equal(300, arm.MinRating);
         }
 
         [Fact]

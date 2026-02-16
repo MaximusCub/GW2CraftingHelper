@@ -96,21 +96,31 @@ namespace GW2CraftingHelper.Services
             }
 
             // Pre-cover: multi-discipline recipes already coverable by a Pass 1
-            // discipline do not need greedy selection. Update max rating if needed.
+            // discipline do not need greedy selection. Pick exactly one covering
+            // discipline per recipe (highest current rating, then alpha) and
+            // update only that discipline's max rating.
             var uncovered = new List<RecipeOption>(
                 stepOptions.Where(o => o.Disciplines.Count > 1));
 
-            foreach (var o in uncovered)
+            uncovered.RemoveAll(o =>
             {
-                foreach (var d in o.Disciplines)
+                var covering = o.Disciplines
+                    .Where(d => disciplineMap.ContainsKey(d))
+                    .OrderByDescending(d => disciplineMap[d])
+                    .ThenBy(d => d)
+                    .FirstOrDefault();
+
+                if (covering == null)
                 {
-                    if (disciplineMap.ContainsKey(d) && o.MinRating > disciplineMap[d])
-                    {
-                        disciplineMap[d] = o.MinRating;
-                    }
+                    return false;
                 }
-            }
-            uncovered.RemoveAll(o => o.Disciplines.Any(d => disciplineMap.ContainsKey(d)));
+
+                if (o.MinRating > disciplineMap[covering])
+                {
+                    disciplineMap[covering] = o.MinRating;
+                }
+                return true;
+            });
 
             // Pass 2: greedy set cover for remaining uncovered recipes.
             // Highest coverage count, then prefer already-selected, then alpha.
