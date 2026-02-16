@@ -558,12 +558,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void FormatDisciplineSublabel_SingleDiscipline()
         {
-            var planDiscs = new List<RequiredDiscipline>
-            {
-                new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
-            };
+            var planDiscNames = new HashSet<string> { "Weaponsmith" };
             var result = PlanViewModelBuilder.FormatDisciplineSublabel(
-                new List<string> { "Weaponsmith" }, 400, planDiscs);
+                new List<string> { "Weaponsmith" }, 400, planDiscNames);
 
             Assert.Equal("Weaponsmith 400", result);
         }
@@ -571,14 +568,11 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void FormatDisciplineSublabel_MultiDiscipline_FiltersToRelevant()
         {
-            var planDiscs = new List<RequiredDiscipline>
-            {
-                new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
-            };
+            var planDiscNames = new HashSet<string> { "Weaponsmith" };
             // Recipe has 4 disciplines, but plan only uses Weaponsmith
             var result = PlanViewModelBuilder.FormatDisciplineSublabel(
                 new List<string> { "Weaponsmith", "Armorsmith", "Huntsman", "Artificer" },
-                400, planDiscs);
+                400, planDiscNames);
 
             Assert.Equal("Weaponsmith 400", result);
         }
@@ -586,14 +580,10 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void FormatDisciplineSublabel_MultiDiscipline_MultiRelevant()
         {
-            var planDiscs = new List<RequiredDiscipline>
-            {
-                new RequiredDiscipline { Discipline = "Armorsmith", MinRating = 400 },
-                new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
-            };
+            var planDiscNames = new HashSet<string> { "Armorsmith", "Weaponsmith" };
             var result = PlanViewModelBuilder.FormatDisciplineSublabel(
                 new List<string> { "Weaponsmith", "Armorsmith", "Huntsman" },
-                400, planDiscs);
+                400, planDiscNames);
 
             Assert.Equal("Armorsmith / Weaponsmith 400", result);
         }
@@ -601,12 +591,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void FormatDisciplineSublabel_NoDisciplines_EmptyString()
         {
-            var planDiscs = new List<RequiredDiscipline>
-            {
-                new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
-            };
+            var planDiscNames = new HashSet<string> { "Weaponsmith" };
             var result = PlanViewModelBuilder.FormatDisciplineSublabel(
-                new List<string>(), 0, planDiscs);
+                new List<string>(), 0, planDiscNames);
 
             Assert.Equal("", result);
         }
@@ -615,7 +602,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void FormatDisciplineSublabel_NullDisciplines_EmptyString()
         {
             var result = PlanViewModelBuilder.FormatDisciplineSublabel(
-                null, 0, new List<RequiredDiscipline>());
+                null, 0, new HashSet<string>());
 
             Assert.Equal("", result);
         }
@@ -624,13 +611,10 @@ namespace GW2CraftingHelper.Tests.Services
         public void FormatDisciplineSublabel_NoIntersection_FallbackToAll()
         {
             // Plan disciplines don't overlap with recipe disciplines
-            var planDiscs = new List<RequiredDiscipline>
-            {
-                new RequiredDiscipline { Discipline = "Leatherworker", MinRating = 400 }
-            };
+            var planDiscNames = new HashSet<string> { "Leatherworker" };
             var result = PlanViewModelBuilder.FormatDisciplineSublabel(
                 new List<string> { "Weaponsmith", "Armorsmith" },
-                300, planDiscs);
+                300, planDiscNames);
 
             Assert.Equal("Armorsmith / Weaponsmith 300", result);
         }

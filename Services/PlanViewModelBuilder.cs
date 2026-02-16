@@ -172,6 +172,10 @@ namespace GW2CraftingHelper.Services
                 IsDefaultExpanded = true
             };
 
+            var planDiscNames = result.RequiredDisciplines != null
+                ? new HashSet<string>(result.RequiredDisciplines.Select(d => d.Discipline))
+                : new HashSet<string>();
+
             foreach (var step in steps)
             {
                 string name = ResolveName(step.ItemId, result.ItemMetadata);
@@ -186,7 +190,7 @@ namespace GW2CraftingHelper.Services
                     if (recipe != null)
                     {
                         sublabel = FormatDisciplineSublabel(
-                            recipe.Disciplines, recipe.MinRating, result.RequiredDisciplines);
+                            recipe.Disciplines, recipe.MinRating, planDiscNames);
                     }
                 }
 
@@ -234,6 +238,10 @@ namespace GW2CraftingHelper.Services
                 IsDefaultExpanded = true
             };
 
+            var planDiscNames = result.RequiredDisciplines != null
+                ? new HashSet<string>(result.RequiredDisciplines.Select(d => d.Discipline))
+                : new HashSet<string>();
+
             foreach (var recipe in result.RequiredRecipes)
             {
                 string name = ResolveName(recipe.OutputItemId, result.ItemMetadata);
@@ -258,7 +266,7 @@ namespace GW2CraftingHelper.Services
                 }
 
                 string sublabel = FormatDisciplineSublabel(
-                    recipe.Disciplines, recipe.MinRating, result.RequiredDisciplines);
+                    recipe.Disciplines, recipe.MinRating, planDiscNames);
 
                 section.Rows.Add(new PlanRowViewModel
                 {
@@ -367,7 +375,7 @@ namespace GW2CraftingHelper.Services
         internal static string FormatDisciplineSublabel(
             List<string> recipeDisciplines,
             int recipeMinRating,
-            List<RequiredDiscipline> planDisciplines)
+            ISet<string> planDiscNames)
         {
             if (recipeDisciplines == null || recipeDisciplines.Count == 0)
             {
@@ -375,11 +383,9 @@ namespace GW2CraftingHelper.Services
             }
 
             // Show disciplines relevant to the plan (intersection with RequiredDisciplines)
-            var planDiscNames = planDisciplines != null
-                ? new HashSet<string>(planDisciplines.Select(d => d.Discipline))
-                : new HashSet<string>();
+            var effectiveNames = planDiscNames ?? new HashSet<string>();
 
-            var relevant = recipeDisciplines.Where(d => planDiscNames.Contains(d)).ToList();
+            var relevant = recipeDisciplines.Where(d => effectiveNames.Contains(d)).ToList();
 
             // Fallback: if no intersection (shouldn't happen), show all recipe disciplines
             if (relevant.Count == 0)
