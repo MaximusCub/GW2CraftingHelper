@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Models;
@@ -330,6 +331,42 @@ namespace GW2CraftingHelper.Tests.Services
             // 20. Weaponsmith discipline still required (root + Inscription)
             Assert.Contains(result.RequiredDisciplines,
                 d => d.Discipline == "Weaponsmith");
+        }
+
+        [Fact]
+        public async Task NoSnapshot_DebugLogContainsTimingEntries()
+        {
+            var (pipeline, _) = BuildPipeline();
+            var result = await pipeline.GenerateStructuredAsync(
+                ZojjasClaymore, 1, null, CancellationToken.None);
+
+            Assert.NotNull(result.DebugLog);
+
+            // All 10 pipeline phase prefixes must appear with timing in ms
+            var expectedPrefixes = new[]
+            {
+                "Build recipe tree",
+                "Collect item IDs",
+                "Fetch TP prices",
+                "Resolve vendor offers",
+                "Query vendor offers",
+                "Inventory reduction",
+                "Solve",
+                "Fetch item metadata",
+                "Fetch learned recipes",
+                "Build result"
+            };
+
+            var timingPattern = new Regex(@"\d+ms");
+
+            foreach (var prefix in expectedPrefixes)
+            {
+                var match = result.DebugLog.FirstOrDefault(
+                    line => line.StartsWith(prefix) && timingPattern.IsMatch(line));
+                Assert.True(match != null,
+                    $"DebugLog missing timing entry for phase '{prefix}'. "
+                    + $"Entries: [{string.Join(", ", result.DebugLog)}]");
+            }
         }
     }
 }

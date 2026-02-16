@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Models;
@@ -498,6 +499,144 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(result.ItemMetadata.ContainsKey(2),
                 "UsedMaterial item ID should have metadata populated");
             Assert.Equal("Intermediate", result.ItemMetadata[2].Name);
+        }
+
+        [Fact]
+        public async Task GenerateAsync_DebugLogContainsTimingEntries()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var result = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
+
+            Assert.NotNull(result.DebugLog);
+
+            // All 7 GenerateAsync phase prefixes must appear with timing
+            var expectedPrefixes = new[]
+            {
+                "Build recipe tree",
+                "Collect item IDs",
+                "Fetch TP prices",
+                "Resolve vendor offers",
+                "Query vendor offers",
+                "Solve",
+                "Fetch item metadata"
+            };
+
+            var timingPattern = new Regex(@"\d+ms");
+
+            foreach (var prefix in expectedPrefixes)
+            {
+                var match = result.DebugLog.FirstOrDefault(
+                    line => line.StartsWith(prefix) && timingPattern.IsMatch(line));
+                Assert.True(match != null,
+                    $"DebugLog missing timing entry for phase '{prefix}'. "
+                    + $"Entries: [{string.Join(", ", result.DebugLog)}]");
+            }
+        }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_ReportsProgressForEachPhase()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var progress = new CapturingProgress<PlanStatus>();
+
+            await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, progress);
+
+            // All 10 expected phase messages in pipeline order
+            var expectedSubstrings = new[]
+            {
+                "recipe tree",
+                "Collecting item IDs",
+                "Fetching prices",
+                "Resolving vendor offers",
+                "Looking up vendor offers",
+                "Reducing inventory",
+                "Solving crafting plan",
+                "Fetching item details",
+                "Checking learned recipes",
+                "Building final result"
+            };
+
+            Assert.True(progress.Reports.Count >= expectedSubstrings.Length,
+                $"Expected >= {expectedSubstrings.Length} progress reports, "
+                + $"got {progress.Reports.Count}: "
+                + $"[{string.Join(", ", progress.Reports.Select(r => r.Message))}]");
+
+            // Verify each expected substring appears in order
+            int searchFrom = 0;
+            foreach (var expected in expectedSubstrings)
+            {
+                int found = -1;
+                for (int i = searchFrom; i < progress.Reports.Count; i++)
+                {
+                    if (progress.Reports[i].Message != null
+                        && progress.Reports[i].Message.Contains(expected))
+                    {
+                        found = i;
+                        break;
+                    }
+                }
+                Assert.True(found >= 0,
+                    $"Progress message containing '{expected}' not found at or after index {searchFrom}. "
+                    + $"Reports: [{string.Join(", ", progress.Reports.Select(r => r.Message))}]");
+                searchFrom = found + 1;
+            }
         }
     }
 }
