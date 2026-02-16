@@ -16,7 +16,7 @@
 - Keep edits focused and minimal
 - Avoid unrelated refactors or formatting churn
 - Follow existing patterns in neighboring files before introducing new structure
-- **ASCII-only in source (.cs):** Code, comments, and string literals must be ASCII (U+0000-U+007F). Use ASCII alternatives like `--` instead of em-dash, `->` instead of arrow, and straight quotes. Exception: strings that must display Unicode to the user at runtime (e.g., item names from the GW2 API).
+- **ASCII-only in source (.cs):** Code, comments, and string literals must be ASCII (U+0000-U+007F). Use ASCII alternatives like `--` instead of em-dash, `->` instead of arrow, and straight quotes. Exception: `\uXXXX` escapes in strings that display Unicode to the user at runtime (e.g., GW2 API item names, UI glyphs like expand/collapse triangles).
 
 ---
 
