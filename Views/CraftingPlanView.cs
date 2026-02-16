@@ -2,6 +2,7 @@ using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
+using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
@@ -30,14 +31,11 @@ namespace GW2CraftingHelper.Views
         private readonly Func<int, int, bool, CancellationToken, Task<CraftingPlanResult>> _generateAsync;
         private readonly Action _switchToSnapshot;
         private readonly ModalDialog _modalDialog;
+        private readonly IItemSearchProvider _itemSearchProvider;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
 
-        // Dropdown items: display name -> item ID (IDs are internal-only)
-        private static readonly Dictionary<string, int> ItemChoices = new Dictionary<string, int>
-        {
-            { "Zojja's Claymore", 46762 },
-            { "Mithril Ingot", 19684 }
-        };
+        // Populated from IItemSearchProvider on view build
+        private IReadOnlyList<ItemSearchResult> _itemChoices = Array.Empty<ItemSearchResult>();
 
         private PlanViewModel _currentPlan;
         private DateTime _planGeneratedAt;
@@ -66,12 +64,13 @@ namespace GW2CraftingHelper.Views
         public CraftingPlanView(
             Func<int, int, bool, CancellationToken, Task<CraftingPlanResult>> generateAsync,
             Action switchToSnapshot,
-            ModalDialog modalDialog)
+            ModalDialog modalDialog,
+            IItemSearchProvider itemSearchProvider)
         {
             _generateAsync = generateAsync;
             _switchToSnapshot = switchToSnapshot;
             _modalDialog = modalDialog;
-            _selectedItemId = ItemChoices.Values.First();
+            _itemSearchProvider = itemSearchProvider;
         }
 
         public void SetStatus(string status)
@@ -79,6 +78,30 @@ namespace GW2CraftingHelper.Views
             if (_statusLabel != null)
             {
                 _statusLabel.Text = status ?? "";
+            }
+        }
+
+        private async void PopulateDropdownAsync()
+        {
+            try
+            {
+                _itemChoices = await _itemSearchProvider.SearchAsync(
+                    "", 100, CancellationToken.None);
+
+                foreach (var item in _itemChoices)
+                {
+                    _itemDropdown.Items.Add(item.Name);
+                }
+
+                if (_itemChoices.Count > 0)
+                {
+                    _itemDropdown.SelectedItem = _itemChoices[0].Name;
+                    _selectedItemId = _itemChoices[0].ItemId;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Failed to populate item dropdown");
             }
         }
 
@@ -125,17 +148,17 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, 3),
                 Parent = _inputPanel
             };
-            foreach (var name in ItemChoices.Keys)
-            {
-                _itemDropdown.Items.Add(name);
-            }
-            _itemDropdown.SelectedItem = ItemChoices.Keys.First();
+            PopulateDropdownAsync();
             _itemDropdown.ValueChanged += (_, __) =>
             {
-                if (_itemDropdown.SelectedItem != null &&
-                    ItemChoices.TryGetValue(_itemDropdown.SelectedItem, out var id))
+                if (_itemDropdown.SelectedItem != null)
                 {
-                    _selectedItemId = id;
+                    var match = _itemChoices.FirstOrDefault(
+                        i => i.Name == _itemDropdown.SelectedItem);
+                    if (match != null)
+                    {
+                        _selectedItemId = match.ItemId;
+                    }
                 }
             };
 
