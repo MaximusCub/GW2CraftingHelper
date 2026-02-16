@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Models;
+using GW2CraftingHelper.Services.Diagnostics;
 
 namespace GW2CraftingHelper.Services
 {
@@ -113,11 +114,14 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
+            var debugLog = new List<string>(timingLog);
+            debugLog.AddRange(PlanTimingAnalyzer.Summarize(timingLog));
+
             return new CraftingPlanResult
             {
                 Plan = plan,
                 ItemMetadata = metadata,
-                DebugLog = timingLog
+                DebugLog = debugLog
             };
         }
 
@@ -244,6 +248,8 @@ namespace GW2CraftingHelper.Services
                 result.DebugLog = new List<string>();
             }
             result.DebugLog.InsertRange(0, timingLog);
+            var summary = PlanTimingAnalyzer.Summarize(timingLog);
+            result.DebugLog.InsertRange(timingLog.Count, summary);
 
             return result;
         }
