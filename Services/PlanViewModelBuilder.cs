@@ -315,7 +315,10 @@ namespace GW2CraftingHelper.Services
             { 59, "Research Notes" },
             { 60, "Imperial Favors" },
             { 62, "Unusual Coins" },
-            { 63, "Rift Essences" }
+            { 63, "Astral Acclaim" },
+            { 78, "Fine Rift Essence" },
+            { 79, "Rare Rift Essence" },
+            { 80, "Masterwork Rift Essence" }
         };
 
         private static PlanRowType MapShoppingRowType(AcquisitionSource source)

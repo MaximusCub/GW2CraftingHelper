@@ -121,6 +121,39 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void SummarySection_AstralAcclaim_CorrectName()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 63, Amount = 375 }
+            });
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("375x Astral Acclaim", ccRow.Label);
+        }
+
+        [Fact]
+        public void SummarySection_RiftEssenceCurrencies_CorrectNames()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 78, Amount = 250 },
+                new CurrencyCost { CurrencyId = 79, Amount = 50 },
+                new CurrencyCost { CurrencyId = 80, Amount = 100 }
+            });
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRows = summary.Rows.Where(r => r.RowType == PlanRowType.CurrencyCost).ToList();
+            Assert.Equal(3, ccRows.Count);
+            Assert.Equal("250x Fine Rift Essence", ccRows[0].Label);
+            Assert.Equal("50x Rare Rift Essence", ccRows[1].Label);
+            Assert.Equal("100x Masterwork Rift Essence", ccRows[2].Label);
+        }
+
+        [Fact]
         public void SummarySection_UnknownCurrency_NoIdDisplayed()
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
