@@ -116,6 +116,140 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void RequiredDisciplines_MultiDisciplineRecipe_IncludesAll()
+        {
+            // Recipe craftable by Weaponsmith, Armorsmith, Huntsman, Artificer
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith", "Armorsmith", "Huntsman", "Artificer" },
+                500, new List<string> { "AutoLearned" },
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Equal(4, result.RequiredDisciplines.Count);
+            var names = result.RequiredDisciplines.Select(d => d.Discipline).OrderBy(d => d).ToList();
+            Assert.Equal(new[] { "Armorsmith", "Artificer", "Huntsman", "Weaponsmith" }, names);
+            Assert.All(result.RequiredDisciplines, d => Assert.Equal(500, d.MinRating));
+        }
+
+        [Fact]
+        public void RequiredDisciplines_ExcludesBuyFromVendorSteps()
+        {
+            // Craft step for item 1, BuyFromVendor step for item 3
+            var innerNode = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Leatherworker" }, 400, new List<string>(),
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith" }, 500, new List<string>(),
+                Leaf(2, 1), innerNode);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.BuyFromVendor }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            // Only Weaponsmith from the Craft step; Leatherworker from BuyFromVendor excluded
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_ExcludesCurrencySteps()
+        {
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith" }, 500, new List<string>(),
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 5, Quantity = 10, Source = AcquisitionSource.Currency }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_MysticForgeNoDisciplines_EmptyList()
+        {
+            // Mystic Forge recipe (negative ID) with no disciplines
+            var tree = TreeWithCraftStep(
+                1, -100, 1,
+                new List<string>(), 0, new List<string>(),
+                Leaf(2, 1), Leaf(3, 1), Leaf(4, 1), Leaf(5, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Empty(result.RequiredDisciplines);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_NoCraftSteps_EmptyList()
+        {
+            var tree = Leaf(1, 5);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 5,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Empty(result.RequiredDisciplines);
+        }
+
+        [Fact]
         public void RequiredRecipes_AutoLearnedFlag()
         {
             var tree = TreeWithCraftStep(
