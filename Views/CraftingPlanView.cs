@@ -322,7 +322,7 @@ namespace GW2CraftingHelper.Views
                 _planGeneratedAt = DateTime.Now;
                 _lastRenderedWidth = _contentPanel?.Width ?? 0;
                 RenderPlan(vm);
-                SetStatus($"Plan generated \u2014 {_planGeneratedAt:MMM d, yyyy h:mm tt}");
+                SetStatus($"Plan generated - {_planGeneratedAt:MMM d, yyyy h:mm tt}");
             }
             catch (Exception ex)
             {
@@ -601,7 +601,7 @@ namespace GW2CraftingHelper.Views
             {
                 var dashLabel = new Label()
                 {
-                    Text = " \u2014 ",
+                    Text = " - ",
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(42 + textLabel.Width, 6),
@@ -625,7 +625,7 @@ namespace GW2CraftingHelper.Views
             string text = $"Craft {row.Quantity}x {row.Label}";
             if (!string.IsNullOrEmpty(row.Sublabel))
             {
-                text += $" \u2014 {row.Sublabel}";
+                text += $" - {row.Sublabel}";
             }
 
             new Label()
@@ -648,7 +648,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
-                Text = $"  {row.Label} \u2014 {row.Sublabel}",
+                Text = $"  {row.Label} - {row.Sublabel}",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(8, 4),
@@ -670,7 +670,7 @@ namespace GW2CraftingHelper.Views
             CreateItemIcon(rowPanel, row.IconUrl, 4, 2);
 
             string statusSuffix = !string.IsNullOrEmpty(row.StatusTag)
-                ? $" \u2014 {row.StatusTag}"
+                ? $" - {row.StatusTag}"
                 : "";
 
             int nameY = hasSublabel ? 2 : 6;

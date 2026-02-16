@@ -1,10 +1,10 @@
-# GW2CraftingHelper --Project Rules
+# GW2CraftingHelper - Project Rules
 
 ## Build & Test
 
 - Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64`
 - Tests: `dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
-- `.csproj` uses explicit `<Compile Include>` --new `.cs` files must be registered
+- `.csproj` uses explicit `<Compile Include>` - new `.cs` files must be registered
 - Changes must be incremental with logical git commits
 - Prefer one commit per logical step (e.g., refactor, behavior change, tests, UI polish)
 
@@ -45,7 +45,7 @@ Tests must remain completely Blish-free.
 
 ## UI & Display
 
-- Item, currency, and vendor IDs are internal-only --never display them to users
+- Item, currency, and vendor IDs are internal-only - never display them to users
 - Coin icons MUST appear to the RIGHT of the number (matching GW2 in-game style):
 
   `123[gold icon] 45[silver icon] 67[copper icon]`
@@ -62,7 +62,7 @@ Tests must remain completely Blish-free.
 
 - Prefer official GW2 APIs (`api.guildwars2.com`)
 - Do not invent data when APIs are missing
-- `gw2efficiency` is research-only --the module must NEVER call it at runtime
+- `gw2efficiency` is research-only - the module must NEVER call it at runtime
 - Pricing logic must preserve multiple sources and avoid invalid currency comparisons
 
 ---
@@ -73,7 +73,7 @@ Goal: Reduce back-and-forth by enforcing a deliberate adversarial review mindset
 
 ---
 
-## Code Reviewer Mode --REQUIRED MINDSET SHIFT
+## Code Reviewer Mode - REQUIRED MINDSET SHIFT
 
 When entering Code Reviewer Mode, you MUST change perspective:
 
@@ -132,7 +132,7 @@ During review, explicitly evaluate:
 
 ---
 
-## Reviewer Checklist --Best Practices and Performance (Diff-Scoped)
+## Reviewer Checklist - Best Practices and Performance (Diff-Scoped)
 
 During Code Reviewer Mode, evaluate the change **relative to the existing codebase**. The goal is to prevent introducing new problems, not to redesign the project.
 
