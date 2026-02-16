@@ -35,8 +35,7 @@ namespace GW2CraftingHelper.Views
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "Confirm",
                 Id = WindowId,
-                TopMost = true,
-                SavesPosition = true
+                TopMost = true
             };
 
             _window.Moved += OnWindowMoved;
@@ -55,22 +54,31 @@ namespace GW2CraftingHelper.Views
                 child.Dispose();
             }
 
-            // Message label
+            // Message label (centered horizontally)
             new Label()
             {
                 Text = message,
-                AutoSizeWidth = true,
+                AutoSizeWidth = false,
                 AutoSizeHeight = true,
+                Width = 380,
+                HorizontalAlignment = HorizontalAlignment.Center,
                 Location = new Point(0, 4),
                 Parent = _window
             };
 
-            // Confirm button
+            // Buttons: centered horizontally, placed in lower half of content
+            int btnW = 100;
+            int cancelW = 70;
+            int btnGap = 16;
+            int totalBtnW = btnW + btnGap + cancelW;
+            int btnX = (380 - totalBtnW) / 2;
+            int btnY = 55;
+
             var confirmBtn = new StandardButton()
             {
                 Text = "Regenerate",
-                Size = new Point(100, 25),
-                Location = new Point(80, 30),
+                Size = new Point(btnW, 25),
+                Location = new Point(btnX, btnY),
                 Parent = _window
             };
             confirmBtn.Click += (_, __) =>
@@ -80,12 +88,11 @@ namespace GW2CraftingHelper.Views
                 _onConfirm?.Invoke();
             };
 
-            // Cancel button
             var cancelBtn = new StandardButton()
             {
                 Text = "Cancel",
-                Size = new Point(70, 25),
-                Location = new Point(190, 30),
+                Size = new Point(cancelW, 25),
+                Location = new Point(btnX + btnW + btnGap, btnY),
                 Parent = _window
             };
             cancelBtn.Click += (_, __) =>
@@ -95,26 +102,22 @@ namespace GW2CraftingHelper.Views
                 _onCancel?.Invoke();
             };
 
-            // Ensure the window is fully on-screen before showing
+            // Position: restore saved location, or center on first show
             var screen = GameService.Graphics.SpriteScreen;
-            int screenW = screen.Width;
-            int screenH = screen.Height;
-            int winW = _window.Width;
-            int winH = _window.Height;
+            int sx = _settings.ModalDialogX.Value;
+            int sy = _settings.ModalDialogY.Value;
 
-            int sx = _window.Location.X;
-            int sy = _window.Location.Y;
-            bool fullyVisible = sx >= 0 && sy >= 0
-                && sx + winW <= screenW && sy + winH <= screenH;
-
-            if (!fullyVisible)
+            if (sx < 0 || sy < 0
+                || sx + _window.Width > screen.Width
+                || sy + _window.Height > screen.Height)
             {
-                _window.Location = new Point(
-                    (screenW - winW) / 2,
-                    (screenH - winH) / 2);
-                _settings.ModalDialogX.Value = _window.Location.X;
-                _settings.ModalDialogY.Value = _window.Location.Y;
+                sx = (screen.Width - _window.Width) / 2;
+                sy = (screen.Height - _window.Height) / 2;
+                _settings.ModalDialogX.Value = sx;
+                _settings.ModalDialogY.Value = sy;
             }
+
+            _window.Location = new Point(sx, sy);
 
             _window.Show();
         }
