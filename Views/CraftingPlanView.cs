@@ -224,7 +224,7 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
-            // Scrollable content area — full width so scrollbar sits at the window edge.
+            // Scrollable content area - full width so scrollbar sits at the window edge.
             // Children use (Width - RightEdgePadding) to keep content clear of the scrollbar.
             _contentPanel = new FlowPanel()
             {
@@ -322,7 +322,7 @@ namespace GW2CraftingHelper.Views
                 _planGeneratedAt = DateTime.Now;
                 _lastRenderedWidth = _contentPanel?.Width ?? 0;
                 RenderPlan(vm);
-                SetStatus($"Plan generated \u2014 {_planGeneratedAt:MMM d, yyyy h:mm tt}");
+                SetStatus($"Plan generated - {_planGeneratedAt:MMM d, yyyy h:mm tt}");
             }
             catch (Exception ex)
             {
@@ -479,6 +479,7 @@ namespace GW2CraftingHelper.Views
                 contentFlow.Visible = !contentFlow.Visible;
                 headerLabel.Text = (contentFlow.Visible ? "\u25BC" : "\u25B6")
                     + " " + section.Title;
+                _contentPanel.Invalidate();
             };
         }
 
@@ -600,7 +601,7 @@ namespace GW2CraftingHelper.Views
             {
                 var dashLabel = new Label()
                 {
-                    Text = " \u2014 ",
+                    Text = " - ",
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(42 + textLabel.Width, 6),
@@ -624,7 +625,7 @@ namespace GW2CraftingHelper.Views
             string text = $"Craft {row.Quantity}x {row.Label}";
             if (!string.IsNullOrEmpty(row.Sublabel))
             {
-                text += $" \u2014 {row.Sublabel}";
+                text += $" - {row.Sublabel}";
             }
 
             new Label()
@@ -647,7 +648,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
-                Text = $"  {row.Label} \u2014 {row.Sublabel}",
+                Text = $"  {row.Label} - {row.Sublabel}",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(8, 4),
@@ -657,24 +658,28 @@ namespace GW2CraftingHelper.Views
 
         private void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
         {
+            bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
+            int rowHeight = hasSublabel ? 48 : 36;
+
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, 36),
+                Size = new Point(panelWidth, rowHeight),
                 Parent = parent
             };
 
             CreateItemIcon(rowPanel, row.IconUrl, 4, 2);
 
             string statusSuffix = !string.IsNullOrEmpty(row.StatusTag)
-                ? $" \u2014 {row.StatusTag}"
+                ? $" - {row.StatusTag}"
                 : "";
 
+            int nameY = hasSublabel ? 2 : 6;
             var label = new Label()
             {
                 Text = $"{row.Label}{statusSuffix}",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(42, 6),
+                Location = new Point(42, nameY),
                 Parent = rowPanel
             };
 
@@ -686,6 +691,19 @@ namespace GW2CraftingHelper.Views
             else if (row.StatusTag == "Auto-learned")
             {
                 label.TextColor = new Color(150, 200, 150);
+            }
+
+            if (hasSublabel)
+            {
+                new Label()
+                {
+                    Text = $"  {row.Sublabel}",
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(42, 22),
+                    TextColor = new Color(170, 170, 170),
+                    Parent = rowPanel
+                };
             }
         }
 

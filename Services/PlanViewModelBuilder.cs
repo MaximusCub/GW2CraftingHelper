@@ -172,6 +172,8 @@ namespace GW2CraftingHelper.Services
                 IsDefaultExpanded = true
             };
 
+            var planDiscNames = BuildPlanDiscNames(result);
+
             foreach (var step in steps)
             {
                 string name = ResolveName(step.ItemId, result.ItemMetadata);
@@ -183,9 +185,10 @@ namespace GW2CraftingHelper.Services
                 {
                     var recipe = result.RequiredRecipes
                         .FirstOrDefault(r => r.RecipeId == step.RecipeId);
-                    if (recipe != null && recipe.Disciplines.Count > 0)
+                    if (recipe != null)
                     {
-                        sublabel = $"{recipe.Disciplines[0]} {recipe.MinRating}";
+                        sublabel = FormatDisciplineSublabel(
+                            recipe.Disciplines, recipe.MinRating, planDiscNames);
                     }
                 }
 
@@ -233,6 +236,8 @@ namespace GW2CraftingHelper.Services
                 IsDefaultExpanded = true
             };
 
+            var planDiscNames = BuildPlanDiscNames(result);
+
             foreach (var recipe in result.RequiredRecipes)
             {
                 string name = ResolveName(recipe.OutputItemId, result.ItemMetadata);
@@ -256,11 +261,8 @@ namespace GW2CraftingHelper.Services
                     statusTag = "";
                 }
 
-                string sublabel = "";
-                if (recipe.Disciplines.Count > 0)
-                {
-                    sublabel = $"{recipe.Disciplines[0]} {recipe.MinRating}";
-                }
+                string sublabel = FormatDisciplineSublabel(
+                    recipe.Disciplines, recipe.MinRating, planDiscNames);
 
                 section.Rows.Add(new PlanRowViewModel
                 {
@@ -275,6 +277,8 @@ namespace GW2CraftingHelper.Services
             return section;
         }
 
+        // TODO: Currency names are sourced from api.guildwars2.com/v2/currencies.
+        // Verify against the official API if broadening coverage beyond this set.
         private static readonly Dictionary<int, string> KnownCurrencyNames = new Dictionary<int, string>
         {
             { 2, "Karma" },
@@ -315,7 +319,10 @@ namespace GW2CraftingHelper.Services
             { 59, "Research Notes" },
             { 60, "Imperial Favors" },
             { 62, "Unusual Coins" },
-            { 63, "Rift Essences" }
+            { 63, "Astral Acclaim" },
+            { 78, "Fine Rift Essence" },
+            { 79, "Rare Rift Essence" },
+            { 80, "Masterwork Rift Essence" }
         };
 
         private static PlanRowType MapShoppingRowType(AcquisitionSource source)
@@ -359,6 +366,46 @@ namespace GW2CraftingHelper.Services
                 return meta.IconUrl;
             }
             return null;
+        }
+
+        private static HashSet<string> BuildPlanDiscNames(CraftingPlanResult result)
+        {
+            if (result.RequiredDisciplines == null || result.RequiredDisciplines.Count == 0)
+            {
+                return new HashSet<string>();
+            }
+            return new HashSet<string>(result.RequiredDisciplines.Select(d => d.Discipline));
+        }
+
+        internal static string FormatDisciplineSublabel(
+            List<string> recipeDisciplines,
+            int recipeMinRating,
+            ISet<string> planDiscNames)
+        {
+            if (recipeDisciplines == null || recipeDisciplines.Count == 0)
+            {
+                return "";
+            }
+
+            List<string> relevant;
+            if (planDiscNames == null || planDiscNames.Count == 0)
+            {
+                // No filtering - show all recipe disciplines
+                relevant = new List<string>(recipeDisciplines);
+            }
+            else
+            {
+                relevant = recipeDisciplines.Where(d => planDiscNames.Contains(d)).ToList();
+
+                // Fallback: if no intersection, show all recipe disciplines
+                if (relevant.Count == 0)
+                {
+                    relevant = new List<string>(recipeDisciplines);
+                }
+            }
+
+            relevant.Sort();
+            return $"{string.Join(" / ", relevant)} {recipeMinRating}";
         }
     }
 }

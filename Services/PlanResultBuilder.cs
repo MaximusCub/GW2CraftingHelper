@@ -55,25 +55,107 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // Derive required disciplines from Craft steps
+            // Derive required disciplines from Craft steps.
+            // Goal: produce a minimal, actionable set of disciplines the user needs.
+            //   Pass 1 - single-discipline recipes are must-use (no choice).
+            //   Pre-cover - remove multi-discipline recipes already coverable by
+            //               a Pass 1 discipline; update max rating if needed.
+            //   Pass 2 - greedy set cover for remaining uncovered recipes:
+            //            highest coverage count, prefer already-selected, alpha.
+            // Max MinRating is tracked per selected discipline.
             var craftSteps = plan.Steps.Where(s => s.Source == AcquisitionSource.Craft).ToList();
-            var disciplineMap = new Dictionary<string, int>();
+            var disciplineMap = new Dictionary<string, int>(); // discipline -> max rating
 
+            // Resolve craft step options (deduplicated by RecipeId)
+            var seenOptionIds = new HashSet<int>();
+            var stepOptions = new List<RecipeOption>();
             foreach (var step in craftSteps)
             {
-                var option = FindRecipeOption(treeUsedForSolve, step.RecipeId);
-                if (option == null)
+                if (!seenOptionIds.Add(step.RecipeId))
                 {
                     continue;
                 }
-
-                foreach (var disc in option.Disciplines)
+                var option = FindRecipeOption(treeUsedForSolve, step.RecipeId);
+                if (option != null && option.Disciplines.Count > 0)
                 {
+                    stepOptions.Add(option);
+                }
+            }
+
+            // Pass 1: single-discipline recipes (must-use)
+            foreach (var option in stepOptions)
+            {
+                if (option.Disciplines.Count == 1)
+                {
+                    var disc = option.Disciplines[0];
                     if (!disciplineMap.ContainsKey(disc) || option.MinRating > disciplineMap[disc])
                     {
                         disciplineMap[disc] = option.MinRating;
                     }
                 }
+            }
+
+            // Pre-cover: multi-discipline recipes already coverable by a Pass 1
+            // discipline do not need greedy selection. Pick exactly one covering
+            // discipline per recipe (highest current rating, then alpha) and
+            // update only that discipline's max rating.
+            var uncovered = new List<RecipeOption>(
+                stepOptions.Where(o => o.Disciplines.Count > 1));
+
+            uncovered.RemoveAll(o =>
+            {
+                var covering = o.Disciplines
+                    .Where(d => disciplineMap.ContainsKey(d))
+                    .OrderByDescending(d => disciplineMap[d])
+                    .ThenBy(d => d)
+                    .FirstOrDefault();
+
+                if (covering == null)
+                {
+                    return false;
+                }
+
+                if (o.MinRating > disciplineMap[covering])
+                {
+                    disciplineMap[covering] = o.MinRating;
+                }
+                return true;
+            });
+
+            // Pass 2: greedy set cover for remaining uncovered recipes.
+            // Highest coverage count, then prefer already-selected, then alpha.
+            while (uncovered.Count > 0)
+            {
+                // Count how many uncovered recipes each discipline covers
+                var freq = new Dictionary<string, int>();
+                foreach (var opt in uncovered)
+                {
+                    foreach (var d in opt.Disciplines)
+                    {
+                        freq[d] = freq.ContainsKey(d) ? freq[d] + 1 : 1;
+                    }
+                }
+
+                // Best discipline: highest coverage, then prefer already-selected, then alpha
+                string best = freq.Keys
+                    .OrderByDescending(d => freq[d])
+                    .ThenByDescending(d => disciplineMap.ContainsKey(d) ? 1 : 0)
+                    .ThenBy(d => d)
+                    .First();
+
+                // Track max MinRating across covered recipes for this discipline
+                foreach (var opt in uncovered)
+                {
+                    if (opt.Disciplines.Contains(best))
+                    {
+                        if (!disciplineMap.ContainsKey(best) || opt.MinRating > disciplineMap[best])
+                        {
+                            disciplineMap[best] = opt.MinRating;
+                        }
+                    }
+                }
+
+                uncovered.RemoveAll(o => o.Disciplines.Contains(best));
             }
 
             var requiredDisciplines = disciplineMap
@@ -113,7 +195,7 @@ namespace GW2CraftingHelper.Services
                 bool? isMissing;
                 if (IsMysticForgeRecipeId(step.RecipeId))
                 {
-                    // Mystic Forge recipes are inherently available — no unlock needed
+                    // Mystic Forge recipes are inherently available - no unlock needed
                     isMissing = false;
                 }
                 else

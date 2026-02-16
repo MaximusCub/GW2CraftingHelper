@@ -90,7 +90,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void RequiredDisciplines_ExcludesNonCraftSteps()
         {
-            // BuyFromTp step for item 2 — its discipline should NOT appear
+            // BuyFromTp step for item 2 - its discipline should NOT appear
             var tree = TreeWithCraftStep(
                 1, 10, 1,
                 new List<string> { "Armorsmith" }, 300, new List<string>(),
@@ -113,6 +113,331 @@ namespace GW2CraftingHelper.Tests.Services
             // Only Armorsmith from the Craft step
             Assert.Single(result.RequiredDisciplines);
             Assert.Equal("Armorsmith", result.RequiredDisciplines[0].Discipline);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_MultiDisciplineRecipe_SelectsExactlyOne()
+        {
+            // Recipe craftable by four disciplines.
+            // Algorithm must select exactly one from the recipe's allowed set.
+            var allowed = new HashSet<string> { "Weaponsmith", "Armorsmith", "Huntsman", "Artificer" };
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string>(allowed),
+                500, new List<string> { "AutoLearned" },
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Contains(result.RequiredDisciplines[0].Discipline, allowed);
+            Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_MultiDisciplineRecipe_PrefersAlreadySelected()
+        {
+            // Inner recipe is single-discipline Weaponsmith (must-use).
+            // Outer recipe is multi-discipline including Weaponsmith - should reuse it.
+            var innerNode = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Weaponsmith" }, 400, new List<string> { "AutoLearned" },
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Armorsmith", "Weaponsmith" }, 500, new List<string> { "AutoLearned" },
+                Leaf(2, 1), innerNode);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            // Only Weaponsmith needed - reused for the multi-discipline recipe
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
+            Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_TwoMultiDisciplineRecipes_NoOverlap_SelectsTwoDisciplines()
+        {
+            // Two multi-discipline recipes with disjoint discipline sets.
+            // Must select one discipline from each recipe's set.
+            var setA = new HashSet<string> { "Armorsmith", "Weaponsmith" };
+            var setB = new HashSet<string> { "Leatherworker", "Tailor" };
+            var innerNode = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string>(setB), 300, new List<string>(),
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string>(setA), 500, new List<string>(),
+                Leaf(2, 1), innerNode);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Equal(2, result.RequiredDisciplines.Count);
+            var names = result.RequiredDisciplines.Select(d => d.Discipline).ToList();
+            Assert.Single(names, n => setA.Contains(n));
+            Assert.Single(names, n => setB.Contains(n));
+        }
+
+        [Fact]
+        public void RequiredDisciplines_OverlappingMultiDiscipline_GreedyCoverSelectsShared()
+        {
+            // Recipe A: {Armorsmith, Weaponsmith}, Recipe B: {Weaponsmith, Leatherworker}.
+            // Weaponsmith appears in both - greedy cover picks it alone.
+            var innerNode = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Weaponsmith", "Leatherworker" }, 400, new List<string>(),
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Armorsmith", "Weaponsmith" }, 500, new List<string>(),
+                Leaf(2, 1), innerNode);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            // Greedy cover: Weaponsmith covers both, max rating = 500
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
+            Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_MultiDiscipline_PreCoveredByPass1_MaxRating()
+        {
+            // Step 1: single-discipline Weaponsmith at 300 (Pass 1 must-use).
+            // Step 2: multi-discipline {Weaponsmith, Armorsmith, Huntsman} at 500.
+            // Pre-cover should recognize Step 2 is already covered by Weaponsmith
+            // and bump Weaponsmith's MinRating to 500 without adding new disciplines.
+            var innerNode = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Weaponsmith", "Armorsmith", "Huntsman" }, 500,
+                new List<string> { "AutoLearned" },
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith" }, 300,
+                new List<string> { "AutoLearned" },
+                Leaf(2, 1), innerNode);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            // Only Weaponsmith selected; max rating is 500 from the multi-discipline recipe
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
+            Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_PreCover_MultiplePass1Overlap_OnlyHighestRatedBumped()
+        {
+            // Pass 1 selects Weaponsmith (400) and Armorsmith (300).
+            // Multi-disc recipe {Weaponsmith, Armorsmith} at 500 is coverable by either.
+            // Pre-cover should pick Weaponsmith (highest existing rating) and bump only
+            // Weaponsmith to 500. Armorsmith must stay at 300.
+            var node3 = TreeWithCraftStep(
+                5, 30, 1,
+                new List<string> { "Weaponsmith", "Armorsmith" }, 500, new List<string>(),
+                Leaf(6, 1));
+
+            var node2 = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Armorsmith" }, 300, new List<string>(),
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith" }, 400, new List<string>(),
+                Leaf(2, 1), node2, node3);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 },
+                    new PlanStep { ItemId = 5, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 30 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Equal(2, result.RequiredDisciplines.Count);
+            var ws = result.RequiredDisciplines.First(d => d.Discipline == "Weaponsmith");
+            var arm = result.RequiredDisciplines.First(d => d.Discipline == "Armorsmith");
+            Assert.Equal(500, ws.MinRating);
+            Assert.Equal(300, arm.MinRating);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_ExcludesBuyFromVendorSteps()
+        {
+            // Craft step for item 1, BuyFromVendor step for item 3
+            var innerNode = TreeWithCraftStep(
+                3, 20, 1,
+                new List<string> { "Leatherworker" }, 400, new List<string>(),
+                Leaf(4, 1));
+
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith" }, 500, new List<string>(),
+                Leaf(2, 1), innerNode);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.BuyFromVendor }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            // Only Weaponsmith from the Craft step; Leatherworker from BuyFromVendor excluded
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_ExcludesCurrencySteps()
+        {
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith" }, 500, new List<string>(),
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    new PlanStep { ItemId = 5, Quantity = 10, Source = AcquisitionSource.Currency }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", result.RequiredDisciplines[0].Discipline);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_MysticForgeNoDisciplines_EmptyList()
+        {
+            // Mystic Forge recipe (negative ID) with no disciplines
+            var tree = TreeWithCraftStep(
+                1, -100, 1,
+                new List<string>(), 0, new List<string>(),
+                Leaf(2, 1), Leaf(3, 1), Leaf(4, 1), Leaf(5, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Empty(result.RequiredDisciplines);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_NoCraftSteps_EmptyList()
+        {
+            var tree = Leaf(1, 5);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 5,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Empty(result.RequiredDisciplines);
         }
 
         [Fact]

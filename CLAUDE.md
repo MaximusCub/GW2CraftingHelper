@@ -1,10 +1,10 @@
-# GW2CraftingHelper — Project Rules
+# GW2CraftingHelper - Project Rules
 
 ## Build & Test
 
 - Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64`
 - Tests: `dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
-- `.csproj` uses explicit `<Compile Include>` — new `.cs` files must be registered
+- `.csproj` uses explicit `<Compile Include>` - new `.cs` files must be registered
 - Changes must be incremental with logical git commits
 - Prefer one commit per logical step (e.g., refactor, behavior change, tests, UI polish)
 
@@ -16,6 +16,7 @@
 - Keep edits focused and minimal
 - Avoid unrelated refactors or formatting churn
 - Follow existing patterns in neighboring files before introducing new structure
+- **ASCII-only in source (.cs):** Source files must contain only ASCII characters (U+0000-U+007F). Do not paste raw Unicode into code, comments, or string literals. If Unicode must be shown at runtime (UI glyphs, item names, etc.), represent it using escapes (e.g., `"\u25BC"` / `"\u25B6"`) or data returned by the GW2 API.
 
 ---
 
@@ -44,7 +45,7 @@ Tests must remain completely Blish-free.
 
 ## UI & Display
 
-- Item, currency, and vendor IDs are internal-only — never display them to users
+- Item, currency, and vendor IDs are internal-only - never display them to users
 - Coin icons MUST appear to the RIGHT of the number (matching GW2 in-game style):
 
   `123[gold icon] 45[silver icon] 67[copper icon]`
@@ -61,23 +62,23 @@ Tests must remain completely Blish-free.
 
 - Prefer official GW2 APIs (`api.guildwars2.com`)
 - Do not invent data when APIs are missing
-- `gw2efficiency` is research-only — the module must NEVER call it at runtime
+- `gw2efficiency` is research-only - the module must NEVER call it at runtime
 - Pricing logic must preserve multiple sources and avoid invalid currency comparisons
 
 ---
 
-# Self-Review After Every Edit (Edit → Review → Fix Loop)
+# Self-Review After Every Edit (Edit -> Review -> Fix Loop)
 
 Goal: Reduce back-and-forth by enforcing a deliberate adversarial review mindset after every runtime-affecting change.
 
 ---
 
-## Code Reviewer Mode — REQUIRED MINDSET SHIFT
+## Code Reviewer Mode - REQUIRED MINDSET SHIFT
 
 When entering Code Reviewer Mode, you MUST change perspective:
 
 - You are no longer the author.
-- You are a skeptical senior engineer reviewing someone else’s pull request.
+- You are a skeptical senior engineer reviewing someone else's pull request.
 - Assume the author made subtle mistakes.
 - Actively try to break the code mentally.
 - Look for edge cases, regressions, and invariant violations.
@@ -131,7 +132,7 @@ During review, explicitly evaluate:
 
 ---
 
-## Reviewer Checklist — Best Practices and Performance (Diff-Scoped)
+## Reviewer Checklist - Best Practices and Performance (Diff-Scoped)
 
 During Code Reviewer Mode, evaluate the change **relative to the existing codebase**. The goal is to prevent introducing new problems, not to redesign the project.
 

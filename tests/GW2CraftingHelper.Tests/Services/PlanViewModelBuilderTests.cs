@@ -121,6 +121,39 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void SummarySection_AstralAcclaim_CorrectName()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 63, Amount = 375 }
+            });
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("375x Astral Acclaim", ccRow.Label);
+        }
+
+        [Fact]
+        public void SummarySection_RiftEssenceCurrencies_CorrectNames()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 78, Amount = 250 },
+                new CurrencyCost { CurrencyId = 79, Amount = 50 },
+                new CurrencyCost { CurrencyId = 80, Amount = 100 }
+            });
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRows = summary.Rows.Where(r => r.RowType == PlanRowType.CurrencyCost).ToList();
+            Assert.Equal(3, ccRows.Count);
+            Assert.Equal("250x Fine Rift Essence", ccRows[0].Label);
+            Assert.Equal("50x Rare Rift Essence", ccRows[1].Label);
+            Assert.Equal("100x Masterwork Rift Essence", ccRows[2].Label);
+        }
+
+        [Fact]
         public void SummarySection_UnknownCurrency_NoIdDisplayed()
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
@@ -518,6 +551,137 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             Assert.Equal(5, vm.TargetQuantity);
+        }
+
+        // --- FormatDisciplineSublabel ---
+
+        [Fact]
+        public void FormatDisciplineSublabel_SingleDiscipline()
+        {
+            var planDiscNames = new HashSet<string> { "Weaponsmith" };
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                new List<string> { "Weaponsmith" }, 400, planDiscNames);
+
+            Assert.Equal("Weaponsmith 400", result);
+        }
+
+        [Fact]
+        public void FormatDisciplineSublabel_MultiDiscipline_FiltersToRelevant()
+        {
+            var planDiscNames = new HashSet<string> { "Weaponsmith" };
+            // Recipe has 4 disciplines, but plan only uses Weaponsmith
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                new List<string> { "Weaponsmith", "Armorsmith", "Huntsman", "Artificer" },
+                400, planDiscNames);
+
+            Assert.Equal("Weaponsmith 400", result);
+        }
+
+        [Fact]
+        public void FormatDisciplineSublabel_MultiDiscipline_MultiRelevant()
+        {
+            var planDiscNames = new HashSet<string> { "Armorsmith", "Weaponsmith" };
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                new List<string> { "Weaponsmith", "Armorsmith", "Huntsman" },
+                400, planDiscNames);
+
+            Assert.Equal("Armorsmith / Weaponsmith 400", result);
+        }
+
+        [Fact]
+        public void FormatDisciplineSublabel_NoDisciplines_EmptyString()
+        {
+            var planDiscNames = new HashSet<string> { "Weaponsmith" };
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                new List<string>(), 0, planDiscNames);
+
+            Assert.Equal("", result);
+        }
+
+        [Fact]
+        public void FormatDisciplineSublabel_NullDisciplines_EmptyString()
+        {
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                null, 0, new HashSet<string>());
+
+            Assert.Equal("", result);
+        }
+
+        [Fact]
+        public void FormatDisciplineSublabel_NoIntersection_FallbackToAll()
+        {
+            // Plan disciplines don't overlap with recipe disciplines
+            var planDiscNames = new HashSet<string> { "Leatherworker" };
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                new List<string> { "Weaponsmith", "Armorsmith" },
+                300, planDiscNames);
+
+            Assert.Equal("Armorsmith / Weaponsmith 300", result);
+        }
+
+        [Fact]
+        public void FormatDisciplineSublabel_NullPlanDiscNames_ShowsAll()
+        {
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                new List<string> { "Weaponsmith", "Armorsmith" }, 400, null);
+
+            Assert.Equal("Armorsmith / Weaponsmith 400", result);
+        }
+
+        // --- Recipe sublabel integration ---
+
+        [Fact]
+        public void RequiredRecipes_Sublabel_ShowsRelevantDisciplines()
+        {
+            var result = MakeResult(
+                requiredDisciplines: new List<RequiredDiscipline>
+                {
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
+                },
+                requiredRecipes: new List<RequiredRecipe>
+                {
+                    new RequiredRecipe
+                    {
+                        RecipeId = 10,
+                        OutputItemId = 1,
+                        IsAutoLearned = true,
+                        Disciplines = new List<string> { "Weaponsmith", "Armorsmith", "Huntsman" },
+                        MinRating = 400
+                    }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredRecipes);
+            Assert.Equal("Weaponsmith 400", section.Rows[0].Sublabel);
+        }
+
+        [Fact]
+        public void CraftingSteps_Sublabel_ShowsRelevantDisciplines()
+        {
+            var result = MakeResult(
+                requiredDisciplines: new List<RequiredDiscipline>
+                {
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
+                },
+                requiredRecipes: new List<RequiredRecipe>
+                {
+                    new RequiredRecipe
+                    {
+                        RecipeId = 10,
+                        OutputItemId = 2,
+                        IsAutoLearned = true,
+                        Disciplines = new List<string> { "Weaponsmith", "Armorsmith", "Huntsman", "Artificer" },
+                        MinRating = 400
+                    }
+                },
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            Assert.Equal("Weaponsmith 400", section.Rows[0].Sublabel);
         }
     }
 }
