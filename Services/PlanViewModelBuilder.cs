@@ -172,9 +172,7 @@ namespace GW2CraftingHelper.Services
                 IsDefaultExpanded = true
             };
 
-            var planDiscNames = result.RequiredDisciplines != null
-                ? new HashSet<string>(result.RequiredDisciplines.Select(d => d.Discipline))
-                : new HashSet<string>();
+            var planDiscNames = BuildPlanDiscNames(result);
 
             foreach (var step in steps)
             {
@@ -238,9 +236,7 @@ namespace GW2CraftingHelper.Services
                 IsDefaultExpanded = true
             };
 
-            var planDiscNames = result.RequiredDisciplines != null
-                ? new HashSet<string>(result.RequiredDisciplines.Select(d => d.Discipline))
-                : new HashSet<string>();
+            var planDiscNames = BuildPlanDiscNames(result);
 
             foreach (var recipe in result.RequiredRecipes)
             {
@@ -372,6 +368,15 @@ namespace GW2CraftingHelper.Services
             return null;
         }
 
+        private static HashSet<string> BuildPlanDiscNames(CraftingPlanResult result)
+        {
+            if (result.RequiredDisciplines == null || result.RequiredDisciplines.Count == 0)
+            {
+                return new HashSet<string>();
+            }
+            return new HashSet<string>(result.RequiredDisciplines.Select(d => d.Discipline));
+        }
+
         internal static string FormatDisciplineSublabel(
             List<string> recipeDisciplines,
             int recipeMinRating,
@@ -382,15 +387,21 @@ namespace GW2CraftingHelper.Services
                 return "";
             }
 
-            // Show disciplines relevant to the plan (intersection with RequiredDisciplines)
-            var effectiveNames = planDiscNames ?? new HashSet<string>();
-
-            var relevant = recipeDisciplines.Where(d => effectiveNames.Contains(d)).ToList();
-
-            // Fallback: if no intersection (shouldn't happen), show all recipe disciplines
-            if (relevant.Count == 0)
+            List<string> relevant;
+            if (planDiscNames == null || planDiscNames.Count == 0)
             {
+                // No filtering - show all recipe disciplines
                 relevant = new List<string>(recipeDisciplines);
+            }
+            else
+            {
+                relevant = recipeDisciplines.Where(d => planDiscNames.Contains(d)).ToList();
+
+                // Fallback: if no intersection, show all recipe disciplines
+                if (relevant.Count == 0)
+                {
+                    relevant = new List<string>(recipeDisciplines);
+                }
             }
 
             relevant.Sort();

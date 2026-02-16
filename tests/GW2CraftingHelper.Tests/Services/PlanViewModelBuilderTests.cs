@@ -619,6 +619,15 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Armorsmith / Weaponsmith 300", result);
         }
 
+        [Fact]
+        public void FormatDisciplineSublabel_NullPlanDiscNames_ShowsAll()
+        {
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                new List<string> { "Weaponsmith", "Armorsmith" }, 400, null);
+
+            Assert.Equal("Armorsmith / Weaponsmith 400", result);
+        }
+
         // --- Recipe sublabel integration ---
 
         [Fact]
