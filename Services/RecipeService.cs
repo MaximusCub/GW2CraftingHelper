@@ -9,18 +9,120 @@ namespace GW2CraftingHelper.Services
     public class RecipeService
     {
         private readonly IRecipeApiClient _api;
+        private readonly int _maxConcurrency;
         private readonly Dictionary<int, IReadOnlyList<int>> _searchCache = new Dictionary<int, IReadOnlyList<int>>();
         private readonly Dictionary<int, RawRecipe> _recipeCache = new Dictionary<int, RawRecipe>();
+        private readonly object _cacheGate = new object();
 
-        public RecipeService(IRecipeApiClient api)
+        private const int DefaultMaxConcurrency = 4;
+
+        public RecipeService(IRecipeApiClient api, int maxConcurrency = DefaultMaxConcurrency)
         {
             _api = api;
+            _maxConcurrency = maxConcurrency;
         }
 
         public async Task<RecipeNode> BuildTreeAsync(int itemId, int quantity, CancellationToken ct)
         {
+            await PreWarmCacheAsync(itemId, ct);
+
             var visiting = new HashSet<int>();
             return await BuildNodeAsync(itemId, "Item", quantity, visiting, ct);
+        }
+
+        private async Task PreWarmCacheAsync(int itemId, CancellationToken ct)
+        {
+            var visited = new HashSet<int>();
+            var frontier = new HashSet<int> { itemId };
+
+            while (frontier.Count > 0)
+            {
+                // Sub-phase A: Search all frontier items concurrently
+                await BoundedConcurrency.ForEachAsync(
+                    frontier,
+                    _maxConcurrency,
+                    id => SearchByOutputCachedAsync(id, ct),
+                    ct);
+
+                // Collect recipe IDs not yet cached
+                var recipeIds = new HashSet<int>();
+                foreach (var fid in frontier)
+                {
+                    IReadOnlyList<int> rids;
+                    lock (_cacheGate)
+                    {
+                        _searchCache.TryGetValue(fid, out rids);
+                    }
+
+                    if (rids == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var rid in rids)
+                    {
+                        bool cached;
+                        lock (_cacheGate)
+                        {
+                            cached = _recipeCache.ContainsKey(rid);
+                        }
+
+                        if (!cached)
+                        {
+                            recipeIds.Add(rid);
+                        }
+                    }
+                }
+
+                // Sub-phase B: Fetch all recipe details concurrently
+                await BoundedConcurrency.ForEachAsync(
+                    recipeIds,
+                    _maxConcurrency,
+                    rid => GetRecipeCachedAsync(rid, ct),
+                    ct);
+
+                // Build next frontier from ingredient item IDs
+                visited.UnionWith(frontier);
+                var nextFrontier = new HashSet<int>();
+
+                foreach (var fid in frontier)
+                {
+                    IReadOnlyList<int> rids;
+                    lock (_cacheGate)
+                    {
+                        _searchCache.TryGetValue(fid, out rids);
+                    }
+
+                    if (rids == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var rid in rids)
+                    {
+                        RawRecipe recipe;
+                        lock (_cacheGate)
+                        {
+                            _recipeCache.TryGetValue(rid, out recipe);
+                        }
+
+                        if (recipe == null)
+                        {
+                            continue;
+                        }
+
+                        foreach (var ingredient in recipe.Ingredients)
+                        {
+                            if (ingredient.Type == "Item" && !visited.Contains(ingredient.Id))
+                            {
+                                nextFrontier.Add(ingredient.Id);
+                            }
+                        }
+                    }
+                }
+
+                frontier = nextFrontier;
+            }
         }
 
         private async Task<RecipeNode> BuildNodeAsync(
@@ -85,25 +187,47 @@ namespace GW2CraftingHelper.Services
 
         private async Task<IReadOnlyList<int>> SearchByOutputCachedAsync(int itemId, CancellationToken ct)
         {
-            if (_searchCache.TryGetValue(itemId, out var cached))
+            lock (_cacheGate)
             {
-                return cached;
+                if (_searchCache.TryGetValue(itemId, out var cached))
+                {
+                    return cached;
+                }
             }
 
             var result = await _api.SearchByOutputAsync(itemId, ct);
-            _searchCache[itemId] = result;
+
+            lock (_cacheGate)
+            {
+                if (!_searchCache.ContainsKey(itemId))
+                {
+                    _searchCache[itemId] = result;
+                }
+            }
+
             return result;
         }
 
         private async Task<RawRecipe> GetRecipeCachedAsync(int recipeId, CancellationToken ct)
         {
-            if (_recipeCache.TryGetValue(recipeId, out var cached))
+            lock (_cacheGate)
             {
-                return cached;
+                if (_recipeCache.TryGetValue(recipeId, out var cached))
+                {
+                    return cached;
+                }
             }
 
             var result = await _api.GetRecipeAsync(recipeId, ct);
-            _recipeCache[recipeId] = result;
+
+            lock (_cacheGate)
+            {
+                if (!_recipeCache.ContainsKey(recipeId))
+                {
+                    _recipeCache[recipeId] = result;
+                }
+            }
+
             return result;
         }
     }
