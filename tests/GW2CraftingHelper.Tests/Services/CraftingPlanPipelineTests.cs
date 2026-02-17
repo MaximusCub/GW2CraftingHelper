@@ -557,6 +557,10 @@ namespace GW2CraftingHelper.Tests.Services
                     $"DebugLog missing timing entry for phase '{prefix}'. "
                     + $"Entries: [{string.Join(", ", result.DebugLog)}]");
             }
+
+            // Timing summary block must be present
+            Assert.Contains(result.DebugLog,
+                line => line == "--- Timing Summary ---");
         }
 
         [Fact]

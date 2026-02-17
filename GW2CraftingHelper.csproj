@@ -109,6 +109,7 @@
     <Compile Include="Services\RecipeClientFactory.cs" />
     <Compile Include="Contracts\IItemSearchProvider.cs" />
     <Compile Include="Contracts\StaticItemSearchProvider.cs" />
+    <Compile Include="Services\Diagnostics\PlanTimingAnalyzer.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">
