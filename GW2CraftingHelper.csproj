@@ -111,6 +111,12 @@
     <Compile Include="Contracts\IItemSearchProvider.cs" />
     <Compile Include="Contracts\StaticItemSearchProvider.cs" />
     <Compile Include="Services\Diagnostics\PlanTimingAnalyzer.cs" />
+    <Compile Include="Services\Recipes\IRecipeCacheStore.cs" />
+    <Compile Include="Services\Recipes\InMemoryRecipeCacheStore.cs" />
+    <Compile Include="Services\Recipes\RecipeCacheSerializer.cs" />
+    <Compile Include="Services\Recipes\SeededRecipeCacheStore.cs" />
+    <Compile Include="Services\Recipes\OverlayRecipeCacheStore.cs" />
+    <Compile Include="Services\Recipes\CompositeRecipeCacheStore.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="AsyncClipboardService, Version=1.7.1.0, Culture=neutral, processorArchitecture=MSIL">
