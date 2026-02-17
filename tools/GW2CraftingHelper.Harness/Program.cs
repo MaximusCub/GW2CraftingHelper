@@ -4,11 +4,13 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Services.Diagnostics;
+using GW2CraftingHelper.Services.Recipes;
 
 namespace GW2CraftingHelper.Harness
 {
@@ -71,6 +73,8 @@ namespace GW2CraftingHelper.Harness
             int iterations = 1;
             bool live = false;
             bool raw = false;
+            bool printCacheStats = false;
+            bool clearOverlayCache = false;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -94,12 +98,21 @@ namespace GW2CraftingHelper.Harness
                     case "--raw":
                         raw = true;
                         break;
+                    case "--print-cache-stats":
+                        printCacheStats = true;
+                        break;
+                    case "--clear-overlay-cache":
+                        clearOverlayCache = true;
+                        break;
                 }
             }
 
             if (profile < 0)
             {
-                Console.Error.WriteLine("Usage: GW2CraftingHelper.Harness --profile <n> [--iterations <n>] [--live] [--raw]");
+                Console.Error.WriteLine(
+                    "Usage: GW2CraftingHelper.Harness --profile <n> " +
+                    "[--iterations <n>] [--live] [--raw] " +
+                    "[--print-cache-stats] [--clear-overlay-cache]");
                 return 1;
             }
 
@@ -141,14 +154,13 @@ namespace GW2CraftingHelper.Harness
                     itemApi = new NullItemApiClient();
                 }
 
-                string dataDir = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory, "harness_data");
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string dataDir = Path.Combine(baseDir, "harness_data");
                 Directory.CreateDirectory(dataDir);
 
                 var vendorLoader = new VendorOfferLoader();
                 var vendorStore = new VendorOfferStore(dataDir, vendorLoader);
-                string vendorBaseline = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory, "ref", "vendor_offers.json");
+                string vendorBaseline = Path.Combine(baseDir, "ref", "vendor_offers.json");
                 if (File.Exists(vendorBaseline))
                 {
                     using (var stream = File.OpenRead(vendorBaseline))
@@ -161,8 +173,48 @@ namespace GW2CraftingHelper.Harness
                     vendorStore.LoadBaseline(null);
                 }
 
+                // Recipe cache: seed + overlay
+                var recipeSeed = new SeededRecipeCacheStore();
+                string seedSearchPath = Path.Combine(baseDir, "ref", "recipe_search_seed.json");
+                string seedRecipesPath = Path.Combine(baseDir, "ref", "recipes_seed.json");
+                if (File.Exists(seedSearchPath) && File.Exists(seedRecipesPath))
+                {
+                    using (var s1 = File.OpenRead(seedSearchPath))
+                    using (var s2 = File.OpenRead(seedRecipesPath))
+                    {
+                        recipeSeed.Load(s1, s2);
+                    }
+                }
+
+                var recipeOverlay = new OverlayRecipeCacheStore(dataDir);
+
+                if (clearOverlayCache)
+                {
+                    Console.WriteLine("Clearing overlay cache...");
+                    string overlayCacheDir = Path.Combine(dataDir, "recipe_cache");
+                    if (Directory.Exists(overlayCacheDir))
+                    {
+                        Directory.Delete(overlayCacheDir, recursive: true);
+                    }
+                }
+
+                {
+                    int? buildId = null;
+                    if (live && httpClient != null)
+                    {
+                        try
+                        {
+                            buildId = await FetchBuildIdAsync(httpClient);
+                        }
+                        catch { }
+                    }
+                    recipeOverlay.Load(buildId);
+                }
+
+                var recipeCacheStore = new CompositeRecipeCacheStore(recipeSeed, recipeOverlay);
+
                 var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
+                    new RecipeService(recipeApi, cacheStore: recipeCacheStore),
                     new TradingPostService(priceApi),
                     new PlanSolver(),
                     new ItemMetadataService(itemApi),
@@ -176,6 +228,16 @@ namespace GW2CraftingHelper.Harness
                 {
                     await RunItemProfile(pipeline, item, iterations, raw, mode);
                     Console.WriteLine();
+                }
+
+                if (printCacheStats)
+                {
+                    var stats = recipeCacheStore.Stats;
+                    Console.WriteLine(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "Recipe cache: Search hits={0} misses={1} | Recipe hits={2} misses={3}",
+                        stats.SearchHits, stats.SearchMisses,
+                        stats.RecipeHits, stats.RecipeMisses));
                 }
             }
             finally
@@ -385,6 +447,21 @@ namespace GW2CraftingHelper.Harness
             }
             double frac = rank - lower;
             return sorted[lower] + frac * (sorted[upper] - sorted[lower]);
+        }
+
+        private static async Task<int> FetchBuildIdAsync(HttpClient httpClient)
+        {
+            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+            {
+                var response = await httpClient.GetAsync(
+                    "https://api.guildwars2.com/v2/build", cts.Token);
+                response.EnsureSuccessStatusCode();
+                string json = await response.Content.ReadAsStringAsync();
+                using (var doc = JsonDocument.Parse(json))
+                {
+                    return doc.RootElement.GetProperty("id").GetInt32();
+                }
+            }
         }
     }
 }

@@ -13,6 +13,7 @@ using Blish_HUD.Settings;
 using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Services.Recipes;
 using GW2CraftingHelper.Views;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -104,8 +105,42 @@ namespace GW2CraftingHelper
             }
             _vendorOfferStore.LoadOverlay();
 
+            // Recipe cache: seed + overlay
+            var recipeSeed = new SeededRecipeCacheStore();
+            try
+            {
+                using (var searchStream = ContentsManager.GetFileStream("recipe_search_seed.json"))
+                using (var recipesStream = ContentsManager.GetFileStream("recipes_seed.json"))
+                {
+                    recipeSeed.Load(searchStream, recipesStream);
+                }
+            }
+            catch
+            {
+                // No seed files yet — graceful degradation
+            }
+
+            var recipeOverlay = new OverlayRecipeCacheStore(dataDir);
+            recipeOverlay.Load(currentGw2BuildId: null);
+
+            // Async build ID fetch for overlay invalidation
+            Task.Run(async () =>
+            {
+                try
+                {
+                    int buildId = await FetchGw2BuildIdAsync();
+                    recipeOverlay.InvalidateIfStale(buildId);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug("Could not fetch GW2 build ID for overlay invalidation: {0}", ex.Message);
+                }
+            });
+
+            var recipeCacheStore = new CompositeRecipeCacheStore(recipeSeed, recipeOverlay);
+
             _craftingPipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
+                new RecipeService(recipeApi, cacheStore: recipeCacheStore),
                 new TradingPostService(priceApi),
                 new PlanSolver(),
                 new ItemMetadataService(itemApi),
@@ -337,6 +372,21 @@ namespace GW2CraftingHelper
             _lastStatus = status ?? "";
             _statusStore.Save(_lastStatus);
             _mainView?.SetStatus(_lastStatus);
+        }
+
+        private async Task<int> FetchGw2BuildIdAsync()
+        {
+            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
+            {
+                var response = await _httpClient.GetAsync(
+                    "https://api.guildwars2.com/v2/build", cts.Token);
+                response.EnsureSuccessStatusCode();
+                string json = await response.Content.ReadAsStringAsync();
+                using (var doc = System.Text.Json.JsonDocument.Parse(json))
+                {
+                    return doc.RootElement.GetProperty("id").GetInt32();
+                }
+            }
         }
     }
 }
