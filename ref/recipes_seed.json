@@ -1,0 +1,953 @@
+﻿{
+  "schemaVersion": 1,
+  "recipes": [
+    {
+      "id": -3,
+      "outputItemId": 19626,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19675,
+          "count": 77
+        },
+        {
+          "type": "Item",
+          "id": 19721,
+          "count": 250
+        },
+        {
+          "type": "Item",
+          "id": 19673,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 19672,
+          "count": 1
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": []
+    },
+    {
+      "id": -2,
+      "outputItemId": 19672,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 24357,
+          "count": 250
+        },
+        {
+          "type": "Item",
+          "id": 24289,
+          "count": 250
+        },
+        {
+          "type": "Item",
+          "id": 24351,
+          "count": 250
+        },
+        {
+          "type": "Item",
+          "id": 24358,
+          "count": 250
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": []
+    },
+    {
+      "id": -1,
+      "outputItemId": 19673,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 24295,
+          "count": 250
+        },
+        {
+          "type": "Item",
+          "id": 24283,
+          "count": 250
+        },
+        {
+          "type": "Item",
+          "id": 24300,
+          "count": 250
+        },
+        {
+          "type": "Item",
+          "id": 24277,
+          "count": 250
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": []
+    },
+    {
+      "id": 1,
+      "outputItemId": 19713,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19726,
+          "count": 2
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman"
+      ],
+      "minRating": 75,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 2,
+      "outputItemId": 19712,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19725,
+          "count": 3
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman"
+      ],
+      "minRating": 400,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 4,
+      "outputItemId": 19711,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19724,
+          "count": 3
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman"
+      ],
+      "minRating": 225,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 5,
+      "outputItemId": 19709,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19722,
+          "count": 3
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman"
+      ],
+      "minRating": 300,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 6,
+      "outputItemId": 19714,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19727,
+          "count": 3
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman"
+      ],
+      "minRating": 150,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 18,
+      "outputItemId": 19684,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19700,
+          "count": 2
+        }
+      ],
+      "disciplines": [
+        "Leatherworker",
+        "Armorsmith",
+        "Tailor",
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman",
+        "Jeweler"
+      ],
+      "minRating": 300,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 19,
+      "outputItemId": 19683,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19699,
+          "count": 3
+        }
+      ],
+      "disciplines": [
+        "Leatherworker",
+        "Armorsmith",
+        "Tailor",
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman"
+      ],
+      "minRating": 75,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 20,
+      "outputItemId": 19688,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19699,
+          "count": 3
+        },
+        {
+          "type": "Item",
+          "id": 19750,
+          "count": 1
+        }
+      ],
+      "disciplines": [
+        "Leatherworker",
+        "Armorsmith",
+        "Tailor",
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman"
+      ],
+      "minRating": 150,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 21,
+      "outputItemId": 19685,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19701,
+          "count": 2
+        }
+      ],
+      "disciplines": [
+        "Armorsmith",
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman",
+        "Jeweler"
+      ],
+      "minRating": 400,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 22,
+      "outputItemId": 19681,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19924,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 19702,
+          "count": 2
+        }
+      ],
+      "disciplines": [
+        "Leatherworker",
+        "Armorsmith",
+        "Tailor",
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman"
+      ],
+      "minRating": 225,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 39,
+      "outputItemId": 12988,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19712,
+          "count": 2
+        },
+        {
+          "type": "Item",
+          "id": 19685,
+          "count": 3
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Scribe",
+        "Huntsman"
+      ],
+      "minRating": 400,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 192,
+      "outputItemId": 19920,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 12988,
+          "count": 5
+        },
+        {
+          "type": "Item",
+          "id": 24295,
+          "count": 5
+        },
+        {
+          "type": "Item",
+          "id": 19721,
+          "count": 5
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 400,
+      "flags": [
+        "LearnedFromItem"
+      ]
+    },
+    {
+      "id": 7308,
+      "outputItemId": 45832,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46736,
+          "count": 3
+        },
+        {
+          "type": "Item",
+          "id": 46738,
+          "count": 3
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 500,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 7311,
+      "outputItemId": 46746,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46732,
+          "count": 5
+        },
+        {
+          "type": "Item",
+          "id": 46734,
+          "count": 5
+        },
+        {
+          "type": "Item",
+          "id": 46752,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 46730,
+          "count": 5
+        }
+      ],
+      "disciplines": [
+        "Leatherworker",
+        "Armorsmith",
+        "Tailor",
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 500,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 7312,
+      "outputItemId": 46736,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19713,
+          "count": 20
+        },
+        {
+          "type": "Item",
+          "id": 19714,
+          "count": 10
+        },
+        {
+          "type": "Item",
+          "id": 19711,
+          "count": 20
+        },
+        {
+          "type": "Item",
+          "id": 46744,
+          "count": 1
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 450,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 7313,
+      "outputItemId": 46738,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19683,
+          "count": 20
+        },
+        {
+          "type": "Item",
+          "id": 19688,
+          "count": 10
+        },
+        {
+          "type": "Item",
+          "id": 19681,
+          "count": 20
+        },
+        {
+          "type": "Item",
+          "id": 46742,
+          "count": 1
+        }
+      ],
+      "disciplines": [
+        "Armorsmith",
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 450,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 7314,
+      "outputItemId": 46730,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46731,
+          "count": 100
+        },
+        {
+          "type": "Item",
+          "id": 19925,
+          "count": 2
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 10
+        }
+      ],
+      "disciplines": [
+        "Leatherworker",
+        "Armorsmith",
+        "Tailor",
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 450,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 7316,
+      "outputItemId": 46732,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46733,
+          "count": 100
+        },
+        {
+          "type": "Item",
+          "id": 19925,
+          "count": 2
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 10
+        }
+      ],
+      "disciplines": [
+        "Leatherworker",
+        "Armorsmith",
+        "Tailor",
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 450,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 7317,
+      "outputItemId": 46734,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46735,
+          "count": 100
+        },
+        {
+          "type": "Item",
+          "id": 19925,
+          "count": 2
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 10
+        }
+      ],
+      "disciplines": [
+        "Leatherworker",
+        "Armorsmith",
+        "Tailor",
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 450,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 7319,
+      "outputItemId": 46742,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19684,
+          "count": 50
+        },
+        {
+          "type": "Item",
+          "id": 19721,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 10
+        }
+      ],
+      "disciplines": [
+        "Leatherworker",
+        "Armorsmith",
+        "Tailor",
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 450,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 7320,
+      "outputItemId": 46744,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19709,
+          "count": 50
+        },
+        {
+          "type": "Item",
+          "id": 19721,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 10
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 450,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 7330,
+      "outputItemId": 46695,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46681,
+          "count": 10
+        },
+        {
+          "type": "Item",
+          "id": 45832,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 19920,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 24277,
+          "count": 10
+        }
+      ],
+      "disciplines": [
+        "Artificer",
+        "Weaponsmith",
+        "Huntsman"
+      ],
+      "minRating": 500,
+      "flags": [
+        "LearnedFromItem"
+      ]
+    },
+    {
+      "id": 7785,
+      "outputItemId": 46762,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46695,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 45847,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 45855,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 46746,
+          "count": 1
+        }
+      ],
+      "disciplines": [
+        "Weaponsmith"
+      ],
+      "minRating": 500,
+      "flags": [
+        "LearnedFromItem"
+      ]
+    },
+    {
+      "id": 7799,
+      "outputItemId": 45847,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46738,
+          "count": 3
+        },
+        {
+          "type": "Item",
+          "id": 24277,
+          "count": 5
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 50
+        }
+      ],
+      "disciplines": [
+        "Weaponsmith"
+      ],
+      "minRating": 500,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 7806,
+      "outputItemId": 45855,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46738,
+          "count": 3
+        },
+        {
+          "type": "Item",
+          "id": 24277,
+          "count": 5
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 50
+        }
+      ],
+      "disciplines": [
+        "Weaponsmith"
+      ],
+      "minRating": 500,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 12053,
+      "outputItemId": 46742,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19684,
+          "count": 50
+        },
+        {
+          "type": "Item",
+          "id": 19721,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 10
+        }
+      ],
+      "disciplines": [
+        "Jeweler"
+      ],
+      "minRating": 400,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 13254,
+      "outputItemId": 46730,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46731,
+          "count": 100
+        },
+        {
+          "type": "Item",
+          "id": 19925,
+          "count": 2
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 10
+        }
+      ],
+      "disciplines": [
+        "Chef"
+      ],
+      "minRating": 425,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 13259,
+      "outputItemId": 46734,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46735,
+          "count": 100
+        },
+        {
+          "type": "Item",
+          "id": 19925,
+          "count": 2
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 10
+        }
+      ],
+      "disciplines": [
+        "Chef"
+      ],
+      "minRating": 425,
+      "flags": [
+        "AutoLearned"
+      ]
+    },
+    {
+      "id": 13260,
+      "outputItemId": 46732,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 46733,
+          "count": 100
+        },
+        {
+          "type": "Item",
+          "id": 19925,
+          "count": 2
+        },
+        {
+          "type": "Item",
+          "id": 46747,
+          "count": 10
+        }
+      ],
+      "disciplines": [
+        "Chef"
+      ],
+      "minRating": 425,
+      "flags": [
+        "AutoLearned"
+      ]
+    }
+  ]
+}
