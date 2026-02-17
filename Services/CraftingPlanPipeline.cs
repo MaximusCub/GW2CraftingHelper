@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,41 +43,81 @@ namespace GW2CraftingHelper.Services
             int targetItemId, int quantity, CancellationToken ct,
             IProgress<PlanStatus> progress = null)
         {
+            var sw = new Stopwatch();
+            var timingLog = new List<string>();
+
             // Step 1: Build recipe tree
+            progress?.Report(new PlanStatus { Message = "Building recipe tree..." });
+            sw.Restart();
             var tree = await _recipeService.BuildTreeAsync(targetItemId, quantity, ct);
+            sw.Stop();
+            timingLog.Add($"Build recipe tree: {sw.ElapsedMilliseconds}ms");
 
             // Step 2: Collect all item IDs from the tree for price lookup
+            progress?.Report(new PlanStatus { Message = "Collecting item IDs..." });
+            sw.Restart();
             var allItemIds = new HashSet<int>();
             CollectItemIds(tree, allItemIds);
+            sw.Stop();
+            timingLog.Add($"Collect item IDs: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
             // Step 3: Fetch TP prices
+            progress?.Report(new PlanStatus
+            {
+                Message = $"Fetching prices ({allItemIds.Count} items)...",
+                Total = allItemIds.Count
+            });
+            sw.Restart();
             var prices = await _tradingPostService.GetPricesAsync(allItemIds, ct);
+            sw.Stop();
+            timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
             // Step 4: Resolve missing vendor offers (if resolver available)
+            progress?.Report(new PlanStatus { Message = "Resolving vendor offers..." });
+            sw.Restart();
             if (_resolver != null && _vendorOfferStore != null)
             {
                 await _resolver.EnsureVendorOffersAsync(allItemIds, progress, ct);
             }
+            sw.Stop();
+            timingLog.Add($"Resolve vendor offers: {sw.ElapsedMilliseconds}ms");
 
             // Step 5: Query vendor offers
+            progress?.Report(new PlanStatus { Message = "Looking up vendor offers..." });
+            sw.Restart();
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
             if (_vendorOfferStore != null)
             {
                 vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
             }
+            sw.Stop();
+            timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
 
             // Step 6: Solve
+            progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
+            sw.Restart();
             var plan = _solver.Solve(tree, prices, vendorOffers);
+            sw.Stop();
+            timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
 
             // Step 7: Fetch item metadata for all step items + target
             var metadataIds = new HashSet<int>(plan.Steps.Select(s => s.ItemId));
             metadataIds.Add(targetItemId);
+            progress?.Report(new PlanStatus
+            {
+                Message = $"Fetching item details ({metadataIds.Count} items)...",
+                Total = metadataIds.Count
+            });
+            sw.Restart();
             var metadata = await _itemMetadataService.GetMetadataAsync(metadataIds, ct);
+            sw.Stop();
+            timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
             return new CraftingPlanResult
             {
                 Plan = plan,
-                ItemMetadata = metadata
+                ItemMetadata = metadata,
+                DebugLog = timingLog
             };
         }
 
@@ -84,30 +125,59 @@ namespace GW2CraftingHelper.Services
             int targetItemId, int quantity, AccountSnapshot snapshot,
             CancellationToken ct, IProgress<PlanStatus> progress = null)
         {
+            var sw = new Stopwatch();
+            var timingLog = new List<string>();
+
             // Step 1: Build recipe tree
+            progress?.Report(new PlanStatus { Message = "Building recipe tree..." });
+            sw.Restart();
             var tree = await _recipeService.BuildTreeAsync(targetItemId, quantity, ct);
+            sw.Stop();
+            timingLog.Add($"Build recipe tree: {sw.ElapsedMilliseconds}ms");
 
             // Step 2: Collect all item IDs from the tree for price lookup
+            progress?.Report(new PlanStatus { Message = "Collecting item IDs..." });
+            sw.Restart();
             var allItemIds = new HashSet<int>();
             CollectItemIds(tree, allItemIds);
+            sw.Stop();
+            timingLog.Add($"Collect item IDs: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
             // Step 3: Fetch TP prices
+            progress?.Report(new PlanStatus
+            {
+                Message = $"Fetching prices ({allItemIds.Count} items)...",
+                Total = allItemIds.Count
+            });
+            sw.Restart();
             var prices = await _tradingPostService.GetPricesAsync(allItemIds, ct);
+            sw.Stop();
+            timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
             // Step 4: Resolve missing vendor offers (if resolver available)
+            progress?.Report(new PlanStatus { Message = "Resolving vendor offers..." });
+            sw.Restart();
             if (_resolver != null && _vendorOfferStore != null)
             {
                 await _resolver.EnsureVendorOffersAsync(allItemIds, progress, ct);
             }
+            sw.Stop();
+            timingLog.Add($"Resolve vendor offers: {sw.ElapsedMilliseconds}ms");
 
             // Step 5: Query vendor offers
+            progress?.Report(new PlanStatus { Message = "Looking up vendor offers..." });
+            sw.Restart();
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
             if (_vendorOfferStore != null)
             {
                 vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
             }
+            sw.Stop();
+            timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
 
             // Step 6: Inventory reduction
+            progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
+            sw.Restart();
             RecipeNode treeUsedForSolve = tree;
             List<UsedMaterial> usedMaterials = null;
 
@@ -119,9 +189,15 @@ namespace GW2CraftingHelper.Services
                 treeUsedForSolve = reduced.ReducedTree;
                 usedMaterials = reduced.UsedMaterials;
             }
+            sw.Stop();
+            timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
 
             // Step 7: Solve
+            progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
+            sw.Restart();
             var plan = _solver.Solve(treeUsedForSolve, prices, vendorOffers);
+            sw.Stop();
+            timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
 
             // Step 8: Fetch item metadata for all step items + target + used materials
             var metadataIds = new HashSet<int>(plan.Steps.Select(s => s.ItemId));
@@ -133,18 +209,43 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
+            progress?.Report(new PlanStatus
+            {
+                Message = $"Fetching item details ({metadataIds.Count} items)...",
+                Total = metadataIds.Count
+            });
+            sw.Restart();
             var metadata = await _itemMetadataService.GetMetadataAsync(metadataIds, ct);
+            sw.Stop();
+            timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
             // Step 9: Fetch learned recipe IDs (if permission available)
+            progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
+            sw.Restart();
             ISet<int> learnedRecipeIds = null;
             if (_accountRecipeClient != null && _accountRecipeClient.HasRequiredPermission())
             {
                 learnedRecipeIds = await _accountRecipeClient.GetLearnedRecipeIdsAsync(ct);
             }
+            sw.Stop();
+            timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");
 
             // Step 10: Build structured result
+            progress?.Report(new PlanStatus { Message = "Building final result..." });
+            sw.Restart();
             var builder = new PlanResultBuilder();
-            return builder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
+            var result = builder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
+            sw.Stop();
+            timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
+
+            // Prepend timing log to debug entries from PlanResultBuilder
+            if (result.DebugLog == null)
+            {
+                result.DebugLog = new List<string>();
+            }
+            result.DebugLog.InsertRange(0, timingLog);
+
+            return result;
         }
 
         private static void CollectItemIds(RecipeNode node, HashSet<int> ids)
