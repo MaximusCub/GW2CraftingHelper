@@ -260,81 +260,95 @@ namespace GW2CraftingHelper.Harness
                 }
             }
 
-            // Compute aggregated statistics
             if (allParsed.Count == 0 || allParsed[0].Count == 0)
             {
                 Console.WriteLine("  No timing data collected.");
                 return;
             }
 
-            // Collect per-phase data across iterations
-            var phaseNames = allParsed[0].Select(p => p.Name).ToList();
-            var phaseData = new Dictionary<string, List<long>>();
-            var totalTimes = new List<long>();
-
-            foreach (var name in phaseNames)
-            {
-                phaseData[name] = new List<long>();
-            }
-
-            foreach (var run in allParsed)
-            {
-                long runTotal = 0;
-                foreach (var phase in run)
-                {
-                    if (phaseData.ContainsKey(phase.Name))
-                    {
-                        phaseData[phase.Name].Add(phase.ElapsedMs);
-                    }
-                    runTotal += phase.ElapsedMs;
-                }
-                totalTimes.Add(runTotal);
-            }
-
-            // Sort each phase's data for percentile computation
-            foreach (var entry in phaseData)
-            {
-                entry.Value.Sort();
-            }
-            totalTimes.Sort();
-
-            double medianTotal = Median(totalTimes);
-
-            Console.WriteLine($"Median total: {medianTotal:F0}ms");
             Console.WriteLine();
 
-            // Phase ranking sorted by median descending
-            var phaseStats = phaseNames
-                .Where(name => phaseData[name].Count > 0)
-                .Select(name =>
-                {
-                    var data = phaseData[name];
-                    double med = Median(data);
-                    return new
-                    {
-                        Name = name,
-                        Min = data[0],
-                        Med = med,
-                        P95 = Percentile(data, 0.95),
-                        Max = data[data.Count - 1],
-                        Avg = data.Average(),
-                        Pct = medianTotal > 0 ? med / medianTotal * 100.0 : 0.0
-                    };
-                })
-                .OrderByDescending(s => s.Med)
-                .ToList();
+            // --- Cold run (iteration 1) ---
+            var cold = allParsed[0];
+            long coldTotal = cold.Sum(p => p.ElapsedMs);
 
-            // Print header
-            Console.WriteLine(
-                "{0,-30} {1,8} {2,8} {3,8} {4,8} {5,8} {6,8}",
-                "Phase", "Min", "Median", "P95", "Max", "Avg", "%");
+            Console.WriteLine("[COLD RUN]");
+            Console.WriteLine(string.Format(
+                CultureInfo.InvariantCulture, "Total: {0}ms", coldTotal));
 
-            foreach (var s in phaseStats)
+            var coldSorted = cold.OrderByDescending(p => p.ElapsedMs).ToList();
+            foreach (var phase in coldSorted)
             {
-                Console.WriteLine(
-                    "{0,-30} {1,6}ms {2,6}ms {3,6}ms {4,6}ms {5,6}ms {6,6:F1}%",
-                    s.Name, s.Min, (long)s.Med, (long)s.P95, s.Max,
-                    (long)s.Avg, s.Pct);
+                double pct = coldTotal > 0
+                    ? (double)phase.ElapsedMs / coldTotal * 100.0
+                    : 0.0;
+                Console.WriteLine(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0}: {1}ms ({2:F1}%)",
+                    phase.Name, phase.ElapsedMs, pct));
+            }
+
+            // --- Warm median (iterations 2+) ---
+            if (allParsed.Count > 1)
+            {
+                var warmRuns = allParsed.Skip(1).ToList();
+                var phaseNames = allParsed[0].Select(p => p.Name).ToList();
+                var warmPhaseData = new Dictionary<string, List<long>>();
+                var warmTotals = new List<long>();
+
+                foreach (var name in phaseNames)
+                {
+                    warmPhaseData[name] = new List<long>();
+                }
+
+                foreach (var run in warmRuns)
+                {
+                    long runTotal = 0;
+                    foreach (var phase in run)
+                    {
+                        if (warmPhaseData.ContainsKey(phase.Name))
+                        {
+                            warmPhaseData[phase.Name].Add(phase.ElapsedMs);
+                        }
+                        runTotal += phase.ElapsedMs;
+                    }
+                    warmTotals.Add(runTotal);
+                }
+
+                foreach (var entry in warmPhaseData)
+                {
+                    entry.Value.Sort();
+                }
+                warmTotals.Sort();
+
+                double warmMedianTotal = Median(warmTotals);
+
+                Console.WriteLine();
+                Console.WriteLine("[WARM MEDIAN]");
+                Console.WriteLine(string.Format(
+                    CultureInfo.InvariantCulture, "Total: {0}ms", (long)warmMedianTotal));
+
+                var warmStats = phaseNames
+                    .Where(name => warmPhaseData[name].Count > 0)
+                    .Select(name =>
+                    {
+                        var data = warmPhaseData[name];
+                        double med = Median(data);
+                        double pct = warmMedianTotal > 0
+                            ? med / warmMedianTotal * 100.0
+                            : 0.0;
+                        return new { Name = name, Med = med, Pct = pct };
+                    })
+                    .OrderByDescending(s => s.Med)
+                    .ToList();
+
+                foreach (var s in warmStats)
+                {
+                    Console.WriteLine(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0}: {1}ms ({2:F1}%)",
+                        s.Name, (long)s.Med, s.Pct));
+                }
             }
         }
 
