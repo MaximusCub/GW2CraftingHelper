@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Models;
+using GW2CraftingHelper.Services.Recipes;
 
 namespace GW2CraftingHelper.Services
 {
@@ -10,30 +11,46 @@ namespace GW2CraftingHelper.Services
     {
         private readonly IRecipeApiClient _api;
         private readonly int _maxConcurrency;
+        private readonly IRecipeCacheStore _cacheStore;
         private readonly Dictionary<int, IReadOnlyList<int>> _searchCache = new Dictionary<int, IReadOnlyList<int>>();
         private readonly Dictionary<int, RawRecipe> _recipeCache = new Dictionary<int, RawRecipe>();
         private readonly object _cacheGate = new object();
 
         private const int DefaultMaxConcurrency = 4;
 
-        public RecipeService(IRecipeApiClient api, int maxConcurrency = DefaultMaxConcurrency)
+        public Action<string> OnStatusUpdate { get; set; }
+        public RecipeCacheStats CacheStats => _cacheStore.Stats;
+
+        public RecipeService(
+            IRecipeApiClient api,
+            int maxConcurrency = DefaultMaxConcurrency,
+            IRecipeCacheStore cacheStore = null)
         {
             _api = api;
             _maxConcurrency = maxConcurrency;
+            _cacheStore = cacheStore ?? new InMemoryRecipeCacheStore();
         }
 
         public async Task<RecipeNode> BuildTreeAsync(int itemId, int quantity, CancellationToken ct)
         {
-            await PreWarmCacheAsync(itemId, ct);
+            try
+            {
+                await PreWarmCacheAsync(itemId, ct);
 
-            var visiting = new HashSet<int>();
-            return await BuildNodeAsync(itemId, "Item", quantity, visiting, ct);
+                var visiting = new HashSet<int>();
+                return await BuildNodeAsync(itemId, "Item", quantity, visiting, ct);
+            }
+            finally
+            {
+                _cacheStore.Flush();
+            }
         }
 
         private async Task PreWarmCacheAsync(int itemId, CancellationToken ct)
         {
             var visited = new HashSet<int>();
             var frontier = new HashSet<int> { itemId };
+            bool statusReported = false;
 
             while (frontier.Count > 0)
             {
@@ -43,6 +60,19 @@ namespace GW2CraftingHelper.Services
                     _maxConcurrency,
                     id => SearchByOutputCachedAsync(id, ct),
                     ct);
+
+                // Report status if API calls dominate (miss rate > 50%)
+                if (!statusReported)
+                {
+                    var stats = _cacheStore.Stats;
+                    int total = stats.SearchHits + stats.SearchMisses;
+                    if (total > 0 && stats.SearchMisses > stats.SearchHits)
+                    {
+                        OnStatusUpdate?.Invoke(
+                            "Discovering recipes from API (first run may take 10s+)...");
+                        statusReported = true;
+                    }
+                }
 
                 // Collect recipe IDs not yet cached
                 var recipeIds = new HashSet<int>();
@@ -195,6 +225,20 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
+            // Check persistent cache store before hitting API
+            var stored = _cacheStore.TryGetSearch(itemId);
+            if (stored != null)
+            {
+                lock (_cacheGate)
+                {
+                    if (!_searchCache.ContainsKey(itemId))
+                    {
+                        _searchCache[itemId] = stored;
+                    }
+                }
+                return stored;
+            }
+
             var result = await _api.SearchByOutputAsync(itemId, ct);
 
             lock (_cacheGate)
@@ -205,6 +249,7 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
+            _cacheStore.PutSearch(itemId, result);
             return result;
         }
 
@@ -218,6 +263,20 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
+            // Check persistent cache store before hitting API
+            var stored = _cacheStore.TryGetRecipe(recipeId);
+            if (stored != null)
+            {
+                lock (_cacheGate)
+                {
+                    if (!_recipeCache.ContainsKey(recipeId))
+                    {
+                        _recipeCache[recipeId] = stored;
+                    }
+                }
+                return stored;
+            }
+
             var result = await _api.GetRecipeAsync(recipeId, ct);
 
             lock (_cacheGate)
@@ -228,6 +287,7 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
+            _cacheStore.PutRecipe(recipeId, result);
             return result;
         }
     }
