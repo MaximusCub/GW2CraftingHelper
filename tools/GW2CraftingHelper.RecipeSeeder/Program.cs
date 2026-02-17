@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -12,14 +14,12 @@ using GW2CraftingHelper.Services.Recipes;
 
 namespace GW2CraftingHelper.RecipeSeeder
 {
-    internal class ProfileItem
-    {
-        public string Name { get; set; }
-        public int ItemId { get; set; }
-    }
-
     internal class Program
     {
+        private const string BaseUrl = "https://api.guildwars2.com/v2";
+        private const int BatchSize = 200;
+        private const int MaxConcurrency = 4;
+
         private static int Main(string[] args)
         {
             return MainAsync(args).GetAwaiter().GetResult();
@@ -27,7 +27,6 @@ namespace GW2CraftingHelper.RecipeSeeder
 
         private static async Task<int> MainAsync(string[] args)
         {
-            int profile = -1;
             string outputDir = null;
             bool force = false;
 
@@ -35,12 +34,6 @@ namespace GW2CraftingHelper.RecipeSeeder
             {
                 switch (args[i])
                 {
-                    case "--profile":
-                        if (i + 1 < args.Length)
-                        {
-                            profile = int.Parse(args[++i], CultureInfo.InvariantCulture);
-                        }
-                        break;
                     case "--output-dir":
                         if (i + 1 < args.Length)
                         {
@@ -51,21 +44,6 @@ namespace GW2CraftingHelper.RecipeSeeder
                         force = true;
                         break;
                 }
-            }
-
-            if (profile < 0)
-            {
-                Console.Error.WriteLine(
-                    "Usage: GW2CraftingHelper.RecipeSeeder " +
-                    "--profile <n> [--output-dir <path>] [--force]");
-                return 1;
-            }
-
-            var items = GetProfileItems(profile);
-            if (items == null || items.Count == 0)
-            {
-                Console.Error.WriteLine($"Unknown profile: {profile}");
-                return 1;
             }
 
             // Default output to repo ref/ directory
@@ -87,34 +65,15 @@ namespace GW2CraftingHelper.RecipeSeeder
                 return 1;
             }
 
-            Console.WriteLine($"Profile {profile} | Output: {outputDir}");
-            Console.WriteLine($"Items: {items.Count}");
+            Console.WriteLine($"Output: {outputDir}");
             Console.WriteLine();
 
             using (var httpClient = new HttpClient())
             {
-                // Build recipe API pipeline
-                var rawApi = new Gw2RecipeApiClient(httpClient);
-                var mfSource = new FileMysticForgeRecipeSource();
-                var recipeApi = RecipeClientFactory.Create(rawApi, mfSource);
+                httpClient.Timeout = TimeSpan.FromMinutes(5);
+                var totalSw = Stopwatch.StartNew();
 
-                // Use InMemoryRecipeCacheStore to collect all discovered data
-                var cacheStore = new InMemoryRecipeCacheStore();
-                var service = new RecipeService(recipeApi, cacheStore: cacheStore);
-
-                // Build tree for each profile item
-                foreach (var item in items)
-                {
-                    Console.Write($"  {item.Name} ({item.ItemId})...");
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
-                    await service.BuildTreeAsync(item.ItemId, 1, CancellationToken.None);
-                    sw.Stop();
-                    Console.WriteLine($" {sw.ElapsedMilliseconds}ms");
-                }
-
-                Console.WriteLine();
-
-                // Fetch GW2 build ID
+                // Step 1: Fetch GW2 build ID
                 int gw2BuildId = 0;
                 try
                 {
@@ -123,21 +82,106 @@ namespace GW2CraftingHelper.RecipeSeeder
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"Warning: Could not fetch build ID: {ex.Message}");
+                    Console.Error.WriteLine(
+                        $"Warning: Could not fetch build ID: {ex.Message}");
                 }
 
-                // Extract collected data
-                var allSearches = cacheStore.GetAllSearches();
-                var allRecipes = cacheStore.GetAllRecipes();
-
+                // Step 2: Fetch all recipe IDs from /v2/recipes
+                Console.Write("Fetching recipe ID list...");
+                var sw = Stopwatch.StartNew();
+                var allRecipeIds = await FetchAllRecipeIdsAsync(httpClient);
+                sw.Stop();
                 Console.WriteLine(
-                    $"Collected: {allSearches.Count} search entries, " +
-                    $"{allRecipes.Count} recipes");
+                    $" {allRecipeIds.Count} recipes ({sw.ElapsedMilliseconds}ms)");
 
-                // Write seed files
+                // Step 3: Batch-fetch all recipe details
+                Console.Write(
+                    $"Fetching recipe details ({allRecipeIds.Count} recipes " +
+                    $"in batches of {BatchSize}, concurrency {MaxConcurrency})...");
+                sw.Restart();
+                var allRecipes = await FetchAllRecipesAsync(
+                    httpClient, allRecipeIds);
+                sw.Stop();
+                Console.WriteLine(
+                    $" {allRecipes.Count} fetched ({sw.ElapsedMilliseconds}ms)");
+
+                // Step 4: Build search index (outputItemId → recipeIds)
+                var searchIndex = new Dictionary<int, List<int>>();
+                foreach (var recipe in allRecipes.Values)
+                {
+                    if (!searchIndex.TryGetValue(
+                        recipe.OutputItemId, out var list))
+                    {
+                        list = new List<int>();
+                        searchIndex[recipe.OutputItemId] = list;
+                    }
+                    list.Add(recipe.Id);
+                }
+
+                // Step 5: Load and merge mystic forge recipes
+                int mfCount = 0;
+                try
+                {
+                    var mfSource = new FileMysticForgeRecipeSource();
+                    using (var mfStream = mfSource.Open())
+                    {
+                        MergeMysticForgeRecipes(
+                            mfStream, allRecipes, searchIndex, out mfCount);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(
+                        $"Warning: Could not load mystic forge recipes: {ex.Message}");
+                }
+
+                // Step 5b: Add negative search entries for leaf items
+                // (ingredients that aren't the output of any recipe)
+                var allIngredientIds = new HashSet<int>();
+                foreach (var recipe in allRecipes.Values)
+                {
+                    foreach (var ing in recipe.Ingredients)
+                    {
+                        if (ing.Type == "Item")
+                        {
+                            allIngredientIds.Add(ing.Id);
+                        }
+                    }
+                }
+
+                int negativeCount = 0;
+                foreach (var ingId in allIngredientIds)
+                {
+                    if (!searchIndex.ContainsKey(ingId))
+                    {
+                        searchIndex[ingId] = new List<int>();
+                        negativeCount++;
+                    }
+                }
+
+                // Sort search index entries for deterministic output
+                foreach (var list in searchIndex.Values)
+                {
+                    list.Sort();
+                }
+
+                totalSw.Stop();
+                Console.WriteLine();
+                Console.WriteLine(
+                    $"Total: {allRecipes.Count} recipes, " +
+                    $"{searchIndex.Count} search entries " +
+                    $"({mfCount} mystic forge, " +
+                    $"{negativeCount} negative/leaf entries) " +
+                    $"in {totalSw.ElapsedMilliseconds}ms");
+
+                // Step 6: Convert and write seed files
                 Directory.CreateDirectory(outputDir);
 
-                string searchJson = RecipeCacheSerializer.SerializeSearches(allSearches);
+                var searches = searchIndex.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => (IReadOnlyList<int>)kvp.Value.AsReadOnly());
+
+                string searchJson = RecipeCacheSerializer.SerializeSearches(searches);
                 File.WriteAllText(searchPath, searchJson, Encoding.UTF8);
 
                 string recipeJson = RecipeCacheSerializer.SerializeRecipes(allRecipes);
@@ -149,7 +193,8 @@ namespace GW2CraftingHelper.RecipeSeeder
                     Gw2BuildId = gw2BuildId,
                     CreatedUtc = DateTime.UtcNow.ToString("o")
                 };
-                string manifestJson = RecipeCacheSerializer.SerializeManifest(manifest);
+                string manifestJson =
+                    RecipeCacheSerializer.SerializeManifest(manifest);
                 File.WriteAllText(manifestPath, manifestJson, Encoding.UTF8);
 
                 Console.WriteLine();
@@ -161,18 +206,234 @@ namespace GW2CraftingHelper.RecipeSeeder
             return 0;
         }
 
-        private static List<ProfileItem> GetProfileItems(int profile)
+        private static async Task<List<int>> FetchAllRecipeIdsAsync(
+            HttpClient httpClient)
         {
-            switch (profile)
+            string json = await httpClient.GetStringAsync($"{BaseUrl}/recipes");
+            return JsonSerializer.Deserialize<List<int>>(json);
+        }
+
+        private static async Task<Dictionary<int, RawRecipe>> FetchAllRecipesAsync(
+            HttpClient httpClient, List<int> recipeIds)
+        {
+            var result = new Dictionary<int, RawRecipe>();
+            var batches = new List<List<int>>();
+
+            for (int i = 0; i < recipeIds.Count; i += BatchSize)
             {
-                case 1:
-                    return new List<ProfileItem>
+                int count = Math.Min(BatchSize, recipeIds.Count - i);
+                batches.Add(recipeIds.GetRange(i, count));
+            }
+
+            int completed = 0;
+            int total = batches.Count;
+            var gate = new object();
+
+            using (var semaphore = new SemaphoreSlim(MaxConcurrency))
+            {
+                var tasks = batches.Select(async batch =>
+                {
+                    await semaphore.WaitAsync();
+                    try
                     {
-                        new ProfileItem { Name = "Gift of Fortune", ItemId = 19626 },
-                        new ProfileItem { Name = "Zojja's Claymore", ItemId = 46762 }
+                        var recipes = await FetchRecipeBatchAsync(
+                            httpClient, batch);
+
+                        lock (gate)
+                        {
+                            foreach (var recipe in recipes)
+                            {
+                                result[recipe.Id] = recipe;
+                            }
+
+                            completed++;
+                            if (completed % 10 == 0 || completed == total)
+                            {
+                                Console.Write(
+                                    $"\r  Batches: {completed}/{total}   ");
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }).ToList();
+
+                await Task.WhenAll(tasks);
+            }
+
+            Console.WriteLine();
+            return result;
+        }
+
+        private static async Task<List<RawRecipe>> FetchRecipeBatchAsync(
+            HttpClient httpClient, List<int> ids)
+        {
+            string idsParam = string.Join(",",
+                ids.Select(id => id.ToString(CultureInfo.InvariantCulture)));
+            string url = $"{BaseUrl}/recipes?ids={idsParam}";
+
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    string json = await httpClient.GetStringAsync(url);
+                    return ParseRecipeBatch(json);
+                }
+                catch (HttpRequestException) when (attempt < 2)
+                {
+                    await Task.Delay(1000 * (attempt + 1));
+                }
+            }
+
+            return new List<RawRecipe>();
+        }
+
+        private static List<RawRecipe> ParseRecipeBatch(string json)
+        {
+            var recipes = new List<RawRecipe>();
+            using (var doc = JsonDocument.Parse(json))
+            {
+                foreach (var elem in doc.RootElement.EnumerateArray())
+                {
+                    var recipe = new RawRecipe
+                    {
+                        Id = elem.GetProperty("id").GetInt32(),
+                        OutputItemId = elem.GetProperty("output_item_id").GetInt32(),
+                        OutputItemCount = elem.GetProperty("output_item_count").GetInt32(),
+                        MinRating = elem.TryGetProperty("min_rating", out var mr)
+                            ? mr.GetInt32() : 0
                     };
-                default:
-                    return null;
+
+                    if (elem.TryGetProperty("disciplines", out var disc))
+                    {
+                        foreach (var d in disc.EnumerateArray())
+                        {
+                            recipe.Disciplines.Add(d.GetString());
+                        }
+                    }
+
+                    if (elem.TryGetProperty("flags", out var flags))
+                    {
+                        foreach (var f in flags.EnumerateArray())
+                        {
+                            recipe.Flags.Add(f.GetString());
+                        }
+                    }
+
+                    if (elem.TryGetProperty("ingredients", out var ings))
+                    {
+                        foreach (var ing in ings.EnumerateArray())
+                        {
+                            recipe.Ingredients.Add(new RawIngredient
+                            {
+                                Type = ing.TryGetProperty("type", out var t)
+                                    ? t.GetString() ?? "Item" : "Item",
+                                Id = ing.GetProperty("item_id").GetInt32(),
+                                Count = ing.GetProperty("count").GetInt32()
+                            });
+                        }
+                    }
+
+                    recipes.Add(recipe);
+                }
+            }
+
+            return recipes;
+        }
+
+        private static void MergeMysticForgeRecipes(
+            Stream mfStream,
+            Dictionary<int, RawRecipe> allRecipes,
+            Dictionary<int, List<int>> searchIndex,
+            out int count)
+        {
+            count = 0;
+
+            using (var reader = new StreamReader(mfStream))
+            {
+                string json = reader.ReadToEnd();
+                using (var doc = JsonDocument.Parse(json))
+                {
+                    if (!doc.RootElement.TryGetProperty("recipes", out var arr))
+                    {
+                        return;
+                    }
+
+                    foreach (var entry in arr.EnumerateArray())
+                    {
+                        if (!entry.TryGetProperty("id", out var idProp))
+                        {
+                            continue;
+                        }
+
+                        int id = idProp.GetInt32();
+                        if (id >= 0)
+                        {
+                            continue;
+                        }
+
+                        if (!entry.TryGetProperty("outputItemId", out var outId) ||
+                            !entry.TryGetProperty("outputItemCount", out var outCount))
+                        {
+                            continue;
+                        }
+
+                        if (!entry.TryGetProperty("ingredients", out var ingsArr))
+                        {
+                            continue;
+                        }
+
+                        var recipe = new RawRecipe
+                        {
+                            Id = id,
+                            OutputItemId = outId.GetInt32(),
+                            OutputItemCount = outCount.GetInt32(),
+                            Disciplines = new List<string> { "MysticForge" },
+                            MinRating = 0,
+                            Flags = new List<string>()
+                        };
+
+                        foreach (var ing in ingsArr.EnumerateArray())
+                        {
+                            if (!ing.TryGetProperty("type", out var ingType) ||
+                                !ing.TryGetProperty("id", out var ingId) ||
+                                !ing.TryGetProperty("count", out var ingCount))
+                            {
+                                continue;
+                            }
+
+                            recipe.Ingredients.Add(new RawIngredient
+                            {
+                                Type = ingType.GetString() ?? "Item",
+                                Id = ingId.GetInt32(),
+                                Count = ingCount.GetInt32()
+                            });
+                        }
+
+                        if (recipe.Ingredients.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        allRecipes[recipe.Id] = recipe;
+
+                        if (!searchIndex.TryGetValue(
+                            recipe.OutputItemId, out var list))
+                        {
+                            list = new List<int>();
+                            searchIndex[recipe.OutputItemId] = list;
+                        }
+
+                        if (!list.Contains(recipe.Id))
+                        {
+                            list.Add(recipe.Id);
+                        }
+
+                        count++;
+                    }
+                }
             }
         }
 
@@ -181,7 +442,7 @@ namespace GW2CraftingHelper.RecipeSeeder
             using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
             {
                 var response = await httpClient.GetAsync(
-                    "https://api.guildwars2.com/v2/build", cts.Token);
+                    $"{BaseUrl}/build", cts.Token);
                 response.EnsureSuccessStatusCode();
                 string json = await response.Content.ReadAsStringAsync();
                 using (var doc = JsonDocument.Parse(json))
