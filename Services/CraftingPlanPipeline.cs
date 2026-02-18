@@ -48,9 +48,22 @@ namespace GW2CraftingHelper.Services
             var timingLog = new List<string>();
 
             // Step 1: Build recipe tree
-            progress?.Report(new PlanStatus { Message = "Building recipe tree..." });
+            progress?.Report(new PlanStatus
+            {
+                Message = "Building recipe tree (may take several seconds on first run)..."
+            });
+            _recipeService.OnStatusUpdate = msg =>
+                progress?.Report(new PlanStatus { Message = msg });
             sw.Restart();
-            var tree = await _recipeService.BuildTreeAsync(targetItemId, quantity, ct);
+            RecipeNode tree;
+            try
+            {
+                tree = await _recipeService.BuildTreeAsync(targetItemId, quantity, ct);
+            }
+            finally
+            {
+                _recipeService.OnStatusUpdate = null;
+            }
             sw.Stop();
             timingLog.Add($"Build recipe tree: {sw.ElapsedMilliseconds}ms");
 
@@ -133,9 +146,22 @@ namespace GW2CraftingHelper.Services
             var timingLog = new List<string>();
 
             // Step 1: Build recipe tree
-            progress?.Report(new PlanStatus { Message = "Building recipe tree..." });
+            progress?.Report(new PlanStatus
+            {
+                Message = "Building recipe tree (may take several seconds on first run)..."
+            });
+            _recipeService.OnStatusUpdate = msg =>
+                progress?.Report(new PlanStatus { Message = msg });
             sw.Restart();
-            var tree = await _recipeService.BuildTreeAsync(targetItemId, quantity, ct);
+            RecipeNode tree;
+            try
+            {
+                tree = await _recipeService.BuildTreeAsync(targetItemId, quantity, ct);
+            }
+            finally
+            {
+                _recipeService.OnStatusUpdate = null;
+            }
             sw.Stop();
             timingLog.Add($"Build recipe tree: {sw.ElapsedMilliseconds}ms");
 
