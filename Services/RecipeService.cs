@@ -42,7 +42,7 @@ namespace GW2CraftingHelper.Services
             }
             finally
             {
-                _cacheStore.Flush();
+                _cacheStore.Flush(force: true);
             }
         }
 

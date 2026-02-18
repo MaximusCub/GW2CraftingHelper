@@ -176,7 +176,7 @@ namespace GW2CraftingHelper.Tests.Services
                     MinRating = 0,
                     Flags = new List<string>()
                 });
-                overlay.ForceFlush();
+                overlay.Flush(force: true);
 
                 // Verify files exist
                 string cacheDir = Path.Combine(tempDir, "recipe_cache");

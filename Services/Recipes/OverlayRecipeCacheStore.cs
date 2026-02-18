@@ -156,10 +156,10 @@ namespace GW2CraftingHelper.Services.Recipes
             {
                 if (_searches.TryGetValue(outputItemId, out var result))
                 {
-                    _stats.SearchHits++;
+                    _stats.IncrementSearchHit();
                     return result;
                 }
-                _stats.SearchMisses++;
+                _stats.IncrementSearchMiss();
                 return null;
             }
         }
@@ -170,10 +170,10 @@ namespace GW2CraftingHelper.Services.Recipes
             {
                 if (_recipes.TryGetValue(recipeId, out var result))
                 {
-                    _stats.RecipeHits++;
+                    _stats.IncrementRecipeHit();
                     return result;
                 }
-                _stats.RecipeMisses++;
+                _stats.IncrementRecipeMiss();
                 return null;
             }
         }
@@ -196,7 +196,7 @@ namespace GW2CraftingHelper.Services.Recipes
             }
         }
 
-        public void Flush()
+        public void Flush(bool force = false)
         {
             lock (_gate)
             {
@@ -205,25 +205,13 @@ namespace GW2CraftingHelper.Services.Recipes
                     return;
                 }
 
-                var now = DateTime.UtcNow;
-                if (now - _lastFlushUtc < FlushDebounce)
+                if (!force)
                 {
-                    return;
-                }
-
-                PersistLocked();
-                _dirty = false;
-                _lastFlushUtc = now;
-            }
-        }
-
-        public void ForceFlush()
-        {
-            lock (_gate)
-            {
-                if (!_dirty)
-                {
-                    return;
+                    var now = DateTime.UtcNow;
+                    if (now - _lastFlushUtc < FlushDebounce)
+                    {
+                        return;
+                    }
                 }
 
                 PersistLocked();

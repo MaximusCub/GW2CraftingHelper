@@ -24,18 +24,18 @@ namespace GW2CraftingHelper.Services.Recipes
             var result = _overlay.TryGetSearch(outputItemId);
             if (result != null)
             {
-                _stats.SearchHits++;
+                _stats.IncrementSearchHit();
                 return result;
             }
 
             result = _seed.TryGetSearch(outputItemId);
             if (result != null)
             {
-                _stats.SearchHits++;
+                _stats.IncrementSearchHit();
                 return result;
             }
 
-            _stats.SearchMisses++;
+            _stats.IncrementSearchMiss();
             return null;
         }
 
@@ -45,18 +45,18 @@ namespace GW2CraftingHelper.Services.Recipes
             var result = _overlay.TryGetRecipe(recipeId);
             if (result != null)
             {
-                _stats.RecipeHits++;
+                _stats.IncrementRecipeHit();
                 return result;
             }
 
             result = _seed.TryGetRecipe(recipeId);
             if (result != null)
             {
-                _stats.RecipeHits++;
+                _stats.IncrementRecipeHit();
                 return result;
             }
 
-            _stats.RecipeMisses++;
+            _stats.IncrementRecipeMiss();
             return null;
         }
 
@@ -70,9 +70,9 @@ namespace GW2CraftingHelper.Services.Recipes
             _overlay.PutRecipe(recipeId, recipe);
         }
 
-        public void Flush()
+        public void Flush(bool force = false)
         {
-            _overlay.Flush();
+            _overlay.Flush(force);
         }
     }
 }
