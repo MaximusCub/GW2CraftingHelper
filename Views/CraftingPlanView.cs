@@ -1,6 +1,7 @@
 using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
+using Blish_HUD.Input;
 using Blish_HUD.Graphics.UI;
 using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
@@ -881,7 +882,7 @@ namespace GW2CraftingHelper.Views
                     childFlow.Visible = false;
                 }
 
-                arrowLabel.Click += (_, __) =>
+                EventHandler<MouseEventArgs> toggleHandler = (_, __) =>
                 {
                     if (!state.ChildrenBuilt)
                     {
@@ -896,6 +897,7 @@ namespace GW2CraftingHelper.Views
                     state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
                     state.ChildContainer.Parent.Invalidate();
                 };
+                rowPanel.Click += toggleHandler;
             }
         }
 
