@@ -186,6 +186,15 @@ namespace GW2CraftingHelper.Harness
                     }
                 }
 
+                string seedManifestPath = Path.Combine(baseDir, "ref", "recipe_seed_manifest.json");
+                if (File.Exists(seedManifestPath))
+                {
+                    using (var ms = File.OpenRead(seedManifestPath))
+                    {
+                        recipeSeed.LoadManifest(ms);
+                    }
+                }
+
                 var recipeOverlay = new OverlayRecipeCacheStore(dataDir);
 
                 if (clearOverlayCache)
@@ -209,6 +218,10 @@ namespace GW2CraftingHelper.Harness
                         catch { }
                     }
                     recipeOverlay.Load(buildId);
+                    if (buildId.HasValue)
+                    {
+                        recipeSeed.SetCurrentBuildId(buildId.Value);
+                    }
                 }
 
                 var recipeCacheStore = new CompositeRecipeCacheStore(recipeSeed, recipeOverlay);
