@@ -4,8 +4,8 @@ namespace GW2CraftingHelper.Services
 {
     public class SolverDecision
     {
-        public AcquisitionSource Source { get; set; }
-        public int RecipeId { get; set; }
-        public long? TotalCost { get; set; }
+        public AcquisitionSource Source { get; internal set; }
+        public int RecipeId { get; internal set; }
+        public long? TotalCost { get; internal set; }
     }
 }

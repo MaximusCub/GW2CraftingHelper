@@ -882,6 +882,7 @@ namespace GW2CraftingHelper.Views
                     childFlow.Visible = false;
                 }
 
+                // If row gains buttons/links later, stop propagation to avoid unwanted toggles.
                 EventHandler<MouseEventArgs> toggleHandler = (_, __) =>
                 {
                     if (!state.ChildrenBuilt)

@@ -347,13 +347,14 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void CurrencyNode_ResolvesKnownName()
+        public void CurrencyNode_ResolvesKnownNames()
         {
-            // Spirit Shards (currency ID 23) should get a real name, not "Unknown Item"
+            // Two known currencies: Spirit Shards (23) and Laurels (3)
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
                     Leaf(2, 3),
-                    Leaf(23, 50, "Currency")));
+                    Leaf(23, 50, "Currency"),
+                    Leaf(3, 10, "Currency")));
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
@@ -366,10 +367,15 @@ namespace GW2CraftingHelper.Tests.Services
             var root = BuildViaRealSolver(tree, prices, metadata);
 
             Assert.Equal(CraftingDecision.Craft, root.Decision);
-            var currencyChild = root.Children.First(
-                c => c.Decision == CraftingDecision.Currency);
-            Assert.Equal("Spirit Shards", currencyChild.Name);
-            Assert.Equal(50, currencyChild.Quantity);
+            var currencies = root.Children
+                .Where(c => c.Decision == CraftingDecision.Currency)
+                .OrderBy(c => c.ItemId)
+                .ToList();
+            Assert.Equal(2, currencies.Count);
+            Assert.Equal("Laurels", currencies[0].Name);
+            Assert.Equal(10, currencies[0].Quantity);
+            Assert.Equal("Spirit Shards", currencies[1].Name);
+            Assert.Equal(50, currencies[1].Quantity);
         }
 
         [Fact]
@@ -394,6 +400,39 @@ namespace GW2CraftingHelper.Tests.Services
             var currencyChild = root.Children.First(
                 c => c.Decision == CraftingDecision.Currency);
             Assert.Equal("Currency", currencyChild.Name);
+        }
+
+        [Fact]
+        public void ItemNode_NotAffectedByCurrencyNaming()
+        {
+            // Item with ID 23 (same as Spirit Shards) must get its name from
+            // metadata, not from the currency map
+            var tree = Leaf(23, 5);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 23, new ItemPrice { ItemId = 23, BuyInstant = 100 } }
+            };
+            var metadata = Meta((23, "Vial of Blood", "vial.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, node.Decision);
+            Assert.Equal("Vial of Blood", node.Name);
+        }
+
+        [Fact]
+        public void Children_SetToNull_CoercedToEmpty()
+        {
+            var node = new CraftingTreeNode { ItemId = 1, Name = "Test" };
+
+            // Default is non-null
+            Assert.NotNull(node.Children);
+            Assert.Empty(node.Children);
+
+            // Explicit null assignment coerced to empty
+            node.Children = null;
+            Assert.NotNull(node.Children);
+            Assert.Empty(node.Children);
         }
 
         private static void AssertChildrenNeverNull(CraftingTreeNode node)

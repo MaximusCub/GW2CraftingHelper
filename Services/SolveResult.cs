@@ -5,7 +5,7 @@ namespace GW2CraftingHelper.Services
 {
     public class SolveResult
     {
-        public CraftingPlan Plan { get; set; }
-        public IReadOnlyDictionary<int, SolverDecision> Decisions { get; set; }
+        public CraftingPlan Plan { get; internal set; }
+        public IReadOnlyDictionary<int, SolverDecision> Decisions { get; internal set; }
     }
 }
