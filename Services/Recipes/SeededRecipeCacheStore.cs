@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
@@ -13,8 +14,29 @@ namespace GW2CraftingHelper.Services.Recipes
             new Dictionary<int, RawRecipe>();
 
         private readonly RecipeCacheStats _stats = new RecipeCacheStats();
+        private int? _seedBuildId;
+        private int _currentBuildId;
+        private int _hasCurrent;
 
         public RecipeCacheStats Stats => _stats;
+        public int? SeedBuildId => _seedBuildId;
+
+        public int? CurrentBuildId
+        {
+            get { return Volatile.Read(ref _hasCurrent) == 1 ? (int?)Volatile.Read(ref _currentBuildId) : null; }
+        }
+
+        public bool SeedIsStale
+        {
+            get
+            {
+                if (!_seedBuildId.HasValue || Volatile.Read(ref _hasCurrent) == 0)
+                {
+                    return false;
+                }
+                return _seedBuildId.Value != Volatile.Read(ref _currentBuildId);
+            }
+        }
 
         public void Load(Stream searchStream, Stream recipesStream)
         {
@@ -31,10 +53,35 @@ namespace GW2CraftingHelper.Services.Recipes
             _recipes = RecipeCacheSerializer.LoadRecipeSeed(recipesStream);
         }
 
+        public void LoadManifest(Stream manifestStream)
+        {
+            if (manifestStream == null)
+            {
+                return;
+            }
+
+            var manifest = RecipeCacheSerializer.LoadManifest<RecipeSeedManifest>(manifestStream);
+            if (manifest.Gw2BuildId > 0)
+            {
+                _seedBuildId = manifest.Gw2BuildId;
+            }
+        }
+
+        public void SetCurrentBuildId(int buildId)
+        {
+            Volatile.Write(ref _currentBuildId, buildId);
+            Volatile.Write(ref _hasCurrent, 1);
+        }
+
         public IReadOnlyList<int> TryGetSearch(int outputItemId)
         {
             if (_searches.TryGetValue(outputItemId, out var result))
             {
+                if (result.Count == 0 && SeedIsStale)
+                {
+                    _stats.IncrementSearchMiss();
+                    return null;
+                }
                 _stats.IncrementSearchHit();
                 return result;
             }

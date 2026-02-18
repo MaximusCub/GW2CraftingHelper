@@ -120,20 +120,33 @@ namespace GW2CraftingHelper
                 // No seed files yet — graceful degradation
             }
 
+            try
+            {
+                using (var manifestStream = ContentsManager.GetFileStream("recipe_seed_manifest.json"))
+                {
+                    recipeSeed.LoadManifest(manifestStream);
+                }
+            }
+            catch
+            {
+                // No manifest — staleness detection disabled
+            }
+
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir);
             recipeOverlay.Load(currentGw2BuildId: null);
 
-            // Async build ID fetch for overlay invalidation
+            // Async build ID fetch for overlay invalidation + seed staleness
             Task.Run(async () =>
             {
                 try
                 {
                     int buildId = await FetchGw2BuildIdAsync();
                     recipeOverlay.InvalidateIfStale(buildId);
+                    recipeSeed.SetCurrentBuildId(buildId);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Debug("Could not fetch GW2 build ID for overlay invalidation: {0}", ex.Message);
+                    Logger.Debug("Could not fetch GW2 build ID for cache validation: {0}", ex.Message);
                 }
             });
 

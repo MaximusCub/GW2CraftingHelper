@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Models;
@@ -51,6 +52,7 @@ namespace GW2CraftingHelper.Services
             var visited = new HashSet<int>();
             var frontier = new HashSet<int> { itemId };
             bool statusReported = false;
+            bool staleReported = false;
 
             while (frontier.Count > 0)
             {
@@ -72,6 +74,19 @@ namespace GW2CraftingHelper.Services
                             "Discovering recipes from API (first run may take 10s+)...");
                         statusReported = true;
                     }
+                }
+
+                // Log seed staleness once per run
+                if (!staleReported
+                    && _cacheStore is CompositeRecipeCacheStore composite
+                    && composite.SeedIsStale)
+                {
+                    OnStatusUpdate?.Invoke(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "Recipe seed built for build {0}; current build {1}; seed negative entries will fall back to API.",
+                        composite.SeedBuildId,
+                        composite.CurrentBuildId));
+                    staleReported = true;
                 }
 
                 // Collect recipe IDs not yet cached
