@@ -444,6 +444,12 @@ namespace GW2CraftingHelper.Views
             {
                 CreateCollapsibleSection(section, panelWidth);
             }
+
+            // Recipe Tree section (if tree data available)
+            if (vm.TreeRoot != null)
+            {
+                CreateTreeSection(vm.TreeRoot, panelWidth);
+            }
         }
 
         private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
@@ -713,6 +719,209 @@ namespace GW2CraftingHelper.Views
                     TextColor = new Color(170, 170, 170),
                     Parent = rowPanel
                 };
+            }
+        }
+
+        // --- Recipe tree section ---
+
+        private class TreeNodeState
+        {
+            public bool ChildrenBuilt;
+            public bool IsExpanded;
+            public FlowPanel ChildContainer;
+            public Label ArrowLabel;
+            public CraftingTreeNode Node;
+            public int Depth;
+            public int PanelWidth;
+        }
+
+        private void CreateTreeSection(CraftingTreeNode treeRoot, int panelWidth)
+        {
+            string arrow = "\u25BC";
+            var headerPanel = new Panel()
+            {
+                Size = new Point(panelWidth, 30),
+                Parent = _contentPanel
+            };
+
+            var headerLabel = new Label()
+            {
+                Text = $"{arrow} Recipe Tree",
+                Font = GameService.Content.DefaultFont18,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(4, 4),
+                Parent = headerPanel
+            };
+
+            var treeFlow = new FlowPanel()
+            {
+                Size = new Point(panelWidth, 0),
+                FlowDirection = ControlFlowDirection.SingleTopToBottom,
+                Visible = true,
+                Parent = _contentPanel,
+                HeightSizingMode = SizingMode.AutoSize
+            };
+
+            RenderTreeNode(treeRoot, treeFlow, panelWidth, 0);
+
+            headerPanel.Click += (_, __) =>
+            {
+                treeFlow.Visible = !treeFlow.Visible;
+                headerLabel.Text = (treeFlow.Visible ? "\u25BC" : "\u25B6")
+                    + " Recipe Tree";
+                _contentPanel.Invalidate();
+            };
+        }
+
+        private void RenderTreeNode(CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth)
+        {
+            const int indentPer = 24;
+            const int arrowWidth = 18;
+            const int iconSize = 32;
+            const int iconPad = 4;
+            const int rowHeight = 36;
+
+            int indent = depth * indentPer;
+            bool hasChildren = node.Children != null && node.Children.Count > 0;
+
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, rowHeight),
+                Parent = parent
+            };
+
+            // Expand/collapse arrow
+            Label arrowLabel = null;
+            if (hasChildren)
+            {
+                bool defaultExpanded = depth < 2;
+                arrowLabel = new Label()
+                {
+                    Text = defaultExpanded ? "\u25BC" : "\u25B6",
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(indent, 8),
+                    Parent = rowPanel
+                };
+            }
+
+            // Item icon
+            int iconX = indent + (hasChildren ? arrowWidth : 0);
+            CreateItemIcon(rowPanel, node.IconUrl, iconX, 2);
+
+            // Quantity + name
+            int textX = iconX + iconSize + iconPad;
+            string nameText = node.Quantity > 0
+                ? $"{node.Quantity}x {node.Name}"
+                : node.Name;
+            var nameLabel = new Label()
+            {
+                Text = nameText,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(textX, 8),
+                Parent = rowPanel
+            };
+
+            // Decision badge
+            int badgeX = textX + nameLabel.Width + 6;
+            string badgeText = GetDecisionBadgeText(node.Decision);
+            Color badgeColor = GetDecisionBadgeColor(node.Decision);
+            var badgeLabel = new Label()
+            {
+                Text = badgeText,
+                TextColor = badgeColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(badgeX, 8),
+                Parent = rowPanel
+            };
+
+            // Cost display: inline coin for nodes with SubtreeCost
+            if (node.SubtreeCost.HasValue && node.SubtreeCost.Value > 0)
+            {
+                int costX = badgeX + badgeLabel.Width + 6;
+                BuildInlineCoin(rowPanel, node.SubtreeCost.Value, costX);
+            }
+
+            // Child container
+            if (hasChildren)
+            {
+                var childFlow = new FlowPanel()
+                {
+                    Size = new Point(panelWidth, 0),
+                    FlowDirection = ControlFlowDirection.SingleTopToBottom,
+                    Parent = parent,
+                    HeightSizingMode = SizingMode.AutoSize
+                };
+
+                var state = new TreeNodeState
+                {
+                    Node = node,
+                    Depth = depth,
+                    ChildContainer = childFlow,
+                    ArrowLabel = arrowLabel,
+                    PanelWidth = panelWidth
+                };
+                if (depth < 2)
+                {
+                    // Default-expanded: build children now
+                    foreach (var child in node.Children)
+                    {
+                        RenderTreeNode(child, childFlow, panelWidth, depth + 1);
+                    }
+                    state.ChildrenBuilt = true;
+                    state.IsExpanded = true;
+                    childFlow.Visible = true;
+                }
+                else
+                {
+                    state.IsExpanded = false;
+                    childFlow.Visible = false;
+                }
+
+                arrowLabel.Click += (_, __) =>
+                {
+                    if (!state.ChildrenBuilt)
+                    {
+                        foreach (var child in state.Node.Children)
+                        {
+                            RenderTreeNode(child, state.ChildContainer, state.PanelWidth, state.Depth + 1);
+                        }
+                        state.ChildrenBuilt = true;
+                    }
+                    state.IsExpanded = !state.IsExpanded;
+                    state.ChildContainer.Visible = state.IsExpanded;
+                    state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
+                    state.ChildContainer.Parent.Invalidate();
+                };
+            }
+        }
+
+        private static string GetDecisionBadgeText(CraftingDecision decision)
+        {
+            switch (decision)
+            {
+                case CraftingDecision.Craft: return "CRAFT";
+                case CraftingDecision.BuyFromTp: return "TP";
+                case CraftingDecision.BuyFromVendor: return "VENDOR";
+                case CraftingDecision.Have: return "HAVE";
+                case CraftingDecision.Currency: return "CURRENCY";
+                default: return "?";
+            }
+        }
+
+        private static Color GetDecisionBadgeColor(CraftingDecision decision)
+        {
+            switch (decision)
+            {
+                case CraftingDecision.Craft: return new Color(100, 200, 100);
+                case CraftingDecision.BuyFromTp: return new Color(255, 200, 60);
+                case CraftingDecision.BuyFromVendor: return new Color(180, 130, 255);
+                case CraftingDecision.Have: return new Color(170, 170, 170);
+                case CraftingDecision.Currency: return new Color(255, 220, 100);
+                default: return new Color(255, 100, 100);
             }
         }
 
