@@ -68,10 +68,13 @@
     <Compile Include="Models\CurrencyCost.cs" />
     <Compile Include="Models\CraftingPlan.cs" />
     <Compile Include="Services\PlanSolver.cs" />
+    <Compile Include="Services\SolverDecision.cs" />
+    <Compile Include="Services\SolveResult.cs" />
     <Compile Include="Models\ItemMetadata.cs" />
     <Compile Include="Models\CraftingPlanResult.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
+    <Compile Include="Services\CraftingTreeBuilder.cs" />
     <Compile Include="Services\CraftingPlanPipeline.cs" />
     <Compile Include="Services\Gw2RecipeApiClient.cs" />
     <Compile Include="Services\Gw2PriceApiClient.cs" />
@@ -108,6 +111,8 @@
     <Compile Include="Services\MysticForgeRecipeData.cs" />
     <Compile Include="Services\CompositeRecipeApiClient.cs" />
     <Compile Include="Services\RecipeClientFactory.cs" />
+    <Compile Include="Contracts\CraftingDecision.cs" />
+    <Compile Include="Contracts\CraftingTreeNode.cs" />
     <Compile Include="Contracts\IItemSearchProvider.cs" />
     <Compile Include="Contracts\StaticItemSearchProvider.cs" />
     <Compile Include="Services\Diagnostics\PlanTimingAnalyzer.cs" />

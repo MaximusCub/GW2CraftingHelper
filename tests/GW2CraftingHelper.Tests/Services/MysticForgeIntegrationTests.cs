@@ -136,7 +136,7 @@ namespace GW2CraftingHelper.Tests.Services
                 }, CancellationToken.None);
 
             var solver = new PlanSolver();
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             // Solver should choose Craft
             var craftStep = plan.Steps.FirstOrDefault(s => s.ItemId == GiftOfMagicId);
@@ -177,7 +177,7 @@ namespace GW2CraftingHelper.Tests.Services
                 }, CancellationToken.None);
 
             var solver = new PlanSolver();
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             // BuyInstant for Gift of Magic = 100
             // Craft cost = 250*(500+400+450+600) = 487500
@@ -305,7 +305,7 @@ namespace GW2CraftingHelper.Tests.Services
                 .GetPricesAsync(allItemIds, CancellationToken.None);
 
             var solver = new PlanSolver();
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             // Gift of Fortune should be crafted (not bought)
             var fortuneStep = plan.Steps.FirstOrDefault(s =>

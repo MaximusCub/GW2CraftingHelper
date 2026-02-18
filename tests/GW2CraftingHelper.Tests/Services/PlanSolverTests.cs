@@ -61,7 +61,8 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices);
+            var result = solver.Solve(tree, prices);
+            var plan = result.Plan;
 
             Assert.Single(plan.Steps);
             var step = plan.Steps[0];
@@ -81,7 +82,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             Assert.Single(plan.Steps);
             var step = plan.Steps[0];
@@ -105,7 +106,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             // Should have: Buy 2x item 2, then Craft 1x item 1
             Assert.Equal(2, plan.Steps.Count);
@@ -136,7 +137,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             // Should just buy item 1, no ingredient steps
             Assert.Single(plan.Steps);
@@ -165,7 +166,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             var craftStep = plan.Steps.First(s => s.Source == AcquisitionSource.Craft);
             Assert.Equal(11, craftStep.RecipeId); // chose cheaper recipe
@@ -189,7 +190,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             // Buys first, then crafts bottom-up: craft B before craft A
             var craftSteps = plan.Steps.Where(s => s.Source == AcquisitionSource.Craft).ToList();
@@ -213,7 +214,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             // No Currency steps
             Assert.DoesNotContain(plan.Steps, s => s.Source == AcquisitionSource.Currency);
@@ -240,7 +241,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             // Buy cost: 3 * 500 = 1500. Craft cost: 8 * 10 = 80. Craft wins.
             var buyStep = plan.Steps.First(s => s.Source == AcquisitionSource.BuyFromTp);
@@ -271,7 +272,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             // Item 2 appears twice as BuyFromTp, should be deduplicated: 3 + 5 = 8
             var item2Steps = plan.Steps.Where(s => s.ItemId == 2).ToList();
@@ -295,7 +296,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices);
+            var plan = solver.Solve(tree, prices).Plan;
 
             // Should buy item 1 since craft is unpriceable
             Assert.Single(plan.Steps);
@@ -317,7 +318,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, null);
+            var plan = solver.Solve(tree, prices, null).Plan;
 
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
@@ -337,7 +338,7 @@ namespace GW2CraftingHelper.Tests.Services
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>();
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, vendorOffers);
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Equal(2, plan.Steps.Count);
             Assert.Contains(plan.Steps, s => s.Source == AcquisitionSource.Craft && s.ItemId == 1);
@@ -378,7 +379,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, vendorOffers);
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
@@ -400,7 +401,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, vendorOffers);
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
@@ -431,7 +432,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, vendorOffers);
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
@@ -453,7 +454,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, vendorOffers);
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
@@ -477,7 +478,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, vendorOffers);
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
@@ -511,7 +512,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, vendorOffers);
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             // Vendor cost = 5 * 10 = 50, TP buy = 200 -> vendor wins
             Assert.Single(plan.Steps);
@@ -531,7 +532,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, vendorOffers);
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);

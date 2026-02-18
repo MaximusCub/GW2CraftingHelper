@@ -110,13 +110,14 @@ namespace GW2CraftingHelper.Services
             // Step 6: Solve
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
-            var plan = _solver.Solve(tree, prices, vendorOffers);
+            var solveResult = _solver.Solve(tree, prices, vendorOffers);
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
 
-            // Step 7: Fetch item metadata for all step items + target
-            var metadataIds = new HashSet<int>(plan.Steps.Select(s => s.ItemId));
+            // Step 7: Fetch item metadata for all step items + target + tree items
+            var metadataIds = new HashSet<int>(solveResult.Plan.Steps.Select(s => s.ItemId));
             metadataIds.Add(targetItemId);
+            CraftingTreeBuilder.CollectTreeItemIds(tree, solveResult.Decisions, metadataIds);
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching item details ({metadataIds.Count} items)...",
@@ -127,13 +128,18 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
+            // Build crafting tree
+            var treeBuilder = new CraftingTreeBuilder();
+            var craftingTree = treeBuilder.BuildTree(tree, solveResult.Decisions, metadata);
+
             var debugLog = new List<string>(timingLog);
             debugLog.AddRange(PlanTimingAnalyzer.Summarize(timingLog));
 
             return new CraftingPlanResult
             {
-                Plan = plan,
+                Plan = solveResult.Plan,
                 ItemMetadata = metadata,
+                CraftingTree = craftingTree,
                 DebugLog = debugLog
             };
         }
@@ -225,11 +231,12 @@ namespace GW2CraftingHelper.Services
             // Step 7: Solve
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
-            var plan = _solver.Solve(treeUsedForSolve, prices, vendorOffers);
+            var solveResult = _solver.Solve(treeUsedForSolve, prices, vendorOffers);
+            var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
 
-            // Step 8: Fetch item metadata for all step items + target + used materials
+            // Step 8: Fetch item metadata for all step items + target + used materials + tree items
             var metadataIds = new HashSet<int>(plan.Steps.Select(s => s.ItemId));
             metadataIds.Add(targetItemId);
             if (usedMaterials != null)
@@ -239,6 +246,7 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
+            CraftingTreeBuilder.CollectTreeItemIds(treeUsedForSolve, solveResult.Decisions, metadataIds);
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching item details ({metadataIds.Count} items)...",
@@ -263,8 +271,12 @@ namespace GW2CraftingHelper.Services
             // Step 10: Build structured result
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
-            var builder = new PlanResultBuilder();
-            var result = builder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
+            var resultBuilder = new PlanResultBuilder();
+            var result = resultBuilder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
+
+            // Build crafting tree
+            var treeBuilder = new CraftingTreeBuilder();
+            result.CraftingTree = treeBuilder.BuildTree(treeUsedForSolve, solveResult.Decisions, metadata);
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
 
