@@ -108,6 +108,8 @@
     <Compile Include="Services\MysticForgeRecipeData.cs" />
     <Compile Include="Services\CompositeRecipeApiClient.cs" />
     <Compile Include="Services\RecipeClientFactory.cs" />
+    <Compile Include="Contracts\CraftingDecision.cs" />
+    <Compile Include="Contracts\CraftingTreeNode.cs" />
     <Compile Include="Contracts\IItemSearchProvider.cs" />
     <Compile Include="Contracts\StaticItemSearchProvider.cs" />
     <Compile Include="Services\Diagnostics\PlanTimingAnalyzer.cs" />

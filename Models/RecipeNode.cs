@@ -7,6 +7,7 @@ namespace GW2CraftingHelper.Models
         public int Id { get; set; }
         public string IngredientType { get; set; }
         public int Quantity { get; set; }
+        public int NodeId { get; set; }
         public List<RecipeOption> Recipes { get; set; } = new List<RecipeOption>();
         public bool IsLeaf => Recipes.Count == 0;
     }

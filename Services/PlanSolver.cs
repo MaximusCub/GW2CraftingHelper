@@ -5,6 +5,19 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
+    public class SolverDecision
+    {
+        public AcquisitionSource Source { get; set; }
+        public int RecipeId { get; set; }
+        public long? TotalCost { get; set; }
+    }
+
+    public class SolveResult
+    {
+        public CraftingPlan Plan { get; set; }
+        public IReadOnlyDictionary<int, SolverDecision> Decisions { get; set; }
+    }
+
     public class PlanSolver
     {
         private struct Decision
@@ -15,17 +28,21 @@ namespace GW2CraftingHelper.Services
             public List<CostLine> VendorCurrencyCosts;
         }
 
-        public CraftingPlan Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
+        public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
         {
             return Solve(tree, prices, null);
         }
 
-        public CraftingPlan Solve(
+        public SolveResult Solve(
             RecipeNode tree,
             IReadOnlyDictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers)
         {
-            var memo = new Dictionary<(int, int), Decision>();
+            var memo = new Dictionary<int, Decision>();
+
+            // Pre-pass: assign unique NodeIds to every node in the tree
+            int nextNodeId = 0;
+            AssignNodeIds(tree, ref nextNodeId);
 
             // Pass 1: decide buy vs craft vs vendor at every node
             Evaluate(tree, prices, vendorOffers, memo);
@@ -77,7 +94,7 @@ namespace GW2CraftingHelper.Services
                 currencyCosts.Add(new CurrencyCost { CurrencyId = kvp.Key, Amount = checked(kvp.Value) });
             }
 
-            return new CraftingPlan
+            var plan = new CraftingPlan
             {
                 TargetItemId = tree.Id,
                 TargetQuantity = tree.Quantity,
@@ -85,23 +102,35 @@ namespace GW2CraftingHelper.Services
                 TotalCoinCost = totalCoinCost,
                 CurrencyCosts = currencyCosts
             };
+
+            // Convert internal memo to public decisions dict
+            var decisions = new Dictionary<int, SolverDecision>(memo.Count);
+            foreach (var kvp in memo)
+            {
+                decisions[kvp.Key] = new SolverDecision
+                {
+                    Source = kvp.Value.Source,
+                    RecipeId = kvp.Value.RecipeId,
+                    TotalCost = kvp.Value.TotalCost
+                };
+            }
+
+            return new SolveResult
+            {
+                Plan = plan,
+                Decisions = decisions
+            };
         }
 
         private long? Evaluate(
             RecipeNode node,
             IReadOnlyDictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
-            Dictionary<(int, int), Decision> memo)
+            Dictionary<int, Decision> memo)
         {
             if (node.IngredientType == "Currency")
             {
                 return null;
-            }
-
-            var key = (node.Id, node.Quantity);
-            if (memo.TryGetValue(key, out var cached))
-            {
-                return cached.TotalCost;
             }
 
             long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices);
@@ -119,7 +148,7 @@ namespace GW2CraftingHelper.Services
 
                 if (winner == AcquisitionSource.BuyFromVendor)
                 {
-                    memo[key] = new Decision
+                    memo[node.NodeId] = new Decision
                     {
                         Source = AcquisitionSource.BuyFromVendor,
                         TotalCost = bestVendorCoinCost,
@@ -131,7 +160,7 @@ namespace GW2CraftingHelper.Services
 
                 if (winner == AcquisitionSource.BuyFromTp)
                 {
-                    memo[key] = new Decision
+                    memo[node.NodeId] = new Decision
                     {
                         Source = AcquisitionSource.BuyFromTp,
                         TotalCost = buyTotalCost.Value,
@@ -140,7 +169,7 @@ namespace GW2CraftingHelper.Services
                     return buyTotalCost.Value;
                 }
 
-                memo[key] = new Decision
+                memo[node.NodeId] = new Decision
                 {
                     Source = AcquisitionSource.UnknownSource,
                     TotalCost = null,
@@ -194,7 +223,7 @@ namespace GW2CraftingHelper.Services
 
             if (source == AcquisitionSource.BuyFromVendor)
             {
-                memo[key] = new Decision
+                memo[node.NodeId] = new Decision
                 {
                     Source = AcquisitionSource.BuyFromVendor,
                     TotalCost = bestVendorCoinCost,
@@ -206,7 +235,7 @@ namespace GW2CraftingHelper.Services
 
             if (source == AcquisitionSource.BuyFromTp)
             {
-                memo[key] = new Decision
+                memo[node.NodeId] = new Decision
                 {
                     Source = AcquisitionSource.BuyFromTp,
                     TotalCost = buyTotalCost.Value,
@@ -217,7 +246,7 @@ namespace GW2CraftingHelper.Services
 
             if (source == AcquisitionSource.Craft)
             {
-                memo[key] = new Decision
+                memo[node.NodeId] = new Decision
                 {
                     Source = AcquisitionSource.Craft,
                     TotalCost = bestCraftCost,
@@ -229,7 +258,7 @@ namespace GW2CraftingHelper.Services
             // Fallback: unpriceable craft or unknown
             if (bestRecipeId != 0)
             {
-                memo[key] = new Decision
+                memo[node.NodeId] = new Decision
                 {
                     Source = AcquisitionSource.Craft,
                     TotalCost = bestCraftCost,
@@ -238,7 +267,7 @@ namespace GW2CraftingHelper.Services
                 return bestCraftCost;
             }
 
-            memo[key] = new Decision
+            memo[node.NodeId] = new Decision
             {
                 Source = AcquisitionSource.UnknownSource,
                 TotalCost = null,
@@ -370,7 +399,7 @@ namespace GW2CraftingHelper.Services
 
         private void Collect(
             RecipeNode node,
-            Dictionary<(int, int), Decision> memo,
+            Dictionary<int, Decision> memo,
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
             Dictionary<int, long> currencyMap,
             Dictionary<(int, int), int> craftOrder,
@@ -389,8 +418,7 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            var key = (node.Id, node.Quantity);
-            if (!memo.TryGetValue(key, out var decision))
+            if (!memo.TryGetValue(node.NodeId, out var decision))
             {
                 return;
             }
@@ -483,6 +511,18 @@ namespace GW2CraftingHelper.Services
                     TotalCost = decision.TotalCost ?? 0L,
                     RecipeId = decision.RecipeId
                 };
+            }
+        }
+
+        private static void AssignNodeIds(RecipeNode node, ref int nextNodeId)
+        {
+            node.NodeId = nextNodeId++;
+            foreach (var recipe in node.Recipes)
+            {
+                foreach (var ingredient in recipe.Ingredients)
+                {
+                    AssignNodeIds(ingredient, ref nextNodeId);
+                }
             }
         }
 
