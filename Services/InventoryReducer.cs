@@ -91,7 +91,8 @@ namespace GW2CraftingHelper.Services
             {
                 Id = node.Id,
                 IngredientType = node.IngredientType,
-                Quantity = node.Quantity
+                Quantity = node.Quantity,
+                NodeId = node.NodeId
             };
 
             foreach (var option in node.Recipes)
