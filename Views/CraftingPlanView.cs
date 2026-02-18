@@ -783,7 +783,7 @@ namespace GW2CraftingHelper.Views
             const int rowHeight = 36;
 
             int indent = depth * indentPer;
-            bool hasChildren = node.Children != null && node.Children.Count > 0;
+            bool hasChildren = node.Children.Count > 0;
 
             var rowPanel = new Panel()
             {

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Contracts
@@ -12,6 +13,6 @@ namespace GW2CraftingHelper.Contracts
         public int? RecipeId { get; set; }
         public long? UnitCost { get; set; }
         public long? SubtreeCost { get; set; }
-        public IReadOnlyList<CraftingTreeNode> Children { get; set; }
+        public IReadOnlyList<CraftingTreeNode> Children { get; set; } = Array.Empty<CraftingTreeNode>();
     }
 }

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Contracts;
@@ -26,8 +25,7 @@ namespace GW2CraftingHelper.Services
                 ItemId = node.Id,
                 Name = ResolveName(node.Id, metadata),
                 IconUrl = ResolveIcon(node.Id, metadata),
-                Quantity = node.Quantity,
-                Children = Array.Empty<CraftingTreeNode>()
+                Quantity = node.Quantity
             };
 
             // Quantity-zero nodes are already owned
@@ -41,6 +39,7 @@ namespace GW2CraftingHelper.Services
             if (node.IngredientType != "Item")
             {
                 treeNode.Decision = CraftingDecision.Currency;
+                treeNode.Name = Gw2Constants.ResolveCurrencyName(node.Id);
                 return treeNode;
             }
 

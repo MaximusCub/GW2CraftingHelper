@@ -320,5 +320,89 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(30, directItem2.SubtreeCost);  // 3 * 10
             Assert.Equal(50, nestedItem2.SubtreeCost);   // 5 * 10
         }
+
+        [Fact]
+        public void ChildrenNeverNull_AllNodeTypes()
+        {
+            // Craft node with a Buy child, a Currency child, and an Owned child
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 3),
+                    Leaf(23, 50, "Currency"),
+                    Leaf(4, 0)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+            };
+            var metadata = Meta(
+                (1, "Root", "r.png"),
+                (2, "Mat", "m.png"),
+                (4, "Owned", "o.png"));
+
+            var root = BuildViaRealSolver(tree, prices, metadata);
+
+            // Every node in the tree must have non-null Children
+            AssertChildrenNeverNull(root);
+        }
+
+        [Fact]
+        public void CurrencyNode_ResolvesKnownName()
+        {
+            // Spirit Shards (currency ID 23) should get a real name, not "Unknown Item"
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 3),
+                    Leaf(23, 50, "Currency")));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+            };
+            var metadata = Meta(
+                (1, "Root", "r.png"),
+                (2, "Mat", "m.png"));
+
+            var root = BuildViaRealSolver(tree, prices, metadata);
+
+            Assert.Equal(CraftingDecision.Craft, root.Decision);
+            var currencyChild = root.Children.First(
+                c => c.Decision == CraftingDecision.Currency);
+            Assert.Equal("Spirit Shards", currencyChild.Name);
+            Assert.Equal(50, currencyChild.Quantity);
+        }
+
+        [Fact]
+        public void CurrencyNode_UnknownId_FallsBackToCurrency()
+        {
+            // Currency ID 9999 is not in KnownCurrencyNames
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 3),
+                    Leaf(9999, 10, "Currency")));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+            };
+            var metadata = Meta(
+                (1, "Root", "r.png"),
+                (2, "Mat", "m.png"));
+
+            var root = BuildViaRealSolver(tree, prices, metadata);
+
+            var currencyChild = root.Children.First(
+                c => c.Decision == CraftingDecision.Currency);
+            Assert.Equal("Currency", currencyChild.Name);
+        }
+
+        private static void AssertChildrenNeverNull(CraftingTreeNode node)
+        {
+            Assert.NotNull(node.Children);
+            foreach (var child in node.Children)
+            {
+                AssertChildrenNeverNull(child);
+            }
+        }
     }
 }
