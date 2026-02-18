@@ -72,6 +72,7 @@
     <Compile Include="Models\CraftingPlanResult.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
+    <Compile Include="Services\CraftingTreeBuilder.cs" />
     <Compile Include="Services\CraftingPlanPipeline.cs" />
     <Compile Include="Services\Gw2RecipeApiClient.cs" />
     <Compile Include="Services\Gw2PriceApiClient.cs" />

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GW2CraftingHelper.Contracts;
 
 namespace GW2CraftingHelper.Models
 {
@@ -32,6 +33,7 @@ namespace GW2CraftingHelper.Models
         public string TargetIconUrl { get; set; }
         public int TargetQuantity { get; set; }
         public List<PlanSectionViewModel> Sections { get; set; } = new List<PlanSectionViewModel>();
+        public CraftingTreeNode TreeRoot { get; set; }
     }
 
     public class PlanSectionViewModel

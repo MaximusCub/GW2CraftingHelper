@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
@@ -10,7 +11,8 @@ namespace GW2CraftingHelper.Services
         {
             var vm = new PlanViewModel
             {
-                TargetQuantity = result.Plan.TargetQuantity
+                TargetQuantity = result.Plan.TargetQuantity,
+                TreeRoot = result.CraftingTree
             };
 
             // Resolve target name/icon
