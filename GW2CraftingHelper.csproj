@@ -99,6 +99,7 @@
     <Compile Include="Models\MaterialSourceAllocation.cs" />
     <Compile Include="Models\UsedMaterial.cs" />
     <Compile Include="Models\ReducedTreeResult.cs" />
+    <Compile Include="Services\AccountItemIndex.cs" />
     <Compile Include="Services\InventoryReducer.cs" />
     <Compile Include="Models\RequiredDiscipline.cs" />
     <Compile Include="Models\RequiredRecipe.cs" />
