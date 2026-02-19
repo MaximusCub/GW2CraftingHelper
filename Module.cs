@@ -63,6 +63,7 @@ namespace GW2CraftingHelper
         private HttpClient _httpClient;
         private CraftingPlanPipeline _craftingPipeline;
         private VendorOfferStore _vendorOfferStore;
+        private IItemSearchProvider _itemSearchProvider;
 
         private CancellationTokenSource _refreshCts;
         private bool _refreshInProgress;
@@ -130,6 +131,25 @@ namespace GW2CraftingHelper
             catch
             {
                 // No manifest - staleness detection disabled
+            }
+
+            // Item name seed for search provider
+            try
+            {
+                using (var nameStream = ContentsManager.GetFileStream("item_name_seed.json"))
+                {
+                    _itemSearchProvider = ItemSearchProviderFactory.Create(
+                        nameStream, out string fallbackReason);
+                    if (fallbackReason != null)
+                    {
+                        Logger.Info("Item search fallback to static provider: {0}", fallbackReason);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Info("Item search fallback to static provider: [{0}] {1}", ex.GetType().Name, ex.Message);
+                _itemSearchProvider = new StaticItemSearchProvider();
             }
 
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir);
@@ -281,7 +301,7 @@ namespace GW2CraftingHelper
                     },
                     SwitchToSnapshotView,
                     _modalDialog,
-                    new StaticItemSearchProvider()
+                    _itemSearchProvider
                 );
             }
             _mainWindow.Show(_craftingView);

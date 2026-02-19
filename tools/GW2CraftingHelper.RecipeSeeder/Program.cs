@@ -57,6 +57,7 @@ namespace GW2CraftingHelper.RecipeSeeder
             string searchPath = Path.Combine(outputDir, "recipe_search_seed.json");
             string recipesPath = Path.Combine(outputDir, "recipes_seed.json");
             string manifestPath = Path.Combine(outputDir, "recipe_seed_manifest.json");
+            string itemNamePath = Path.Combine(outputDir, "item_name_seed.json");
 
             if (!force && (File.Exists(searchPath) || File.Exists(recipesPath)))
             {
@@ -197,10 +198,34 @@ namespace GW2CraftingHelper.RecipeSeeder
                     RecipeCacheSerializer.SerializeManifest(manifest);
                 File.WriteAllText(manifestPath, manifestJson, Encoding.UTF8);
 
+                // Step 7: Generate item name seed for search provider
+                var craftableItemIds = searchIndex
+                    .Where(kvp => kvp.Value.Count > 0)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                craftableItemIds.Sort();
+
+                Console.Write(
+                    $"Fetching item names ({craftableItemIds.Count} craftable items " +
+                    $"in batches of {BatchSize})...");
+                sw.Restart();
+                var itemNames = await FetchItemNamesAsync(
+                    httpClient, craftableItemIds);
+                sw.Stop();
+                Console.WriteLine(
+                    $" {itemNames.Count} fetched ({sw.ElapsedMilliseconds}ms)");
+
+                var itemNameJson = JsonSerializer.Serialize(
+                    itemNames.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+                        .Select(e => new { id = e.Id, name = e.Name, icon = e.Icon }),
+                    new JsonSerializerOptions { WriteIndented = false });
+                File.WriteAllText(itemNamePath, itemNameJson, Encoding.UTF8);
+
                 Console.WriteLine();
                 Console.WriteLine($"Written: {searchPath}");
                 Console.WriteLine($"Written: {recipesPath}");
                 Console.WriteLine($"Written: {manifestPath}");
+                Console.WriteLine($"Written: {itemNamePath} ({itemNames.Count} items)");
             }
 
             return 0;
@@ -435,6 +460,109 @@ namespace GW2CraftingHelper.RecipeSeeder
                     }
                 }
             }
+        }
+
+        private static async Task<List<ItemNameInfo>> FetchItemNamesAsync(
+            HttpClient httpClient, List<int> itemIds)
+        {
+            var result = new List<ItemNameInfo>();
+            var batches = new List<List<int>>();
+
+            for (int i = 0; i < itemIds.Count; i += BatchSize)
+            {
+                int count = Math.Min(BatchSize, itemIds.Count - i);
+                batches.Add(itemIds.GetRange(i, count));
+            }
+
+            int completed = 0;
+            int total = batches.Count;
+            var gate = new object();
+
+            using (var semaphore = new SemaphoreSlim(MaxConcurrency))
+            {
+                var tasks = batches.Select(async batch =>
+                {
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        var items = await FetchItemBatchAsync(httpClient, batch);
+
+                        lock (gate)
+                        {
+                            result.AddRange(items);
+                            completed++;
+                            if (completed % 10 == 0 || completed == total)
+                            {
+                                Console.Write(
+                                    $"\r  Batches: {completed}/{total}   ");
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }).ToList();
+
+                await Task.WhenAll(tasks);
+            }
+
+            Console.WriteLine();
+            return result;
+        }
+
+        private static async Task<List<ItemNameInfo>> FetchItemBatchAsync(
+            HttpClient httpClient, List<int> ids)
+        {
+            string idsParam = string.Join(",",
+                ids.Select(id => id.ToString(CultureInfo.InvariantCulture)));
+            string url = $"{BaseUrl}/items?ids={idsParam}";
+
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    string json = await httpClient.GetStringAsync(url);
+                    return ParseItemBatch(json);
+                }
+                catch (HttpRequestException) when (attempt < 2)
+                {
+                    await Task.Delay(1000 * (attempt + 1));
+                }
+            }
+
+            return new List<ItemNameInfo>();
+        }
+
+        private static List<ItemNameInfo> ParseItemBatch(string json)
+        {
+            var items = new List<ItemNameInfo>();
+            using (var doc = JsonDocument.Parse(json))
+            {
+                foreach (var elem in doc.RootElement.EnumerateArray())
+                {
+                    var item = new ItemNameInfo
+                    {
+                        Id = elem.GetProperty("id").GetInt32(),
+                        Name = elem.TryGetProperty("name", out var n)
+                            ? n.GetString() ?? "" : "",
+                        Icon = elem.TryGetProperty("icon", out var ic)
+                            ? ic.GetString() : null
+                    };
+                    if (!string.IsNullOrEmpty(item.Name))
+                    {
+                        items.Add(item);
+                    }
+                }
+            }
+            return items;
+        }
+
+        private class ItemNameInfo
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public string Icon { get; set; }
         }
 
         private static async Task<int> FetchBuildIdAsync(HttpClient httpClient)
