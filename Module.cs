@@ -117,7 +117,7 @@ namespace GW2CraftingHelper
             }
             catch
             {
-                // No seed files yet — graceful degradation
+                // No seed files yet - graceful degradation
             }
 
             try
@@ -129,7 +129,7 @@ namespace GW2CraftingHelper
             }
             catch
             {
-                // No manifest — staleness detection disabled
+                // No manifest - staleness detection disabled
             }
 
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir);

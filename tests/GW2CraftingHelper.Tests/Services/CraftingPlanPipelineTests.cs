@@ -157,7 +157,7 @@ namespace GW2CraftingHelper.Tests.Services
             var itemApi = new InMemoryItemApiClient();
             itemApi.AddItem(1, "Vendor Item", "vendor.png");
 
-            // Vendor offers 1x item for 100 coin — cheaper than TP
+            // Vendor offers 1x item for 100 coin - cheaper than TP
             var tempDir = System.IO.Path.Combine(
                 System.IO.Path.GetTempPath(),
                 "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
@@ -393,7 +393,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new ItemMetadataService(itemApi),
                 reducer: new InventoryReducer());
 
-            // Own item 2 — the intermediate craftable
+            // Own item 2 - the intermediate craftable
             var snapshot = new AccountSnapshot
             {
                 Items = new List<SnapshotItemEntry>
@@ -480,7 +480,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new ItemMetadataService(itemApi),
                 reducer: new InventoryReducer());
 
-            // Own the intermediate item 2 — it gets pruned from steps but
+            // Own the intermediate item 2 - it gets pruned from steps but
             // should still have metadata for display in UsedMaterials section
             var snapshot = new AccountSnapshot
             {

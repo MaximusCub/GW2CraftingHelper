@@ -37,8 +37,8 @@ namespace GW2CraftingHelper.Services
             Dictionary<int, int> pool,
             List<UsedMaterial> used)
         {
-            // Only "Item" nodes are consumable from inventory and can have recipes.
-            // "Currency" nodes are always leaves in the GW2 recipe model.
+            // In the current GW2 recipe model, only "Item" nodes are consumable
+            // from inventory and can have recipes. Currency nodes are leaves.
             if (node.IngredientType != "Item")
             {
                 return;
@@ -140,8 +140,8 @@ namespace GW2CraftingHelper.Services
             Dictionary<int, Dictionary<string, int>> pool,
             List<UsedMaterial> used)
         {
-            // Only "Item" nodes are consumable from inventory and can have recipes.
-            // "Currency" nodes are always leaves in the GW2 recipe model.
+            // In the current GW2 recipe model, only "Item" nodes are consumable
+            // from inventory and can have recipes. Currency nodes are leaves.
             if (node.IngredientType != "Item")
             {
                 return;

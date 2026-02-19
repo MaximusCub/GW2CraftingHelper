@@ -119,7 +119,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void CraftableFullyOwned_RecipesCleared_IngredientsNotConsumed()
         {
             // Item 1 (qty 2) -> recipe 10 -> leaf item 2 (qty 6)
-            // Own 2 of item 1 — should clear recipes, NOT consume item 2
+            // Own 2 of item 1 - should clear recipes, NOT consume item 2
             var tree = Craftable(1, 2, 10, 1, Leaf(2, 6));
             var pool = new Dictionary<int, int> { { 1, 2 }, { 2, 100 } };
 
@@ -217,7 +217,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Recipes = new List<RecipeOption> { option }
             };
 
-            // Pool has currency id 99 — should not be consumed
+            // Pool has currency id 99 - should not be consumed
             var pool = new Dictionary<int, int> { { 99, 999 } };
 
             var result = _reducer.Reduce(tree, pool);
@@ -233,7 +233,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void UsedMaterials_Aggregated()
         {
             // Root item 1 -> recipe 10 -> [item 2 (qty 3), item 2 (qty 4)]
-            // Pool has 10 of item 2 — both branches consume, aggregated to single entry
+            // Pool has 10 of item 2 - both branches consume, aggregated to single entry
             var option = new RecipeOption
             {
                 RecipeId = 10,
@@ -337,7 +337,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void FullyOwnedIntermediate_NoRecipesOnNode()
         {
             // Item 1 (qty 3) -> recipe 10 -> leaf item 2 (qty 9)
-            // Own 3 of item 1 — fully owned craftable intermediate
+            // Own 3 of item 1 - fully owned craftable intermediate
             var tree = Craftable(1, 3, 10, 1, Leaf(2, 9));
             var pool = new Dictionary<int, int> { { 1, 3 } };
 
@@ -618,7 +618,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void Sourced_NullSnapshot_TreeNotReduced()
         {
             // Simulates useOwn=false: when no index is available,
-            // Reduce still works with an empty index — nothing consumed.
+            // Reduce still works with an empty index - nothing consumed.
             var tree = Craftable(1, 5, 10, 1, Leaf(2, 5));
             var emptyIndex = new AccountItemIndex(null);
 
@@ -653,9 +653,9 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void Sourced_SourcesContract_AlwaysNonNull()
+        public void Sourced_WhenConsumed_SourcesIsNonNullList()
         {
-            // Sourced overload: Sources is always non-null, even when nothing consumed
+            // Sourced overload: when items are consumed, Sources is a non-null list
             var tree = Leaf(100, 5);
             var emptyIndex = new AccountItemIndex(null);
 
