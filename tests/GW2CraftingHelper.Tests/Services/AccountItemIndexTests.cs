@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>());
 
-            Assert.Equal(0, index.GetQuantity(1, "Bank"));
+            Assert.Equal(0, index.GetQuantity(1, AccountItemIndex.SourceBank));
             Assert.Empty(index.GetSources(1));
         }
 
@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(null);
 
-            Assert.Equal(0, index.GetQuantity(1, "Bank"));
+            Assert.Equal(0, index.GetQuantity(1, AccountItemIndex.SourceBank));
             Assert.Empty(index.GetSources(1));
         }
 
@@ -42,12 +42,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 25, "MaterialStorage")
+                Entry(100, 25, AccountItemIndex.SourceMaterialStorage)
             });
 
-            Assert.Equal(25, index.GetQuantity(100, "MaterialStorage"));
-            Assert.Equal(0, index.GetQuantity(100, "Bank"));
-            Assert.Equal(0, index.GetQuantity(999, "MaterialStorage"));
+            Assert.Equal(25, index.GetQuantity(100, AccountItemIndex.SourceMaterialStorage));
+            Assert.Equal(0, index.GetQuantity(100, AccountItemIndex.SourceBank));
+            Assert.Equal(0, index.GetQuantity(999, AccountItemIndex.SourceMaterialStorage));
         }
 
         [Fact]
@@ -55,13 +55,13 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 10, "MaterialStorage"),
-                Entry(100, 5, "Bank"),
+                Entry(100, 10, AccountItemIndex.SourceMaterialStorage),
+                Entry(100, 5, AccountItemIndex.SourceBank),
                 Entry(100, 3, "Alice")
             });
 
-            Assert.Equal(10, index.GetQuantity(100, "MaterialStorage"));
-            Assert.Equal(5, index.GetQuantity(100, "Bank"));
+            Assert.Equal(10, index.GetQuantity(100, AccountItemIndex.SourceMaterialStorage));
+            Assert.Equal(5, index.GetQuantity(100, AccountItemIndex.SourceBank));
             Assert.Equal(3, index.GetQuantity(100, "Alice"));
         }
 
@@ -70,11 +70,11 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 10, "Bank"),
-                Entry(100, 7, "Bank")
+                Entry(100, 10, AccountItemIndex.SourceBank),
+                Entry(100, 7, AccountItemIndex.SourceBank)
             });
 
-            Assert.Equal(17, index.GetQuantity(100, "Bank"));
+            Assert.Equal(17, index.GetQuantity(100, AccountItemIndex.SourceBank));
         }
 
         [Fact]
@@ -82,19 +82,19 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 10, "MaterialStorage"),
-                Entry(100, 5, "Bank"),
-                Entry(200, 3, "SharedInventory")
+                Entry(100, 10, AccountItemIndex.SourceMaterialStorage),
+                Entry(100, 5, AccountItemIndex.SourceBank),
+                Entry(200, 3, AccountItemIndex.SourceSharedInventory)
             });
 
             var sources100 = index.GetSources(100);
             Assert.Equal(2, sources100.Count);
-            Assert.Contains("MaterialStorage", sources100);
-            Assert.Contains("Bank", sources100);
+            Assert.Contains(AccountItemIndex.SourceMaterialStorage, sources100);
+            Assert.Contains(AccountItemIndex.SourceBank, sources100);
 
             var sources200 = index.GetSources(200);
             Assert.Single(sources200);
-            Assert.Equal("SharedInventory", sources200[0]);
+            Assert.Equal(AccountItemIndex.SourceSharedInventory, sources200[0]);
         }
 
         [Fact]
@@ -102,7 +102,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 10, "Bank")
+                Entry(100, 10, AccountItemIndex.SourceBank)
             });
 
             Assert.Empty(index.GetSources(999));
@@ -113,7 +113,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 10, "Bank")
+                Entry(100, 10, AccountItemIndex.SourceBank)
             });
 
             Assert.Equal(0, index.GetQuantity(100, null));
@@ -124,15 +124,15 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 0, "Bank"),
-                Entry(100, 5, "MaterialStorage")
+                Entry(100, 0, AccountItemIndex.SourceBank),
+                Entry(100, 5, AccountItemIndex.SourceMaterialStorage)
             });
 
-            Assert.Equal(0, index.GetQuantity(100, "Bank"));
-            Assert.Equal(5, index.GetQuantity(100, "MaterialStorage"));
+            Assert.Equal(0, index.GetQuantity(100, AccountItemIndex.SourceBank));
+            Assert.Equal(5, index.GetQuantity(100, AccountItemIndex.SourceMaterialStorage));
             var sources = index.GetSources(100);
             Assert.Single(sources);
-            Assert.Equal("MaterialStorage", sources[0]);
+            Assert.Equal(AccountItemIndex.SourceMaterialStorage, sources[0]);
         }
 
         [Fact]
@@ -140,9 +140,9 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 1, "Bank"),
-                Entry(100, 2, "SharedInventory"),
-                Entry(100, 3, "MaterialStorage"),
+                Entry(100, 1, AccountItemIndex.SourceBank),
+                Entry(100, 2, AccountItemIndex.SourceSharedInventory),
+                Entry(100, 3, AccountItemIndex.SourceMaterialStorage),
                 Entry(100, 4, "Alice")
             });
 
@@ -150,10 +150,10 @@ namespace GW2CraftingHelper.Tests.Services
                 100, index, "Alice");
 
             Assert.Equal(4, prioritized.Count);
-            Assert.Equal("MaterialStorage", prioritized[0]);
+            Assert.Equal(AccountItemIndex.SourceMaterialStorage, prioritized[0]);
             Assert.Equal("Alice", prioritized[1]);
-            Assert.Equal("SharedInventory", prioritized[2]);
-            Assert.Equal("Bank", prioritized[3]);
+            Assert.Equal(AccountItemIndex.SourceSharedInventory, prioritized[2]);
+            Assert.Equal(AccountItemIndex.SourceBank, prioritized[3]);
         }
 
         [Fact]
@@ -161,8 +161,8 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 1, "Bank"),
-                Entry(100, 2, "MaterialStorage"),
+                Entry(100, 1, AccountItemIndex.SourceBank),
+                Entry(100, 2, AccountItemIndex.SourceMaterialStorage),
                 Entry(100, 3, "Bob")
             });
 
@@ -170,8 +170,8 @@ namespace GW2CraftingHelper.Tests.Services
                 100, index, null);
 
             Assert.Equal(3, prioritized.Count);
-            Assert.Equal("MaterialStorage", prioritized[0]);
-            Assert.Equal("Bank", prioritized[1]);
+            Assert.Equal(AccountItemIndex.SourceMaterialStorage, prioritized[0]);
+            Assert.Equal(AccountItemIndex.SourceBank, prioritized[1]);
             Assert.Equal("Bob", prioritized[2]);
         }
 
@@ -210,16 +210,16 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 5, "Bank"),
-                Entry(100, 3, "MaterialStorage")
+                Entry(100, 5, AccountItemIndex.SourceBank),
+                Entry(100, 3, AccountItemIndex.SourceMaterialStorage)
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(
                 100, index, "NonexistentChar");
 
             Assert.Equal(2, prioritized.Count);
-            Assert.Equal("MaterialStorage", prioritized[0]);
-            Assert.Equal("Bank", prioritized[1]);
+            Assert.Equal(AccountItemIndex.SourceMaterialStorage, prioritized[0]);
+            Assert.Equal(AccountItemIndex.SourceBank, prioritized[1]);
         }
 
         [Fact]
@@ -228,13 +228,13 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 5, null),
-                Entry(100, 3, "Bank")
+                Entry(100, 3, AccountItemIndex.SourceBank)
             });
 
-            Assert.Equal(3, index.GetQuantity(100, "Bank"));
+            Assert.Equal(3, index.GetQuantity(100, AccountItemIndex.SourceBank));
             var sources = index.GetSources(100);
             Assert.Single(sources);
-            Assert.Equal("Bank", sources[0]);
+            Assert.Equal(AccountItemIndex.SourceBank, sources[0]);
         }
 
         [Fact]
@@ -243,10 +243,10 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 5, ""),
-                Entry(100, 3, "Bank")
+                Entry(100, 3, AccountItemIndex.SourceBank)
             });
 
-            Assert.Equal(3, index.GetQuantity(100, "Bank"));
+            Assert.Equal(3, index.GetQuantity(100, AccountItemIndex.SourceBank));
             Assert.Equal(0, index.GetQuantity(100, ""));
             var sources = index.GetSources(100);
             Assert.Single(sources);
@@ -258,13 +258,13 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 5, "  "),
-                Entry(100, 3, "Bank")
+                Entry(100, 3, AccountItemIndex.SourceBank)
             });
 
-            Assert.Equal(3, index.GetQuantity(100, "Bank"));
+            Assert.Equal(3, index.GetQuantity(100, AccountItemIndex.SourceBank));
             var sources = index.GetSources(100);
             Assert.Single(sources);
-            Assert.Equal("Bank", sources[0]);
+            Assert.Equal(AccountItemIndex.SourceBank, sources[0]);
         }
 
         [Fact]
@@ -275,7 +275,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, 1, "Charlie"),
                 Entry(100, 2, "Alice"),
-                Entry(100, 3, "Bank")
+                Entry(100, 3, AccountItemIndex.SourceBank)
             });
 
             var sources1 = index.GetSources(100);
@@ -285,7 +285,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(sources1, sources2);
             // Ordinal sorted: Alice < Bank < Charlie
             Assert.Equal("Alice", sources1[0]);
-            Assert.Equal("Bank", sources1[1]);
+            Assert.Equal(AccountItemIndex.SourceBank, sources1[1]);
             Assert.Equal("Charlie", sources1[2]);
         }
 
@@ -297,9 +297,9 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 1, "Zara"),
-                Entry(100, 2, "Bank"),
-                Entry(100, 3, "SharedInventory"),
-                Entry(100, 4, "MaterialStorage"),
+                Entry(100, 2, AccountItemIndex.SourceBank),
+                Entry(100, 3, AccountItemIndex.SourceSharedInventory),
+                Entry(100, 4, AccountItemIndex.SourceMaterialStorage),
                 Entry(100, 5, "ActiveHero"),
                 Entry(100, 6, "Alice")
             });
@@ -308,10 +308,10 @@ namespace GW2CraftingHelper.Tests.Services
                 100, index, "ActiveHero");
 
             Assert.Equal(6, prioritized.Count);
-            Assert.Equal("MaterialStorage", prioritized[0]);
+            Assert.Equal(AccountItemIndex.SourceMaterialStorage, prioritized[0]);
             Assert.Equal("ActiveHero", prioritized[1]);
-            Assert.Equal("SharedInventory", prioritized[2]);
-            Assert.Equal("Bank", prioritized[3]);
+            Assert.Equal(AccountItemIndex.SourceSharedInventory, prioritized[2]);
+            Assert.Equal(AccountItemIndex.SourceBank, prioritized[3]);
             Assert.Equal("Alice", prioritized[4]);
             Assert.Equal("Zara", prioritized[5]);
         }

@@ -37,6 +37,8 @@ namespace GW2CraftingHelper.Services
             Dictionary<int, int> pool,
             List<UsedMaterial> used)
         {
+            // Only "Item" nodes are consumable from inventory and can have recipes.
+            // "Currency" nodes are always leaves in the GW2 recipe model.
             if (node.IngredientType != "Item")
             {
                 return;
@@ -104,20 +106,21 @@ namespace GW2CraftingHelper.Services
                     var allSources = g
                         .Where(u => u.Sources != null)
                         .SelectMany(u => u.Sources)
-                        .GroupBy(s => s.Source)
+                        .GroupBy(s => s.Source, StringComparer.Ordinal)
                         .Select(sg => new MaterialSourceAllocation
                         {
                             Source = sg.Key,
                             Quantity = sg.Sum(a => a.Quantity)
                         })
                         .Where(a => a.Quantity > 0)
+                        .OrderBy(a => a.Source, StringComparer.Ordinal)
                         .ToList();
 
                     return new UsedMaterial
                     {
                         ItemId = g.Key,
                         QuantityUsed = g.Sum(u => u.QuantityUsed),
-                        Sources = allSources.Count > 0 ? allSources : null
+                        Sources = allSources
                     };
                 })
                 .Where(u => u.QuantityUsed > 0)
@@ -137,6 +140,8 @@ namespace GW2CraftingHelper.Services
             Dictionary<int, Dictionary<string, int>> pool,
             List<UsedMaterial> used)
         {
+            // Only "Item" nodes are consumable from inventory and can have recipes.
+            // "Currency" nodes are always leaves in the GW2 recipe model.
             if (node.IngredientType != "Item")
             {
                 return;

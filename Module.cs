@@ -267,7 +267,7 @@ namespace GW2CraftingHelper
                         }
                         catch
                         {
-                            // Gw2Mumble unavailable — graceful fallback
+                            // Gw2Mumble unavailable - graceful fallback
                         }
 
                         if (useOwn)
