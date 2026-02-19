@@ -221,5 +221,107 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("MaterialStorage", prioritized[0]);
             Assert.Equal("Bank", prioritized[1]);
         }
+
+        [Fact]
+        public void NullSource_Excluded()
+        {
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                Entry(100, 5, null),
+                Entry(100, 3, "Bank")
+            });
+
+            Assert.Equal(3, index.GetQuantity(100, "Bank"));
+            var sources = index.GetSources(100);
+            Assert.Single(sources);
+            Assert.Equal("Bank", sources[0]);
+        }
+
+        [Fact]
+        public void EmptySource_Excluded()
+        {
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                Entry(100, 5, ""),
+                Entry(100, 3, "Bank")
+            });
+
+            Assert.Equal(3, index.GetQuantity(100, "Bank"));
+            Assert.Equal(0, index.GetQuantity(100, ""));
+            var sources = index.GetSources(100);
+            Assert.Single(sources);
+        }
+
+        [Fact]
+        public void WhitespaceSource_Excluded()
+        {
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                Entry(100, 5, "  "),
+                Entry(100, 3, "Bank")
+            });
+
+            Assert.Equal(3, index.GetQuantity(100, "Bank"));
+            var sources = index.GetSources(100);
+            Assert.Single(sources);
+            Assert.Equal("Bank", sources[0]);
+        }
+
+        [Fact]
+        public void GetSources_ReturnsDeterministicOrder()
+        {
+            // Insert sources in non-alphabetical order
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                Entry(100, 1, "Charlie"),
+                Entry(100, 2, "Alice"),
+                Entry(100, 3, "Bank")
+            });
+
+            var sources1 = index.GetSources(100);
+            var sources2 = index.GetSources(100);
+
+            Assert.Equal(3, sources1.Count);
+            Assert.Equal(sources1, sources2);
+            // Ordinal sorted: Alice < Bank < Charlie
+            Assert.Equal("Alice", sources1[0]);
+            Assert.Equal("Bank", sources1[1]);
+            Assert.Equal("Charlie", sources1[2]);
+        }
+
+        [Fact]
+        public void GetPrioritizedSources_AllSourceTypes_FullPriorityChain()
+        {
+            // Every source type present: MaterialStorage, active char, SharedInventory,
+            // Bank, plus two other characters
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                Entry(100, 1, "Zara"),
+                Entry(100, 2, "Bank"),
+                Entry(100, 3, "SharedInventory"),
+                Entry(100, 4, "MaterialStorage"),
+                Entry(100, 5, "ActiveHero"),
+                Entry(100, 6, "Alice")
+            });
+
+            var prioritized = AccountItemIndex.GetPrioritizedSources(
+                100, index, "ActiveHero");
+
+            Assert.Equal(6, prioritized.Count);
+            Assert.Equal("MaterialStorage", prioritized[0]);
+            Assert.Equal("ActiveHero", prioritized[1]);
+            Assert.Equal("SharedInventory", prioritized[2]);
+            Assert.Equal("Bank", prioritized[3]);
+            Assert.Equal("Alice", prioritized[4]);
+            Assert.Equal("Zara", prioritized[5]);
+        }
+
+        [Fact]
+        public void SourceConstants_MatchExpectedValues()
+        {
+            Assert.Equal("MaterialStorage", AccountItemIndex.SourceMaterialStorage);
+            Assert.Equal("SharedInventory", AccountItemIndex.SourceSharedInventory);
+            Assert.Equal("Bank", AccountItemIndex.SourceBank);
+        }
     }
 }

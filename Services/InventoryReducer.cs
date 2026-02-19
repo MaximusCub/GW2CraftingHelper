@@ -225,7 +225,7 @@ namespace GW2CraftingHelper.Services
             if (pool.TryGetValue(itemId, out var sourcePool) &&
                 sourcePool.TryGetValue(source, out int remaining))
             {
-                return remaining;
+                return Math.Max(0, remaining);
             }
 
             // First access: initialize from index
@@ -250,7 +250,7 @@ namespace GW2CraftingHelper.Services
                 remaining = index.GetQuantity(itemId, source);
             }
 
-            sourcePool[source] = remaining - amount;
+            sourcePool[source] = Math.Max(0, remaining - amount);
         }
 
         private static RecipeNode CloneNode(RecipeNode node)

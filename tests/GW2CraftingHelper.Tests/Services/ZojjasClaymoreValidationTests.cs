@@ -297,7 +297,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = OriGsBlade, Count = 1 }
+                    new SnapshotItemEntry { ItemId = OriGsBlade, Count = 1, Source = "MaterialStorage" }
                 }
             };
 

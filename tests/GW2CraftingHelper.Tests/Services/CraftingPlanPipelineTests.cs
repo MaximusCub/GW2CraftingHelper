@@ -316,7 +316,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 2, Count = 3 }
+                    new SnapshotItemEntry { ItemId = 2, Count = 3, Source = "MaterialStorage" }
                 }
             };
 
@@ -398,7 +398,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 2, Count = 1 }
+                    new SnapshotItemEntry { ItemId = 2, Count = 1, Source = "MaterialStorage" }
                 }
             };
 
@@ -486,7 +486,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 2, Count = 1 }
+                    new SnapshotItemEntry { ItemId = 2, Count = 1, Source = "MaterialStorage" }
                 }
             };
 

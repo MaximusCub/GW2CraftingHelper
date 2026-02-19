@@ -518,5 +518,138 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(2, sources.First(s => s.Source == "MaterialStorage").Quantity);
             Assert.Equal(1, sources.First(s => s.Source == "Bank").Quantity);
         }
+
+        [Fact]
+        public void Sourced_PoolNeverGoesNegative()
+        {
+            // Two branches both need item 2: first needs 5, second needs 5.
+            // Only 7 available from MaterialStorage.
+            // After first branch: pool=2. Second branch: consume min(2,5)=2, pool=0.
+            // Pool must never go negative.
+            var ing1 = Leaf(2, 5);
+            var ing2 = Leaf(2, 5);
+            var option = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                CraftsNeeded = 1
+            };
+            option.Ingredients.Add(ing1);
+            option.Ingredients.Add(ing2);
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                Recipes = new List<RecipeOption> { option }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 7, "MaterialStorage")
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            var reducedIng1 = result.ReducedTree.Recipes[0].Ingredients[0];
+            var reducedIng2 = result.ReducedTree.Recipes[0].Ingredients[1];
+
+            Assert.Equal(0, reducedIng1.Quantity);  // 5-5=0
+            Assert.Equal(3, reducedIng2.Quantity);   // 5-2=3
+
+            var totalUsed = result.UsedMaterials
+                .Where(u => u.ItemId == 2)
+                .Sum(u => u.QuantityUsed);
+            Assert.Equal(7, totalUsed);
+        }
+
+        [Fact]
+        public void Sourced_ExactConsumption_PoolReachesZeroNotNegative()
+        {
+            // Exactly enough items: need 5, have 5. Pool should reach exactly 0.
+            var tree = Leaf(100, 5);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 5, "MaterialStorage")
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(5, result.UsedMaterials[0].QuantityUsed);
+        }
+
+        [Fact]
+        public void Sourced_ComprehensivePriority_FullChainWithPoolVerification()
+        {
+            // Item 100, need 20.
+            // Sources: MaterialStorage=5, ActiveChar=4, SharedInventory=3, Bank=2, OtherChar=6
+            // Priority: MaterialStorage(5) -> ActiveChar(4) -> SharedInventory(3) -> Bank(2) -> OtherChar(6)
+            // Total available = 20, exactly enough. All consumed in priority order.
+            var tree = Leaf(100, 20);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 6, "Zephyr"),
+                SnapEntry(100, 2, "Bank"),
+                SnapEntry(100, 3, "SharedInventory"),
+                SnapEntry(100, 5, "MaterialStorage"),
+                SnapEntry(100, 4, "ActiveHero")
+            });
+
+            var result = _reducer.Reduce(tree, index, "ActiveHero");
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(20, result.UsedMaterials[0].QuantityUsed);
+
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Equal(5, sources.Count);
+
+            // Verify each source contributed the right amount
+            Assert.Equal(5, sources.First(s => s.Source == "MaterialStorage").Quantity);
+            Assert.Equal(4, sources.First(s => s.Source == "ActiveHero").Quantity);
+            Assert.Equal(3, sources.First(s => s.Source == "SharedInventory").Quantity);
+            Assert.Equal(2, sources.First(s => s.Source == "Bank").Quantity);
+            Assert.Equal(6, sources.First(s => s.Source == "Zephyr").Quantity);
+        }
+
+        [Fact]
+        public void Sourced_NullSnapshot_TreeNotReduced()
+        {
+            // Simulates useOwn=false: when no index is available,
+            // Reduce still works with an empty index — nothing consumed.
+            var tree = Craftable(1, 5, 10, 1, Leaf(2, 5));
+            var emptyIndex = new AccountItemIndex(null);
+
+            var result = _reducer.Reduce(tree, emptyIndex, null);
+
+            Assert.Equal(5, result.ReducedTree.Quantity);
+            Assert.Single(result.ReducedTree.Recipes);
+            Assert.Equal(5, result.ReducedTree.Recipes[0].Ingredients[0].Quantity);
+            Assert.Empty(result.UsedMaterials);
+        }
+
+        [Fact]
+        public void Sourced_NullSourceEntries_Excluded()
+        {
+            // Items with null/empty sources should not affect reduction
+            var tree = Leaf(100, 5);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 10, null),
+                SnapEntry(100, 10, ""),
+                SnapEntry(100, 3, "Bank")
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            // Only Bank's 3 should be consumed (null/empty excluded from index)
+            Assert.Equal(2, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(3, result.UsedMaterials[0].QuantityUsed);
+            Assert.Single(result.UsedMaterials[0].Sources);
+            Assert.Equal("Bank", result.UsedMaterials[0].Sources[0].Source);
+        }
     }
 }

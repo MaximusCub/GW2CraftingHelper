@@ -7,6 +7,10 @@ namespace GW2CraftingHelper.Services
 {
     public class AccountItemIndex
     {
+        public const string SourceMaterialStorage = "MaterialStorage";
+        public const string SourceSharedInventory = "SharedInventory";
+        public const string SourceBank = "Bank";
+
         private static readonly IReadOnlyList<string> EmptySources = Array.Empty<string>();
 
         // itemId -> source -> count
@@ -28,7 +32,11 @@ namespace GW2CraftingHelper.Services
                     continue;
                 }
 
-                string source = entry.Source ?? "";
+                string source = entry.Source;
+                if (string.IsNullOrWhiteSpace(source))
+                {
+                    continue;
+                }
 
                 if (!_index.TryGetValue(entry.ItemId, out var sourceMap))
                 {
@@ -67,7 +75,9 @@ namespace GW2CraftingHelper.Services
         {
             if (_index.TryGetValue(itemId, out var sourceMap))
             {
-                return sourceMap.Keys.ToList();
+                var keys = sourceMap.Keys.ToList();
+                keys.Sort(StringComparer.Ordinal);
+                return keys;
             }
 
             return EmptySources;
@@ -88,9 +98,9 @@ namespace GW2CraftingHelper.Services
             var result = new List<string>();
 
             // Priority 1: MaterialStorage
-            if (sourceSet.Remove("MaterialStorage"))
+            if (sourceSet.Remove(SourceMaterialStorage))
             {
-                result.Add("MaterialStorage");
+                result.Add(SourceMaterialStorage);
             }
 
             // Priority 2: Active character
@@ -101,15 +111,15 @@ namespace GW2CraftingHelper.Services
             }
 
             // Priority 3: SharedInventory
-            if (sourceSet.Remove("SharedInventory"))
+            if (sourceSet.Remove(SourceSharedInventory))
             {
-                result.Add("SharedInventory");
+                result.Add(SourceSharedInventory);
             }
 
             // Priority 4: Bank
-            if (sourceSet.Remove("Bank"))
+            if (sourceSet.Remove(SourceBank))
             {
-                result.Add("Bank");
+                result.Add(SourceBank);
             }
 
             // Priority 5: Remaining sources (other characters), sorted
