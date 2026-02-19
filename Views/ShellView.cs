@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Views
         private int _activeTabIndex = -1;
 
         private LogTabContent _logContent;
-        private bool _built;
+        private Container _buildPanel;
 
         public ShellView(
             MainView snapshotContent,
@@ -50,8 +50,7 @@ namespace GW2CraftingHelper.Views
 
         protected override void Build(Container buildPanel)
         {
-            if (_built) return;
-            _built = true;
+            _buildPanel = buildPanel;
 
             int w = buildPanel.ContentRegion.Width;
             int h = buildPanel.ContentRegion.Height;
@@ -210,6 +209,23 @@ namespace GW2CraftingHelper.Views
                     ? new Color(60, 60, 60, 220)
                     : new Color(40, 40, 40, 150);
             }
+        }
+
+        protected override void Unload()
+        {
+            if (_buildPanel != null)
+            {
+                _buildPanel.Resized -= OnShellResized;
+                _buildPanel = null;
+            }
+
+            _tabPanel = null;
+            _contentArea = null;
+            _tabContainers = null;
+            _tabButtons = null;
+            _tabBuilt = null;
+            _activeTabIndex = -1;
+            _logContent = null;
         }
 
         private void OnShellResized(object sender, ResizedEventArgs e)
