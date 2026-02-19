@@ -146,7 +146,8 @@ namespace GW2CraftingHelper.Services
 
         public async Task<CraftingPlanResult> GenerateStructuredAsync(
             int targetItemId, int quantity, AccountSnapshot snapshot,
-            CancellationToken ct, IProgress<PlanStatus> progress = null)
+            CancellationToken ct, IProgress<PlanStatus> progress = null,
+            string activeCharacterName = null)
         {
             var sw = new Stopwatch();
             var timingLog = new List<string>();
@@ -219,9 +220,8 @@ namespace GW2CraftingHelper.Services
 
             if (snapshot != null && _reducer != null)
             {
-                var pool = SnapshotHelpers.AggregateItems(snapshot.Items)
-                    .ToDictionary(e => e.ItemId, e => e.Count);
-                var reduced = _reducer.Reduce(tree, pool);
+                var index = new AccountItemIndex(snapshot.Items);
+                var reduced = _reducer.Reduce(tree, index, activeCharacterName);
                 treeUsedForSolve = reduced.ReducedTree;
                 usedMaterials = reduced.UsedMaterials;
             }
