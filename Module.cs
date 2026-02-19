@@ -134,21 +134,22 @@ namespace GW2CraftingHelper
             }
 
             // Item name seed for search provider
-            _itemSearchProvider = new StaticItemSearchProvider();
             try
             {
                 using (var nameStream = ContentsManager.GetFileStream("item_name_seed.json"))
                 {
-                    var nameSeed = ItemNameSeedData.Load(nameStream);
-                    if (nameSeed.Items.Count > 0)
+                    _itemSearchProvider = ItemSearchProviderFactory.Create(
+                        nameStream, out string fallbackReason);
+                    if (fallbackReason != null)
                     {
-                        _itemSearchProvider = new CraftableItemSearchProvider(nameSeed);
+                        Logger.Info("Item search fallback to static provider: {0}", fallbackReason);
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // No item name seed — falls back to StaticItemSearchProvider
+                Logger.Info("Item search fallback to static provider: {0}", ex.Message);
+                _itemSearchProvider = new StaticItemSearchProvider();
             }
 
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir);

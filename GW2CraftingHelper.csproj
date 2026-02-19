@@ -118,6 +118,7 @@
     <Compile Include="Contracts\IItemSearchProvider.cs" />
     <Compile Include="Contracts\StaticItemSearchProvider.cs" />
     <Compile Include="Services\CraftableItemSearchProvider.cs" />
+    <Compile Include="Services\ItemSearchProviderFactory.cs" />
     <Compile Include="Services\Diagnostics\PlanTimingAnalyzer.cs" />
     <Compile Include="Services\Recipes\IRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\InMemoryRecipeCacheStore.cs" />
