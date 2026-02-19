@@ -1,3 +1,4 @@
+using System;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
@@ -25,6 +26,7 @@ namespace GW2CraftingHelper.Views
         private int _activeTabIndex = -1;
 
         private LogTabContent _logContent;
+        private bool _built;
 
         public ShellView(
             MainView snapshotContent,
@@ -48,6 +50,9 @@ namespace GW2CraftingHelper.Views
 
         protected override void Build(Container buildPanel)
         {
+            if (_built) return;
+            _built = true;
+
             int w = buildPanel.ContentRegion.Width;
             int h = buildPanel.ContentRegion.Height;
 
@@ -108,9 +113,10 @@ namespace GW2CraftingHelper.Views
             }
 
             // Right content area
+            int contentW = Math.Max(0, w - TabPanelWidth);
             _contentArea = new Panel()
             {
-                Size = new Point(w - TabPanelWidth, h),
+                Size = new Point(contentW, h),
                 Location = new Point(TabPanelWidth, 0),
                 Parent = buildPanel
             };
@@ -122,7 +128,7 @@ namespace GW2CraftingHelper.Views
             {
                 _tabContainers[i] = new Panel()
                 {
-                    Size = new Point(w - TabPanelWidth, h),
+                    Size = new Point(contentW, h),
                     Location = new Point(0, 0),
                     Visible = false,
                     Parent = _contentArea
@@ -211,14 +217,15 @@ namespace GW2CraftingHelper.Views
             var container = (Container)sender;
             int w = container.ContentRegion.Width;
             int h = container.ContentRegion.Height;
+            int contentW = Math.Max(0, w - TabPanelWidth);
 
             _tabPanel.Size = new Point(TabPanelWidth, h);
-            _contentArea.Size = new Point(w - TabPanelWidth, h);
+            _contentArea.Size = new Point(contentW, h);
             _contentArea.Location = new Point(TabPanelWidth, 0);
 
             for (int i = 0; i < _tabContainers.Length; i++)
             {
-                _tabContainers[i].Size = new Point(w - TabPanelWidth, h);
+                _tabContainers[i].Size = new Point(contentW, h);
             }
         }
     }

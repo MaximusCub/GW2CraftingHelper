@@ -284,6 +284,7 @@ namespace GW2CraftingHelper.Views
             _quantity = qty;
 
             _generateButton.Enabled = false;
+            _lastDebugLog = null;
             SetStatus("Generating...");
 
             var statusProgress = new Progress<PlanStatus>(ps =>
@@ -311,6 +312,7 @@ namespace GW2CraftingHelper.Views
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Plan generation failed");
+                _lastDebugLog = new[] { $"Generation failed: {ex.Message}" };
                 SetStatus($"Error: {ex.Message}");
             }
             finally
