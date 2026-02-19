@@ -83,6 +83,10 @@
     <Compile Include="Views\CraftingPlanView.cs" />
     <Compile Include="Views\ResizableModuleWindow.cs" />
     <Compile Include="Views\ModalDialog.cs" />
+    <Compile Include="Views\TabDefinition.cs" />
+    <Compile Include="Views\TabRegistry.cs" />
+    <Compile Include="Views\ShellView.cs" />
+    <Compile Include="Views\LogTabContent.cs" />
     <Compile Include="Services\ModuleSettings.cs" />
     <Compile Include="Models\Gw2Constants.cs" />
     <Compile Include="Models\CostLine.cs" />

@@ -48,8 +48,7 @@ namespace GW2CraftingHelper
         private CornerIcon _cornerIcon;
         private ResizableModuleWindow _mainWindow;
         private ModalDialog _modalDialog;
-        private MainView _mainView;
-        private CraftingPlanView _craftingView;
+        private ShellView _shellView;
 
         private ModuleSettings _settings;
         private SnapshotStore _snapshotStore;
@@ -64,6 +63,7 @@ namespace GW2CraftingHelper
         private CraftingPlanPipeline _craftingPipeline;
         private VendorOfferStore _vendorOfferStore;
         private IItemSearchProvider _itemSearchProvider;
+        private Texture2D _moduleIconTexture;
 
         private CancellationTokenSource _refreshCts;
         private bool _refreshInProgress;
@@ -182,14 +182,13 @@ namespace GW2CraftingHelper
                 reducer: new InventoryReducer(),
                 accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager));
 
-            Texture2D iconTexture;
             try
             {
-                iconTexture = ContentsManager.GetTexture("icon.png");
+                _moduleIconTexture = ContentsManager.GetTexture("icon.png");
             }
             catch
             {
-                iconTexture = ContentService.Textures.Error;
+                _moduleIconTexture = ContentService.Textures.Error;
             }
 
             _mainWindow = new ResizableModuleWindow(
@@ -209,31 +208,68 @@ namespace GW2CraftingHelper
             _cornerIcon = new CornerIcon()
             {
                 IconName = "GW2 Crafting Helper",
-                Icon = new AsyncTexture2D(iconTexture),
+                Icon = new AsyncTexture2D(_moduleIconTexture),
                 Priority = 1245846523,
                 Parent = GameService.Graphics.SpriteScreen
             };
 
             _cornerIcon.Click += (s, e) =>
             {
-                if (_mainView == null)
+                if (_shellView == null)
                 {
-                    _mainView = new MainView(
+                    var snapshotContent = new MainView(
                         _currentSnapshot,
                         _lastStatus,
                         UserRefreshAsync,
                         ClearCache,
-                        SaveStatus,
-                        SwitchToCraftingView
+                        SaveStatus
+                    );
+
+                    var craftingContent = new CraftingPlanView(
+                        (itemId, qty, useOwn, ct, progress) =>
+                        {
+                            string activeChar = null;
+                            try
+                            {
+                                var mumble = GameService.Gw2Mumble;
+                                if (mumble != null &&
+                                    mumble.PlayerCharacter != null &&
+                                    !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
+                                {
+                                    activeChar = mumble.PlayerCharacter.Name;
+                                }
+                            }
+                            catch
+                            {
+                                // Gw2Mumble unavailable - graceful fallback
+                            }
+
+                            if (useOwn)
+                            {
+                                return _craftingPipeline.GenerateStructuredAsync(
+                                    itemId, qty, _currentSnapshot, ct, progress,
+                                    activeChar);
+                            }
+                            return _craftingPipeline.GenerateStructuredAsync(
+                                itemId, qty, null, ct, progress);
+                        },
+                        _modalDialog,
+                        _itemSearchProvider
+                    );
+
+                    _shellView = new ShellView(
+                        snapshotContent,
+                        craftingContent,
+                        new AsyncTexture2D(_moduleIconTexture)
                     );
                 }
                 else
                 {
-                    _mainView.SetSnapshot(_currentSnapshot);
-                    _mainView.SetStatus(_lastStatus);
+                    _shellView.SetSnapshot(_currentSnapshot);
+                    _shellView.SetStatus(_lastStatus);
                 }
 
-                _mainWindow.ToggleWindow(_mainView);
+                _mainWindow.ToggleWindow(_shellView);
             };
         }
 
@@ -255,8 +291,8 @@ namespace GW2CraftingHelper
             {
                 Logger.Info("Applying snapshot to view CapturedAt={0:o}", _pendingSnapshot?.CapturedAt);
                 _snapshotDirty = false;
-                _mainView?.SetSnapshot(_pendingSnapshot);
-                _mainView?.SetStatus(_lastStatus);
+                _shellView?.SetSnapshot(_pendingSnapshot);
+                _shellView?.SetStatus(_lastStatus);
             }
 
             if (_refreshInProgress) return;
@@ -265,56 +301,6 @@ namespace GW2CraftingHelper
             if (!_snapshotService.HasRequiredPermissions()) return;
 
             _ = RefreshSnapshotInBackgroundAsync();
-        }
-
-        private void SwitchToCraftingView()
-        {
-            if (_craftingView == null)
-            {
-                _craftingView = new CraftingPlanView(
-                    (itemId, qty, useOwn, ct, progress) =>
-                    {
-                        string activeChar = null;
-                        try
-                        {
-                            var mumble = GameService.Gw2Mumble;
-                            if (mumble != null &&
-                                mumble.PlayerCharacter != null &&
-                                !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
-                            {
-                                activeChar = mumble.PlayerCharacter.Name;
-                            }
-                        }
-                        catch
-                        {
-                            // Gw2Mumble unavailable - graceful fallback
-                        }
-
-                        if (useOwn)
-                        {
-                            return _craftingPipeline.GenerateStructuredAsync(
-                                itemId, qty, _currentSnapshot, ct, progress,
-                                activeChar);
-                        }
-                        return _craftingPipeline.GenerateStructuredAsync(
-                            itemId, qty, null, ct, progress);
-                    },
-                    SwitchToSnapshotView,
-                    _modalDialog,
-                    _itemSearchProvider
-                );
-            }
-            _mainWindow.Show(_craftingView);
-        }
-
-        private void SwitchToSnapshotView()
-        {
-            if (_mainView != null)
-            {
-                _mainView.SetSnapshot(_currentSnapshot);
-                _mainView.SetStatus(_lastStatus);
-            }
-            _mainWindow.Show(_mainView);
         }
 
         protected override void Unload()
@@ -421,7 +407,7 @@ namespace GW2CraftingHelper
         {
             _lastStatus = status ?? "";
             _statusStore.Save(_lastStatus);
-            _mainView?.SetStatus(_lastStatus);
+            _shellView?.SetStatus(_lastStatus);
         }
 
         private async Task<int> FetchGw2BuildIdAsync()

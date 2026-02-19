@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Views
 {
     public class ResizableModuleWindow : StandardWindow
     {
-        private static readonly Point MinSize = new Point(450, 400);
+        private static readonly Point MinSize = new Point(560, 400);
 
         public ResizableModuleWindow(
             AsyncTexture2D background,

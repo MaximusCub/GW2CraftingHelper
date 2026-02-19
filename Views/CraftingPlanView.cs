@@ -2,7 +2,6 @@ using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Blish_HUD.Input;
-using Blish_HUD.Graphics.UI;
 using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
@@ -15,22 +14,21 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Views
 {
-    public class CraftingPlanView : View
+    public class CraftingPlanView
     {
         private static readonly Logger Logger = Logger.GetLogger<CraftingPlanView>();
 
         // Layout constants
-        private const int TabHeight = 35;
-        private const int InputRowY = 40;
-        private const int ControlsRowY = 78;
-        private const int StatusRowY = 116;
-        private const int SeparatorY = 137;
-        private const int ContentY = 142;
-        private const int TopRegionHeight = 147;
+        private const int RowHeight = 35;
+        private const int InputRowY = 5;
+        private const int ControlsRowY = 43;
+        private const int StatusRowY = 81;
+        private const int SeparatorY = 102;
+        private const int ContentY = 107;
+        private const int TopRegionHeight = 112;
         private const int RightEdgePadding = 20;
 
         private readonly Func<int, int, bool, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
-        private readonly Action _switchToSnapshot;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
@@ -47,8 +45,11 @@ namespace GW2CraftingHelper.Views
         // Suppress flag for checkbox revert
         private bool _suppressToggle;
 
+        // Debug log from last plan generation
+        private IReadOnlyList<string> _lastDebugLog;
+        public IReadOnlyList<string> LastDebugLog => _lastDebugLog;
+
         // UI controls (stored for resize handler)
-        private Panel _tabPanel;
         private Panel _inputPanel;
         private Panel _controlsPanel;
         private Dropdown _itemDropdown;
@@ -64,12 +65,10 @@ namespace GW2CraftingHelper.Views
 
         public CraftingPlanView(
             Func<int, int, bool, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
-            Action switchToSnapshot,
             ModalDialog modalDialog,
             IItemSearchProvider itemSearchProvider)
         {
             _generateAsync = generateAsync;
-            _switchToSnapshot = switchToSnapshot;
             _modalDialog = modalDialog;
             _itemSearchProvider = itemSearchProvider;
         }
@@ -106,39 +105,14 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        protected override void Build(Container buildPanel)
+        public void Build(Container buildPanel)
         {
             int w = buildPanel.ContentRegion.Width;
-
-            // Tab bar
-            _tabPanel = new Panel()
-            {
-                Size = new Point(w, TabHeight),
-                Parent = buildPanel
-            };
-
-            var snapshotTab = new StandardButton()
-            {
-                Text = "Snapshot",
-                Size = new Point(100, 28),
-                Location = new Point(0, 3),
-                Parent = _tabPanel
-            };
-            snapshotTab.Click += (_, __) => _switchToSnapshot?.Invoke();
-
-            new StandardButton()
-            {
-                Text = "Crafting Plan",
-                Size = new Point(110, 28),
-                Location = new Point(105, 3),
-                Enabled = false,
-                Parent = _tabPanel
-            };
 
             // Input row: dropdown + quantity
             _inputPanel = new Panel()
             {
-                Size = new Point(w, TabHeight),
+                Size = new Point(w, RowHeight),
                 Location = new Point(0, InputRowY),
                 Parent = buildPanel
             };
@@ -183,7 +157,7 @@ namespace GW2CraftingHelper.Views
             // Controls row: checkbox + generate button
             _controlsPanel = new Panel()
             {
-                Size = new Point(w, TabHeight),
+                Size = new Point(w, RowHeight),
                 Location = new Point(0, ControlsRowY),
                 Parent = buildPanel
             };
@@ -253,9 +227,8 @@ namespace GW2CraftingHelper.Views
             int h = container.ContentRegion.Height;
 
             // Update widths of layout panels
-            _tabPanel.Size = new Point(w, TabHeight);
-            _inputPanel.Size = new Point(w, TabHeight);
-            _controlsPanel.Size = new Point(w, TabHeight);
+            _inputPanel.Size = new Point(w, RowHeight);
+            _controlsPanel.Size = new Point(w, RowHeight);
             _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
             _separator.Size = new Point(w - RightEdgePadding, 2);
             _contentPanel.Size = new Point(w, h - TopRegionHeight);
@@ -327,6 +300,7 @@ namespace GW2CraftingHelper.Views
                     _selectedItemId, _quantity, _useOwnMaterials,
                     CancellationToken.None, statusProgress);
 
+                _lastDebugLog = result.DebugLog;
                 var vm = _vmBuilder.Build(result);
                 _currentPlan = vm;
                 _planGeneratedAt = DateTime.Now;
