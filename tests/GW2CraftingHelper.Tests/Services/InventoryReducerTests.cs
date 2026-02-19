@@ -347,5 +347,176 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.ReducedTree.Recipes);
             Assert.True(result.ReducedTree.IsLeaf);
         }
+
+        // ---- Source-aware overload tests ----
+
+        private static SnapshotItemEntry SnapEntry(int itemId, int count, string source)
+        {
+            return new SnapshotItemEntry
+            {
+                ItemId = itemId,
+                Count = count,
+                Source = source
+            };
+        }
+
+        [Fact]
+        public void Sourced_BasicReduction_ReducesCorrectly()
+        {
+            var tree = Leaf(100, 5);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 5, "MaterialStorage")
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(100, result.UsedMaterials[0].ItemId);
+            Assert.Equal(5, result.UsedMaterials[0].QuantityUsed);
+        }
+
+        [Fact]
+        public void Sourced_SourcesPopulated_InUsedMaterial()
+        {
+            var tree = Leaf(100, 8);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 5, "MaterialStorage"),
+                SnapEntry(100, 3, "Bank")
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.NotNull(sources);
+            Assert.Equal(2, sources.Count);
+
+            var matSource = sources.First(s => s.Source == "MaterialStorage");
+            var bankSource = sources.First(s => s.Source == "Bank");
+            Assert.Equal(5, matSource.Quantity);
+            Assert.Equal(3, bankSource.Quantity);
+        }
+
+        [Fact]
+        public void Sourced_PriorityOrder_MaterialStorageFirst()
+        {
+            // Tree needs 3 of item 100. Both MaterialStorage and Bank have 3.
+            // MaterialStorage should be consumed first.
+            var tree = Leaf(100, 3);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 3, "Bank"),
+                SnapEntry(100, 3, "MaterialStorage")
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Single(sources);
+            Assert.Equal("MaterialStorage", sources[0].Source);
+            Assert.Equal(3, sources[0].Quantity);
+        }
+
+        [Fact]
+        public void Sourced_ActiveCharConsumedBeforeBank()
+        {
+            var tree = Leaf(100, 5);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 3, "Bank"),
+                SnapEntry(100, 5, "Alice")
+            });
+
+            var result = _reducer.Reduce(tree, index, "Alice");
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Single(sources);
+            Assert.Equal("Alice", sources[0].Source);
+            Assert.Equal(5, sources[0].Quantity);
+        }
+
+        [Fact]
+        public void Sourced_ItemNotInIndex_NotReduced()
+        {
+            var tree = Leaf(100, 5);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>());
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(5, result.ReducedTree.Quantity);
+            Assert.Empty(result.UsedMaterials);
+        }
+
+        [Fact]
+        public void Sourced_OldOverload_StillWorksUnchanged()
+        {
+            var tree = Leaf(100, 5);
+            var pool = new Dictionary<int, int> { { 100, 3 } };
+
+            var result = _reducer.Reduce(tree, pool);
+
+            Assert.Equal(2, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(3, result.UsedMaterials[0].QuantityUsed);
+            // Old overload does not populate Sources
+            Assert.Null(result.UsedMaterials[0].Sources);
+        }
+
+        [Fact]
+        public void Sourced_PartialReduction_OnlyConsumesAvailable()
+        {
+            var tree = Leaf(100, 10);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 3, "MaterialStorage"),
+                SnapEntry(100, 4, "Bank")
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(3, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(7, result.UsedMaterials[0].QuantityUsed);
+
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Equal(2, sources.Count);
+        }
+
+        [Fact]
+        public void Sourced_MultiLevel_SourceTrackingAcrossTree()
+        {
+            // Root (id=1, qty=1) -> recipe 10 -> leaf (id=2, qty=3)
+            // Own 2 of item 2 from MaterialStorage, 1 from Bank
+            var tree = Craftable(1, 1, 10, 1, Leaf(2, 3));
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 2, "MaterialStorage"),
+                SnapEntry(2, 1, "Bank")
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            // Root is still qty=1, needs crafting
+            Assert.Equal(1, result.ReducedTree.Quantity);
+            // Ingredient fully consumed
+            var ingredient = result.ReducedTree.Recipes[0].Ingredients[0];
+            Assert.Equal(0, ingredient.Quantity);
+
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(2, result.UsedMaterials[0].ItemId);
+            Assert.Equal(3, result.UsedMaterials[0].QuantityUsed);
+
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Equal(2, sources.Count);
+            Assert.Equal(2, sources.First(s => s.Source == "MaterialStorage").Quantity);
+            Assert.Equal(1, sources.First(s => s.Source == "Bank").Quantity);
+        }
     }
 }
