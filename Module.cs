@@ -148,7 +148,7 @@ namespace GW2CraftingHelper
             }
             catch (Exception ex)
             {
-                Logger.Info("Item search fallback to static provider: {0}", ex.Message);
+                Logger.Info("Item search fallback to static provider: [{0}] {1}", ex.GetType().Name, ex.Message);
                 _itemSearchProvider = new StaticItemSearchProvider();
             }
 
