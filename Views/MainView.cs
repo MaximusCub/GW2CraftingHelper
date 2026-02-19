@@ -1,7 +1,6 @@
 using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
-using Blish_HUD.Graphics.UI;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
@@ -13,7 +12,7 @@ using System.Threading.Tasks;
 namespace GW2CraftingHelper.Views
 {
 
-    public class MainView : View
+    public class MainView
     {
 
         private static readonly Logger Logger = Logger.GetLogger<MainView>();
@@ -23,21 +22,18 @@ namespace GW2CraftingHelper.Views
         private readonly Func<Task<AccountSnapshot>> _refreshAsync;
         private readonly Action _clearCache;
         private readonly Action<string> _saveStatus;
-        private readonly Action _switchToCrafting;
 
         // Layout constants
-        private const int TabHeight = 35;
-        private const int HeaderRowY = 40;
+        private const int HeaderRowY = 5;
         private const int HeaderHeight = 40;
-        private const int FilterRowY = 85;
+        private const int FilterRowY = 50;
         private const int FilterHeight = 40;
-        private const int CoinRowY = 130;
+        private const int CoinRowY = 95;
         private const int CoinHeight = 24;
-        private const int ContentY = 158;
-        private const int TopRegionHeight = 160;
+        private const int ContentY = 123;
+        private const int TopRegionHeight = 125;
 
         // UI controls (stored for resize handler)
-        private Panel _tabPanel;
         private Panel _headerPanel;
         private Panel _filterPanel;
         private FlowPanel _contentPanel;
@@ -54,15 +50,13 @@ namespace GW2CraftingHelper.Views
             string initialStatus,
             Func<Task<AccountSnapshot>> refreshAsync,
             Action clearCache,
-            Action<string> saveStatus,
-            Action switchToCrafting = null)
+            Action<string> saveStatus)
         {
             _snapshot = snapshot;
             _initialStatus = initialStatus;
             _refreshAsync = refreshAsync;
             _clearCache = clearCache;
             _saveStatus = saveStatus;
-            _switchToCrafting = switchToCrafting;
         }
 
         public void SetSnapshot(AccountSnapshot snapshot)
@@ -81,37 +75,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        protected override void Build(Container buildPanel)
+        public void Build(Container buildPanel)
         {
             int w = buildPanel.ContentRegion.Width;
-
-            // Tab bar
-            _tabPanel = new Panel()
-            {
-                Size = new Point(w, TabHeight),
-                Parent = buildPanel
-            };
-
-            new StandardButton()
-            {
-                Text = "Snapshot",
-                Size = new Point(100, 28),
-                Location = new Point(0, 3),
-                Enabled = false, // current tab
-                Parent = _tabPanel
-            };
-
-            if (_switchToCrafting != null)
-            {
-                var craftingTab = new StandardButton()
-                {
-                    Text = "Crafting Plan",
-                    Size = new Point(110, 28),
-                    Location = new Point(105, 3),
-                    Parent = _tabPanel
-                };
-                craftingTab.Click += (_, __) => _switchToCrafting();
-            }
 
             // Header row
             _headerPanel = new Panel()
@@ -263,7 +229,6 @@ namespace GW2CraftingHelper.Views
             int w = container.ContentRegion.Width;
             int h = container.ContentRegion.Height;
 
-            _tabPanel.Size = new Point(w, TabHeight);
             _headerPanel.Size = new Point(w, HeaderHeight);
             _clearButton.Location = new Point(w - 220, 5);
             _refreshButton.Location = new Point(w - 110, 5);
