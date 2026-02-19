@@ -119,7 +119,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void CraftableFullyOwned_RecipesCleared_IngredientsNotConsumed()
         {
             // Item 1 (qty 2) -> recipe 10 -> leaf item 2 (qty 6)
-            // Own 2 of item 1 — should clear recipes, NOT consume item 2
+            // Own 2 of item 1 - should clear recipes, NOT consume item 2
             var tree = Craftable(1, 2, 10, 1, Leaf(2, 6));
             var pool = new Dictionary<int, int> { { 1, 2 }, { 2, 100 } };
 
@@ -217,7 +217,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Recipes = new List<RecipeOption> { option }
             };
 
-            // Pool has currency id 99 — should not be consumed
+            // Pool has currency id 99 - should not be consumed
             var pool = new Dictionary<int, int> { { 99, 999 } };
 
             var result = _reducer.Reduce(tree, pool);
@@ -233,7 +233,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void UsedMaterials_Aggregated()
         {
             // Root item 1 -> recipe 10 -> [item 2 (qty 3), item 2 (qty 4)]
-            // Pool has 10 of item 2 — both branches consume, aggregated to single entry
+            // Pool has 10 of item 2 - both branches consume, aggregated to single entry
             var option = new RecipeOption
             {
                 RecipeId = 10,
@@ -337,7 +337,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void FullyOwnedIntermediate_NoRecipesOnNode()
         {
             // Item 1 (qty 3) -> recipe 10 -> leaf item 2 (qty 9)
-            // Own 3 of item 1 — fully owned craftable intermediate
+            // Own 3 of item 1 - fully owned craftable intermediate
             var tree = Craftable(1, 3, 10, 1, Leaf(2, 9));
             var pool = new Dictionary<int, int> { { 1, 3 } };
 
@@ -346,6 +346,473 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, result.ReducedTree.Quantity);
             Assert.Empty(result.ReducedTree.Recipes);
             Assert.True(result.ReducedTree.IsLeaf);
+        }
+
+        // ---- Source-aware overload tests ----
+
+        private static SnapshotItemEntry SnapEntry(int itemId, int count, string source)
+        {
+            return new SnapshotItemEntry
+            {
+                ItemId = itemId,
+                Count = count,
+                Source = source
+            };
+        }
+
+        [Fact]
+        public void Sourced_BasicReduction_ReducesCorrectly()
+        {
+            var tree = Leaf(100, 5);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(100, result.UsedMaterials[0].ItemId);
+            Assert.Equal(5, result.UsedMaterials[0].QuantityUsed);
+        }
+
+        [Fact]
+        public void Sourced_SourcesPopulated_InUsedMaterial()
+        {
+            var tree = Leaf(100, 8);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(100, 3, AccountItemIndex.SourceBank)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.NotNull(sources);
+            Assert.Equal(2, sources.Count);
+
+            var matSource = sources.First(s => s.Source == AccountItemIndex.SourceMaterialStorage);
+            var bankSource = sources.First(s => s.Source == AccountItemIndex.SourceBank);
+            Assert.Equal(5, matSource.Quantity);
+            Assert.Equal(3, bankSource.Quantity);
+        }
+
+        [Fact]
+        public void Sourced_PriorityOrder_MaterialStorageFirst()
+        {
+            // Tree needs 3 of item 100. Both MaterialStorage and Bank have 3.
+            // MaterialStorage should be consumed first.
+            var tree = Leaf(100, 3);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 3, AccountItemIndex.SourceBank),
+                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Single(sources);
+            Assert.Equal(AccountItemIndex.SourceMaterialStorage, sources[0].Source);
+            Assert.Equal(3, sources[0].Quantity);
+        }
+
+        [Fact]
+        public void Sourced_ActiveCharConsumedBeforeBank()
+        {
+            var tree = Leaf(100, 5);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 3, AccountItemIndex.SourceBank),
+                SnapEntry(100, 5, "Alice")
+            });
+
+            var result = _reducer.Reduce(tree, index, "Alice");
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Single(sources);
+            Assert.Equal("Alice", sources[0].Source);
+            Assert.Equal(5, sources[0].Quantity);
+        }
+
+        [Fact]
+        public void Sourced_ItemNotInIndex_NotReduced()
+        {
+            var tree = Leaf(100, 5);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>());
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(5, result.ReducedTree.Quantity);
+            Assert.Empty(result.UsedMaterials);
+        }
+
+        [Fact]
+        public void Sourced_OldOverload_StillWorksUnchanged()
+        {
+            var tree = Leaf(100, 5);
+            var pool = new Dictionary<int, int> { { 100, 3 } };
+
+            var result = _reducer.Reduce(tree, pool);
+
+            Assert.Equal(2, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(3, result.UsedMaterials[0].QuantityUsed);
+            // Legacy contract: old overload leaves Sources null
+            Assert.Null(result.UsedMaterials[0].Sources);
+        }
+
+        [Fact]
+        public void Sourced_PartialReduction_OnlyConsumesAvailable()
+        {
+            var tree = Leaf(100, 10);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(100, 4, AccountItemIndex.SourceBank)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(3, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(7, result.UsedMaterials[0].QuantityUsed);
+
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Equal(2, sources.Count);
+        }
+
+        [Fact]
+        public void Sourced_MultiLevel_SourceTrackingAcrossTree()
+        {
+            // Root (id=1, qty=1) -> recipe 10 -> leaf (id=2, qty=3)
+            // Own 2 of item 2 from MaterialStorage, 1 from Bank
+            var tree = Craftable(1, 1, 10, 1, Leaf(2, 3));
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 2, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(2, 1, AccountItemIndex.SourceBank)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            // Root is still qty=1, needs crafting
+            Assert.Equal(1, result.ReducedTree.Quantity);
+            // Ingredient fully consumed
+            var ingredient = result.ReducedTree.Recipes[0].Ingredients[0];
+            Assert.Equal(0, ingredient.Quantity);
+
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(2, result.UsedMaterials[0].ItemId);
+            Assert.Equal(3, result.UsedMaterials[0].QuantityUsed);
+
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Equal(2, sources.Count);
+            Assert.Equal(2, sources.First(s => s.Source == AccountItemIndex.SourceMaterialStorage).Quantity);
+            Assert.Equal(1, sources.First(s => s.Source == AccountItemIndex.SourceBank).Quantity);
+        }
+
+        [Fact]
+        public void Sourced_PoolNeverGoesNegative()
+        {
+            // Two branches both need item 2: first needs 5, second needs 5.
+            // Only 7 available from MaterialStorage.
+            // After first branch: pool=2. Second branch: consume min(2,5)=2, pool=0.
+            // Pool must never go negative.
+            var ing1 = Leaf(2, 5);
+            var ing2 = Leaf(2, 5);
+            var option = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                CraftsNeeded = 1
+            };
+            option.Ingredients.Add(ing1);
+            option.Ingredients.Add(ing2);
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                Recipes = new List<RecipeOption> { option }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 7, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            var reducedIng1 = result.ReducedTree.Recipes[0].Ingredients[0];
+            var reducedIng2 = result.ReducedTree.Recipes[0].Ingredients[1];
+
+            Assert.Equal(0, reducedIng1.Quantity);  // 5-5=0
+            Assert.Equal(3, reducedIng2.Quantity);   // 5-2=3
+
+            var totalUsed = result.UsedMaterials
+                .Where(u => u.ItemId == 2)
+                .Sum(u => u.QuantityUsed);
+            Assert.Equal(7, totalUsed);
+        }
+
+        [Fact]
+        public void Sourced_ExactConsumption_PoolReachesZeroNotNegative()
+        {
+            // Exactly enough items: need 5, have 5. Pool should reach exactly 0.
+            var tree = Leaf(100, 5);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(5, result.UsedMaterials[0].QuantityUsed);
+        }
+
+        [Fact]
+        public void Sourced_ComprehensivePriority_FullChainWithPoolVerification()
+        {
+            // Item 100, need 20.
+            // Sources: MaterialStorage=5, ActiveChar=4, SharedInventory=3, Bank=2, OtherChar=6
+            // Priority: MaterialStorage(5) -> ActiveChar(4) -> SharedInventory(3) -> Bank(2) -> OtherChar(6)
+            // Total available = 20, exactly enough. All consumed in priority order.
+            var tree = Leaf(100, 20);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 6, "Zephyr"),
+                SnapEntry(100, 2, AccountItemIndex.SourceBank),
+                SnapEntry(100, 3, AccountItemIndex.SourceSharedInventory),
+                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(100, 4, "ActiveHero")
+            });
+
+            var result = _reducer.Reduce(tree, index, "ActiveHero");
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(20, result.UsedMaterials[0].QuantityUsed);
+
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Equal(5, sources.Count);
+
+            // Verify each source contributed the right amount
+            Assert.Equal(5, sources.First(s => s.Source == AccountItemIndex.SourceMaterialStorage).Quantity);
+            Assert.Equal(4, sources.First(s => s.Source == "ActiveHero").Quantity);
+            Assert.Equal(3, sources.First(s => s.Source == AccountItemIndex.SourceSharedInventory).Quantity);
+            Assert.Equal(2, sources.First(s => s.Source == AccountItemIndex.SourceBank).Quantity);
+            Assert.Equal(6, sources.First(s => s.Source == "Zephyr").Quantity);
+        }
+
+        [Fact]
+        public void Sourced_NullSnapshot_TreeNotReduced()
+        {
+            // Simulates useOwn=false: when no index is available,
+            // Reduce still works with an empty index - nothing consumed.
+            var tree = Craftable(1, 5, 10, 1, Leaf(2, 5));
+            var emptyIndex = new AccountItemIndex(null);
+
+            var result = _reducer.Reduce(tree, emptyIndex, null);
+
+            Assert.Equal(5, result.ReducedTree.Quantity);
+            Assert.Single(result.ReducedTree.Recipes);
+            Assert.Equal(5, result.ReducedTree.Recipes[0].Ingredients[0].Quantity);
+            Assert.Empty(result.UsedMaterials);
+        }
+
+        [Fact]
+        public void Sourced_NullSourceEntries_Excluded()
+        {
+            // Items with null/empty sources should not affect reduction
+            var tree = Leaf(100, 5);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 10, null),
+                SnapEntry(100, 10, ""),
+                SnapEntry(100, 3, AccountItemIndex.SourceBank)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            // Only Bank's 3 should be consumed (null/empty excluded from index)
+            Assert.Equal(2, result.ReducedTree.Quantity);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(3, result.UsedMaterials[0].QuantityUsed);
+            Assert.Single(result.UsedMaterials[0].Sources);
+            Assert.Equal(AccountItemIndex.SourceBank, result.UsedMaterials[0].Sources[0].Source);
+        }
+
+        [Fact]
+        public void Sourced_WhenConsumed_SourcesIsNonNullList()
+        {
+            // Sourced overload: when items are consumed, Sources is a non-null list
+            var tree = Leaf(100, 5);
+            var emptyIndex = new AccountItemIndex(null);
+
+            var result = _reducer.Reduce(tree, emptyIndex, null);
+
+            // Nothing consumed, so UsedMaterials is empty
+            Assert.Empty(result.UsedMaterials);
+
+            // When items ARE consumed, Sources is a non-null list
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 5, AccountItemIndex.SourceBank)
+            });
+            var result2 = _reducer.Reduce(Leaf(100, 5), index, null);
+
+            Assert.Single(result2.UsedMaterials);
+            Assert.NotNull(result2.UsedMaterials[0].Sources);
+            Assert.Single(result2.UsedMaterials[0].Sources);
+        }
+
+        [Fact]
+        public void Sourced_OldOverload_SourcesIsNull()
+        {
+            // Legacy contract: old overload has no source concept, Sources stays null
+            var tree = Leaf(100, 5);
+            var pool = new Dictionary<int, int> { { 100, 3 } };
+
+            var result = _reducer.Reduce(tree, pool);
+
+            Assert.Single(result.UsedMaterials);
+            Assert.Null(result.UsedMaterials[0].Sources);
+        }
+
+        [Fact]
+        public void Sourced_AggregatedSources_DeterministicOrdering()
+        {
+            // Two branches consuming from Zephyr and Bank.
+            // Aggregated Sources must be ordered alphabetically by source name.
+            var ing1 = Leaf(2, 3);
+            var ing2 = Leaf(2, 4);
+            var option = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                CraftsNeeded = 1
+            };
+            option.Ingredients.Add(ing1);
+            option.Ingredients.Add(ing2);
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                Recipes = new List<RecipeOption> { option }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 4, "Zephyr"),
+                SnapEntry(2, 4, AccountItemIndex.SourceBank)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            var sources = result.UsedMaterials
+                .First(u => u.ItemId == 2).Sources;
+
+            Assert.Equal(2, sources.Count);
+            // Ordinal: "Bank" < "Zephyr"
+            Assert.Equal(AccountItemIndex.SourceBank, sources[0].Source);
+            Assert.Equal("Zephyr", sources[1].Source);
+        }
+
+        [Fact]
+        public void Sourced_CurrencyNodeWithItemSiblings_OnlyItemsReduced()
+        {
+            // Item 1 -> recipe 10 -> [item 2 (qty 3), currency 99 (qty 50)]
+            // Sourced overload: item 2 is reduced, currency 99 is untouched
+            var option = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                CraftsNeeded = 1
+            };
+            option.Ingredients.Add(Leaf(2, 3));
+            option.Ingredients.Add(Leaf(99, 50, "Currency"));
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                Recipes = new List<RecipeOption> { option }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 10, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            // Item 2 fully consumed
+            var reducedItem = result.ReducedTree.Recipes[0].Ingredients[0];
+            Assert.Equal(0, reducedItem.Quantity);
+
+            // Currency unchanged
+            var currencyNode = result.ReducedTree.Recipes[0].Ingredients[1];
+            Assert.Equal(50, currencyNode.Quantity);
+            Assert.Equal("Currency", currencyNode.IngredientType);
+
+            // Only item 2 in used materials
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(2, result.UsedMaterials[0].ItemId);
+            Assert.NotNull(result.UsedMaterials[0].Sources);
+        }
+
+        [Fact]
+        public void OldVsNew_SameQuantityResults_WhenSourcesProvided()
+        {
+            // Regression: sourced overload must produce the same tree quantities
+            // as old overload when total owned quantities match.
+            // Item 1 (qty 10) -> recipe 10 (output 2) -> leaf item 2 (qty 25)
+            // Own 4 of item 1 from mixed sources.
+            var tree = Craftable(1, 10, 10, 2, Leaf(2, 25));
+
+            // Old overload: flat pool
+            var pool = new Dictionary<int, int> { { 1, 4 } };
+            var oldResult = _reducer.Reduce(tree, pool);
+
+            // New overload: same total from two sources
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 2, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(1, 2, AccountItemIndex.SourceBank)
+            });
+            var newResult = _reducer.Reduce(tree, index, null);
+
+            // Tree quantities must match exactly
+            Assert.Equal(oldResult.ReducedTree.Quantity, newResult.ReducedTree.Quantity);
+            Assert.Equal(
+                oldResult.ReducedTree.Recipes[0].CraftsNeeded,
+                newResult.ReducedTree.Recipes[0].CraftsNeeded);
+            Assert.Equal(
+                oldResult.ReducedTree.Recipes[0].Ingredients[0].Quantity,
+                newResult.ReducedTree.Recipes[0].Ingredients[0].Quantity);
+
+            // Total consumed quantity matches
+            Assert.Equal(
+                oldResult.UsedMaterials.Sum(u => u.QuantityUsed),
+                newResult.UsedMaterials.Sum(u => u.QuantityUsed));
+
+            // New overload has Sources; old does not
+            Assert.Null(oldResult.UsedMaterials[0].Sources);
+            Assert.NotNull(newResult.UsedMaterials[0].Sources);
+
+            // Original tree not mutated by either call
+            Assert.Equal(10, tree.Quantity);
         }
     }
 }

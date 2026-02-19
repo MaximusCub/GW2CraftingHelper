@@ -117,7 +117,7 @@ namespace GW2CraftingHelper
             }
             catch
             {
-                // No seed files yet — graceful degradation
+                // No seed files yet - graceful degradation
             }
 
             try
@@ -129,7 +129,7 @@ namespace GW2CraftingHelper
             }
             catch
             {
-                // No manifest — staleness detection disabled
+                // No manifest - staleness detection disabled
             }
 
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir);
@@ -254,10 +254,27 @@ namespace GW2CraftingHelper
                 _craftingView = new CraftingPlanView(
                     (itemId, qty, useOwn, ct, progress) =>
                     {
+                        string activeChar = null;
+                        try
+                        {
+                            var mumble = GameService.Gw2Mumble;
+                            if (mumble != null &&
+                                mumble.PlayerCharacter != null &&
+                                !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
+                            {
+                                activeChar = mumble.PlayerCharacter.Name;
+                            }
+                        }
+                        catch
+                        {
+                            // Gw2Mumble unavailable - graceful fallback
+                        }
+
                         if (useOwn)
                         {
                             return _craftingPipeline.GenerateStructuredAsync(
-                                itemId, qty, _currentSnapshot, ct, progress);
+                                itemId, qty, _currentSnapshot, ct, progress,
+                                activeChar);
                         }
                         return _craftingPipeline.GenerateStructuredAsync(
                             itemId, qty, null, ct, progress);

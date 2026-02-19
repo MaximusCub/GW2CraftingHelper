@@ -292,12 +292,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var (pipeline, _) = BuildPipeline();
 
-            // Own 1x Orichalcum GS Blade (46738) — a Weaponsmith-only craftable
+            // Own 1x Orichalcum GS Blade (46738) - a Weaponsmith-only craftable
             var snapshot = new AccountSnapshot
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = OriGsBlade, Count = 1 }
+                    new SnapshotItemEntry { ItemId = OriGsBlade, Count = 1, Source = AccountItemIndex.SourceMaterialStorage }
                 }
             };
 
