@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>M17 Icon Candidates - GW2 Crafting Helper</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; margin: 20px; max-width: 900px; }
+  h1 { color: #f0c040; border-bottom: 2px solid #f0c040; padding-bottom: 8px; }
+  h2 { color: #c0a040; margin-top: 32px; }
+  .mapping { background: #2a3a2e; border: 2px solid #6a6; border-radius: 8px; padding: 14px; margin: 10px 0; display: flex; align-items: center; gap: 14px; }
+  .mapping img { width: 48px; height: 48px; image-rendering: pixelated; background: #111; border: 1px solid #555; flex-shrink: 0; }
+  .mapping .tab-name { font-size: 18px; font-weight: bold; color: #8f8; min-width: 140px; }
+  .mapping .pick { color: #ccc; font-size: 14px; }
+  .mapping .pick-id { font-family: monospace; color: #8cf; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid #333; }
+  .row:hover { background: #2a2a3e; }
+  .row img { width: 48px; height: 48px; image-rendering: pixelated; background: #111; border: 1px solid #333; flex-shrink: 0; }
+  .row .num { font-size: 16px; font-weight: bold; color: #f0c040; min-width: 28px; text-align: right; }
+  .row .id { font-family: monospace; font-size: 14px; color: #8cf; min-width: 80px; }
+  .row .src { font-size: 11px; color: #999; min-width: 100px; }
+  .row .desc { font-size: 14px; color: #ddd; }
+  .note { background: #2a2a3e; border-left: 3px solid #f0c040; padding: 10px 14px; margin: 12px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>M17 Icon Candidates</h1>
+
+<div class="note">
+  All icons load from <code>assets.gw2dat.com</code> and are used via <code>AsyncTexture2D.FromAssetId(ID)</code>.
+  3 originally listed IDs (156748, 156724, 156733) were removed because they return 404.
+</div>
+
+<h2>Suggested Tab Mappings</h2>
+
+<div class="mapping">
+  <img src="https://assets.gw2dat.com/156699.png" alt="156699">
+  <span class="tab-name">Snapshot</span>
+  <span class="pick">#9 Bank vault - <span class="pick-id">156699</span></span>
+</div>
+<div class="mapping">
+  <img src="https://assets.gw2dat.com/156702.png" alt="156702">
+  <span class="tab-name">Crafting Plan</span>
+  <span class="pick">#21 Anvil/crafting station - <span class="pick-id">156702</span></span>
+</div>
+<div class="mapping">
+  <img src="https://assets.gw2dat.com/156734.png" alt="156734">
+  <span class="tab-name">Log</span>
+  <span class="pick">#23 Scroll/document - <span class="pick-id">156734</span></span>
+</div>
+<div class="mapping">
+  <img src="https://assets.gw2dat.com/156689.png" alt="156689">
+  <span class="tab-name">Plan History</span>
+  <span class="pick">#27 Clock/history - <span class="pick-id">156689</span></span>
+</div>
+<div class="mapping">
+  <img src="https://assets.gw2dat.com/156740.png" alt="156740">
+  <span class="tab-name">Crafting Ranker</span>
+  <span class="pick">#30 Trophy/rank - <span class="pick-id">156740</span></span>
+</div>
+<div class="mapping">
+  <img src="https://assets.gw2dat.com/156736.png" alt="156736">
+  <span class="tab-name">Settings</span>
+  <span class="pick">#1 Gear/cog - <span class="pick-id">156736</span></span>
+</div>
+<div class="mapping">
+  <img src="https://assets.gw2dat.com/157097.png" alt="157097">
+  <span class="tab-name">About</span>
+  <span class="pick">#8 Question mark/help - <span class="pick-id">157097</span></span>
+</div>
+
+<h2>All Available Icons</h2>
+
+<div class="row"><span class="num">1</span><img src="https://assets.gw2dat.com/156736.png" alt="156736"><span class="id">156736</span><span class="src">Event Table</span><span class="desc">Gear/cog - General settings tab</span></div>
+<div class="row"><span class="num">2</span><img src="https://assets.gw2dat.com/605018.png" alt="605018"><span class="id">605018</span><span class="src">Event Table</span><span class="desc">Map/area pin - Event Areas tab</span></div>
+<div class="row"><span class="num">3</span><img src="https://assets.gw2dat.com/1466345.png" alt="1466345"><span class="id">1466345</span><span class="src">Event Table</span><span class="desc">Bell/notification - Reminders tab</span></div>
+<div class="row"><span class="num">4</span><img src="https://assets.gw2dat.com/759448.png" alt="759448"><span class="id">759448</span><span class="src">Event Table</span><span class="desc">Dynamic event marker</span></div>
+<div class="row"><span class="num">5</span><img src="https://assets.gw2dat.com/3126786.png" alt="3126786"><span class="id">3126786</span><span class="src">Event Table</span><span class="desc">Timer/clock - Event Timers tab</span></div>
+<div class="row"><span class="num">6</span><img src="https://assets.gw2dat.com/156680.png" alt="156680"><span class="id">156680</span><span class="src">Event Table</span><span class="desc">Arrow/upload - Self Hosting tab</span></div>
+<div class="row"><span class="num">7</span><img src="https://assets.gw2dat.com/156764.png" alt="156764"><span class="id">156764</span><span class="src">Event Table</span><span class="desc">Blish/brand icon</span></div>
+<div class="row"><span class="num">8</span><img src="https://assets.gw2dat.com/157097.png" alt="157097"><span class="id">157097</span><span class="src">Event Table</span><span class="desc">Question mark/help</span></div>
+<div class="row"><span class="num">9</span><img src="https://assets.gw2dat.com/156699.png" alt="156699"><span class="id">156699</span><span class="src">GW2 Bank</span><span class="desc">Bank vault icon</span></div>
+<div class="row"><span class="num">10</span><img src="https://assets.gw2dat.com/156700.png" alt="156700"><span class="id">156700</span><span class="src">GW2 Bank</span><span class="desc">Bank tab variant</span></div>
+<div class="row"><span class="num">11</span><img src="https://assets.gw2dat.com/156701.png" alt="156701"><span class="id">156701</span><span class="src">GW2 Inventory</span><span class="desc">Backpack/inventory icon</span></div>
+<div class="row"><span class="num">12</span><img src="https://assets.gw2dat.com/156677.png" alt="156677"><span class="id">156677</span><span class="src">GW2 Storage</span><span class="desc">Chest/storage icon</span></div>
+<div class="row"><span class="num">13</span><img src="https://assets.gw2dat.com/156678.png" alt="156678"><span class="id">156678</span><span class="src">GW2 Storage</span><span class="desc">Chest icon variant</span></div>
+<div class="row"><span class="num">14</span><img src="https://assets.gw2dat.com/156710.png" alt="156710"><span class="id">156710</span><span class="src">Discipline</span><span class="desc">Armorsmith discipline</span></div>
+<div class="row"><span class="num">15</span><img src="https://assets.gw2dat.com/156711.png" alt="156711"><span class="id">156711</span><span class="src">Discipline</span><span class="desc">Artificer discipline</span></div>
+<div class="row"><span class="num">16</span><img src="https://assets.gw2dat.com/156714.png" alt="156714"><span class="id">156714</span><span class="src">Discipline</span><span class="desc">Chef discipline</span></div>
+<div class="row"><span class="num">17</span><img src="https://assets.gw2dat.com/156716.png" alt="156716"><span class="id">156716</span><span class="src">Discipline</span><span class="desc">Huntsman discipline</span></div>
+<div class="row"><span class="num">18</span><img src="https://assets.gw2dat.com/156720.png" alt="156720"><span class="id">156720</span><span class="src">Discipline</span><span class="desc">Jeweler discipline</span></div>
+<div class="row"><span class="num">19</span><img src="https://assets.gw2dat.com/156722.png" alt="156722"><span class="id">156722</span><span class="src">Discipline</span><span class="desc">Leatherworker discipline</span></div>
+<div class="row"><span class="num">20</span><img src="https://assets.gw2dat.com/156727.png" alt="156727"><span class="id">156727</span><span class="src">Discipline</span><span class="desc">Tailor discipline</span></div>
+<div class="row"><span class="num">21</span><img src="https://assets.gw2dat.com/156702.png" alt="156702"><span class="id">156702</span><span class="src">GW2 Crafting</span><span class="desc">Anvil/crafting station</span></div>
+<div class="row"><span class="num">22</span><img src="https://assets.gw2dat.com/156703.png" alt="156703"><span class="id">156703</span><span class="src">GW2 Crafting</span><span class="desc">Mystic Forge icon</span></div>
+<div class="row"><span class="num">23</span><img src="https://assets.gw2dat.com/156734.png" alt="156734"><span class="id">156734</span><span class="src">GW2 UI</span><span class="desc">Scroll/document</span></div>
+<div class="row"><span class="num">24</span><img src="https://assets.gw2dat.com/156735.png" alt="156735"><span class="id">156735</span><span class="src">GW2 UI</span><span class="desc">Scroll icon variant</span></div>
+<div class="row"><span class="num">25</span><img src="https://assets.gw2dat.com/156684.png" alt="156684"><span class="id">156684</span><span class="src">GW2 UI</span><span class="desc">Book/journal icon</span></div>
+<div class="row"><span class="num">26</span><img src="https://assets.gw2dat.com/156685.png" alt="156685"><span class="id">156685</span><span class="src">GW2 UI</span><span class="desc">Book icon variant</span></div>
+<div class="row"><span class="num">27</span><img src="https://assets.gw2dat.com/156689.png" alt="156689"><span class="id">156689</span><span class="src">GW2 UI</span><span class="desc">Clock/history icon</span></div>
+<div class="row"><span class="num">28</span><img src="https://assets.gw2dat.com/156690.png" alt="156690"><span class="id">156690</span><span class="src">GW2 UI</span><span class="desc">Timer/hourglass</span></div>
+<div class="row"><span class="num">29</span><img src="https://assets.gw2dat.com/156691.png" alt="156691"><span class="id">156691</span><span class="src">GW2 UI</span><span class="desc">Clock variant</span></div>
+<div class="row"><span class="num">30</span><img src="https://assets.gw2dat.com/156740.png" alt="156740"><span class="id">156740</span><span class="src">GW2 UI</span><span class="desc">Trophy/rank icon</span></div>
+<div class="row"><span class="num">31</span><img src="https://assets.gw2dat.com/156741.png" alt="156741"><span class="id">156741</span><span class="src">GW2 UI</span><span class="desc">Trophy/achievement variant</span></div>
+<div class="row"><span class="num">32</span><img src="https://assets.gw2dat.com/156686.png" alt="156686"><span class="id">156686</span><span class="src">GW2 UI</span><span class="desc">Chart/graph icon</span></div>
+<div class="row"><span class="num">33</span><img src="https://assets.gw2dat.com/156736.png" alt="156736"><span class="id">156736</span><span class="src">GW2 UI</span><span class="desc">Gear/cog (same as #1)</span></div>
+<div class="row"><span class="num">34</span><img src="https://assets.gw2dat.com/156742.png" alt="156742"><span class="id">156742</span><span class="src">GW2 UI</span><span class="desc">Wrench/tools icon</span></div>
+<div class="row"><span class="num">35</span><img src="https://assets.gw2dat.com/156743.png" alt="156743"><span class="id">156743</span><span class="src">GW2 UI</span><span class="desc">Info circle icon</span></div>
+<div class="row"><span class="num">36</span><img src="https://assets.gw2dat.com/156744.png" alt="156744"><span class="id">156744</span><span class="src">Trading Post</span><span class="desc">Trading Post / commerce icon</span></div>
+<div class="row"><span class="num">37</span><img src="https://assets.gw2dat.com/156745.png" alt="156745"><span class="id">156745</span><span class="src">Trading Post</span><span class="desc">Trading icon variant</span></div>
+<div class="row"><span class="num">38</span><img src="https://assets.gw2dat.com/156746.png" alt="156746"><span class="id">156746</span><span class="src">Trading Post</span><span class="desc">Coins/gold icon</span></div>
+<div class="row"><span class="num">39</span><img src="https://assets.gw2dat.com/156749.png" alt="156749"><span class="id">156749</span><span class="src">GW2 UI</span><span class="desc">Eye/view icon</span></div>
+<div class="row"><span class="num">40</span><img src="https://assets.gw2dat.com/156750.png" alt="156750"><span class="id">156750</span><span class="src">GW2 UI</span><span class="desc">Arrow/navigation icon</span></div>
+<div class="row"><span class="num">41</span><img src="https://assets.gw2dat.com/156752.png" alt="156752"><span class="id">156752</span><span class="src">GW2 UI</span><span class="desc">Search/magnifying glass</span></div>
+<div class="row"><span class="num">42</span><img src="https://assets.gw2dat.com/156754.png" alt="156754"><span class="id">156754</span><span class="src">GW2 UI</span><span class="desc">Refresh/cycle icon</span></div>
+<div class="row"><span class="num">43</span><img src="https://assets.gw2dat.com/156755.png" alt="156755"><span class="id">156755</span><span class="src">GW2 UI</span><span class="desc">Shield/security icon</span></div>
+<div class="row"><span class="num">44</span><img src="https://assets.gw2dat.com/156756.png" alt="156756"><span class="id">156756</span><span class="src">GW2 UI</span><span class="desc">Person/character icon</span></div>
+<div class="row"><span class="num">45</span><img src="https://assets.gw2dat.com/156704.png" alt="156704"><span class="id">156704</span><span class="src">GW2 Crafting</span><span class="desc">Crafting UI element</span></div>
+<div class="row"><span class="num">46</span><img src="https://assets.gw2dat.com/156705.png" alt="156705"><span class="id">156705</span><span class="src">GW2 Crafting</span><span class="desc">Crafting UI element variant</span></div>
+<div class="row"><span class="num">47</span><img src="https://assets.gw2dat.com/156706.png" alt="156706"><span class="id">156706</span><span class="src">GW2 Crafting</span><span class="desc">Crafting UI element variant 2</span></div>
+<div class="row"><span class="num">48</span><img src="https://assets.gw2dat.com/102392.png" alt="102392"><span class="id">102392</span><span class="src">Emblem</span><span class="desc">Event boss - Event Table's emblem</span></div>
+<div class="row"><span class="num">49</span><img src="https://assets.gw2dat.com/155997.png" alt="155997"><span class="id">155997</span><span class="src">Window</span><span class="desc">Window background texture</span></div>
+<div class="row"><span class="num">50</span><img src="https://assets.gw2dat.com/605026.png" alt="605026"><span class="id">605026</span><span class="src">Window</span><span class="desc">Sidebar split line texture</span></div>
+
+</body>
+</html>

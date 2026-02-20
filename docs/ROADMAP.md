@@ -569,3 +569,41 @@ M12 introduces an account-item index with per-source location data. M16 leverage
 #### Reference Requests
 - GW2 in-game bank and material storage UI for layout inspiration (tabbed storage groups, grid vs list)
 - gw2efficiency account page for feature comparison (what grouping/sorting/filtering options do users expect?)
+
+---
+
+### M17: Visual Parity with Event Table
+
+**Lane**: 1 (UI)
+**Branch**: m17-visual-parity
+**Dependencies**: M14
+
+#### Problem Statement
+The module's window uses a custom `ShellView` with manual tab rendering (text labels, flat panels, hardcoded dark colors) inside a `ResizableModuleWindow` (extends `StandardWindow`). This looks noticeably different from other polished Blish HUD modules like Event Table, which use the built-in `TabbedWindow2` control for native GW2-style window chrome, icon-based sidebar tabs, and an overlapping emblem badge.
+
+#### Scope
+- Replace `ResizableModuleWindow` + `ShellView` with `TabbedWindow2`
+- Icon-based sidebar tabs with tooltip names (matching Event Table's pattern)
+- Large app emblem in top-left corner (overlapping sidebar)
+- GW2-native window textures, borders, title bar, sidebar rendering
+- Preserve all resize behavior and minimum size enforcement
+- Preserve all existing functionality -- pure presentation-layer change
+- Create `ViewAdapter` (thin `View` wrapper) to bridge existing `Build(Container)` classes to `TabbedWindow2`'s `Func<IView>` tab interface
+
+#### Non-Goals
+- Backend, service, model, or contract changes
+- Crafting logic, plan solver, or pricing changes
+- Font or typography changes (deferred unless trivially achievable)
+- New features or functional behavior changes
+
+#### Acceptance Criteria (Verifiable)
+- [ ] Window renders with GW2-native chrome (title bar, sidebar, split line, fade gradient)
+- [ ] Sidebar tabs are icon-only with tooltip names on hover
+- [ ] App emblem displays in top-left, overlapping sidebar area
+- [ ] All existing tabs function identically to current behavior
+- [ ] Window resize enforces minimum size and persists position/size
+- [ ] No visible flicker on tab switch
+- [ ] No performance regression (frame rate, resize latency)
+- [ ] Corner icon toggles window as before
+- [ ] Build passes (0 errors, 0 warnings)
+- [ ] All existing tests pass

@@ -50,6 +50,10 @@ namespace GW2CraftingHelper
         private ModalDialog _modalDialog;
         private ShellView _shellView;
 
+        // M17 spike: TabbedWindow2 alongside existing window for validation
+        private ResizableTabbedWindow _spikeWindow;
+        private MainView _spikeSnapshotContent;
+
         private ModuleSettings _settings;
         private SnapshotStore _snapshotStore;
         private StatusStore _statusStore;
@@ -64,6 +68,7 @@ namespace GW2CraftingHelper
         private VendorOfferStore _vendorOfferStore;
         private IItemSearchProvider _itemSearchProvider;
         private Texture2D _moduleIconTexture;
+        private Texture2D _emblemTexture;
 
         private CancellationTokenSource _refreshCts;
         private bool _refreshInProgress;
@@ -191,6 +196,15 @@ namespace GW2CraftingHelper
                 _moduleIconTexture = ContentService.Textures.Error;
             }
 
+            try
+            {
+                _emblemTexture = ContentsManager.GetTexture("emblem.png");
+            }
+            catch
+            {
+                _emblemTexture = _moduleIconTexture;
+            }
+
             _mainWindow = new ResizableModuleWindow(
                 AsyncTexture2D.FromAssetId(155997),
                 new Rectangle(25, 26, 560, 640),
@@ -271,6 +285,44 @@ namespace GW2CraftingHelper
 
                 _mainWindow.ToggleWindow(_shellView);
             };
+
+            // M17 spike: TabbedWindow2 with Snapshot tab only
+            // Minimum size (930x710) matches the window region intentionally.
+            // Validated in-game to align with Event Table / Blish HUD's own
+            // TabbedWindow dimensions and the 1024x1024 background texture (502049).
+            _spikeWindow = new ResizableTabbedWindow(
+                AsyncTexture2D.FromAssetId(502049),
+                new Rectangle(35, 26, 930, 710),
+                new Rectangle(81, 11, 884, 710),
+                new Point(930, 710))
+            {
+                Parent = GameService.Graphics.SpriteScreen,
+                Title = "GW2 Crafting Helper (Spike)",
+                Emblem = new AsyncTexture2D(_emblemTexture),
+                Id = $"{nameof(Module)}_SpikeWindow_m17",
+                SavesPosition = true
+            };
+
+            _spikeSnapshotContent = new MainView(
+                _currentSnapshot,
+                _lastStatus,
+                UserRefreshAsync,
+                ClearCache,
+                SaveStatus
+            );
+
+            _spikeWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(156699),
+                () => new ViewAdapter("Snapshot", c => _spikeSnapshotContent.Build(c)),
+                "Snapshot"));
+
+            // Right-click corner icon toggles spike window
+            _cornerIcon.RightMouseButtonPressed += (s, e) =>
+            {
+                _spikeSnapshotContent.SetSnapshot(_currentSnapshot);
+                _spikeSnapshotContent.SetStatus(_lastStatus);
+                _spikeWindow.ToggleWindow();
+            };
         }
 
         protected override async Task LoadAsync()
@@ -293,6 +345,9 @@ namespace GW2CraftingHelper
                 _snapshotDirty = false;
                 _shellView?.SetSnapshot(_pendingSnapshot);
                 _shellView?.SetStatus(_lastStatus);
+                // M17 spike: push updates to spike window's snapshot view
+                _spikeSnapshotContent?.SetSnapshot(_pendingSnapshot);
+                _spikeSnapshotContent?.SetStatus(_lastStatus);
             }
 
             if (_refreshInProgress) return;
@@ -314,6 +369,7 @@ namespace GW2CraftingHelper
             _modalDialog?.Dispose();
             _cornerIcon?.Dispose();
             _mainWindow?.Dispose();
+            _spikeWindow?.Dispose();
         }
 
         private void OnSubtokenUpdated(object sender, ValueEventArgs<IEnumerable<Gw2Sharp.WebApi.V2.Models.TokenPermission>> e)
