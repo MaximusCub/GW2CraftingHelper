@@ -1,7 +1,7 @@
 # GW2CraftingHelper — Roadmap
 
 > **Supersedes** all prior plan documents (now archived in `docs/archive/plans/2026-02-15/`).
-> **Status date**: 2026-02-15
+> **Status date**: 2026-02-19
 
 ---
 
@@ -23,6 +23,23 @@
 | M5 | Recipe metadata (disciplines, rating, flags) |
 | M6 | Inventory reducer (use-own-materials toggle) |
 | M7 | Pipeline integration + structured `CraftingPlanResult` |
+
+### Phase C — Correctness, Performance & Search (Milestones 9-13)
+
+| Milestone | What shipped |
+|-----------|-------------|
+| M9 | Plan view correctness -- discipline derivation, Rift Essence normalization, collapse reflow, recipe enrichment |
+| M10 | Plan generation performance -- progress reporting, phase timing, profiling harness, concurrent fetching, seeded recipe cache |
+| M11 | Crafting tree visualization -- collapsible tree DTO, solver-annotated nodes, tree rendering panel |
+| M12 | Account data & material sourcing -- per-source item index, `UsedMaterial` enrichment, priority-based reduction |
+| M13 | Item selection & search -- real `IItemSearchProvider`, prefix/substring matching, seed-based index |
+
+### Phase D — Navigation & Tooling (Milestones 14-15)
+
+| Milestone | What shipped |
+|-----------|-------------|
+| M14 | Left-hand navigation tabs -- `ShellView`, `TabRegistry`, vertical tab panel, state-preserving tab switching |
+| M15 | Mystic Forge recipe seeder -- wiki SMW scraper tool, 1590 recipes generated, deterministic output |
 
 ### Additional Completed Work
 
@@ -128,7 +145,7 @@ Milestones are planned and filled in as work begins. Each milestone follows this
 
 > **Note**: Acceptance criteria must be **verifiable** — either via automated tests or observable in-game behavior. Avoid subjective criteria like "works correctly".
 
-### M9: Plan View Correctness & Integrity
+### M9: Plan View Correctness & Integrity (COMPLETED - PR #13)
 
 **Branch**: m9-plan-correctness
 **Dependencies**: None
@@ -182,7 +199,7 @@ Additionally, the Required Recipes section currently shows only recipe IDs/names
 
 ---
 
-### M10: Plan Generation Performance & Observability
+### M10: Plan Generation Performance & Observability (COMPLETED - PRs #14-19)
 
 **Branch**: m10-performance-observability
 **Dependencies**: None
@@ -244,7 +261,7 @@ Only phase 4 currently reports progress via `IProgress<PlanStatus>`.
 
 ---
 
-### M11: Crafting Tree Visualization
+### M11: Crafting Tree Visualization (COMPLETED - PR #20)
 
 **Branch**: m11-tree-visualization
 **Dependencies**: M9
@@ -305,7 +322,7 @@ The `RecipeNode` model (`Models/RecipeNode.cs`) captures the full recipe tree du
 
 ---
 
-### M12: Account Data & Material Sourcing Transparency
+### M12: Account Data & Material Sourcing Transparency (COMPLETED - PR #21)
 
 **Branch**: m12-account-sourcing
 **Dependencies**: M9
@@ -360,7 +377,7 @@ The fix requires preserving per-source item entries through the reduction pipeli
 
 ---
 
-### M13: Item Selection & Search Expansion
+### M13: Item Selection & Search Expansion (COMPLETED - PR #22)
 
 **Branch**: m13-item-search
 **Dependencies**: M9
@@ -414,7 +431,7 @@ A real provider must index all items that `CraftingPlanPipeline` can generate pl
 
 ---
 
-### M14: Navigation & Multi-Tab Expansion
+### M14: Navigation & Multi-Tab Expansion (COMPLETED - PR #23)
 
 **Branch**: m14-navigation-tabs
 **Dependencies**: M9
@@ -471,7 +488,7 @@ A proper navigation system is needed: a persistent left-hand vertical tab panel 
 
 ---
 
-### M15: Mystic Forge Recipe Seeder
+### M15: Mystic Forge Recipe Seeder (COMPLETED - PR #24)
 
 **Lane**: 3 (Central)
 **Branch**: m15-mystic-forge-seeder
