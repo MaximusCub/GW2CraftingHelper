@@ -80,6 +80,8 @@
     <Compile Include="Services\Gw2PriceApiClient.cs" />
     <Compile Include="Services\Gw2ItemApiClient.cs" />
     <Compile Include="Views\MainView.cs" />
+    <Compile Include="Views\AutocompleteTextBox.cs" />
+    <Compile Include="Views\SuggestionPanel.cs" />
     <Compile Include="Views\CraftingPlanView.cs" />
     <Compile Include="Views\ResizableModuleWindow.cs" />
     <Compile Include="Views\ModalDialog.cs" />

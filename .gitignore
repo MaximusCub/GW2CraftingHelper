@@ -368,4 +368,5 @@ packages/
 *.runtimeconfig.json
 *.runtimeconfig.dev.json
 
-
+# MysticForgeSeeder intermediate cache
+ref/mf_item_id_cache.json

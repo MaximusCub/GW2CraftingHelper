@@ -33,9 +33,6 @@ namespace GW2CraftingHelper.Views
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
 
-        // Populated from IItemSearchProvider on view build
-        private IReadOnlyList<ItemSearchResult> _itemChoices = Array.Empty<ItemSearchResult>();
-
         private PlanViewModel _currentPlan;
         private DateTime _planGeneratedAt;
         private bool _useOwnMaterials;
@@ -52,7 +49,8 @@ namespace GW2CraftingHelper.Views
         // UI controls (stored for resize handler)
         private Panel _inputPanel;
         private Panel _controlsPanel;
-        private Dropdown _itemDropdown;
+        private AutocompleteTextBox _searchBox;
+        private SuggestionPanel _suggestionPanel;
         private TextBox _qtyInput;
         private Checkbox _ownMaterialsCheckbox;
         private StandardButton _generateButton;
@@ -81,35 +79,19 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private async void PopulateDropdownAsync()
+        private void OnSelectedItemChanged(int itemId)
         {
-            try
-            {
-                _itemChoices = await _itemSearchProvider.SearchAsync(
-                    "", 100, CancellationToken.None);
-
-                foreach (var item in _itemChoices)
-                {
-                    _itemDropdown.Items.Add(item.Name);
-                }
-
-                if (_itemChoices.Count > 0)
-                {
-                    _itemDropdown.SelectedItem = _itemChoices[0].Name;
-                    _selectedItemId = _itemChoices[0].ItemId;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn(ex, "Failed to populate item dropdown");
-            }
+            _selectedItemId = itemId;
         }
 
         public void Build(Container buildPanel)
         {
+            // Clean up screen-parented popup from previous build cycle
+            _suggestionPanel?.Dispose();
+
             int w = buildPanel.ContentRegion.Width;
 
-            // Input row: dropdown + quantity
+            // Input row: search box + quantity
             _inputPanel = new Panel()
             {
                 Size = new Point(w, RowHeight),
@@ -117,24 +99,18 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
-            _itemDropdown = new Dropdown()
+            _searchBox = new AutocompleteTextBox()
             {
+                PlaceholderText = "Search items...",
                 Size = new Point(200, 28),
                 Location = new Point(0, 3),
                 Parent = _inputPanel
             };
-            PopulateDropdownAsync();
-            _itemDropdown.ValueChanged += (_, __) =>
+
+            _suggestionPanel = new SuggestionPanel(_searchBox, _itemSearchProvider);
+            _suggestionPanel.ItemSelected += (_, args) =>
             {
-                if (_itemDropdown.SelectedItem != null)
-                {
-                    var match = _itemChoices.FirstOrDefault(
-                        i => i.Name == _itemDropdown.SelectedItem);
-                    if (match != null)
-                    {
-                        _selectedItemId = match.ItemId;
-                    }
-                }
+                OnSelectedItemChanged(args.ItemId);
             };
 
             new Label()
