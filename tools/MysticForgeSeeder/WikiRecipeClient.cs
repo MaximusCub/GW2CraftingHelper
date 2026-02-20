@@ -456,9 +456,12 @@ namespace MysticForgeSeeder
 
         /// <summary>
         /// Safely reads an integer from a JsonElement.
-        /// Handles both integer and floating-point JSON numbers
-        /// (wiki SMW sometimes returns 1.0 instead of 1).
-        /// Rejects non-whole doubles (e.g. 1.2) and out-of-range values.
+        /// The GW2 Wiki SMW API serialises all numeric printout values as
+        /// JSON floats (e.g. 1.0 instead of 1) because the underlying
+        /// MediaWiki property type is "Quantity". System.Text.Json treats
+        /// these as non-integer, so TryGetInt32 fails and we must fall back
+        /// to TryGetDouble. We still validate that the value is a whole
+        /// number within int range to avoid silently truncating bad data.
         /// </summary>
         private static bool TryReadInt(JsonElement el, out int value)
         {
