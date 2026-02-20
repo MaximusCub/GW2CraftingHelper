@@ -17,6 +17,7 @@
 - Avoid unrelated refactors or formatting churn
 - Follow existing patterns in neighboring files before introducing new structure
 - **ASCII-only in source (.cs):** Source files must contain only ASCII characters (U+0000-U+007F). Do not paste raw Unicode into code, comments, or string literals. If Unicode must be shown at runtime (UI glyphs, item names, etc.), represent it using escapes (e.g., `"\u25BC"` / `"\u25B6"`) or data returned by the GW2 API.
+- **No em-dashes in source or config:** Never use em-dash (`\u2014`) in source code, comments, string literals, config files, test code, or any non-user-facing text unless specifically required. Use a plain ASCII hyphen (`-`) or double-hyphen (`--`) instead. Em-dashes are only acceptable in correctly-encoded user presentation layers (e.g., UI text rendered via BlishHUD controls).
 
 ---
 
