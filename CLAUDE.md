@@ -7,6 +7,7 @@
 - `.csproj` uses explicit `<Compile Include>` - new `.cs` files must be registered
 - Changes must be incremental with logical git commits
 - Prefer one commit per logical step (e.g., refactor, behavior change, tests, UI polish)
+- **Browser automation**: Do not use Chrome/browser MCP tools without asking the user first
 
 ---
 

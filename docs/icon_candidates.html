@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>M17 Icon Candidates - GW2 Crafting Helper</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; margin: 20px; }
+  h1 { color: #f0c040; border-bottom: 2px solid #f0c040; padding-bottom: 8px; }
+  h2 { color: #c0a040; margin-top: 32px; }
+  .note { background: #2a2a3e; border-left: 3px solid #f0c040; padding: 10px 14px; margin: 12px 0; font-size: 13px; }
+  .copy-block { background: #0d0d1a; border: 1px solid #444; padding: 12px; font-family: monospace; font-size: 14px; white-space: pre-line; margin: 12px 0; user-select: all; cursor: text; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
+  .card { background: #2a2a3e; border: 1px solid #444; border-radius: 6px; padding: 14px; display: flex; align-items: center; gap: 14px; }
+  .card:hover { border-color: #f0c040; }
+  .card img { width: 64px; height: 64px; image-rendering: pixelated; background: #111; border: 1px solid #333; flex-shrink: 0; }
+  .card .info { flex: 1; }
+  .card .num { font-size: 22px; font-weight: bold; color: #f0c040; width: 30px; text-align: right; flex-shrink: 0; }
+  .card .id { font-family: monospace; font-size: 16px; color: #8cf; user-select: all; }
+  .card .url { font-family: monospace; font-size: 10px; color: #888; word-break: break-all; user-select: all; }
+  .card .use { font-size: 12px; color: #aaa; margin-top: 4px; }
+  .section-label { display: inline-block; background: #f0c040; color: #1a1a2e; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; margin-bottom: 4px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+  th, td { border: 1px solid #444; padding: 6px 10px; text-align: left; }
+  th { background: #2a2a3e; color: #f0c040; }
+</style>
+</head>
+<body>
+
+<h1>M17 Icon Candidates - GW2 Crafting Helper</h1>
+
+<div class="note">
+  <strong>Note:</strong> Previews load from assets.gw2dat.com and may fail or be rate-limited.
+  Use the asset IDs and URLs below to look up icons directly. Each ID can be loaded via
+  <code>AsyncTexture2D.FromAssetId(ID)</code> in Blish HUD code.
+</div>
+
+<h2>Our Tabs (need icon assignments)</h2>
+<table>
+  <tr><th>Tab</th><th>Current Label</th><th>Status</th></tr>
+  <tr><td>0</td><td>Snapshot</td><td>Implemented</td></tr>
+  <tr><td>1</td><td>Crafting Plan</td><td>Implemented</td></tr>
+  <tr><td>2</td><td>Log</td><td>Implemented</td></tr>
+  <tr><td>3</td><td>Plan History</td><td>Placeholder</td></tr>
+  <tr><td>4</td><td>Crafting Ranker</td><td>Placeholder</td></tr>
+  <tr><td>5</td><td>Settings</td><td>Placeholder</td></tr>
+  <tr><td>6</td><td>About</td><td>Placeholder</td></tr>
+</table>
+
+<h2>Quick Copy - All Asset IDs</h2>
+<div class="copy-block">
+156699
+156700
+156701
+156702
+156703
+156704
+156705
+156706
+156736
+156680
+156764
+157097
+605018
+759448
+1466345
+3126786
+102392
+155997
+156008
+156009
+156010
+605026
+156677
+156678
+156679
+156684
+156685
+156686
+156689
+156690
+156691
+156710
+156711
+156714
+156716
+156720
+156722
+156724
+156727
+156733
+156734
+156735
+156740
+156741
+156742
+156743
+156744
+156745
+156746
+156748
+156749
+156750
+156752
+156754
+156755
+156756
+</div>
+
+<h2>Section A: Event Table Icons (reference)</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="num">1</span>
+    <img src="https://assets.gw2dat.com/156736.png" alt="156736" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">EVENT TABLE</div>
+      <div class="id">156736</div>
+      <div class="url">https://assets.gw2dat.com/156736.png</div>
+      <div class="use">Gear/cog icon - used for "General" settings tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">2</span>
+    <img src="https://assets.gw2dat.com/605018.png" alt="605018" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">EVENT TABLE</div>
+      <div class="id">605018</div>
+      <div class="url">https://assets.gw2dat.com/605018.png</div>
+      <div class="use">Map/area pin - used for "Event Areas" tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">3</span>
+    <img src="https://assets.gw2dat.com/1466345.png" alt="1466345" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">EVENT TABLE</div>
+      <div class="id">1466345</div>
+      <div class="url">https://assets.gw2dat.com/1466345.png</div>
+      <div class="use">Bell/notification - used for "Reminders" tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">4</span>
+    <img src="https://assets.gw2dat.com/759448.png" alt="759448" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">EVENT TABLE</div>
+      <div class="id">759448</div>
+      <div class="url">https://assets.gw2dat.com/759448.png</div>
+      <div class="use">Dynamic event marker - used for "Dynamic Events" tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">5</span>
+    <img src="https://assets.gw2dat.com/3126786.png" alt="3126786" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">EVENT TABLE</div>
+      <div class="id">3126786</div>
+      <div class="url">https://assets.gw2dat.com/3126786.png</div>
+      <div class="use">Timer/clock - used for "Event Timers" tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">6</span>
+    <img src="https://assets.gw2dat.com/156680.png" alt="156680" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">EVENT TABLE</div>
+      <div class="id">156680</div>
+      <div class="url">https://assets.gw2dat.com/156680.png</div>
+      <div class="use">Arrow/upload - used for "Self Hosting Events" tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">7</span>
+    <img src="https://assets.gw2dat.com/156764.png" alt="156764" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">EVENT TABLE</div>
+      <div class="id">156764</div>
+      <div class="url">https://assets.gw2dat.com/156764.png</div>
+      <div class="use">Blish/brand icon - used for "Estreya BlishHUD" tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">8</span>
+    <img src="https://assets.gw2dat.com/157097.png" alt="157097" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">EVENT TABLE</div>
+      <div class="id">157097</div>
+      <div class="url">https://assets.gw2dat.com/157097.png</div>
+      <div class="use">Question mark/help - used for "Help" tab</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Section B: Snapshot / Bank / Inventory Icons</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="num">9</span>
+    <img src="https://assets.gw2dat.com/156699.png" alt="156699" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156699</div>
+      <div class="url">https://assets.gw2dat.com/156699.png</div>
+      <div class="use">Bank vault icon - good for Snapshot tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">10</span>
+    <img src="https://assets.gw2dat.com/156700.png" alt="156700" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156700</div>
+      <div class="url">https://assets.gw2dat.com/156700.png</div>
+      <div class="use">Bank tab icon variant</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">11</span>
+    <img src="https://assets.gw2dat.com/156701.png" alt="156701" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156701</div>
+      <div class="url">https://assets.gw2dat.com/156701.png</div>
+      <div class="use">Backpack/inventory icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">12</span>
+    <img src="https://assets.gw2dat.com/156677.png" alt="156677" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156677</div>
+      <div class="url">https://assets.gw2dat.com/156677.png</div>
+      <div class="use">Chest/storage icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">13</span>
+    <img src="https://assets.gw2dat.com/156678.png" alt="156678" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156678</div>
+      <div class="url">https://assets.gw2dat.com/156678.png</div>
+      <div class="use">Chest icon variant</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Section C: Crafting / Anvil / Discipline Icons</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="num">14</span>
+    <img src="https://assets.gw2dat.com/156710.png" alt="156710" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156710</div>
+      <div class="url">https://assets.gw2dat.com/156710.png</div>
+      <div class="use">Crafting discipline icon (Armorsmith)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">15</span>
+    <img src="https://assets.gw2dat.com/156711.png" alt="156711" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156711</div>
+      <div class="url">https://assets.gw2dat.com/156711.png</div>
+      <div class="use">Crafting discipline icon (Artificer)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">16</span>
+    <img src="https://assets.gw2dat.com/156714.png" alt="156714" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156714</div>
+      <div class="url">https://assets.gw2dat.com/156714.png</div>
+      <div class="use">Crafting discipline icon (Chef)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">17</span>
+    <img src="https://assets.gw2dat.com/156716.png" alt="156716" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156716</div>
+      <div class="url">https://assets.gw2dat.com/156716.png</div>
+      <div class="use">Crafting discipline icon (Huntsman)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">18</span>
+    <img src="https://assets.gw2dat.com/156720.png" alt="156720" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156720</div>
+      <div class="url">https://assets.gw2dat.com/156720.png</div>
+      <div class="use">Crafting discipline icon (Jeweler)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">19</span>
+    <img src="https://assets.gw2dat.com/156722.png" alt="156722" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156722</div>
+      <div class="url">https://assets.gw2dat.com/156722.png</div>
+      <div class="use">Crafting discipline icon (Leatherworker)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">20</span>
+    <img src="https://assets.gw2dat.com/156724.png" alt="156724" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156724</div>
+      <div class="url">https://assets.gw2dat.com/156724.png</div>
+      <div class="use">Crafting discipline icon (Scribe)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">21</span>
+    <img src="https://assets.gw2dat.com/156727.png" alt="156727" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156727</div>
+      <div class="url">https://assets.gw2dat.com/156727.png</div>
+      <div class="use">Crafting discipline icon (Tailor)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">22</span>
+    <img src="https://assets.gw2dat.com/156733.png" alt="156733" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156733</div>
+      <div class="url">https://assets.gw2dat.com/156733.png</div>
+      <div class="use">Crafting discipline icon (Weaponsmith)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">23</span>
+    <img src="https://assets.gw2dat.com/156702.png" alt="156702" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156702</div>
+      <div class="url">https://assets.gw2dat.com/156702.png</div>
+      <div class="use">Anvil/crafting station icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">24</span>
+    <img src="https://assets.gw2dat.com/156703.png" alt="156703" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156703</div>
+      <div class="url">https://assets.gw2dat.com/156703.png</div>
+      <div class="use">Mystic Forge icon</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Section D: Log / Document / Scroll Icons</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="num">25</span>
+    <img src="https://assets.gw2dat.com/156734.png" alt="156734" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156734</div>
+      <div class="url">https://assets.gw2dat.com/156734.png</div>
+      <div class="use">Scroll/document - good for Log tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">26</span>
+    <img src="https://assets.gw2dat.com/156735.png" alt="156735" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156735</div>
+      <div class="url">https://assets.gw2dat.com/156735.png</div>
+      <div class="use">Scroll icon variant</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">27</span>
+    <img src="https://assets.gw2dat.com/156684.png" alt="156684" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156684</div>
+      <div class="url">https://assets.gw2dat.com/156684.png</div>
+      <div class="use">Book/journal icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">28</span>
+    <img src="https://assets.gw2dat.com/156685.png" alt="156685" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156685</div>
+      <div class="url">https://assets.gw2dat.com/156685.png</div>
+      <div class="use">Book icon variant</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Section E: History / Clock / Timer Icons</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="num">29</span>
+    <img src="https://assets.gw2dat.com/156689.png" alt="156689" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156689</div>
+      <div class="url">https://assets.gw2dat.com/156689.png</div>
+      <div class="use">Clock/history icon - good for Plan History tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">30</span>
+    <img src="https://assets.gw2dat.com/156690.png" alt="156690" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156690</div>
+      <div class="url">https://assets.gw2dat.com/156690.png</div>
+      <div class="use">Timer/hourglass icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">31</span>
+    <img src="https://assets.gw2dat.com/156691.png" alt="156691" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156691</div>
+      <div class="url">https://assets.gw2dat.com/156691.png</div>
+      <div class="use">Clock variant</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Section F: Ranking / Chart / Stats Icons</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="num">32</span>
+    <img src="https://assets.gw2dat.com/156740.png" alt="156740" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156740</div>
+      <div class="url">https://assets.gw2dat.com/156740.png</div>
+      <div class="use">Trophy/rank - good for Crafting Ranker tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">33</span>
+    <img src="https://assets.gw2dat.com/156741.png" alt="156741" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156741</div>
+      <div class="url">https://assets.gw2dat.com/156741.png</div>
+      <div class="use">Trophy/achievement icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">34</span>
+    <img src="https://assets.gw2dat.com/156686.png" alt="156686" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156686</div>
+      <div class="url">https://assets.gw2dat.com/156686.png</div>
+      <div class="use">Chart/graph icon</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Section G: Settings / Gear / Info Icons</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="num">35</span>
+    <img src="https://assets.gw2dat.com/156736.png" alt="156736" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156736</div>
+      <div class="url">https://assets.gw2dat.com/156736.png</div>
+      <div class="use">Gear/cog - canonical Settings icon (same as Event Table)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">36</span>
+    <img src="https://assets.gw2dat.com/156742.png" alt="156742" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156742</div>
+      <div class="url">https://assets.gw2dat.com/156742.png</div>
+      <div class="use">Wrench/tools icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">37</span>
+    <img src="https://assets.gw2dat.com/157097.png" alt="157097" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">157097</div>
+      <div class="url">https://assets.gw2dat.com/157097.png</div>
+      <div class="use">Question mark/help - canonical About/Help icon (same as Event Table)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">38</span>
+    <img src="https://assets.gw2dat.com/156743.png" alt="156743" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156743</div>
+      <div class="url">https://assets.gw2dat.com/156743.png</div>
+      <div class="use">Info circle icon</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Section H: Trading Post / Commerce Icons</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="num">39</span>
+    <img src="https://assets.gw2dat.com/156744.png" alt="156744" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156744</div>
+      <div class="url">https://assets.gw2dat.com/156744.png</div>
+      <div class="use">Trading Post / commerce icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">40</span>
+    <img src="https://assets.gw2dat.com/156745.png" alt="156745" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156745</div>
+      <div class="url">https://assets.gw2dat.com/156745.png</div>
+      <div class="use">Trading icon variant</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">41</span>
+    <img src="https://assets.gw2dat.com/156746.png" alt="156746" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156746</div>
+      <div class="url">https://assets.gw2dat.com/156746.png</div>
+      <div class="use">Coins/gold icon</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Section I: Misc GW2 UI Icons</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="num">42</span>
+    <img src="https://assets.gw2dat.com/156748.png" alt="156748" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156748</div>
+      <div class="url">https://assets.gw2dat.com/156748.png</div>
+      <div class="use">Star/favorite icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">43</span>
+    <img src="https://assets.gw2dat.com/156749.png" alt="156749" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156749</div>
+      <div class="url">https://assets.gw2dat.com/156749.png</div>
+      <div class="use">Eye/view icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">44</span>
+    <img src="https://assets.gw2dat.com/156750.png" alt="156750" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156750</div>
+      <div class="url">https://assets.gw2dat.com/156750.png</div>
+      <div class="use">Arrow/navigation icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">45</span>
+    <img src="https://assets.gw2dat.com/156752.png" alt="156752" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156752</div>
+      <div class="url">https://assets.gw2dat.com/156752.png</div>
+      <div class="use">Search/magnifying glass</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">46</span>
+    <img src="https://assets.gw2dat.com/156754.png" alt="156754" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156754</div>
+      <div class="url">https://assets.gw2dat.com/156754.png</div>
+      <div class="use">Refresh/cycle icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">47</span>
+    <img src="https://assets.gw2dat.com/156755.png" alt="156755" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156755</div>
+      <div class="url">https://assets.gw2dat.com/156755.png</div>
+      <div class="use">Shield/security icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">48</span>
+    <img src="https://assets.gw2dat.com/156756.png" alt="156756" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="id">156756</div>
+      <div class="url">https://assets.gw2dat.com/156756.png</div>
+      <div class="use">Person/character icon</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">49</span>
+    <img src="https://assets.gw2dat.com/102392.png" alt="102392" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">EMBLEM</div>
+      <div class="id">102392</div>
+      <div class="url">https://assets.gw2dat.com/102392.png</div>
+      <div class="use">Event boss icon - Event Table's emblem (reference only)</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Section J: Window Chrome Textures (reference only)</h2>
+<div class="grid">
+
+  <div class="card">
+    <span class="num">50</span>
+    <img src="https://assets.gw2dat.com/155997.png" alt="155997" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">WINDOW</div>
+      <div class="id">155997</div>
+      <div class="url">https://assets.gw2dat.com/155997.png</div>
+      <div class="use">Window background texture (both modules use this)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">51</span>
+    <img src="https://assets.gw2dat.com/605026.png" alt="605026" onerror="this.alt='[load failed]';this.style.opacity=0.3">
+    <div class="info">
+      <div class="section-label">WINDOW</div>
+      <div class="id">605026</div>
+      <div class="url">https://assets.gw2dat.com/605026.png</div>
+      <div class="use">Sidebar split line texture</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
