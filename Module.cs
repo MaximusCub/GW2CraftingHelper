@@ -287,6 +287,9 @@ namespace GW2CraftingHelper
             };
 
             // M17 spike: TabbedWindow2 with Snapshot tab only
+            // Minimum size (930x710) matches the window region intentionally.
+            // Validated in-game to align with Event Table / Blish HUD's own
+            // TabbedWindow dimensions and the 1024x1024 background texture (502049).
             _spikeWindow = new ResizableTabbedWindow(
                 AsyncTexture2D.FromAssetId(502049),
                 new Rectangle(35, 26, 930, 710),
