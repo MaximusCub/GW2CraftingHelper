@@ -327,7 +327,7 @@ The fix requires preserving per-source item entries through the reduction pipeli
 - **Lane 2**: Surface per-material sourcing information in `CraftingPlanResult` so `PlanViewModelBuilder` can consume it
 
 #### Non-Goals
-- UI rendering of sourcing information (Lane 1 concern, deferred to future milestone or M15)
+- UI rendering of sourcing information (Lane 1 concern, deferred to future milestone or M16)
 - Configurable source priority order (hardcoded priority is sufficient)
 - Real-time inventory tracking (snapshot-based only)
 - Modifying `SnapshotHelpers.AggregateItems` — it remains available for contexts where aggregation is appropriate (e.g., snapshot display)
@@ -471,15 +471,42 @@ A proper navigation system is needed: a persistent left-hand vertical tab panel 
 
 ---
 
-### M15: Snapshot → Account Explorer Evolution
+### M15: Mystic Forge Recipe Seeder
 
-**Branch**: m15-account-explorer
+**Lane**: 3 (Central)
+**Branch**: m15-mystic-forge-seeder
+**Dependencies**: None
+
+#### Problem Statement
+`ref/mystic_forge_recipes.json` has only 4 hand-crafted recipes. The GW2 API has no Mystic Forge endpoint. The GW2 Wiki has ~2,534 MF recipe entries queryable via Semantic MediaWiki. A seeder tool is needed to scrape the wiki, resolve item IDs, and generate the complete recipe file so items like "Orrax Manifested" appear in autocomplete search.
+
+#### Scope
+- **New tool**: `tools/MysticForgeSeeder/` (.NET 8.0 console app, no external NuGet packages)
+- **WikiRecipeClient**: POST-based SMW queries with retry, backoff, jitter, pagination
+- **5-step pipeline**: Query recipes, collect names, resolve IDs (with persistent cache), build recipe objects, write output
+- **Deterministic output**: Byte-identical `ref/mystic_forge_recipes.json` for unchanged wiki data + cache
+- **Safety limits**: `--max-requests`, `--delay`, `--dry-run`, `--force-resolve` CLI flags
+
+#### Acceptance Criteria
+- [ ] `ref/mystic_forge_recipes.json` has 2000+ recipes after seeder run
+- [ ] Spot-check: "Orrax Manifested", "Eternity", "Sunrise" present with correct IDs
+- [ ] All recipe IDs negative, all ingredient IDs positive
+- [ ] Repeated run produces byte-identical output (determinism invariant)
+- [ ] `ref/mf_item_id_cache.json` persists resolved IDs across runs
+- [ ] Existing RecipeSeeder, build, and tests still pass
+- [ ] Build passes (0 errors, 0 warnings)
+
+---
+
+### M16: Snapshot -> Account Explorer Evolution
+
+**Branch**: m16-account-explorer
 **Dependencies**: M12
 
 #### Problem Statement
 The current snapshot tab (`MainView`) displays a flat scrollable list of items and wallet entries. With hundreds of items across bank, material storage, and multiple characters, the flat list is unwieldy. Users cannot quickly find specific items, sort by value, or understand where their items are stored.
 
-M12 introduces an account-item index with per-source location data. M15 leverages that index to present a structured, searchable, grouped account explorer — transforming the snapshot tab from a debug-style dump into a useful inventory management view.
+M12 introduces an account-item index with per-source location data. M16 leverages that index to present a structured, searchable, grouped account explorer -- transforming the snapshot tab from a debug-style dump into a useful inventory management view.
 
 #### Scope
 - **Backend (Lane 2)**: Reuse the M12 account-item index to provide grouped views by storage location (MaterialStorage, Bank, SharedInventory, per-character)
