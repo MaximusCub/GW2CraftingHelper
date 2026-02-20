@@ -68,6 +68,7 @@ namespace GW2CraftingHelper
         private VendorOfferStore _vendorOfferStore;
         private IItemSearchProvider _itemSearchProvider;
         private Texture2D _moduleIconTexture;
+        private Texture2D _emblemTexture;
 
         private CancellationTokenSource _refreshCts;
         private bool _refreshInProgress;
@@ -195,6 +196,15 @@ namespace GW2CraftingHelper
                 _moduleIconTexture = ContentService.Textures.Error;
             }
 
+            try
+            {
+                _emblemTexture = ContentsManager.GetTexture("emblem.png");
+            }
+            catch
+            {
+                _emblemTexture = _moduleIconTexture;
+            }
+
             _mainWindow = new ResizableModuleWindow(
                 AsyncTexture2D.FromAssetId(155997),
                 new Rectangle(25, 26, 560, 640),
@@ -278,14 +288,14 @@ namespace GW2CraftingHelper
 
             // M17 spike: TabbedWindow2 with Snapshot tab only
             _spikeWindow = new ResizableTabbedWindow(
-                AsyncTexture2D.FromAssetId(155997),
+                AsyncTexture2D.FromAssetId(502049),
                 new Rectangle(35, 26, 930, 710),
                 new Rectangle(81, 11, 884, 710),
                 new Point(560, 400))
             {
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "GW2 Crafting Helper (Spike)",
-                Emblem = new AsyncTexture2D(_moduleIconTexture),
+                Emblem = new AsyncTexture2D(_emblemTexture),
                 Id = $"{nameof(Module)}_SpikeWindow_m17",
                 SavesPosition = true
             };

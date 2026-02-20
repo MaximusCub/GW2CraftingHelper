@@ -242,6 +242,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="ref\icon.png" />
+    <Content Include="ref\emblem.png" />
     <Content Include="ref\vendor_offers.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
