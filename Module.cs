@@ -291,7 +291,7 @@ namespace GW2CraftingHelper
                 AsyncTexture2D.FromAssetId(502049),
                 new Rectangle(35, 26, 930, 710),
                 new Rectangle(81, 11, 884, 710),
-                new Point(560, 400))
+                new Point(930, 710))
             {
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "GW2 Crafting Helper (Spike)",
@@ -310,7 +310,7 @@ namespace GW2CraftingHelper
 
             _spikeWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156699),
-                () => new ViewAdapter(c => _spikeSnapshotContent.Build(c)),
+                () => new ViewAdapter("Snapshot", c => _spikeSnapshotContent.Build(c)),
                 "Snapshot"));
 
             // Right-click corner icon toggles spike window
