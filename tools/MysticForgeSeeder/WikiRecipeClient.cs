@@ -458,6 +458,7 @@ namespace MysticForgeSeeder
         /// Safely reads an integer from a JsonElement.
         /// Handles both integer and floating-point JSON numbers
         /// (wiki SMW sometimes returns 1.0 instead of 1).
+        /// Rejects non-whole doubles (e.g. 1.2) and out-of-range values.
         /// </summary>
         private static bool TryReadInt(JsonElement el, out int value)
         {
@@ -467,7 +468,18 @@ namespace MysticForgeSeeder
             }
             if (el.TryGetDouble(out double d))
             {
-                value = (int)d;
+                if (d < int.MinValue || d > int.MaxValue)
+                {
+                    value = 0;
+                    return false;
+                }
+                double rounded = Math.Round(d);
+                if (Math.Abs(d - rounded) > 1e-9)
+                {
+                    value = 0;
+                    return false;
+                }
+                value = (int)rounded;
                 return true;
             }
             value = 0;
