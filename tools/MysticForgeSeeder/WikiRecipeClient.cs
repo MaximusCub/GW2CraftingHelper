@@ -105,7 +105,10 @@ namespace MysticForgeSeeder
 
                 if (root.TryGetProperty("query-continue-offset", out var continueEl))
                 {
-                    int nextOffset = continueEl.GetInt32();
+                    if (!TryReadInt(continueEl, out int nextOffset))
+                    {
+                        break;
+                    }
                     if (nextOffset <= offset)
                     {
                         break;
@@ -204,14 +207,8 @@ namespace MysticForgeSeeder
                             printouts.TryGetProperty("Has game id", out var gameIds) &&
                             gameIds.GetArrayLength() > 0)
                         {
-                            var idEl = gameIds[0];
-                            int gameId = 0;
-                            if (idEl.ValueKind == JsonValueKind.Number)
-                            {
-                                gameId = idEl.GetInt32();
-                            }
-
-                            if (gameId > 0)
+                            if (TryReadInt(gameIds[0], out int gameId) &&
+                                gameId > 0)
                             {
                                 // Log case collisions
                                 if (result.TryGetValue(canonicalName, out int existing) &&
@@ -274,11 +271,9 @@ namespace MysticForgeSeeder
             if (printouts.TryGetProperty("Has output quantity", out var qtyArr) &&
                 qtyArr.GetArrayLength() > 0)
             {
-                var qtyEl = qtyArr[0];
-                if (qtyEl.ValueKind == JsonValueKind.Number)
+                if (TryReadInt(qtyArr[0], out int val) && val > 0)
                 {
-                    int val = qtyEl.GetInt32();
-                    if (val > 0) outputQuantity = val;
+                    outputQuantity = val;
                 }
             }
 
@@ -342,11 +337,9 @@ namespace MysticForgeSeeder
                 qtyObj.TryGetProperty("item", out var qtyItems) &&
                 qtyItems.GetArrayLength() > 0)
             {
-                var qtyEl = qtyItems[0];
-                if (qtyEl.ValueKind == JsonValueKind.Number)
+                if (TryReadInt(qtyItems[0], out int val) && val > 0)
                 {
-                    int val = qtyEl.GetInt32();
-                    if (val > 0) quantity = val;
+                    quantity = val;
                 }
             }
 
@@ -356,10 +349,9 @@ namespace MysticForgeSeeder
                 idxObj.TryGetProperty("item", out var idxItems) &&
                 idxItems.GetArrayLength() > 0)
             {
-                var idxEl = idxItems[0];
-                if (idxEl.ValueKind == JsonValueKind.Number)
+                if (TryReadInt(idxItems[0], out int idx))
                 {
-                    index = idxEl.GetInt32();
+                    index = idx;
                 }
             }
 
@@ -460,6 +452,26 @@ namespace MysticForgeSeeder
 
             throw new HttpRequestException(
                 $"Failed after {MaxRetries + 1} attempts");
+        }
+
+        /// <summary>
+        /// Safely reads an integer from a JsonElement.
+        /// Handles both integer and floating-point JSON numbers
+        /// (wiki SMW sometimes returns 1.0 instead of 1).
+        /// </summary>
+        private static bool TryReadInt(JsonElement el, out int value)
+        {
+            if (el.TryGetInt32(out value))
+            {
+                return true;
+            }
+            if (el.TryGetDouble(out double d))
+            {
+                value = (int)d;
+                return true;
+            }
+            value = 0;
+            return false;
         }
 
         private static int AddJitter(int baseMs)
