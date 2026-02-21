@@ -259,6 +259,9 @@ namespace GW2CraftingHelper
                 Title = "GW2 Crafting Helper",
                 Emblem = new AsyncTexture2D(_emblemTexture),
                 Id = $"{nameof(Module)}_MainWindow",
+                Location = new Point(
+                    (GameService.Graphics.SpriteScreen.Width - 930) / 2,
+                    (GameService.Graphics.SpriteScreen.Height - 710) / 2),
                 SavesPosition = true
             };
 
