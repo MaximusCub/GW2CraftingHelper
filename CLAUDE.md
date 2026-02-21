@@ -1,9 +1,29 @@
 # GW2CraftingHelper - Project Rules
 
+## Tool Paths
+
+`dotnet` and `gh` may not be on the shell PATH. Try each location in order; use the first one that works. Do NOT search the filesystem unless all listed paths fail.
+
+### dotnet
+
+1. `"/mnt/c/Program Files/dotnet/dotnet.exe"` (WSL)
+2. `dotnet` (native Windows / on PATH)
+
+When invoking Windows `dotnet.exe` from WSL, pass **Windows-style project paths** (e.g., `C:/Dev/Blish/GW2CraftingHelper/...`) -- MSBuild cannot resolve `/mnt/` paths.
+
+### gh (GitHub CLI)
+
+1. `"/mnt/c/Program Files/GitHub CLI/gh.exe"` (WSL)
+2. `"/c/Program Files/GitHub CLI/gh.exe"` (Git Bash / MSYS2)
+3. `gh` (native Windows / on PATH)
+
+---
+
 ## Build & Test
 
-- Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64`
-- Tests: `dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+- Build: `<dotnet> build GW2CraftingHelper.csproj -p:Platform=x64`
+- Tests: `<dotnet> test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+- `<dotnet>` refers to whichever dotnet path resolved above
 - `.csproj` uses explicit `<Compile Include>` - new `.cs` files must be registered
 - Changes must be incremental with logical git commits
 - Prefer one commit per logical step (e.g., refactor, behavior change, tests, UI polish)
@@ -254,10 +274,10 @@ All review happens via GitHub Pull Requests.
 
 ## Validation
 
-Run:
+Run (using the resolved `<dotnet>` from **Tool Paths**):
 
-`dotnet build GW2CraftingHelper.csproj -p:Platform=x64`  
-`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+`<dotnet> build GW2CraftingHelper.csproj -p:Platform=x64`
+`<dotnet> test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
 
 Both must pass before PR creation.
 
@@ -269,19 +289,13 @@ Both must pass before PR creation.
 
 ## GitHub CLI (`gh`)
 
-`gh` is installed but NOT on the shell PATH. Always invoke it via its absolute path:
-
-```bash
-"/c/Program Files/GitHub CLI/gh.exe"
-```
-
-Example: `"/c/Program Files/GitHub CLI/gh.exe" pr create ...`
+Use the resolved `gh` path from the **Tool Paths** section above.
 
 ## PR Creation
 
 Use:
 
-`"/c/Program Files/GitHub CLI/gh.exe" pr create --base master --head <milestone-branch> --title "<concise milestone title>" --body-file <tempfile>`
+`<gh> pr create --base master --head <milestone-branch> --title "<concise milestone title>" --body-file <tempfile>`
 
 ### Required PR Body Template
 
