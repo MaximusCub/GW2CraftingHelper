@@ -523,7 +523,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, 28),
                 Parent = parent
             };
-            BuildCoinDisplay(rowPanel, row.CoinValue);
+            BuildCoinDisplay(rowPanel, row.CoinValue, row.Label);
         }
 
         private void CreateTextRow(string text, FlowPanel parent, int panelWidth)
@@ -1021,7 +1021,7 @@ namespace GW2CraftingHelper.Views
 
         // --- Coin display helpers (reused from original) ---
 
-        private static void BuildCoinDisplay(Panel parent, long copper)
+        private static void BuildCoinDisplay(Panel parent, long copper, string label = "Total")
         {
             if (copper < 0) copper = 0;
 
@@ -1032,7 +1032,7 @@ namespace GW2CraftingHelper.Views
             int x = 0;
             var totalLabel = new Label()
             {
-                Text = "  Total: ",
+                Text = "  " + (string.IsNullOrEmpty(label) ? "Total" : label) + ": ",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(8, 4),
