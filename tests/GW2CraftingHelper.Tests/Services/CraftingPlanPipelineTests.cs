@@ -711,6 +711,48 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task Structured_RootRecipeOverproduces_RevenueCoversWholeBatch()
+        {
+            // Recipe outputs 5 per craft; requesting 1 still costs a full
+            // craft, so all 5 produced units count as sellable revenue.
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 5,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 10000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+
+            // Craft cost: 3x100 = 300 for a batch of 5
+            Assert.Equal(300, result.Plan.TotalCoinCost);
+            Assert.Equal(5, result.SellableQuantity);
+            // Revenue: 5 x 400 = 2000 total; -100 listing -200 exchange = 1700
+            Assert.Equal(1700, result.NetSaleValue);
+            Assert.Equal(1400, result.CraftingProfit);
+        }
+
+        [Fact]
         public async Task Structured_BuyOrderBasis_MaterialsCostedAtBuyOrders()
         {
             var pipeline = BuildEconomicsPipeline(out var priceApi);

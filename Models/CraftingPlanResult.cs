@@ -23,6 +23,12 @@ namespace GW2CraftingHelper.Models
         public long? TargetUnitSellPrice { get; set; }
 
         /// <summary>
+        /// Units the plan actually produces (>= requested quantity when the
+        /// chosen root recipe over-produces). Sell-side figures use this.
+        /// </summary>
+        public int SellableQuantity { get; set; }
+
+        /// <summary>
         /// Net coin from instant-selling the crafted quantity after the 15%
         /// Trading Post fees; null when no sell price exists.
         /// </summary>

@@ -30,22 +30,33 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void NetSaleRevenue_StandardPrice_85Percent()
         {
-            // 100c: -5 listing -10 exchange = 85 per unit
+            // Total 300c: -15 listing -30 exchange = 255
             Assert.Equal(255, TradingPostMath.NetSaleRevenue(100, 3));
         }
 
         [Fact]
-        public void NetSaleRevenue_MinimumFeesCanZeroOut()
+        public void NetSaleRevenue_BulkCheapStack_FeesOnTransactionTotal()
         {
-            // 1c: both fees floor at 1c, net clamps to 0, never negative
-            Assert.Equal(0, TradingPostMath.NetSaleRevenue(1, 10));
+            // Wiki reference case: 250 units at 1c = 250c total;
+            // listing round(12.5)=13, exchange 25 -> nets 212, NOT 0.
+            // Fees are per transaction, never per unit.
+            Assert.Equal(212, TradingPostMath.NetSaleRevenue(1, 250));
         }
 
         [Fact]
-        public void NetSaleRevenue_LowPrice_FloorsAtOneCopperFees()
+        public void NetSaleRevenue_SmallCheapStack_MinimumFeesOnTotal()
         {
-            // 3c: 1c listing + 1c exchange = 1c net per unit
-            Assert.Equal(5, TradingPostMath.NetSaleRevenue(3, 5));
+            // Total 10c: both fees floor at 1c -> 8
+            Assert.Equal(8, TradingPostMath.NetSaleRevenue(1, 10));
+            // Total 15c: listing 1c (floor), exchange 2c (round 1.5 up) -> 12
+            Assert.Equal(12, TradingPostMath.NetSaleRevenue(3, 5));
+        }
+
+        [Fact]
+        public void NetSaleRevenue_SingleOneCopper_ClampsAtZero()
+        {
+            // Total 1c: 1c + 1c minimum fees exceed value -> 0, never negative
+            Assert.Equal(0, TradingPostMath.NetSaleRevenue(1, 1));
         }
 
         [Fact]

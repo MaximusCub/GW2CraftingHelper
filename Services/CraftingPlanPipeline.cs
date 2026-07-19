@@ -282,13 +282,33 @@ namespace GW2CraftingHelper.Services
             // Sell-side economics: what the crafted quantity nets after TP
             // fees, and profit versus the plan's coin cost. Coin-only by
             // design - non-coin currency costs have no coin value here.
+            // Revenue must cover what the batch actually PRODUCES: when the
+            // chosen root recipe over-produces (OutputCount does not divide
+            // the requested quantity), the plan's cost pays for the whole
+            // batch, so the extra units are sellable too.
             result.PriceBasis = priceBasis;
+            int sellableQuantity = quantity;
+            if (solveResult.Decisions.TryGetValue(treeUsedForSolve.NodeId, out var rootDecision) &&
+                rootDecision.Source == AcquisitionSource.Craft)
+            {
+                var chosenRecipe = treeUsedForSolve.Recipes
+                    .FirstOrDefault(r => r.RecipeId == rootDecision.RecipeId);
+                if (chosenRecipe != null && chosenRecipe.OutputCount > 0)
+                {
+                    int produced = chosenRecipe.CraftsNeeded * chosenRecipe.OutputCount;
+                    if (produced > sellableQuantity)
+                    {
+                        sellableQuantity = produced;
+                    }
+                }
+            }
+            result.SellableQuantity = sellableQuantity;
             if (prices.TryGetValue(targetItemId, out var targetPrice) &&
                 targetPrice.SellInstant > 0)
             {
                 result.TargetUnitSellPrice = targetPrice.SellInstant;
                 result.NetSaleValue = TradingPostMath.NetSaleRevenue(
-                    targetPrice.SellInstant, quantity);
+                    targetPrice.SellInstant, sellableQuantity);
                 result.CraftingProfit = result.NetSaleValue.Value - plan.TotalCoinCost;
             }
             sw.Stop();

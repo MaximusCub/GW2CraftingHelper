@@ -98,10 +98,13 @@ namespace GW2CraftingHelper.Services
             // Sell-side rows: only when the target has a live sell price.
             if (result.NetSaleValue.HasValue)
             {
+                string sellLabel = result.SellableQuantity > result.Plan.TargetQuantity
+                    ? $"Sell value ({result.SellableQuantity}x, after 15% TP fees)"
+                    : "Sell value (after 15% TP fees)";
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.CoinTotal,
-                    Label = "Sell value (after 15% TP fees)",
+                    Label = sellLabel,
                     CoinValue = result.NetSaleValue.Value
                 });
 

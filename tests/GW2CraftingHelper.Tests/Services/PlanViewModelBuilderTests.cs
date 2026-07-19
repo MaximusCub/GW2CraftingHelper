@@ -748,6 +748,19 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void OverproducedBatch_SellRowShowsActualQuantity()
+        {
+            var result = MakeResult(targetQuantity: 1, totalCoinCost: 300);
+            result.SellableQuantity = 5;
+            result.NetSaleValue = 1700;
+            result.CraftingProfit = 1400;
+
+            var vm = _builder.Build(result);
+
+            Assert.Equal("Sell value (5x, after 15% TP fees)", vm.Sections[0].Rows[1].Label);
+        }
+
+        [Fact]
         public void BuyOrderBasis_TotalRowLabeled()
         {
             var result = MakeResult(totalCoinCost: 100);

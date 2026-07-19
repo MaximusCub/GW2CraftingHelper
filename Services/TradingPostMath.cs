@@ -4,34 +4,36 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Trading Post fee arithmetic. GW2 charges a 5% listing fee and a 10%
-    /// exchange tax on sale, each rounded half-up with a 1 copper minimum
-    /// (per the GW2 wiki's Trading Post documentation). Fees are computed
-    /// per unit, matching how the game charges per listed item.
+    /// exchange tax, each computed on the TOTAL sale value of the
+    /// transaction, rounded half-up with a 1 copper minimum per fee (per
+    /// the GW2 wiki's Trading Post documentation). Fees must not be applied
+    /// per unit: a 250-stack of 1c items nets ~212c, not 0.
     /// </summary>
     public static class TradingPostMath
     {
-        public static long ListingFee(long unitPrice)
+        public static long ListingFee(long totalValue)
         {
-            if (unitPrice <= 0)
+            if (totalValue <= 0)
             {
                 return 0;
             }
-            return Math.Max(1L, RoundHalfUp(unitPrice, 5));
+            return Math.Max(1L, RoundHalfUp(totalValue, 5));
         }
 
-        public static long ExchangeFee(long unitPrice)
+        public static long ExchangeFee(long totalValue)
         {
-            if (unitPrice <= 0)
+            if (totalValue <= 0)
             {
                 return 0;
             }
-            return Math.Max(1L, RoundHalfUp(unitPrice, 10));
+            return Math.Max(1L, RoundHalfUp(totalValue, 10));
         }
 
         /// <summary>
         /// Net copper received for selling <paramref name="quantity"/> units
-        /// at <paramref name="unitPrice"/> after both fees. Returns 0 for
-        /// non-positive prices or quantities.
+        /// at <paramref name="unitPrice"/> in one transaction, after both
+        /// fees on the total. Returns 0 for non-positive prices/quantities;
+        /// never negative.
         /// </summary>
         public static long NetSaleRevenue(long unitPrice, int quantity)
         {
@@ -40,12 +42,9 @@ namespace GW2CraftingHelper.Services
                 return 0;
             }
 
-            long netPerUnit = unitPrice - ListingFee(unitPrice) - ExchangeFee(unitPrice);
-            if (netPerUnit < 0)
-            {
-                netPerUnit = 0;
-            }
-            return netPerUnit * quantity;
+            long totalValue = unitPrice * quantity;
+            long net = totalValue - ListingFee(totalValue) - ExchangeFee(totalValue);
+            return net < 0 ? 0 : net;
         }
 
         private static long RoundHalfUp(long value, int percent)
