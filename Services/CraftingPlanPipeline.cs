@@ -279,6 +279,85 @@ namespace GW2CraftingHelper.Services
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(treeUsedForSolve, solveResult.Decisions, metadata);
 
+            ApplySellSideEconomics(
+                result, treeUsedForSolve, solveResult, prices,
+                targetItemId, quantity, priceBasis);
+
+            // Capture inputs so the UI can re-solve locally with per-node
+            // overrides (no network round-trips).
+            result.SolveContext = new PlanSolveContext
+            {
+                TargetItemId = targetItemId,
+                Quantity = quantity,
+                Tree = treeUsedForSolve,
+                Prices = prices,
+                VendorOffers = vendorOffers,
+                Metadata = metadata,
+                LearnedRecipeIds = learnedRecipeIds,
+                UsedMaterials = usedMaterials,
+                PriceBasis = priceBasis
+            };
+            sw.Stop();
+            timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
+
+            // Prepend timing log to debug entries from PlanResultBuilder
+            if (result.DebugLog == null)
+            {
+                result.DebugLog = new List<string>();
+            }
+            result.DebugLog.InsertRange(0, timingLog);
+            var summary = PlanTimingAnalyzer.Summarize(timingLog);
+            result.DebugLog.InsertRange(timingLog.Count, summary);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Re-solves a previously generated plan with per-node decision
+        /// overrides. Purely local: reuses the context's tree, prices,
+        /// offers, and metadata; no network calls.
+        /// </summary>
+        public CraftingPlanResult ResolveWithOverrides(
+            PlanSolveContext context,
+            IReadOnlyDictionary<int, AcquisitionSource> overrides)
+        {
+            var solveResult = _solver.Solve(
+                context.Tree, context.Prices, context.VendorOffers,
+                context.PriceBasis, overrides);
+
+            var resultBuilder = new PlanResultBuilder();
+            var result = resultBuilder.Build(
+                solveResult.Plan, context.Tree, context.Metadata,
+                context.UsedMaterials, context.LearnedRecipeIds);
+
+            var treeBuilder = new CraftingTreeBuilder();
+            result.CraftingTree = treeBuilder.BuildTree(
+                context.Tree, solveResult.Decisions, context.Metadata);
+
+            ApplySellSideEconomics(
+                result, context.Tree, solveResult, context.Prices,
+                context.TargetItemId, context.Quantity, context.PriceBasis);
+            result.SolveContext = context;
+
+            if (result.DebugLog == null)
+            {
+                result.DebugLog = new List<string>();
+            }
+            result.DebugLog.Insert(0,
+                $"Local re-solve with {overrides?.Count ?? 0} override(s)");
+
+            return result;
+        }
+
+        private static void ApplySellSideEconomics(
+            CraftingPlanResult result,
+            RecipeNode treeUsedForSolve,
+            SolveResult solveResult,
+            IReadOnlyDictionary<int, ItemPrice> prices,
+            int targetItemId,
+            int quantity,
+            PriceBasis priceBasis)
+        {
             // Sell-side economics: what the crafted quantity nets after TP
             // fees, and profit versus the plan's coin cost. Coin-only by
             // design - non-coin currency costs have no coin value here.
@@ -309,21 +388,8 @@ namespace GW2CraftingHelper.Services
                 result.TargetUnitSellPrice = targetPrice.SellInstant;
                 result.NetSaleValue = TradingPostMath.NetSaleRevenue(
                     targetPrice.SellInstant, sellableQuantity);
-                result.CraftingProfit = result.NetSaleValue.Value - plan.TotalCoinCost;
+                result.CraftingProfit = result.NetSaleValue.Value - solveResult.Plan.TotalCoinCost;
             }
-            sw.Stop();
-            timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
-
-            // Prepend timing log to debug entries from PlanResultBuilder
-            if (result.DebugLog == null)
-            {
-                result.DebugLog = new List<string>();
-            }
-            result.DebugLog.InsertRange(0, timingLog);
-            var summary = PlanTimingAnalyzer.Summarize(timingLog);
-            result.DebugLog.InsertRange(timingLog.Count, summary);
-
-            return result;
         }
 
         private static void CollectItemIds(RecipeNode node, HashSet<int> ids)

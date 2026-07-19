@@ -753,6 +753,38 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task ResolveWithOverrides_LocalResolveFlipsDecisionAndEconomics()
+        {
+            var pipeline = BuildEconomicsPipeline(out var priceApi);
+            // Craft (300) beats buy (1000); target sells to orders at 400.
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+            Assert.NotNull(initial.SolveContext);
+            Assert.Equal(300, initial.Plan.TotalCoinCost);
+
+            // Force the root to be bought instead
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+            };
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
+
+            Assert.Single(resolved.Plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, resolved.Plan.Steps[0].Source);
+            Assert.Equal(1000, resolved.Plan.TotalCoinCost);
+            // Economics recomputed: 340 net - 1000 cost = -660
+            Assert.Equal(-660, resolved.CraftingProfit);
+            // Context is carried forward for subsequent re-solves
+            Assert.Same(initial.SolveContext, resolved.SolveContext);
+            // Tree reflects the forced decision and availability
+            Assert.Equal(Contracts.CraftingDecision.BuyFromTp, resolved.CraftingTree.Decision);
+            Assert.True(resolved.CraftingTree.CanCraft);
+            Assert.True(resolved.CraftingTree.CanBuyTp);
+        }
+
+        [Fact]
         public async Task Structured_BuyOrderBasis_MaterialsCostedAtBuyOrders()
         {
             var pipeline = BuildEconomicsPipeline(out var priceApi);

@@ -13,6 +13,9 @@ namespace GW2CraftingHelper.Services
             public long? TotalCost;
             public int RecipeId;
             public List<CostLine> VendorCurrencyCosts;
+            public bool CanCraft;
+            public bool CanBuyTp;
+            public bool CanBuyVendor;
         }
 
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
@@ -24,16 +27,20 @@ namespace GW2CraftingHelper.Services
             RecipeNode tree,
             IReadOnlyDictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
-            PriceBasis priceBasis = PriceBasis.InstantBuy)
+            PriceBasis priceBasis = PriceBasis.InstantBuy,
+            IReadOnlyDictionary<int, AcquisitionSource> overrides = null)
         {
             var memo = new Dictionary<int, Decision>();
 
-            // Pre-pass: assign unique NodeIds to every node in the tree
+            // Pre-pass: assign unique NodeIds to every node in the tree.
+            // Assignment is deterministic (DFS order), so NodeIds - and any
+            // overrides keyed on them - are stable across re-solves of the
+            // same tree.
             int nextNodeId = 0;
             AssignNodeIds(tree, ref nextNodeId);
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo, priceBasis);
+            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -99,7 +106,10 @@ namespace GW2CraftingHelper.Services
                 {
                     Source = kvp.Value.Source,
                     RecipeId = kvp.Value.RecipeId,
-                    TotalCost = kvp.Value.TotalCost
+                    TotalCost = kvp.Value.TotalCost,
+                    CanCraft = kvp.Value.CanCraft,
+                    CanBuyTp = kvp.Value.CanBuyTp,
+                    CanBuyVendor = kvp.Value.CanBuyVendor
                 };
             }
 
@@ -115,7 +125,8 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             Dictionary<int, Decision> memo,
-            PriceBasis priceBasis)
+            PriceBasis priceBasis,
+            IReadOnlyDictionary<int, AcquisitionSource> overrides)
         {
             if (node.IngredientType == "Currency")
             {
@@ -137,55 +148,8 @@ namespace GW2CraftingHelper.Services
                 out long? fallbackVendorCoinCost,
                 out List<CostLine> fallbackVendorCurrencyCosts);
 
-            // Leaf item: no recipes
-            if (node.IsLeaf)
-            {
-                var winner = PickCheapest(buyTotalCost, null, comparableVendorCoinCost);
-
-                if (winner == AcquisitionSource.BuyFromVendor)
-                {
-                    memo[node.NodeId] = new Decision
-                    {
-                        Source = AcquisitionSource.BuyFromVendor,
-                        TotalCost = comparableVendorCoinCost,
-                        RecipeId = 0
-                    };
-                    return comparableVendorCoinCost;
-                }
-
-                if (winner == AcquisitionSource.BuyFromTp)
-                {
-                    memo[node.NodeId] = new Decision
-                    {
-                        Source = AcquisitionSource.BuyFromTp,
-                        TotalCost = buyTotalCost.Value,
-                        RecipeId = 0
-                    };
-                    return buyTotalCost.Value;
-                }
-
-                if (fallbackVendorCoinCost.HasValue)
-                {
-                    memo[node.NodeId] = new Decision
-                    {
-                        Source = AcquisitionSource.BuyFromVendor,
-                        TotalCost = fallbackVendorCoinCost,
-                        RecipeId = 0,
-                        VendorCurrencyCosts = fallbackVendorCurrencyCosts
-                    };
-                    return fallbackVendorCoinCost;
-                }
-
-                memo[node.NodeId] = new Decision
-                {
-                    Source = AcquisitionSource.UnknownSource,
-                    TotalCost = null,
-                    RecipeId = 0
-                };
-                return null;
-            }
-
-            // Has recipes: evaluate each option
+            // Evaluate recipe options (children are always evaluated so their
+            // decisions exist even if this node ends up bought).
             long? bestCraftCost = null;
             int bestRecipeId = 0;
 
@@ -201,7 +165,8 @@ namespace GW2CraftingHelper.Services
                         continue;
                     }
 
-                    long? ingredientCost = Evaluate(ingredient, prices, vendorOffers, memo, priceBasis);
+                    long? ingredientCost = Evaluate(
+                        ingredient, prices, vendorOffers, memo, priceBasis, overrides);
                     if (!ingredientCost.HasValue)
                     {
                         allPriceable = false;
@@ -225,40 +190,63 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
+            bool canCraft = bestRecipeId != 0;
+            bool canBuyTp = buyTotalCost.HasValue;
+            bool canBuyVendor = comparableVendorCoinCost.HasValue ||
+                                fallbackVendorCoinCost.HasValue;
+
+            long? Commit(AcquisitionSource src, long? cost, int recipeId, List<CostLine> vendorCurrencyCosts)
+            {
+                memo[node.NodeId] = new Decision
+                {
+                    Source = src,
+                    TotalCost = cost,
+                    RecipeId = recipeId,
+                    VendorCurrencyCosts = vendorCurrencyCosts,
+                    CanCraft = canCraft,
+                    CanBuyTp = canBuyTp,
+                    CanBuyVendor = canBuyVendor
+                };
+                return cost;
+            }
+
+            // A user override wins whenever it is feasible for this node;
+            // infeasible overrides are ignored and the best path applies.
+            if (overrides != null &&
+                overrides.TryGetValue(node.NodeId, out var forced))
+            {
+                if (forced == AcquisitionSource.Craft && canCraft)
+                {
+                    return Commit(AcquisitionSource.Craft, bestCraftCost, bestRecipeId, null);
+                }
+                if (forced == AcquisitionSource.BuyFromTp && canBuyTp)
+                {
+                    return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, 0, null);
+                }
+                if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
+                {
+                    return comparableVendorCoinCost.HasValue
+                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, 0, null)
+                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
+                }
+            }
+
             // Three-way comparison: vendor (pure coin) vs TP buy vs craft
             var source = PickCheapest(buyTotalCost, bestCraftCost, comparableVendorCoinCost);
 
             if (source == AcquisitionSource.BuyFromVendor)
             {
-                memo[node.NodeId] = new Decision
-                {
-                    Source = AcquisitionSource.BuyFromVendor,
-                    TotalCost = comparableVendorCoinCost,
-                    RecipeId = 0
-                };
-                return comparableVendorCoinCost;
+                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, 0, null);
             }
 
             if (source == AcquisitionSource.BuyFromTp)
             {
-                memo[node.NodeId] = new Decision
-                {
-                    Source = AcquisitionSource.BuyFromTp,
-                    TotalCost = buyTotalCost.Value,
-                    RecipeId = 0
-                };
-                return buyTotalCost.Value;
+                return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, 0, null);
             }
 
             if (source == AcquisitionSource.Craft)
             {
-                memo[node.NodeId] = new Decision
-                {
-                    Source = AcquisitionSource.Craft,
-                    TotalCost = bestCraftCost,
-                    RecipeId = bestRecipeId
-                };
-                return bestCraftCost;
+                return Commit(AcquisitionSource.Craft, bestCraftCost, bestRecipeId, null);
             }
 
             // Fallback order when nothing is coin-priceable: a mixed-currency
@@ -266,34 +254,15 @@ namespace GW2CraftingHelper.Services
             // preferred over descending into an unpriceable craft subtree.
             if (fallbackVendorCoinCost.HasValue)
             {
-                memo[node.NodeId] = new Decision
-                {
-                    Source = AcquisitionSource.BuyFromVendor,
-                    TotalCost = fallbackVendorCoinCost,
-                    RecipeId = 0,
-                    VendorCurrencyCosts = fallbackVendorCurrencyCosts
-                };
-                return fallbackVendorCoinCost;
+                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
             }
 
             if (bestRecipeId != 0)
             {
-                memo[node.NodeId] = new Decision
-                {
-                    Source = AcquisitionSource.Craft,
-                    TotalCost = bestCraftCost,
-                    RecipeId = bestRecipeId
-                };
-                return bestCraftCost;
+                return Commit(AcquisitionSource.Craft, bestCraftCost, bestRecipeId, null);
             }
 
-            memo[node.NodeId] = new Decision
-            {
-                Source = AcquisitionSource.UnknownSource,
-                TotalCost = null,
-                RecipeId = 0
-            };
-            return null;
+            return Commit(AcquisitionSource.UnknownSource, null, 0, null);
         }
 
         /// <summary>

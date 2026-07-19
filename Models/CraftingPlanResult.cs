@@ -39,5 +39,11 @@ namespace GW2CraftingHelper.Models
         /// costs are not valued and are excluded; null when no sell price.
         /// </summary>
         public long? CraftingProfit { get; set; }
+
+        /// <summary>
+        /// Inputs for local re-solving (per-node overrides). Populated by
+        /// GenerateStructuredAsync; null on the legacy path.
+        /// </summary>
+        public PlanSolveContext SolveContext { get; set; }
     }
 }

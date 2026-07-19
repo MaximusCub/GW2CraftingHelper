@@ -23,6 +23,7 @@ namespace GW2CraftingHelper.Services
             var treeNode = new CraftingTreeNode
             {
                 ItemId = node.Id,
+                NodeId = node.NodeId,
                 Name = ResolveName(node.Id, metadata),
                 IconUrl = ResolveIcon(node.Id, metadata),
                 Rarity = ResolveRarity(node.Id, metadata),
@@ -53,6 +54,9 @@ namespace GW2CraftingHelper.Services
 
             treeNode.Decision = MapSource(decision.Source);
             treeNode.SubtreeCost = decision.TotalCost;
+            treeNode.CanCraft = decision.CanCraft;
+            treeNode.CanBuyTp = decision.CanBuyTp;
+            treeNode.CanBuyVendor = decision.CanBuyVendor;
 
             if (decision.Source == AcquisitionSource.BuyFromTp ||
                 decision.Source == AcquisitionSource.BuyFromVendor)
