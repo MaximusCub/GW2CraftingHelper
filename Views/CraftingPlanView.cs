@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Views
         private const int TopRegionHeight = 112;
         private const int RightEdgePadding = 20;
 
-        private readonly Func<int, int, bool, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
+        private readonly Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
@@ -36,6 +36,7 @@ namespace GW2CraftingHelper.Views
         private PlanViewModel _currentPlan;
         private DateTime _planGeneratedAt;
         private bool _useOwnMaterials;
+        private PriceBasis _priceBasis = PriceBasis.InstantBuy;
         private int _selectedItemId;
         private int _quantity = 1;
 
@@ -62,7 +63,7 @@ namespace GW2CraftingHelper.Views
         private int _lastRenderedWidth;
 
         public CraftingPlanView(
-            Func<int, int, bool, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
+            Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
             IItemSearchProvider itemSearchProvider)
         {
@@ -146,6 +147,33 @@ namespace GW2CraftingHelper.Views
                 Parent = _controlsPanel
             };
             _ownMaterialsCheckbox.CheckedChanged += OnOwnMaterialsToggled;
+
+            // Price basis selector; applies on the next Generate.
+            new Label()
+            {
+                Text = "Prices:",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(170, 7),
+                Parent = _controlsPanel
+            };
+            var priceBasisDropdown = new Dropdown()
+            {
+                Size = new Point(110, 28),
+                Location = new Point(218, 3),
+                Parent = _controlsPanel
+            };
+            priceBasisDropdown.Items.Add("Instant Buy");
+            priceBasisDropdown.Items.Add("Buy Orders");
+            priceBasisDropdown.SelectedItem = _priceBasis == PriceBasis.BuyOrder
+                ? "Buy Orders"
+                : "Instant Buy";
+            priceBasisDropdown.ValueChanged += (_, e) =>
+            {
+                _priceBasis = e.CurrentValue == "Buy Orders"
+                    ? PriceBasis.BuyOrder
+                    : PriceBasis.InstantBuy;
+            };
 
             _generateButton = new StandardButton()
             {
@@ -274,7 +302,7 @@ namespace GW2CraftingHelper.Views
             try
             {
                 var result = await _generateAsync(
-                    _selectedItemId, _quantity, _useOwnMaterials,
+                    _selectedItemId, _quantity, _useOwnMaterials, _priceBasis,
                     CancellationToken.None, statusProgress);
 
                 _lastDebugLog = result.DebugLog;
@@ -495,7 +523,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, 28),
                 Parent = parent
             };
-            BuildCoinDisplay(rowPanel, row.CoinValue);
+            BuildCoinDisplay(rowPanel, row.CoinValue, row.Label);
         }
 
         private void CreateTextRow(string text, FlowPanel parent, int panelWidth)
@@ -993,7 +1021,7 @@ namespace GW2CraftingHelper.Views
 
         // --- Coin display helpers (reused from original) ---
 
-        private static void BuildCoinDisplay(Panel parent, long copper)
+        private static void BuildCoinDisplay(Panel parent, long copper, string label = "Total")
         {
             if (copper < 0) copper = 0;
 
@@ -1004,7 +1032,7 @@ namespace GW2CraftingHelper.Views
             int x = 0;
             var totalLabel = new Label()
             {
-                Text = "  Total: ",
+                Text = "  " + (string.IsNullOrEmpty(label) ? "Total" : label) + ": ",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(8, 4),

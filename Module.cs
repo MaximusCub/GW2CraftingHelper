@@ -215,7 +215,7 @@ namespace GW2CraftingHelper
             );
 
             _craftingContent = new CraftingPlanView(
-                (itemId, qty, useOwn, ct, progress) =>
+                (itemId, qty, useOwn, priceBasis, ct, progress) =>
                 {
                     string activeChar = null;
                     try
@@ -237,10 +237,11 @@ namespace GW2CraftingHelper
                     {
                         return _craftingPipeline.GenerateStructuredAsync(
                             itemId, qty, _currentSnapshot, ct, progress,
-                            activeChar);
+                            activeChar, priceBasis);
                     }
                     return _craftingPipeline.GenerateStructuredAsync(
-                        itemId, qty, null, ct, progress);
+                        itemId, qty, null, ct, progress,
+                        null, priceBasis);
                 },
                 _modalDialog,
                 _itemSearchProvider

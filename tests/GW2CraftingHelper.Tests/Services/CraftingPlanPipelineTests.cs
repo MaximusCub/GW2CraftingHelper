@@ -642,5 +642,131 @@ namespace GW2CraftingHelper.Tests.Services
                 searchFrom = found + 1;
             }
         }
+
+        // --- Sell-side economics ---
+
+        private static CraftingPlanPipeline BuildEconomicsPipeline(
+            out InMemoryPriceApiClient priceApi)
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            priceApi = new InMemoryPriceApiClient();
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+        }
+
+        [Fact]
+        public async Task Structured_TargetHasBuyOrders_ProfitFieldsComputed()
+        {
+            var pipeline = BuildEconomicsPipeline(out var priceApi);
+            // Target: buy orders at 400 (sell revenue), sell listings at 1000.
+            // Ingredient: instant buy 100 -> craft cost 3x100=300 < buy 1000.
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+
+            Assert.Equal(300, result.Plan.TotalCoinCost);
+            Assert.Equal(400, result.TargetUnitSellPrice);
+            // 400 - 20 (5%) - 40 (10%) = 340 net
+            Assert.Equal(340, result.NetSaleValue);
+            Assert.Equal(40, result.CraftingProfit);
+            Assert.Equal(PriceBasis.InstantBuy, result.PriceBasis);
+        }
+
+        [Fact]
+        public async Task Structured_NoBuyOrders_ProfitFieldsNull()
+        {
+            var pipeline = BuildEconomicsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 0, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+
+            Assert.Null(result.TargetUnitSellPrice);
+            Assert.Null(result.NetSaleValue);
+            Assert.Null(result.CraftingProfit);
+        }
+
+        [Fact]
+        public async Task Structured_RootRecipeOverproduces_RevenueCoversWholeBatch()
+        {
+            // Recipe outputs 5 per craft; requesting 1 still costs a full
+            // craft, so all 5 produced units count as sellable revenue.
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 5,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 10000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+
+            // Craft cost: 3x100 = 300 for a batch of 5
+            Assert.Equal(300, result.Plan.TotalCoinCost);
+            Assert.Equal(5, result.SellableQuantity);
+            // Revenue: 5 x 400 = 2000 total; -100 listing -200 exchange = 1700
+            Assert.Equal(1700, result.NetSaleValue);
+            Assert.Equal(1400, result.CraftingProfit);
+        }
+
+        [Fact]
+        public async Task Structured_BuyOrderBasis_MaterialsCostedAtBuyOrders()
+        {
+            var pipeline = BuildEconomicsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            // Ingredient: instant 100, buy order 10 -> craft cost 30 at basis.
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.BuyOrder);
+
+            Assert.Equal(30, result.Plan.TotalCoinCost);
+            Assert.Equal(PriceBasis.BuyOrder, result.PriceBasis);
+            Assert.Equal(310, result.CraftingProfit);
+        }
     }
 }

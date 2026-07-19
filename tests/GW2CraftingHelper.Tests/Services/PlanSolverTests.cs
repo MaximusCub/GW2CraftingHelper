@@ -762,5 +762,95 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(150, plan.TotalCoinCost);
             Assert.Empty(plan.CurrencyCosts);
         }
+
+        // --- Price basis tests ---
+
+        [Fact]
+        public void BuyOrderBasis_UsesBuyOrderPrice()
+        {
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 60 } }
+            };
+            var solver = new PlanSolver();
+
+            var instant = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.InstantBuy).Plan;
+            var order = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.BuyOrder).Plan;
+
+            Assert.Equal(200, instant.TotalCoinCost);
+            Assert.Equal(120, order.TotalCoinCost);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_NoBuyOrders_ItemNotPriceable()
+        {
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(Leaf(1, 1), prices, null, PriceBasis.BuyOrder).Plan;
+
+            Assert.Equal(AcquisitionSource.UnknownSource, plan.Steps[0].Source);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_CanFlipBuyVsCraftDecision()
+        {
+            // Output: instant 100 / order 90. Craft from 2x ingredient:
+            // instant 2x60=120 (buy wins), order 2x30=60 (craft wins).
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 90 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 60, SellInstant = 30 } }
+            };
+            var solver = new PlanSolver();
+
+            var instant = solver.Solve(
+                Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2))), prices, null,
+                PriceBasis.InstantBuy).Plan;
+            var order = solver.Solve(
+                Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2))), prices, null,
+                PriceBasis.BuyOrder).Plan;
+
+            Assert.Single(instant.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, instant.Steps[0].Source);
+            Assert.Contains(order.Steps, s => s.Source == AcquisitionSource.Craft);
+            Assert.Equal(60, order.TotalCoinCost);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_VendorItemBarter_PricedAtBasis()
+        {
+            // Offer: 5x item 42. Instant 10 -> 50; order 4 -> 20.
+            var offer = new VendorOffer
+            {
+                OfferId = "test-barter-basis",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Item", Id = 42, Count = 5 }
+                },
+                MerchantName = "Barter Vendor",
+                Locations = new List<string>()
+            };
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200, SellInstant = 100 } },
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10, SellInstant = 4 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var order = solver.Solve(Leaf(1, 1), prices, vendorOffers, PriceBasis.BuyOrder).Plan;
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, order.Steps[0].Source);
+            Assert.Equal(20, order.TotalCoinCost);
+        }
     }
 }
