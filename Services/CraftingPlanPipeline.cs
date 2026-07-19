@@ -378,6 +378,8 @@ namespace GW2CraftingHelper.Services
                 bool feasible = false;
                 if (source == AcquisitionSource.Craft)
                 {
+                    // Permissive: the solver ignores forced crafts whose cost
+                    // is not fully priceable, so stray entries are harmless.
                     feasible = node.Recipes.Count > 0;
                 }
                 else if (source == AcquisitionSource.BuyFromTp)

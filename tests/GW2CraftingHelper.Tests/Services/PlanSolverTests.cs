@@ -958,6 +958,32 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void Override_ForcedCraftOnUnpriceableRecipe_IgnoredKeepsBuy()
+        {
+            // Item 1 is TP-priced AND has a recipe, but the recipe's
+            // ingredient has no price: forcing Craft must be refused (a null
+            // craft cost would silently understate the plan total) and the
+            // pill must not even offer Craft (CanCraft false).
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { 0, AcquisitionSource.Craft }
+            };
+            var result = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
+
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Decisions[0].Source);
+            Assert.Equal(100, result.Plan.TotalCoinCost);
+            Assert.False(result.Decisions[0].CanCraft);
+            Assert.True(result.Decisions[0].CanBuyTp);
+        }
+
+        [Fact]
         public void AvailabilityFlags_ReflectFeasiblePaths()
         {
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>

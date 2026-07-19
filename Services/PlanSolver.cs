@@ -190,7 +190,13 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            bool canCraft = bestRecipeId != 0;
+            // Craft is only a FORCEABLE path when its cost is fully
+            // priceable. bestRecipeId alone also covers the unpriceable
+            // last-resort recipe, and forcing that would commit a null cost
+            // whose branch silently drops out of the plan total (misleading
+            // pricing). The last-resort auto path below is unaffected: it
+            // only fires when nothing else is priceable at all.
+            bool canCraft = bestCraftCost.HasValue;
             bool canBuyTp = buyTotalCost.HasValue;
             bool canBuyVendor = comparableVendorCoinCost.HasValue ||
                                 fallbackVendorCoinCost.HasValue;
