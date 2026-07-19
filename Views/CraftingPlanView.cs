@@ -29,16 +29,26 @@ namespace GW2CraftingHelper.Views
         private const int RightEdgePadding = 20;
 
         private readonly Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
+        private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
 
         private PlanViewModel _currentPlan;
+        private CraftingPlanResult _lastResult;
         private DateTime _planGeneratedAt;
         private bool _useOwnMaterials;
         private PriceBasis _priceBasis = PriceBasis.InstantBuy;
         private int _selectedItemId;
         private int _quantity = 1;
+
+        // Per-node user decision overrides (keyed by solver NodeId) and
+        // explicit tree expansion state; both survive local re-solves and
+        // reset on a fresh Generate.
+        private readonly Dictionary<int, AcquisitionSource> _nodeOverrides =
+            new Dictionary<int, AcquisitionSource>();
+        private readonly Dictionary<int, bool> _nodeExpansion =
+            new Dictionary<int, bool>();
 
         // Suppress flag for checkbox revert
         private bool _suppressToggle;
@@ -65,11 +75,13 @@ namespace GW2CraftingHelper.Views
         public CraftingPlanView(
             Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
-            IItemSearchProvider itemSearchProvider)
+            IItemSearchProvider itemSearchProvider,
+            Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> resolveOverridesSync = null)
         {
             _generateAsync = generateAsync;
             _modalDialog = modalDialog;
             _itemSearchProvider = itemSearchProvider;
+            _resolveOverridesSync = resolveOverridesSync;
         }
 
         public void SetStatus(string status)
@@ -305,6 +317,9 @@ namespace GW2CraftingHelper.Views
                     _selectedItemId, _quantity, _useOwnMaterials, _priceBasis,
                     CancellationToken.None, statusProgress);
 
+                _nodeOverrides.Clear();
+                _nodeExpansion.Clear();
+                _lastResult = result;
                 _lastDebugLog = result.DebugLog;
                 var vm = _vmBuilder.Build(result);
                 _currentPlan = vm;
@@ -767,6 +782,39 @@ namespace GW2CraftingHelper.Views
 
             RenderTreeNode(treeRoot, treeFlow, panelWidth, 0);
 
+            // Decision presets: clear overrides / force craft-everywhere /
+            // force buy-everywhere (feasibility respected by the solver).
+            var bestPathButton = new StandardButton()
+            {
+                Text = "Best Path",
+                Size = new Point(80, 24),
+                Location = new Point(150, 3),
+                Parent = headerPanel
+            };
+            var craftAllButton = new StandardButton()
+            {
+                Text = "Craft All",
+                Size = new Point(76, 24),
+                Location = new Point(234, 3),
+                Parent = headerPanel
+            };
+            var buyAllButton = new StandardButton()
+            {
+                Text = "Buy All",
+                Size = new Point(70, 24),
+                Location = new Point(314, 3),
+                Parent = headerPanel
+            };
+
+            bestPathButton.Click += (_, __) =>
+            {
+                if (_nodeOverrides.Count == 0) return;
+                _nodeOverrides.Clear();
+                ApplyOverridesAndResolve();
+            };
+            craftAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.Craft);
+            buyAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.BuyFromTp);
+
             expandAllButton.Click += (_, __) =>
             {
                 // Building children appends to _treeNodeStates; index loop
@@ -783,6 +831,7 @@ namespace GW2CraftingHelper.Views
                         s.ChildrenBuilt = true;
                     }
                     s.IsExpanded = true;
+                    _nodeExpansion[s.Node.NodeId] = true;
                     s.ChildContainer.Visible = true;
                     s.ArrowLabel.Text = "\u25BC";
                 }
@@ -794,6 +843,7 @@ namespace GW2CraftingHelper.Views
                 foreach (var s in _treeNodeStates)
                 {
                     s.IsExpanded = false;
+                    _nodeExpansion[s.Node.NodeId] = false;
                     s.ChildContainer.Visible = false;
                     s.ArrowLabel.Text = "\u25B6";
                 }
@@ -803,7 +853,9 @@ namespace GW2CraftingHelper.Views
             headerPanel.Click += (_, __) =>
             {
                 // Ignore clicks that landed on the header buttons.
-                if (expandAllButton.MouseOver || collapseAllButton.MouseOver)
+                if (expandAllButton.MouseOver || collapseAllButton.MouseOver ||
+                    bestPathButton.MouseOver || craftAllButton.MouseOver ||
+                    buyAllButton.MouseOver)
                 {
                     return;
                 }
@@ -812,6 +864,75 @@ namespace GW2CraftingHelper.Views
                     + " Recipe Tree";
                 _contentPanel.Invalidate();
             };
+        }
+
+        /// <summary>
+        /// The next feasible acquisition source when cycling this node's
+        /// decision, or null when fewer than two paths are feasible.
+        /// </summary>
+        private static AcquisitionSource? GetNextCyclableSource(CraftingTreeNode node)
+        {
+            var order = new List<AcquisitionSource>(3);
+            if (node.CanCraft) order.Add(AcquisitionSource.Craft);
+            if (node.CanBuyTp) order.Add(AcquisitionSource.BuyFromTp);
+            if (node.CanBuyVendor) order.Add(AcquisitionSource.BuyFromVendor);
+            if (order.Count < 2)
+            {
+                return null;
+            }
+
+            AcquisitionSource current;
+            switch (node.Decision)
+            {
+                case CraftingDecision.Craft: current = AcquisitionSource.Craft; break;
+                case CraftingDecision.BuyFromTp: current = AcquisitionSource.BuyFromTp; break;
+                case CraftingDecision.BuyFromVendor: current = AcquisitionSource.BuyFromVendor; break;
+                default: return null;
+            }
+
+            int idx = order.IndexOf(current);
+            return order[(idx + 1) % order.Count];
+        }
+
+        private void ApplyPreset(AcquisitionSource source)
+        {
+            if (_lastResult?.SolveContext == null) return;
+            _nodeOverrides.Clear();
+            // Walk the full solver tree (not the display tree, which hides
+            // children under bought nodes) so one click reaches every level.
+            var preset = CraftingPlanPipeline.BuildPresetOverrides(
+                _lastResult.SolveContext, source);
+            foreach (var kvp in preset)
+            {
+                _nodeOverrides[kvp.Key] = kvp.Value;
+            }
+            ApplyOverridesAndResolve();
+        }
+
+        private void ApplyOverridesAndResolve()
+        {
+            if (_lastResult?.SolveContext == null || _resolveOverridesSync == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var result = _resolveOverridesSync(_lastResult.SolveContext, _nodeOverrides);
+                _lastResult = result;
+                _lastDebugLog = result.DebugLog;
+                var vm = _vmBuilder.Build(result);
+                _currentPlan = vm;
+                RenderPlan(vm);
+                SetStatus(_nodeOverrides.Count == 0
+                    ? "Best path restored"
+                    : $"Decisions updated ({_nodeOverrides.Count} override(s))");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Override re-solve failed");
+                SetStatus($"Error: {ex.Message}");
+            }
         }
 
         private void RenderTreeNode(CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth)
@@ -846,14 +967,18 @@ namespace GW2CraftingHelper.Views
                 rowPanel.BackgroundColor = Color.Transparent;
             };
 
-            // Expand/collapse arrow
+            // Expand/collapse arrow. Explicit user expansion state survives
+            // local re-solves; unvisited nodes default to expanded above
+            // depth 2.
+            bool isExpanded = _nodeExpansion.TryGetValue(node.NodeId, out bool userExpanded)
+                ? userExpanded
+                : depth < 2;
             Label arrowLabel = null;
             if (hasChildren)
             {
-                bool defaultExpanded = depth < 2;
                 arrowLabel = new Label()
                 {
-                    Text = defaultExpanded ? "\u25BC" : "\u25B6",
+                    Text = isExpanded ? "\u25BC" : "\u25B6",
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(indent, 12),
@@ -887,7 +1012,9 @@ namespace GW2CraftingHelper.Views
             };
 
             // Decision badge rendered as a subtle pill: measure the label
-            // first, then wrap it in a tinted background panel.
+            // first, then wrap it in a tinted background panel. When more
+            // than one acquisition path is feasible, clicking the pill
+            // cycles the decision and re-solves locally.
             int badgeX = textX + nameLabel.Width + 6;
             string badgeText = GetDecisionBadgeText(node.Decision);
             Color badgeColor = GetDecisionBadgeColor(node.Decision);
@@ -908,6 +1035,18 @@ namespace GW2CraftingHelper.Views
             };
             badgeLabel.Parent = badgePill;
             badgeLabel.Location = new Point(4, 2);
+
+            AcquisitionSource? nextSource = GetNextCyclableSource(node);
+            if (nextSource.HasValue && _resolveOverridesSync != null)
+            {
+                badgePill.BackgroundColor = badgeColor * 0.35f;
+                badgePill.BasicTooltipText = "Click: switch acquisition source";
+                badgePill.Click += (_, __) =>
+                {
+                    _nodeOverrides[node.NodeId] = nextSource.Value;
+                    ApplyOverridesAndResolve();
+                };
+            }
 
             // Cost display: inline coin for nodes with SubtreeCost
             if (node.SubtreeCost.HasValue && node.SubtreeCost.Value > 0)
@@ -936,9 +1075,8 @@ namespace GW2CraftingHelper.Views
                     PanelWidth = panelWidth
                 };
                 _treeNodeStates.Add(state);
-                if (depth < 2)
+                if (isExpanded)
                 {
-                    // Default-expanded: build children now
                     foreach (var child in node.Children)
                     {
                         RenderTreeNode(child, childFlow, panelWidth, depth + 1);
@@ -953,9 +1091,14 @@ namespace GW2CraftingHelper.Views
                     childFlow.Visible = false;
                 }
 
-                // If row gains buttons/links later, stop propagation to avoid unwanted toggles.
                 EventHandler<MouseEventArgs> toggleHandler = (_, __) =>
                 {
+                    // The badge pill has its own click action; do not treat
+                    // it as an expand/collapse toggle.
+                    if (badgePill.MouseOver)
+                    {
+                        return;
+                    }
                     if (!state.ChildrenBuilt)
                     {
                         foreach (var child in state.Node.Children)
@@ -965,6 +1108,7 @@ namespace GW2CraftingHelper.Views
                         state.ChildrenBuilt = true;
                     }
                     state.IsExpanded = !state.IsExpanded;
+                    _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
                     state.ChildContainer.Visible = state.IsExpanded;
                     state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
                     state.ChildContainer.Parent.Invalidate();

@@ -593,7 +593,7 @@ namespace GW2CraftingHelper.Services
         /// Unit acquisition cost under the chosen basis: lowest sell listing
         /// (instant) or highest buy order (patient). 0 = not priceable.
         /// </summary>
-        private static int GetUnitPrice(ItemPrice price, PriceBasis priceBasis)
+        internal static int GetUnitPrice(ItemPrice price, PriceBasis priceBasis)
         {
             return priceBasis == PriceBasis.BuyOrder
                 ? price.SellInstant

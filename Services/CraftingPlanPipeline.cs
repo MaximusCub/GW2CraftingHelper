@@ -349,6 +349,55 @@ namespace GW2CraftingHelper.Services
             return result;
         }
 
+        /// <summary>
+        /// Builds an override map forcing <paramref name="source"/> on every
+        /// node of the context's solver tree where it is feasible: nodes
+        /// with recipes for Craft, nodes priced under the context's basis
+        /// for BuyFromTp. Walks the full tree so nodes hidden beneath
+        /// bought intermediates are covered in a single pass.
+        /// </summary>
+        public static Dictionary<int, AcquisitionSource> BuildPresetOverrides(
+            PlanSolveContext context, AcquisitionSource source)
+        {
+            var overrides = new Dictionary<int, AcquisitionSource>();
+            CollectPresetOverrides(context.Tree, context, source, overrides);
+            return overrides;
+        }
+
+        private static void CollectPresetOverrides(
+            RecipeNode node,
+            PlanSolveContext context,
+            AcquisitionSource source,
+            Dictionary<int, AcquisitionSource> overrides)
+        {
+            if (node.IngredientType == "Item")
+            {
+                bool feasible = false;
+                if (source == AcquisitionSource.Craft)
+                {
+                    feasible = node.Recipes.Count > 0;
+                }
+                else if (source == AcquisitionSource.BuyFromTp)
+                {
+                    feasible = context.Prices != null &&
+                               context.Prices.TryGetValue(node.Id, out var price) &&
+                               PlanSolver.GetUnitPrice(price, context.PriceBasis) > 0;
+                }
+                if (feasible)
+                {
+                    overrides[node.NodeId] = source;
+                }
+            }
+
+            foreach (var recipe in node.Recipes)
+            {
+                foreach (var ingredient in recipe.Ingredients)
+                {
+                    CollectPresetOverrides(ingredient, context, source, overrides);
+                }
+            }
+        }
+
         private static void ApplySellSideEconomics(
             CraftingPlanResult result,
             RecipeNode treeUsedForSolve,

@@ -244,7 +244,8 @@ namespace GW2CraftingHelper
                         null, priceBasis);
                 },
                 _modalDialog,
-                _itemSearchProvider
+                _itemSearchProvider,
+                (ctx, overrides) => _craftingPipeline.ResolveWithOverrides(ctx, overrides)
             );
 
             // Minimum size (930x710) matches the window region intentionally.
