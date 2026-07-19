@@ -847,6 +847,11 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, resolved.Plan.TotalCoinCost);
             Assert.Contains(resolved.Plan.Steps,
                 s => s.Source == AcquisitionSource.Craft && s.ItemId == 2);
+            // Metadata must cover items surfaced only by the override
+            // (regression: items under bought nodes were never fetched and
+            // rendered as "Unknown Item")
+            Assert.All(resolved.Plan.Steps,
+                s => Assert.True(resolved.ItemMetadata.ContainsKey(s.ItemId)));
 
             // Buy All flips everything buyable to TP purchases
             var buyAll = CraftingPlanPipeline.BuildPresetOverrides(

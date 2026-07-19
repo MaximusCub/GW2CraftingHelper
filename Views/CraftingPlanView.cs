@@ -49,6 +49,8 @@ namespace GW2CraftingHelper.Views
             new Dictionary<int, AcquisitionSource>();
         private readonly Dictionary<int, bool> _nodeExpansion =
             new Dictionary<int, bool>();
+        private readonly Dictionary<PlanSectionType, bool> _sectionExpansion =
+            new Dictionary<PlanSectionType, bool>();
 
         // Suppress flag for checkbox revert
         private bool _suppressToggle;
@@ -319,6 +321,7 @@ namespace GW2CraftingHelper.Views
 
                 _nodeOverrides.Clear();
                 _nodeExpansion.Clear();
+                _sectionExpansion.Clear();
                 _lastResult = result;
                 _lastDebugLog = result.DebugLog;
                 var vm = _vmBuilder.Build(result);
@@ -450,8 +453,14 @@ namespace GW2CraftingHelper.Views
 
         private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
         {
+            // User collapse state survives re-renders (width changes, local
+            // re-solves); resets on a fresh Generate.
+            bool expanded = _sectionExpansion.TryGetValue(section.SectionType, out bool userExpanded)
+                ? userExpanded
+                : section.IsDefaultExpanded;
+
             // Section header (clickable)
-            string arrow = section.IsDefaultExpanded ? "\u25BC" : "\u25B6";
+            string arrow = expanded ? "\u25BC" : "\u25B6";
             var headerPanel = new Panel()
             {
                 Size = new Point(panelWidth, 30),
@@ -473,7 +482,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(panelWidth, 0),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
-                Visible = section.IsDefaultExpanded,
+                Visible = expanded,
                 Parent = _contentPanel,
                 HeightSizingMode = SizingMode.AutoSize
             };
@@ -488,6 +497,7 @@ namespace GW2CraftingHelper.Views
             headerPanel.Click += (_, __) =>
             {
                 contentFlow.Visible = !contentFlow.Visible;
+                _sectionExpansion[section.SectionType] = contentFlow.Visible;
                 headerLabel.Text = (contentFlow.Visible ? "\u25BC" : "\u25B6")
                     + " " + section.Title;
                 _contentPanel.Invalidate();

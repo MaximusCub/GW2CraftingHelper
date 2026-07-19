@@ -238,7 +238,11 @@ namespace GW2CraftingHelper.Services
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
 
             // Step 8: Fetch item metadata for all step items + target + used materials + tree items
-            var metadataIds = new HashSet<int>(plan.Steps.Select(s => s.ItemId));
+            // Fetch metadata for EVERY tree item (not just chosen-path ones):
+            // local override re-solves can surface any node's item in steps,
+            // and the cached SolveContext metadata must cover them all.
+            var metadataIds = new HashSet<int>(allItemIds);
+            metadataIds.UnionWith(plan.Steps.Select(s => s.ItemId));
             metadataIds.Add(targetItemId);
             if (usedMaterials != null)
             {
@@ -247,7 +251,6 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
-            CraftingTreeBuilder.CollectTreeItemIds(treeUsedForSolve, solveResult.Decisions, metadataIds);
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching item details ({metadataIds.Count} items)...",
