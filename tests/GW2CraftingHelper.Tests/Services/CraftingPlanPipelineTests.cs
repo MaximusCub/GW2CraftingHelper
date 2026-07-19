@@ -753,6 +753,115 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task ResolveWithOverrides_LocalResolveFlipsDecisionAndEconomics()
+        {
+            var pipeline = BuildEconomicsPipeline(out var priceApi);
+            // Craft (300) beats buy (1000); target sells to orders at 400.
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+            Assert.NotNull(initial.SolveContext);
+            Assert.Equal(300, initial.Plan.TotalCoinCost);
+
+            // Force the root to be bought instead
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+            };
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
+
+            Assert.Single(resolved.Plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, resolved.Plan.Steps[0].Source);
+            Assert.Equal(1000, resolved.Plan.TotalCoinCost);
+            // Economics recomputed: 340 net - 1000 cost = -660
+            Assert.Equal(-660, resolved.CraftingProfit);
+            // Context is carried forward for subsequent re-solves
+            Assert.Same(initial.SolveContext, resolved.SolveContext);
+            // Tree reflects the forced decision and availability
+            Assert.Equal(Contracts.CraftingDecision.BuyFromTp, resolved.CraftingTree.Decision);
+            Assert.True(resolved.CraftingTree.CanCraft);
+            Assert.True(resolved.CraftingTree.CanBuyTp);
+        }
+
+        [Fact]
+        public async Task BuildPresetOverrides_CraftAll_ReachesNodesUnderBoughtIntermediates()
+        {
+            // Item 1 <- recipe(2) <- recipe(3). Intermediate 2 is cheap to
+            // buy, so the best path hides node 3 below a bought node; the
+            // Craft All preset must still force-craft both levels.
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddSearchResult(2, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 2,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 2 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+            var priceApi = new InMemoryPriceApiClient();
+            // Buying 2 (50) beats crafting it (2x100=200); buying 1 (500)
+            // loses to crafting-from-bought-2 (50)
+            priceApi.AddPrice(1, buyUnitPrice: 10, sellUnitPrice: 500);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 50);
+            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Mid", "m.png");
+            itemApi.AddItem(3, "Base", "b.png");
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+            // Baseline: craft 1 from bought 2 (50)
+            Assert.Equal(50, initial.Plan.TotalCoinCost);
+
+            var craftAll = CraftingPlanPipeline.BuildPresetOverrides(
+                initial.SolveContext, AcquisitionSource.Craft);
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, craftAll);
+
+            // Now both levels craft: cost = 2x100 for item 3
+            Assert.Equal(200, resolved.Plan.TotalCoinCost);
+            Assert.Contains(resolved.Plan.Steps,
+                s => s.Source == AcquisitionSource.Craft && s.ItemId == 2);
+            // Metadata must cover items surfaced only by the override
+            // (regression: items under bought nodes were never fetched and
+            // rendered as "Unknown Item")
+            Assert.All(resolved.Plan.Steps,
+                s => Assert.True(resolved.ItemMetadata.ContainsKey(s.ItemId)));
+
+            // Buy All flips everything buyable to TP purchases
+            var buyAll = CraftingPlanPipeline.BuildPresetOverrides(
+                initial.SolveContext, AcquisitionSource.BuyFromTp);
+            var bought = pipeline.ResolveWithOverrides(initial.SolveContext, buyAll);
+            Assert.Single(bought.Plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, bought.Plan.Steps[0].Source);
+        }
+
+        [Fact]
         public async Task Structured_BuyOrderBasis_MaterialsCostedAtBuyOrders()
         {
             var pipeline = BuildEconomicsPipeline(out var priceApi);

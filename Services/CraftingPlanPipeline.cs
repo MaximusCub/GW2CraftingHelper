@@ -238,7 +238,11 @@ namespace GW2CraftingHelper.Services
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
 
             // Step 8: Fetch item metadata for all step items + target + used materials + tree items
-            var metadataIds = new HashSet<int>(plan.Steps.Select(s => s.ItemId));
+            // Fetch metadata for EVERY tree item (not just chosen-path ones):
+            // local override re-solves can surface any node's item in steps,
+            // and the cached SolveContext metadata must cover them all.
+            var metadataIds = new HashSet<int>(allItemIds);
+            metadataIds.UnionWith(plan.Steps.Select(s => s.ItemId));
             metadataIds.Add(targetItemId);
             if (usedMaterials != null)
             {
@@ -247,7 +251,6 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
-            CraftingTreeBuilder.CollectTreeItemIds(treeUsedForSolve, solveResult.Decisions, metadataIds);
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching item details ({metadataIds.Count} items)...",
@@ -279,6 +282,136 @@ namespace GW2CraftingHelper.Services
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(treeUsedForSolve, solveResult.Decisions, metadata);
 
+            ApplySellSideEconomics(
+                result, treeUsedForSolve, solveResult, prices,
+                targetItemId, quantity, priceBasis);
+
+            // Capture inputs so the UI can re-solve locally with per-node
+            // overrides (no network round-trips).
+            result.SolveContext = new PlanSolveContext
+            {
+                TargetItemId = targetItemId,
+                Quantity = quantity,
+                Tree = treeUsedForSolve,
+                Prices = prices,
+                VendorOffers = vendorOffers,
+                Metadata = metadata,
+                LearnedRecipeIds = learnedRecipeIds,
+                UsedMaterials = usedMaterials,
+                PriceBasis = priceBasis
+            };
+            sw.Stop();
+            timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
+
+            // Prepend timing log to debug entries from PlanResultBuilder
+            if (result.DebugLog == null)
+            {
+                result.DebugLog = new List<string>();
+            }
+            result.DebugLog.InsertRange(0, timingLog);
+            var summary = PlanTimingAnalyzer.Summarize(timingLog);
+            result.DebugLog.InsertRange(timingLog.Count, summary);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Re-solves a previously generated plan with per-node decision
+        /// overrides. Purely local: reuses the context's tree, prices,
+        /// offers, and metadata; no network calls.
+        /// </summary>
+        public CraftingPlanResult ResolveWithOverrides(
+            PlanSolveContext context,
+            IReadOnlyDictionary<int, AcquisitionSource> overrides)
+        {
+            var solveResult = _solver.Solve(
+                context.Tree, context.Prices, context.VendorOffers,
+                context.PriceBasis, overrides);
+
+            var resultBuilder = new PlanResultBuilder();
+            var result = resultBuilder.Build(
+                solveResult.Plan, context.Tree, context.Metadata,
+                context.UsedMaterials, context.LearnedRecipeIds);
+
+            var treeBuilder = new CraftingTreeBuilder();
+            result.CraftingTree = treeBuilder.BuildTree(
+                context.Tree, solveResult.Decisions, context.Metadata);
+
+            ApplySellSideEconomics(
+                result, context.Tree, solveResult, context.Prices,
+                context.TargetItemId, context.Quantity, context.PriceBasis);
+            result.SolveContext = context;
+
+            if (result.DebugLog == null)
+            {
+                result.DebugLog = new List<string>();
+            }
+            result.DebugLog.Insert(0,
+                $"Local re-solve with {overrides?.Count ?? 0} override(s)");
+
+            return result;
+        }
+
+        /// <summary>
+        /// Builds an override map forcing <paramref name="source"/> on every
+        /// node of the context's solver tree where it is feasible: nodes
+        /// with recipes for Craft, nodes priced under the context's basis
+        /// for BuyFromTp. Walks the full tree so nodes hidden beneath
+        /// bought intermediates are covered in a single pass.
+        /// </summary>
+        public static Dictionary<int, AcquisitionSource> BuildPresetOverrides(
+            PlanSolveContext context, AcquisitionSource source)
+        {
+            var overrides = new Dictionary<int, AcquisitionSource>();
+            CollectPresetOverrides(context.Tree, context, source, overrides);
+            return overrides;
+        }
+
+        private static void CollectPresetOverrides(
+            RecipeNode node,
+            PlanSolveContext context,
+            AcquisitionSource source,
+            Dictionary<int, AcquisitionSource> overrides)
+        {
+            if (node.IngredientType == "Item")
+            {
+                bool feasible = false;
+                if (source == AcquisitionSource.Craft)
+                {
+                    // Permissive: the solver ignores forced crafts whose cost
+                    // is not fully priceable, so stray entries are harmless.
+                    feasible = node.Recipes.Count > 0;
+                }
+                else if (source == AcquisitionSource.BuyFromTp)
+                {
+                    feasible = context.Prices != null &&
+                               context.Prices.TryGetValue(node.Id, out var price) &&
+                               PlanSolver.GetUnitPrice(price, context.PriceBasis) > 0;
+                }
+                if (feasible)
+                {
+                    overrides[node.NodeId] = source;
+                }
+            }
+
+            foreach (var recipe in node.Recipes)
+            {
+                foreach (var ingredient in recipe.Ingredients)
+                {
+                    CollectPresetOverrides(ingredient, context, source, overrides);
+                }
+            }
+        }
+
+        private static void ApplySellSideEconomics(
+            CraftingPlanResult result,
+            RecipeNode treeUsedForSolve,
+            SolveResult solveResult,
+            IReadOnlyDictionary<int, ItemPrice> prices,
+            int targetItemId,
+            int quantity,
+            PriceBasis priceBasis)
+        {
             // Sell-side economics: what the crafted quantity nets after TP
             // fees, and profit versus the plan's coin cost. Coin-only by
             // design - non-coin currency costs have no coin value here.
@@ -309,21 +442,8 @@ namespace GW2CraftingHelper.Services
                 result.TargetUnitSellPrice = targetPrice.SellInstant;
                 result.NetSaleValue = TradingPostMath.NetSaleRevenue(
                     targetPrice.SellInstant, sellableQuantity);
-                result.CraftingProfit = result.NetSaleValue.Value - plan.TotalCoinCost;
+                result.CraftingProfit = result.NetSaleValue.Value - solveResult.Plan.TotalCoinCost;
             }
-            sw.Stop();
-            timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
-
-            // Prepend timing log to debug entries from PlanResultBuilder
-            if (result.DebugLog == null)
-            {
-                result.DebugLog = new List<string>();
-            }
-            result.DebugLog.InsertRange(0, timingLog);
-            var summary = PlanTimingAnalyzer.Summarize(timingLog);
-            result.DebugLog.InsertRange(timingLog.Count, summary);
-
-            return result;
         }
 
         private static void CollectItemIds(RecipeNode node, HashSet<int> ids)
