@@ -158,7 +158,7 @@ namespace GW2CraftingHelper.Services
                                 {
                                     ItemId = item.Id,
                                     Count  = item.Count,
-                                    Source = "Character:" + name
+                                    Source = AccountItemIndex.CharacterSourcePrefix + name
                                 });
                             }
                         }

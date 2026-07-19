@@ -11,6 +11,11 @@ namespace GW2CraftingHelper.Services
         public const string SourceSharedInventory = "SharedInventory";
         public const string SourceBank = "Bank";
 
+        // Character sources are stored as "Character:<name>" (see Gw2AccountSnapshotService).
+        // The prefix also guarantees a character named e.g. "Bank" can never collide
+        // with a storage-location source key.
+        public const string CharacterSourcePrefix = "Character:";
+
         private static readonly IReadOnlyList<string> EmptySources = Array.Empty<string>();
 
         // itemId -> source -> count
@@ -103,11 +108,15 @@ namespace GW2CraftingHelper.Services
                 result.Add(SourceMaterialStorage);
             }
 
-            // Priority 2: Active character
-            if (!string.IsNullOrEmpty(activeCharacterName) &&
-                sourceSet.Remove(activeCharacterName))
+            // Priority 2: Active character. Callers pass the bare character name;
+            // index sources use the "Character:<name>" encoding.
+            if (!string.IsNullOrEmpty(activeCharacterName))
             {
-                result.Add(activeCharacterName);
+                string activeSource = CharacterSourcePrefix + activeCharacterName;
+                if (sourceSet.Remove(activeSource))
+                {
+                    result.Add(activeSource);
+                }
             }
 
             // Priority 3: SharedInventory

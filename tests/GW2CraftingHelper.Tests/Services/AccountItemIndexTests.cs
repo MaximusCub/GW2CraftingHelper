@@ -19,6 +19,13 @@ namespace GW2CraftingHelper.Tests.Services
             };
         }
 
+        // Character sources must use the same encoding production writes
+        // (Gw2AccountSnapshotService): "Character:<name>".
+        private static string CharSource(string name)
+        {
+            return AccountItemIndex.CharacterSourcePrefix + name;
+        }
+
         [Fact]
         public void EmptyItems_AllQueriesReturnZero()
         {
@@ -57,12 +64,12 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, 10, AccountItemIndex.SourceMaterialStorage),
                 Entry(100, 5, AccountItemIndex.SourceBank),
-                Entry(100, 3, "Alice")
+                Entry(100, 3, CharSource("Alice"))
             });
 
             Assert.Equal(10, index.GetQuantity(100, AccountItemIndex.SourceMaterialStorage));
             Assert.Equal(5, index.GetQuantity(100, AccountItemIndex.SourceBank));
-            Assert.Equal(3, index.GetQuantity(100, "Alice"));
+            Assert.Equal(3, index.GetQuantity(100, CharSource("Alice")));
         }
 
         [Fact]
@@ -143,7 +150,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Entry(100, 1, AccountItemIndex.SourceBank),
                 Entry(100, 2, AccountItemIndex.SourceSharedInventory),
                 Entry(100, 3, AccountItemIndex.SourceMaterialStorage),
-                Entry(100, 4, "Alice")
+                Entry(100, 4, CharSource("Alice"))
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(
@@ -151,7 +158,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(4, prioritized.Count);
             Assert.Equal(AccountItemIndex.SourceMaterialStorage, prioritized[0]);
-            Assert.Equal("Alice", prioritized[1]);
+            Assert.Equal(CharSource("Alice"), prioritized[1]);
             Assert.Equal(AccountItemIndex.SourceSharedInventory, prioritized[2]);
             Assert.Equal(AccountItemIndex.SourceBank, prioritized[3]);
         }
@@ -163,7 +170,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, 1, AccountItemIndex.SourceBank),
                 Entry(100, 2, AccountItemIndex.SourceMaterialStorage),
-                Entry(100, 3, "Bob")
+                Entry(100, 3, CharSource("Bob"))
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(
@@ -172,7 +179,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(3, prioritized.Count);
             Assert.Equal(AccountItemIndex.SourceMaterialStorage, prioritized[0]);
             Assert.Equal(AccountItemIndex.SourceBank, prioritized[1]);
-            Assert.Equal("Bob", prioritized[2]);
+            Assert.Equal(CharSource("Bob"), prioritized[2]);
         }
 
         [Fact]
@@ -180,18 +187,18 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 1, "Charlie"),
-                Entry(100, 2, "Alice"),
-                Entry(100, 3, "Bob")
+                Entry(100, 1, CharSource("Charlie")),
+                Entry(100, 2, CharSource("Alice")),
+                Entry(100, 3, CharSource("Bob"))
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(
                 100, index, null);
 
             Assert.Equal(3, prioritized.Count);
-            Assert.Equal("Alice", prioritized[0]);
-            Assert.Equal("Bob", prioritized[1]);
-            Assert.Equal("Charlie", prioritized[2]);
+            Assert.Equal(CharSource("Alice"), prioritized[0]);
+            Assert.Equal(CharSource("Bob"), prioritized[1]);
+            Assert.Equal(CharSource("Charlie"), prioritized[2]);
         }
 
         [Fact]
@@ -273,8 +280,8 @@ namespace GW2CraftingHelper.Tests.Services
             // Insert sources in non-alphabetical order
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 1, "Charlie"),
-                Entry(100, 2, "Alice"),
+                Entry(100, 1, CharSource("Charlie")),
+                Entry(100, 2, CharSource("Alice")),
                 Entry(100, 3, AccountItemIndex.SourceBank)
             });
 
@@ -283,10 +290,10 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(3, sources1.Count);
             Assert.Equal(sources1, sources2);
-            // Ordinal sorted: Alice < Bank < Charlie
-            Assert.Equal("Alice", sources1[0]);
-            Assert.Equal(AccountItemIndex.SourceBank, sources1[1]);
-            Assert.Equal("Charlie", sources1[2]);
+            // Ordinal sorted: Bank < Character:Alice < Character:Charlie
+            Assert.Equal(AccountItemIndex.SourceBank, sources1[0]);
+            Assert.Equal(CharSource("Alice"), sources1[1]);
+            Assert.Equal(CharSource("Charlie"), sources1[2]);
         }
 
         [Fact]
@@ -296,12 +303,12 @@ namespace GW2CraftingHelper.Tests.Services
             // Bank, plus two other characters
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 1, "Zara"),
+                Entry(100, 1, CharSource("Zara")),
                 Entry(100, 2, AccountItemIndex.SourceBank),
                 Entry(100, 3, AccountItemIndex.SourceSharedInventory),
                 Entry(100, 4, AccountItemIndex.SourceMaterialStorage),
-                Entry(100, 5, "ActiveHero"),
-                Entry(100, 6, "Alice")
+                Entry(100, 5, CharSource("ActiveHero")),
+                Entry(100, 6, CharSource("Alice"))
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(
@@ -309,11 +316,11 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(6, prioritized.Count);
             Assert.Equal(AccountItemIndex.SourceMaterialStorage, prioritized[0]);
-            Assert.Equal("ActiveHero", prioritized[1]);
+            Assert.Equal(CharSource("ActiveHero"), prioritized[1]);
             Assert.Equal(AccountItemIndex.SourceSharedInventory, prioritized[2]);
             Assert.Equal(AccountItemIndex.SourceBank, prioritized[3]);
-            Assert.Equal("Alice", prioritized[4]);
-            Assert.Equal("Zara", prioritized[5]);
+            Assert.Equal(CharSource("Alice"), prioritized[4]);
+            Assert.Equal(CharSource("Zara"), prioritized[5]);
         }
 
         [Fact]
@@ -322,6 +329,27 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("MaterialStorage", AccountItemIndex.SourceMaterialStorage);
             Assert.Equal("SharedInventory", AccountItemIndex.SourceSharedInventory);
             Assert.Equal("Bank", AccountItemIndex.SourceBank);
+            Assert.Equal("Character:", AccountItemIndex.CharacterSourcePrefix);
+        }
+
+        [Fact]
+        public void GetPrioritizedSources_BareNameSource_NotTreatedAsActiveCharacter()
+        {
+            // Regression guard: sources must be matched in the production
+            // "Character:<name>" encoding. A bare-name source (which production
+            // never writes) must not be promoted to the active-character slot.
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                Entry(100, 1, AccountItemIndex.SourceBank),
+                Entry(100, 2, "Alice")
+            });
+
+            var prioritized = AccountItemIndex.GetPrioritizedSources(
+                100, index, "Alice");
+
+            Assert.Equal(2, prioritized.Count);
+            Assert.Equal(AccountItemIndex.SourceBank, prioritized[0]);
+            Assert.Equal("Alice", prioritized[1]);
         }
     }
 }
