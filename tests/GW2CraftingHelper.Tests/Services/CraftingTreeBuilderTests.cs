@@ -102,6 +102,27 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void Rarity_PopulatedFromMetadata_NullWhenAbsent()
+        {
+            // Item 1 crafts from item 2; only item 2 has rarity metadata.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+            };
+            var metadata = new Dictionary<int, ItemMetadata>
+            {
+                { 1, new ItemMetadata { ItemId = 1, Name = "Sword", IconUrl = "s.png" } },
+                { 2, new ItemMetadata { ItemId = 2, Name = "Ingot", IconUrl = "i.png", Rarity = "Fine" } }
+            };
+
+            var node = BuildViaRealSolver(tree, prices, metadata);
+
+            Assert.Null(node.Rarity);
+            Assert.Equal("Fine", node.Children[0].Rarity);
+        }
+
+        [Fact]
         public void CraftNode_ChildrenAreIngredients()
         {
             // Item 1 crafts from 2x item 2. Craft is cheaper.

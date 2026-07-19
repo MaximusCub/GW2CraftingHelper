@@ -13,9 +13,9 @@ namespace GW2CraftingHelper.Tests.Helpers
 
         public IReadOnlyList<IReadOnlyList<int>> Calls => _calls;
 
-        public void AddItem(int id, string name, string icon)
+        public void AddItem(int id, string name, string icon, string rarity = null)
         {
-            _items[id] = new RawItem { Id = id, Name = name, Icon = icon };
+            _items[id] = new RawItem { Id = id, Name = name, Icon = icon, Rarity = rarity };
         }
 
         public Task<IReadOnlyList<RawItem>> GetItemsAsync(

@@ -10,6 +10,10 @@ namespace GW2CraftingHelper.Contracts
         public int ItemId { get; set; }
         public string Name { get; set; }
         public string IconUrl { get; set; }
+
+        // GW2 API rarity string (e.g. "Fine", "Exotic"); null/empty = unknown.
+        public string Rarity { get; set; }
+
         public int Quantity { get; set; }
         public CraftingDecision Decision { get; set; }
         public int? RecipeId { get; set; }

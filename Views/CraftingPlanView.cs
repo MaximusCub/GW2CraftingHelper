@@ -688,8 +688,13 @@ namespace GW2CraftingHelper.Views
             public int PanelWidth;
         }
 
+        // States for the current render pass; rebuilt with the tree itself.
+        private readonly List<TreeNodeState> _treeNodeStates = new List<TreeNodeState>();
+
         private void CreateTreeSection(CraftingTreeNode treeRoot, int panelWidth)
         {
+            _treeNodeStates.Clear();
+
             string arrow = "\u25BC";
             var headerPanel = new Panel()
             {
@@ -707,6 +712,22 @@ namespace GW2CraftingHelper.Views
                 Parent = headerPanel
             };
 
+            var expandAllButton = new StandardButton()
+            {
+                Text = "Expand All",
+                Size = new Point(92, 24),
+                Location = new Point(panelWidth - 196, 3),
+                Parent = headerPanel
+            };
+
+            var collapseAllButton = new StandardButton()
+            {
+                Text = "Collapse All",
+                Size = new Point(96, 24),
+                Location = new Point(panelWidth - 100, 3),
+                Parent = headerPanel
+            };
+
             var treeFlow = new FlowPanel()
             {
                 Size = new Point(panelWidth, 0),
@@ -718,8 +739,46 @@ namespace GW2CraftingHelper.Views
 
             RenderTreeNode(treeRoot, treeFlow, panelWidth, 0);
 
+            expandAllButton.Click += (_, __) =>
+            {
+                // Building children appends to _treeNodeStates; index loop
+                // deliberately walks the growing list.
+                for (int i = 0; i < _treeNodeStates.Count; i++)
+                {
+                    var s = _treeNodeStates[i];
+                    if (!s.ChildrenBuilt)
+                    {
+                        foreach (var child in s.Node.Children)
+                        {
+                            RenderTreeNode(child, s.ChildContainer, s.PanelWidth, s.Depth + 1);
+                        }
+                        s.ChildrenBuilt = true;
+                    }
+                    s.IsExpanded = true;
+                    s.ChildContainer.Visible = true;
+                    s.ArrowLabel.Text = "\u25BC";
+                }
+                treeFlow.Invalidate();
+            };
+
+            collapseAllButton.Click += (_, __) =>
+            {
+                foreach (var s in _treeNodeStates)
+                {
+                    s.IsExpanded = false;
+                    s.ChildContainer.Visible = false;
+                    s.ArrowLabel.Text = "\u25B6";
+                }
+                treeFlow.Invalidate();
+            };
+
             headerPanel.Click += (_, __) =>
             {
+                // Ignore clicks that landed on the header buttons.
+                if (expandAllButton.MouseOver || collapseAllButton.MouseOver)
+                {
+                    return;
+                }
                 treeFlow.Visible = !treeFlow.Visible;
                 headerLabel.Text = (treeFlow.Visible ? "\u25BC" : "\u25B6")
                     + " Recipe Tree";
@@ -732,8 +791,9 @@ namespace GW2CraftingHelper.Views
             const int indentPer = 24;
             const int arrowWidth = 18;
             const int iconSize = 32;
+            const int borderSize = iconSize + 2;
             const int iconPad = 4;
-            const int rowHeight = 36;
+            const int rowHeight = 40;
 
             int indent = depth * indentPer;
             bool hasChildren = node.Children.Count > 0;
@@ -741,7 +801,21 @@ namespace GW2CraftingHelper.Views
             var rowPanel = new Panel()
             {
                 Size = new Point(panelWidth, rowHeight),
+                BackgroundColor = Color.Transparent,
                 Parent = parent
+            };
+
+            // Hover wash (pattern per SuggestionPanel row highlighting).
+            // Color.White * 0.07f premultiplies alpha; a raw
+            // Color(255,255,255,18) renders as near-opaque white in XNA's
+            // premultiplied pipeline (verified via screenshot loop).
+            rowPanel.MouseEntered += (_, __) =>
+            {
+                rowPanel.BackgroundColor = Color.White * 0.07f;
+            };
+            rowPanel.MouseLeft += (_, __) =>
+            {
+                rowPanel.BackgroundColor = Color.Transparent;
             };
 
             // Expand/collapse arrow
@@ -754,17 +828,24 @@ namespace GW2CraftingHelper.Views
                     Text = defaultExpanded ? "\u25BC" : "\u25B6",
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(indent, 8),
+                    Location = new Point(indent, 12),
                     Parent = rowPanel
                 };
             }
 
-            // Item icon
+            // Item icon with 1px rarity-colored border
             int iconX = indent + (hasChildren ? arrowWidth : 0);
-            CreateItemIcon(rowPanel, node.IconUrl, iconX, 2);
+            var iconBorder = new Panel()
+            {
+                Size = new Point(borderSize, borderSize),
+                Location = new Point(iconX, 3),
+                BackgroundColor = GetRarityBorderColor(node.Rarity),
+                Parent = rowPanel
+            };
+            CreateItemIcon(iconBorder, node.IconUrl, 1, 1);
 
             // Quantity + name
-            int textX = iconX + iconSize + iconPad;
+            int textX = iconX + borderSize + iconPad;
             string nameText = node.Quantity > 0
                 ? $"{node.Quantity}x {node.Name}"
                 : node.Name;
@@ -773,11 +854,12 @@ namespace GW2CraftingHelper.Views
                 Text = nameText,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(textX, 8),
+                Location = new Point(textX, 12),
                 Parent = rowPanel
             };
 
-            // Decision badge
+            // Decision badge rendered as a subtle pill: measure the label
+            // first, then wrap it in a tinted background panel.
             int badgeX = textX + nameLabel.Width + 6;
             string badgeText = GetDecisionBadgeText(node.Decision);
             Color badgeColor = GetDecisionBadgeColor(node.Decision);
@@ -787,15 +869,23 @@ namespace GW2CraftingHelper.Views
                 TextColor = badgeColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(badgeX, 8),
                 Parent = rowPanel
             };
+            var badgePill = new Panel()
+            {
+                Size = new Point(badgeLabel.Width + 8, badgeLabel.Height + 4),
+                Location = new Point(badgeX, 10),
+                BackgroundColor = badgeColor * 0.25f,
+                Parent = rowPanel
+            };
+            badgeLabel.Parent = badgePill;
+            badgeLabel.Location = new Point(4, 2);
 
             // Cost display: inline coin for nodes with SubtreeCost
             if (node.SubtreeCost.HasValue && node.SubtreeCost.Value > 0)
             {
-                int costX = badgeX + badgeLabel.Width + 6;
-                BuildInlineCoin(rowPanel, node.SubtreeCost.Value, costX);
+                int costX = badgeX + badgePill.Width + 6;
+                BuildInlineCoin(rowPanel, node.SubtreeCost.Value, costX, 10);
             }
 
             // Child container
@@ -817,6 +907,7 @@ namespace GW2CraftingHelper.Views
                     ArrowLabel = arrowLabel,
                     PanelWidth = panelWidth
                 };
+                _treeNodeStates.Add(state);
                 if (depth < 2)
                 {
                     // Default-expanded: build children now
@@ -880,6 +971,26 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        /// <summary>
+        /// Standard GW2 rarity palette for icon borders. Unknown/absent rarity
+        /// (and Basic, whose canonical white would look borderless next to
+        /// tinted ones) renders a neutral dark grey - never guess a rarity.
+        /// </summary>
+        private static Color GetRarityBorderColor(string rarity)
+        {
+            switch (rarity)
+            {
+                case "Junk": return new Color(170, 170, 170);
+                case "Fine": return new Color(98, 164, 218);
+                case "Masterwork": return new Color(26, 147, 6);
+                case "Rare": return new Color(252, 208, 11);
+                case "Exotic": return new Color(255, 164, 5);
+                case "Ascended": return new Color(251, 62, 141);
+                case "Legendary": return new Color(76, 19, 157);
+                default: return new Color(60, 60, 60);
+            }
+        }
+
         // --- Coin display helpers (reused from original) ---
 
         private static void BuildCoinDisplay(Panel parent, long copper)
@@ -906,7 +1017,7 @@ namespace GW2CraftingHelper.Views
             AddCoinSegment(parent, x, 156902, cop.ToString(), 4);
         }
 
-        private static void BuildInlineCoin(Panel parent, long copper, int startX)
+        private static void BuildInlineCoin(Panel parent, long copper, int startX, int y = 6)
         {
             if (copper < 0) copper = 0;
 
@@ -915,9 +1026,9 @@ namespace GW2CraftingHelper.Views
             long cop = copper % 100;
 
             int x = startX;
-            x = AddCoinSegment(parent, x, 156904, gold.ToString(), 6);
-            x = AddCoinSegment(parent, x, 156907, silver.ToString(), 6);
-            AddCoinSegment(parent, x, 156902, cop.ToString(), 6);
+            x = AddCoinSegment(parent, x, 156904, gold.ToString(), y);
+            x = AddCoinSegment(parent, x, 156907, silver.ToString(), y);
+            AddCoinSegment(parent, x, 156902, cop.ToString(), y);
         }
 
         private static Color GetCoinColor(int assetId)
