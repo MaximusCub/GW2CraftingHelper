@@ -430,7 +430,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(100, 3, AccountItemIndex.SourceBank),
-                SnapEntry(100, 5, "Alice")
+                SnapEntry(100, 5, AccountItemIndex.CharacterSourcePrefix + "Alice")
             });
 
             var result = _reducer.Reduce(tree, index, "Alice");
@@ -438,7 +438,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, result.ReducedTree.Quantity);
             var sources = result.UsedMaterials[0].Sources;
             Assert.Single(sources);
-            Assert.Equal("Alice", sources[0].Source);
+            Assert.Equal(AccountItemIndex.CharacterSourcePrefix + "Alice", sources[0].Source);
             Assert.Equal(5, sources[0].Quantity);
         }
 
@@ -590,11 +590,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(100, 20);
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(100, 6, "Zephyr"),
+                SnapEntry(100, 6, AccountItemIndex.CharacterSourcePrefix + "Zephyr"),
                 SnapEntry(100, 2, AccountItemIndex.SourceBank),
                 SnapEntry(100, 3, AccountItemIndex.SourceSharedInventory),
                 SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(100, 4, "ActiveHero")
+                SnapEntry(100, 4, AccountItemIndex.CharacterSourcePrefix + "ActiveHero")
             });
 
             var result = _reducer.Reduce(tree, index, "ActiveHero");
@@ -608,10 +608,10 @@ namespace GW2CraftingHelper.Tests.Services
 
             // Verify each source contributed the right amount
             Assert.Equal(5, sources.First(s => s.Source == AccountItemIndex.SourceMaterialStorage).Quantity);
-            Assert.Equal(4, sources.First(s => s.Source == "ActiveHero").Quantity);
+            Assert.Equal(4, sources.First(s => s.Source == AccountItemIndex.CharacterSourcePrefix + "ActiveHero").Quantity);
             Assert.Equal(3, sources.First(s => s.Source == AccountItemIndex.SourceSharedInventory).Quantity);
             Assert.Equal(2, sources.First(s => s.Source == AccountItemIndex.SourceBank).Quantity);
-            Assert.Equal(6, sources.First(s => s.Source == "Zephyr").Quantity);
+            Assert.Equal(6, sources.First(s => s.Source == AccountItemIndex.CharacterSourcePrefix + "Zephyr").Quantity);
         }
 
         [Fact]
@@ -714,7 +714,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 4, "Zephyr"),
+                SnapEntry(2, 4, AccountItemIndex.CharacterSourcePrefix + "Zephyr"),
                 SnapEntry(2, 4, AccountItemIndex.SourceBank)
             });
 
@@ -724,9 +724,9 @@ namespace GW2CraftingHelper.Tests.Services
                 .First(u => u.ItemId == 2).Sources;
 
             Assert.Equal(2, sources.Count);
-            // Ordinal: "Bank" < "Zephyr"
+            // Ordinal: "Bank" < "Character:Zephyr"
             Assert.Equal(AccountItemIndex.SourceBank, sources[0].Source);
-            Assert.Equal("Zephyr", sources[1].Source);
+            Assert.Equal(AccountItemIndex.CharacterSourcePrefix + "Zephyr", sources[1].Source);
         }
 
         [Fact]
