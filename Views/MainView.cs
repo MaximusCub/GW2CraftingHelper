@@ -282,7 +282,8 @@ namespace GW2CraftingHelper.Views
 
             foreach (var item in items)
             {
-                string name = string.IsNullOrEmpty(item.Name) ? item.ItemId.ToString() : item.Name;
+                // Never display raw item IDs (repo invariant).
+                string name = string.IsNullOrEmpty(item.Name) ? "Unknown Item" : item.Name;
                 string text = $"{name} x{item.Count}  ({item.Source})";
                 CreateRow(item.IconUrl, text);
             }
@@ -294,7 +295,8 @@ namespace GW2CraftingHelper.Views
 
             foreach (var entry in _snapshot.Wallet)
             {
-                string name = string.IsNullOrEmpty(entry.CurrencyName) ? $"Currency #{entry.CurrencyId}" : entry.CurrencyName;
+                // Never display raw currency IDs (repo invariant).
+                string name = string.IsNullOrEmpty(entry.CurrencyName) ? "Unknown Currency" : entry.CurrencyName;
                 string text = $"{name}: {entry.Value:N0}";
                 CreateRow(entry.IconUrl, text);
             }

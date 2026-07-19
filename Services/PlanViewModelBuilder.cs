@@ -151,12 +151,14 @@ namespace GW2CraftingHelper.Services
             {
                 string name = ResolveName(um.ItemId, result.ItemMetadata);
                 string iconUrl = ResolveIconUrl(um.ItemId, result.ItemMetadata);
+                string rarity = ResolveRarity(um.ItemId, result.ItemMetadata);
 
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.UsedMaterial,
                     Label = name,
                     IconUrl = iconUrl,
+                    Rarity = rarity,
                     Quantity = um.QuantityUsed
                 });
             }
@@ -178,6 +180,7 @@ namespace GW2CraftingHelper.Services
             {
                 string name = ResolveName(step.ItemId, result.ItemMetadata);
                 string iconUrl = ResolveIconUrl(step.ItemId, result.ItemMetadata);
+                string rarity = ResolveRarity(step.ItemId, result.ItemMetadata);
                 PlanRowType rowType = MapShoppingRowType(step.Source);
 
                 section.Rows.Add(new PlanRowViewModel
@@ -185,6 +188,7 @@ namespace GW2CraftingHelper.Services
                     RowType = rowType,
                     Label = name,
                     IconUrl = iconUrl,
+                    Rarity = rarity,
                     Quantity = step.Quantity,
                     CoinValue = step.TotalCost
                 });
@@ -209,6 +213,7 @@ namespace GW2CraftingHelper.Services
             {
                 string name = ResolveName(step.ItemId, result.ItemMetadata);
                 string iconUrl = ResolveIconUrl(step.ItemId, result.ItemMetadata);
+                string rarity = ResolveRarity(step.ItemId, result.ItemMetadata);
 
                 // Find discipline info from RequiredRecipes
                 string sublabel = "";
@@ -229,6 +234,7 @@ namespace GW2CraftingHelper.Services
                     Label = name,
                     Sublabel = sublabel,
                     IconUrl = iconUrl,
+                    Rarity = rarity,
                     Quantity = step.Quantity
                 });
             }
@@ -273,6 +279,7 @@ namespace GW2CraftingHelper.Services
             {
                 string name = ResolveName(recipe.OutputItemId, result.ItemMetadata);
                 string iconUrl = ResolveIconUrl(recipe.OutputItemId, result.ItemMetadata);
+                string rarity = ResolveRarity(recipe.OutputItemId, result.ItemMetadata);
 
                 string statusTag;
                 if (recipe.IsAutoLearned)
@@ -301,6 +308,7 @@ namespace GW2CraftingHelper.Services
                     Label = name,
                     Sublabel = sublabel,
                     IconUrl = iconUrl,
+                    Rarity = rarity,
                     StatusTag = statusTag
                 });
             }
@@ -343,6 +351,17 @@ namespace GW2CraftingHelper.Services
                 metadata.TryGetValue(itemId, out var meta))
             {
                 return meta.IconUrl;
+            }
+            return null;
+        }
+
+        private static string ResolveRarity(
+            int itemId, IReadOnlyDictionary<int, ItemMetadata> metadata)
+        {
+            if (metadata != null &&
+                metadata.TryGetValue(itemId, out var meta))
+            {
+                return meta.Rarity;
             }
             return null;
         }
