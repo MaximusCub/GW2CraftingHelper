@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Contracts;
@@ -84,12 +85,37 @@ namespace GW2CraftingHelper.Services
             };
 
             // CoinTotal row
+            string basisSuffix = result.PriceBasis == PriceBasis.BuyOrder
+                ? " (buy-order prices)"
+                : "";
             section.Rows.Add(new PlanRowViewModel
             {
                 RowType = PlanRowType.CoinTotal,
-                Label = "Total",
+                Label = "Total" + basisSuffix,
                 CoinValue = result.Plan.TotalCoinCost
             });
+
+            // Sell-side rows: only when the target has a live sell price.
+            if (result.NetSaleValue.HasValue)
+            {
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CoinTotal,
+                    Label = "Sell value (after 15% TP fees)",
+                    CoinValue = result.NetSaleValue.Value
+                });
+
+                long profit = result.CraftingProfit ?? 0L;
+                bool hasCurrencyCosts = result.Plan.CurrencyCosts != null &&
+                                        result.Plan.CurrencyCosts.Count > 0;
+                string qualifier = hasCurrencyCosts ? " (coin costs only)" : "";
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CoinTotal,
+                    Label = (profit >= 0 ? "Profit if sold" : "Loss if sold") + qualifier,
+                    CoinValue = Math.Abs(profit)
+                });
+            }
 
             // CurrencyCost rows
             if (result.Plan.CurrencyCosts != null)

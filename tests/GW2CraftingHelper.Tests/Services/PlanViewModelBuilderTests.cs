@@ -683,5 +683,79 @@ namespace GW2CraftingHelper.Tests.Services
             var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
             Assert.Equal("Weaponsmith 400", section.Rows[0].Sublabel);
         }
+
+        // --- Sell-side economics rows ---
+
+        [Fact]
+        public void NoSellPrice_NoSellRows()
+        {
+            var result = MakeResult(totalCoinCost: 500);
+            var vm = _builder.Build(result);
+
+            var rows = vm.Sections[0].Rows;
+            Assert.Single(rows);
+            Assert.Equal("Total", rows[0].Label);
+        }
+
+        [Fact]
+        public void SellValuePresent_AddsSellAndProfitRows()
+        {
+            var result = MakeResult(totalCoinCost: 300);
+            result.TargetUnitSellPrice = 400;
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 40;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal(3, rows.Count);
+            Assert.Equal("Sell value (after 15% TP fees)", rows[1].Label);
+            Assert.Equal(340L, rows[1].CoinValue);
+            Assert.Equal("Profit if sold", rows[2].Label);
+            Assert.Equal(40L, rows[2].CoinValue);
+        }
+
+        [Fact]
+        public void NegativeProfit_RendersAsLossWithAbsoluteValue()
+        {
+            var result = MakeResult(totalCoinCost: 500);
+            result.NetSaleValue = 340;
+            result.CraftingProfit = -160;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal("Loss if sold", rows[2].Label);
+            Assert.Equal(160L, rows[2].CoinValue);
+        }
+
+        [Fact]
+        public void CurrencyCostsPresent_ProfitRowGetsCoinOnlyQualifier()
+        {
+            var result = MakeResult(
+                totalCoinCost: 100,
+                currencyCosts: new List<CurrencyCost>
+                {
+                    new CurrencyCost { CurrencyId = 2, Amount = 50 }
+                });
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 240;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal("Profit if sold (coin costs only)", rows[2].Label);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_TotalRowLabeled()
+        {
+            var result = MakeResult(totalCoinCost: 100);
+            result.PriceBasis = PriceBasis.BuyOrder;
+
+            var vm = _builder.Build(result);
+
+            Assert.Equal("Total (buy-order prices)", vm.Sections[0].Rows[0].Label);
+        }
     }
 }

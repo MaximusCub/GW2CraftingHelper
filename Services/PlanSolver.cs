@@ -23,7 +23,8 @@ namespace GW2CraftingHelper.Services
         public SolveResult Solve(
             RecipeNode tree,
             IReadOnlyDictionary<int, ItemPrice> prices,
-            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers)
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
+            PriceBasis priceBasis = PriceBasis.InstantBuy)
         {
             var memo = new Dictionary<int, Decision>();
 
@@ -32,7 +33,7 @@ namespace GW2CraftingHelper.Services
             AssignNodeIds(tree, ref nextNodeId);
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo);
+            Evaluate(tree, prices, vendorOffers, memo, priceBasis);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -113,14 +114,15 @@ namespace GW2CraftingHelper.Services
             RecipeNode node,
             IReadOnlyDictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
-            Dictionary<int, Decision> memo)
+            Dictionary<int, Decision> memo,
+            PriceBasis priceBasis)
         {
             if (node.IngredientType == "Currency")
             {
                 return null;
             }
 
-            long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices);
+            long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices, priceBasis);
 
             // Evaluate vendor offers. Offers costing only coin (directly or via
             // TP-priced item barter) are comparable with TP/craft coin costs and
@@ -130,7 +132,7 @@ namespace GW2CraftingHelper.Services
             // option. They are kept only as a fallback when nothing priceable
             // exists (repo invariant: avoid invalid currency comparisons).
             EvaluateVendorOffers(
-                node, prices, vendorOffers,
+                node, prices, vendorOffers, priceBasis,
                 out long? comparableVendorCoinCost,
                 out long? fallbackVendorCoinCost,
                 out List<CostLine> fallbackVendorCurrencyCosts);
@@ -199,7 +201,7 @@ namespace GW2CraftingHelper.Services
                         continue;
                     }
 
-                    long? ingredientCost = Evaluate(ingredient, prices, vendorOffers, memo);
+                    long? ingredientCost = Evaluate(ingredient, prices, vendorOffers, memo, priceBasis);
                     if (!ingredientCost.HasValue)
                     {
                         allPriceable = false;
@@ -310,6 +312,7 @@ namespace GW2CraftingHelper.Services
             RecipeNode node,
             IReadOnlyDictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
+            PriceBasis priceBasis,
             out long? bestComparableCoinCost,
             out long? fallbackCoinCost,
             out List<CostLine> fallbackCurrencyCosts)
@@ -352,10 +355,12 @@ namespace GW2CraftingHelper.Services
                     }
                     else if (string.Equals(cost.Type, "Item", StringComparison.Ordinal))
                     {
-                        if (prices.TryGetValue(cost.Id, out var itemPrice) &&
-                            itemPrice.BuyInstant > 0)
+                        int unitPrice = prices.TryGetValue(cost.Id, out var itemPrice)
+                            ? GetUnitPrice(itemPrice, priceBasis)
+                            : 0;
+                        if (unitPrice > 0)
                         {
-                            coinCost += (long)cost.Count * itemPrice.BuyInstant;
+                            coinCost += (long)cost.Count * unitPrice;
                         }
                         else
                         {
@@ -599,13 +604,31 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        private long? GetBuyCost(int itemId, int quantity, IReadOnlyDictionary<int, ItemPrice> prices)
+        private long? GetBuyCost(
+            int itemId, int quantity,
+            IReadOnlyDictionary<int, ItemPrice> prices,
+            PriceBasis priceBasis)
         {
-            if (prices.TryGetValue(itemId, out var price) && price.BuyInstant > 0)
+            if (prices.TryGetValue(itemId, out var price))
             {
-                return (long)quantity * price.BuyInstant;
+                int unitPrice = GetUnitPrice(price, priceBasis);
+                if (unitPrice > 0)
+                {
+                    return (long)quantity * unitPrice;
+                }
             }
             return null;
+        }
+
+        /// <summary>
+        /// Unit acquisition cost under the chosen basis: lowest sell listing
+        /// (instant) or highest buy order (patient). 0 = not priceable.
+        /// </summary>
+        private static int GetUnitPrice(ItemPrice price, PriceBasis priceBasis)
+        {
+            return priceBasis == PriceBasis.BuyOrder
+                ? price.SellInstant
+                : price.BuyInstant;
         }
     }
 }

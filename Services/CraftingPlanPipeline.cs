@@ -147,7 +147,8 @@ namespace GW2CraftingHelper.Services
         public async Task<CraftingPlanResult> GenerateStructuredAsync(
             int targetItemId, int quantity, AccountSnapshot snapshot,
             CancellationToken ct, IProgress<PlanStatus> progress = null,
-            string activeCharacterName = null)
+            string activeCharacterName = null,
+            PriceBasis priceBasis = PriceBasis.InstantBuy)
         {
             var sw = new Stopwatch();
             var timingLog = new List<string>();
@@ -231,7 +232,7 @@ namespace GW2CraftingHelper.Services
             // Step 7: Solve
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
-            var solveResult = _solver.Solve(treeUsedForSolve, prices, vendorOffers);
+            var solveResult = _solver.Solve(treeUsedForSolve, prices, vendorOffers, priceBasis);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -277,6 +278,19 @@ namespace GW2CraftingHelper.Services
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(treeUsedForSolve, solveResult.Decisions, metadata);
+
+            // Sell-side economics: what the crafted quantity nets after TP
+            // fees, and profit versus the plan's coin cost. Coin-only by
+            // design - non-coin currency costs have no coin value here.
+            result.PriceBasis = priceBasis;
+            if (prices.TryGetValue(targetItemId, out var targetPrice) &&
+                targetPrice.SellInstant > 0)
+            {
+                result.TargetUnitSellPrice = targetPrice.SellInstant;
+                result.NetSaleValue = TradingPostMath.NetSaleRevenue(
+                    targetPrice.SellInstant, quantity);
+                result.CraftingProfit = result.NetSaleValue.Value - plan.TotalCoinCost;
+            }
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
 

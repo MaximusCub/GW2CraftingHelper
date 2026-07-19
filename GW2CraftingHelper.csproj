@@ -61,6 +61,8 @@
     <Compile Include="Services\RecipeService.cs" />
     <Compile Include="Services\BoundedConcurrency.cs" />
     <Compile Include="Models\ItemPrice.cs" />
+    <Compile Include="Models\PriceBasis.cs" />
+    <Compile Include="Services\TradingPostMath.cs" />
     <Compile Include="Services\IPriceApiClient.cs" />
     <Compile Include="Services\TradingPostService.cs" />
     <Compile Include="Models\AcquisitionSource.cs" />
