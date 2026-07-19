@@ -538,5 +538,180 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
             Assert.Equal(300, plan.TotalCoinCost);
         }
+
+        // --- Mixed-currency vendor offer tests ---
+        // Offers with non-coin currency lines must never win a coin-cost
+        // comparison (their coin part alone is not their real price); they may
+        // only be used when no coin-priceable option exists.
+
+        private static VendorOffer MixedVendorOffer(
+            int outputItemId, int coinCost, int currencyId, int currencyCount, int outputCount = 1)
+        {
+            var costLines = new List<CostLine>();
+            if (coinCost > 0)
+            {
+                costLines.Add(new CostLine
+                {
+                    Type = "Currency",
+                    Id = Gw2Constants.CoinCurrencyId,
+                    Count = coinCost
+                });
+            }
+            costLines.Add(new CostLine { Type = "Currency", Id = currencyId, Count = currencyCount });
+
+            return new VendorOffer
+            {
+                OfferId = "test-mixed-" + outputItemId + "-" + currencyId + "-" + currencyCount,
+                OutputItemId = outputItemId,
+                OutputCount = outputCount,
+                CostLines = costLines,
+                MerchantName = "Mixed Vendor",
+                Locations = new List<string>()
+            };
+        }
+
+        [Fact]
+        public void MixedCurrencyVendor_DoesNotBeatTpPrice()
+        {
+            // Regression: a karma-priced offer used to be rated by its coin part
+            // (here 0) and always beat any TP price.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(500, plan.TotalCoinCost);
+            Assert.Empty(plan.CurrencyCosts);
+        }
+
+        [Fact]
+        public void MixedCurrencyVendor_DoesNotBeatPriceableCraft()
+        {
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 10, 2, 50) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            // Craft (2 x 50 = 100 coin) wins over the incomparable mixed offer.
+            Assert.Contains(plan.Steps, s => s.Source == AcquisitionSource.Craft && s.ItemId == 1);
+            Assert.Empty(plan.CurrencyCosts);
+        }
+
+        [Fact]
+        public void MixedCurrencyVendor_FallbackForUnpriceableCraftNode()
+        {
+            // Output has a recipe whose ingredient has no TP price, and a mixed
+            // vendor offer: the offer is the only complete acquisition.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 25, 2, 50) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(25, plan.TotalCoinCost);
+            Assert.Single(plan.CurrencyCosts);
+            Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
+            Assert.Equal(50, plan.CurrencyCosts[0].Amount);
+        }
+
+        [Fact]
+        public void MixedVendorOffers_FallbackPicksLowerCoinPart()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    1, new List<VendorOffer>
+                    {
+                        MixedVendorOffer(1, 100, 2, 50),
+                        MixedVendorOffer(1, 50, 2, 500)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Equal(50, plan.TotalCoinCost);
+            Assert.Equal(500, plan.CurrencyCosts[0].Amount);
+        }
+
+        [Fact]
+        public void MixedVendorOffers_CoinTie_FewerCurrencyUnitsWins()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    1, new List<VendorOffer>
+                    {
+                        MixedVendorOffer(1, 100, 2, 90),
+                        MixedVendorOffer(1, 100, 2, 40)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Equal(100, plan.TotalCoinCost);
+            Assert.Equal(40, plan.CurrencyCosts[0].Amount);
+        }
+
+        [Fact]
+        public void MixedOfferPresent_PureCoinOfferStillComparable()
+        {
+            // TP 150 vs pure-coin vendor 200 vs mixed offer with coin part 10:
+            // the mixed offer must not hijack the comparison; TP wins.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 150 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    1, new List<VendorOffer>
+                    {
+                        CoinVendorOffer(1, 200),
+                        MixedVendorOffer(1, 10, 2, 50)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(150, plan.TotalCoinCost);
+            Assert.Empty(plan.CurrencyCosts);
+        }
     }
 }
