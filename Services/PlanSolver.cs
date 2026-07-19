@@ -178,7 +178,11 @@ namespace GW2CraftingHelper.Services
 
                 if (allPriceable)
                 {
-                    if (!bestCraftCost.HasValue || craftCost < bestCraftCost.Value)
+                    // Cost tie-break: lowest RecipeId, so the choice is
+                    // deterministic regardless of recipe list order.
+                    if (!bestCraftCost.HasValue ||
+                        craftCost < bestCraftCost.Value ||
+                        (craftCost == bestCraftCost.Value && recipe.RecipeId < bestRecipeId))
                     {
                         bestCraftCost = craftCost;
                         bestRecipeId = recipe.RecipeId;

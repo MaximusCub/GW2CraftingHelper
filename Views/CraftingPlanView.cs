@@ -293,8 +293,10 @@ namespace GW2CraftingHelper.Views
 
         private async Task TriggerGenerate()
         {
-            // Parse quantity
-            if (!int.TryParse(_qtyInput?.Text, out int qty) || qty < 1)
+            // Parse quantity; tell the user when their input was discarded
+            // instead of silently resetting it.
+            bool qtyInvalid = !int.TryParse(_qtyInput?.Text, out int qty) || qty < 1;
+            if (qtyInvalid)
             {
                 qty = 1;
                 if (_qtyInput != null) _qtyInput.Text = "1";
@@ -303,7 +305,9 @@ namespace GW2CraftingHelper.Views
 
             _generateButton.Enabled = false;
             _lastDebugLog = null;
-            SetStatus("Generating...");
+            SetStatus(qtyInvalid
+                ? "Quantity was invalid - reset to 1. Generating..."
+                : "Generating...");
 
             var statusProgress = new Progress<PlanStatus>(ps =>
             {
@@ -346,6 +350,10 @@ namespace GW2CraftingHelper.Views
         private void RenderPlan(PlanViewModel vm)
         {
             if (_contentPanel == null) return;
+
+            // Drop tree states up front so a plan without a tree section
+            // does not retain disposed controls from the previous render.
+            _treeNodeStates.Clear();
 
             foreach (var child in _contentPanel.Children.ToArray())
             {
@@ -459,21 +467,31 @@ namespace GW2CraftingHelper.Views
                 ? userExpanded
                 : section.IsDefaultExpanded;
 
-            // Section header (clickable)
-            string arrow = expanded ? "\u25BC" : "\u25B6";
+            // Section header (clickable). The arrow gets its own label in
+            // the default font: DefaultFont18 has no glyph for the triangle
+            // characters, so an arrow embedded in the title never rendered.
             var headerPanel = new Panel()
             {
                 Size = new Point(panelWidth, 30),
                 Parent = _contentPanel
             };
 
+            var headerArrow = new Label()
+            {
+                Text = expanded ? "\u25BC" : "\u25B6",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(4, 8),
+                Parent = headerPanel
+            };
+
             var headerLabel = new Label()
             {
-                Text = $"{arrow} {section.Title}",
+                Text = section.Title,
                 Font = GameService.Content.DefaultFont18,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(4, 4),
+                Location = new Point(22, 4),
                 Parent = headerPanel
             };
 
@@ -498,8 +516,7 @@ namespace GW2CraftingHelper.Views
             {
                 contentFlow.Visible = !contentFlow.Visible;
                 _sectionExpansion[section.SectionType] = contentFlow.Visible;
-                headerLabel.Text = (contentFlow.Visible ? "\u25BC" : "\u25B6")
-                    + " " + section.Title;
+                headerArrow.Text = contentFlow.Visible ? "\u25BC" : "\u25B6";
                 _contentPanel.Invalidate();
             };
         }
@@ -576,7 +593,7 @@ namespace GW2CraftingHelper.Views
                 Parent = parent
             };
 
-            CreateItemIcon(rowPanel, row.IconUrl, 4, 2);
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 4, 1);
 
             new Label()
             {
@@ -596,7 +613,7 @@ namespace GW2CraftingHelper.Views
                 Parent = parent
             };
 
-            CreateItemIcon(rowPanel, row.IconUrl, 4, 2);
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 4, 1);
 
             string prefix;
             switch (row.RowType)
@@ -641,7 +658,7 @@ namespace GW2CraftingHelper.Views
                 Parent = parent
             };
 
-            CreateItemIcon(rowPanel, row.IconUrl, 4, 2);
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 4, 1);
 
             string text = $"Craft {row.Quantity}x {row.Label}";
             if (!string.IsNullOrEmpty(row.Sublabel))
@@ -688,7 +705,7 @@ namespace GW2CraftingHelper.Views
                 Parent = parent
             };
 
-            CreateItemIcon(rowPanel, row.IconUrl, 4, 2);
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 4, 1);
 
             string statusSuffix = !string.IsNullOrEmpty(row.StatusTag)
                 ? $" - {row.StatusTag}"
@@ -748,20 +765,28 @@ namespace GW2CraftingHelper.Views
         {
             _treeNodeStates.Clear();
 
-            string arrow = "\u25BC";
             var headerPanel = new Panel()
             {
                 Size = new Point(panelWidth, 30),
                 Parent = _contentPanel
             };
 
+            var headerArrow = new Label()
+            {
+                Text = "\u25BC",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(4, 8),
+                Parent = headerPanel
+            };
+
             var headerLabel = new Label()
             {
-                Text = $"{arrow} Recipe Tree",
+                Text = "Recipe Tree",
                 Font = GameService.Content.DefaultFont18,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(4, 4),
+                Location = new Point(22, 4),
                 Parent = headerPanel
             };
 
@@ -860,18 +885,25 @@ namespace GW2CraftingHelper.Views
                 treeFlow.Invalidate();
             };
 
+            // Guard uses PRESS-time hover state: with a release-time check,
+            // pressing on the header background and releasing over a button
+            // dropped the click entirely (neither toggle nor button fired).
+            bool pressStartedOnButton = false;
+            headerPanel.LeftMouseButtonPressed += (_, __) =>
+            {
+                pressStartedOnButton =
+                    expandAllButton.MouseOver || collapseAllButton.MouseOver ||
+                    bestPathButton.MouseOver || craftAllButton.MouseOver ||
+                    buyAllButton.MouseOver;
+            };
             headerPanel.Click += (_, __) =>
             {
-                // Ignore clicks that landed on the header buttons.
-                if (expandAllButton.MouseOver || collapseAllButton.MouseOver ||
-                    bestPathButton.MouseOver || craftAllButton.MouseOver ||
-                    buyAllButton.MouseOver)
+                if (pressStartedOnButton)
                 {
                     return;
                 }
                 treeFlow.Visible = !treeFlow.Visible;
-                headerLabel.Text = (treeFlow.Visible ? "\u25BC" : "\u25B6")
-                    + " Recipe Tree";
+                headerArrow.Text = treeFlow.Visible ? "\u25BC" : "\u25B6";
                 _contentPanel.Invalidate();
             };
         }
@@ -998,14 +1030,7 @@ namespace GW2CraftingHelper.Views
 
             // Item icon with 1px rarity-colored border
             int iconX = indent + (hasChildren ? arrowWidth : 0);
-            var iconBorder = new Panel()
-            {
-                Size = new Point(borderSize, borderSize),
-                Location = new Point(iconX, 3),
-                BackgroundColor = GetRarityBorderColor(node.Rarity),
-                Parent = rowPanel
-            };
-            CreateItemIcon(iconBorder, node.IconUrl, 1, 1);
+            CreateRarityFramedIcon(rowPanel, node.IconUrl, node.Rarity, iconX, 3);
 
             // Quantity + name
             int textX = iconX + borderSize + iconPad;
@@ -1045,6 +1070,13 @@ namespace GW2CraftingHelper.Views
             };
             badgeLabel.Parent = badgePill;
             badgeLabel.Location = new Point(4, 2);
+
+            if (node.UnitCost.HasValue && node.Quantity > 1 &&
+                (node.Decision == CraftingDecision.BuyFromTp ||
+                 node.Decision == CraftingDecision.BuyFromVendor))
+            {
+                rowPanel.BasicTooltipText = "Unit price: " + FormatCoinText(node.UnitCost.Value);
+            }
 
             AcquisitionSource? nextSource = GetNextCyclableSource(node);
             if (nextSource.HasValue && _resolveOverridesSync != null)
@@ -1158,6 +1190,15 @@ namespace GW2CraftingHelper.Views
         /// (and Basic, whose canonical white would look borderless next to
         /// tinted ones) renders a neutral dark grey - never guess a rarity.
         /// </summary>
+        private static string FormatCoinText(long copper)
+        {
+            if (copper < 0) copper = 0;
+            long gold = copper / 10000;
+            long silver = (copper % 10000) / 100;
+            long cop = copper % 100;
+            return $"{gold}g {silver}s {cop}c";
+        }
+
         private static Color GetRarityBorderColor(string rarity)
         {
             switch (rarity)
@@ -1252,6 +1293,22 @@ namespace GW2CraftingHelper.Views
         }
 
         // --- Icon helper ---
+
+        /// <summary>
+        /// 32px item icon inside a 1px rarity-colored frame (34px overall).
+        /// </summary>
+        private static void CreateRarityFramedIcon(
+            Panel parent, string iconUrl, string rarity, int x, int y)
+        {
+            var frame = new Panel()
+            {
+                Size = new Point(34, 34),
+                Location = new Point(x, y),
+                BackgroundColor = GetRarityBorderColor(rarity),
+                Parent = parent
+            };
+            CreateItemIcon(frame, iconUrl, 1, 1);
+        }
 
         private static void CreateItemIcon(Panel parent, string iconUrl, int x, int y)
         {

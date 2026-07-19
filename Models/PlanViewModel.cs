@@ -50,6 +50,9 @@ namespace GW2CraftingHelper.Models
         public string Label { get; set; }
         public string Sublabel { get; set; }
         public string IconUrl { get; set; }
+
+        // GW2 API rarity string; null/empty = unknown (neutral border).
+        public string Rarity { get; set; }
         public int Quantity { get; set; }
         public long CoinValue { get; set; }
         public string StatusTag { get; set; }
