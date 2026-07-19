@@ -46,13 +46,12 @@ namespace GW2CraftingHelper
         internal Gw2ApiManager Gw2ApiManager => this.ModuleParameters.Gw2ApiManager;
 
         private CornerIcon _cornerIcon;
-        private ResizableModuleWindow _mainWindow;
+        private ResizableTabbedWindow _mainWindow;
         private ModalDialog _modalDialog;
-        private ShellView _shellView;
-
-        // M17 spike: TabbedWindow2 alongside existing window for validation
-        private ResizableTabbedWindow _spikeWindow;
-        private MainView _spikeSnapshotContent;
+        private MainView _snapshotContent;
+        private CraftingPlanView _craftingContent;
+        private LogTabContent _logContent;
+        private Tab _logTab;
 
         private ModuleSettings _settings;
         private SnapshotStore _snapshotStore;
@@ -205,19 +204,115 @@ namespace GW2CraftingHelper
                 _emblemTexture = _moduleIconTexture;
             }
 
-            _mainWindow = new ResizableModuleWindow(
-                AsyncTexture2D.FromAssetId(155997),
-                new Rectangle(25, 26, 560, 640),
-                new Rectangle(40, 50, 540, 590)
-            )
+            _modalDialog = new ModalDialog(_settings);
+
+            _snapshotContent = new MainView(
+                _currentSnapshot,
+                _lastStatus,
+                UserRefreshAsync,
+                ClearCache,
+                SaveStatus
+            );
+
+            _craftingContent = new CraftingPlanView(
+                (itemId, qty, useOwn, ct, progress) =>
+                {
+                    string activeChar = null;
+                    try
+                    {
+                        var mumble = GameService.Gw2Mumble;
+                        if (mumble != null &&
+                            mumble.PlayerCharacter != null &&
+                            !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
+                        {
+                            activeChar = mumble.PlayerCharacter.Name;
+                        }
+                    }
+                    catch
+                    {
+                        // Gw2Mumble unavailable - graceful fallback
+                    }
+
+                    if (useOwn)
+                    {
+                        return _craftingPipeline.GenerateStructuredAsync(
+                            itemId, qty, _currentSnapshot, ct, progress,
+                            activeChar);
+                    }
+                    return _craftingPipeline.GenerateStructuredAsync(
+                        itemId, qty, null, ct, progress);
+                },
+                _modalDialog,
+                _itemSearchProvider
+            );
+
+            // Minimum size (930x710) matches the window region intentionally.
+            // Validated in-game to align with Event Table / Blish HUD's own
+            // TabbedWindow dimensions and the 1024x1024 background texture (502049).
+            _mainWindow = new ResizableTabbedWindow(
+                AsyncTexture2D.FromAssetId(502049),
+                new Rectangle(35, 26, 930, 710),
+                new Rectangle(81, 11, 884, 710),
+                new Point(930, 710))
             {
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "GW2 Crafting Helper",
-                Id = $"{nameof(Module)}_MainWindow_38d37290",
+                Emblem = new AsyncTexture2D(_emblemTexture),
+                Id = $"{nameof(Module)}_MainWindow",
+                Location = new Point(
+                    (GameService.Graphics.SpriteScreen.Width - 930) / 2,
+                    (GameService.Graphics.SpriteScreen.Height - 710) / 2),
                 SavesPosition = true
             };
 
-            _modalDialog = new ModalDialog(_settings);
+            _mainWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(156699),
+                () => new ViewAdapter("Snapshot", c => _snapshotContent.Build(c)),
+                "Snapshot"));
+
+            _mainWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(156711),
+                () => new ViewAdapter("Crafting Plan", c => _craftingContent.Build(c)),
+                "Crafting Plan"));
+
+            _logTab = new Tab(
+                AsyncTexture2D.FromAssetId(156701),
+                () => new ViewAdapter("Log", c =>
+                {
+                    _logContent = new LogTabContent(() => _craftingContent.LastDebugLog);
+                    _logContent.Build(c);
+                }),
+                "Log");
+            _mainWindow.Tabs.Add(_logTab);
+
+            _mainWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(156691),
+                () => new ViewAdapter("Plan History", BuildPlaceholder),
+                "Plan History"));
+
+            _mainWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(156686),
+                () => new ViewAdapter("Crafting Ranker", BuildPlaceholder),
+                "Crafting Ranker"));
+
+            _mainWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(156736),
+                () => new ViewAdapter("Settings", BuildPlaceholder),
+                "Settings"));
+
+            _mainWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(157097),
+                () => new ViewAdapter("About", BuildPlaceholder),
+                "About"));
+
+            // Refresh log content when switching to the Log tab
+            _mainWindow.TabChanged += (s, e) =>
+            {
+                if (_mainWindow.SelectedTab == _logTab && _logContent != null)
+                {
+                    _logContent.Refresh();
+                }
+            };
 
             _cornerIcon = new CornerIcon()
             {
@@ -229,99 +324,7 @@ namespace GW2CraftingHelper
 
             _cornerIcon.Click += (s, e) =>
             {
-                if (_shellView == null)
-                {
-                    var snapshotContent = new MainView(
-                        _currentSnapshot,
-                        _lastStatus,
-                        UserRefreshAsync,
-                        ClearCache,
-                        SaveStatus
-                    );
-
-                    var craftingContent = new CraftingPlanView(
-                        (itemId, qty, useOwn, ct, progress) =>
-                        {
-                            string activeChar = null;
-                            try
-                            {
-                                var mumble = GameService.Gw2Mumble;
-                                if (mumble != null &&
-                                    mumble.PlayerCharacter != null &&
-                                    !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
-                                {
-                                    activeChar = mumble.PlayerCharacter.Name;
-                                }
-                            }
-                            catch
-                            {
-                                // Gw2Mumble unavailable - graceful fallback
-                            }
-
-                            if (useOwn)
-                            {
-                                return _craftingPipeline.GenerateStructuredAsync(
-                                    itemId, qty, _currentSnapshot, ct, progress,
-                                    activeChar);
-                            }
-                            return _craftingPipeline.GenerateStructuredAsync(
-                                itemId, qty, null, ct, progress);
-                        },
-                        _modalDialog,
-                        _itemSearchProvider
-                    );
-
-                    _shellView = new ShellView(
-                        snapshotContent,
-                        craftingContent,
-                        new AsyncTexture2D(_moduleIconTexture)
-                    );
-                }
-                else
-                {
-                    _shellView.SetSnapshot(_currentSnapshot);
-                    _shellView.SetStatus(_lastStatus);
-                }
-
-                _mainWindow.ToggleWindow(_shellView);
-            };
-
-            // M17 spike: TabbedWindow2 with Snapshot tab only
-            // Minimum size (930x710) matches the window region intentionally.
-            // Validated in-game to align with Event Table / Blish HUD's own
-            // TabbedWindow dimensions and the 1024x1024 background texture (502049).
-            _spikeWindow = new ResizableTabbedWindow(
-                AsyncTexture2D.FromAssetId(502049),
-                new Rectangle(35, 26, 930, 710),
-                new Rectangle(81, 11, 884, 710),
-                new Point(930, 710))
-            {
-                Parent = GameService.Graphics.SpriteScreen,
-                Title = "GW2 Crafting Helper (Spike)",
-                Emblem = new AsyncTexture2D(_emblemTexture),
-                Id = $"{nameof(Module)}_SpikeWindow_m17",
-                SavesPosition = true
-            };
-
-            _spikeSnapshotContent = new MainView(
-                _currentSnapshot,
-                _lastStatus,
-                UserRefreshAsync,
-                ClearCache,
-                SaveStatus
-            );
-
-            _spikeWindow.Tabs.Add(new Tab(
-                AsyncTexture2D.FromAssetId(156699),
-                () => new ViewAdapter("Snapshot", c => _spikeSnapshotContent.Build(c)),
-                "Snapshot"));
-
-            // Right-click corner icon toggles spike window
-            _cornerIcon.RightMouseButtonPressed += (s, e) =>
-            {
-                _spikeSnapshotContent.SetSnapshot(_currentSnapshot);
-                _spikeSnapshotContent.SetStatus(_lastStatus);
-                _spikeWindow.ToggleWindow();
+                _mainWindow.ToggleWindow();
             };
         }
 
@@ -343,11 +346,8 @@ namespace GW2CraftingHelper
             {
                 Logger.Info("Applying snapshot to view CapturedAt={0:o}", _pendingSnapshot?.CapturedAt);
                 _snapshotDirty = false;
-                _shellView?.SetSnapshot(_pendingSnapshot);
-                _shellView?.SetStatus(_lastStatus);
-                // M17 spike: push updates to spike window's snapshot view
-                _spikeSnapshotContent?.SetSnapshot(_pendingSnapshot);
-                _spikeSnapshotContent?.SetStatus(_lastStatus);
+                _snapshotContent?.SetSnapshot(_pendingSnapshot);
+                _snapshotContent?.SetStatus(_lastStatus);
             }
 
             if (_refreshInProgress) return;
@@ -369,7 +369,6 @@ namespace GW2CraftingHelper
             _modalDialog?.Dispose();
             _cornerIcon?.Dispose();
             _mainWindow?.Dispose();
-            _spikeWindow?.Dispose();
         }
 
         private void OnSubtokenUpdated(object sender, ValueEventArgs<IEnumerable<Gw2Sharp.WebApi.V2.Models.TokenPermission>> e)
@@ -463,7 +462,20 @@ namespace GW2CraftingHelper
         {
             _lastStatus = status ?? "";
             _statusStore.Save(_lastStatus);
-            _shellView?.SetStatus(_lastStatus);
+            _snapshotContent?.SetStatus(_lastStatus);
+        }
+
+        private static void BuildPlaceholder(Container container)
+        {
+            new Label()
+            {
+                Text = "Coming Soon",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(20, 20),
+                TextColor = new Color(150, 150, 150),
+                Parent = container
+            };
         }
 
         private async Task<int> FetchGw2BuildIdAsync()
