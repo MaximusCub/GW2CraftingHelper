@@ -714,7 +714,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 4, "Zephyr"),
+                SnapEntry(2, 4, AccountItemIndex.CharacterSourcePrefix + "Zephyr"),
                 SnapEntry(2, 4, AccountItemIndex.SourceBank)
             });
 
@@ -724,9 +724,9 @@ namespace GW2CraftingHelper.Tests.Services
                 .First(u => u.ItemId == 2).Sources;
 
             Assert.Equal(2, sources.Count);
-            // Ordinal: "Bank" < "Zephyr"
+            // Ordinal: "Bank" < "Character:Zephyr"
             Assert.Equal(AccountItemIndex.SourceBank, sources[0].Source);
-            Assert.Equal("Zephyr", sources[1].Source);
+            Assert.Equal(AccountItemIndex.CharacterSourcePrefix + "Zephyr", sources[1].Source);
         }
 
         [Fact]

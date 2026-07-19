@@ -685,6 +685,55 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void MixedVendorOffers_CoinTie_DifferentCurrencies_FirstOfferKept()
+        {
+            // 500 units of currency 2 vs 20 units of currency 3 must NOT be
+            // compared - unit counts of different currencies have no exchange
+            // rate. On a coin-part tie across currencies the first-listed
+            // offer wins deterministically.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    1, new List<VendorOffer>
+                    {
+                        MixedVendorOffer(1, 0, 2, 500),
+                        MixedVendorOffer(1, 0, 3, 20)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.CurrencyCosts);
+            Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
+            Assert.Equal(500, plan.CurrencyCosts[0].Amount);
+        }
+
+        [Fact]
+        public void MixedVendorOffer_ScaledCurrencyOverflowsInt_OfferSkippedNotCrash()
+        {
+            // 350,000 currency per unit x 10,000 units needed exceeds
+            // int.MaxValue; the offer must be skipped gracefully, not abort
+            // the whole solve with an OverflowException.
+            var tree = Leaf(1, 10000);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 350000) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.UnknownSource, plan.Steps[0].Source);
+            Assert.Empty(plan.CurrencyCosts);
+        }
+
+        [Fact]
         public void MixedOfferPresent_PureCoinOfferStillComparable()
         {
             // TP 150 vs pure-coin vendor 200 vs mixed offer with coin part 10:

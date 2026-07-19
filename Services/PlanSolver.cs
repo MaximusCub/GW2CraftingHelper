@@ -299,9 +299,12 @@ namespace GW2CraftingHelper.Services
         /// TP-priceable item barter only) are cost-comparable with TP/craft and
         /// reported via <paramref name="bestComparableCoinCost"/>. Offers with
         /// non-coin currency lines are incomparable with coin costs and reported
-        /// only as a fallback; among themselves they are ranked by lowest coin
-        /// part, then fewest total currency units (a deterministic heuristic,
-        /// since ranking across different currencies has no exchange rate).
+        /// only as a fallback, ranked by lowest coin part. A coin-part tie is
+        /// broken by unit count only when both offers cost the same single
+        /// currency (a genuine like-for-like comparison); ties across different
+        /// currencies keep the first-listed offer, because ranking across
+        /// currencies has no exchange rate and unit counts of different
+        /// currencies must never be compared.
         /// </summary>
         private static void EvaluateVendorOffers(
             RecipeNode node,
@@ -315,6 +318,7 @@ namespace GW2CraftingHelper.Services
             fallbackCoinCost = null;
             fallbackCurrencyCosts = null;
             long fallbackCurrencyUnits = 0;
+            int fallbackSingleCurrencyId = -1;
 
             if (vendorOffers == null ||
                 !vendorOffers.TryGetValue(node.Id, out var offers))
@@ -381,22 +385,41 @@ namespace GW2CraftingHelper.Services
 
                 var scaledCurrencyCosts = new List<CostLine>();
                 long totalCurrencyUnits = 0;
+                bool scalable = true;
                 foreach (var cc in currencyCosts)
                 {
                     long scaled = (long)cc.Count * unitsNeeded;
+                    if (scaled > int.MaxValue)
+                    {
+                        // A quantity this large cannot be represented in a
+                        // CostLine; skip the offer rather than crash the solve.
+                        scalable = false;
+                        break;
+                    }
                     totalCurrencyUnits += scaled;
                     scaledCurrencyCosts.Add(new CostLine
                     {
                         Type = cc.Type,
                         Id = cc.Id,
-                        Count = checked((int)scaled)
+                        Count = (int)scaled
                     });
                 }
+
+                if (!scalable)
+                {
+                    continue;
+                }
+
+                // The offer's single currency id, or -1 when it spans several
+                // currencies (unit counts are then never compared).
+                int singleCurrencyId = currencyCosts.Count == 1 ? currencyCosts[0].Id : -1;
 
                 bool better =
                     !fallbackCoinCost.HasValue ||
                     totalCoinCost < fallbackCoinCost.Value ||
                     (totalCoinCost == fallbackCoinCost.Value &&
+                     singleCurrencyId != -1 &&
+                     singleCurrencyId == fallbackSingleCurrencyId &&
                      totalCurrencyUnits < fallbackCurrencyUnits);
 
                 if (better)
@@ -404,6 +427,7 @@ namespace GW2CraftingHelper.Services
                     fallbackCoinCost = totalCoinCost;
                     fallbackCurrencyCosts = scaledCurrencyCosts;
                     fallbackCurrencyUnits = totalCurrencyUnits;
+                    fallbackSingleCurrencyId = singleCurrencyId;
                 }
             }
         }
