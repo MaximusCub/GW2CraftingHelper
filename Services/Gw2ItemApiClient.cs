@@ -53,7 +53,8 @@ namespace GW2CraftingHelper.Services
                     {
                         Id = item.Value<int>("id"),
                         Name = item.Value<string>("name") ?? "",
-                        Icon = item.Value<string>("icon") ?? ""
+                        Icon = item.Value<string>("icon") ?? "",
+                        Rarity = item.Value<string>("rarity") ?? ""
                     });
                 }
 

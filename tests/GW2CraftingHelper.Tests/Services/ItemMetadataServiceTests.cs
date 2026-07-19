@@ -25,6 +25,20 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task Rarity_FlowsThroughFromApi()
+        {
+            var api = new InMemoryItemApiClient();
+            api.AddItem(19685, "Mithril Ingot", "https://example.com/mithril.png", "Basic");
+            api.AddItem(30684, "Frostfang", "https://example.com/ff.png");
+            var svc = new ItemMetadataService(api);
+
+            var result = await svc.GetMetadataAsync(new[] { 19685, 30684 }, CancellationToken.None);
+
+            Assert.Equal("Basic", result[19685].Rarity);
+            Assert.Null(result[30684].Rarity);
+        }
+
+        [Fact]
         public async Task ItemAbsentFromApi_NotInDictionary()
         {
             var api = new InMemoryItemApiClient();

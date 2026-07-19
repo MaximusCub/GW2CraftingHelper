@@ -25,6 +25,7 @@ namespace GW2CraftingHelper.Services
                 ItemId = node.Id,
                 Name = ResolveName(node.Id, metadata),
                 IconUrl = ResolveIcon(node.Id, metadata),
+                Rarity = ResolveRarity(node.Id, metadata),
                 Quantity = node.Quantity
             };
 
@@ -109,6 +110,17 @@ namespace GW2CraftingHelper.Services
                 metadata.TryGetValue(id, out var meta))
             {
                 return meta.IconUrl;
+            }
+            return null;
+        }
+
+        private static string ResolveRarity(
+            int id, IReadOnlyDictionary<int, ItemMetadata> metadata)
+        {
+            if (metadata != null &&
+                metadata.TryGetValue(id, out var meta))
+            {
+                return meta.Rarity;
             }
             return null;
         }

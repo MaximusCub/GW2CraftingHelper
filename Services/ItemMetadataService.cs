@@ -44,7 +44,8 @@ namespace GW2CraftingHelper.Services
                     {
                         ItemId = entry.Id,
                         Name = entry.Name,
-                        IconUrl = entry.Icon
+                        IconUrl = entry.Icon,
+                        Rarity = entry.Rarity
                     };
                     _cache[entry.Id] = meta;
                 }

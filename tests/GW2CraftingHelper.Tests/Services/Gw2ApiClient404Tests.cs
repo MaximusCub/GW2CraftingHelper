@@ -132,6 +132,24 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task ItemClient_ParsesRarity_MissingFieldYieldsEmpty()
+        {
+            var json = @"[
+                {""id"":1,""name"":""A"",""icon"":""http://a.png"",""rarity"":""Exotic""},
+                {""id"":2,""name"":""B"",""icon"":""http://b.png""}]";
+            using (var handler = new StubHandler(HttpStatusCode.OK, json))
+            using (var http = new HttpClient(handler))
+            {
+                var client = new Gw2ItemApiClient(http);
+                var result = await client.GetItemsAsync(
+                    new[] { 1, 2 }, CancellationToken.None);
+
+                Assert.Equal("Exotic", result[0].Rarity);
+                Assert.Equal("", result[1].Rarity);
+            }
+        }
+
+        [Fact]
         public async Task ItemClient_500_ThrowsWithStatusCode()
         {
             using (var handler = new StubHandler(HttpStatusCode.InternalServerError))
