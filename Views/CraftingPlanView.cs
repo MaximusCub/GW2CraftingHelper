@@ -805,10 +805,13 @@ namespace GW2CraftingHelper.Views
                 Parent = parent
             };
 
-            // Hover wash (pattern per SuggestionPanel row highlighting)
+            // Hover wash (pattern per SuggestionPanel row highlighting).
+            // Color.White * 0.07f premultiplies alpha; a raw
+            // Color(255,255,255,18) renders as near-opaque white in XNA's
+            // premultiplied pipeline (verified via screenshot loop).
             rowPanel.MouseEntered += (_, __) =>
             {
-                rowPanel.BackgroundColor = new Color(255, 255, 255, 18);
+                rowPanel.BackgroundColor = Color.White * 0.07f;
             };
             rowPanel.MouseLeft += (_, __) =>
             {
