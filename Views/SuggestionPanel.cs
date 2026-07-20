@@ -86,20 +86,37 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            // Stale result guard
-            if (ct.IsCancellationRequested || _disposed) return;
-            if (_textBox.Text == null || _textBox.Text.Trim() != query) return;
-
-            if (results == null || results.Count == 0)
+            // Blish HUD's XNA host has no SynchronizationContext, so this
+            // continuation may resume on a ThreadPool thread if the search
+            // provider ever completes asynchronously (see
+            // Contracts/IItemSearchProvider.cs). Both providers wired up
+            // today return already-completed tasks, so this is currently
+            // inert, but marshal pre-emptively so a future provider cannot
+            // reintroduce an off-thread control mutation here. The
+            // stale-query guard stays inside the marshaled action so stale
+            // results are still discarded against current state at the
+            // moment of UI application, not at the moment the search
+            // finished. The focus check guards against a slower path: the
+            // textbox can lose focus (OnFocusChanged hides the panel) while
+            // this search is still in flight, and without re-checking focus
+            // here a queued result could ShowPanel() again right after
+            // dismissal.
+            MainThreadMarshal.Run(() =>
             {
-                HidePanel();
-                return;
-            }
+                if (ct.IsCancellationRequested || _disposed || !_textBox.Focused) return;
+                if (_textBox.Text == null || _textBox.Text.Trim() != query) return;
 
-            _results = results;
-            _highlightIndex = 0;
-            RebuildRows();
-            ShowPanel();
+                if (results == null || results.Count == 0)
+                {
+                    HidePanel();
+                    return;
+                }
+
+                _results = results;
+                _highlightIndex = 0;
+                RebuildRows();
+                ShowPanel();
+            });
         }
 
         private void OnArrowPressed(object sender, int delta)

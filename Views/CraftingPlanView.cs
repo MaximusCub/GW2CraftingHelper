@@ -50,6 +50,15 @@ namespace GW2CraftingHelper.Views
         private int _selectedItemId;
         private int _quantity = 1;
 
+        // Bumped at the start of every TriggerGenerate call (Generate button
+        // and OnOwnMaterialsToggled's modal-confirm path both funnel through
+        // it). Each call captures its own value and every deferred callback
+        // it queues re-checks it against the live field before applying
+        // anything, so a superseded generation's result cannot clobber a
+        // newer one (last-drained-wins) even though both entry points can
+        // overlap in flight.
+        private int _generateSequence;
+
         // Per-node user decision overrides (keyed by solver NodeId) and
         // explicit tree expansion state; both survive local re-solves and
         // reset on a fresh Generate.
@@ -784,6 +793,15 @@ namespace GW2CraftingHelper.Views
 
         private async Task TriggerGenerate()
         {
+            // Captured before anything else. Both entry points that reach
+            // TriggerGenerate (the Generate button's Click and the modal
+            // confirm callback wired in OnOwnMaterialsToggled/ModalDialog)
+            // are Blish UI event handlers, so this increment always runs on
+            // the main thread before any await - no lock needed, and every
+            // deferred callback below reads _generateSequence from the main
+            // thread too (inside a MainThreadMarshal.Run callback).
+            int myGen = ++_generateSequence;
+
             // Parse quantity; tell the user when their input was discarded
             // instead of silently resetting it.
             bool qtyInvalid = !int.TryParse(_qtyInput?.Text, out int qty) || qty < 1;
@@ -800,11 +818,21 @@ namespace GW2CraftingHelper.Views
                 ? "Quantity was invalid - reset to 1. Generating..."
                 : "Generating...");
 
+            // Progress<T> captures the SynchronizationContext at construction
+            // time and posts callbacks through it; with none installed (see
+            // MainThreadMarshal), the callback runs on a ThreadPool thread,
+            // so the SetStatus call must be marshaled. Guarded by myGen so a
+            // progress tick from a since-superseded generation cannot
+            // overwrite a newer generation's status text.
             var statusProgress = new Progress<PlanStatus>(ps =>
             {
                 if (ps != null && !string.IsNullOrEmpty(ps.Message))
                 {
-                    SetStatus(ps.Message);
+                    MainThreadMarshal.Run(() =>
+                    {
+                        if (myGen != _generateSequence) return;
+                        SetStatus(ps.Message);
+                    });
                 }
             });
 
@@ -814,27 +842,83 @@ namespace GW2CraftingHelper.Views
                     _selectedItemId, _quantity, _useOwnMaterials, _priceBasis,
                     CancellationToken.None, statusProgress);
 
-                _nodeOverrides.Clear();
-                _nodeExpansion.Clear();
-                _sectionExpansion.Clear();
-                _lastResult = result;
-                _lastDebugLog = result.DebugLog;
+                // Blish HUD's XNA host has no SynchronizationContext, so this
+                // continuation may resume on a ThreadPool thread. vm-building
+                // is pure CPU work over already-fetched data - no controls
+                // touched - so it stays off the UI thread. The rest mutates
+                // shared view state (_nodeOverrides etc.) as well as Blish
+                // HUD controls (RenderPlan, SetStatus); bundling the state
+                // mutation into the same main-thread callback as the control
+                // mutation prevents a torn/interleaved write on these fields
+                // between two ThreadPool continuations. That alone would
+                // still let an older generation's result overwrite a newer
+                // one once both land (last-drained-wins), so the myGen check
+                // below is what actually discards a stale generation's
+                // result instead of just serializing it.
                 var vm = _vmBuilder.Build(result);
-                _currentPlan = vm;
-                _planGeneratedAt = DateTime.Now;
-                _lastRenderedWidth = _contentPanel?.Width ?? 0;
-                RenderPlan(vm);
-                SetStatus($"Plan generated - {_planGeneratedAt:MMM d, yyyy h:mm tt}");
+                MainThreadMarshal.Run(() =>
+                {
+                    if (myGen != _generateSequence) return;
+
+                    // Plain-state writes happen before any control mutation
+                    // so a disposed-control bail below can never strand this
+                    // generation's state half-applied.
+                    _nodeOverrides.Clear();
+                    _nodeExpansion.Clear();
+                    _sectionExpansion.Clear();
+                    _lastResult = result;
+                    _lastDebugLog = result.DebugLog;
+                    _currentPlan = vm;
+                    _planGeneratedAt = DateTime.Now;
+
+                    // The view may have been torn down (tab switched away,
+                    // module disabled) while generation was in flight - a
+                    // disposed control's Parent is nulled on disposal (see
+                    // ResizeDebounceStep) - nothing left to render into.
+                    if (_contentPanel == null || _contentPanel.Parent == null) return;
+
+                    _lastRenderedWidth = _contentPanel.Width;
+                    RenderPlan(vm);
+                    SetStatus($"Plan generated - {_planGeneratedAt:MMM d, yyyy h:mm tt}");
+                });
             }
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Plan generation failed");
-                _lastDebugLog = new[] { $"Generation failed: {ex.Message}" };
-                SetStatus($"Error: {ex.Message}");
+                MainThreadMarshal.Run(() =>
+                {
+                    // A superseded generation's failure must not clobber a
+                    // newer generation's (possibly successful) state or
+                    // status - same reasoning as the success path above.
+                    if (myGen != _generateSequence) return;
+
+                    _lastDebugLog = new[] { $"Generation failed: {ex.Message}" };
+
+                    if (_contentPanel == null || _contentPanel.Parent == null) return;
+                    SetStatus($"Error: {ex.Message}");
+                });
             }
             finally
             {
-                _generateButton.Enabled = true;
+                // Runs later on the main thread once queued - the button is
+                // still guaranteed to re-enable on every path (success,
+                // exception, or cancellation) since finally always executes
+                // and Run always queues. The myGen check is evaluated here,
+                // inside the queued callback, rather than before queuing:
+                // if it were checked up front, a stale generation could pass
+                // the check, queue an unconditional enable, and have that
+                // enable drain AFTER a newer generation has since started
+                // and disabled the button again - re-enabling it while the
+                // newer generation is still genuinely in flight. Checking at
+                // drain time closes that window; only the generation that
+                // matches _generateSequence at the moment its own finally
+                // actually runs is allowed to re-enable.
+                MainThreadMarshal.Run(() =>
+                {
+                    if (myGen != _generateSequence) return;
+                    if (_contentPanel == null || _contentPanel.Parent == null) return;
+                    _generateButton.Enabled = true;
+                });
             }
         }
 

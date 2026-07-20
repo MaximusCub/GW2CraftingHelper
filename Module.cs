@@ -62,6 +62,12 @@ namespace GW2CraftingHelper
         private AccountSnapshot _pendingSnapshot;
         private bool _snapshotDirty;
         private string _lastStatus;
+        // Drained in Update() using the same dirty-flag polling pattern as
+        // _snapshotDirty above, rather than MainThreadMarshal, so a status
+        // saved from a ThreadPool continuation reaches the main thread the
+        // same way an already-established mechanism does - one polling
+        // path instead of two competing ways to get back to the UI thread.
+        private bool _statusDirty;
 
         private HttpClient _httpClient;
         private CraftingPlanPipeline _craftingPipeline;
@@ -215,7 +221,8 @@ namespace GW2CraftingHelper
                 _lastStatus,
                 UserRefreshAsync,
                 ClearCache,
-                SaveStatus
+                SaveStatus,
+                SaveStatusThreadSafe
             );
 
             _craftingContent = new CraftingPlanView(
@@ -359,12 +366,30 @@ namespace GW2CraftingHelper
 
         protected override void Update(GameTime gameTime)
         {
+            bool statusApplied = false;
+
             if (_snapshotDirty)
             {
                 Logger.Info("Applying snapshot to view CapturedAt={0:o}", _pendingSnapshot?.CapturedAt);
                 _snapshotDirty = false;
                 _snapshotContent?.SetSnapshot(_pendingSnapshot);
                 _snapshotContent?.SetStatus(_lastStatus);
+                statusApplied = true;
+            }
+
+            // Status updates saved from a ThreadPool continuation (Blish's
+            // XNA host has no SynchronizationContext) land here instead of
+            // touching the view directly - see SaveStatusThreadSafe. Skipped
+            // when the snapshot branch above already applied _lastStatus
+            // this tick (both flags can be set together, e.g. a background
+            // refresh updates both), so SetStatus runs at most once per tick.
+            if (_statusDirty)
+            {
+                _statusDirty = false;
+                if (!statusApplied)
+                {
+                    _snapshotContent?.SetStatus(_lastStatus);
+                }
             }
 
             if (_refreshInProgress) return;
@@ -427,7 +452,7 @@ namespace GW2CraftingHelper
             {
                 var snapshot = await FetchAndSaveSnapshotAsync(_refreshCts.Token);
                 var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
-                SaveStatus(status);
+                SaveStatusThreadSafe(status);
             }
             catch (OperationCanceledException)
             {
@@ -437,7 +462,7 @@ namespace GW2CraftingHelper
             {
                 Logger.Warn(ex, "Failed to refresh account snapshot");
                 var status = $"Refresh failed \u2014 {DateTime.Now:t}";
-                SaveStatus(status);
+                SaveStatusThreadSafe(status);
             }
             finally
             {
@@ -475,11 +500,37 @@ namespace GW2CraftingHelper
             _snapshotDirty = false;
         }
 
-        private void SaveStatus(string status)
+        private void PersistStatus(string status)
         {
             _lastStatus = status ?? "";
             _statusStore.Save(_lastStatus);
+        }
+
+        // Called directly from a context already known to be on the main
+        // thread: MainView's Clear Cache click handler (synchronous, no
+        // await). MainView's async Refresh Now handler persists via
+        // SaveStatusThreadSafe instead, because its continuation may resume
+        // on a ThreadPool thread and the _snapshotContent.SetStatus call
+        // below is a control mutation - not safe to run off the UI thread.
+        private void SaveStatus(string status)
+        {
+            PersistStatus(status);
             _snapshotContent?.SetStatus(_lastStatus);
+        }
+
+        // Thread-safe variant for callers that may run on a ThreadPool
+        // continuation (Blish HUD's XNA host installs no
+        // SynchronizationContext, so await continuations do not resume on
+        // the main thread) - used by the background auto-refresh path below
+        // and wired into MainView as its async Refresh Now handler's
+        // persistence callback. Persists the status immediately - file I/O
+        // is safe off the UI thread - but defers the control mutation to
+        // Update() via the same dirty-flag polling pattern already used for
+        // snapshots, rather than touching _snapshotContent here.
+        private void SaveStatusThreadSafe(string status)
+        {
+            PersistStatus(status);
+            _statusDirty = true;
         }
 
         private static void BuildPlaceholder(Container container)
