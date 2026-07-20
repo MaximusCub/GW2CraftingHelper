@@ -82,6 +82,8 @@
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
+    <Compile Include="Models\AcquisitionHint.cs" />
+    <Compile Include="Services\AcquisitionHintService.cs" />
     <Compile Include="Services\CraftingTreeBuilder.cs" />
     <Compile Include="Services\CraftingPlanPipeline.cs" />
     <Compile Include="Services\Gw2RecipeApiClient.cs" />
@@ -267,6 +269,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ref\item_name_seed.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ref\acquisition_hints_seed.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
