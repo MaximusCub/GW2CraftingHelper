@@ -64,6 +64,11 @@ namespace GW2CraftingHelper.Models
         public string Rarity { get; set; }
         public int Quantity { get; set; }
         public long CoinValue { get; set; }
+
+        // Per-unit price (CoinValue is the row's total for Quantity units).
+        // Only populated for shopping rows, which show both a unit-price and
+        // a total-price table column.
+        public long UnitCoinValue { get; set; }
         public string StatusTag { get; set; }
     }
 }

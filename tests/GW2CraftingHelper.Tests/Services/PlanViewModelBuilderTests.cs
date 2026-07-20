@@ -296,6 +296,20 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(5000L, section.Rows[0].CoinValue);
         }
 
+        [Fact]
+        public void ShoppingList_UnitCoinValueFromStepUnitCost()
+        {
+            var result = MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp, UnitCost = 1000, TotalCost = 5000 }
+            });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList);
+            Assert.Equal(1000L, section.Rows[0].UnitCoinValue);
+            Assert.Equal(5000L, section.Rows[0].CoinValue);
+        }
+
         // --- Crafting Steps ---
 
         [Fact]

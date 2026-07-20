@@ -199,7 +199,8 @@ namespace GW2CraftingHelper.Services
                     IconUrl = iconUrl,
                     Rarity = rarity,
                     Quantity = step.Quantity,
-                    CoinValue = step.TotalCost
+                    CoinValue = step.TotalCost,
+                    UnitCoinValue = step.UnitCost
                 });
             }
 

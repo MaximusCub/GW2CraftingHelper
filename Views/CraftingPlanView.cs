@@ -719,59 +719,471 @@ namespace GW2CraftingHelper.Views
         private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
         {
             var header = CreateSectionHeader(section.Title, section.SectionType, panelWidth, section.IsDefaultExpanded);
+            var contentFlow = header.ContentFlow;
 
-            // Populate rows. The Total Cost section renders its CoinTotal
-            // rows as a tile row (gw2e's 5-tile cost-breakdown) instead of
-            // one row per total; everything else uses the generic dispatch.
-            if (section.SectionType == PlanSectionType.Summary)
+            // Every section gets its own table-column layout (spec: aligned
+            // columns everywhere, not free-flowing text rows), so each has a
+            // dedicated body builder rather than a generic per-row dispatch.
+            switch (section.SectionType)
             {
-                CreateSummarySectionBody(section, header.ContentFlow, panelWidth);
-            }
-            else
-            {
-                foreach (var row in section.Rows)
-                {
-                    CreateRow(row, header.ContentFlow, panelWidth);
-                }
+                case PlanSectionType.Summary:
+                    CreateSummarySectionBody(section, contentFlow, panelWidth);
+                    break;
+                case PlanSectionType.UsedMaterials:
+                    CreateUsedMaterialsBody(section, contentFlow, panelWidth);
+                    break;
+                case PlanSectionType.ShoppingList:
+                    CreateShoppingListBody(section, contentFlow, panelWidth);
+                    break;
+                case PlanSectionType.CraftingSteps:
+                    CreateCraftingStepsBody(section, contentFlow, panelWidth);
+                    break;
+                case PlanSectionType.RequiredDisciplines:
+                    CreateDisciplinesBody(section, contentFlow, panelWidth);
+                    break;
+                case PlanSectionType.RequiredRecipes:
+                    CreateRecipesBody(section, contentFlow, panelWidth);
+                    break;
+                default:
+                    // Defensive fallback for a future section type added
+                    // without a dedicated body builder - never leave a
+                    // section silently empty.
+                    foreach (var row in section.Rows)
+                    {
+                        CreateTextRow(row.Label, contentFlow, panelWidth);
+                    }
+                    break;
             }
         }
 
-        private void CreateRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
+        /// <summary>
+        /// 1px divider at the bottom edge of a row panel - the shared "list
+        /// row" chrome used by every table-style section except the tree
+        /// (which uses indent guidelines instead, per gw2e's own convention).
+        /// </summary>
+        private static void CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight)
         {
-            switch (row.RowType)
+            new Panel()
             {
-                // CoinTotal rows only ever appear in the Total Cost section,
-                // which renders them as a tile row via CreateSummarySectionBody
-                // before falling through to this generic dispatch - so this
-                // case is intentionally absent here.
+                Size = new Point(panelWidth, 1),
+                Location = new Point(0, rowHeight - 1),
+                BackgroundColor = new Color(70, 70, 70),
+                Parent = rowPanel
+            };
+        }
 
-                case PlanRowType.CurrencyCost:
-                    CreateTextRow(row.Label, parent, panelWidth);
-                    break;
+        private static Label CreateRightAlignedLabel(
+            Panel parent, string text, BitmapFont font, Color color, int rightEdgeX, int y)
+        {
+            int width = (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
+            return new Label()
+            {
+                Text = text ?? "",
+                Font = font,
+                TextColor = color,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(rightEdgeX - width, y),
+                Parent = parent
+            };
+        }
 
-                case PlanRowType.UsedMaterial:
-                    CreateIconQuantityRow(row, parent, panelWidth);
-                    break;
+        /// <summary>
+        /// Small grey informational tag (reuses the tree's Locked pill
+        /// styling) - used for the shopping list's source tag and anywhere
+        /// else a short non-interactive label needs pill chrome.
+        /// </summary>
+        private static void CreateSmallTag(Panel parent, string text, int x, int y)
+        {
+            var font = GameService.Content.DefaultFont12;
+            int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
+            int width = textWidth + 12;
+            GetPillColors(PillKind.Locked, out Color border, out Color fill);
 
-                case PlanRowType.ShoppingBuy:
-                case PlanRowType.ShoppingVendor:
-                case PlanRowType.ShoppingCurrency:
-                case PlanRowType.ShoppingUnknown:
-                    CreateShoppingRow(row, parent, panelWidth);
-                    break;
+            var outer = new Panel()
+            {
+                Size = new Point(width, 18),
+                Location = new Point(x, y),
+                BackgroundColor = border,
+                Parent = parent
+            };
+            var inner = new Panel()
+            {
+                Size = new Point(width - 2, 16),
+                Location = new Point(1, 1),
+                BackgroundColor = fill,
+                Parent = outer
+            };
+            new Label()
+            {
+                Text = text,
+                Font = font,
+                TextColor = border,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point((width - 2 - textWidth) / 2, 1),
+                Parent = inner
+            };
+        }
 
-                case PlanRowType.CraftStep:
-                    CreateCraftStepRow(row, parent, panelWidth);
-                    break;
+        // --- Used Materials section ---
 
-                case PlanRowType.DisciplineRow:
-                    CreateDisciplineRow(row, parent, panelWidth);
-                    break;
-
-                case PlanRowType.RecipeRow:
-                    CreateRecipeRow(row, parent, panelWidth);
-                    break;
+        private void CreateUsedMaterialsBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
+        {
+            for (int i = 0; i < section.Rows.Count; i++)
+            {
+                CreateUsedMaterialRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
             }
+        }
+
+        private static void CreateUsedMaterialRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        {
+            const int rowHeight = 36;
+            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
+
+            const int nameX = 50;
+            int qtyRightEdge = panelWidth - 8;
+            var font = GameService.Content.DefaultFont14;
+
+            string qtyText = $"{row.Quantity}x";
+            int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
+            int nameMaxWidth = System.Math.Max(20, qtyRightEdge - qtyWidth - 12 - nameX);
+
+            string fullName = row.Label ?? "";
+            string displayName = EllipsizeToWidth(font, fullName, nameMaxWidth);
+            new Label()
+            {
+                Text = displayName,
+                Font = font,
+                TextColor = GetRarityNameColor(row.Rarity),
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(nameX, 9),
+                Parent = rowPanel
+            };
+            if (displayName != fullName)
+            {
+                rowPanel.BasicTooltipText = fullName;
+            }
+
+            new Label()
+            {
+                Text = qtyText,
+                Font = font,
+                TextColor = new Color(200, 200, 200),
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(qtyRightEdge - qtyWidth, 9),
+                Parent = rowPanel
+            };
+
+            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+        }
+
+        // --- Shopping List section ---
+
+        private void CreateShoppingListBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
+        {
+            CreateShoppingListHeaderRow(contentFlow, panelWidth);
+            for (int i = 0; i < section.Rows.Count; i++)
+            {
+                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
+            }
+        }
+
+        private static void CreateShoppingListHeaderRow(FlowPanel parent, int panelWidth)
+        {
+            var rowPanel = new Panel() { Size = new Point(panelWidth, 22), Parent = parent };
+            var font = GameService.Content.DefaultFont12;
+            var color = new Color(153, 153, 153);
+
+            int qtyRightEdge = panelWidth - 260;
+            int unitColX = panelWidth - 240;
+            int totalRightEdge = panelWidth - 8;
+
+            new Label()
+            {
+                Text = "Item", Font = font, TextColor = color,
+                AutoSizeWidth = true, AutoSizeHeight = true,
+                Location = new Point(50, 4), Parent = rowPanel
+            };
+            CreateRightAlignedLabel(rowPanel, "Amount", font, color, qtyRightEdge, 4);
+            new Label()
+            {
+                Text = "Each", Font = font, TextColor = color,
+                AutoSizeWidth = true, AutoSizeHeight = true,
+                Location = new Point(unitColX, 4), Parent = rowPanel
+            };
+            CreateRightAlignedLabel(rowPanel, "Total", font, color, totalRightEdge, 4);
+        }
+
+        private static string ShoppingSourceTag(PlanRowType rowType)
+        {
+            switch (rowType)
+            {
+                case PlanRowType.ShoppingVendor: return "VENDOR";
+                case PlanRowType.ShoppingCurrency: return "CURRENCY";
+                case PlanRowType.ShoppingUnknown: return "UNKNOWN";
+                default: return null; // ShoppingBuy: plain TP purchase, no tag needed
+            }
+        }
+
+        private static void CreateShoppingRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        {
+            const int rowHeight = 36;
+            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
+
+            const int nameX = 50;
+            int qtyRightEdge = panelWidth - 260;
+            int unitColX = panelWidth - 240;
+            int totalRightEdge = panelWidth - 8;
+            var font = GameService.Content.DefaultFont14;
+
+            string qtyText = $"{row.Quantity}x";
+            int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
+            int nameMaxWidth = System.Math.Max(20, qtyRightEdge - qtyWidth - 12 - nameX);
+
+            string fullName = row.Label ?? "";
+            string displayName = EllipsizeToWidth(font, fullName, nameMaxWidth);
+            var nameLabel = new Label()
+            {
+                Text = displayName,
+                Font = font,
+                TextColor = GetRarityNameColor(row.Rarity),
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(nameX, 9),
+                Parent = rowPanel
+            };
+            if (displayName != fullName)
+            {
+                rowPanel.BasicTooltipText = fullName;
+            }
+
+            string sourceTag = ShoppingSourceTag(row.RowType);
+            if (!string.IsNullOrEmpty(sourceTag))
+            {
+                CreateSmallTag(rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9);
+            }
+
+            new Label()
+            {
+                Text = qtyText,
+                Font = font,
+                TextColor = new Color(200, 200, 200),
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(qtyRightEdge - qtyWidth, 9),
+                Parent = rowPanel
+            };
+
+            if (row.UnitCoinValue > 0)
+            {
+                LayoutCoinSegments(rowPanel, BuildCoinSegments(row.UnitCoinValue, font), unitColX, 9, font);
+            }
+            if (row.CoinValue > 0)
+            {
+                LayoutCoinSegmentsRightAligned(rowPanel, BuildCoinSegments(row.CoinValue, font), totalRightEdge, 9, font);
+            }
+
+            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+        }
+
+        // --- Crafting Steps section ---
+
+        private void CreateCraftingStepsBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
+        {
+            for (int i = 0; i < section.Rows.Count; i++)
+            {
+                CreateCraftStepRow(section.Rows[i], i + 1, contentFlow, panelWidth, i == section.Rows.Count - 1);
+            }
+        }
+
+        private static void CreateCraftStepRow(
+            PlanRowViewModel row, int stepNumber, FlowPanel parent, int panelWidth, bool isLast)
+        {
+            const int rowHeight = 44;
+            const int badgeSize = 36;
+            const int badgeX = 8;
+            const int badgeY = 4;
+            const int iconX = 52;
+            const int textX = 94; // iconX(52) + frame(34) + gap(8)
+
+            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+
+            new Panel()
+            {
+                Size = new Point(badgeSize, badgeSize),
+                Location = new Point(badgeX, badgeY),
+                BackgroundColor = Color.White * 0.08f,
+                Parent = rowPanel
+            };
+            string numberText = stepNumber.ToString();
+            var numberFont = GameService.Content.DefaultFont18;
+            var numberMeasure = numberFont.MeasureString(numberText);
+            int numberWidth = (int)System.Math.Ceiling(numberMeasure.Width);
+            int numberHeight = (int)System.Math.Ceiling(numberMeasure.Height);
+            new Label()
+            {
+                Text = numberText,
+                Font = numberFont,
+                TextColor = Color.White,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(badgeX + (badgeSize - numberWidth) / 2, badgeY + (badgeSize - numberHeight) / 2),
+                Parent = rowPanel
+            };
+
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, iconX, 5);
+
+            var textFont = GameService.Content.DefaultFont16;
+            var greyColor = new Color(170, 170, 170);
+            int x = textX;
+
+            var craftLabel = new Label()
+            {
+                Text = "Craft ", Font = textFont, TextColor = greyColor,
+                AutoSizeWidth = true, AutoSizeHeight = true,
+                Location = new Point(x, 13), Parent = rowPanel
+            };
+            x += craftLabel.Width;
+
+            var qtyLabel = new Label()
+            {
+                Text = $"{row.Quantity}x ", Font = textFont, TextColor = greyColor,
+                AutoSizeWidth = true, AutoSizeHeight = true,
+                Location = new Point(x, 13), Parent = rowPanel
+            };
+            x += qtyLabel.Width;
+
+            new Label()
+            {
+                Text = row.Label ?? "", Font = textFont, TextColor = GetRarityNameColor(row.Rarity),
+                AutoSizeWidth = true, AutoSizeHeight = true,
+                Location = new Point(x, 13), Parent = rowPanel
+            };
+
+            if (!string.IsNullOrEmpty(row.Sublabel))
+            {
+                CreateRightAlignedLabel(
+                    rowPanel, row.Sublabel, GameService.Content.DefaultFont12,
+                    new Color(153, 153, 153), panelWidth - 8, 16);
+            }
+
+            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+        }
+
+        // --- Required Disciplines / Required Recipes sections (c-table) ---
+
+        private static void CreateCTableHeaderRow(
+            FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, 26),
+                BackgroundColor = new Color(35, 35, 35),
+                Parent = parent
+            };
+            var font = GameService.Content.DefaultFont14;
+            new Label()
+            {
+                Text = leftLabel, Font = font, TextColor = Color.White,
+                AutoSizeWidth = true, AutoSizeHeight = true,
+                Location = new Point(leftX, 5), Parent = rowPanel
+            };
+            CreateRightAlignedLabel(rowPanel, rightLabel, font, Color.White, panelWidth - 8, 5);
+        }
+
+        private void CreateDisciplinesBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
+        {
+            CreateCTableHeaderRow(contentFlow, panelWidth, "Discipline", 8, "Level");
+            for (int i = 0; i < section.Rows.Count; i++)
+            {
+                CreateDisciplineRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
+            }
+        }
+
+        private static void CreateDisciplineRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        {
+            const int rowHeight = 32;
+            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+            var font = GameService.Content.DefaultFont14;
+
+            new Label()
+            {
+                Text = row.Label ?? "", Font = font,
+                AutoSizeWidth = true, AutoSizeHeight = true,
+                Location = new Point(8, 7), Parent = rowPanel
+            };
+            CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
+
+            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+        }
+
+        private void CreateRecipesBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
+        {
+            CreateCTableHeaderRow(contentFlow, panelWidth, "Recipe", 50, "Status");
+            for (int i = 0; i < section.Rows.Count; i++)
+            {
+                CreateRecipeRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
+            }
+        }
+
+        private static void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        {
+            bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
+            int rowHeight = hasSublabel ? 44 : 32;
+
+            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
+
+            var font = GameService.Content.DefaultFont14;
+            int nameY = hasSublabel ? 4 : 8;
+            new Label()
+            {
+                Text = row.Label ?? "",
+                Font = font,
+                TextColor = GetRarityNameColor(row.Rarity),
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(50, nameY),
+                Parent = rowPanel
+            };
+
+            if (hasSublabel)
+            {
+                new Label()
+                {
+                    Text = row.Sublabel,
+                    Font = GameService.Content.DefaultFont12,
+                    TextColor = new Color(170, 170, 170),
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(50, 22),
+                    Parent = rowPanel
+                };
+            }
+
+            if (!string.IsNullOrEmpty(row.StatusTag))
+            {
+                Color statusColor = Color.White;
+                if (row.StatusTag == "Missing!")
+                {
+                    statusColor = new Color(255, 100, 100);
+                }
+                else if (row.StatusTag == "Auto-learned")
+                {
+                    statusColor = new Color(150, 200, 150);
+                }
+                CreateRightAlignedLabel(rowPanel, row.StatusTag, font, statusColor, panelWidth - 8, hasSublabel ? 10 : 8);
+            }
+
+            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
         }
 
         /// <summary>
@@ -854,9 +1266,10 @@ namespace GW2CraftingHelper.Views
                 CreateCostTileRow(coinRows, contentFlow, panelWidth);
             }
 
+            // The only other row type in this section is CurrencyCost.
             foreach (var row in otherRows)
             {
-                CreateRow(row, contentFlow, panelWidth);
+                CreateTextRow(row.Label, contentFlow, panelWidth);
             }
         }
 
@@ -875,167 +1288,6 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(8, 4),
                 Parent = rowPanel
             };
-        }
-
-        private void CreateIconQuantityRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, 36),
-                Parent = parent
-            };
-
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 4, 1);
-
-            new Label()
-            {
-                Text = $"{row.Quantity}x {row.Label}",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(42, 6),
-                Parent = rowPanel
-            };
-        }
-
-        private void CreateShoppingRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, 36),
-                Parent = parent
-            };
-
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 4, 1);
-
-            string prefix;
-            switch (row.RowType)
-            {
-                case PlanRowType.ShoppingBuy: prefix = "Buy"; break;
-                case PlanRowType.ShoppingVendor: prefix = "Buy (vendor)"; break;
-                case PlanRowType.ShoppingCurrency: prefix = "Acquire"; break;
-                default: prefix = "Acquire (no known source)"; break;
-            }
-
-            var textLabel = new Label()
-            {
-                Text = $"{prefix} {row.Quantity}x {row.Label}",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(42, 6),
-                Parent = rowPanel
-            };
-
-            // Inline coin display for shopping rows with coin value
-            if (row.CoinValue > 0 &&
-                (row.RowType == PlanRowType.ShoppingBuy || row.RowType == PlanRowType.ShoppingVendor))
-            {
-                var dashLabel = new Label()
-                {
-                    Text = " - ",
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(42 + textLabel.Width, 6),
-                    Parent = rowPanel
-                };
-                int coinX = 42 + textLabel.Width + dashLabel.Width;
-                var coinFont = GameService.Content.DefaultFont14;
-                LayoutCoinSegments(rowPanel, BuildCoinSegments(row.CoinValue, coinFont), coinX, 6, coinFont);
-            }
-        }
-
-        private void CreateCraftStepRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, 36),
-                Parent = parent
-            };
-
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 4, 1);
-
-            string text = $"Craft {row.Quantity}x {row.Label}";
-            if (!string.IsNullOrEmpty(row.Sublabel))
-            {
-                text += $" - {row.Sublabel}";
-            }
-
-            new Label()
-            {
-                Text = text,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(42, 6),
-                Parent = rowPanel
-            };
-        }
-
-        private void CreateDisciplineRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, 28),
-                Parent = parent
-            };
-
-            new Label()
-            {
-                Text = $"  {row.Label} - {row.Sublabel}",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(8, 4),
-                Parent = rowPanel
-            };
-        }
-
-        private void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
-        {
-            bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
-            int rowHeight = hasSublabel ? 48 : 36;
-
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, rowHeight),
-                Parent = parent
-            };
-
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 4, 1);
-
-            string statusSuffix = !string.IsNullOrEmpty(row.StatusTag)
-                ? $" - {row.StatusTag}"
-                : "";
-
-            int nameY = hasSublabel ? 2 : 6;
-            var label = new Label()
-            {
-                Text = $"{row.Label}{statusSuffix}",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(42, nameY),
-                Parent = rowPanel
-            };
-
-            // Color the status tag
-            if (row.StatusTag == "Missing!")
-            {
-                label.TextColor = new Color(255, 100, 100);
-            }
-            else if (row.StatusTag == "Auto-learned")
-            {
-                label.TextColor = new Color(150, 200, 150);
-            }
-
-            if (hasSublabel)
-            {
-                new Label()
-                {
-                    Text = $"  {row.Sublabel}",
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(42, 22),
-                    TextColor = new Color(170, 170, 170),
-                    Parent = rowPanel
-                };
-            }
         }
 
         // --- Recipe tree section ---
