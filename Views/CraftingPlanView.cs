@@ -1049,6 +1049,12 @@ namespace GW2CraftingHelper.Views
             public CraftingTreeNode Node;
             public int Depth;
             public int PanelWidth;
+
+            // Whether lazily-built children (built on first expand) should
+            // render dimmed - computed once from this node's own dimmed
+            // state and decision, so it stays correct however many frames
+            // later the user actually expands the node.
+            public bool ChildDimmed;
         }
 
         // States for the current render pass; rebuilt with the tree itself.
@@ -1104,7 +1110,7 @@ namespace GW2CraftingHelper.Views
             craftAllButton = PlaceButtonRight("Craft All", 76);
             bestPathButton = PlaceButtonRight("Best Path", 80);
 
-            RenderTreeNode(treeRoot, treeFlow, panelWidth, 0);
+            RenderTreeNode(treeRoot, treeFlow, panelWidth, 0, dimmed: false);
 
             // Decision presets: clear overrides / force craft-everywhere /
             // force buy-everywhere (feasibility respected by the solver).
@@ -1128,7 +1134,7 @@ namespace GW2CraftingHelper.Views
                     {
                         foreach (var child in s.Node.Children)
                         {
-                            RenderTreeNode(child, s.ChildContainer, s.PanelWidth, s.Depth + 1);
+                            RenderTreeNode(child, s.ChildContainer, s.PanelWidth, s.Depth + 1, s.ChildDimmed);
                         }
                         s.ChildrenBuilt = true;
                     }
@@ -1159,34 +1165,6 @@ namespace GW2CraftingHelper.Views
                     bestPathButton.MouseOver || craftAllButton.MouseOver ||
                     buyAllButton.MouseOver;
             };
-        }
-
-        /// <summary>
-        /// The next feasible acquisition source when cycling this node's
-        /// decision, or null when fewer than two paths are feasible.
-        /// </summary>
-        private static AcquisitionSource? GetNextCyclableSource(CraftingTreeNode node)
-        {
-            var order = new List<AcquisitionSource>(3);
-            if (node.CanCraft) order.Add(AcquisitionSource.Craft);
-            if (node.CanBuyTp) order.Add(AcquisitionSource.BuyFromTp);
-            if (node.CanBuyVendor) order.Add(AcquisitionSource.BuyFromVendor);
-            if (order.Count < 2)
-            {
-                return null;
-            }
-
-            AcquisitionSource current;
-            switch (node.Decision)
-            {
-                case CraftingDecision.Craft: current = AcquisitionSource.Craft; break;
-                case CraftingDecision.BuyFromTp: current = AcquisitionSource.BuyFromTp; break;
-                case CraftingDecision.BuyFromVendor: current = AcquisitionSource.BuyFromVendor; break;
-                default: return null;
-            }
-
-            int idx = order.IndexOf(current);
-            return order[(idx + 1) % order.Count];
         }
 
         private void ApplyPreset(AcquisitionSource source)
@@ -1230,21 +1208,29 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void RenderTreeNode(CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth)
-        {
-            const int indentPer = 24;
-            const int arrowWidth = 18;
-            const int iconSize = 32;
-            const int borderSize = iconSize + 2;
-            const int iconPad = 4;
-            const int rowHeight = 40;
+        // Fixed tree-row column grid (spec: "the key gw2e table look" - every
+        // row aligns regardless of depth). Right-anchored columns (pills,
+        // cost) sit at the same x on every row; only the left side (caret,
+        // icon, name) shifts with indent.
+        private const int TreeIndentPer = 24;
+        private const int TreeCaretColWidth = 18;
+        private const int TreeIconSize = 32;
+        private const int TreeIconBorder = 1;
+        private const int TreeIconFrameSize = TreeIconSize + TreeIconBorder * 2;
+        private const int TreeNameGap = 6;
+        private const int TreeRowHeight = 40;
+        private const int TreePillColumnWidth = 240;
+        private const int TreeCostColumnWidth = 150;
+        private const int TreeRightMargin = 8;
 
-            int indent = depth * indentPer;
+        private void RenderTreeNode(CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, bool dimmed)
+        {
+            int indent = depth * TreeIndentPer;
             bool hasChildren = node.Children.Count > 0;
 
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, rowHeight),
+                Size = new Point(panelWidth, TreeRowHeight),
                 BackgroundColor = Color.Transparent,
                 Parent = parent
             };
@@ -1262,18 +1248,20 @@ namespace GW2CraftingHelper.Views
                 rowPanel.BackgroundColor = Color.Transparent;
             };
 
-            // Expand/collapse arrow. Explicit user expansion state survives
-            // local re-solves; unvisited nodes default to expanded above
-            // depth 2.
+            // Caret column: fixed width even for leaf rows (no children ->
+            // no glyph, but the icon column still starts at the same x as
+            // every sibling), so caret state is scannable at a glance.
             bool isExpanded = _nodeExpansion.TryGetValue(node.NodeId, out bool userExpanded)
                 ? userExpanded
                 : depth < 2;
             Label arrowLabel = null;
             if (hasChildren)
             {
+                Color arrowColor = dimmed ? Color.White * 0.35f : Color.White;
                 arrowLabel = new Label()
                 {
                     Text = isExpanded ? "\u25BC" : "\u25B6",
+                    TextColor = arrowColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(indent, 12),
@@ -1281,89 +1269,112 @@ namespace GW2CraftingHelper.Views
                 };
             }
 
-            // Item icon with 1px rarity-colored border
-            int iconX = indent + (hasChildren ? arrowWidth : 0);
-            CreateRarityFramedIcon(rowPanel, node.IconUrl, node.Rarity, iconX, 3);
-
-            // Quantity + name
-            int textX = iconX + borderSize + iconPad;
-            string nameText = node.Quantity > 0
-                ? $"{node.Quantity}x {node.Name}"
-                : node.Name;
-            var nameLabel = new Label()
+            // Icon column: rarity-framed, dimmed reference branches get a
+            // neutral frame plus a dark scrim over the icon itself (Blish
+            // panels have no tint/filter property, so a translucent black
+            // overlay approximates gw2e's grayscale+opacity filter).
+            int iconX = indent + TreeCaretColWidth;
+            Color frameColor = dimmed ? new Color(60, 60, 60) : GetRarityBorderColor(node.Rarity);
+            CreateRarityFramedIcon(rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
+            if (dimmed)
             {
-                Text = nameText,
+                new Panel()
+                {
+                    Size = new Point(TreeIconSize, TreeIconSize),
+                    Location = new Point(iconX + TreeIconBorder, 3 + TreeIconBorder),
+                    BackgroundColor = Color.Black * 0.5f,
+                    Parent = rowPanel
+                };
+            }
+
+            // Name column: fixed x regardless of depth's remaining width;
+            // clipped with an ellipsis against the pill column so long names
+            // never collide with the fixed-position columns to its right.
+            int nameX = indent + TreeCaretColWidth + TreeIconFrameSize + TreeNameGap;
+            int pillColX = panelWidth - (TreeRightMargin + TreeCostColumnWidth) - TreePillColumnWidth;
+            int costRightEdge = panelWidth - TreeRightMargin;
+            int nameMaxWidth = System.Math.Max(20, pillColX - nameX - 8);
+
+            var nameFont = GameService.Content.DefaultFont14;
+            string qtyPrefix = node.Quantity > 0 ? $"{node.Quantity}x " : "";
+            int qtyWidth = qtyPrefix.Length > 0
+                ? (int)System.Math.Ceiling(nameFont.MeasureString(qtyPrefix).Width)
+                : 0;
+            int nameAvailWidth = System.Math.Max(10, nameMaxWidth - qtyWidth);
+            string fullName = node.Name ?? "";
+            string displayName = EllipsizeToWidth(nameFont, fullName, nameAvailWidth);
+
+            Color qtyColor = new Color(170, 170, 170);
+            Color nameColor = GetRarityNameColor(node.Rarity);
+            if (dimmed)
+            {
+                qtyColor *= 0.35f;
+                nameColor *= 0.35f;
+            }
+
+            if (qtyPrefix.Length > 0)
+            {
+                new Label()
+                {
+                    Text = qtyPrefix,
+                    Font = nameFont,
+                    TextColor = qtyColor,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(nameX, 12),
+                    Parent = rowPanel
+                };
+            }
+            new Label()
+            {
+                Text = displayName,
+                Font = nameFont,
+                TextColor = nameColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(textX, 12),
+                Location = new Point(nameX + qtyWidth, 12),
                 Parent = rowPanel
             };
 
-            // Decision badge rendered as a subtle pill: measure the label
-            // first, then wrap it in a tinted background panel. When more
-            // than one acquisition path is feasible, clicking the pill
-            // cycles the decision and re-solves locally.
-            int badgeX = textX + nameLabel.Width + 6;
-            string badgeText = GetDecisionBadgeText(node.Decision);
-            Color badgeColor = GetDecisionBadgeColor(node.Decision);
-            var badgeLabel = new Label()
+            var tooltipParts = new List<string>();
+            if (displayName != fullName)
             {
-                Text = badgeText,
-                TextColor = badgeColor,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Parent = rowPanel
-            };
-            var badgePill = new Panel()
-            {
-                Size = new Point(badgeLabel.Width + 8, badgeLabel.Height + 4),
-                Location = new Point(badgeX, 10),
-                BackgroundColor = badgeColor * 0.25f,
-                Parent = rowPanel
-            };
-            badgeLabel.Parent = badgePill;
-            badgeLabel.Location = new Point(4, 2);
-
+                tooltipParts.Add(fullName);
+            }
             if (node.UnitCost.HasValue && node.Quantity > 1 &&
                 (node.Decision == CraftingDecision.BuyFromTp ||
                  node.Decision == CraftingDecision.BuyFromVendor))
             {
-                rowPanel.BasicTooltipText = "Unit price: " + FormatCoinText(node.UnitCost.Value);
+                tooltipParts.Add("Unit price: " + FormatCoinText(node.UnitCost.Value));
+            }
+            if (tooltipParts.Count > 0)
+            {
+                rowPanel.BasicTooltipText = string.Join("\n", tooltipParts);
             }
 
-            AcquisitionSource? nextSource = GetNextCyclableSource(node);
-            if (nextSource.HasValue && _resolveOverridesSync != null)
-            {
-                // Clickable pills carry a cycle glyph, brighter tint, and a
-                // tooltip; locked pills stay plain so the two states are
-                // visually unmistakable.
-                badgeLabel.Text = badgeText + " \u21C4";
-                badgePill.Size = new Point(badgeLabel.Width + 8, badgeLabel.Height + 4);
-                badgePill.BackgroundColor = badgeColor * 0.4f;
-                badgePill.BasicTooltipText = "Click: switch acquisition source";
-                badgePill.Click += (_, __) =>
-                {
-                    _nodeOverrides[node.NodeId] = nextSource.Value;
-                    ApplyOverridesAndResolve();
-                };
-            }
-            else
-            {
-                badgePill.BackgroundColor = badgeColor * 0.15f;
-                badgePill.BasicTooltipText = "Source is fixed for this item";
-            }
+            // Decision pill column: one pill per feasible source (direct
+            // selection - click sets the override and re-solves), or a
+            // single locked/HAVE/CURRENCY pill when there is no choice.
+            var pillPanels = RenderDecisionPills(rowPanel, node, pillColX, 10, dimmed);
 
-            // Cost display: inline coin for nodes with SubtreeCost
+            // Cost column: right-aligned so coin amounts line up vertically
+            // across every row regardless of digit count.
             if (node.SubtreeCost.HasValue && node.SubtreeCost.Value > 0)
             {
-                int costX = badgeX + badgePill.Width + 6;
                 var costFont = GameService.Content.DefaultFont14;
-                LayoutCoinSegments(rowPanel, BuildCoinSegments(node.SubtreeCost.Value, costFont), costX, 10, costFont);
+                var segments = BuildCoinSegments(node.SubtreeCost.Value, costFont);
+                LayoutCoinSegmentsRightAligned(
+                    rowPanel, segments, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
             }
 
-            // Child container
+            // Child container. Children of a non-Craft decision are gw2e's
+            // ".not-crafted" informational reference branch (what it would
+            // cost to craft instead) - dimmed, and the flag does not stack
+            // on already-dimmed branches.
             if (hasChildren)
             {
+                bool childDimmed = dimmed || node.Decision != CraftingDecision.Craft;
+
                 var childFlow = new FlowPanel()
                 {
                     Size = new Point(panelWidth, 0),
@@ -1378,14 +1389,15 @@ namespace GW2CraftingHelper.Views
                     Depth = depth,
                     ChildContainer = childFlow,
                     ArrowLabel = arrowLabel,
-                    PanelWidth = panelWidth
+                    PanelWidth = panelWidth,
+                    ChildDimmed = childDimmed
                 };
                 _treeNodeStates.Add(state);
                 if (isExpanded)
                 {
                     foreach (var child in node.Children)
                     {
-                        RenderTreeNode(child, childFlow, panelWidth, depth + 1);
+                        RenderTreeNode(child, childFlow, panelWidth, depth + 1, childDimmed);
                     }
                     state.ChildrenBuilt = true;
                     state.IsExpanded = true;
@@ -1399,11 +1411,11 @@ namespace GW2CraftingHelper.Views
 
                 EventHandler<MouseEventArgs> toggleHandler = (_, __) =>
                 {
-                    // The badge pill has its own click action; do not treat
-                    // it as an expand/collapse toggle.
-                    if (badgePill.MouseOver)
+                    // Pills have their own click actions; do not also treat
+                    // a pill click as an expand/collapse toggle.
+                    foreach (var pill in pillPanels)
                     {
-                        return;
+                        if (pill.MouseOver) return;
                     }
                     PreserveScrollAcross(() =>
                     {
@@ -1411,7 +1423,8 @@ namespace GW2CraftingHelper.Views
                         {
                             foreach (var child in state.Node.Children)
                             {
-                                RenderTreeNode(child, state.ChildContainer, state.PanelWidth, state.Depth + 1);
+                                RenderTreeNode(
+                                    child, state.ChildContainer, state.PanelWidth, state.Depth + 1, state.ChildDimmed);
                             }
                             state.ChildrenBuilt = true;
                         }
@@ -1426,37 +1439,193 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static string GetDecisionBadgeText(CraftingDecision decision)
+        // --- Decision pills ---
+
+        private enum PillKind
         {
-            switch (decision)
-            {
-                case CraftingDecision.Craft: return "CRAFT";
-                case CraftingDecision.BuyFromTp: return "TP";
-                case CraftingDecision.BuyFromVendor: return "VENDOR";
-                case CraftingDecision.Have: return "HAVE";
-                case CraftingDecision.Currency: return "CURRENCY";
-                default: return "?";
-            }
+            Selected,
+            Available,
+            Locked,
+            Have
         }
 
-        private static Color GetDecisionBadgeColor(CraftingDecision decision)
+        private struct PillSpec
         {
-            switch (decision)
+            public string Text;
+            public AcquisitionSource? Source; // non-null => clickable
+            public PillKind Kind;
+        }
+
+        /// <summary>
+        /// One pill per feasible acquisition source (gw2e's multi-pill
+        /// model): 2-3 pills means a real choice, exactly 1 pill means the
+        /// source is locked - the pill count itself is the affordance.
+        /// HAVE/CURRENCY/UNKNOWN are always single, non-interactive pills
+        /// (no AcquisitionSource value represents "force use owned
+        /// materials", so there is nothing to override to).
+        /// </summary>
+        private static List<PillSpec> BuildPillSpecs(CraftingTreeNode node)
+        {
+            var specs = new List<PillSpec>(3);
+
+            if (node.Decision == CraftingDecision.Have)
             {
-                case CraftingDecision.Craft: return new Color(100, 200, 100);
-                case CraftingDecision.BuyFromTp: return new Color(255, 200, 60);
-                case CraftingDecision.BuyFromVendor: return new Color(180, 130, 255);
-                case CraftingDecision.Have: return new Color(170, 170, 170);
-                case CraftingDecision.Currency: return new Color(255, 220, 100);
-                default: return new Color(255, 100, 100);
+                specs.Add(new PillSpec { Text = "HAVE", Source = null, Kind = PillKind.Have });
+                return specs;
+            }
+            if (node.Decision == CraftingDecision.Currency)
+            {
+                specs.Add(new PillSpec { Text = "CURRENCY", Source = null, Kind = PillKind.Locked });
+                return specs;
+            }
+
+            var options = new List<(AcquisitionSource src, string text)>(3);
+            if (node.CanCraft) options.Add((AcquisitionSource.Craft, "CRAFT"));
+            if (node.CanBuyTp) options.Add((AcquisitionSource.BuyFromTp, "TP"));
+            if (node.CanBuyVendor) options.Add((AcquisitionSource.BuyFromVendor, "VENDOR"));
+
+            if (options.Count == 0)
+            {
+                specs.Add(new PillSpec { Text = "UNKNOWN", Source = null, Kind = PillKind.Locked });
+                return specs;
+            }
+            if (options.Count == 1)
+            {
+                specs.Add(new PillSpec { Text = options[0].text, Source = null, Kind = PillKind.Locked });
+                return specs;
+            }
+
+            AcquisitionSource current;
+            switch (node.Decision)
+            {
+                case CraftingDecision.Craft: current = AcquisitionSource.Craft; break;
+                case CraftingDecision.BuyFromTp: current = AcquisitionSource.BuyFromTp; break;
+                case CraftingDecision.BuyFromVendor: current = AcquisitionSource.BuyFromVendor; break;
+                default: current = options[0].src; break; // defensive; solver always matches one of the options
+            }
+
+            foreach (var opt in options)
+            {
+                bool selected = opt.src == current;
+                specs.Add(new PillSpec
+                {
+                    Text = opt.text,
+                    // The selected pill is already the active choice -
+                    // clicking it would be a no-op re-solve, so it is
+                    // rendered non-interactive rather than wired up.
+                    Source = selected ? (AcquisitionSource?)null : opt.src,
+                    Kind = selected ? PillKind.Selected : PillKind.Available
+                });
+            }
+            return specs;
+        }
+
+        private static void GetPillColors(PillKind kind, out Color border, out Color fill)
+        {
+            switch (kind)
+            {
+                case PillKind.Selected:
+                    border = new Color(45, 197, 14); // #2DC50E
+                    fill = border * 0.15f;
+                    break;
+                case PillKind.Have:
+                    border = new Color(113, 113, 255); // #7171FF
+                    fill = border * 0.15f;
+                    break;
+                case PillKind.Available:
+                    border = new Color(138, 138, 138); // #8A8A8A
+                    fill = Color.Transparent;
+                    break;
+                case PillKind.Locked:
+                default:
+                    border = new Color(107, 107, 107); // #6B6B6B
+                    fill = Color.Black * 0.3f;
+                    break;
             }
         }
 
         /// <summary>
-        /// Standard GW2 rarity palette for icon borders. Unknown/absent rarity
-        /// (and Basic, whose canonical white would look borderless next to
-        /// tinted ones) renders a neutral dark grey - never guess a rarity.
+        /// Renders the pill column and returns the created pill panels so
+        /// the row's expand/collapse click handler can exclude them from
+        /// its own hit-test (a pill click is a decision, not a toggle).
         /// </summary>
+        private List<Panel> RenderDecisionPills(
+            Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
+        {
+            var specs = BuildPillSpecs(node);
+            var font = GameService.Content.DefaultFont12;
+            var pillPanels = new List<Panel>(specs.Count);
+            int x = pillColX;
+
+            foreach (var spec in specs)
+            {
+                int textWidth = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width);
+                int pillWidth = textWidth + 12;
+
+                GetPillColors(spec.Kind, out Color borderColor, out Color fillColor);
+                Color textColor = borderColor;
+                if (dimmed)
+                {
+                    borderColor *= 0.35f;
+                    fillColor *= 0.35f;
+                    textColor *= 0.35f;
+                }
+
+                // Border simulated as an outer colored panel with a 1px-inset
+                // fill panel - same nesting technique as CreateRarityFramedIcon.
+                var outer = new Panel()
+                {
+                    Size = new Point(pillWidth, 20),
+                    Location = new Point(x, pillY),
+                    BackgroundColor = borderColor,
+                    Parent = rowPanel
+                };
+                var inner = new Panel()
+                {
+                    Size = new Point(pillWidth - 2, 18),
+                    Location = new Point(1, 1),
+                    BackgroundColor = fillColor,
+                    Parent = outer
+                };
+                new Label()
+                {
+                    Text = spec.Text,
+                    Font = font,
+                    TextColor = textColor,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point((pillWidth - 2 - textWidth) / 2, 2),
+                    Parent = inner
+                };
+
+                bool interactive = !dimmed && spec.Source.HasValue && _resolveOverridesSync != null;
+                if (interactive)
+                {
+                    outer.BasicTooltipText = $"Switch to {spec.Text}";
+                    var source = spec.Source.Value;
+                    outer.Click += (_, __) =>
+                    {
+                        _nodeOverrides[node.NodeId] = source;
+                        ApplyOverridesAndResolve();
+                    };
+                    Color restingBorder = borderColor;
+                    outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
+                    outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
+                }
+                else if (spec.Kind == PillKind.Locked)
+                {
+                    outer.BasicTooltipText = "Only available source";
+                }
+
+                pillPanels.Add(outer);
+                x += pillWidth + 6;
+            }
+
+            return pillPanels;
+        }
+
+        // Plain "12g 34s 56c" text for contexts that cannot render coin
+        // icons (BasicTooltipText has no inline-image support).
         private static string FormatCoinText(long copper)
         {
             if (copper < 0) copper = 0;
@@ -1466,6 +1635,44 @@ namespace GW2CraftingHelper.Views
             return $"{gold}g {silver}s {cop}c";
         }
 
+        /// <summary>
+        /// Truncates text to fit maxWidth, appending "..." when it doesn't
+        /// fit whole. Binary-searches the longest prefix (rather than
+        /// trimming one character at a time) since MeasureString is not
+        /// free and item names can run long.
+        /// </summary>
+        private static string EllipsizeToWidth(BitmapFont font, string text, int maxWidth)
+        {
+            if (string.IsNullOrEmpty(text)) return text ?? "";
+            if (maxWidth <= 0) return "";
+
+            int fullWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
+            if (fullWidth <= maxWidth) return text;
+
+            const string ellipsis = "...";
+            int ellipsisWidth = (int)System.Math.Ceiling(font.MeasureString(ellipsis).Width);
+            if (ellipsisWidth >= maxWidth)
+            {
+                // Degenerate (extremely narrow column): still show the
+                // ellipsis rather than nothing, so the row reads as
+                // "truncated" instead of "blank/broken".
+                return ellipsis;
+            }
+
+            int lo = 0, hi = text.Length;
+            while (lo < hi)
+            {
+                int mid = (lo + hi + 1) / 2;
+                int width = (int)System.Math.Ceiling(font.MeasureString(text.Substring(0, mid)).Width) + ellipsisWidth;
+                if (width <= maxWidth) lo = mid; else hi = mid - 1;
+            }
+            return lo <= 0 ? ellipsis : text.Substring(0, lo) + ellipsis;
+        }
+
+        /// <summary>
+        /// Standard GW2 rarity palette for icon borders. Unknown/absent
+        /// rarity renders a neutral dark grey - never guess a rarity.
+        /// </summary>
         private static Color GetRarityBorderColor(string rarity)
         {
             switch (rarity)
@@ -1632,12 +1839,24 @@ namespace GW2CraftingHelper.Views
             Panel parent, string iconUrl, string rarity, int x, int y,
             int iconSize = 32, int borderThickness = 1)
         {
+            CreateRarityFramedIcon(
+                parent, iconUrl, GetRarityBorderColor(rarity), x, y, iconSize, borderThickness);
+        }
+
+        /// <summary>
+        /// Same as above with an explicit frame color, for dimmed
+        /// not-crafted subtree rows (neutral grey frame instead of rarity).
+        /// </summary>
+        private static void CreateRarityFramedIcon(
+            Panel parent, string iconUrl, Color frameColor, int x, int y,
+            int iconSize = 32, int borderThickness = 1)
+        {
             int frameSize = iconSize + borderThickness * 2;
             var frame = new Panel()
             {
                 Size = new Point(frameSize, frameSize),
                 Location = new Point(x, y),
-                BackgroundColor = GetRarityBorderColor(rarity),
+                BackgroundColor = frameColor,
                 Parent = parent
             };
             CreateItemIcon(frame, iconUrl, borderThickness, borderThickness, iconSize);
