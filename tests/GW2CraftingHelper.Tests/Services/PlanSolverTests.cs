@@ -254,7 +254,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void SameItemInMultipleBranches_DeduplicatedStep()
         {
-            // Item 1 crafts from: 3x item 2 + 5x item 2 (same item, two ingredients — simulating
+            // Item 1 crafts from: 3x item 2 + 5x item 2 (same item, two ingredients - simulating
             // what happens when item 2 appears via two branches in a real tree)
             // Actually, let's make it: item 1 -> recipe with 2 ingredients that are both item 2
             // More realistically: item 1 -> (item 2, item 3), item 3 -> item 2
@@ -347,7 +347,8 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Vendor offer tests ---
 
-        private static VendorOffer CoinVendorOffer(int outputItemId, int coinCost, int outputCount = 1)
+        private static VendorOffer CoinVendorOffer(
+            int outputItemId, int coinCost, int outputCount = 1, int? dailyCap = null, int? weeklyCap = null)
         {
             return new VendorOffer
             {
@@ -359,7 +360,9 @@ namespace GW2CraftingHelper.Tests.Services
                     new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = coinCost }
                 },
                 MerchantName = "TestMerchant",
-                Locations = new List<string> { "TestLoc" }
+                Locations = new List<string> { "TestLoc" },
+                DailyCap = dailyCap,
+                WeeklyCap = weeklyCap
             };
         }
 
@@ -545,7 +548,8 @@ namespace GW2CraftingHelper.Tests.Services
         // only be used when no coin-priceable option exists.
 
         private static VendorOffer MixedVendorOffer(
-            int outputItemId, int coinCost, int currencyId, int currencyCount, int outputCount = 1)
+            int outputItemId, int coinCost, int currencyId, int currencyCount, int outputCount = 1,
+            int? dailyCap = null, int? weeklyCap = null)
         {
             var costLines = new List<CostLine>();
             if (coinCost > 0)
@@ -566,7 +570,9 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputCount = outputCount,
                 CostLines = costLines,
                 MerchantName = "Mixed Vendor",
-                Locations = new List<string>()
+                Locations = new List<string>(),
+                DailyCap = dailyCap,
+                WeeklyCap = weeklyCap
             };
         }
 
@@ -761,6 +767,218 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
             Assert.Equal(150, plan.TotalCoinCost);
             Assert.Empty(plan.CurrencyCosts);
+        }
+
+        // --- Vendor purchase-cap tests ---
+        // V1 semantics: an offer whose DailyCap (or WeeklyCap when DailyCap is
+        // absent/zero) cannot cover the node's needed purchases in a single
+        // cap period is excluded entirely - it never competes in the
+        // comparable tier or the fallback tier. Partial cap-split sourcing
+        // (buy up to the cap, then take the rest from a second source) is a
+        // deliberate non-goal; a node is still sourced from exactly one
+        // acquisition.
+
+        [Fact]
+        public void CappedOffer_NeededExceedsCap_ExcludedFallsBackToTp()
+        {
+            // Vendor sells for 1 coin each but only 25/day; node needs 50, so
+            // one day's cap cannot cover it and the offer must be excluded,
+            // leaving the (much pricier) TP buy as the only option.
+            var tree = Leaf(1, 50);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 10 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, dailyCap: 25) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(500, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void CappedOffer_NeededWithinCap_StillUsedAsVendor()
+        {
+            // Needed (20) is within the cap (25); the far cheaper vendor
+            // offer must still be picked over the expensive TP price.
+            var tree = Leaf(1, 20);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, dailyCap: 25) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(100, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void CappedBatchOffer_CapTimesOutputCountArithmetic()
+        {
+            // Offer sells batches of 10 with a cap of 3 purchases/day (max
+            // 30 units/day). Needing 25 units requires only 3 purchases
+            // (ceil(25/10)), which fits the cap even though 25 itself is far
+            // greater than the raw DailyCap of 3 - proving OutputCount is
+            // correctly folded into the cap check rather than comparing the
+            // node's raw quantity against the cap.
+            var tree = Leaf(1, 25);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, outputCount: 10, dailyCap: 3) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(15, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void CappedBatchOffer_OneMoreUnitPushesPastCap_Excluded()
+        {
+            // Same batch/cap shape as above (10/batch, cap 3 => 30/day), but
+            // needing 31 units requires 4 purchases (ceil(31/10)), which
+            // exceeds the cap even though the cap*OutputCount ceiling (30) is
+            // barely below 31.
+            var tree = Leaf(1, 31);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, outputCount: 10, dailyCap: 3) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.UnknownSource, plan.Steps[0].Source);
+            Assert.Equal(0, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void ZeroCap_TreatedAsUncapped()
+        {
+            // An explicit DailyCap of 0 (not merely absent) must still mean
+            // uncapped per the V1 decision, not "zero purchases allowed".
+            var tree = Leaf(1, 500);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, dailyCap: 0) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(500, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void WeeklyCapUsed_WhenDailyCapAbsent()
+        {
+            // No DailyCap set; WeeklyCap of 25 cannot cover the 50 needed, so
+            // the offer is excluded and TP is used instead.
+            var tree = Leaf(1, 50);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 10 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, weeklyCap: 25) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(500, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void DailyCapTakesPrecedenceOverWeeklyCap()
+        {
+            // DailyCap (100) alone covers the 50 needed, so the offer is used
+            // even though its WeeklyCap (1) alone would have excluded it -
+            // DailyCap wins whenever it is positive.
+            var tree = Leaf(1, 50);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, dailyCap: 100, weeklyCap: 1) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(50, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void CappedMixedCurrencyOffer_NeededExceedsCap_ExcludedFromFallbackTier()
+        {
+            // A mixed-currency offer only ever competes in the fallback
+            // tier (its non-coin currency line is unvalued). The cap check
+            // must still apply there: needing 50 against a cap of 10 excludes
+            // it, leaving no acquisition at all (no TP price, no recipe).
+            var tree = Leaf(1, 50);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50, dailyCap: 10) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.UnknownSource, plan.Steps[0].Source);
+            Assert.Equal(0, plan.TotalCoinCost);
+            Assert.Empty(plan.CurrencyCosts);
+        }
+
+        [Fact]
+        public void CappedMixedCurrencyOffer_NeededWithinCap_StillUsedAsFallback()
+        {
+            // Needed (5) is within the cap (10); the mixed-currency offer
+            // remains the fallback acquisition (no TP price, no recipe).
+            var tree = Leaf(1, 5);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50, dailyCap: 10) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(0, plan.TotalCoinCost);
+            Assert.Single(plan.CurrencyCosts);
+            Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
+            Assert.Equal(250, plan.CurrencyCosts[0].Amount);
         }
 
         // --- Price basis tests ---
@@ -1007,6 +1225,277 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(result.Decisions[1].CanCraft);
             Assert.True(result.Decisions[1].CanBuyTp);
             Assert.True(result.Decisions[1].CanBuyVendor);
+        }
+
+        // --- Currency valuation tests ---
+        // A user-provided CurrencyValuation makes an offer's non-coin
+        // currency lines comparable, but ONLY when every line on the offer
+        // has a valuation; the valuation affects comparison only, never the
+        // currency amounts reported on the plan.
+
+        [Fact]
+        public void ValuedCurrencyOffer_BeatsExpensiveTp_AndPlanListsCurrencyCost()
+        {
+            // Karma-priced offer (0 coin, 50 karma) with a user valuation of
+            // 5 copper/karma (= 250 total) beats a 1000-copper TP price. The
+            // plan must still report the real karma amount to pay, not a
+            // coin-converted figure.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(0, plan.Steps[0].TotalCost); // coin part only - offer has no coin cost
+            Assert.Equal(0, plan.TotalCoinCost);
+            Assert.Single(plan.CurrencyCosts);
+            Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
+            Assert.Equal(50, plan.CurrencyCosts[0].Amount);
+        }
+
+        [Fact]
+        public void UnvaluedCurrencyOffer_WithoutValuation_StaysFallbackOnly()
+        {
+            // Same offer and prices as the valued-wins test above, but with
+            // no valuation supplied at all: pins the existing fallback-only
+            // behavior (TP wins; the offer never even enters the comparison).
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(1000, plan.TotalCoinCost);
+            Assert.Empty(plan.CurrencyCosts);
+        }
+
+        [Fact]
+        public void ValuedCurrencyOffer_LosesWhenValuedCostExceedsTp()
+        {
+            // Same karma offer, but its valued cost (250) now exceeds the TP
+            // price (100): TP must win outright, and the losing offer must
+            // not leak into CurrencyCosts.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(100, plan.TotalCoinCost);
+            Assert.Empty(plan.CurrencyCosts);
+        }
+
+        [Fact]
+        public void MixedValuedAndUnvaluedCurrencyOffer_StaysFallbackTier()
+        {
+            // Offer costs both a valued currency (karma, id 2) and an
+            // unvalued one (laurels, id 3). Any unvalued line must keep the
+            // WHOLE offer in the fallback tier - it must not become
+            // partially comparable. No TP price exists, so the fallback
+            // offer is the only acquisition; both currency lines (valued and
+            // unvalued alike) must appear in full on the plan.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var offer = new VendorOffer
+            {
+                OfferId = "test-mixed-valued-and-unvalued",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Currency", Id = 2, Count = 10 },
+                    new CostLine { Type = "Currency", Id = 3, Count = 1000 }
+                },
+                MerchantName = "Mixed Vendor",
+                Locations = new List<string>()
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(0, plan.Steps[0].TotalCost);
+            Assert.Equal(2, plan.CurrencyCosts.Count);
+            Assert.Contains(plan.CurrencyCosts, c => c.CurrencyId == 2 && c.Amount == 10);
+            Assert.Contains(plan.CurrencyCosts, c => c.CurrencyId == 3 && c.Amount == 1000);
+        }
+
+        [Fact]
+        public void MixedValuedAndUnvaluedCurrencyOffer_DoesNotBeatTp()
+        {
+            // Even a trivially cheap valued line must not make the offer
+            // comparable while any other line stays unvalued.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var offer = new VendorOffer
+            {
+                OfferId = "test-mixed-valued-cheap",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Currency", Id = 2, Count = 1 },
+                    new CostLine { Type = "Currency", Id = 3, Count = 1 }
+                },
+                MerchantName = "Mixed Vendor",
+                Locations = new List<string>()
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 1 } });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation).Plan;
+
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(100, plan.TotalCoinCost);
+            Assert.Empty(plan.CurrencyCosts);
+        }
+
+        [Fact]
+        public void ValuedCurrencyOffer_ForcedOverride_CarriesCurrencyCostsIntoPlan()
+        {
+            // A per-node override forcing BuyFromVendor on a fully-valued
+            // offer must commit the same real coin part + currency lines as
+            // the automatic comparison path.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { 0, AcquisitionSource.BuyFromVendor }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, overrides, valuation).Plan;
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(0, plan.Steps[0].TotalCost);
+            Assert.Single(plan.CurrencyCosts);
+            Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
+            Assert.Equal(50, plan.CurrencyCosts[0].Amount);
+        }
+
+        // --- Comparison-value laundering regression tests ---
+        // A valued vendor offer's coin-equivalent (coin + valued currency)
+        // must survive being summed into an ANCESTOR's craft cost. Before
+        // the fix, the craft loop summed each ingredient's returned REAL
+        // coin cost (e.g. 0 for a karma-only vendor offer) instead of its
+        // comparison value (coin + valued currency), so the karma cost was
+        // laundered away and an ancestor could wrongly choose to craft
+        // through a valued vendor offer that was actually more expensive.
+
+        [Fact]
+        public void ValuedVendorDescendant_DoesNotLaunderIntoCraftComparison_TpWinsForAncestor()
+        {
+            // B (item 2): TP buy 1000, or vendor offer 0 coin + 50 karma
+            // (currency 3) valued at 5 copper/unit = 250 comparison value.
+            // A (item 1): TP buy 200, or craft from 1x B.
+            // Craft-A's true comparison cost is B's comparison value (250),
+            // not B's real coin part (0), so TP-buy-A (200) must beat craft.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, 3, 50) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 3, 5 } });
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation);
+
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Decisions[0].Source);
+            Assert.Single(result.Plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
+            Assert.Equal(1, result.Plan.Steps[0].ItemId);
+            Assert.Equal(200, result.Plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void ValuedVendorDescendant_CraftStillWinsWhenGenuinelyCheaper_PlanShowsRealCoinAndCurrency()
+        {
+            // Same B options as above, but A's TP price (2000) is expensive
+            // enough that craft (comparison cost 250) genuinely wins. The
+            // committed plan must show the REAL coin cost (0, B's vendor
+            // coin part) and the real karma amount (50) - the valuation used
+            // to pick this path must never leak into the displayed coin.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 2000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, 3, 50) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 3, 5 } });
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation);
+            var plan = result.Plan;
+
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.Contains(plan.Steps, s => s.Source == AcquisitionSource.Craft && s.ItemId == 1);
+            Assert.Contains(plan.Steps, s => s.Source == AcquisitionSource.BuyFromVendor && s.ItemId == 2);
+
+            // Real coin cost only (B's vendor coin part is 0) - the 250
+            // comparison value used to pick this path must not appear here.
+            Assert.Equal(0, plan.TotalCoinCost);
+            Assert.Single(plan.CurrencyCosts);
+            Assert.Equal(3, plan.CurrencyCosts[0].CurrencyId);
+            Assert.Equal(50, plan.CurrencyCosts[0].Amount);
         }
     }
 }

@@ -235,15 +235,18 @@ namespace GW2CraftingHelper
                         // Gw2Mumble unavailable - graceful fallback
                     }
 
+                    var currencyValuation = _settings.GetCurrencyValuation();
+                    var ownMaterialsMode = _settings.GetOwnMaterialsMode();
+
                     if (useOwn)
                     {
                         return _craftingPipeline.GenerateStructuredAsync(
                             itemId, qty, _currentSnapshot, ct, progress,
-                            activeChar, priceBasis);
+                            activeChar, priceBasis, currencyValuation, ownMaterialsMode);
                     }
                     return _craftingPipeline.GenerateStructuredAsync(
                         itemId, qty, null, ct, progress,
-                        null, priceBasis);
+                        null, priceBasis, currencyValuation, ownMaterialsMode);
                 },
                 _modalDialog,
                 _itemSearchProvider,

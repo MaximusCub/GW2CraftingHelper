@@ -45,5 +45,16 @@ namespace GW2CraftingHelper.Models
         /// GenerateStructuredAsync; null on the legacy path.
         /// </summary>
         public PlanSolveContext SolveContext { get; set; }
+
+        /// <summary>
+        /// Sum, over UsedMaterials, of TradingPostMath.NetSaleRevenue for
+        /// that material's instant-sell unit price and quantity used: what
+        /// selling those already-owned materials would have netted after
+        /// Trading Post fees. Null in OwnMaterialsMode.Free, or when no
+        /// materials were used by inventory reduction. A material with no
+        /// instant-sell price (SellInstant 0/absent) contributes 0 rather
+        /// than being excluded from the sum.
+        /// </summary>
+        public long? MaterialOpportunityCost { get; set; }
     }
 }

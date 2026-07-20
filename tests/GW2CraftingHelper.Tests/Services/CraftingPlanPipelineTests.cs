@@ -938,5 +938,351 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(PriceBasis.BuyOrder, result.PriceBasis);
             Assert.Equal(310, result.CraftingProfit);
         }
+
+        // --- Currency valuation threading ---
+
+        [Fact]
+        public async Task GenerateStructuredAsync_CurrencyValuation_ThreadsIntoSolverAndContext()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 1000, sellUnitPrice: 2000);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Karma Item", "karma.png");
+
+            var tempDir = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
+            System.IO.Directory.CreateDirectory(tempDir);
+            try
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tempDir, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-karma-offer",
+                        OutputItemId = 1,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Currency", Id = 2, Count = 50 }
+                        },
+                        MerchantName = "Karma Vendor",
+                        Locations = new List<string>()
+                    }
+                });
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store,
+                    reducer: new InventoryReducer());
+
+                var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
+
+                var result = await pipeline.GenerateStructuredAsync(
+                    1, 1, null, CancellationToken.None,
+                    currencyValuation: valuation);
+
+                // Vendor wins: 50 karma x 5 copper = 250 < 1000 TP
+                Assert.Single(result.Plan.Steps);
+                Assert.Equal(AcquisitionSource.BuyFromVendor, result.Plan.Steps[0].Source);
+                Assert.Equal(0, result.Plan.Steps[0].TotalCost);
+                Assert.Single(result.Plan.CurrencyCosts);
+                Assert.Equal(2, result.Plan.CurrencyCosts[0].CurrencyId);
+                Assert.Equal(50, result.Plan.CurrencyCosts[0].Amount);
+
+                // The valuation is captured on the context for later local re-solves
+                Assert.NotNull(result.SolveContext.CurrencyValuation);
+                Assert.True(result.SolveContext.CurrencyValuation.TryGetCopperValue(2, out long copperPerUnit));
+                Assert.Equal(5, copperPerUnit);
+
+                // A subsequent local re-solve (no network calls, no overrides)
+                // must keep using the valuation carried on the context.
+                var resolved = pipeline.ResolveWithOverrides(result.SolveContext, null);
+                Assert.Equal(AcquisitionSource.BuyFromVendor, resolved.Plan.Steps[0].Source);
+                Assert.Single(resolved.Plan.CurrencyCosts);
+                Assert.Equal(50, resolved.Plan.CurrencyCosts[0].Amount);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_NoCurrencyValuationArgument_ContextDefaultsToNone()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Item", "icon.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+
+            Assert.NotNull(result.SolveContext.CurrencyValuation);
+            Assert.False(result.SolveContext.CurrencyValuation.TryGetCopperValue(2, out _));
+        }
+
+        // --- Own-materials valuation (M28) ---
+
+        private static CraftingPlanPipeline BuildOwnMaterialsPipeline(
+            out InMemoryPriceApiClient priceApi, int ingredientCount = 5)
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = ingredientCount }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            priceApi = new InMemoryPriceApiClient();
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+        }
+
+        private static AccountSnapshot OwnIngredient(int count)
+        {
+            return new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry
+                    {
+                        ItemId = 2,
+                        Count = count,
+                        Source = AccountItemIndex.SourceMaterialStorage
+                    }
+                }
+            };
+        }
+
+        [Fact]
+        public async Task Structured_ValuedMode_DeductsMaterialOpportunityCostFromProfit()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            // Ingredient: SellInstant=10 (opportunity-cost basis), BuyInstant=100 (craft-cost basis).
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            // Own 3 of the 5 needed; the other 2 are bought.
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnIngredient(3), CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued);
+
+            // Craft cost: (5 - 3) x 100 = 200
+            Assert.Equal(200, result.Plan.TotalCoinCost);
+            Assert.Single(result.UsedMaterials);
+            Assert.Equal(3, result.UsedMaterials[0].QuantityUsed);
+
+            // Opportunity cost: selling 3 x 10c = 30 total; fees -2 (5%) -3 (10%) = 25 net.
+            Assert.Equal(25, result.MaterialOpportunityCost);
+
+            // Sell value (unchanged): 400 - 20 (5%) - 40 (10%) = 340
+            Assert.Equal(340, result.NetSaleValue);
+            // Profit: 340 - 200 (coin cost) - 25 (opportunity cost) = 115
+            Assert.Equal(115, result.CraftingProfit);
+        }
+
+        [Fact]
+        public async Task Structured_FreeMode_MaterialOpportunityCostNullAndProfitUnchanged()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            // Default mode (no ownMaterialsMode argument) - Free.
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnIngredient(3), CancellationToken.None);
+
+            Assert.Equal(200, result.Plan.TotalCoinCost);
+            Assert.Null(result.MaterialOpportunityCost);
+            // Profit unaffected by ownership: 340 - 200 = 140
+            Assert.Equal(140, result.CraftingProfit);
+        }
+
+        [Fact]
+        public async Task Structured_ValuedMode_NoSnapshot_MaterialOpportunityCostNull()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            // Valued mode but nothing was reduced (no snapshot) - no owned
+            // materials, so there is nothing to have forgone selling.
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued);
+
+            Assert.Empty(result.UsedMaterials);
+            Assert.Null(result.MaterialOpportunityCost);
+            // All 5 ingredients bought at 100 each = 500; profit = 340 - 500 = -160
+            Assert.Equal(500, result.Plan.TotalCoinCost);
+            Assert.Equal(-160, result.CraftingProfit);
+        }
+
+        [Fact]
+        public async Task Structured_ValuedMode_UnsellableUsedMaterial_ContributesZero()
+        {
+            // Two ingredients are owned and consumed: item 2 is sellable,
+            // item 3 has no buy orders (SellInstant 0) and must contribute
+            // 0 to the opportunity cost rather than being skipped/erroring
+            // or zeroing the whole sum.
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 5 },
+                    new RawIngredient { Type = "Item", Id = 3, Count = 4 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100); // sellable, SellInstant=10
+            priceApi.AddPrice(3, buyUnitPrice: 0, sellUnitPrice: 50);   // unsellable, SellInstant=0
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Sellable Ingredient", "i.png");
+            itemApi.AddItem(3, "Unsellable Ingredient", "j.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var snapshot = new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry { ItemId = 2, Count = 5, Source = AccountItemIndex.SourceMaterialStorage },
+                    new SnapshotItemEntry { ItemId = 3, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
+                }
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, snapshot, CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued);
+
+            Assert.Equal(2, result.UsedMaterials.Count);
+
+            // Only item 2's 5 units count: 5x10=50 total; fees -3 (5%) -5 (10%) = 42 net.
+            // Item 3 contributes 0 despite 4 units being used.
+            Assert.Equal(42, result.MaterialOpportunityCost);
+        }
+
+        [Fact]
+        public async Task ResolveWithOverrides_PreservesOwnMaterialsMode()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnIngredient(3), CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued);
+
+            Assert.Equal(OwnMaterialsMode.Valued, initial.SolveContext.OwnMaterialsMode);
+            Assert.Equal(25, initial.MaterialOpportunityCost);
+            Assert.Equal(115, initial.CraftingProfit);
+
+            // A no-op local re-solve must keep valuing owned materials the
+            // same way the original Generate did (context-carried, like
+            // CurrencyValuation).
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, null);
+
+            Assert.Equal(25, resolved.MaterialOpportunityCost);
+            Assert.Equal(115, resolved.CraftingProfit);
+        }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_NoOwnMaterialsModeArgument_ContextDefaultsToFree()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnIngredient(3), CancellationToken.None);
+
+            Assert.Equal(OwnMaterialsMode.Free, result.SolveContext.OwnMaterialsMode);
+            Assert.Null(result.MaterialOpportunityCost);
+        }
+
+        [Fact]
+        public async Task Structured_ValuedMode_UsedMaterialPrices_AlreadyCoveredByTreeFetch()
+        {
+            // Design assertion (see M28 spec): prices are fetched for
+            // allItemIds, which is collected from the PRE-reduction tree
+            // (Step 2 runs before Step 6's reduction), so every used
+            // material - being a tree item that reduction happened to
+            // remove - already has a price entry by the time
+            // ApplySellSideEconomics runs. No separate fetch is needed for
+            // MaterialOpportunityCost, and this test pins that: the used
+            // material's price came from the ordinary tree price fetch.
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            // Own ALL of the required ingredient, so nothing is left to buy
+            // for item 2 (any remaining step is a zero-quantity/zero-cost
+            // placeholder) - its only real trace is UsedMaterials. If its
+            // price had to be fetched specially for the opportunity-cost
+            // calc rather than coming from the tree-wide fetch, this would
+            // be null/0 instead of the expected net value.
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnIngredient(5), CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued);
+
+            Assert.DoesNotContain(result.Plan.Steps, s => s.ItemId == 2 && s.Quantity > 0);
+            Assert.Equal(5, result.UsedMaterials[0].QuantityUsed);
+
+            // 5x10=50 total; fees -3 (5%) -5 (10%) = 42 net.
+            Assert.Equal(42, result.MaterialOpportunityCost);
+        }
     }
 }

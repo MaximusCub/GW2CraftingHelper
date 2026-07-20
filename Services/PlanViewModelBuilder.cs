@@ -104,6 +104,19 @@ namespace GW2CraftingHelper.Services
                 CoinValue = result.Plan.TotalCoinCost
             });
 
+            // Own-materials opportunity cost (Valued mode only, and only
+            // when it is actually non-zero - a material with no
+            // instant-sell price contributes nothing worth surfacing).
+            if (result.MaterialOpportunityCost.HasValue && result.MaterialOpportunityCost.Value > 0)
+            {
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CoinTotal,
+                    Label = "Own materials (sell value forgone)",
+                    CoinValue = result.MaterialOpportunityCost.Value
+                });
+            }
+
             // Sell-side rows: only when the target has a live sell price.
             if (result.NetSaleValue.HasValue)
             {

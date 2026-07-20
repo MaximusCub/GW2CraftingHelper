@@ -11,12 +11,22 @@ namespace GW2CraftingHelper.Services
     {
         private const int BatchSize = 200;
 
-        private readonly IPriceApiClient _api;
-        private readonly Dictionary<int, ItemPrice> _cache = new Dictionary<int, ItemPrice>();
+        // The GW2 commerce API refreshes trading post prices on its own short
+        // upstream cache cycle; a 15 minute local TTL keeps this cache from
+        // drifting far behind that cycle while still avoiding a re-fetch on
+        // every request.
+        private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(15);
 
-        public TradingPostService(IPriceApiClient api)
+        private readonly IPriceApiClient _api;
+        private readonly Func<DateTime> _utcNow;
+        private readonly object _cacheLock = new object();
+        private readonly Dictionary<int, (ItemPrice Price, DateTime FetchedUtc)> _cache =
+            new Dictionary<int, (ItemPrice Price, DateTime FetchedUtc)>();
+
+        public TradingPostService(IPriceApiClient api, Func<DateTime> utcNow = null)
         {
             _api = api;
+            _utcNow = utcNow ?? (() => DateTime.UtcNow);
         }
 
         public async Task<IReadOnlyDictionary<int, ItemPrice>> GetPricesAsync(
@@ -24,12 +34,16 @@ namespace GW2CraftingHelper.Services
         {
             var uniqueIds = new HashSet<int>(itemIds);
             var toFetch = new List<int>();
+            var now = _utcNow();
 
-            foreach (var id in uniqueIds)
+            lock (_cacheLock)
             {
-                if (!_cache.ContainsKey(id))
+                foreach (var id in uniqueIds)
                 {
-                    toFetch.Add(id);
+                    if (!_cache.TryGetValue(id, out var cached) || now - cached.FetchedUtc >= CacheTtl)
+                    {
+                        toFetch.Add(id);
+                    }
                 }
             }
 
@@ -39,24 +53,30 @@ namespace GW2CraftingHelper.Services
                 var batch = toFetch.GetRange(i, count);
                 var entries = await _api.GetPricesAsync(batch, ct);
 
-                foreach (var entry in entries)
+                lock (_cacheLock)
                 {
-                    var price = new ItemPrice
+                    foreach (var entry in entries)
                     {
-                        ItemId = entry.Id,
-                        BuyInstant = entry.SellUnitPrice,
-                        SellInstant = entry.BuyUnitPrice
-                    };
-                    _cache[entry.Id] = price;
+                        var price = new ItemPrice
+                        {
+                            ItemId = entry.Id,
+                            BuyInstant = entry.SellUnitPrice,
+                            SellInstant = entry.BuyUnitPrice
+                        };
+                        _cache[entry.Id] = (price, now);
+                    }
                 }
             }
 
             var result = new Dictionary<int, ItemPrice>();
-            foreach (var id in uniqueIds)
+            lock (_cacheLock)
             {
-                if (_cache.TryGetValue(id, out var price))
+                foreach (var id in uniqueIds)
                 {
-                    result[id] = price;
+                    if (_cache.TryGetValue(id, out var cached) && now - cached.FetchedUtc < CacheTtl)
+                    {
+                        result[id] = cached.Price;
+                    }
                 }
             }
 

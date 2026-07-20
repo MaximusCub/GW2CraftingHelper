@@ -798,5 +798,73 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal("Total (buy-order prices)", vm.Sections[0].Rows[0].Label);
         }
+
+        // --- Own-materials opportunity cost row (M28) ---
+
+        [Fact]
+        public void MaterialOpportunityCostPositive_AddsRowRightAfterTotal()
+        {
+            var result = MakeResult(totalCoinCost: 200);
+            result.MaterialOpportunityCost = 25;
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 115;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal(4, rows.Count);
+            Assert.Equal("Total", rows[0].Label);
+            Assert.Equal("Own materials (sell value forgone)", rows[1].Label);
+            Assert.Equal(25L, rows[1].CoinValue);
+            Assert.Equal(PlanRowType.CoinTotal, rows[1].RowType);
+            Assert.Equal("Sell value (after 15% TP fees)", rows[2].Label);
+            Assert.Equal("Profit if sold", rows[3].Label);
+            Assert.Equal(115L, rows[3].CoinValue);
+        }
+
+        [Fact]
+        public void MaterialOpportunityCostPositive_NoSellPrice_StillAddsRow()
+        {
+            // MaterialOpportunityCost can be populated even when the target
+            // has no live sell price (NetSaleValue/CraftingProfit stay
+            // null) - the row is not gated on target sellability.
+            var result = MakeResult(totalCoinCost: 200);
+            result.MaterialOpportunityCost = 25;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal(2, rows.Count);
+            Assert.Equal("Own materials (sell value forgone)", rows[1].Label);
+            Assert.Equal(25L, rows[1].CoinValue);
+        }
+
+        [Fact]
+        public void MaterialOpportunityCostZero_NoRow()
+        {
+            // All used materials were unsellable - the sum is 0, not null,
+            // but a 0-value row is not worth surfacing.
+            var result = MakeResult(totalCoinCost: 200);
+            result.MaterialOpportunityCost = 0;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Single(rows);
+            Assert.Equal("Total", rows[0].Label);
+        }
+
+        [Fact]
+        public void MaterialOpportunityCostNull_NoRow()
+        {
+            // Free mode (default) - MaterialOpportunityCost is never set.
+            var result = MakeResult(totalCoinCost: 200);
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Single(rows);
+            Assert.Equal("Total", rows[0].Label);
+        }
     }
 }
