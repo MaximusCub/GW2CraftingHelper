@@ -158,7 +158,8 @@ namespace GW2CraftingHelper.Services
             CancellationToken ct, IProgress<PlanStatus> progress = null,
             string activeCharacterName = null,
             PriceBasis priceBasis = PriceBasis.InstantBuy,
-            CurrencyValuation currencyValuation = null)
+            CurrencyValuation currencyValuation = null,
+            OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
             var sw = new Stopwatch();
@@ -303,7 +304,7 @@ namespace GW2CraftingHelper.Services
 
             ApplySellSideEconomics(
                 result, treeUsedForSolve, solveResult, prices,
-                targetItemId, quantity, priceBasis);
+                targetItemId, quantity, priceBasis, usedMaterials, ownMaterialsMode);
 
             // Capture inputs so the UI can re-solve locally with per-node
             // overrides (no network round-trips).
@@ -318,7 +319,8 @@ namespace GW2CraftingHelper.Services
                 LearnedRecipeIds = learnedRecipeIds,
                 UsedMaterials = usedMaterials,
                 PriceBasis = priceBasis,
-                CurrencyValuation = valuation
+                CurrencyValuation = valuation,
+                OwnMaterialsMode = ownMaterialsMode
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -359,7 +361,8 @@ namespace GW2CraftingHelper.Services
 
             ApplySellSideEconomics(
                 result, context.Tree, solveResult, context.Prices,
-                context.TargetItemId, context.Quantity, context.PriceBasis);
+                context.TargetItemId, context.Quantity, context.PriceBasis,
+                context.UsedMaterials, context.OwnMaterialsMode);
             result.SolveContext = context;
 
             if (result.DebugLog == null)
@@ -474,7 +477,9 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemPrice> prices,
             int targetItemId,
             int quantity,
-            PriceBasis priceBasis)
+            PriceBasis priceBasis,
+            List<UsedMaterial> usedMaterials,
+            OwnMaterialsMode ownMaterialsMode)
         {
             // Sell-side economics: what the crafted quantity nets after TP
             // fees, and profit versus the plan's coin cost. Coin-only by
@@ -500,13 +505,43 @@ namespace GW2CraftingHelper.Services
                 }
             }
             result.SellableQuantity = sellableQuantity;
+
+            // Own-materials opportunity cost (gw2efficiency-style "value own
+            // materials"): what selling the owned materials that inventory
+            // reduction consumed would have netted after TP fees. Reduction
+            // itself never changes - owned mats are still consumed first at
+            // zero acquisition cost in both modes; this only affects the
+            // profit figure below. A material with no instant-sell price
+            // (SellInstant 0/absent) contributes 0, not an exclusion.
+            long? materialOpportunityCost = null;
+            if (ownMaterialsMode == OwnMaterialsMode.Valued &&
+                usedMaterials != null && usedMaterials.Count > 0)
+            {
+                long sum = 0;
+                foreach (var used in usedMaterials)
+                {
+                    if (prices.TryGetValue(used.ItemId, out var matPrice) &&
+                        matPrice.SellInstant > 0)
+                    {
+                        sum += TradingPostMath.NetSaleRevenue(matPrice.SellInstant, used.QuantityUsed);
+                    }
+                }
+                materialOpportunityCost = sum;
+            }
+            result.MaterialOpportunityCost = materialOpportunityCost;
+
             if (prices.TryGetValue(targetItemId, out var targetPrice) &&
                 targetPrice.SellInstant > 0)
             {
                 result.TargetUnitSellPrice = targetPrice.SellInstant;
                 result.NetSaleValue = TradingPostMath.NetSaleRevenue(
                     targetPrice.SellInstant, sellableQuantity);
-                result.CraftingProfit = result.NetSaleValue.Value - solveResult.Plan.TotalCoinCost;
+                long profit = result.NetSaleValue.Value - solveResult.Plan.TotalCoinCost;
+                if (materialOpportunityCost.HasValue)
+                {
+                    profit -= materialOpportunityCost.Value;
+                }
+                result.CraftingProfit = profit;
             }
         }
 
