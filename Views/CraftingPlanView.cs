@@ -121,7 +121,11 @@ namespace GW2CraftingHelper.Views
         {
             int saved = _contentPanel?.VerticalScrollOffset ?? 0;
             int capturedGeneration = ++_scrollRestoreGeneration;
+            Logger.Info("[M30#1] ScrollPreserve begin gen={0} savedOffset={1} panelH={2}",
+                capturedGeneration, saved, _contentPanel?.Height ?? -1);
             mutate();
+            Logger.Info("[M30#1] ScrollPreserve after-mutate gen={0} childCount={1} panelH={2}",
+                capturedGeneration, _contentPanel?.Children.Count ?? -1, _contentPanel?.Height ?? -1);
             if (saved > 0)
             {
                 RestoreScrollOffset(saved, capturedGeneration);
@@ -146,6 +150,8 @@ namespace GW2CraftingHelper.Views
                 // fight the current restore or scroll a stale/disposed panel.
                 if (capturedGeneration != _scrollRestoreGeneration || capturedPanel != _contentPanel)
                 {
+                    Logger.Info("[M30#1] ScrollRestore bail gen={0} currentGen={1} panelSwapped={2} attempt={3}",
+                        capturedGeneration, _scrollRestoreGeneration, capturedPanel != _contentPanel, attempts);
                     return;
                 }
 
@@ -168,6 +174,8 @@ namespace GW2CraftingHelper.Views
 
                     float ratio = ScrollMath.RatioForOffset(
                         savedOffset, contentHeight, capturedPanel.Height);
+                    Logger.Info("[M30#1] ScrollRestore tick gen={0} attempt={1} savedOffsetPx={2} contentH={3} panelH={4} ratio={5:F4} lastRatio={6:F4}",
+                        capturedGeneration, attempts + 1, savedOffset, contentHeight, capturedPanel.Height, ratio, lastRatio);
                     scrollbar.ScrollDistance = ratio;
 
                     attempts++;
@@ -176,6 +184,58 @@ namespace GW2CraftingHelper.Views
                     if (attempts < 10 && !stable)
                     {
                         GameService.Overlay.QueueMainThreadUpdate(Tick);
+                    }
+                    else
+                    {
+                        string reason = stable ? "stable" : "max-attempts";
+                        Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason={2} finalRatio={3:F4} finalContentH={4}",
+                            capturedGeneration, attempts, reason, ratio, contentHeight);
+
+                        // Read-only watchdog: observes for a few more frames
+                        // after we stop contesting the scrollbar, WITHOUT
+                        // ever writing ScrollDistance itself, to tell apart
+                        // "we settled at the correct position" from "Blish's
+                        // Panel reset the scrollbar to 0 right after we let
+                        // go of it".
+                        int watchFrame = 0;
+                        void WatchTick(GameTime __)
+                        {
+                            if (capturedGeneration != _scrollRestoreGeneration || capturedPanel != _contentPanel)
+                            {
+                                return;
+                            }
+
+                            watchFrame++;
+                            float? watchedDistance = null;
+                            int watchedContentHeight = 0;
+                            try
+                            {
+                                var watchScrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
+                                watchedDistance = watchScrollbar?.ScrollDistance;
+                                foreach (var child in capturedPanel.Children)
+                                {
+                                    if (child.Visible && child.Bottom > watchedContentHeight)
+                                    {
+                                        watchedContentHeight = child.Bottom;
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Diagnostic-only: reflection/layout mismatch, stop watching.
+                                return;
+                            }
+
+                            Logger.Info("[M30#1] ScrollWatch gen={0} frame={1} scrollDistance={2:F4} contentH={3}",
+                                capturedGeneration, watchFrame, watchedDistance ?? -1f, watchedContentHeight);
+
+                            if (watchFrame < 15)
+                            {
+                                GameService.Overlay.QueueMainThreadUpdate(WatchTick);
+                            }
+                        }
+
+                        GameService.Overlay.QueueMainThreadUpdate(WatchTick);
                     }
                 }
                 catch
@@ -454,6 +514,8 @@ namespace GW2CraftingHelper.Views
             }
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
+            Logger.Info("[M30#1] RenderPlan rebuild sections={0} hasTree={1} panelWidth={2}",
+                vm?.Sections?.Count ?? -1, vm?.TreeRoot != null, panelWidth);
 
             CreatePlanHeader(vm, panelWidth);
 
@@ -1449,6 +1511,8 @@ namespace GW2CraftingHelper.Views
 
         private void ApplyOverridesAndResolve()
         {
+            Logger.Info("[M30#1] ApplyOverridesAndResolve begin overrideCount={0} scrollBefore={1}",
+                _nodeOverrides.Count, _contentPanel?.VerticalScrollOffset ?? -1);
             if (_lastResult?.SolveContext == null || _resolveOverridesSync == null)
             {
                 return;
@@ -1685,8 +1749,14 @@ namespace GW2CraftingHelper.Views
                     // a pill click as an expand/collapse toggle.
                     foreach (var pill in pillPanels)
                     {
-                        if (pill.MouseOver) return;
+                        if (pill.MouseOver)
+                        {
+                            Logger.Info("[M30#1] Tree row toggle suppressed by pill nodeId={0}", node.NodeId);
+                            return;
+                        }
                     }
+                    Logger.Info("[M30#1] Tree row toggle firing nodeId={0} scrollBefore={1}",
+                        node.NodeId, _contentPanel?.VerticalScrollOffset ?? -1);
                     PreserveScrollAcross(() =>
                     {
                         if (!state.ChildrenBuilt)
@@ -1875,6 +1945,8 @@ namespace GW2CraftingHelper.Views
                     var source = spec.Source.Value;
                     outer.Click += (_, __) =>
                     {
+                        Logger.Info("[M30#1] Pill click nodeId={0} source={1} scrollBefore={2}",
+                            node.NodeId, source, _contentPanel?.VerticalScrollOffset ?? -1);
                         _nodeOverrides[node.NodeId] = source;
                         ApplyOverridesAndResolve();
                     };
