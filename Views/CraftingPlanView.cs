@@ -1480,9 +1480,18 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(nameX, 9),
                 Parent = rowPanel
             };
+            var tooltipParts = new List<string>();
             if (displayName != fullName)
             {
-                rowPanel.BasicTooltipText = fullName;
+                tooltipParts.Add(fullName);
+            }
+            if (!string.IsNullOrEmpty(row.HintText))
+            {
+                tooltipParts.Add(row.HintText);
+            }
+            if (tooltipParts.Count > 0)
+            {
+                rowPanel.BasicTooltipText = string.Join("\n", tooltipParts);
             }
 
             string sourceTag = ShoppingSourceTag(row.RowType);
@@ -2201,6 +2210,10 @@ namespace GW2CraftingHelper.Views
             {
                 tooltipParts.Add("Unit price: " + FormatCoinText(node.UnitCost.Value));
             }
+            if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
+            {
+                tooltipParts.Add(node.AcquisitionHint);
+            }
             if (tooltipParts.Count > 0)
             {
                 rowPanel.BasicTooltipText = string.Join("\n", tooltipParts);
@@ -2474,7 +2487,22 @@ namespace GW2CraftingHelper.Views
                 }
                 else if (spec.Kind == PillKind.Locked)
                 {
-                    outer.BasicTooltipText = "Only available source";
+                    // The UNKNOWN pill (node.Decision == Unknown - no
+                    // feasible source at all) is a different situation from
+                    // every other locked pill (exactly one feasible source,
+                    // just not a choice): "Only available source" is
+                    // misleading there since there IS no available source.
+                    // Prefer the seeded wiki hint when one exists.
+                    if (node.Decision == CraftingDecision.Unknown)
+                    {
+                        outer.BasicTooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
+                            ? node.AcquisitionHint
+                            : "No known acquisition source";
+                    }
+                    else
+                    {
+                        outer.BasicTooltipText = "Only available source";
+                    }
                 }
 
                 pillPanels.Add(outer);
