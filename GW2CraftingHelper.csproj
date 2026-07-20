@@ -70,6 +70,7 @@
     <Compile Include="Models\AcquisitionSource.cs" />
     <Compile Include="Models\PlanStep.cs" />
     <Compile Include="Models\CurrencyCost.cs" />
+    <Compile Include="Models\CurrencyValuation.cs" />
     <Compile Include="Models\CraftingPlan.cs" />
     <Compile Include="Services\PlanSolver.cs" />
     <Compile Include="Services\SolverDecision.cs" />
@@ -92,6 +93,7 @@
     <Compile Include="Views\ViewAdapter.cs" />
     <Compile Include="Views\ResizableTabbedWindow.cs" />
     <Compile Include="Services\ModuleSettings.cs" />
+    <Compile Include="Services\CurrencyValuationSerializer.cs" />
     <Compile Include="Models\Gw2Constants.cs" />
     <Compile Include="Models\CostLine.cs" />
     <Compile Include="Models\VendorOffer.cs" />

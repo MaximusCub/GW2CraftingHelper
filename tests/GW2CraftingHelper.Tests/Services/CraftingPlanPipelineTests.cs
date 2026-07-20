@@ -938,5 +938,105 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(PriceBasis.BuyOrder, result.PriceBasis);
             Assert.Equal(310, result.CraftingProfit);
         }
+
+        // --- Currency valuation threading ---
+
+        [Fact]
+        public async Task GenerateStructuredAsync_CurrencyValuation_ThreadsIntoSolverAndContext()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 1000, sellUnitPrice: 2000);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Karma Item", "karma.png");
+
+            var tempDir = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
+            System.IO.Directory.CreateDirectory(tempDir);
+            try
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tempDir, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-karma-offer",
+                        OutputItemId = 1,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Currency", Id = 2, Count = 50 }
+                        },
+                        MerchantName = "Karma Vendor",
+                        Locations = new List<string>()
+                    }
+                });
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store,
+                    reducer: new InventoryReducer());
+
+                var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
+
+                var result = await pipeline.GenerateStructuredAsync(
+                    1, 1, null, CancellationToken.None,
+                    currencyValuation: valuation);
+
+                // Vendor wins: 50 karma x 5 copper = 250 < 1000 TP
+                Assert.Single(result.Plan.Steps);
+                Assert.Equal(AcquisitionSource.BuyFromVendor, result.Plan.Steps[0].Source);
+                Assert.Equal(0, result.Plan.Steps[0].TotalCost);
+                Assert.Single(result.Plan.CurrencyCosts);
+                Assert.Equal(2, result.Plan.CurrencyCosts[0].CurrencyId);
+                Assert.Equal(50, result.Plan.CurrencyCosts[0].Amount);
+
+                // The valuation is captured on the context for later local re-solves
+                Assert.NotNull(result.SolveContext.CurrencyValuation);
+                Assert.True(result.SolveContext.CurrencyValuation.TryGetCopperValue(2, out long copperPerUnit));
+                Assert.Equal(5, copperPerUnit);
+
+                // A subsequent local re-solve (no network calls, no overrides)
+                // must keep using the valuation carried on the context.
+                var resolved = pipeline.ResolveWithOverrides(result.SolveContext, null);
+                Assert.Equal(AcquisitionSource.BuyFromVendor, resolved.Plan.Steps[0].Source);
+                Assert.Single(resolved.Plan.CurrencyCosts);
+                Assert.Equal(50, resolved.Plan.CurrencyCosts[0].Amount);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_NoCurrencyValuationArgument_ContextDefaultsToNone()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Item", "icon.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+
+            Assert.NotNull(result.SolveContext.CurrencyValuation);
+            Assert.False(result.SolveContext.CurrencyValuation.TryGetCopperValue(2, out _));
+        }
     }
 }
