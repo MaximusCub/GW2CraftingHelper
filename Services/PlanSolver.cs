@@ -28,8 +28,10 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             PriceBasis priceBasis = PriceBasis.InstantBuy,
-            IReadOnlyDictionary<int, AcquisitionSource> overrides = null)
+            IReadOnlyDictionary<int, AcquisitionSource> overrides = null,
+            CurrencyValuation currencyValuation = null)
         {
+            var valuation = currencyValuation ?? CurrencyValuation.None;
             var memo = new Dictionary<int, Decision>();
 
             // Pre-pass: assign unique NodeIds to every node in the tree.
@@ -40,7 +42,7 @@ namespace GW2CraftingHelper.Services
             AssignNodeIds(tree, ref nextNodeId);
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides);
+            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -126,7 +128,8 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             Dictionary<int, Decision> memo,
             PriceBasis priceBasis,
-            IReadOnlyDictionary<int, AcquisitionSource> overrides)
+            IReadOnlyDictionary<int, AcquisitionSource> overrides,
+            CurrencyValuation currencyValuation)
         {
             if (node.IngredientType == "Currency")
             {
@@ -137,14 +140,24 @@ namespace GW2CraftingHelper.Services
 
             // Evaluate vendor offers. Offers costing only coin (directly or via
             // TP-priced item barter) are comparable with TP/craft coin costs and
-            // compete in PickCheapest. Offers with non-coin currency lines (karma,
-            // essences, ...) are NOT comparable with coin - rating them by their
-            // coin part alone would make e.g. a 500k-karma offer beat every coin
-            // option. They are kept only as a fallback when nothing priceable
-            // exists (repo invariant: avoid invalid currency comparisons).
+            // compete in PickCheapest. Offers with non-coin currency lines
+            // (karma, essences, ...) are comparable too, but ONLY when every
+            // one of those currencies has a user-provided valuation
+            // (currencyValuation) - their coin-equivalent (coin part + valued
+            // currency lines) is what competes. Offers with any unvalued
+            // currency line are NOT comparable with coin - rating them by
+            // their coin part alone would make e.g. a 500k-karma offer beat
+            // every coin option - and are kept only as a fallback when
+            // nothing priceable exists (repo invariant: avoid invalid
+            // currency comparisons / never invent exchange rates). Either
+            // way, a winning offer's non-coin currency lines are always
+            // reported on the plan (VendorCurrencyCosts) - valuation only
+            // affects comparison, never the displayed currency cost.
             EvaluateVendorOffers(
-                node, prices, vendorOffers, priceBasis,
+                node, prices, vendorOffers, priceBasis, currencyValuation,
+                out long? comparableVendorValue,
                 out long? comparableVendorCoinCost,
+                out List<CostLine> comparableVendorCurrencyCosts,
                 out long? fallbackVendorCoinCost,
                 out List<CostLine> fallbackVendorCurrencyCosts);
 
@@ -166,7 +179,7 @@ namespace GW2CraftingHelper.Services
                     }
 
                     long? ingredientCost = Evaluate(
-                        ingredient, prices, vendorOffers, memo, priceBasis, overrides);
+                        ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation);
                     if (!ingredientCost.HasValue)
                     {
                         allPriceable = false;
@@ -202,7 +215,7 @@ namespace GW2CraftingHelper.Services
             // only fires when nothing else is priceable at all.
             bool canCraft = bestCraftCost.HasValue;
             bool canBuyTp = buyTotalCost.HasValue;
-            bool canBuyVendor = comparableVendorCoinCost.HasValue ||
+            bool canBuyVendor = comparableVendorValue.HasValue ||
                                 fallbackVendorCoinCost.HasValue;
 
             long? Commit(AcquisitionSource src, long? cost, int recipeId, List<CostLine> vendorCurrencyCosts)
@@ -235,18 +248,19 @@ namespace GW2CraftingHelper.Services
                 }
                 if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
                 {
-                    return comparableVendorCoinCost.HasValue
-                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, 0, null)
+                    return comparableVendorValue.HasValue
+                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, 0, comparableVendorCurrencyCosts)
                         : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
                 }
             }
 
-            // Three-way comparison: vendor (pure coin) vs TP buy vs craft
-            var source = PickCheapest(buyTotalCost, bestCraftCost, comparableVendorCoinCost);
+            // Three-way comparison: vendor (coin part + any valued currency
+            // lines) vs TP buy vs craft
+            var source = PickCheapest(buyTotalCost, bestCraftCost, comparableVendorValue);
 
             if (source == AcquisitionSource.BuyFromVendor)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, 0, null);
+                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, 0, comparableVendorCurrencyCosts);
             }
 
             if (source == AcquisitionSource.BuyFromTp)
@@ -276,27 +290,41 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Splits vendor offers into two tiers. Pure-coin offers (coin and/or
-        /// TP-priceable item barter only) are cost-comparable with TP/craft and
-        /// reported via <paramref name="bestComparableCoinCost"/>. Offers with
-        /// non-coin currency lines are incomparable with coin costs and reported
-        /// only as a fallback, ranked by lowest coin part. A coin-part tie is
-        /// broken by unit count only when both offers cost the same single
-        /// currency (a genuine like-for-like comparison); ties across different
-        /// currencies keep the first-listed offer, because ranking across
-        /// currencies has no exchange rate and unit counts of different
-        /// currencies must never be compared.
+        /// Splits vendor offers into two tiers. An offer is COMPARABLE (competes
+        /// with TP/craft coin costs in PickCheapest) when it has no non-coin
+        /// currency lines at all, OR every one of its non-coin currency lines
+        /// has a user-provided valuation (<paramref name="currencyValuation"/>):
+        /// its comparison value is coin part + sum(count * copperPerUnit) over
+        /// those valued lines, reported via <paramref name="bestComparableValue"/>.
+        /// The winning comparable offer's real coin part and (if any) currency
+        /// lines are reported separately via <paramref name="bestComparableCoinCost"/>
+        /// and <paramref name="bestComparableCurrencyCosts"/> - the valuation
+        /// affects comparison only, never the amounts committed to the plan.
+        /// An offer with at least one non-coin currency line that has NO
+        /// valuation (including when it is mixed with other, valued lines) is
+        /// incomparable with coin costs and reported only as a FALLBACK,
+        /// ranked by lowest coin part. A fallback coin-part tie is broken by
+        /// unit count only when both offers cost the same single currency (a
+        /// genuine like-for-like comparison); ties across different currencies
+        /// keep the first-listed offer, because ranking across currencies has
+        /// no exchange rate and unit counts of different currencies must never
+        /// be compared.
         /// </summary>
         private static void EvaluateVendorOffers(
             RecipeNode node,
             IReadOnlyDictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             PriceBasis priceBasis,
+            CurrencyValuation currencyValuation,
+            out long? bestComparableValue,
             out long? bestComparableCoinCost,
+            out List<CostLine> bestComparableCurrencyCosts,
             out long? fallbackCoinCost,
             out List<CostLine> fallbackCurrencyCosts)
         {
+            bestComparableValue = null;
             bestComparableCoinCost = null;
+            bestComparableCurrencyCosts = null;
             fallbackCoinCost = null;
             fallbackCurrencyCosts = null;
             long fallbackCurrencyUnits = 0;
@@ -357,40 +385,86 @@ namespace GW2CraftingHelper.Services
                 int unitsNeeded = (int)Math.Ceiling((double)node.Quantity / offer.OutputCount);
                 long totalCoinCost = coinCost * unitsNeeded;
 
-                if (currencyCosts.Count == 0)
-                {
-                    if (!bestComparableCoinCost.HasValue ||
-                        totalCoinCost < bestComparableCoinCost.Value)
-                    {
-                        bestComparableCoinCost = totalCoinCost;
-                    }
-                    continue;
-                }
-
-                var scaledCurrencyCosts = new List<CostLine>();
+                // Scale and value the non-coin currency lines (no-op for a
+                // pure-coin offer, which has none). allValued stays
+                // vacuously true when there are no non-coin lines, so a
+                // pure-coin offer always lands in the comparable branch
+                // below with valuationCopper == 0 - unchanged from before.
+                List<CostLine> scaledCurrencyCosts = null;
                 long totalCurrencyUnits = 0;
+                long valuationCopper = 0;
                 bool scalable = true;
-                foreach (var cc in currencyCosts)
+                bool allValued = true;
+
+                if (currencyCosts.Count > 0)
                 {
-                    long scaled = (long)cc.Count * unitsNeeded;
-                    if (scaled > int.MaxValue)
+                    scaledCurrencyCosts = new List<CostLine>(currencyCosts.Count);
+                    foreach (var cc in currencyCosts)
                     {
-                        // A quantity this large cannot be represented in a
-                        // CostLine; skip the offer rather than crash the solve.
-                        scalable = false;
-                        break;
+                        long scaled = (long)cc.Count * unitsNeeded;
+                        if (scaled > int.MaxValue)
+                        {
+                            // A quantity this large cannot be represented in a
+                            // CostLine; skip the offer rather than crash the solve.
+                            scalable = false;
+                            break;
+                        }
+                        totalCurrencyUnits += scaled;
+                        scaledCurrencyCosts.Add(new CostLine
+                        {
+                            Type = cc.Type,
+                            Id = cc.Id,
+                            Count = (int)scaled
+                        });
+
+                        if (allValued)
+                        {
+                            if (currencyValuation != null &&
+                                currencyValuation.TryGetCopperValue(cc.Id, out long copperPerUnit))
+                            {
+                                try
+                                {
+                                    valuationCopper = checked(valuationCopper + (scaled * copperPerUnit));
+                                }
+                                catch (OverflowException)
+                                {
+                                    // Absurd valuation input; fall back rather
+                                    // than crash or silently misrank offers.
+                                    allValued = false;
+                                }
+                            }
+                            else
+                            {
+                                allValued = false;
+                            }
+                        }
                     }
-                    totalCurrencyUnits += scaled;
-                    scaledCurrencyCosts.Add(new CostLine
-                    {
-                        Type = cc.Type,
-                        Id = cc.Id,
-                        Count = (int)scaled
-                    });
                 }
 
                 if (!scalable)
                 {
+                    continue;
+                }
+
+                if (allValued)
+                {
+                    long comparisonValue;
+                    try
+                    {
+                        comparisonValue = checked(totalCoinCost + valuationCopper);
+                    }
+                    catch (OverflowException)
+                    {
+                        continue;
+                    }
+
+                    if (!bestComparableValue.HasValue ||
+                        comparisonValue < bestComparableValue.Value)
+                    {
+                        bestComparableValue = comparisonValue;
+                        bestComparableCoinCost = totalCoinCost;
+                        bestComparableCurrencyCosts = scaledCurrencyCosts;
+                    }
                     continue;
                 }
 
