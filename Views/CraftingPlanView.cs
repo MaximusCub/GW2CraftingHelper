@@ -1049,7 +1049,23 @@ namespace GW2CraftingHelper.Views
         // effectively unbounded budget with "Total" - the two overlapped
         // for routine gold-value rows.
         private const int ShoppingColTotalWidth = 150;
-        private const int ShoppingColGap = 12;
+        private const int ShoppingColAmountWidth = 90;
+        private const int ShoppingColGap = 20;
+
+        /// <summary>
+        /// Right edges for the shopping list's Amount/Each/Total columns,
+        /// derived right-to-left off the fixed panel edge so header and data
+        /// rows can never drift apart. Total anchors first; Each reserves
+        /// ShoppingColTotalWidth plus a gap to its left; Amount reserves
+        /// ShoppingColAmountWidth plus another gap to its left in turn.
+        /// </summary>
+        private static void ComputeShoppingColumnEdges(
+            int panelWidth, out int totalRightEdge, out int eachRightEdge, out int qtyRightEdge)
+        {
+            totalRightEdge = panelWidth - 8;
+            eachRightEdge = totalRightEdge - ShoppingColTotalWidth - ShoppingColGap;
+            qtyRightEdge = eachRightEdge - ShoppingColAmountWidth - ShoppingColGap;
+        }
 
         private static void CreateShoppingListHeaderRow(FlowPanel parent, int panelWidth)
         {
@@ -1057,9 +1073,7 @@ namespace GW2CraftingHelper.Views
             var font = GameService.Content.DefaultFont12;
             var color = new Color(153, 153, 153);
 
-            int qtyRightEdge = panelWidth - 260;
-            int totalRightEdge = panelWidth - 8;
-            int eachRightEdge = totalRightEdge - ShoppingColTotalWidth - ShoppingColGap;
+            ComputeShoppingColumnEdges(panelWidth, out int totalRightEdge, out int eachRightEdge, out int qtyRightEdge);
 
             new Label()
             {
@@ -1091,9 +1105,7 @@ namespace GW2CraftingHelper.Views
             CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
 
             const int nameX = 50;
-            int qtyRightEdge = panelWidth - 260;
-            int totalRightEdge = panelWidth - 8;
-            int eachRightEdge = totalRightEdge - ShoppingColTotalWidth - ShoppingColGap;
+            ComputeShoppingColumnEdges(panelWidth, out int totalRightEdge, out int eachRightEdge, out int qtyRightEdge);
             var font = GameService.Content.DefaultFont14;
 
             string qtyText = $"{row.Quantity}x";
