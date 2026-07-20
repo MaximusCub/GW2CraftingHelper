@@ -1575,7 +1575,7 @@ namespace GW2CraftingHelper.Views
             // The only other row type in this section is CurrencyCost.
             foreach (var row in otherRows)
             {
-                CreateTextRow(row.Label, contentFlow, panelWidth);
+                CreateCurrencyRow(row, contentFlow, panelWidth);
             }
         }
 
@@ -1594,6 +1594,46 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(8, 4),
                 Parent = rowPanel
             };
+        }
+
+        // Sized between the tree/row item-icon (32px) and the coin-segment
+        // icon (20px) since it sits inside a plain 28px text row; reuses
+        // CoinLabelIconGap (below, in the coin display helpers) for the
+        // text-to-icon gap so both follow the same "number/text first, gap,
+        // icon" convention.
+        private const int CurrencyRowHeight = 28;
+        private const int CurrencyIconSize = 18;
+
+        /// <summary>
+        /// CurrencyCost row: identical "  {label}" text to CreateTextRow,
+        /// plus the currency's icon immediately to its right when known.
+        /// IconUrl null (no data available - service not wired up, fetch
+        /// not yet complete, or the currency was absent from the API
+        /// response) renders exactly like CreateTextRow - never a
+        /// placeholder guess for a missing icon.
+        /// </summary>
+        private void CreateCurrencyRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, CurrencyRowHeight),
+                Parent = parent
+            };
+            var label = new Label()
+            {
+                Text = "  " + row.Label,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(8, 4),
+                Parent = rowPanel
+            };
+
+            if (!string.IsNullOrEmpty(row.IconUrl))
+            {
+                int iconX = 8 + label.Width + CoinLabelIconGap;
+                int iconY = (CurrencyRowHeight - CurrencyIconSize) / 2;
+                CreateItemIcon(rowPanel, row.IconUrl, iconX, iconY, CurrencyIconSize);
+            }
         }
 
         // --- Recipe tree section ---
