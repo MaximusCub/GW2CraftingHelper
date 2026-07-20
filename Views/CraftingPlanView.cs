@@ -99,6 +99,19 @@ namespace GW2CraftingHelper.Views
         // each frame and bails as soon as a newer restore has superseded it.
         private int _scrollRestoreGeneration;
 
+        // GameService.Overlay.QueueMainThreadUpdate, when re-queued from
+        // inside its own queued callback, drains in the SAME frame rather
+        // than waiting for the next real Update() tick (confirmed by
+        // identical-millisecond [M30#1] trace lines). ScrollFrameGate tells
+        // real frame advances apart from same-frame re-queues; these tune
+        // how many real frames the restore loop and its post-convergence
+        // guard run for, and the safety valve for a same-frame stall.
+        private const int ScrollRestoreMaxRealFrames = 30;
+        private const int ScrollRestoreRequiredStableStreak = 3;
+        private const int ScrollGuardWindowFrames = 20;
+        private const int ScrollGuardHardCapFrames = 120;
+        private const int ScrollMaxSameFrameSpins = 400;
+
         public CraftingPlanView(
             Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
@@ -133,8 +146,12 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// Runs a layout-mutating action and restores the content panel's
         /// scroll position afterwards. Nested AutoSize flow panels converge
-        /// height over several frames, so the restore re-asserts each frame
-        /// until the computed ratio stabilizes (max 10 frames).
+        /// height over several REAL frames, so the restore re-asserts each
+        /// real frame until the computed ratio and content height stabilize
+        /// (up to ScrollRestoreMaxRealFrames), then a ScrollGuard keeps
+        /// re-asserting for a further window of real frames to contest any
+        /// late scrollbar reset Blish's Panel performs once layout finishes
+        /// settling. See RestoreScrollOffset and ScrollFrameGate.
         /// </summary>
         private void PreserveScrollAcross(Action mutate)
         {
@@ -151,6 +168,37 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        /// <summary>
+        /// Tells a real engine frame advance apart from QueueMainThreadUpdate
+        /// re-queuing itself and draining again within the SAME frame. A
+        /// call is a "real frame" the first time it is asked (no prior frame
+        /// to compare against) or whenever GameTime.TotalGameTime differs
+        /// from the previous real frame's; otherwise it is a same-frame spin.
+        /// SpinCount resets on every real frame so it budgets each stall
+        /// independently rather than accumulating across the whole loop.
+        /// </summary>
+        private sealed class ScrollFrameGate
+        {
+            private TimeSpan? _lastFrameTime;
+
+            public int SpinCount { get; private set; }
+
+            public bool IsRealFrame(GameTime gameTime)
+            {
+                TimeSpan? current = gameTime?.TotalGameTime;
+                bool isNewFrame = !_lastFrameTime.HasValue || !current.HasValue || current.Value != _lastFrameTime.Value;
+                if (isNewFrame)
+                {
+                    _lastFrameTime = current;
+                    SpinCount = 0;
+                    return true;
+                }
+
+                SpinCount++;
+                return false;
+            }
+        }
+
         private void RestoreScrollOffset(int savedOffset, int capturedGeneration)
         {
             if (_contentPanel == null || PanelScrollbarField == null)
@@ -159,18 +207,40 @@ namespace GW2CraftingHelper.Views
             }
 
             var capturedPanel = _contentPanel;
-            int attempts = 0;
+            var frameGate = new ScrollFrameGate();
+            int realFrame = 0;
             float lastRatio = -1f;
+            int lastContentHeight = -1;
+            int stableStreak = 0;
 
-            void Tick(GameTime _)
+            void Tick(GameTime gameTime)
             {
                 // A newer restore superseded this loop, or Build() swapped
                 // in a fresh content panel: stop immediately rather than
                 // fight the current restore or scroll a stale/disposed panel.
                 if (capturedGeneration != _scrollRestoreGeneration || capturedPanel != _contentPanel)
                 {
-                    Logger.Info("[M30#1] ScrollRestore bail gen={0} currentGen={1} panelSwapped={2} attempt={3}",
-                        capturedGeneration, _scrollRestoreGeneration, capturedPanel != _contentPanel, attempts);
+                    Logger.Info("[M30#1] ScrollRestore bail gen={0} currentGen={1} panelSwapped={2} realFrame={3}",
+                        capturedGeneration, _scrollRestoreGeneration, capturedPanel != _contentPanel, realFrame);
+                    return;
+                }
+
+                // Same-frame drain guard: QueueMainThreadUpdate re-queued
+                // from inside its own callback runs immediately in the same
+                // frame instead of waiting for the next Update(). Re-queue
+                // without touching attempts/stability/the scrollbar until a
+                // real frame actually arrives, with a safety valve so a
+                // pathological same-frame loop cannot spin forever.
+                if (!frameGate.IsRealFrame(gameTime))
+                {
+                    if (frameGate.SpinCount >= ScrollMaxSameFrameSpins)
+                    {
+                        Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=spin-cap finalRatio={2:F4} finalContentH={3}",
+                            capturedGeneration, realFrame, lastRatio, lastContentHeight);
+                        return;
+                    }
+
+                    GameService.Overlay.QueueMainThreadUpdate(Tick);
                     return;
                 }
 
@@ -179,6 +249,8 @@ namespace GW2CraftingHelper.Views
                     var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
                     if (scrollbar == null)
                     {
+                        Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=no-scrollbar finalRatio={2:F4} finalContentH={3}",
+                            capturedGeneration, realFrame, lastRatio, lastContentHeight);
                         return;
                     }
 
@@ -193,68 +265,29 @@ namespace GW2CraftingHelper.Views
 
                     float ratio = ScrollMath.RatioForOffset(
                         savedOffset, contentHeight, capturedPanel.Height);
-                    Logger.Info("[M30#1] ScrollRestore tick gen={0} attempt={1} savedOffsetPx={2} contentH={3} panelH={4} ratio={5:F4} lastRatio={6:F4}",
-                        capturedGeneration, attempts + 1, savedOffset, contentHeight, capturedPanel.Height, ratio, lastRatio);
+                    realFrame++;
+                    Logger.Info("[M30#1] ScrollRestore tick gen={0} realFrame={1} savedOffsetPx={2} contentH={3} panelH={4} ratio={5:F4} lastRatio={6:F4}",
+                        capturedGeneration, realFrame, savedOffset, contentHeight, capturedPanel.Height, ratio, lastRatio);
                     scrollbar.ScrollDistance = ratio;
 
-                    attempts++;
-                    bool stable = System.Math.Abs(ratio - lastRatio) < 0.0005f;
+                    bool ratioStable = System.Math.Abs(ratio - lastRatio) < 0.0005f;
+                    bool heightStable = contentHeight == lastContentHeight;
+                    stableStreak = (ratioStable && heightStable) ? stableStreak + 1 : 0;
                     lastRatio = ratio;
-                    if (attempts < 10 && !stable)
+                    lastContentHeight = contentHeight;
+
+                    bool converged = stableStreak >= ScrollRestoreRequiredStableStreak;
+                    if (realFrame < ScrollRestoreMaxRealFrames && !converged)
                     {
                         GameService.Overlay.QueueMainThreadUpdate(Tick);
                     }
                     else
                     {
-                        string reason = stable ? "stable" : "max-attempts";
+                        string reason = converged ? "stable" : "max-attempts";
                         Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason={2} finalRatio={3:F4} finalContentH={4}",
-                            capturedGeneration, attempts, reason, ratio, contentHeight);
+                            capturedGeneration, realFrame, reason, ratio, contentHeight);
 
-                        // Read-only watchdog: observes for a few more frames
-                        // after we stop contesting the scrollbar, WITHOUT
-                        // ever writing ScrollDistance itself, to tell apart
-                        // "we settled at the correct position" from "Blish's
-                        // Panel reset the scrollbar to 0 right after we let
-                        // go of it".
-                        int watchFrame = 0;
-                        void WatchTick(GameTime __)
-                        {
-                            if (capturedGeneration != _scrollRestoreGeneration || capturedPanel != _contentPanel)
-                            {
-                                return;
-                            }
-
-                            watchFrame++;
-                            float? watchedDistance = null;
-                            int watchedContentHeight = 0;
-                            try
-                            {
-                                var watchScrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
-                                watchedDistance = watchScrollbar?.ScrollDistance;
-                                foreach (var child in capturedPanel.Children)
-                                {
-                                    if (child.Visible && child.Bottom > watchedContentHeight)
-                                    {
-                                        watchedContentHeight = child.Bottom;
-                                    }
-                                }
-                            }
-                            catch
-                            {
-                                // Diagnostic-only: reflection/layout mismatch, stop watching.
-                                return;
-                            }
-
-                            Logger.Info("[M30#1] ScrollWatch gen={0} frame={1} scrollDistance={2:F4} contentH={3}",
-                                capturedGeneration, watchFrame, watchedDistance ?? -1f, watchedContentHeight);
-
-                            if (watchFrame < 15)
-                            {
-                                GameService.Overlay.QueueMainThreadUpdate(WatchTick);
-                            }
-                        }
-
-                        GameService.Overlay.QueueMainThreadUpdate(WatchTick);
+                        StartScrollGuard(capturedPanel, capturedGeneration, savedOffset);
                     }
                 }
                 catch
@@ -264,6 +297,99 @@ namespace GW2CraftingHelper.Views
             }
 
             GameService.Overlay.QueueMainThreadUpdate(Tick);
+        }
+
+        /// <summary>
+        /// Active guard that runs after RestoreScrollOffset's Tick loop
+        /// converges (or hits its attempt cap). Blish's Panel can still
+        /// reset the scrollbar to top once the nested-AutoSize section stack
+        /// finishes converging over later real frames, after Tick has
+        /// already let go of the scrollbar; the guard keeps re-asserting the
+        /// target ratio - recomputed each real frame from the ORIGINAL
+        /// savedOffset against the current content height - for a further
+        /// window of real frames so a late reset gets contested rather than
+        /// observed and ignored. The window slides forward on every
+        /// re-assert or content-height change; a hard cap guarantees
+        /// termination even if content height never settles.
+        /// </summary>
+        private void StartScrollGuard(Panel capturedPanel, int capturedGeneration, int savedOffset)
+        {
+            var frameGate = new ScrollFrameGate();
+            int totalFrames = 0;
+            int remaining = ScrollGuardWindowFrames;
+            int lastContentHeight = -1;
+
+            void GuardTick(GameTime gameTime)
+            {
+                if (capturedGeneration != _scrollRestoreGeneration || capturedPanel != _contentPanel)
+                {
+                    Logger.Info("[M30#1] ScrollGuard bail gen={0} currentGen={1} panelSwapped={2} frames={3}",
+                        capturedGeneration, _scrollRestoreGeneration, capturedPanel != _contentPanel, totalFrames);
+                    return;
+                }
+
+                if (!frameGate.IsRealFrame(gameTime))
+                {
+                    if (frameGate.SpinCount >= ScrollMaxSameFrameSpins)
+                    {
+                        Logger.Info("[M30#1] ScrollGuard end frames={0} reason=spin-cap", totalFrames);
+                        return;
+                    }
+
+                    GameService.Overlay.QueueMainThreadUpdate(GuardTick);
+                    return;
+                }
+
+                try
+                {
+                    var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
+                    if (scrollbar == null)
+                    {
+                        Logger.Info("[M30#1] ScrollGuard end frames={0} reason=no-scrollbar", totalFrames);
+                        return;
+                    }
+
+                    int contentHeight = 0;
+                    foreach (var child in capturedPanel.Children)
+                    {
+                        if (child.Visible && child.Bottom > contentHeight)
+                        {
+                            contentHeight = child.Bottom;
+                        }
+                    }
+
+                    totalFrames++;
+                    float target = ScrollMath.RatioForOffset(savedOffset, contentHeight, capturedPanel.Height);
+                    float current = scrollbar.ScrollDistance;
+                    bool heightChanged = contentHeight != lastContentHeight;
+                    lastContentHeight = contentHeight;
+
+                    bool reasserted = System.Math.Abs(current - target) > 0.002f;
+                    if (reasserted)
+                    {
+                        scrollbar.ScrollDistance = target;
+                        Logger.Info("[M30#1] ScrollGuard reassert gen={0} frame={1} was={2:F4} target={3:F4} contentH={4}",
+                            capturedGeneration, totalFrames, current, target, contentHeight);
+                    }
+
+                    remaining = (reasserted || heightChanged) ? ScrollGuardWindowFrames : remaining - 1;
+
+                    if (remaining > 0 && totalFrames < ScrollGuardHardCapFrames)
+                    {
+                        GameService.Overlay.QueueMainThreadUpdate(GuardTick);
+                    }
+                    else
+                    {
+                        Logger.Info("[M30#1] ScrollGuard end frames={0}", totalFrames);
+                    }
+                }
+                catch
+                {
+                    // Diagnostic-only: reflection/layout mismatch, stop guarding.
+                }
+            }
+
+            GameService.Overlay.QueueMainThreadUpdate(GuardTick);
         }
 
         private void OnSelectedItemChanged(int itemId)
