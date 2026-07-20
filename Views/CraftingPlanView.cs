@@ -115,8 +115,8 @@ namespace GW2CraftingHelper.Views
         // GameService.Overlay.QueueMainThreadUpdate, when re-queued from
         // inside its own queued callback, drains in the SAME frame rather
         // than waiting for the next real Update() tick (confirmed by
-        // identical-millisecond [M30#1] trace lines), so it cannot step
-        // frames at all. FrameTicker drives these from Control.DoUpdate
+        // identical-millisecond trace lines during diagnosis), so it cannot
+        // step frames at all. FrameTicker drives these from Control.DoUpdate
         // instead, which the SpriteScreen invokes exactly once per real
         // frame; these constants tune how many real frames the restore loop
         // and its post-convergence guard run for.
@@ -171,11 +171,7 @@ namespace GW2CraftingHelper.Views
         {
             int saved = _contentPanel?.VerticalScrollOffset ?? 0;
             int capturedGeneration = ++_scrollRestoreGeneration;
-            Logger.Info("[M30#1] ScrollPreserve begin gen={0} savedOffset={1} panelH={2}",
-                capturedGeneration, saved, _contentPanel?.Height ?? -1);
             mutate();
-            Logger.Info("[M30#1] ScrollPreserve after-mutate gen={0} childCount={1} panelH={2}",
-                capturedGeneration, _contentPanel?.Children.Count ?? -1, _contentPanel?.Height ?? -1);
             if (saved > 0)
             {
                 RestoreScrollOffset(saved, capturedGeneration);
@@ -241,7 +237,7 @@ namespace GW2CraftingHelper.Views
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn(ex, "[M30#1] FrameTicker step failed; stopping");
+                    Logger.Warn(ex, "FrameTicker step failed; stopping");
                     keepGoing = false;
                 }
 
@@ -290,8 +286,6 @@ namespace GW2CraftingHelper.Views
             var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
             if (scrollbar == null)
             {
-                Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=no-scrollbar finalRatio={2:F4} finalContentH={3}",
-                    capturedGeneration, 0, -1f, -1);
                 return;
             }
 
@@ -310,9 +304,6 @@ namespace GW2CraftingHelper.Views
                 if (capturedGeneration != _scrollRestoreGeneration ||
                     capturedPanel != _contentPanel || capturedPanel.Parent == null)
                 {
-                    Logger.Info("[M30#1] ScrollRestore bail gen={0} currentGen={1} panelSwapped={2} panelDetached={3} realFrame={4}",
-                        capturedGeneration, _scrollRestoreGeneration, capturedPanel != _contentPanel,
-                        capturedPanel.Parent == null, realFrame);
                     return false;
                 }
 
@@ -359,8 +350,6 @@ namespace GW2CraftingHelper.Views
                         isLibraryReset = currentDistance <= 0.0005f && ratio > 0.01f;
                         if (!isLibraryReset)
                         {
-                            Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=user-scroll finalRatio={2:F4} finalContentH={3}",
-                                capturedGeneration, realFrame, lastWrittenRatio, contentHeight);
                             return false;
                         }
 
@@ -386,10 +375,6 @@ namespace GW2CraftingHelper.Views
                         return true;
                     }
 
-                    string reason = converged ? "stable" : "max-attempts";
-                    Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason={2} finalRatio={3:F4} finalContentH={4}",
-                        capturedGeneration, realFrame, reason, ratio, contentHeight);
-
                     StartScrollGuard(capturedPanel, capturedGeneration, savedOffset, scrollbar);
                     return false;
                 }
@@ -397,7 +382,7 @@ namespace GW2CraftingHelper.Views
                 {
                     // Reflection/layout mismatch, or the panel/scrollbar was
                     // disposed out from under us: degrade to reset-to-top.
-                    Logger.Warn(ex, "[M30#1] scroll restore/guard degraded");
+                    Logger.Warn(ex, "Scroll restore degraded; falling back to top");
                     return false;
                 }
             }
@@ -438,9 +423,6 @@ namespace GW2CraftingHelper.Views
                 if (capturedGeneration != _scrollRestoreGeneration ||
                     capturedPanel != _contentPanel || capturedPanel.Parent == null)
                 {
-                    Logger.Info("[M30#1] ScrollGuard bail gen={0} currentGen={1} panelSwapped={2} panelDetached={3} frames={4}",
-                        capturedGeneration, _scrollRestoreGeneration, capturedPanel != _contentPanel,
-                        capturedPanel.Parent == null, totalFrames);
                     return false;
                 }
 
@@ -473,8 +455,6 @@ namespace GW2CraftingHelper.Views
                         if (reasserted)
                         {
                             scrollbar.ScrollDistance = target;
-                            Logger.Info("[M30#1] ScrollGuard reassert gen={0} frame={1} was={2:F4} target={3:F4} contentH={4}",
-                                capturedGeneration, totalFrames, current, target, contentHeight);
                         }
 
                         remaining = ScrollGuardWindowFrames;
@@ -492,13 +472,9 @@ namespace GW2CraftingHelper.Views
                         // win.
                         scrollbar.ScrollDistance = target;
                         zeroReassert++;
-                        Logger.Info("[M30#1] ScrollGuard reassert gen={0} frame={1} was={2:F4} target={3:F4} contentH={4}",
-                            capturedGeneration, totalFrames, current, target, contentHeight);
 
                         if (zeroReassert > 4)
                         {
-                            Logger.Info("[M30#1] ScrollGuard end gen={0} frames={1} reason=user-top",
-                                capturedGeneration, totalFrames);
                             return false;
                         }
 
@@ -510,8 +486,6 @@ namespace GW2CraftingHelper.Views
                         // the user scrolled. Stop contesting entirely -
                         // never re-assert over legitimate user input, and
                         // re-arming from here is now impossible.
-                        Logger.Info("[M30#1] ScrollGuard end gen={0} frames={1} reason=user-scroll",
-                            capturedGeneration, totalFrames);
                         return false;
                     }
                     else
@@ -524,7 +498,6 @@ namespace GW2CraftingHelper.Views
                         return true;
                     }
 
-                    Logger.Info("[M30#1] ScrollGuard end frames={0}", totalFrames);
                     return false;
                 }
                 catch (Exception ex)
@@ -532,7 +505,7 @@ namespace GW2CraftingHelper.Views
                     // Diagnostic-only: reflection/layout mismatch, or the
                     // panel/scrollbar was disposed out from under us - stop
                     // guarding.
-                    Logger.Warn(ex, "[M30#1] scroll restore/guard degraded");
+                    Logger.Warn(ex, "Scroll guard stopped by exception");
                     return false;
                 }
             }
@@ -879,8 +852,6 @@ namespace GW2CraftingHelper.Views
             }
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
-            Logger.Info("[M30#1] RenderPlan rebuild sections={0} hasTree={1} panelWidth={2}",
-                vm?.Sections?.Count ?? -1, vm?.TreeRoot != null, panelWidth);
 
             CreatePlanHeader(vm, panelWidth);
 
@@ -1947,8 +1918,6 @@ namespace GW2CraftingHelper.Views
 
         private void ApplyOverridesAndResolve()
         {
-            Logger.Info("[M30#1] ApplyOverridesAndResolve begin overrideCount={0} scrollBefore={1}",
-                _nodeOverrides.Count, _contentPanel?.VerticalScrollOffset ?? -1);
             if (_lastResult?.SolveContext == null || _resolveOverridesSync == null)
             {
                 return;
@@ -2218,12 +2187,9 @@ namespace GW2CraftingHelper.Views
                     {
                         if (pill.MouseOver)
                         {
-                            Logger.Info("[M30#1] Tree row toggle suppressed by pill nodeId={0}", node.NodeId);
                             return;
                         }
                     }
-                    Logger.Info("[M30#1] Tree row toggle firing nodeId={0} scrollBefore={1}",
-                        node.NodeId, _contentPanel?.VerticalScrollOffset ?? -1);
                     PreserveScrollAcross(() =>
                     {
                         if (!state.ChildrenBuilt)
@@ -2415,8 +2381,6 @@ namespace GW2CraftingHelper.Views
                     var source = spec.Source.Value;
                     outer.Click += (_, __) =>
                     {
-                        Logger.Info("[M30#1] Pill click nodeId={0} source={1} scrollBefore={2}",
-                            node.NodeId, source, _contentPanel?.VerticalScrollOffset ?? -1);
                         _nodeOverrides[node.NodeId] = source;
                         ApplyOverridesAndResolve();
                     };
