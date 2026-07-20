@@ -90,7 +90,6 @@ namespace GW2CraftingHelper.Views
         // chain; the chain requeues itself until ResizeDebounceMs elapses
         // since the last resize tick, then fires one render.
         private const int ResizeDebounceMs = 150;
-        private int _resizeDebounceGeneration;
         private DateTime _lastResizeEventUtc;
         private bool _resizeRenderPending;
 
@@ -207,9 +206,22 @@ namespace GW2CraftingHelper.Views
             }
 
             var capturedPanel = _contentPanel;
+
+            // Resolved once for the whole restore+guard run rather than via
+            // reflection on every frame - see the perf note on
+            // PanelScrollbarField. A missing scrollbar degrades to today's
+            // reset-to-top, same as before this was hoisted.
+            var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
+            if (scrollbar == null)
+            {
+                Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=no-scrollbar finalRatio={2:F4} finalContentH={3}",
+                    capturedGeneration, 0, -1f, -1);
+                return;
+            }
+
             var frameGate = new ScrollFrameGate();
             int realFrame = 0;
-            float lastRatio = -1f;
+            float lastWrittenRatio = -1f;
             int lastContentHeight = -1;
             int stableStreak = 0;
 
@@ -236,7 +248,7 @@ namespace GW2CraftingHelper.Views
                     if (frameGate.SpinCount >= ScrollMaxSameFrameSpins)
                     {
                         Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=spin-cap finalRatio={2:F4} finalContentH={3}",
-                            capturedGeneration, realFrame, lastRatio, lastContentHeight);
+                            capturedGeneration, realFrame, lastWrittenRatio, lastContentHeight);
                         return;
                     }
 
@@ -246,14 +258,6 @@ namespace GW2CraftingHelper.Views
 
                 try
                 {
-                    var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
-                    if (scrollbar == null)
-                    {
-                        Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=no-scrollbar finalRatio={2:F4} finalContentH={3}",
-                            capturedGeneration, realFrame, lastRatio, lastContentHeight);
-                        return;
-                    }
-
                     int contentHeight = 0;
                     foreach (var child in capturedPanel.Children)
                     {
@@ -263,17 +267,36 @@ namespace GW2CraftingHelper.Views
                         }
                     }
 
+                    // Before writing anything: a library reset (Blish's
+                    // Panel resetting its scrollbar) is ALWAYS correlated
+                    // with a content-height change; a user wheel/drag moves
+                    // the scrollbar with no height change. If content
+                    // height is unchanged since the previous real frame and
+                    // the scrollbar has drifted from what we last wrote by
+                    // more than tolerance, the user moved it - stop
+                    // immediately rather than fighting them. Gated on
+                    // lastWrittenRatio >= 0 so the first real frame (no
+                    // prior write to compare against) never false-triggers.
+                    float currentDistance = scrollbar.ScrollDistance;
+                    bool heightUnchanged = contentHeight == lastContentHeight;
+                    if (lastWrittenRatio >= 0f && heightUnchanged &&
+                        System.Math.Abs(currentDistance - lastWrittenRatio) > 0.004f)
+                    {
+                        Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=user-scroll finalRatio={2:F4} finalContentH={3}",
+                            capturedGeneration, realFrame, lastWrittenRatio, contentHeight);
+                        return;
+                    }
+
                     float ratio = ScrollMath.RatioForOffset(
                         savedOffset, contentHeight, capturedPanel.Height);
                     realFrame++;
                     Logger.Info("[M30#1] ScrollRestore tick gen={0} realFrame={1} savedOffsetPx={2} contentH={3} panelH={4} ratio={5:F4} lastRatio={6:F4}",
-                        capturedGeneration, realFrame, savedOffset, contentHeight, capturedPanel.Height, ratio, lastRatio);
+                        capturedGeneration, realFrame, savedOffset, contentHeight, capturedPanel.Height, ratio, lastWrittenRatio);
                     scrollbar.ScrollDistance = ratio;
 
-                    bool ratioStable = System.Math.Abs(ratio - lastRatio) < 0.0005f;
-                    bool heightStable = contentHeight == lastContentHeight;
-                    stableStreak = (ratioStable && heightStable) ? stableStreak + 1 : 0;
-                    lastRatio = ratio;
+                    bool ratioStable = System.Math.Abs(ratio - lastWrittenRatio) < 0.0005f;
+                    stableStreak = (ratioStable && heightUnchanged) ? stableStreak + 1 : 0;
+                    lastWrittenRatio = ratio;
                     lastContentHeight = contentHeight;
 
                     bool converged = stableStreak >= ScrollRestoreRequiredStableStreak;
@@ -287,12 +310,14 @@ namespace GW2CraftingHelper.Views
                         Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason={2} finalRatio={3:F4} finalContentH={4}",
                             capturedGeneration, realFrame, reason, ratio, contentHeight);
 
-                        StartScrollGuard(capturedPanel, capturedGeneration, savedOffset);
+                        StartScrollGuard(capturedPanel, capturedGeneration, savedOffset, scrollbar);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Reflection/layout mismatch: degrade to reset-to-top.
+                    // Reflection/layout mismatch, or the panel/scrollbar was
+                    // disposed out from under us: degrade to reset-to-top.
+                    Logger.Warn(ex, "[M30#1] scroll restore/guard degraded");
                 }
             }
 
@@ -312,7 +337,7 @@ namespace GW2CraftingHelper.Views
         /// re-assert or content-height change; a hard cap guarantees
         /// termination even if content height never settles.
         /// </summary>
-        private void StartScrollGuard(Panel capturedPanel, int capturedGeneration, int savedOffset)
+        private void StartScrollGuard(Panel capturedPanel, int capturedGeneration, int savedOffset, Scrollbar scrollbar)
         {
             var frameGate = new ScrollFrameGate();
             int totalFrames = 0;
@@ -342,13 +367,6 @@ namespace GW2CraftingHelper.Views
 
                 try
                 {
-                    var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
-                    if (scrollbar == null)
-                    {
-                        Logger.Info("[M30#1] ScrollGuard end frames={0} reason=no-scrollbar", totalFrames);
-                        return;
-                    }
-
                     int contentHeight = 0;
                     foreach (var child in capturedPanel.Children)
                     {
@@ -364,15 +382,38 @@ namespace GW2CraftingHelper.Views
                     bool heightChanged = contentHeight != lastContentHeight;
                     lastContentHeight = contentHeight;
 
-                    bool reasserted = System.Math.Abs(current - target) > 0.002f;
-                    if (reasserted)
+                    if (heightChanged)
                     {
-                        scrollbar.ScrollDistance = target;
-                        Logger.Info("[M30#1] ScrollGuard reassert gen={0} frame={1} was={2:F4} target={3:F4} contentH={4}",
-                            capturedGeneration, totalFrames, current, target, contentHeight);
-                    }
+                        // Content height moved: this is the library-reset
+                        // contest path (Blish's Panel resets the scrollbar
+                        // whenever content height changes). Recompute the
+                        // target and re-assert if it drifted, and always
+                        // slide the window forward regardless - unchanged
+                        // from prior behavior.
+                        bool reasserted = System.Math.Abs(current - target) > 0.002f;
+                        if (reasserted)
+                        {
+                            scrollbar.ScrollDistance = target;
+                            Logger.Info("[M30#1] ScrollGuard reassert gen={0} frame={1} was={2:F4} target={3:F4} contentH={4}",
+                                capturedGeneration, totalFrames, current, target, contentHeight);
+                        }
 
-                    remaining = (reasserted || heightChanged) ? ScrollGuardWindowFrames : remaining - 1;
+                        remaining = ScrollGuardWindowFrames;
+                    }
+                    else if (System.Math.Abs(current - target) > 0.004f)
+                    {
+                        // Height stable but the scrollbar moved on its own:
+                        // the user scrolled. Stop contesting entirely -
+                        // never re-assert over legitimate user input, and
+                        // re-arming from here is now impossible.
+                        Logger.Info("[M30#1] ScrollGuard end gen={0} frames={1} reason=user-scroll",
+                            capturedGeneration, totalFrames);
+                        return;
+                    }
+                    else
+                    {
+                        remaining--;
+                    }
 
                     if (remaining > 0 && totalFrames < ScrollGuardHardCapFrames)
                     {
@@ -383,9 +424,12 @@ namespace GW2CraftingHelper.Views
                         Logger.Info("[M30#1] ScrollGuard end frames={0}", totalFrames);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Diagnostic-only: reflection/layout mismatch, stop guarding.
+                    // Diagnostic-only: reflection/layout mismatch, or the
+                    // panel/scrollbar was disposed out from under us - stop
+                    // guarding.
+                    Logger.Warn(ex, "[M30#1] scroll restore/guard degraded");
                 }
             }
 
@@ -556,7 +600,6 @@ namespace GW2CraftingHelper.Views
             if (_currentPlan != null && w != _lastRenderedWidth)
             {
                 _lastResizeEventUtc = DateTime.UtcNow;
-                _resizeDebounceGeneration++;
                 if (!_resizeRenderPending)
                 {
                     _resizeRenderPending = true;
@@ -2076,7 +2119,6 @@ namespace GW2CraftingHelper.Views
                         _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
                         state.ChildContainer.Visible = state.IsExpanded;
                         state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
-                        state.ChildContainer.Parent.Invalidate();
                         InvalidateUpToContentPanel(state.ChildContainer);
                     });
                 };
