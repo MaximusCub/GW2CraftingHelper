@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Services
                 TreeRoot = result.CraftingTree
             };
 
-            // Resolve target name/icon
+            // Resolve target name/icon/rarity
             if (result.ItemMetadata != null &&
                 result.ItemMetadata.TryGetValue(result.Plan.TargetItemId, out var targetMeta))
             {
@@ -24,14 +24,23 @@ namespace GW2CraftingHelper.Services
                     ? targetMeta.Name
                     : "Unknown Item";
                 vm.TargetIconUrl = targetMeta.IconUrl;
+                vm.TargetRarity = targetMeta.Rarity;
             }
             else
             {
                 vm.TargetItemName = "Unknown Item";
                 vm.TargetIconUrl = null;
+                vm.TargetRarity = null;
             }
 
-            // 1. Summary section (always present)
+            // Section emission order mirrors gw2efficiency's calculator page
+            // (header/cost-breakdown -> recipe-tree -> used-owned-materials ->
+            // shopping-list -> required-disciplines -> required-recipes ->
+            // crafting-steps). The recipe tree itself is not in this list
+            // (it renders from vm.TreeRoot, positioned second by the view);
+            // everything else below is exactly the gw2e ordering.
+
+            // 1. Total Cost section (always present)
             vm.Sections.Add(BuildSummarySection(result));
 
             // 2. Used Materials section (only if non-null and non-empty)
@@ -54,22 +63,22 @@ namespace GW2CraftingHelper.Services
                 vm.Sections.Add(BuildShoppingListSection(shoppingSteps, result));
             }
 
-            // 4. Crafting Steps section (only if non-empty)
-            if (craftSteps.Count > 0)
-            {
-                vm.Sections.Add(BuildCraftingStepsSection(craftSteps, result));
-            }
-
-            // 5. Required Disciplines section (only if non-empty)
+            // 4. Required Disciplines section (only if non-empty)
             if (result.RequiredDisciplines != null && result.RequiredDisciplines.Count > 0)
             {
                 vm.Sections.Add(BuildDisciplinesSection(result));
             }
 
-            // 6. Required Recipes section (only if non-empty)
+            // 5. Required Recipes section (only if non-empty)
             if (result.RequiredRecipes != null && result.RequiredRecipes.Count > 0)
             {
                 vm.Sections.Add(BuildRecipesSection(result));
+            }
+
+            // 6. Crafting Steps section (only if non-empty) - last, per gw2e order
+            if (craftSteps.Count > 0)
+            {
+                vm.Sections.Add(BuildCraftingStepsSection(craftSteps, result));
             }
 
             return vm;
@@ -80,7 +89,7 @@ namespace GW2CraftingHelper.Services
             var section = new PlanSectionViewModel
             {
                 SectionType = PlanSectionType.Summary,
-                Title = "Summary",
+                Title = "Total Cost",
                 IsDefaultExpanded = true
             };
 
@@ -203,7 +212,8 @@ namespace GW2CraftingHelper.Services
                     IconUrl = iconUrl,
                     Rarity = rarity,
                     Quantity = step.Quantity,
-                    CoinValue = step.TotalCost
+                    CoinValue = step.TotalCost,
+                    UnitCoinValue = step.UnitCost
                 });
             }
 

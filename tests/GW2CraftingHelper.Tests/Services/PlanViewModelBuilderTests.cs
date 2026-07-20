@@ -87,6 +87,20 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal("Unknown Item", vm.TargetItemName);
             Assert.Null(vm.TargetIconUrl);
+            Assert.Null(vm.TargetRarity);
+        }
+
+        [Fact]
+        public void TargetItem_ResolvesRarity()
+        {
+            var meta = new Dictionary<int, ItemMetadata>
+            {
+                [1] = new ItemMetadata { ItemId = 1, Name = "Zojja's Claymore", IconUrl = "c.png", Rarity = "Exotic" }
+            };
+            var result = MakeResult(targetItemId: 1, metadata: meta);
+            var vm = _builder.Build(result);
+
+            Assert.Equal("Exotic", vm.TargetRarity);
         }
 
         // --- Summary section ---
@@ -279,6 +293,20 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             var section = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList);
+            Assert.Equal(5000L, section.Rows[0].CoinValue);
+        }
+
+        [Fact]
+        public void ShoppingList_UnitCoinValueFromStepUnitCost()
+        {
+            var result = MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp, UnitCost = 1000, TotalCost = 5000 }
+            });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList);
+            Assert.Equal(1000L, section.Rows[0].UnitCoinValue);
             Assert.Equal(5000L, section.Rows[0].CoinValue);
         }
 
@@ -513,9 +541,9 @@ namespace GW2CraftingHelper.Tests.Services
                 PlanSectionType.Summary,
                 PlanSectionType.UsedMaterials,
                 PlanSectionType.ShoppingList,
-                PlanSectionType.CraftingSteps,
                 PlanSectionType.RequiredDisciplines,
-                PlanSectionType.RequiredRecipes
+                PlanSectionType.RequiredRecipes,
+                PlanSectionType.CraftingSteps
             }, types);
         }
 

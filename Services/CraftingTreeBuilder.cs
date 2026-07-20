@@ -12,13 +12,14 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, SolverDecision> decisions,
             IReadOnlyDictionary<int, ItemMetadata> metadata)
         {
-            return BuildNode(root, decisions, metadata);
+            return BuildNode(root, decisions, metadata, insideReferenceBranch: false);
         }
 
         private static CraftingTreeNode BuildNode(
             RecipeNode node,
             IReadOnlyDictionary<int, SolverDecision> decisions,
-            IReadOnlyDictionary<int, ItemMetadata> metadata)
+            IReadOnlyDictionary<int, ItemMetadata> metadata,
+            bool insideReferenceBranch)
         {
             var treeNode = new CraftingTreeNode
             {
@@ -72,16 +73,63 @@ namespace GW2CraftingHelper.Services
                 if (recipe != null)
                 {
                     treeNode.RecipeId = recipe.RecipeId;
-                    var children = new List<CraftingTreeNode>(recipe.Ingredients.Count);
-                    foreach (var ingredient in recipe.Ingredients)
-                    {
-                        children.Add(BuildNode(ingredient, decisions, metadata));
-                    }
-                    treeNode.Children = children;
+                    // Propagate insideReferenceBranch as-is (not reset to
+                    // false): a Craft decision reached WHILE already inside
+                    // a reference branch is still hypothetical content, and
+                    // must keep suppressing further reference branches
+                    // below it - see the cap comment below for why.
+                    treeNode.Children = BuildChildren(recipe, decisions, metadata, insideReferenceBranch);
                 }
+            }
+            else if (!insideReferenceBranch &&
+                     (decision.Source == AcquisitionSource.BuyFromTp ||
+                      decision.Source == AcquisitionSource.BuyFromVendor) &&
+                     node.Recipes.Count > 0)
+            {
+                // Reference branch: gw2e's "what it would cost to craft
+                // instead" - informational, not an actual crafting step, so
+                // it is built from recipe[0] (the deterministic first
+                // option) rather than a "chosen" recipe, since nothing was
+                // crafted here. PlanSolver.Evaluate always walks every
+                // recipe's ingredients to get a comparison value, even for a
+                // node it ultimately decides to buy, so those ingredients'
+                // decisions already exist in the dict - safe to recurse into
+                // here.
+                //
+                // Capped to AT MOST ONE reference branch per root-to-leaf
+                // path: everything built below here passes
+                // insideReferenceBranch=true, which blocks starting another
+                // one no matter how many further Craft/Buy-with-recipe
+                // decisions alternate beneath it. A naive "reset to
+                // not-inside on every Craft step" cap (tried first) does NOT
+                // bound this: GW2 crafting data very commonly alternates
+                // buyable-with-a-recipe <-> craft <-> buyable-with-a-recipe
+                // down a chain, and node.Recipes here is the FULL
+                // alternate-recipe graph the upstream RecipeService already
+                // expanded for every option (not just the solver's chosen
+                // path, which is all this builder walked before) - letting
+                // reference branches restart at every such alternation
+                // measured as an effectively unbounded hang on a real deep
+                // item (Deldrimor Steel Ingot) during manual verification.
+                treeNode.Children = BuildChildren(node.Recipes[0], decisions, metadata, insideReferenceBranch: true);
+                treeNode.IsReferenceBranch = true;
             }
 
             return treeNode;
+        }
+
+        private static List<CraftingTreeNode> BuildChildren(
+            RecipeOption recipe,
+            IReadOnlyDictionary<int, SolverDecision> decisions,
+            IReadOnlyDictionary<int, ItemMetadata> metadata,
+            bool insideReferenceBranch)
+        {
+            var children = new List<CraftingTreeNode>(recipe.Ingredients.Count);
+            foreach (var ingredient in recipe.Ingredients)
+            {
+                children.Add(BuildNode(ingredient, decisions, metadata, insideReferenceBranch));
+            }
+            return children;
         }
 
         private static CraftingDecision MapSource(AcquisitionSource source)

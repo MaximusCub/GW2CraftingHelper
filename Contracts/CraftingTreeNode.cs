@@ -31,6 +31,12 @@ namespace GW2CraftingHelper.Contracts
         public long? UnitCost { get; set; }
         public long? SubtreeCost { get; set; }
 
+        // True when this node was bought (TP/vendor) but ALSO has a known
+        // recipe, so Children holds gw2e's "what it would cost to craft
+        // instead" reference branch rather than an actual crafting step.
+        // The view renders these dimmed and collapsed by default.
+        public bool IsReferenceBranch { get; set; }
+
         public IReadOnlyList<CraftingTreeNode> Children
         {
             get => _children;
