@@ -28,6 +28,13 @@ namespace GW2CraftingHelper.Views
         private const int ContentY = 107;
         private const int TopRegionHeight = 112;
         private const int RightEdgePadding = 20;
+        private const int SectionSpacing = 16;
+
+        // Shared divider greys. Both readable against the parchment texture;
+        // SectionDividerColor is the brighter of the two, one tier below the
+        // 180-grey structural separators (window chrome, unrelated to these).
+        private static readonly Color RowDividerColor = new Color(100, 100, 100);
+        private static readonly Color SectionDividerColor = new Color(130, 130, 130);
 
         private readonly Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
         private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> _resolveOverridesSync;
@@ -75,10 +82,48 @@ namespace GW2CraftingHelper.Views
         // Resize tracking
         private int _lastRenderedWidth;
 
+        // Trailing debounce for resize-triggered re-renders. A re-render is a
+        // full dispose+rebuild of the plan tree, which restarts nested
+        // AutoSize height convergence; firing it on every >=1px resize tick
+        // during a window drag flickers and transiently squashes deep tree
+        // nodes. _resizeRenderPending gates a single in-flight debounce
+        // ticker; each real frame it checks whether ResizeDebounceMs has
+        // elapsed since the last resize tick, then fires one render once it
+        // has - see ResizeDebounceStep and FrameTicker.
+        private const int ResizeDebounceMs = 150;
+        private DateTime _lastResizeEventUtc;
+        private bool _resizeRenderPending;
+
         // Bumped by every PreserveScrollAcross call; an in-flight restore
         // Tick loop compares its captured value against the current one
         // each frame and bails as soon as a newer restore has superseded it.
         private int _scrollRestoreGeneration;
+
+        // Live FrameTicker instances (null when idle). Tracked so Build()
+        // can cancel a leftover ticker from the previous build cycle before
+        // starting a new one, using the same SpriteScreen-parented cleanup
+        // pattern _suggestionPanel uses: these tickers are parented to the
+        // SpriteScreen rather than this view's own control tree, so nothing
+        // else tears them down when a tab is torn down or the module
+        // unloads. Each ticker also bails itself out on its own next frame
+        // (generation mismatch, panel swap, or panel detached) as a second
+        // line of defense.
+        private FrameTicker _scrollRestoreTicker;
+        private FrameTicker _scrollGuardTicker;
+        private FrameTicker _resizeDebounceTicker;
+
+        // GameService.Overlay.QueueMainThreadUpdate, when re-queued from
+        // inside its own queued callback, drains in the SAME frame rather
+        // than waiting for the next real Update() tick (confirmed by
+        // identical-millisecond trace lines during diagnosis), so it cannot
+        // step frames at all. FrameTicker drives these from Control.DoUpdate
+        // instead, which the SpriteScreen invokes exactly once per real
+        // frame; these constants tune how many real frames the restore loop
+        // and its post-convergence guard run for.
+        private const int ScrollRestoreMaxRealFrames = 30;
+        private const int ScrollRestoreRequiredStableStreak = 3;
+        private const int ScrollGuardWindowFrames = 20;
+        private const int ScrollGuardHardCapFrames = 120;
 
         public CraftingPlanView(
             Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
@@ -114,8 +159,13 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// Runs a layout-mutating action and restores the content panel's
         /// scroll position afterwards. Nested AutoSize flow panels converge
-        /// height over several frames, so the restore re-asserts each frame
-        /// until the computed ratio stabilizes (max 10 frames).
+        /// height over several REAL frames, so the restore re-asserts each
+        /// real frame until the computed ratio and content height stabilize
+        /// (up to ScrollRestoreMaxRealFrames), then a ScrollGuard keeps
+        /// re-asserting for a further window of real frames to contest any
+        /// late scrollbar reset Blish's Panel performs once layout finishes
+        /// settling. See RestoreScrollOffset, StartScrollGuard, and
+        /// FrameTicker.
         /// </summary>
         private void PreserveScrollAcross(Action mutate)
         {
@@ -128,6 +178,98 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        /// <summary>
+        /// Drives a per-real-frame step callback from Control.DoUpdate,
+        /// which the SpriteScreen invokes exactly once per real engine
+        /// Update() pass (GraphicsService.Update -> SpriteScreen.Update ->
+        /// Container.DoUpdate iterates its visible children -> child.Update
+        /// -> child.DoUpdate). Unlike GameService.Overlay.QueueMainThread-
+        /// Update - which drains a re-queued callback again within the SAME
+        /// frame instead of waiting for the next Update() tick, the defect
+        /// this class replaces - DoUpdate never fires more than once per
+        /// real frame, so no frame-gating is needed here.
+        ///
+        /// The step callback returns true to keep ticking next frame, false
+        /// to stop. A false return or an unhandled exception from the step
+        /// both dispose the ticker (detaching it from the SpriteScreen) so
+        /// it cannot keep running against stale state. A 1x1, fully
+        /// transparent, empty-Paint control parented to the SpriteScreen is
+        /// imperceptible; Visible must stay true because Container only
+        /// calls Update on children that are Visible (or not yet laid out).
+        /// </summary>
+        private sealed class FrameTicker : Control
+        {
+            private readonly Func<GameTime, bool> _step;
+            private TimeSpan? _lastFrameTime;
+            private bool _canceled;
+
+            public FrameTicker(Func<GameTime, bool> step)
+            {
+                _step = step ?? throw new ArgumentNullException(nameof(step));
+                Size = new Point(1, 1);
+                Location = new Point(0, 0);
+                Visible = true;
+
+                var screen = GameService.Graphics?.SpriteScreen;
+                if (screen != null)
+                {
+                    Parent = screen;
+                }
+            }
+
+            public override void DoUpdate(GameTime gameTime)
+            {
+                // Cheap belt-and-braces: DoUpdate is documented to fire
+                // once per real frame, so this should never trigger, but
+                // guards against a duplicate call with an unchanged
+                // TotalGameTime regardless.
+                TimeSpan? current = gameTime?.TotalGameTime;
+                if (_lastFrameTime.HasValue && current.HasValue && current.Value == _lastFrameTime.Value)
+                {
+                    return;
+                }
+                _lastFrameTime = current;
+
+                bool keepGoing;
+                try
+                {
+                    keepGoing = _step(gameTime);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex, "FrameTicker step failed; stopping");
+                    keepGoing = false;
+                }
+
+                if (!keepGoing)
+                {
+                    Cancel();
+                }
+            }
+
+            protected override void Paint(Microsoft.Xna.Framework.Graphics.SpriteBatch spriteBatch, Rectangle bounds)
+            {
+                // Intentionally empty - this control exists only to receive
+                // per-frame DoUpdate calls and must never draw anything.
+            }
+
+            protected override CaptureType CapturesInput()
+            {
+                // A default Control intercepts mouse input over its bounds;
+                // this one sits at the screen's (0,0) corner purely to
+                // receive DoUpdate calls and must never intercept a click or
+                // hover meant for whatever else is at that pixel.
+                return CaptureType.None;
+            }
+
+            public void Cancel()
+            {
+                if (_canceled) return;
+                _canceled = true;
+                Dispose();
+            }
+        }
+
         private void RestoreScrollOffset(int savedOffset, int capturedGeneration)
         {
             if (_contentPanel == null || PanelScrollbarField == null)
@@ -136,27 +278,37 @@ namespace GW2CraftingHelper.Views
             }
 
             var capturedPanel = _contentPanel;
-            int attempts = 0;
-            float lastRatio = -1f;
 
-            void Tick(GameTime _)
+            // Resolved once for the whole restore+guard run rather than via
+            // reflection on every frame - see the perf note on
+            // PanelScrollbarField. A missing scrollbar degrades to today's
+            // reset-to-top, same as before this was hoisted.
+            var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
+            if (scrollbar == null)
             {
-                // A newer restore superseded this loop, or Build() swapped
-                // in a fresh content panel: stop immediately rather than
-                // fight the current restore or scroll a stale/disposed panel.
-                if (capturedGeneration != _scrollRestoreGeneration || capturedPanel != _contentPanel)
+                return;
+            }
+
+            int realFrame = 0;
+            float lastWrittenRatio = -1f;
+            int lastContentHeight = -1;
+            int stableStreak = 0;
+
+            bool Tick(GameTime gameTime)
+            {
+                // A newer restore superseded this loop, Build() swapped in
+                // a fresh content panel, or the panel was torn down (tab
+                // switch / module unload): stop immediately rather than
+                // fight the current restore or scroll a stale/disposed
+                // panel.
+                if (capturedGeneration != _scrollRestoreGeneration ||
+                    capturedPanel != _contentPanel || capturedPanel.Parent == null)
                 {
-                    return;
+                    return false;
                 }
 
                 try
                 {
-                    var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
-                    if (scrollbar == null)
-                    {
-                        return;
-                    }
-
                     int contentHeight = 0;
                     foreach (var child in capturedPanel.Children)
                     {
@@ -166,25 +318,200 @@ namespace GW2CraftingHelper.Views
                         }
                     }
 
+                    // Before writing anything: distinguish Blish's own
+                    // reset-to-top from real user input. The naive signal -
+                    // height unchanged since the previous real frame but the
+                    // scrollbar drifted from what we last wrote - matches
+                    // BOTH a user scroll AND a library reset, because
+                    // Blish's Panel zeroes ScrollDistance during its layout
+                    // pass one real frame after a height change: by the
+                    // time we observe it here, height already reads stable
+                    // again (it changed last frame, not this one) while the
+                    // scrollbar reads 0. The fingerprint that tells them
+                    // apart: a library reset always lands exactly at (or
+                    // within float tolerance of) zero while our own target
+                    // sits meaningfully above it; a user scroll can land
+                    // anywhere. Near-top targets are ambiguous (a genuine
+                    // user scroll also lands near zero) and a wrong restore
+                    // there is imperceptible, so they fall through to the
+                    // user-scroll branch rather than being contested. Gated
+                    // on lastWrittenRatio >= 0 so the first real frame (no
+                    // prior write to compare against) never false-triggers.
                     float ratio = ScrollMath.RatioForOffset(
                         savedOffset, contentHeight, capturedPanel.Height);
+                    float currentDistance = scrollbar.ScrollDistance;
+                    bool heightUnchanged = contentHeight == lastContentHeight;
+                    bool diverged = lastWrittenRatio >= 0f && heightUnchanged &&
+                        System.Math.Abs(currentDistance - lastWrittenRatio) > 0.004f;
+                    bool isLibraryReset = false;
+
+                    if (diverged)
+                    {
+                        isLibraryReset = currentDistance <= 0.0005f && ratio > 0.01f;
+                        if (!isLibraryReset)
+                        {
+                            return false;
+                        }
+
+                        // Library reset: rewrite the target below and reset
+                        // the stability streak (this frame does not count
+                        // toward convergence) - still bounded by the
+                        // real-frame cap. Kept quiet; this is a routine,
+                        // expected event on the hot path.
+                    }
+
+                    realFrame++;
                     scrollbar.ScrollDistance = ratio;
 
-                    attempts++;
-                    bool stable = System.Math.Abs(ratio - lastRatio) < 0.0005f;
-                    lastRatio = ratio;
-                    if (attempts < 10 && !stable)
+                    bool ratioStable = !isLibraryReset &&
+                        System.Math.Abs(ratio - lastWrittenRatio) < 0.0005f;
+                    stableStreak = (ratioStable && heightUnchanged) ? stableStreak + 1 : 0;
+                    lastWrittenRatio = ratio;
+                    lastContentHeight = contentHeight;
+
+                    bool converged = stableStreak >= ScrollRestoreRequiredStableStreak;
+                    if (realFrame < ScrollRestoreMaxRealFrames && !converged)
                     {
-                        GameService.Overlay.QueueMainThreadUpdate(Tick);
+                        return true;
                     }
+
+                    StartScrollGuard(capturedPanel, capturedGeneration, savedOffset, scrollbar);
+                    return false;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Reflection/layout mismatch: degrade to reset-to-top.
+                    // Reflection/layout mismatch, or the panel/scrollbar was
+                    // disposed out from under us: degrade to reset-to-top.
+                    Logger.Warn(ex, "Scroll restore degraded; falling back to top");
+                    return false;
                 }
             }
 
-            GameService.Overlay.QueueMainThreadUpdate(Tick);
+            _scrollRestoreTicker?.Cancel();
+            _scrollRestoreTicker = new FrameTicker(Tick);
+        }
+
+        /// <summary>
+        /// Active guard that runs after RestoreScrollOffset's Tick loop
+        /// converges (or hits its attempt cap). Blish's Panel can still
+        /// reset the scrollbar to top once the nested-AutoSize section stack
+        /// finishes converging over later real frames, after Tick has
+        /// already let go of the scrollbar; the guard keeps re-asserting the
+        /// target ratio - recomputed each real frame from the ORIGINAL
+        /// savedOffset against the current content height - for a further
+        /// window of real frames so a late reset gets contested rather than
+        /// observed and ignored. The window slides forward on every
+        /// re-assert or content-height change; a hard cap guarantees
+        /// termination even if content height never settles.
+        /// </summary>
+        private void StartScrollGuard(Panel capturedPanel, int capturedGeneration, int savedOffset, Scrollbar scrollbar)
+        {
+            int totalFrames = 0;
+            int remaining = ScrollGuardWindowFrames;
+            int lastContentHeight = -1;
+
+            // Counts library reset-to-zero contests across the guard's
+            // ENTIRE lifetime (never reset on height changes or normal
+            // countdown frames). Caps a persistent user-vs-guard fight: if
+            // a user is genuinely holding the bar at top through repeated
+            // library resets, they must eventually win rather than being
+            // fought forever.
+            int zeroReassert = 0;
+
+            bool GuardTick(GameTime gameTime)
+            {
+                if (capturedGeneration != _scrollRestoreGeneration ||
+                    capturedPanel != _contentPanel || capturedPanel.Parent == null)
+                {
+                    return false;
+                }
+
+                try
+                {
+                    int contentHeight = 0;
+                    foreach (var child in capturedPanel.Children)
+                    {
+                        if (child.Visible && child.Bottom > contentHeight)
+                        {
+                            contentHeight = child.Bottom;
+                        }
+                    }
+
+                    totalFrames++;
+                    float target = ScrollMath.RatioForOffset(savedOffset, contentHeight, capturedPanel.Height);
+                    float current = scrollbar.ScrollDistance;
+                    bool heightChanged = contentHeight != lastContentHeight;
+                    lastContentHeight = contentHeight;
+
+                    if (heightChanged)
+                    {
+                        // Content height moved: this is the library-reset
+                        // contest path (Blish's Panel resets the scrollbar
+                        // whenever content height changes). Recompute the
+                        // target and re-assert if it drifted, and always
+                        // slide the window forward regardless - unchanged
+                        // from prior behavior.
+                        bool reasserted = System.Math.Abs(current - target) > 0.002f;
+                        if (reasserted)
+                        {
+                            scrollbar.ScrollDistance = target;
+                        }
+
+                        remaining = ScrollGuardWindowFrames;
+                    }
+                    else if (current <= 0.0005f && target > 0.01f)
+                    {
+                        // Height stable but the scrollbar reads exactly
+                        // zero while our target sits well above it: Blish's
+                        // Panel reset the scrollbar to top on a layout pass
+                        // that landed between two of our real frames (see
+                        // the fingerprint comment in RestoreScrollOffset).
+                        // Contest it like a height-change reset, but cap
+                        // the back-and-forth via zeroReassert - a user
+                        // genuinely holding the bar at top must eventually
+                        // win.
+                        scrollbar.ScrollDistance = target;
+                        zeroReassert++;
+
+                        if (zeroReassert > 4)
+                        {
+                            return false;
+                        }
+
+                        remaining = ScrollGuardWindowFrames;
+                    }
+                    else if (System.Math.Abs(current - target) > 0.004f)
+                    {
+                        // Height stable but the scrollbar moved on its own:
+                        // the user scrolled. Stop contesting entirely -
+                        // never re-assert over legitimate user input, and
+                        // re-arming from here is now impossible.
+                        return false;
+                    }
+                    else
+                    {
+                        remaining--;
+                    }
+
+                    if (remaining > 0 && totalFrames < ScrollGuardHardCapFrames)
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    // Diagnostic-only: reflection/layout mismatch, or the
+                    // panel/scrollbar was disposed out from under us - stop
+                    // guarding.
+                    Logger.Warn(ex, "Scroll guard stopped by exception");
+                    return false;
+                }
+            }
+
+            _scrollGuardTicker?.Cancel();
+            _scrollGuardTicker = new FrameTicker(GuardTick);
         }
 
         private void OnSelectedItemChanged(int itemId)
@@ -196,6 +523,19 @@ namespace GW2CraftingHelper.Views
         {
             // Clean up screen-parented popup from previous build cycle
             _suggestionPanel?.Dispose();
+
+            // Same cleanup for any leftover scroll-restore/guard/resize-
+            // debounce tickers from the previous build cycle - see the
+            // field comments above. Reset _resizeRenderPending too, or a
+            // ticker canceled mid-debounce here would leave it stuck true
+            // and silently disable all future resize debouncing.
+            _scrollRestoreTicker?.Cancel();
+            _scrollRestoreTicker = null;
+            _scrollGuardTicker?.Cancel();
+            _scrollGuardTicker = null;
+            _resizeDebounceTicker?.Cancel();
+            _resizeDebounceTicker = null;
+            _resizeRenderPending = false;
 
             int w = buildPanel.ContentRegion.Width;
 
@@ -344,12 +684,70 @@ namespace GW2CraftingHelper.Views
             _separator.Size = new Point(w - RightEdgePadding, 2);
             _contentPanel.Size = new Point(w, h - TopRegionHeight);
 
-            // Re-render plan content when width changes (centered title, right-aligned timestamps)
+            // Re-render plan content when width changes (centered title, right-aligned
+            // timestamps). Debounced to a single trailing render fired once the
+            // resize drag settles - see ResizeDebounceStep and the _resize*
+            // fields for why.
             if (_currentPlan != null && w != _lastRenderedWidth)
             {
-                _lastRenderedWidth = w;
-                PreserveScrollAcross(() => RenderPlan(_currentPlan));
+                _lastResizeEventUtc = DateTime.UtcNow;
+                if (!_resizeRenderPending)
+                {
+                    _resizeRenderPending = true;
+                    _resizeDebounceTicker?.Cancel();
+                    _resizeDebounceTicker = new FrameTicker(ResizeDebounceStep);
+                }
             }
+        }
+
+        /// <summary>
+        /// Trailing edge of the resize debounce. Ticks once per real frame
+        /// while resize events keep landing within ResizeDebounceMs of one
+        /// another, then fires a single re-render once the drag settles.
+        /// _resizeRenderPending guarantees only one of these tickers is ever
+        /// running, so repeated resize ticks just extend _lastResizeEventUtc
+        /// rather than spawning parallel tickers.
+        /// </summary>
+        private bool ResizeDebounceStep(GameTime gameTime)
+        {
+            // The view may have been unloaded (tab switched away, module
+            // disabled) while this was pending - nothing to render into.
+            if (_contentPanel == null || _contentPanel.Parent == null)
+            {
+                _resizeRenderPending = false;
+                return false;
+            }
+
+            if ((DateTime.UtcNow - _lastResizeEventUtc).TotalMilliseconds < ResizeDebounceMs)
+            {
+                return true;
+            }
+
+            _resizeRenderPending = false;
+
+            try
+            {
+                // Re-read the panel width fresh rather than trust whatever w
+                // was captured by the resize tick that started this ticker -
+                // only the width at the moment the drag actually settled
+                // matters.
+                int currentWidth = _contentPanel.Width;
+                if (_currentPlan != null && currentWidth != _lastRenderedWidth)
+                {
+                    _lastRenderedWidth = currentWidth;
+                    PreserveScrollAcross(() => RenderPlan(_currentPlan));
+                }
+            }
+            catch (Exception ex)
+            {
+                // The content panel was disposed between the last resize tick
+                // and the debounce firing (e.g. Build() ran again for a tab
+                // reload mid-drag). Degrade silently: whichever Build() call
+                // is current already rendered fresh content at its own width.
+                Logger.Warn(ex, "Resize debounce render skipped; content panel unavailable");
+            }
+
+            return false;
         }
 
         private void OnOwnMaterialsToggled(object sender, CheckChangedEvent e)
@@ -567,6 +965,8 @@ namespace GW2CraftingHelper.Views
                 Text = nameText,
                 Font = titleFont,
                 TextColor = GetRarityNameColor(vm.TargetRarity),
+                ShowShadow = true,
+                ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(textX, textY),
@@ -640,6 +1040,14 @@ namespace GW2CraftingHelper.Views
             string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
             Func<bool> suppressToggle = null)
         {
+            // Consistent top gap before every section (including the tree),
+            // so sections do not sit flush against whatever preceded them.
+            new Panel()
+            {
+                Size = new Point(panelWidth, SectionSpacing),
+                Parent = _contentPanel
+            };
+
             bool expanded = _sectionExpansion.TryGetValue(sectionKey, out bool userExpanded)
                 ? userExpanded
                 : defaultExpanded;
@@ -688,7 +1096,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(panelWidth, 1),
                 Location = new Point(0, 29),
-                BackgroundColor = new Color(90, 90, 90),
+                BackgroundColor = SectionDividerColor,
                 Parent = headerPanel
             };
 
@@ -775,7 +1183,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(panelWidth, 1),
                 Location = new Point(0, rowHeight - 1),
-                BackgroundColor = new Color(70, 70, 70),
+                BackgroundColor = RowDividerColor,
                 Parent = rowPanel
             };
         }
@@ -866,6 +1274,8 @@ namespace GW2CraftingHelper.Views
                 Text = displayName,
                 Font = font,
                 TextColor = GetRarityNameColor(row.Rarity),
+                ShowShadow = true,
+                ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(nameX, 9),
@@ -909,7 +1319,23 @@ namespace GW2CraftingHelper.Views
         // effectively unbounded budget with "Total" - the two overlapped
         // for routine gold-value rows.
         private const int ShoppingColTotalWidth = 150;
-        private const int ShoppingColGap = 12;
+        private const int ShoppingColAmountWidth = 90;
+        private const int ShoppingColGap = 20;
+
+        /// <summary>
+        /// Right edges for the shopping list's Amount/Each/Total columns,
+        /// derived right-to-left off the fixed panel edge so header and data
+        /// rows can never drift apart. Total anchors first; Each reserves
+        /// ShoppingColTotalWidth plus a gap to its left; Amount reserves
+        /// ShoppingColAmountWidth plus another gap to its left in turn.
+        /// </summary>
+        private static void ComputeShoppingColumnEdges(
+            int panelWidth, out int totalRightEdge, out int eachRightEdge, out int qtyRightEdge)
+        {
+            totalRightEdge = panelWidth - 8;
+            eachRightEdge = totalRightEdge - ShoppingColTotalWidth - ShoppingColGap;
+            qtyRightEdge = eachRightEdge - ShoppingColAmountWidth - ShoppingColGap;
+        }
 
         private static void CreateShoppingListHeaderRow(FlowPanel parent, int panelWidth)
         {
@@ -917,9 +1343,7 @@ namespace GW2CraftingHelper.Views
             var font = GameService.Content.DefaultFont12;
             var color = new Color(153, 153, 153);
 
-            int qtyRightEdge = panelWidth - 260;
-            int totalRightEdge = panelWidth - 8;
-            int eachRightEdge = totalRightEdge - ShoppingColTotalWidth - ShoppingColGap;
+            ComputeShoppingColumnEdges(panelWidth, out int totalRightEdge, out int eachRightEdge, out int qtyRightEdge);
 
             new Label()
             {
@@ -951,9 +1375,7 @@ namespace GW2CraftingHelper.Views
             CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
 
             const int nameX = 50;
-            int qtyRightEdge = panelWidth - 260;
-            int totalRightEdge = panelWidth - 8;
-            int eachRightEdge = totalRightEdge - ShoppingColTotalWidth - ShoppingColGap;
+            ComputeShoppingColumnEdges(panelWidth, out int totalRightEdge, out int eachRightEdge, out int qtyRightEdge);
             var font = GameService.Content.DefaultFont14;
 
             string qtyText = $"{row.Quantity}x";
@@ -967,6 +1389,8 @@ namespace GW2CraftingHelper.Views
                 Text = displayName,
                 Font = font,
                 TextColor = GetRarityNameColor(row.Rarity),
+                ShowShadow = true,
+                ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(nameX, 9),
@@ -1076,6 +1500,7 @@ namespace GW2CraftingHelper.Views
             new Label()
             {
                 Text = row.Label ?? "", Font = textFont, TextColor = GetRarityNameColor(row.Rarity),
+                ShowShadow = true, ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(x, 13), Parent = rowPanel
             };
@@ -1162,6 +1587,8 @@ namespace GW2CraftingHelper.Views
                 Text = row.Label ?? "",
                 Font = font,
                 TextColor = GetRarityNameColor(row.Rarity),
+                ShowShadow = true,
+                ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(50, nameY),
@@ -1282,7 +1709,7 @@ namespace GW2CraftingHelper.Views
             // The only other row type in this section is CurrencyCost.
             foreach (var row in otherRows)
             {
-                CreateTextRow(row.Label, contentFlow, panelWidth);
+                CreateCurrencyRow(row, contentFlow, panelWidth);
             }
         }
 
@@ -1301,6 +1728,46 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(8, 4),
                 Parent = rowPanel
             };
+        }
+
+        // Sized between the tree/row item-icon (32px) and the coin-segment
+        // icon (20px) since it sits inside a plain 28px text row; reuses
+        // CoinLabelIconGap (below, in the coin display helpers) for the
+        // text-to-icon gap so both follow the same "number/text first, gap,
+        // icon" convention.
+        private const int CurrencyRowHeight = 28;
+        private const int CurrencyIconSize = 18;
+
+        /// <summary>
+        /// CurrencyCost row: identical "  {label}" text to CreateTextRow,
+        /// plus the currency's icon immediately to its right when known.
+        /// IconUrl null (no data available - service not wired up, fetch
+        /// not yet complete, or the currency was absent from the API
+        /// response) renders exactly like CreateTextRow - never a
+        /// placeholder guess for a missing icon.
+        /// </summary>
+        private void CreateCurrencyRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, CurrencyRowHeight),
+                Parent = parent
+            };
+            var label = new Label()
+            {
+                Text = "  " + row.Label,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(8, 4),
+                Parent = rowPanel
+            };
+
+            if (!string.IsNullOrEmpty(row.IconUrl))
+            {
+                int iconX = 8 + label.Width + CoinLabelIconGap;
+                int iconY = (CurrencyRowHeight - CurrencyIconSize) / 2;
+                CreateItemIcon(rowPanel, row.IconUrl, iconX, iconY, CurrencyIconSize);
+            }
         }
 
         // --- Recipe tree section ---
@@ -1409,6 +1876,7 @@ namespace GW2CraftingHelper.Views
                     s.ArrowLabel.Text = "\u25BC";
                 }
                 treeFlow.Invalidate();
+                InvalidateUpToContentPanel(treeFlow);
             });
 
             collapseAllButton.Click += (_, __) => PreserveScrollAcross(() =>
@@ -1421,6 +1889,7 @@ namespace GW2CraftingHelper.Views
                     s.ArrowLabel.Text = "\u25B6";
                 }
                 treeFlow.Invalidate();
+                InvalidateUpToContentPanel(treeFlow);
             });
 
             headerPanel.LeftMouseButtonPressed += (_, __) =>
@@ -1487,6 +1956,33 @@ namespace GW2CraftingHelper.Views
         private const int TreePillColumnWidth = 240;
         private const int TreeCostColumnWidth = 150;
         private const int TreeRightMargin = 8;
+
+        /// <summary>
+        /// Walks up from start's Parent chain, calling Invalidate() on every
+        /// ancestor Container up to and including _contentPanel. AutoSize
+        /// FlowPanels only re-measure their own height on Invalidate, so a
+        /// toggle deep in the tree that invalidates only its immediate
+        /// parent leaves every ancestor above that stale - visible as leftover
+        /// whitespace before the next section after collapsing a deep
+        /// subtree. Bounded to guard against a control that is somehow never
+        /// an ancestor of _contentPanel (would otherwise walk to a null
+        /// Parent anyway, but the cap keeps this defensively finite).
+        /// </summary>
+        private void InvalidateUpToContentPanel(Control start)
+        {
+            Container current = start?.Parent;
+            int hops = 0;
+            while (current != null && hops < 50)
+            {
+                current.Invalidate();
+                if (current == _contentPanel)
+                {
+                    break;
+                }
+                current = current.Parent;
+                hops++;
+            }
+        }
 
         private void RenderTreeNode(CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, bool dimmed)
         {
@@ -1578,8 +2074,10 @@ namespace GW2CraftingHelper.Views
             Color nameColor = GetRarityNameColor(node.Rarity);
             if (dimmed)
             {
-                qtyColor *= 0.35f;
-                nameColor *= 0.35f;
+                qtyColor *= 0.45f;
+                // Lift dark hues toward readable before dimming (premultiplied-
+                // correct: Lerp opaque colors first, then apply alpha via *).
+                nameColor = Color.Lerp(nameColor, Color.White, 0.30f) * 0.50f;
             }
 
             if (qtyPrefix.Length > 0)
@@ -1600,6 +2098,8 @@ namespace GW2CraftingHelper.Views
                 Text = displayName,
                 Font = nameFont,
                 TextColor = nameColor,
+                ShowShadow = true,
+                ShadowColor = dimmed ? Color.Black * 0.4f : Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(nameX + qtyWidth, 12),
@@ -1685,7 +2185,10 @@ namespace GW2CraftingHelper.Views
                     // a pill click as an expand/collapse toggle.
                     foreach (var pill in pillPanels)
                     {
-                        if (pill.MouseOver) return;
+                        if (pill.MouseOver)
+                        {
+                            return;
+                        }
                     }
                     PreserveScrollAcross(() =>
                     {
@@ -1702,7 +2205,7 @@ namespace GW2CraftingHelper.Views
                         _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
                         state.ChildContainer.Visible = state.IsExpanded;
                         state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
-                        state.ChildContainer.Parent.Invalidate();
+                        InvalidateUpToContentPanel(state.ChildContainer);
                     });
                 };
                 rowPanel.Click += toggleHandler;
@@ -1833,7 +2336,10 @@ namespace GW2CraftingHelper.Views
                 int pillWidth = textWidth + 12;
 
                 GetPillColors(spec.Kind, out Color borderColor, out Color fillColor);
-                Color textColor = borderColor;
+                // White, not borderColor: Selected/Available fills expose the
+                // border hue behind the label, so border-colored text has zero
+                // contrast against its own backdrop (M30 #11).
+                Color textColor = Color.White;
                 if (dimmed)
                 {
                     borderColor *= 0.35f;
@@ -1959,7 +2465,7 @@ namespace GW2CraftingHelper.Views
                 case "Rare": return new Color(252, 208, 11);
                 case "Exotic": return new Color(255, 164, 5);
                 case "Ascended": return new Color(251, 62, 141);
-                case "Legendary": return new Color(76, 19, 157);
+                case "Legendary": return new Color(160, 95, 240);
                 default: return new Color(60, 60, 60);
             }
         }
@@ -1981,7 +2487,7 @@ namespace GW2CraftingHelper.Views
                 case "Rare": return new Color(252, 208, 11);
                 case "Exotic": return new Color(255, 164, 5);
                 case "Ascended": return new Color(251, 62, 141);
-                case "Legendary": return new Color(76, 19, 157);
+                case "Legendary": return new Color(160, 95, 240);
                 default: return new Color(200, 200, 200);
             }
         }

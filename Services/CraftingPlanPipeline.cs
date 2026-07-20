@@ -19,6 +19,7 @@ namespace GW2CraftingHelper.Services
         private readonly VendorOfferResolver _resolver;
         private readonly InventoryReducer _reducer;
         private readonly IAccountRecipeClient _accountRecipeClient;
+        private readonly CurrencyMetadataService _currencyMetadataService;
 
         public CraftingPlanPipeline(
             RecipeService recipeService,
@@ -28,7 +29,8 @@ namespace GW2CraftingHelper.Services
             VendorOfferStore vendorOfferStore = null,
             VendorOfferResolver resolver = null,
             InventoryReducer reducer = null,
-            IAccountRecipeClient accountRecipeClient = null)
+            IAccountRecipeClient accountRecipeClient = null,
+            CurrencyMetadataService currencyMetadataService = null)
         {
             _recipeService = recipeService;
             _tradingPostService = tradingPostService;
@@ -38,6 +40,7 @@ namespace GW2CraftingHelper.Services
             _resolver = resolver;
             _reducer = reducer;
             _accountRecipeClient = accountRecipeClient;
+            _currencyMetadataService = currencyMetadataService;
         }
 
         public async Task<CraftingPlanResult> GenerateAsync(
@@ -133,9 +136,48 @@ namespace GW2CraftingHelper.Services
                 Total = metadataIds.Count
             });
             sw.Restart();
+
+            // Kick off the decorative currency-metadata fetch now, in
+            // parallel with item metadata, rather than sequentially after
+            // it - the service has its own internal timeout (see
+            // CurrencyMetadataService), so a hung /v2/currencies can no
+            // longer add to the plan-generation critical path. Observed
+            // independently of the await below so a fault is never left
+            // unobserved if item metadata throws first.
+            var currencyTask = _currencyMetadataService?.GetAllAsync(ct);
+            ObserveFault(currencyTask);
+
             var metadata = await _itemMetadataService.GetMetadataAsync(metadataIds, ct);
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
+
+            // Step 8: Await the currency name/icon metadata fetch started
+            // above. Optional dependency: null when not wired up (e.g. the
+            // CLI harness), in which case CurrencyCost rows stay text-only
+            // via the offline Gw2Constants fallback (see
+            // PlanViewModelBuilder). Any failure besides genuine caller
+            // cancellation is swallowed here too, consistent with the
+            // service's own contract of returning an empty result.
+            progress?.Report(new PlanStatus { Message = "Fetching currency details..." });
+            sw.Restart();
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null;
+            if (currencyTask != null)
+            {
+                try
+                {
+                    currencyMetadata = await currencyTask;
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    currencyMetadata = null;
+                }
+            }
+            sw.Stop();
+            timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
 
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
@@ -149,7 +191,8 @@ namespace GW2CraftingHelper.Services
                 Plan = solveResult.Plan,
                 ItemMetadata = metadata,
                 CraftingTree = craftingTree,
-                DebugLog = debugLog
+                DebugLog = debugLog,
+                CurrencyMetadata = currencyMetadata
             };
         }
 
@@ -277,11 +320,50 @@ namespace GW2CraftingHelper.Services
                 Total = metadataIds.Count
             });
             sw.Restart();
+
+            // Kick off the decorative currency-metadata fetch now, in
+            // parallel with item metadata, rather than sequentially after
+            // it - the service has its own internal timeout (see
+            // CurrencyMetadataService), so a hung /v2/currencies can no
+            // longer add to the plan-generation critical path. Observed
+            // independently of the await below so a fault is never left
+            // unobserved if item metadata throws first.
+            var currencyTask = _currencyMetadataService?.GetAllAsync(ct);
+            ObserveFault(currencyTask);
+
             var metadata = await _itemMetadataService.GetMetadataAsync(metadataIds, ct);
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
-            // Step 9: Fetch learned recipe IDs (if permission available)
+            // Step 9: Await the currency name/icon metadata fetch started
+            // above. Optional dependency: null when not wired up (e.g. the
+            // CLI harness), in which case CurrencyCost rows stay text-only
+            // via the offline Gw2Constants fallback (see
+            // PlanViewModelBuilder). Any failure besides genuine caller
+            // cancellation is swallowed here too, consistent with the
+            // service's own contract of returning an empty result.
+            progress?.Report(new PlanStatus { Message = "Fetching currency details..." });
+            sw.Restart();
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null;
+            if (currencyTask != null)
+            {
+                try
+                {
+                    currencyMetadata = await currencyTask;
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    currencyMetadata = null;
+                }
+            }
+            sw.Stop();
+            timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
+
+            // Step 10: Fetch learned recipe IDs (if permission available)
             progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
             sw.Restart();
             ISet<int> learnedRecipeIds = null;
@@ -292,11 +374,12 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");
 
-            // Step 10: Build structured result
+            // Step 11: Build structured result
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
+            result.CurrencyMetadata = currencyMetadata;
 
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
@@ -320,7 +403,8 @@ namespace GW2CraftingHelper.Services
                 UsedMaterials = usedMaterials,
                 PriceBasis = priceBasis,
                 CurrencyValuation = valuation,
-                OwnMaterialsMode = ownMaterialsMode
+                OwnMaterialsMode = ownMaterialsMode,
+                CurrencyMetadata = currencyMetadata
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -354,6 +438,7 @@ namespace GW2CraftingHelper.Services
             var result = resultBuilder.Build(
                 solveResult.Plan, context.Tree, context.Metadata,
                 context.UsedMaterials, context.LearnedRecipeIds);
+            result.CurrencyMetadata = context.CurrencyMetadata;
 
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(
@@ -543,6 +628,21 @@ namespace GW2CraftingHelper.Services
                 }
                 result.CraftingProfit = profit;
             }
+        }
+
+        /// <summary>
+        /// Attaches a fire-and-forget continuation that touches Exception
+        /// on fault, so a task's failure is always observed even if the
+        /// caller's own await of it is skipped (e.g. an earlier awaited
+        /// step throws first) - prevents an unobserved task exception at
+        /// GC time. Does not change the task's outcome for anyone who does
+        /// await it.
+        /// </summary>
+        private static void ObserveFault(Task task)
+        {
+            task?.ContinueWith(
+                t => { var _ = t.Exception; },
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
         }
 
         private static void CollectItemIds(RecipeNode node, HashSet<int> ids)

@@ -21,6 +21,14 @@ namespace GW2CraftingHelper.Models
         public PriceBasis PriceBasis { get; set; }
 
         /// <summary>
+        /// Currency name/icon metadata snapshotted at GENERATION time, so
+        /// that ResolveWithOverrides' local re-solve can reuse it on
+        /// CurrencyCost rows without any network call (same reasoning as
+        /// Prices/VendorOffers/Metadata above).
+        /// </summary>
+        public IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadata { get; set; }
+
+        /// <summary>
         /// The currency valuation in effect at GENERATION time, snapshotted
         /// here alongside Prices/VendorOffers/Metadata. This is intentional:
         /// ResolveWithOverrides re-solves locally and, like prices and

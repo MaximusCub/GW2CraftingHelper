@@ -187,7 +187,8 @@ namespace GW2CraftingHelper
                 _vendorOfferStore,
                 resolver: null,
                 reducer: new InventoryReducer(),
-                accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager));
+                accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager),
+                currencyMetadataService: new CurrencyMetadataService(_httpClient));
 
             try
             {
@@ -259,10 +260,16 @@ namespace GW2CraftingHelper
             // Minimum size (930x710) matches the window region intentionally.
             // Validated in-game to align with Event Table / Blish HUD's own
             // TabbedWindow dimensions and the 1024x1024 background texture (502049).
+            // contentRegion must end above the window bottom: flush would be
+            // contentRegion.Y + contentRegion.Height == windowRegion.Height
+            // (11 + 699 == 710), but texture 502049 also fades to transparent
+            // over roughly its last 15 rows (verified via screenshot: content
+            // at the flush edge shows windows behind bleeding through), so an
+            // extra 15px margin keeps every row on opaque backdrop.
             _mainWindow = new ResizableTabbedWindow(
                 AsyncTexture2D.FromAssetId(502049),
                 new Rectangle(35, 26, 930, 710),
-                new Rectangle(81, 11, 884, 710),
+                new Rectangle(81, 11, 884, 684),
                 new Point(930, 710))
             {
                 Parent = GameService.Graphics.SpriteScreen,
