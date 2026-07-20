@@ -52,6 +52,7 @@ namespace GW2CraftingHelper
         private CraftingPlanView _craftingContent;
         private LogTabContent _logContent;
         private Tab _logTab;
+        private SettingsTabContent _settingsContent;
 
         private ModuleSettings _settings;
         private SnapshotStore _snapshotStore;
@@ -252,6 +253,8 @@ namespace GW2CraftingHelper
                 (ctx, overrides) => _craftingPipeline.ResolveWithOverrides(ctx, overrides)
             );
 
+            _settingsContent = new SettingsTabContent(_settings);
+
             // Minimum size (930x710) matches the window region intentionally.
             // Validated in-game to align with Event Table / Blish HUD's own
             // TabbedWindow dimensions and the 1024x1024 background texture (502049).
@@ -303,7 +306,7 @@ namespace GW2CraftingHelper
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156736),
-                () => new ViewAdapter("Settings", BuildPlaceholder),
+                () => new ViewAdapter("Settings", c => _settingsContent.Build(c)),
                 "Settings"));
 
             _mainWindow.Tabs.Add(new Tab(

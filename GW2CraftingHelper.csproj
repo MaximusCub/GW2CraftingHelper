@@ -90,6 +90,7 @@
     <Compile Include="Views\CraftingPlanView.cs" />
     <Compile Include="Views\ModalDialog.cs" />
     <Compile Include="Views\LogTabContent.cs" />
+    <Compile Include="Views\SettingsTabContent.cs" />
     <Compile Include="Views\ViewAdapter.cs" />
     <Compile Include="Views\ResizableTabbedWindow.cs" />
     <Compile Include="Services\ModuleSettings.cs" />
