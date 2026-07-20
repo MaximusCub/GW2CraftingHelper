@@ -15,6 +15,13 @@ namespace GW2CraftingHelper.Services
         // (Blish-free) does the actual conversion so that logic is unit-testable.
         public SettingEntry<string> CurrencyValuationsJson { get; private set; }
 
+        // gw2efficiency-style "value own materials" (M28): when enabled,
+        // materials the account already owns are valued at their sell
+        // opportunity cost instead of treated as free. Reduction itself is
+        // unaffected - this only feeds OwnMaterialsMode for the pipeline's
+        // profit calculation.
+        public SettingEntry<bool> ValueOwnMaterials { get; private set; }
+
         public ModuleSettings(SettingCollection settings)
         {
             ModalDialogX = settings.DefineSetting(
@@ -31,6 +38,11 @@ namespace GW2CraftingHelper.Services
                 "CurrencyValuationsJson", string.Empty,
                 () => "Currency Valuations",
                 () => "User-provided coin values for non-coin currencies (JSON)");
+
+            ValueOwnMaterials = settings.DefineSetting(
+                "ValueOwnMaterials", false,
+                () => "Value own materials",
+                () => "Value owned materials at their sell opportunity cost instead of treating them as free");
         }
 
         /// <summary>
@@ -51,11 +63,21 @@ namespace GW2CraftingHelper.Services
             CurrencyValuationsJson.Value = CurrencyValuationSerializer.Serialize(valuation);
         }
 
+        /// <summary>
+        /// Maps the ValueOwnMaterials toggle onto the pipeline's
+        /// OwnMaterialsMode enum. Defaults to Free.
+        /// </summary>
+        public OwnMaterialsMode GetOwnMaterialsMode()
+        {
+            return ValueOwnMaterials.Value ? OwnMaterialsMode.Valued : OwnMaterialsMode.Free;
+        }
+
         public void ResetToDefaults()
         {
             ModalDialogX.Value = -1;
             ModalDialogY.Value = -1;
             CurrencyValuationsJson.Value = string.Empty;
+            ValueOwnMaterials.Value = false;
         }
     }
 }
