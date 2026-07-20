@@ -1549,6 +1549,7 @@ namespace GW2CraftingHelper.Views
                     s.ArrowLabel.Text = "\u25BC";
                 }
                 treeFlow.Invalidate();
+                InvalidateUpToContentPanel(treeFlow);
             });
 
             collapseAllButton.Click += (_, __) => PreserveScrollAcross(() =>
@@ -1561,6 +1562,7 @@ namespace GW2CraftingHelper.Views
                     s.ArrowLabel.Text = "\u25B6";
                 }
                 treeFlow.Invalidate();
+                InvalidateUpToContentPanel(treeFlow);
             });
 
             headerPanel.LeftMouseButtonPressed += (_, __) =>
@@ -1629,6 +1631,33 @@ namespace GW2CraftingHelper.Views
         private const int TreePillColumnWidth = 240;
         private const int TreeCostColumnWidth = 150;
         private const int TreeRightMargin = 8;
+
+        /// <summary>
+        /// Walks up from start's Parent chain, calling Invalidate() on every
+        /// ancestor Container up to and including _contentPanel. AutoSize
+        /// FlowPanels only re-measure their own height on Invalidate, so a
+        /// toggle deep in the tree that invalidates only its immediate
+        /// parent leaves every ancestor above that stale - visible as leftover
+        /// whitespace before the next section after collapsing a deep
+        /// subtree. Bounded to guard against a control that is somehow never
+        /// an ancestor of _contentPanel (would otherwise walk to a null
+        /// Parent anyway, but the cap keeps this defensively finite).
+        /// </summary>
+        private void InvalidateUpToContentPanel(Control start)
+        {
+            Container current = start?.Parent;
+            int hops = 0;
+            while (current != null && hops < 50)
+            {
+                current.Invalidate();
+                if (current == _contentPanel)
+                {
+                    break;
+                }
+                current = current.Parent;
+                hops++;
+            }
+        }
 
         private void RenderTreeNode(CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, bool dimmed)
         {
@@ -1851,6 +1880,7 @@ namespace GW2CraftingHelper.Views
                         state.ChildContainer.Visible = state.IsExpanded;
                         state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
                         state.ChildContainer.Parent.Invalidate();
+                        InvalidateUpToContentPanel(state.ChildContainer);
                     });
                 };
                 rowPanel.Click += toggleHandler;
