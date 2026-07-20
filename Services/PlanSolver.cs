@@ -348,6 +348,17 @@ namespace GW2CraftingHelper.Services
         /// keep the first-listed offer, because ranking across currencies has
         /// no exchange rate and unit counts of different currencies must never
         /// be compared.
+        ///
+        /// V1 purchase-cap semantics: an offer with a positive DailyCap (or a
+        /// positive WeeklyCap when DailyCap is absent/zero) that cannot supply
+        /// the node's needed quantity within a single cap period - i.e. the
+        /// node needs more purchases than the cap allows - is excluded from
+        /// this node's evaluation entirely, from both the comparable and the
+        /// fallback tier. Zero or absent caps mean uncapped, matching most
+        /// offers. Non-goal: this does not split a node's need across a capped
+        /// offer plus a second source once the cap is exhausted - a node is
+        /// still sourced from exactly one acquisition (partial cap-split
+        /// sourcing is left for a future milestone).
         /// </summary>
         private static void EvaluateVendorOffers(
             RecipeNode node,
@@ -422,6 +433,20 @@ namespace GW2CraftingHelper.Services
                 }
 
                 int unitsNeeded = (int)Math.Ceiling((double)node.Quantity / offer.OutputCount);
+
+                // Purchase cap (see V1 semantics above): DailyCap wins when
+                // positive, else WeeklyCap when positive, else the offer is
+                // uncapped. If the node needs more purchases than fit in one
+                // cap period, the offer cannot fully supply this node and is
+                // excluded from both tiers below.
+                int? purchaseCap = offer.DailyCap.HasValue && offer.DailyCap.Value > 0
+                    ? offer.DailyCap
+                    : (offer.WeeklyCap.HasValue && offer.WeeklyCap.Value > 0 ? offer.WeeklyCap : null);
+                if (purchaseCap.HasValue && unitsNeeded > purchaseCap.Value)
+                {
+                    continue;
+                }
+
                 long totalCoinCost = coinCost * unitsNeeded;
 
                 // Scale and value the non-coin currency lines (no-op for a
