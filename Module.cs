@@ -259,10 +259,14 @@ namespace GW2CraftingHelper
             // Minimum size (930x710) matches the window region intentionally.
             // Validated in-game to align with Event Table / Blish HUD's own
             // TabbedWindow dimensions and the 1024x1024 background texture (502049).
+            // contentRegion must stay flush with the window bottom
+            // (contentRegion.Y + contentRegion.Height == windowRegion.Height,
+            // i.e. 11 + 699 == 710) so content never renders past the
+            // background texture's opaque area.
             _mainWindow = new ResizableTabbedWindow(
                 AsyncTexture2D.FromAssetId(502049),
                 new Rectangle(35, 26, 930, 710),
-                new Rectangle(81, 11, 884, 710),
+                new Rectangle(81, 11, 884, 699),
                 new Point(930, 710))
             {
                 Parent = GameService.Graphics.SpriteScreen,
