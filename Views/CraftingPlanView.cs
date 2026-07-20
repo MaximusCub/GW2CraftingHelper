@@ -614,23 +614,48 @@ namespace GW2CraftingHelper.Views
             };
         }
 
-        private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
+        /// <summary>
+        /// Bundle returned by CreateSectionHeader: the header panel (parent
+        /// for any extra header-row buttons a caller adds), its arrow label,
+        /// and the already-wired content FlowPanel rows should be added to.
+        /// </summary>
+        private sealed class SectionHeaderHandle
         {
-            // User collapse state survives re-renders (width changes, local
-            // re-solves); resets on a fresh Generate.
-            bool expanded = _sectionExpansion.TryGetValue(section.SectionType, out bool userExpanded)
-                ? userExpanded
-                : section.IsDefaultExpanded;
+            public Panel HeaderPanel;
+            public Label ArrowLabel;
+            public FlowPanel ContentFlow;
+        }
 
-            // Section header (clickable). The arrow gets its own label in
-            // the default font: DefaultFont18 has no glyph for the triangle
-            // characters, so an arrow embedded in the title never rendered.
+        /// <summary>
+        /// Shared chrome for every collapsible section (the 6 PlanSectionType
+        /// sections and the Recipe Tree alike): caret + Font18 title, a 1px
+        /// divider spanning the full width under the header, a hover wash on
+        /// the whole clickable row, and click-to-toggle with expansion state
+        /// persisted in _sectionExpansion under sectionKey. suppressToggle
+        /// lets a caller with its own header-row buttons (the tree's
+        /// Expand All / Collapse All / presets) veto the toggle when the
+        /// click landed on one of them.
+        /// </summary>
+        private SectionHeaderHandle CreateSectionHeader(
+            string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
+            Func<bool> suppressToggle = null)
+        {
+            bool expanded = _sectionExpansion.TryGetValue(sectionKey, out bool userExpanded)
+                ? userExpanded
+                : defaultExpanded;
+
             var headerPanel = new Panel()
             {
                 Size = new Point(panelWidth, 30),
+                BackgroundColor = Color.Transparent,
                 Parent = _contentPanel
             };
+            headerPanel.MouseEntered += (_, __) => headerPanel.BackgroundColor = Color.White * 0.05f;
+            headerPanel.MouseLeft += (_, __) => headerPanel.BackgroundColor = Color.Transparent;
 
+            // The arrow gets its own label in the default font: DefaultFont18
+            // has no glyph for the triangle characters, so an arrow embedded
+            // in the title never rendered.
             var headerArrow = new Label()
             {
                 Text = expanded ? "\u25BC" : "\u25B6",
@@ -640,9 +665,9 @@ namespace GW2CraftingHelper.Views
                 Parent = headerPanel
             };
 
-            var headerLabel = new Label()
+            new Label()
             {
-                Text = section.Title,
+                Text = title,
                 Font = GameService.Content.DefaultFont18,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -650,7 +675,15 @@ namespace GW2CraftingHelper.Views
                 Parent = headerPanel
             };
 
-            // Content panel
+            // Divider under the header - identical chrome for every section.
+            new Panel()
+            {
+                Size = new Point(panelWidth, 1),
+                Location = new Point(0, 29),
+                BackgroundColor = new Color(90, 90, 90),
+                Parent = headerPanel
+            };
+
             var contentFlow = new FlowPanel()
             {
                 Size = new Point(panelWidth, 0),
@@ -660,32 +693,47 @@ namespace GW2CraftingHelper.Views
                 HeightSizingMode = SizingMode.AutoSize
             };
 
+            headerPanel.Click += (_, __) =>
+            {
+                if (suppressToggle != null && suppressToggle())
+                {
+                    return;
+                }
+                PreserveScrollAcross(() =>
+                {
+                    contentFlow.Visible = !contentFlow.Visible;
+                    _sectionExpansion[sectionKey] = contentFlow.Visible;
+                    headerArrow.Text = contentFlow.Visible ? "\u25BC" : "\u25B6";
+                    _contentPanel.Invalidate();
+                });
+            };
+
+            return new SectionHeaderHandle
+            {
+                HeaderPanel = headerPanel,
+                ArrowLabel = headerArrow,
+                ContentFlow = contentFlow
+            };
+        }
+
+        private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
+        {
+            var header = CreateSectionHeader(section.Title, section.SectionType, panelWidth, section.IsDefaultExpanded);
+
             // Populate rows. The Total Cost section renders its CoinTotal
             // rows as a tile row (gw2e's 5-tile cost-breakdown) instead of
             // one row per total; everything else uses the generic dispatch.
             if (section.SectionType == PlanSectionType.Summary)
             {
-                CreateSummarySectionBody(section, contentFlow, panelWidth);
+                CreateSummarySectionBody(section, header.ContentFlow, panelWidth);
             }
             else
             {
                 foreach (var row in section.Rows)
                 {
-                    CreateRow(row, contentFlow, panelWidth);
+                    CreateRow(row, header.ContentFlow, panelWidth);
                 }
             }
-
-            // Toggle on click
-            headerPanel.Click += (_, __) =>
-            {
-                PreserveScrollAcross(() =>
-                {
-                    contentFlow.Visible = !contentFlow.Visible;
-                    _sectionExpansion[section.SectionType] = contentFlow.Visible;
-                    headerArrow.Text = contentFlow.Visible ? "\u25BC" : "\u25B6";
-                    _contentPanel.Invalidate();
-                });
-            };
         }
 
         private void CreateRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
@@ -1010,82 +1058,56 @@ namespace GW2CraftingHelper.Views
         {
             _treeNodeStates.Clear();
 
-            var headerPanel = new Panel()
-            {
-                Size = new Point(panelWidth, 30),
-                Parent = _contentPanel
-            };
+            // The header's Click-to-toggle is wired inside CreateSectionHeader
+            // before these buttons exist; suppressToggle captures them by
+            // reference and reads their (assigned-below) MouseOver lazily,
+            // at click time - not at subscription time.
+            StandardButton expandAllButton = null;
+            StandardButton collapseAllButton = null;
+            StandardButton bestPathButton = null;
+            StandardButton craftAllButton = null;
+            StandardButton buyAllButton = null;
 
-            var headerArrow = new Label()
-            {
-                Text = "\u25BC",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(4, 8),
-                Parent = headerPanel
-            };
+            // Guard uses PRESS-time hover state: with a release-time check,
+            // pressing on the header background and releasing over a button
+            // dropped the click entirely (neither toggle nor button fired).
+            bool pressStartedOnButton = false;
 
-            var headerLabel = new Label()
-            {
-                Text = "Recipe Tree",
-                Font = GameService.Content.DefaultFont18,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(22, 4),
-                Parent = headerPanel
-            };
+            var header = CreateSectionHeader(
+                "Recipe Tree", PlanSectionType.RecipeTree, panelWidth, true,
+                suppressToggle: () => pressStartedOnButton);
+            var headerPanel = header.HeaderPanel;
+            var treeFlow = header.ContentFlow;
 
-            var expandAllButton = new StandardButton()
+            // Header-row buttons, right-to-left per the spec's fixed
+            // offsets-from-the-right layout: Collapse All, Expand All, then
+            // the presets (Buy All / Craft All / Best Path) continuing
+            // leftward with 4px gaps so they never collide with the title.
+            int cursorX = panelWidth;
+            StandardButton PlaceButtonRight(string text, int width)
             {
-                Text = "Expand All",
-                Size = new Point(92, 24),
-                Location = new Point(panelWidth - 196, 3),
-                Parent = headerPanel
-            };
+                cursorX -= width;
+                var button = new StandardButton()
+                {
+                    Text = text,
+                    Size = new Point(width, 24),
+                    Location = new Point(cursorX, 3),
+                    Parent = headerPanel
+                };
+                cursorX -= 4;
+                return button;
+            }
 
-            var collapseAllButton = new StandardButton()
-            {
-                Text = "Collapse All",
-                Size = new Point(96, 24),
-                Location = new Point(panelWidth - 100, 3),
-                Parent = headerPanel
-            };
-
-            var treeFlow = new FlowPanel()
-            {
-                Size = new Point(panelWidth, 0),
-                FlowDirection = ControlFlowDirection.SingleTopToBottom,
-                Visible = true,
-                Parent = _contentPanel,
-                HeightSizingMode = SizingMode.AutoSize
-            };
+            collapseAllButton = PlaceButtonRight("Collapse All", 96);
+            expandAllButton = PlaceButtonRight("Expand All", 92);
+            buyAllButton = PlaceButtonRight("Buy All", 70);
+            craftAllButton = PlaceButtonRight("Craft All", 76);
+            bestPathButton = PlaceButtonRight("Best Path", 80);
 
             RenderTreeNode(treeRoot, treeFlow, panelWidth, 0);
 
             // Decision presets: clear overrides / force craft-everywhere /
             // force buy-everywhere (feasibility respected by the solver).
-            var bestPathButton = new StandardButton()
-            {
-                Text = "Best Path",
-                Size = new Point(80, 24),
-                Location = new Point(150, 3),
-                Parent = headerPanel
-            };
-            var craftAllButton = new StandardButton()
-            {
-                Text = "Craft All",
-                Size = new Point(76, 24),
-                Location = new Point(234, 3),
-                Parent = headerPanel
-            };
-            var buyAllButton = new StandardButton()
-            {
-                Text = "Buy All",
-                Size = new Point(70, 24),
-                Location = new Point(314, 3),
-                Parent = headerPanel
-            };
-
             bestPathButton.Click += (_, __) =>
             {
                 if (_nodeOverrides.Count == 0) return;
@@ -1130,26 +1152,12 @@ namespace GW2CraftingHelper.Views
                 treeFlow.Invalidate();
             });
 
-            // Guard uses PRESS-time hover state: with a release-time check,
-            // pressing on the header background and releasing over a button
-            // dropped the click entirely (neither toggle nor button fired).
-            bool pressStartedOnButton = false;
             headerPanel.LeftMouseButtonPressed += (_, __) =>
             {
                 pressStartedOnButton =
                     expandAllButton.MouseOver || collapseAllButton.MouseOver ||
                     bestPathButton.MouseOver || craftAllButton.MouseOver ||
                     buyAllButton.MouseOver;
-            };
-            headerPanel.Click += (_, __) =>
-            {
-                if (pressStartedOnButton)
-                {
-                    return;
-                }
-                treeFlow.Visible = !treeFlow.Visible;
-                headerArrow.Text = treeFlow.Visible ? "\u25BC" : "\u25B6";
-                _contentPanel.Invalidate();
             };
         }
 
