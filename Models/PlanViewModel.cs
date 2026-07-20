@@ -70,5 +70,10 @@ namespace GW2CraftingHelper.Models
         // a total-price table column.
         public long UnitCoinValue { get; set; }
         public string StatusTag { get; set; }
+
+        // Wiki-derived acquisition guidance for unknown-source rows,
+        // tooltip-only. Deliberately separate from Sublabel, which renders
+        // inline in the row itself - HintText never renders inline.
+        public string HintText { get; set; }
     }
 }

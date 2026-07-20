@@ -165,6 +165,25 @@ namespace GW2CraftingHelper
                 _itemSearchProvider = new StaticItemSearchProvider();
             }
 
+            // Acquisition hints seed: wiki-derived guidance for items with
+            // no priceable source (docs/KNOWN-ISSUES.md item 8). Static
+            // local file, no async fetch needed - loaded once here and
+            // passed straight to the pipeline (simpler than
+            // CurrencyMetadataService, which hits a live API).
+            IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null;
+            try
+            {
+                using (var hintsStream = ContentsManager.GetFileStream("acquisition_hints_seed.json"))
+                {
+                    acquisitionHints = AcquisitionHintService.Load(hintsStream);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Info("Acquisition hints unavailable: [{0}] {1}", ex.GetType().Name, ex.Message);
+                acquisitionHints = null;
+            }
+
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir);
             recipeOverlay.Load(currentGw2BuildId: null);
 
@@ -194,7 +213,8 @@ namespace GW2CraftingHelper
                 resolver: null,
                 reducer: new InventoryReducer(),
                 accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager),
-                currencyMetadataService: new CurrencyMetadataService(_httpClient));
+                currencyMetadataService: new CurrencyMetadataService(_httpClient),
+                acquisitionHints: acquisitionHints);
 
             try
             {

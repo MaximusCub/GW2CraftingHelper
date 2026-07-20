@@ -20,6 +20,7 @@ namespace GW2CraftingHelper.Services
         private readonly InventoryReducer _reducer;
         private readonly IAccountRecipeClient _accountRecipeClient;
         private readonly CurrencyMetadataService _currencyMetadataService;
+        private readonly IReadOnlyDictionary<int, AcquisitionHint> _acquisitionHints;
 
         public CraftingPlanPipeline(
             RecipeService recipeService,
@@ -30,7 +31,8 @@ namespace GW2CraftingHelper.Services
             VendorOfferResolver resolver = null,
             InventoryReducer reducer = null,
             IAccountRecipeClient accountRecipeClient = null,
-            CurrencyMetadataService currencyMetadataService = null)
+            CurrencyMetadataService currencyMetadataService = null,
+            IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null)
         {
             _recipeService = recipeService;
             _tradingPostService = tradingPostService;
@@ -41,6 +43,7 @@ namespace GW2CraftingHelper.Services
             _reducer = reducer;
             _accountRecipeClient = accountRecipeClient;
             _currencyMetadataService = currencyMetadataService;
+            _acquisitionHints = acquisitionHints;
         }
 
         public async Task<CraftingPlanResult> GenerateAsync(
@@ -181,7 +184,7 @@ namespace GW2CraftingHelper.Services
 
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
-            var craftingTree = treeBuilder.BuildTree(tree, solveResult.Decisions, metadata);
+            var craftingTree = treeBuilder.BuildTree(tree, solveResult.Decisions, metadata, _acquisitionHints);
 
             var debugLog = new List<string>(timingLog);
             debugLog.AddRange(PlanTimingAnalyzer.Summarize(timingLog));
@@ -192,7 +195,8 @@ namespace GW2CraftingHelper.Services
                 ItemMetadata = metadata,
                 CraftingTree = craftingTree,
                 DebugLog = debugLog,
-                CurrencyMetadata = currencyMetadata
+                CurrencyMetadata = currencyMetadata,
+                AcquisitionHints = _acquisitionHints
             };
         }
 
@@ -380,10 +384,12 @@ namespace GW2CraftingHelper.Services
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
             result.CurrencyMetadata = currencyMetadata;
+            result.AcquisitionHints = _acquisitionHints;
 
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
-            result.CraftingTree = treeBuilder.BuildTree(treeUsedForSolve, solveResult.Decisions, metadata);
+            result.CraftingTree = treeBuilder.BuildTree(
+                treeUsedForSolve, solveResult.Decisions, metadata, _acquisitionHints);
 
             ApplySellSideEconomics(
                 result, treeUsedForSolve, solveResult, prices,
@@ -404,7 +410,8 @@ namespace GW2CraftingHelper.Services
                 PriceBasis = priceBasis,
                 CurrencyValuation = valuation,
                 OwnMaterialsMode = ownMaterialsMode,
-                CurrencyMetadata = currencyMetadata
+                CurrencyMetadata = currencyMetadata,
+                AcquisitionHints = _acquisitionHints
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -439,10 +446,11 @@ namespace GW2CraftingHelper.Services
                 solveResult.Plan, context.Tree, context.Metadata,
                 context.UsedMaterials, context.LearnedRecipeIds);
             result.CurrencyMetadata = context.CurrencyMetadata;
+            result.AcquisitionHints = context.AcquisitionHints;
 
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(
-                context.Tree, solveResult.Decisions, context.Metadata);
+                context.Tree, solveResult.Decisions, context.Metadata, context.AcquisitionHints);
 
             ApplySellSideEconomics(
                 result, context.Tree, solveResult, context.Prices,

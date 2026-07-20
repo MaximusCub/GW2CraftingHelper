@@ -10,15 +10,17 @@ namespace GW2CraftingHelper.Services
         public CraftingTreeNode BuildTree(
             RecipeNode root,
             IReadOnlyDictionary<int, SolverDecision> decisions,
-            IReadOnlyDictionary<int, ItemMetadata> metadata)
+            IReadOnlyDictionary<int, ItemMetadata> metadata,
+            IReadOnlyDictionary<int, AcquisitionHint> hints = null)
         {
-            return BuildNode(root, decisions, metadata, insideReferenceBranch: false);
+            return BuildNode(root, decisions, metadata, hints, insideReferenceBranch: false);
         }
 
         private static CraftingTreeNode BuildNode(
             RecipeNode node,
             IReadOnlyDictionary<int, SolverDecision> decisions,
             IReadOnlyDictionary<int, ItemMetadata> metadata,
+            IReadOnlyDictionary<int, AcquisitionHint> hints,
             bool insideReferenceBranch)
         {
             var treeNode = new CraftingTreeNode
@@ -50,6 +52,7 @@ namespace GW2CraftingHelper.Services
             if (!decisions.TryGetValue(node.NodeId, out var decision))
             {
                 treeNode.Decision = CraftingDecision.Unknown;
+                ApplyAcquisitionHint(treeNode, hints);
                 return treeNode;
             }
 
@@ -78,7 +81,7 @@ namespace GW2CraftingHelper.Services
                     // a reference branch is still hypothetical content, and
                     // must keep suppressing further reference branches
                     // below it - see the cap comment below for why.
-                    treeNode.Children = BuildChildren(recipe, decisions, metadata, insideReferenceBranch);
+                    treeNode.Children = BuildChildren(recipe, decisions, metadata, hints, insideReferenceBranch);
                 }
             }
             else if (!insideReferenceBranch &&
@@ -111,23 +114,47 @@ namespace GW2CraftingHelper.Services
                 // reference branches restart at every such alternation
                 // measured as an effectively unbounded hang on a real deep
                 // item (Deldrimor Steel Ingot) during manual verification.
-                treeNode.Children = BuildChildren(node.Recipes[0], decisions, metadata, insideReferenceBranch: true);
+                treeNode.Children = BuildChildren(node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true);
                 treeNode.IsReferenceBranch = true;
             }
 
+            ApplyAcquisitionHint(treeNode, hints);
             return treeNode;
+        }
+
+        /// <summary>
+        /// Sets AcquisitionHint from the seeded hint dictionary, but only
+        /// for Decision == Unknown nodes - hints must never bleed onto a
+        /// node that has a real (even if unappealing) priced source, since
+        /// the hint text describes how to acquire an item with NO known
+        /// source at all.
+        /// </summary>
+        private static void ApplyAcquisitionHint(
+            CraftingTreeNode treeNode,
+            IReadOnlyDictionary<int, AcquisitionHint> hints)
+        {
+            if (treeNode.Decision != CraftingDecision.Unknown || hints == null)
+            {
+                return;
+            }
+            if (hints.TryGetValue(treeNode.ItemId, out var hint) &&
+                hint != null && !string.IsNullOrEmpty(hint.Hint))
+            {
+                treeNode.AcquisitionHint = hint.Hint;
+            }
         }
 
         private static List<CraftingTreeNode> BuildChildren(
             RecipeOption recipe,
             IReadOnlyDictionary<int, SolverDecision> decisions,
             IReadOnlyDictionary<int, ItemMetadata> metadata,
+            IReadOnlyDictionary<int, AcquisitionHint> hints,
             bool insideReferenceBranch)
         {
             var children = new List<CraftingTreeNode>(recipe.Ingredients.Count);
             foreach (var ingredient in recipe.Ingredients)
             {
-                children.Add(BuildNode(ingredient, decisions, metadata, insideReferenceBranch));
+                children.Add(BuildNode(ingredient, decisions, metadata, hints, insideReferenceBranch));
             }
             return children;
         }

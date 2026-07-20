@@ -66,5 +66,13 @@ namespace GW2CraftingHelper.Models
         /// PlanViewModelBuilder).
         /// </summary>
         public IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadata { get; set; }
+
+        /// <summary>
+        /// Wiki-derived acquisition hints for unpriceable items, keyed by
+        /// item id (see AcquisitionHintService / ref/acquisition_hints_seed.json).
+        /// Hint text is tooltip-only presentation; null when the module was
+        /// not wired with hint data.
+        /// </summary>
+        public IReadOnlyDictionary<int, AcquisitionHint> AcquisitionHints { get; set; }
     }
 }
