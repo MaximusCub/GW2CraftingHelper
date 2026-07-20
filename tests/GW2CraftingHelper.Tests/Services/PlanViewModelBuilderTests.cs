@@ -262,6 +262,30 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void SummarySection_CurrencyCost_IdPresentButEmptyNameAndIcon_FallsBackToConstantsAndNullIcon()
+        {
+            // Id IS in the metadata dictionary (fetch succeeded and covers
+            // this currency), but the entry's Name/IconUrl are both empty
+            // strings (e.g. an API payload with a blank name) - the
+            // !string.IsNullOrEmpty guards in ResolveCurrencyName/
+            // ResolveCurrencyIconUrl must treat that the same as "absent"
+            // rather than rendering a blank label or a bogus icon.
+            var currencyMeta = new Dictionary<int, CurrencyMetadata>
+            {
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "", IconUrl = "" }
+            };
+            var result = MakeResult(
+                currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 23, Amount = 50 } },
+                currencyMetadata: currencyMeta);
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("50x Spirit Shards", ccRow.Label);
+            Assert.Null(ccRow.IconUrl);
+        }
+
+        [Fact]
         public void SummarySection_CurrencyCost_UnknownId_FallsBackToGeneric_EvenWithMetadataPresent()
         {
             var currencyMeta = new Dictionary<int, CurrencyMetadata>

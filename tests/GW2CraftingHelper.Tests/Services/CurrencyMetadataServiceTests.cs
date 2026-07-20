@@ -1,3 +1,4 @@
+using System;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -209,6 +210,144 @@ namespace GW2CraftingHelper.Tests.Services
                 var result = await service.GetAllAsync(CancellationToken.None);
 
                 Assert.Empty(result);
+            }
+        }
+
+        // --- M30 review: cancellation, timeout, malformed-field, and
+        // duplicate-id gaps ---
+
+        /// <summary>
+        /// Checks cancellation via ThrowIfCancellationRequested inside the
+        /// handler itself rather than relying on HttpClient's own
+        /// pre-canceled-token short-circuit - deterministic regardless of
+        /// framework internals, and it is what the caller's token actually
+        /// being canceled would look like on a real request in flight.
+        /// </summary>
+        private class CancellationAwareHandler : HttpMessageHandler
+        {
+            private readonly string _body;
+
+            public CancellationAwareHandler(string body)
+            {
+                _body = body;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(_body)
+                });
+            }
+        }
+
+        [Fact]
+        public async Task GetAllAsync_CallerCancellation_ThrowsOperationCanceled_NotEmptySuccess()
+        {
+            using (var handler = new CancellationAwareHandler(SampleJson))
+            using (var http = new HttpClient(handler))
+            {
+                var service = new CurrencyMetadataService(http);
+                using (var cts = new CancellationTokenSource())
+                {
+                    cts.Cancel();
+
+                    await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                        () => service.GetAllAsync(cts.Token));
+                }
+            }
+        }
+
+        /// <summary>
+        /// A handler whose per-request delay can be changed between calls
+        /// on the SAME instance, so a test can exercise "slow call times
+        /// out" followed by "fast call on the same service succeeds"
+        /// without swapping the HttpClient/handler (which would prove
+        /// nothing about the service's own retry-after-failure behavior).
+        /// </summary>
+        private class ConfigurableDelayHandler : HttpMessageHandler
+        {
+            private readonly string _body;
+            public TimeSpan Delay { get; set; }
+
+            public ConfigurableDelayHandler(string body)
+            {
+                _body = body;
+            }
+
+            protected override async Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                if (Delay > TimeSpan.Zero)
+                {
+                    await Task.Delay(Delay, cancellationToken);
+                }
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(_body)
+                };
+            }
+        }
+
+        [Fact]
+        public async Task GetAllAsync_HandlerSlowerThanTimeout_ReturnsEmpty_NoThrow_ThenFastRetrySucceeds()
+        {
+            using (var handler = new ConfigurableDelayHandler(SampleJson) { Delay = TimeSpan.FromSeconds(2) })
+            using (var http = new HttpClient(handler))
+            {
+                var service = new CurrencyMetadataService(http, TimeSpan.FromMilliseconds(100));
+
+                var firstResult = await service.GetAllAsync(CancellationToken.None);
+                Assert.Empty(firstResult);
+
+                // Retry-after-failure, same instance: a subsequent fast
+                // call must succeed rather than being permanently
+                // negative-cached by the timed-out first attempt.
+                handler.Delay = TimeSpan.Zero;
+                var secondResult = await service.GetAllAsync(CancellationToken.None);
+                Assert.Equal(5, secondResult.Count);
+                Assert.Equal("Spirit Shards", secondResult[23].Name);
+            }
+        }
+
+        private const string MissingOrNullIconJson = @"[
+            { ""id"": 1, ""name"": ""Coin"", ""order"": 1 },
+            { ""id"": 2, ""name"": ""Karma"", ""icon"": null, ""order"": 2 }
+        ]";
+
+        [Fact]
+        public async Task GetAllAsync_MissingOrNullIcon_IconUrlEmptyString_NoThrow()
+        {
+            using (var handler = new StubHandler(HttpStatusCode.OK, MissingOrNullIconJson))
+            using (var http = new HttpClient(handler))
+            {
+                var service = new CurrencyMetadataService(http);
+                var result = await service.GetAllAsync(CancellationToken.None);
+
+                Assert.Equal("", result[1].IconUrl);
+                Assert.Equal("", result[2].IconUrl);
+            }
+        }
+
+        private const string DuplicateIdsJson = @"[
+            { ""id"": 1, ""name"": ""First Coin"", ""icon"": ""first.png"" },
+            { ""id"": 1, ""name"": ""Second Coin"", ""icon"": ""second.png"" }
+        ]";
+
+        [Fact]
+        public async Task GetAllAsync_DuplicateIds_LastWriteWins_NoThrow()
+        {
+            using (var handler = new StubHandler(HttpStatusCode.OK, DuplicateIdsJson))
+            using (var http = new HttpClient(handler))
+            {
+                var service = new CurrencyMetadataService(http);
+                var result = await service.GetAllAsync(CancellationToken.None);
+
+                Assert.Single(result);
+                Assert.Equal("Second Coin", result[1].Name);
+                Assert.Equal("second.png", result[1].IconUrl);
             }
         }
     }
