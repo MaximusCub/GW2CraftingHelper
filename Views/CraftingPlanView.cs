@@ -327,32 +327,55 @@ namespace GW2CraftingHelper.Views
                         }
                     }
 
-                    // Before writing anything: a library reset (Blish's
-                    // Panel resetting its scrollbar) is ALWAYS correlated
-                    // with a content-height change; a user wheel/drag moves
-                    // the scrollbar with no height change. If content
-                    // height is unchanged since the previous real frame and
-                    // the scrollbar has drifted from what we last wrote by
-                    // more than tolerance, the user moved it - stop
-                    // immediately rather than fighting them. Gated on
-                    // lastWrittenRatio >= 0 so the first real frame (no
+                    // Before writing anything: distinguish Blish's own
+                    // reset-to-top from real user input. The naive signal -
+                    // height unchanged since the previous real frame but the
+                    // scrollbar drifted from what we last wrote - matches
+                    // BOTH a user scroll AND a library reset, because
+                    // Blish's Panel zeroes ScrollDistance during its layout
+                    // pass one real frame after a height change: by the
+                    // time we observe it here, height already reads stable
+                    // again (it changed last frame, not this one) while the
+                    // scrollbar reads 0. The fingerprint that tells them
+                    // apart: a library reset always lands exactly at (or
+                    // within float tolerance of) zero while our own target
+                    // sits meaningfully above it; a user scroll can land
+                    // anywhere. Near-top targets are ambiguous (a genuine
+                    // user scroll also lands near zero) and a wrong restore
+                    // there is imperceptible, so they fall through to the
+                    // user-scroll branch rather than being contested. Gated
+                    // on lastWrittenRatio >= 0 so the first real frame (no
                     // prior write to compare against) never false-triggers.
-                    float currentDistance = scrollbar.ScrollDistance;
-                    bool heightUnchanged = contentHeight == lastContentHeight;
-                    if (lastWrittenRatio >= 0f && heightUnchanged &&
-                        System.Math.Abs(currentDistance - lastWrittenRatio) > 0.004f)
-                    {
-                        Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=user-scroll finalRatio={2:F4} finalContentH={3}",
-                            capturedGeneration, realFrame, lastWrittenRatio, contentHeight);
-                        return false;
-                    }
-
                     float ratio = ScrollMath.RatioForOffset(
                         savedOffset, contentHeight, capturedPanel.Height);
+                    float currentDistance = scrollbar.ScrollDistance;
+                    bool heightUnchanged = contentHeight == lastContentHeight;
+                    bool diverged = lastWrittenRatio >= 0f && heightUnchanged &&
+                        System.Math.Abs(currentDistance - lastWrittenRatio) > 0.004f;
+                    bool isLibraryReset = false;
+
+                    if (diverged)
+                    {
+                        isLibraryReset = currentDistance <= 0.0005f && ratio > 0.01f;
+                        if (!isLibraryReset)
+                        {
+                            Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=user-scroll finalRatio={2:F4} finalContentH={3}",
+                                capturedGeneration, realFrame, lastWrittenRatio, contentHeight);
+                            return false;
+                        }
+
+                        // Library reset: rewrite the target below and reset
+                        // the stability streak (this frame does not count
+                        // toward convergence) - still bounded by the
+                        // real-frame cap. Kept quiet; this is a routine,
+                        // expected event on the hot path.
+                    }
+
                     realFrame++;
                     scrollbar.ScrollDistance = ratio;
 
-                    bool ratioStable = System.Math.Abs(ratio - lastWrittenRatio) < 0.0005f;
+                    bool ratioStable = !isLibraryReset &&
+                        System.Math.Abs(ratio - lastWrittenRatio) < 0.0005f;
                     stableStreak = (ratioStable && heightUnchanged) ? stableStreak + 1 : 0;
                     lastWrittenRatio = ratio;
                     lastContentHeight = contentHeight;
@@ -402,6 +425,14 @@ namespace GW2CraftingHelper.Views
             int remaining = ScrollGuardWindowFrames;
             int lastContentHeight = -1;
 
+            // Counts library reset-to-zero contests across the guard's
+            // ENTIRE lifetime (never reset on height changes or normal
+            // countdown frames). Caps a persistent user-vs-guard fight: if
+            // a user is genuinely holding the bar at top through repeated
+            // library resets, they must eventually win rather than being
+            // fought forever.
+            int zeroReassert = 0;
+
             bool GuardTick(GameTime gameTime)
             {
                 if (capturedGeneration != _scrollRestoreGeneration ||
@@ -444,6 +475,31 @@ namespace GW2CraftingHelper.Views
                             scrollbar.ScrollDistance = target;
                             Logger.Info("[M30#1] ScrollGuard reassert gen={0} frame={1} was={2:F4} target={3:F4} contentH={4}",
                                 capturedGeneration, totalFrames, current, target, contentHeight);
+                        }
+
+                        remaining = ScrollGuardWindowFrames;
+                    }
+                    else if (current <= 0.0005f && target > 0.01f)
+                    {
+                        // Height stable but the scrollbar reads exactly
+                        // zero while our target sits well above it: Blish's
+                        // Panel reset the scrollbar to top on a layout pass
+                        // that landed between two of our real frames (see
+                        // the fingerprint comment in RestoreScrollOffset).
+                        // Contest it like a height-change reset, but cap
+                        // the back-and-forth via zeroReassert - a user
+                        // genuinely holding the bar at top must eventually
+                        // win.
+                        scrollbar.ScrollDistance = target;
+                        zeroReassert++;
+                        Logger.Info("[M30#1] ScrollGuard reassert gen={0} frame={1} was={2:F4} target={3:F4} contentH={4}",
+                            capturedGeneration, totalFrames, current, target, contentHeight);
+
+                        if (zeroReassert > 4)
+                        {
+                            Logger.Info("[M30#1] ScrollGuard end gen={0} frames={1} reason=user-top",
+                                capturedGeneration, totalFrames);
+                            return false;
                         }
 
                         remaining = ScrollGuardWindowFrames;
