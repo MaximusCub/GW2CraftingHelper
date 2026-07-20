@@ -107,6 +107,12 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
 
+            // Vendor offers can charge ITEMS that appear nowhere in the
+            // recipe tree (e.g. Gift of Glory costs 250x Shard of Glory).
+            // Without their prices the solver silently skips the offer as
+            // unpriceable, so fetch the missing cost-item prices and merge.
+            prices = await AugmentWithVendorCostPricesAsync(prices, vendorOffers, ct);
+
             // Step 6: Solve
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
@@ -212,6 +218,12 @@ namespace GW2CraftingHelper.Services
             }
             sw.Stop();
             timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
+
+            // Vendor offers can charge ITEMS that appear nowhere in the
+            // recipe tree (e.g. Gift of Glory costs 250x Shard of Glory).
+            // Without their prices the solver silently skips the offer as
+            // unpriceable, so fetch the missing cost-item prices and merge.
+            prices = await AugmentWithVendorCostPricesAsync(prices, vendorOffers, ct);
 
             // Step 6: Inventory reduction
             progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
@@ -350,6 +362,50 @@ namespace GW2CraftingHelper.Services
                 $"Local re-solve with {overrides?.Count ?? 0} override(s)");
 
             return result;
+        }
+
+        /// <summary>
+        /// Fetches TP prices for vendor-offer Item cost lines that are not
+        /// already priced (they are not recipe-tree items, so the main price
+        /// fetch never sees them) and returns a merged price dictionary.
+        /// </summary>
+        private async Task<IReadOnlyDictionary<int, ItemPrice>> AugmentWithVendorCostPricesAsync(
+            IReadOnlyDictionary<int, ItemPrice> prices,
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
+            CancellationToken ct)
+        {
+            if (vendorOffers == null)
+            {
+                return prices;
+            }
+
+            var costItemIds = new HashSet<int>();
+            foreach (var offerList in vendorOffers.Values)
+            {
+                foreach (var offer in offerList)
+                {
+                    if (offer.CostLines == null) continue;
+                    foreach (var cost in offer.CostLines)
+                    {
+                        if (string.Equals(cost.Type, "Item", StringComparison.Ordinal) &&
+                            !prices.ContainsKey(cost.Id))
+                        {
+                            costItemIds.Add(cost.Id);
+                        }
+                    }
+                }
+            }
+
+            if (costItemIds.Count == 0)
+            {
+                return prices;
+            }
+
+            var costPrices = await _tradingPostService.GetPricesAsync(costItemIds, ct);
+            var merged = new Dictionary<int, ItemPrice>(prices.Count + costPrices.Count);
+            foreach (var kvp in prices) merged[kvp.Key] = kvp.Value;
+            foreach (var kvp in costPrices) merged[kvp.Key] = kvp.Value;
+            return merged;
         }
 
         /// <summary>

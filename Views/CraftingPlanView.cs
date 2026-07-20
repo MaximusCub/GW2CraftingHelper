@@ -74,6 +74,11 @@ namespace GW2CraftingHelper.Views
         // Resize tracking
         private int _lastRenderedWidth;
 
+        // Bumped by every PreserveScrollAcross call; an in-flight restore
+        // Tick loop compares its captured value against the current one
+        // each frame and bails as soon as a newer restore has superseded it.
+        private int _scrollRestoreGeneration;
+
         public CraftingPlanView(
             Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
@@ -92,6 +97,93 @@ namespace GW2CraftingHelper.Views
             {
                 _statusLabel.Text = status ?? "";
             }
+        }
+
+        // Blish HUD keeps a Panel's Scrollbar in a private field and resets
+        // it to top whenever content height changes; the field is the only
+        // handle that lets us restore the position (VerticalScrollOffset is
+        // overwritten from the scrollbar every frame). Resolved once; if a
+        // future Blish rename removes it we degrade to today's reset-to-top.
+        private static readonly System.Reflection.FieldInfo PanelScrollbarField =
+            typeof(Panel).GetField(
+                "_panelScrollbar",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+
+        /// <summary>
+        /// Runs a layout-mutating action and restores the content panel's
+        /// scroll position afterwards. Nested AutoSize flow panels converge
+        /// height over several frames, so the restore re-asserts each frame
+        /// until the computed ratio stabilizes (max 10 frames).
+        /// </summary>
+        private void PreserveScrollAcross(Action mutate)
+        {
+            int saved = _contentPanel?.VerticalScrollOffset ?? 0;
+            int capturedGeneration = ++_scrollRestoreGeneration;
+            mutate();
+            if (saved > 0)
+            {
+                RestoreScrollOffset(saved, capturedGeneration);
+            }
+        }
+
+        private void RestoreScrollOffset(int savedOffset, int capturedGeneration)
+        {
+            if (_contentPanel == null || PanelScrollbarField == null)
+            {
+                return;
+            }
+
+            var capturedPanel = _contentPanel;
+            int attempts = 0;
+            float lastRatio = -1f;
+
+            void Tick(GameTime _)
+            {
+                // A newer restore superseded this loop, or Build() swapped
+                // in a fresh content panel: stop immediately rather than
+                // fight the current restore or scroll a stale/disposed panel.
+                if (capturedGeneration != _scrollRestoreGeneration || capturedPanel != _contentPanel)
+                {
+                    return;
+                }
+
+                try
+                {
+                    var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
+                    if (scrollbar == null)
+                    {
+                        return;
+                    }
+
+                    int contentHeight = 0;
+                    foreach (var child in capturedPanel.Children)
+                    {
+                        if (child.Visible && child.Bottom > contentHeight)
+                        {
+                            contentHeight = child.Bottom;
+                        }
+                    }
+
+                    float ratio = ScrollMath.RatioForOffset(
+                        savedOffset, contentHeight, capturedPanel.Height);
+                    scrollbar.ScrollDistance = ratio;
+
+                    attempts++;
+                    bool stable = System.Math.Abs(ratio - lastRatio) < 0.0005f;
+                    lastRatio = ratio;
+                    if (attempts < 10 && !stable)
+                    {
+                        GameService.Overlay.QueueMainThreadUpdate(Tick);
+                    }
+                }
+                catch
+                {
+                    // Reflection/layout mismatch: degrade to reset-to-top.
+                }
+            }
+
+            GameService.Overlay.QueueMainThreadUpdate(Tick);
         }
 
         private void OnSelectedItemChanged(int itemId)
@@ -255,7 +347,7 @@ namespace GW2CraftingHelper.Views
             if (_currentPlan != null && w != _lastRenderedWidth)
             {
                 _lastRenderedWidth = w;
-                RenderPlan(_currentPlan);
+                PreserveScrollAcross(() => RenderPlan(_currentPlan));
             }
         }
 
@@ -514,10 +606,13 @@ namespace GW2CraftingHelper.Views
             // Toggle on click
             headerPanel.Click += (_, __) =>
             {
-                contentFlow.Visible = !contentFlow.Visible;
-                _sectionExpansion[section.SectionType] = contentFlow.Visible;
-                headerArrow.Text = contentFlow.Visible ? "\u25BC" : "\u25B6";
-                _contentPanel.Invalidate();
+                PreserveScrollAcross(() =>
+                {
+                    contentFlow.Visible = !contentFlow.Visible;
+                    _sectionExpansion[section.SectionType] = contentFlow.Visible;
+                    headerArrow.Text = contentFlow.Visible ? "\u25BC" : "\u25B6";
+                    _contentPanel.Invalidate();
+                });
             };
         }
 
@@ -621,7 +716,7 @@ namespace GW2CraftingHelper.Views
                 case PlanRowType.ShoppingBuy: prefix = "Buy"; break;
                 case PlanRowType.ShoppingVendor: prefix = "Buy (vendor)"; break;
                 case PlanRowType.ShoppingCurrency: prefix = "Acquire"; break;
-                default: prefix = "???"; break;
+                default: prefix = "Acquire (no known source)"; break;
             }
 
             var textLabel = new Label()
@@ -850,7 +945,7 @@ namespace GW2CraftingHelper.Views
             craftAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.Craft);
             buyAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.BuyFromTp);
 
-            expandAllButton.Click += (_, __) =>
+            expandAllButton.Click += (_, __) => PreserveScrollAcross(() =>
             {
                 // Building children appends to _treeNodeStates; index loop
                 // deliberately walks the growing list.
@@ -871,9 +966,9 @@ namespace GW2CraftingHelper.Views
                     s.ArrowLabel.Text = "\u25BC";
                 }
                 treeFlow.Invalidate();
-            };
+            });
 
-            collapseAllButton.Click += (_, __) =>
+            collapseAllButton.Click += (_, __) => PreserveScrollAcross(() =>
             {
                 foreach (var s in _treeNodeStates)
                 {
@@ -883,7 +978,7 @@ namespace GW2CraftingHelper.Views
                     s.ArrowLabel.Text = "\u25B6";
                 }
                 treeFlow.Invalidate();
-            };
+            });
 
             // Guard uses PRESS-time hover state: with a release-time check,
             // pressing on the header background and releasing over a button
@@ -965,7 +1060,7 @@ namespace GW2CraftingHelper.Views
                 _lastDebugLog = result.DebugLog;
                 var vm = _vmBuilder.Build(result);
                 _currentPlan = vm;
-                RenderPlan(vm);
+                PreserveScrollAcross(() => RenderPlan(vm));
                 SetStatus(_nodeOverrides.Count == 0
                     ? "Best path restored"
                     : $"Decisions updated ({_nodeOverrides.Count} override(s))");
@@ -1081,13 +1176,23 @@ namespace GW2CraftingHelper.Views
             AcquisitionSource? nextSource = GetNextCyclableSource(node);
             if (nextSource.HasValue && _resolveOverridesSync != null)
             {
-                badgePill.BackgroundColor = badgeColor * 0.35f;
+                // Clickable pills carry a cycle glyph, brighter tint, and a
+                // tooltip; locked pills stay plain so the two states are
+                // visually unmistakable.
+                badgeLabel.Text = badgeText + " \u21C4";
+                badgePill.Size = new Point(badgeLabel.Width + 8, badgeLabel.Height + 4);
+                badgePill.BackgroundColor = badgeColor * 0.4f;
                 badgePill.BasicTooltipText = "Click: switch acquisition source";
                 badgePill.Click += (_, __) =>
                 {
                     _nodeOverrides[node.NodeId] = nextSource.Value;
                     ApplyOverridesAndResolve();
                 };
+            }
+            else
+            {
+                badgePill.BackgroundColor = badgeColor * 0.15f;
+                badgePill.BasicTooltipText = "Source is fixed for this item";
             }
 
             // Cost display: inline coin for nodes with SubtreeCost
@@ -1141,19 +1246,22 @@ namespace GW2CraftingHelper.Views
                     {
                         return;
                     }
-                    if (!state.ChildrenBuilt)
+                    PreserveScrollAcross(() =>
                     {
-                        foreach (var child in state.Node.Children)
+                        if (!state.ChildrenBuilt)
                         {
-                            RenderTreeNode(child, state.ChildContainer, state.PanelWidth, state.Depth + 1);
+                            foreach (var child in state.Node.Children)
+                            {
+                                RenderTreeNode(child, state.ChildContainer, state.PanelWidth, state.Depth + 1);
+                            }
+                            state.ChildrenBuilt = true;
                         }
-                        state.ChildrenBuilt = true;
-                    }
-                    state.IsExpanded = !state.IsExpanded;
-                    _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
-                    state.ChildContainer.Visible = state.IsExpanded;
-                    state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
-                    state.ChildContainer.Parent.Invalidate();
+                        state.IsExpanded = !state.IsExpanded;
+                        _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
+                        state.ChildContainer.Visible = state.IsExpanded;
+                        state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
+                        state.ChildContainer.Parent.Invalidate();
+                    });
                 };
                 rowPanel.Click += toggleHandler;
             }
@@ -1312,21 +1420,25 @@ namespace GW2CraftingHelper.Views
 
         private static void CreateItemIcon(Panel parent, string iconUrl, int x, int y)
         {
-            AsyncTexture2D icon;
+            // Missing icon: render a neutral empty-slot square, not the
+            // alarming red error texture - a data gap is not a failure.
             if (string.IsNullOrEmpty(iconUrl))
             {
-                icon = new AsyncTexture2D(ContentService.Textures.Error);
-            }
-            else
-            {
-                icon = GameService.Content.GetRenderServiceTexture(iconUrl);
+                new Panel()
+                {
+                    Size = new Point(32, 32),
+                    Location = new Point(x, y),
+                    BackgroundColor = new Color(45, 45, 45),
+                    Parent = parent
+                };
+                return;
             }
 
             new Panel()
             {
                 Size = new Point(32, 32),
                 Location = new Point(x, y),
-                BackgroundTexture = icon,
+                BackgroundTexture = GameService.Content.GetRenderServiceTexture(iconUrl),
                 Parent = parent
             };
         }

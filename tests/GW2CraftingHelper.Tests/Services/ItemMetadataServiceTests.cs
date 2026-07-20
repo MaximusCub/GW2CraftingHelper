@@ -25,6 +25,90 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task TransientPartialResponse_RetriedOnce()
+        {
+            var api = new InMemoryItemApiClient();
+            api.AddItem(1, "A", "a.png");
+            api.AddItem(2, "B", "b.png");
+            api.DropOnce.Add(2);
+            var svc = new ItemMetadataService(api);
+
+            var result = await svc.GetMetadataAsync(new[] { 1, 2 }, CancellationToken.None);
+
+            // Second request healed the dropped id
+            Assert.True(result.ContainsKey(2));
+            Assert.Equal("B", result[2].Name);
+            Assert.Equal(2, api.Calls.Count);
+        }
+
+        [Fact]
+        public async Task SeedFallback_UsedForMissingIds_AndMissesNegativeCached()
+        {
+            var api = new InMemoryItemApiClient();
+            api.AddItem(1, "Api Name", "api.png", "Exotic");
+            var seed = new GW2CraftingHelper.Services.Recipes.ItemNameSeedData(
+                new List<GW2CraftingHelper.Services.Recipes.ItemNameEntry>
+                {
+                    new GW2CraftingHelper.Services.Recipes.ItemNameEntry
+                    {
+                        Id = 2, Name = "Seed Name", Icon = "seed.png"
+                    }
+                });
+            var svc = new ItemMetadataService(api, seed);
+
+            var first = await svc.GetMetadataAsync(new[] { 1, 2 }, CancellationToken.None);
+
+            Assert.Equal("Api Name", first[1].Name);
+            Assert.Equal("Seed Name", first[2].Name);
+            Assert.Equal("seed.png", first[2].IconUrl);
+            Assert.Null(first[2].Rarity);
+
+            int callsAfterFirst = api.Calls.Count;
+
+            // Item 2 is now negative-cached as genuinely missing: even
+            // though the API "recovers", the service must not pay another
+            // round trip for it within this session - it keeps serving the
+            // seed fallback and issues zero additional API calls.
+            api.AddItem(2, "Api Late", "late.png", "Rare");
+            var second = await svc.GetMetadataAsync(new[] { 2 }, CancellationToken.None);
+            Assert.Equal("Seed Name", second[2].Name);
+            Assert.Equal(callsAfterFirst, api.Calls.Count);
+        }
+
+        [Fact]
+        public async Task KnownMissingId_SecondCall_PerformsZeroAdditionalApiCalls()
+        {
+            var api = new InMemoryItemApiClient();
+            var svc = new ItemMetadataService(api);
+
+            await svc.GetMetadataAsync(new[] { 99999 }, CancellationToken.None);
+            int callsAfterFirst = api.Calls.Count;
+
+            await svc.GetMetadataAsync(new[] { 99999 }, CancellationToken.None);
+
+            Assert.Equal(callsAfterFirst, api.Calls.Count);
+        }
+
+        [Fact]
+        public async Task RetryWaveFailure_DegradesToPartialResult_DoesNotThrow()
+        {
+            var api = new InMemoryItemApiClient();
+            api.AddItem(1, "A", "a.png");
+            api.AddItem(2, "B", "b.png");
+            api.DropOnce.Add(2);
+            // Call 1 is the first wave (drops id 2); call 2 is the retry
+            // wave for the straggler - make it fail transiently.
+            api.ThrowOnCallNumber = 2;
+            var svc = new ItemMetadataService(api);
+
+            var result = await svc.GetMetadataAsync(new[] { 1, 2 }, CancellationToken.None);
+
+            Assert.True(result.ContainsKey(1));
+            Assert.Equal("A", result[1].Name);
+            Assert.False(result.ContainsKey(2));
+        }
+
+        [Fact]
         public async Task Rarity_FlowsThroughFromApi()
         {
             var api = new InMemoryItemApiClient();

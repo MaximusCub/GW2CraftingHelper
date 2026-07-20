@@ -24,6 +24,20 @@ namespace GW2CraftingHelper.Services
         public static IItemSearchProvider Create(
             Stream seedStream, out string fallbackReason)
         {
+            return Create(seedStream, out fallbackReason, out _);
+        }
+
+        /// <summary>
+        /// Overload that also exposes the parsed seed data so other services
+        /// (e.g. metadata fallback) can reuse it without re-reading the file.
+        /// <paramref name="seedData"/> is null when the fallback provider is
+        /// returned.
+        /// </summary>
+        public static IItemSearchProvider Create(
+            Stream seedStream, out string fallbackReason, out ItemNameSeedData seedData)
+        {
+            seedData = null;
+
             if (seedStream == null)
             {
                 fallbackReason = "seed stream is null";
@@ -32,16 +46,17 @@ namespace GW2CraftingHelper.Services
 
             try
             {
-                var seedData = ItemNameSeedData.Load(seedStream);
+                var loaded = ItemNameSeedData.Load(seedStream);
 
-                if (seedData.Items.Count == 0)
+                if (loaded.Items.Count == 0)
                 {
                     fallbackReason = "seed data contains no items";
                     return new StaticItemSearchProvider();
                 }
 
                 fallbackReason = null;
-                return new CraftableItemSearchProvider(seedData);
+                seedData = loaded;
+                return new CraftableItemSearchProvider(loaded);
             }
             catch (Exception ex)
             {

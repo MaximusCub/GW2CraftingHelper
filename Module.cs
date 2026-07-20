@@ -137,13 +137,15 @@ namespace GW2CraftingHelper
                 // No manifest - staleness detection disabled
             }
 
-            // Item name seed for search provider
+            // Item name seed for search provider; the parsed seed is also
+            // reused as the metadata fallback for ids the live API drops.
+            ItemNameSeedData itemNameSeed = null;
             try
             {
                 using (var nameStream = ContentsManager.GetFileStream("item_name_seed.json"))
                 {
                     _itemSearchProvider = ItemSearchProviderFactory.Create(
-                        nameStream, out string fallbackReason);
+                        nameStream, out string fallbackReason, out itemNameSeed);
                     if (fallbackReason != null)
                     {
                         Logger.Info("Item search fallback to static provider: {0}", fallbackReason);
@@ -180,7 +182,7 @@ namespace GW2CraftingHelper
                 new RecipeService(recipeApi, cacheStore: recipeCacheStore),
                 new TradingPostService(priceApi),
                 new PlanSolver(),
-                new ItemMetadataService(itemApi),
+                new ItemMetadataService(itemApi, itemNameSeed),
                 _vendorOfferStore,
                 resolver: null,
                 reducer: new InventoryReducer(),
