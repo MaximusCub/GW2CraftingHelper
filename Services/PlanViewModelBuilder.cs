@@ -89,7 +89,7 @@ namespace GW2CraftingHelper.Services
             var section = new PlanSectionViewModel
             {
                 SectionType = PlanSectionType.Summary,
-                Title = "Summary",
+                Title = "Total Cost",
                 IsDefaultExpanded = true
             };
 

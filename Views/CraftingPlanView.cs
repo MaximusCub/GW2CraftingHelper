@@ -655,10 +655,14 @@ namespace GW2CraftingHelper.Views
 
             // The arrow gets its own label in the default font: DefaultFont18
             // has no glyph for the triangle characters, so an arrow embedded
-            // in the title never rendered.
+            // in the title never rendered. Explicit White TextColor matters
+            // here - Label's default text color reads as near-black against
+            // this dark theme (confirmed via the screenshot loop), which is
+            // why the tree row carets already set it explicitly.
             var headerArrow = new Label()
             {
                 Text = expanded ? "\u25BC" : "\u25B6",
+                TextColor = Color.White,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(4, 8),
