@@ -653,19 +653,24 @@ namespace GW2CraftingHelper.Views
             headerPanel.MouseEntered += (_, __) => headerPanel.BackgroundColor = Color.White * 0.05f;
             headerPanel.MouseLeft += (_, __) => headerPanel.BackgroundColor = Color.Transparent;
 
-            // The arrow gets its own label in the default font: DefaultFont18
-            // has no glyph for the triangle characters, so an arrow embedded
-            // in the title never rendered. Explicit White TextColor matters
-            // here - Label's default text color reads as near-black against
-            // this dark theme (confirmed via the screenshot loop), which is
-            // why the tree row carets already set it explicitly.
+            // ASCII "v"/">" rather than the U+25BC/U+25B6 triangle glyphs used
+            // by the tree's own node carets: confirmed via the screenshot loop
+            // that the triangle glyphs silently fail to render specifically
+            // for a Label parented directly under a fresh section-header Panel
+            // (tried explicit White/Red TextColor and DefaultFont14/18 - the
+            // triangle never appeared in any combination, while an ASCII
+            // character in the same Label at the same position renders fine,
+            // and the tree's own carets - built later in the same render
+            // pass, in a different parent chain - render the triangle glyphs
+            // correctly). Root cause not identified; ASCII sidesteps it and
+            // keeps the caret legible either way.
             var headerArrow = new Label()
             {
-                Text = expanded ? "\u25BC" : "\u25B6",
+                Text = expanded ? "v" : ">",
                 TextColor = Color.White,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(4, 8),
+                Location = new Point(4, 6),
                 Parent = headerPanel
             };
 
@@ -707,7 +712,7 @@ namespace GW2CraftingHelper.Views
                 {
                     contentFlow.Visible = !contentFlow.Visible;
                     _sectionExpansion[sectionKey] = contentFlow.Visible;
-                    headerArrow.Text = contentFlow.Visible ? "\u25BC" : "\u25B6";
+                    headerArrow.Text = contentFlow.Visible ? "v" : ">";
                     _contentPanel.Invalidate();
                 });
             };
