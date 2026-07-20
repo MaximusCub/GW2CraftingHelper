@@ -1,5 +1,6 @@
 using Blish_HUD;
 using Blish_HUD.Content;
+using MonoGame.Extended.BitmapFonts;
 using Blish_HUD.Controls;
 using Blish_HUD.Input;
 using GW2CraftingHelper.Contracts;
@@ -454,25 +455,90 @@ namespace GW2CraftingHelper.Views
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
 
-            // Plan header: fixed-height container with vertically centered icon + title
-            const int headerHeight = 56;
+            CreatePlanHeader(vm, panelWidth);
+
+            // Separator under header
+            new Panel()
+            {
+                Size = new Point(panelWidth, 2),
+                BackgroundColor = new Color(180, 180, 180),
+                Parent = _contentPanel
+            };
+
+            // Section order mirrors gw2efficiency's calculator page: total
+            // cost breakdown, then the recipe tree, then everything else in
+            // the builder's emission order (used materials, shopping list,
+            // required disciplines, required recipes, crafting steps). The
+            // tree lives outside vm.Sections (it renders from vm.TreeRoot),
+            // so it is positioned explicitly between the two loops below.
+            PlanSectionViewModel summarySection = null;
+            foreach (var section in vm.Sections)
+            {
+                if (section.SectionType == PlanSectionType.Summary)
+                {
+                    summarySection = section;
+                    break;
+                }
+            }
+            if (summarySection != null)
+            {
+                CreateCollapsibleSection(summarySection, panelWidth);
+            }
+
+            if (vm.TreeRoot != null)
+            {
+                CreateTreeSection(vm.TreeRoot, panelWidth);
+            }
+
+            foreach (var section in vm.Sections)
+            {
+                if (section.SectionType == PlanSectionType.Summary) continue;
+                CreateCollapsibleSection(section, panelWidth);
+            }
+        }
+
+        /// <summary>
+        /// Plan header: rarity-framed item icon + two-tone title ("Crafting
+        /// Plan for " in white, item name in its rarity color) + grey
+        /// quantity, centered as a unit; timestamp right-aligned below.
+        /// Mirrors gw2e's centered .tooltip-item + name header block.
+        /// </summary>
+        private void CreatePlanHeader(PlanViewModel vm, int panelWidth)
+        {
+            const int headerHeight = 60;
             const int headerTopPad = 10;
             const int headerBottomPad = 4;
-            const int iconSize = 32;
+            const int iconSize = 40;
+            const int iconBorder = 2;
             const int iconPad = 8;
 
-            var titleFont = GameService.Content.DefaultFont18;
-            string titleText = $"{vm.TargetItemName} Crafting Plan";
-            var measured = titleFont.MeasureString(titleText);
-            int textWidth = (int)System.Math.Ceiling(measured.Width);
-            int textHeight = (int)System.Math.Ceiling(measured.Height);
+            int frameSize = iconSize + iconBorder * 2;
 
-            int totalTitleWidth = iconSize + iconPad + textWidth;
+            var titleFont = GameService.Content.DefaultFont18;
+            var qtyFont = GameService.Content.DefaultFont16;
+
+            string prefixText = "Crafting Plan for ";
+            string nameText = vm.TargetItemName ?? "Unknown Item";
+            string qtyText = vm.TargetQuantity > 1 ? $" x {vm.TargetQuantity}" : "";
+
+            var prefixMeasure = titleFont.MeasureString(prefixText);
+            var nameMeasure = titleFont.MeasureString(nameText);
+            int prefixWidth = (int)System.Math.Ceiling(prefixMeasure.Width);
+            int nameWidth = (int)System.Math.Ceiling(nameMeasure.Width);
+            int textHeight = (int)System.Math.Ceiling(prefixMeasure.Height);
+
+            int qtyWidth = 0;
+            if (qtyText.Length > 0)
+            {
+                qtyWidth = (int)System.Math.Ceiling(qtyFont.MeasureString(qtyText).Width);
+            }
+
+            int totalTitleWidth = frameSize + iconPad + prefixWidth + nameWidth + qtyWidth;
             int startX = System.Math.Max(0, (panelWidth - totalTitleWidth) / 2);
             int centerRegion = headerHeight - headerTopPad - headerBottomPad;
-            int iconY = headerTopPad + (centerRegion - iconSize) / 2;
+            int iconY = headerTopPad + (centerRegion - frameSize) / 2;
             // Anchor text to icon's visual center with -2px optical nudge for descenders
-            int textY = iconY + (iconSize - textHeight) / 2 - 2;
+            int textY = iconY + (frameSize - textHeight) / 2 - 2;
 
             var titlePanel = new Panel()
             {
@@ -480,34 +546,50 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            // Target item icon
-            AsyncTexture2D titleIcon;
-            if (!string.IsNullOrEmpty(vm.TargetIconUrl))
-            {
-                titleIcon = GameService.Content.GetRenderServiceTexture(vm.TargetIconUrl);
-            }
-            else
-            {
-                titleIcon = new AsyncTexture2D(ContentService.Textures.Error);
-            }
+            CreateRarityFramedIcon(
+                titlePanel, vm.TargetIconUrl, vm.TargetRarity, startX, iconY,
+                iconSize: iconSize, borderThickness: iconBorder);
 
-            new Panel()
-            {
-                Size = new Point(iconSize, iconSize),
-                Location = new Point(startX, iconY),
-                BackgroundTexture = titleIcon,
-                Parent = titlePanel
-            };
-
+            int textX = startX + frameSize + iconPad;
             new Label()
             {
-                Text = titleText,
+                Text = prefixText,
                 Font = titleFont,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(startX + iconSize + iconPad, textY),
+                Location = new Point(textX, textY),
                 Parent = titlePanel
             };
+            textX += prefixWidth;
+
+            new Label()
+            {
+                Text = nameText,
+                Font = titleFont,
+                TextColor = GetRarityNameColor(vm.TargetRarity),
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(textX, textY),
+                Parent = titlePanel
+            };
+            textX += nameWidth;
+
+            if (qtyText.Length > 0)
+            {
+                // DefaultFont16 sits a little taller than Font18's cap
+                // height at this weight; +3 keeps its baseline visually
+                // aligned with the name label instead of reading "raised".
+                new Label()
+                {
+                    Text = qtyText,
+                    Font = qtyFont,
+                    TextColor = new Color(170, 170, 170),
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(textX, textY + 3),
+                    Parent = titlePanel
+                };
+            }
 
             // Generated timestamp: right-aligned
             var tsPanel = new Panel()
@@ -530,25 +612,6 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(System.Math.Max(0, panelWidth - tsWidth - 8), 2),
                 Parent = tsPanel
             };
-
-            // Separator under header
-            new Panel()
-            {
-                Size = new Point(panelWidth, 2),
-                BackgroundColor = new Color(180, 180, 180),
-                Parent = _contentPanel
-            };
-
-            foreach (var section in vm.Sections)
-            {
-                CreateCollapsibleSection(section, panelWidth);
-            }
-
-            // Recipe Tree section (if tree data available)
-            if (vm.TreeRoot != null)
-            {
-                CreateTreeSection(vm.TreeRoot, panelWidth);
-            }
         }
 
         private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
@@ -597,10 +660,19 @@ namespace GW2CraftingHelper.Views
                 HeightSizingMode = SizingMode.AutoSize
             };
 
-            // Populate rows
-            foreach (var row in section.Rows)
+            // Populate rows. The Total Cost section renders its CoinTotal
+            // rows as a tile row (gw2e's 5-tile cost-breakdown) instead of
+            // one row per total; everything else uses the generic dispatch.
+            if (section.SectionType == PlanSectionType.Summary)
             {
-                CreateRow(row, contentFlow, panelWidth);
+                CreateSummarySectionBody(section, contentFlow, panelWidth);
+            }
+            else
+            {
+                foreach (var row in section.Rows)
+                {
+                    CreateRow(row, contentFlow, panelWidth);
+                }
             }
 
             // Toggle on click
@@ -620,9 +692,10 @@ namespace GW2CraftingHelper.Views
         {
             switch (row.RowType)
             {
-                case PlanRowType.CoinTotal:
-                    CreateCoinTotalRow(row, parent, panelWidth);
-                    break;
+                // CoinTotal rows only ever appear in the Total Cost section,
+                // which renders them as a tile row via CreateSummarySectionBody
+                // before falling through to this generic dispatch - so this
+                // case is intentionally absent here.
 
                 case PlanRowType.CurrencyCost:
                     CreateTextRow(row.Label, parent, panelWidth);
@@ -653,14 +726,90 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void CreateCoinTotalRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
+        /// <summary>
+        /// gw2e's cost-breakdown: a centered row of equal-width stat tiles,
+        /// one per CoinTotal row (Total, Sell value, Profit/Loss - up to the
+        /// spec's 5 when all are applicable). Non-coin rows (currency costs)
+        /// are handled separately as full-width rows underneath.
+        /// </summary>
+        private static void CreateCostTileRow(List<PlanRowViewModel> coinRows, FlowPanel parent, int panelWidth)
         {
+            int tileCount = coinRows.Count;
+            if (tileCount == 0) return;
+
+            const int rowHeight = 56;
+            const int totalMargin = 40;
+            const int minTileWidth = 80;
+            int tileWidth = System.Math.Max(minTileWidth, (panelWidth - totalMargin) / tileCount);
+            int rowContentWidth = tileWidth * tileCount;
+            int startX = System.Math.Max(0, (panelWidth - rowContentWidth) / 2);
+
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, 28),
+                Size = new Point(panelWidth, rowHeight),
                 Parent = parent
             };
-            BuildCoinDisplay(rowPanel, row.CoinValue, row.Label);
+
+            var captionFont = GameService.Content.DefaultFont12;
+            var amountFont = GameService.Content.DefaultFont16;
+            var captionColor = new Color(153, 153, 153);
+
+            for (int i = 0; i < tileCount; i++)
+            {
+                int tileX = startX + i * tileWidth;
+                var row = coinRows[i];
+
+                string caption = TileCaptionFor(row.Label);
+                int captionWidth = (int)System.Math.Ceiling(captionFont.MeasureString(caption).Width);
+                new Label()
+                {
+                    Text = caption,
+                    Font = captionFont,
+                    TextColor = captionColor,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(tileX + System.Math.Max(0, (tileWidth - captionWidth) / 2), 6),
+                    Parent = rowPanel
+                };
+
+                var segments = BuildCoinSegments(row.CoinValue, amountFont);
+                int segmentsWidth = TotalCoinSegmentsWidth(segments);
+                int coinStartX = tileX + System.Math.Max(0, (tileWidth - segmentsWidth) / 2);
+                LayoutCoinSegments(rowPanel, segments, coinStartX, 30, amountFont);
+            }
+        }
+
+        /// <summary>
+        /// Strips the parenthetical qualifier off a Summary row label
+        /// ("Sell value (5x, after 15% TP fees)" -> "Sell value") so tile
+        /// captions stay short, like gw2e's "Buy price" / "Sell price".
+        /// </summary>
+        private static string TileCaptionFor(string rowLabel)
+        {
+            if (string.IsNullOrEmpty(rowLabel)) return "";
+            int parenIdx = rowLabel.IndexOf('(');
+            return (parenIdx > 0 ? rowLabel.Substring(0, parenIdx) : rowLabel).Trim();
+        }
+
+        private void CreateSummarySectionBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
+        {
+            var coinRows = new List<PlanRowViewModel>();
+            var otherRows = new List<PlanRowViewModel>();
+            foreach (var row in section.Rows)
+            {
+                if (row.RowType == PlanRowType.CoinTotal) coinRows.Add(row);
+                else otherRows.Add(row);
+            }
+
+            if (coinRows.Count > 0)
+            {
+                CreateCostTileRow(coinRows, contentFlow, panelWidth);
+            }
+
+            foreach (var row in otherRows)
+            {
+                CreateRow(row, contentFlow, panelWidth);
+            }
         }
 
         private void CreateTextRow(string text, FlowPanel parent, int panelWidth)
@@ -741,7 +890,8 @@ namespace GW2CraftingHelper.Views
                     Parent = rowPanel
                 };
                 int coinX = 42 + textLabel.Width + dashLabel.Width;
-                BuildInlineCoin(rowPanel, row.CoinValue, coinX);
+                var coinFont = GameService.Content.DefaultFont14;
+                LayoutCoinSegments(rowPanel, BuildCoinSegments(row.CoinValue, coinFont), coinX, 6, coinFont);
             }
         }
 
@@ -1199,7 +1349,8 @@ namespace GW2CraftingHelper.Views
             if (node.SubtreeCost.HasValue && node.SubtreeCost.Value > 0)
             {
                 int costX = badgeX + badgePill.Width + 6;
-                BuildInlineCoin(rowPanel, node.SubtreeCost.Value, costX, 10);
+                var costFont = GameService.Content.DefaultFont14;
+                LayoutCoinSegments(rowPanel, BuildCoinSegments(node.SubtreeCost.Value, costFont), costX, 10, costFont);
             }
 
             // Child container
@@ -1313,42 +1464,59 @@ namespace GW2CraftingHelper.Views
             {
                 case "Junk": return new Color(170, 170, 170);
                 case "Fine": return new Color(98, 164, 218);
-                case "Masterwork": return new Color(26, 147, 6);
+                case "Masterwork": return new Color(45, 197, 14);
                 case "Rare": return new Color(252, 208, 11);
                 case "Exotic": return new Color(255, 164, 5);
                 case "Ascended": return new Color(251, 62, 141);
-                case "Legendary": return new Color(76, 19, 157);
+                case "Legendary": return new Color(160, 46, 247);
                 default: return new Color(60, 60, 60);
             }
         }
 
-        // --- Coin display helpers (reused from original) ---
-
-        private static void BuildCoinDisplay(Panel parent, long copper, string label = "Total")
+        /// <summary>
+        /// GW2's in-game-bright rarity palette for item NAME text on Blish's
+        /// dark background (gw2efficiency's own name-color palette is
+        /// deliberately dimmed for a white page and is illegible here).
+        /// Unknown/absent rarity renders a neutral light grey - never guess.
+        /// </summary>
+        private static Color GetRarityNameColor(string rarity)
         {
-            if (copper < 0) copper = 0;
-
-            long gold = copper / 10000;
-            long silver = (copper % 10000) / 100;
-            long cop = copper % 100;
-
-            int x = 0;
-            var totalLabel = new Label()
+            switch (rarity)
             {
-                Text = "  " + (string.IsNullOrEmpty(label) ? "Total" : label) + ": ",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(8, 4),
-                Parent = parent
-            };
-            x = 8 + totalLabel.Width;
-
-            x = AddCoinSegment(parent, x, 156904, gold.ToString(), 4);
-            x = AddCoinSegment(parent, x, 156907, silver.ToString(), 4);
-            AddCoinSegment(parent, x, 156902, cop.ToString(), 4);
+                case "Junk": return new Color(170, 170, 170);
+                case "Basic": return new Color(255, 255, 255);
+                case "Fine": return new Color(98, 164, 218);
+                case "Masterwork": return new Color(45, 197, 14);
+                case "Rare": return new Color(252, 208, 11);
+                case "Exotic": return new Color(255, 164, 5);
+                case "Ascended": return new Color(251, 62, 141);
+                case "Legendary": return new Color(160, 46, 247);
+                default: return new Color(200, 200, 200);
+            }
         }
 
-        private static void BuildInlineCoin(Panel parent, long copper, int startX, int y = 6)
+        // --- Coin display helpers ---
+        //
+        // gw2e's Coins component renders NumberFormat(gold) -> icon ->
+        // NumberFormat(silver, zero-padded once gold precedes it) -> icon ->
+        // NumberFormat(copper, zero-padded once silver precedes it) -> icon,
+        // omitting leading all-zero units (a sub-1-gold amount starts at
+        // silver, un-padded). Segments are measured up front so the same
+        // spec list can be laid out left-anchored, right-anchored (table
+        // price columns), or centered (cost tiles) without re-measuring.
+
+        private const int CoinIconSize = 20;
+        private const int CoinLabelIconGap = 2;
+        private const int CoinSegmentGap = 6;
+
+        private struct CoinSegmentSpec
+        {
+            public int AssetId;
+            public string Text;
+            public int TextWidth;
+        }
+
+        private static List<CoinSegmentSpec> BuildCoinSegments(long copper, BitmapFont font)
         {
             if (copper < 0) copper = 0;
 
@@ -1356,10 +1524,82 @@ namespace GW2CraftingHelper.Views
             long silver = (copper % 10000) / 100;
             long cop = copper % 100;
 
+            bool showGold = gold > 0;
+            bool showSilver = showGold || silver > 0;
+
+            var segments = new List<CoinSegmentSpec>(3);
+            if (showGold)
+            {
+                AddSegmentSpec(segments, font, 156904, gold.ToString());
+            }
+            if (showSilver)
+            {
+                AddSegmentSpec(segments, font, 156907, showGold ? silver.ToString("D2") : silver.ToString());
+            }
+            // Copper always renders (even "0") so a zero total is never a blank row.
+            AddSegmentSpec(segments, font, 156902, showSilver ? cop.ToString("D2") : cop.ToString());
+            return segments;
+        }
+
+        private static void AddSegmentSpec(List<CoinSegmentSpec> segments, BitmapFont font, int assetId, string text)
+        {
+            int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
+            segments.Add(new CoinSegmentSpec { AssetId = assetId, Text = text, TextWidth = width });
+        }
+
+        private static int TotalCoinSegmentsWidth(List<CoinSegmentSpec> segments)
+        {
+            if (segments.Count == 0) return 0;
+            int width = 0;
+            foreach (var seg in segments)
+            {
+                width += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
+            }
+            return width - CoinSegmentGap;
+        }
+
+        /// <summary>
+        /// Lays out coin segments left-to-right starting at x. alphaScale
+        /// dims the number labels (not the icons - Panel has no tint
+        /// property) for dimmed not-crafted subtree rows.
+        /// </summary>
+        private static void LayoutCoinSegments(
+            Panel parent, List<CoinSegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
+        {
             int x = startX;
-            x = AddCoinSegment(parent, x, 156904, gold.ToString(), y);
-            x = AddCoinSegment(parent, x, 156907, silver.ToString(), y);
-            AddCoinSegment(parent, x, 156902, cop.ToString(), y);
+            foreach (var seg in segments)
+            {
+                Color textColor = GetCoinColor(seg.AssetId);
+                if (alphaScale < 1f) textColor *= alphaScale;
+
+                new Label()
+                {
+                    Text = seg.Text,
+                    Font = font,
+                    TextColor = textColor,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(x, y),
+                    Parent = parent
+                };
+
+                new Panel()
+                {
+                    Size = new Point(CoinIconSize, CoinIconSize),
+                    Location = new Point(x + seg.TextWidth + CoinLabelIconGap, y),
+                    BackgroundTexture = AsyncTexture2D.FromAssetId(seg.AssetId),
+                    Parent = parent
+                };
+
+                x += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
+            }
+        }
+
+        private static void LayoutCoinSegmentsRightAligned(
+            Panel parent, List<CoinSegmentSpec> segments, int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
+        {
+            int startX = rightEdgeX - TotalCoinSegmentsWidth(segments);
+            LayoutCoinSegments(parent, segments, startX, y, font, alphaScale);
         }
 
         private static Color GetCoinColor(int assetId)
@@ -1373,52 +1613,29 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static int AddCoinSegment(Panel parent, int x, int assetId, string value, int y)
-        {
-            const int iconSize = 20;
-            const int gap = 2;
-            const int segmentGap = 6;
-
-            var label = new Label()
-            {
-                Text = value,
-                TextColor = GetCoinColor(assetId),
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(x, y),
-                Parent = parent
-            };
-
-            new Panel()
-            {
-                Size = new Point(iconSize, iconSize),
-                Location = new Point(x + label.Width + gap, y),
-                BackgroundTexture = AsyncTexture2D.FromAssetId(assetId),
-                Parent = parent
-            };
-
-            return x + label.Width + gap + iconSize + segmentGap;
-        }
-
         // --- Icon helper ---
 
         /// <summary>
-        /// 32px item icon inside a 1px rarity-colored frame (34px overall).
+        /// Item icon inside a rarity-colored frame. Defaults to the tree/row
+        /// size (32px icon, 1px border = 34px overall); the plan header uses
+        /// a larger 40px/2px variant (44px overall, gw2e's .tooltip-item).
         /// </summary>
         private static void CreateRarityFramedIcon(
-            Panel parent, string iconUrl, string rarity, int x, int y)
+            Panel parent, string iconUrl, string rarity, int x, int y,
+            int iconSize = 32, int borderThickness = 1)
         {
+            int frameSize = iconSize + borderThickness * 2;
             var frame = new Panel()
             {
-                Size = new Point(34, 34),
+                Size = new Point(frameSize, frameSize),
                 Location = new Point(x, y),
                 BackgroundColor = GetRarityBorderColor(rarity),
                 Parent = parent
             };
-            CreateItemIcon(frame, iconUrl, 1, 1);
+            CreateItemIcon(frame, iconUrl, borderThickness, borderThickness, iconSize);
         }
 
-        private static void CreateItemIcon(Panel parent, string iconUrl, int x, int y)
+        private static void CreateItemIcon(Panel parent, string iconUrl, int x, int y, int size = 32)
         {
             // Missing icon: render a neutral empty-slot square, not the
             // alarming red error texture - a data gap is not a failure.
@@ -1426,7 +1643,7 @@ namespace GW2CraftingHelper.Views
             {
                 new Panel()
                 {
-                    Size = new Point(32, 32),
+                    Size = new Point(size, size),
                     Location = new Point(x, y),
                     BackgroundColor = new Color(45, 45, 45),
                     Parent = parent
@@ -1436,7 +1653,7 @@ namespace GW2CraftingHelper.Views
 
             new Panel()
             {
-                Size = new Point(32, 32),
+                Size = new Point(size, size),
                 Location = new Point(x, y),
                 BackgroundTexture = GameService.Content.GetRenderServiceTexture(iconUrl),
                 Parent = parent
