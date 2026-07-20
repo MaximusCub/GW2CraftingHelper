@@ -97,6 +97,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(5, node.Quantity);
             Assert.Equal(CraftingDecision.BuyFromTp, node.Decision);
             Assert.Empty(node.Children);
+            Assert.False(node.IsReferenceBranch); // no recipe to build a reference branch from
             Assert.Equal(100, node.UnitCost);
             Assert.Equal(500, node.SubtreeCost);
         }
@@ -143,6 +144,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(10, node.RecipeId);
             Assert.Null(node.UnitCost); // Craft nodes have no unit cost
             Assert.Equal(200, node.SubtreeCost);
+            Assert.False(node.IsReferenceBranch); // real craft, not a reference branch
             Assert.Single(node.Children);
 
             var child = node.Children[0];
@@ -152,7 +154,127 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(CraftingDecision.BuyFromTp, child.Decision);
             Assert.Equal(100, child.UnitCost);
             Assert.Equal(200, child.SubtreeCost);
+            Assert.False(child.IsReferenceBranch); // no recipe to build a reference branch from
             Assert.Empty(child.Children);
+        }
+
+        /// <summary>
+        /// Item 2 could be crafted from item 3 (Option 20), but buying it
+        /// directly is cheaper, so the solver buys it - Item 2 gets a
+        /// reference branch built from Option 20. Item 3 itself could ALSO
+        /// be crafted from item 4 (Option 30), and buying it is also
+        /// cheaper - but item 3 only exists here as part of item 2's
+        /// reference branch, so it must NOT sprout its own nested reference
+        /// branch (capped to at most one reference branch per root-to-leaf
+        /// path; see CraftingTreeBuilder.BuildNode's insideReferenceBranch
+        /// comment - an earlier, uncapped version of this recursion hung
+        /// for 60+ seconds building a real Deldrimor Steel Ingot plan).
+        /// </summary>
+        [Fact]
+        public void BoughtNode_WithRecipe_GetsReferenceChildren_CappedAtOneLevel()
+        {
+            var tree = Craftable(2, 5,
+                Option(20, 1, 1,
+                    Craftable(3, 1,
+                        Option(30, 1, 1,
+                            Leaf(4, 2)))));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 5 } },       // buy: 5 * 5 = 25
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } },      // buy: 1 * 50 = 50
+                { 4, new ItemPrice { ItemId = 4, BuyInstant = 1000 } }     // craft(3) via 4: 2 * 1000 = 2000
+            };
+            var metadata = Meta(
+                (2, "Bought Item", "b.png"),
+                (3, "Also Bought", "a.png"),
+                (4, "Raw", "r.png"));
+
+            var root = BuildViaRealSolver(tree, prices, metadata);
+
+            // Item 2: bought (25 < craft-via-3's 50), reference branch built
+            // from Option 20 even though nothing here was crafted.
+            Assert.Equal(CraftingDecision.BuyFromTp, root.Decision);
+            Assert.True(root.IsReferenceBranch);
+            Assert.Equal(25, root.SubtreeCost);
+            Assert.Single(root.Children);
+
+            // Item 3: also independently bought (50 < craft-via-4's 2000)
+            // and also has a recipe, but it appears INSIDE item 2's
+            // reference branch - it must render as a plain leaf, not start
+            // its own nested reference branch.
+            var refChild = root.Children[0];
+            Assert.Equal(3, refChild.ItemId);
+            Assert.Equal(CraftingDecision.BuyFromTp, refChild.Decision);
+            Assert.False(refChild.IsReferenceBranch);
+            Assert.Equal(50, refChild.SubtreeCost);
+            Assert.Empty(refChild.Children);
+        }
+
+        /// <summary>
+        /// Regression test for the exact bug class that caused a real hang:
+        /// an initial fix reset the "inside a reference branch" state to
+        /// false on every Craft step, so a chain that alternates
+        /// buy-with-a-recipe -> craft -> buy-with-a-recipe (extremely common
+        /// in real GW2 crafting data) kept restarting new reference
+        /// branches forever. Item 2 is bought but has a recipe (reference
+        /// branch starts). Its reference child, item 3, is independently
+        /// CRAFTED (cheaper to craft than buy) - the craft step must
+        /// propagate "inside a reference branch" rather than clearing it.
+        /// Item 3's own ingredient, item 5, is bought but ALSO has a recipe
+        /// - if the cap did not propagate through the craft step, item 5
+        /// would incorrectly sprout its own reference branch.
+        /// </summary>
+        [Fact]
+        public void ReferenceBranch_StaysSuppressed_AcrossAnInterveningCraftDecision()
+        {
+            var tree = Craftable(2, 5,
+                Option(20, 1, 1,
+                    Craftable(3, 1,
+                        Option(30, 1, 1,
+                            Craftable(5, 1,
+                                Option(40, 1, 1,
+                                    Leaf(6, 1)))))));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 1 } },     // buy: 5 * 1 = 5
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 200 } },   // buy: 1 * 200 = 200 (craft via 5 is cheaper: 20)
+                { 5, new ItemPrice { ItemId = 5, BuyInstant = 20 } },    // buy: 1 * 20 = 20 (craft via 6 is far pricier: 1000)
+                { 6, new ItemPrice { ItemId = 6, BuyInstant = 1000 } }   // buy: 1 * 1000 = 1000
+            };
+            var metadata = Meta(
+                (2, "Root Bought", "r.png"),
+                (3, "Mid Crafted", "m.png"),
+                (5, "Inner Bought", "i.png"),
+                (6, "Raw", "raw.png"));
+
+            var root = BuildViaRealSolver(tree, prices, metadata);
+
+            // Item 2: bought (5 < craft-via-3's 20) - reference branch starts.
+            Assert.Equal(CraftingDecision.BuyFromTp, root.Decision);
+            Assert.True(root.IsReferenceBranch);
+            Assert.Single(root.Children);
+
+            // Item 3: independently CRAFTED (20 < buy's 200) - reached only
+            // via item 2's reference branch, so it is hypothetical content,
+            // not a real crafting step, even though its own Decision is
+            // Craft. Craft nodes are never themselves flagged as reference
+            // branches (only bought-with-a-recipe nodes are), but the
+            // suppression must still propagate to ITS children.
+            var craftedInsideRef = root.Children[0];
+            Assert.Equal(3, craftedInsideRef.ItemId);
+            Assert.Equal(CraftingDecision.Craft, craftedInsideRef.Decision);
+            Assert.False(craftedInsideRef.IsReferenceBranch);
+            Assert.Single(craftedInsideRef.Children);
+
+            // Item 5: bought (20 < craft-via-6's 1000) and has its own
+            // recipe - the exact shape that starts a reference branch when
+            // NOT already inside one. Reached here through the craft step
+            // above, so it must stay suppressed: plain leaf, no children.
+            var innerBought = craftedInsideRef.Children[0];
+            Assert.Equal(5, innerBought.ItemId);
+            Assert.Equal(CraftingDecision.BuyFromTp, innerBought.Decision);
+            Assert.False(innerBought.IsReferenceBranch);
+            Assert.Empty(innerBought.Children);
         }
 
         [Fact]
@@ -169,6 +291,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(CraftingDecision.Have, treeNode.Decision);
             Assert.Equal(0, treeNode.Quantity);
+            Assert.False(treeNode.IsReferenceBranch);
             Assert.Empty(treeNode.Children);
         }
 
@@ -186,6 +309,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(CraftingDecision.Currency, treeNode.Decision);
             Assert.Equal(23, treeNode.ItemId);
             Assert.Equal(100, treeNode.Quantity);
+            Assert.False(treeNode.IsReferenceBranch);
             Assert.Empty(treeNode.Children);
         }
 

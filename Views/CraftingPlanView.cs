@@ -654,16 +654,15 @@ namespace GW2CraftingHelper.Views
             headerPanel.MouseLeft += (_, __) => headerPanel.BackgroundColor = Color.Transparent;
 
             // ASCII "v"/">" rather than the U+25BC/U+25B6 triangle glyphs used
-            // by the tree's own node carets: confirmed via the screenshot loop
-            // that the triangle glyphs silently fail to render specifically
-            // for a Label parented directly under a fresh section-header Panel
-            // (tried explicit White/Red TextColor and DefaultFont14/18 - the
-            // triangle never appeared in any combination, while an ASCII
-            // character in the same Label at the same position renders fine,
-            // and the tree's own carets - built later in the same render
-            // pass, in a different parent chain - render the triangle glyphs
-            // correctly). Root cause not identified; ASCII sidesteps it and
-            // keeps the caret legible either way.
+            // by the tree's own node carets. Re-attempted during the M24
+            // adversarial-review pass on the theory that a separate
+            // default-font Label (the tree's own pattern) would render the
+            // triangle correctly here too; a pixel-level scan of a fresh
+            // screenshot showed the triangle failing to render for BOTH the
+            // section header AND, in that same session, the tree's own row
+            // caret (previously "confirmed working") - so the premise that
+            // motivated re-attempting Unicode did not hold this time either,
+            // and ASCII remains the only glyph confirmed to render here.
             var headerArrow = new Label()
             {
                 Text = expanded ? "v" : ">",
@@ -902,6 +901,16 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        // Reserved right-aligned price columns for the shopping list's Each
+        // and Total prices: both anchor to a fixed right edge and grow
+        // LEFTWARD, so a gold-value amount in either column can never grow
+        // into the other's space. Previously "Each" was left-aligned at a
+        // fixed start x with no bound on its right edge, sharing an
+        // effectively unbounded budget with "Total" - the two overlapped
+        // for routine gold-value rows.
+        private const int ShoppingColTotalWidth = 150;
+        private const int ShoppingColGap = 12;
+
         private static void CreateShoppingListHeaderRow(FlowPanel parent, int panelWidth)
         {
             var rowPanel = new Panel() { Size = new Point(panelWidth, 22), Parent = parent };
@@ -909,8 +918,8 @@ namespace GW2CraftingHelper.Views
             var color = new Color(153, 153, 153);
 
             int qtyRightEdge = panelWidth - 260;
-            int unitColX = panelWidth - 240;
             int totalRightEdge = panelWidth - 8;
+            int eachRightEdge = totalRightEdge - ShoppingColTotalWidth - ShoppingColGap;
 
             new Label()
             {
@@ -919,12 +928,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(50, 4), Parent = rowPanel
             };
             CreateRightAlignedLabel(rowPanel, "Amount", font, color, qtyRightEdge, 4);
-            new Label()
-            {
-                Text = "Each", Font = font, TextColor = color,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(unitColX, 4), Parent = rowPanel
-            };
+            CreateRightAlignedLabel(rowPanel, "Each", font, color, eachRightEdge, 4);
             CreateRightAlignedLabel(rowPanel, "Total", font, color, totalRightEdge, 4);
         }
 
@@ -948,8 +952,8 @@ namespace GW2CraftingHelper.Views
 
             const int nameX = 50;
             int qtyRightEdge = panelWidth - 260;
-            int unitColX = panelWidth - 240;
             int totalRightEdge = panelWidth - 8;
+            int eachRightEdge = totalRightEdge - ShoppingColTotalWidth - ShoppingColGap;
             var font = GameService.Content.DefaultFont14;
 
             string qtyText = $"{row.Quantity}x";
@@ -992,7 +996,7 @@ namespace GW2CraftingHelper.Views
 
             if (row.UnitCoinValue > 0)
             {
-                LayoutCoinSegments(rowPanel, BuildCoinSegments(row.UnitCoinValue, font), unitColX, 9, font);
+                LayoutCoinSegmentsRightAligned(rowPanel, BuildCoinSegments(row.UnitCoinValue, font), eachRightEdge, 9, font);
             }
             if (row.CoinValue > 0)
             {
@@ -1512,9 +1516,14 @@ namespace GW2CraftingHelper.Views
             // Caret column: fixed width even for leaf rows (no children ->
             // no glyph, but the icon column still starts at the same x as
             // every sibling), so caret state is scannable at a glance.
+            // Reference-branch nodes (dimmed - see the childDimmed comment
+            // below) always start collapsed regardless of depth, so a bought
+            // node's "what it would cost to craft instead" subtree does not
+            // visually explode the plan the moment its parent expands.
+            // Non-reference nodes keep the existing depth<2 default.
             bool isExpanded = _nodeExpansion.TryGetValue(node.NodeId, out bool userExpanded)
                 ? userExpanded
-                : depth < 2;
+                : (!dimmed && depth < 2);
             Label arrowLabel = null;
             if (hasChildren)
             {
@@ -1939,12 +1948,18 @@ namespace GW2CraftingHelper.Views
             switch (rarity)
             {
                 case "Junk": return new Color(170, 170, 170);
+                // Deliberately NOT white: a white border reads as borderless
+                // next to the tinted frames around it (this row's icon frame
+                // in particular sits beside Fine/Rare/etc. frames that are
+                // clearly colored). Distinct from the (60, 60, 60)
+                // unknown/absent-rarity fallback below - M19 design intent.
+                case "Basic": return new Color(90, 90, 90);
                 case "Fine": return new Color(98, 164, 218);
-                case "Masterwork": return new Color(45, 197, 14);
+                case "Masterwork": return new Color(26, 147, 6);
                 case "Rare": return new Color(252, 208, 11);
                 case "Exotic": return new Color(255, 164, 5);
                 case "Ascended": return new Color(251, 62, 141);
-                case "Legendary": return new Color(160, 46, 247);
+                case "Legendary": return new Color(76, 19, 157);
                 default: return new Color(60, 60, 60);
             }
         }
@@ -1962,11 +1977,11 @@ namespace GW2CraftingHelper.Views
                 case "Junk": return new Color(170, 170, 170);
                 case "Basic": return new Color(255, 255, 255);
                 case "Fine": return new Color(98, 164, 218);
-                case "Masterwork": return new Color(45, 197, 14);
+                case "Masterwork": return new Color(26, 147, 6);
                 case "Rare": return new Color(252, 208, 11);
                 case "Exotic": return new Color(255, 164, 5);
                 case "Ascended": return new Color(251, 62, 141);
-                case "Legendary": return new Color(160, 46, 247);
+                case "Legendary": return new Color(76, 19, 157);
                 default: return new Color(200, 200, 200);
             }
         }
