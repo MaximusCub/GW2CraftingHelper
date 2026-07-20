@@ -248,7 +248,17 @@ namespace GW2CraftingHelper.Views
 
         private void SaveValuations()
         {
+            // Seeded from the currently-persisted valuation (not empty) so
+            // an invalid row is left untouched below rather than silently
+            // dropped: the status label tells the user invalid entries are
+            // "not saved", which must mean unchanged, not cleared. Only a
+            // row the user deliberately blanks is removed.
             var entries = new Dictionary<int, long>();
+            foreach (var kvp in _settings.GetCurrencyValuation().CopperPerUnit)
+            {
+                entries[kvp.Key] = kvp.Value;
+            }
+
             int invalidCount = 0;
 
             foreach (var row in _rows)
@@ -260,6 +270,7 @@ namespace GW2CraftingHelper.Views
                 {
                     // Blank box = unset; the currency is simply excluded
                     // from the saved valuation, not an error.
+                    entries.Remove(row.CurrencyId);
                     continue;
                 }
 
@@ -269,6 +280,9 @@ namespace GW2CraftingHelper.Views
                 }
                 else
                 {
+                    // Left out of this row's changes entirely - whatever
+                    // was previously persisted for this currency (if
+                    // anything) is preserved, matching "not saved" below.
                     row.ErrorLabel.Text = "Must be a positive whole number";
                     invalidCount++;
                 }
@@ -280,7 +294,8 @@ namespace GW2CraftingHelper.Views
             }
             catch (Exception ex)
             {
-                // Defensive: entries is built exclusively from
+                // Defensive: entries is seeded from the already-valid
+                // persisted valuation and only ever updated with
                 // SettingsInputParser-validated positive values on
                 // non-coin currency ids, so CurrencyValuation's
                 // constructor should never actually reject it. Still
