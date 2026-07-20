@@ -19,7 +19,8 @@ namespace GW2CraftingHelper.Tests.Services
             Dictionary<int, ItemMetadata> metadata = null,
             List<UsedMaterial> usedMaterials = null,
             List<RequiredDiscipline> requiredDisciplines = null,
-            List<RequiredRecipe> requiredRecipes = null)
+            List<RequiredRecipe> requiredRecipes = null,
+            Dictionary<int, CurrencyMetadata> currencyMetadata = null)
         {
             return new CraftingPlanResult
             {
@@ -37,7 +38,8 @@ namespace GW2CraftingHelper.Tests.Services
                 UsedMaterials = usedMaterials,
                 RequiredDisciplines = requiredDisciplines ?? new List<RequiredDiscipline>(),
                 RequiredRecipes = requiredRecipes ?? new List<RequiredRecipe>(),
-                DebugLog = new List<string>()
+                DebugLog = new List<string>(),
+                CurrencyMetadata = currencyMetadata
             };
         }
 
@@ -180,6 +182,101 @@ namespace GW2CraftingHelper.Tests.Services
             var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
             Assert.Equal("10x Currency", ccRow.Label);
             Assert.DoesNotContain("99999", ccRow.Label);
+        }
+
+        // --- Currency icons (M30 #3) ---
+
+        [Fact]
+        public void SummarySection_CurrencyCost_IconUrlFromMetadata_WhenPresent()
+        {
+            var currencyMeta = new Dictionary<int, CurrencyMetadata>
+            {
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "spirit_shard.png" }
+            };
+            var result = MakeResult(
+                currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 23, Amount = 50 } },
+                currencyMetadata: currencyMeta);
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("spirit_shard.png", ccRow.IconUrl);
+            Assert.Equal("50x Spirit Shards", ccRow.Label);
+        }
+
+        [Fact]
+        public void SummarySection_CurrencyCost_IconUrlNull_WhenMetadataAbsent()
+        {
+            // No CurrencyMetadata supplied at all (e.g. the pipeline was not
+            // wired with a CurrencyMetadataService) - row must render
+            // exactly as it did before icons existed: text-only, no guess.
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 50 }
+            });
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Null(ccRow.IconUrl);
+            Assert.Equal("50x Spirit Shards", ccRow.Label);
+        }
+
+        [Fact]
+        public void SummarySection_CurrencyCost_IconUrlNull_WhenIdMissingFromMetadata()
+        {
+            // Metadata dictionary is present (fetch succeeded) but does not
+            // contain this particular currency id - still no placeholder.
+            var currencyMeta = new Dictionary<int, CurrencyMetadata>
+            {
+                [2] = new CurrencyMetadata { CurrencyId = 2, Name = "Karma", IconUrl = "karma.png" }
+            };
+            var result = MakeResult(
+                currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 23, Amount = 50 } },
+                currencyMetadata: currencyMeta);
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Null(ccRow.IconUrl);
+            Assert.Equal("50x Spirit Shards", ccRow.Label);
+        }
+
+        [Fact]
+        public void SummarySection_CurrencyCost_NamePrefersMetadataOverConstantsFallback()
+        {
+            // Metadata name deliberately differs from the Gw2Constants
+            // offline table to prove the live-fetched name wins.
+            var currencyMeta = new Dictionary<int, CurrencyMetadata>
+            {
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shard (Live)", IconUrl = "s.png" }
+            };
+            var result = MakeResult(
+                currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 23, Amount = 7 } },
+                currencyMetadata: currencyMeta);
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("7x Spirit Shard (Live)", ccRow.Label);
+        }
+
+        [Fact]
+        public void SummarySection_CurrencyCost_UnknownId_FallsBackToGeneric_EvenWithMetadataPresent()
+        {
+            var currencyMeta = new Dictionary<int, CurrencyMetadata>
+            {
+                [2] = new CurrencyMetadata { CurrencyId = 2, Name = "Karma", IconUrl = "karma.png" }
+            };
+            var result = MakeResult(
+                currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 99999, Amount = 10 } },
+                currencyMetadata: currencyMeta);
+            var vm = _builder.Build(result);
+
+            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("10x Currency", ccRow.Label);
+            Assert.Null(ccRow.IconUrl);
         }
 
         // --- Used Materials ---

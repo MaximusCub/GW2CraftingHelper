@@ -77,9 +77,11 @@
     <Compile Include="Services\SolverDecision.cs" />
     <Compile Include="Services\SolveResult.cs" />
     <Compile Include="Models\ItemMetadata.cs" />
+    <Compile Include="Models\CurrencyMetadata.cs" />
     <Compile Include="Models\CraftingPlanResult.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
+    <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CraftingTreeBuilder.cs" />
     <Compile Include="Services\CraftingPlanPipeline.cs" />
     <Compile Include="Services\Gw2RecipeApiClient.cs" />

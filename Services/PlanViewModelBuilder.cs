@@ -147,12 +147,14 @@ namespace GW2CraftingHelper.Services
             {
                 foreach (var cc in result.Plan.CurrencyCosts)
                 {
-                    string currencyName = ResolveCurrencyName(cc.CurrencyId);
+                    string currencyName = ResolveCurrencyName(cc.CurrencyId, result.CurrencyMetadata);
+                    string iconUrl = ResolveCurrencyIconUrl(cc.CurrencyId, result.CurrencyMetadata);
                     section.Rows.Add(new PlanRowViewModel
                     {
                         RowType = PlanRowType.CurrencyCost,
                         Label = $"{cc.Amount}x {currencyName}",
-                        Quantity = (int)cc.Amount
+                        Quantity = (int)cc.Amount,
+                        IconUrl = iconUrl
                     });
                 }
             }
@@ -350,9 +352,39 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        private static string ResolveCurrencyName(int currencyId)
+        /// <summary>
+        /// Prefers the live-fetched currency name when CurrencyMetadataService
+        /// has resolved it, falling back to the offline Gw2Constants table
+        /// (kept as the fallback, not removed) when metadata is null/absent
+        /// for this id or came back with an empty name.
+        /// </summary>
+        private static string ResolveCurrencyName(
+            int currencyId, IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
         {
+            if (currencyMetadata != null &&
+                currencyMetadata.TryGetValue(currencyId, out var meta) &&
+                !string.IsNullOrEmpty(meta.Name))
+            {
+                return meta.Name;
+            }
             return Gw2Constants.ResolveCurrencyName(currencyId);
+        }
+
+        /// <summary>
+        /// Icon for a CurrencyCost row; null (never a placeholder guess)
+        /// when metadata is absent for this id or has no icon URL - the row
+        /// then renders exactly as it did before icons existed.
+        /// </summary>
+        private static string ResolveCurrencyIconUrl(
+            int currencyId, IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
+        {
+            if (currencyMetadata != null &&
+                currencyMetadata.TryGetValue(currencyId, out var meta) &&
+                !string.IsNullOrEmpty(meta.IconUrl))
+            {
+                return meta.IconUrl;
+            }
+            return null;
         }
 
         private static string ResolveName(

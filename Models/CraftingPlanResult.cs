@@ -56,5 +56,15 @@ namespace GW2CraftingHelper.Models
         /// than being excluded from the sum.
         /// </summary>
         public long? MaterialOpportunityCost { get; set; }
+
+        /// <summary>
+        /// Name/icon metadata for wallet currencies referenced by
+        /// Plan.CurrencyCosts, keyed by currency id. Null when the pipeline
+        /// was not given a CurrencyMetadataService, or when that service's
+        /// first fetch has not completed yet; CurrencyCost rows then render
+        /// text-only using the Gw2Constants offline name fallback (see
+        /// PlanViewModelBuilder).
+        /// </summary>
+        public IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadata { get; set; }
     }
 }

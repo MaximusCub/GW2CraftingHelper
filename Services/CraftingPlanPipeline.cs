@@ -19,6 +19,7 @@ namespace GW2CraftingHelper.Services
         private readonly VendorOfferResolver _resolver;
         private readonly InventoryReducer _reducer;
         private readonly IAccountRecipeClient _accountRecipeClient;
+        private readonly CurrencyMetadataService _currencyMetadataService;
 
         public CraftingPlanPipeline(
             RecipeService recipeService,
@@ -28,7 +29,8 @@ namespace GW2CraftingHelper.Services
             VendorOfferStore vendorOfferStore = null,
             VendorOfferResolver resolver = null,
             InventoryReducer reducer = null,
-            IAccountRecipeClient accountRecipeClient = null)
+            IAccountRecipeClient accountRecipeClient = null,
+            CurrencyMetadataService currencyMetadataService = null)
         {
             _recipeService = recipeService;
             _tradingPostService = tradingPostService;
@@ -38,6 +40,7 @@ namespace GW2CraftingHelper.Services
             _resolver = resolver;
             _reducer = reducer;
             _accountRecipeClient = accountRecipeClient;
+            _currencyMetadataService = currencyMetadataService;
         }
 
         public async Task<CraftingPlanResult> GenerateAsync(
@@ -137,6 +140,20 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
+            // Step 8: Fetch currency name/icon metadata for CurrencyCost rows.
+            // Optional dependency: null when not wired up (e.g. the CLI
+            // harness), in which case CurrencyCost rows stay text-only via
+            // the offline Gw2Constants fallback (see PlanViewModelBuilder).
+            progress?.Report(new PlanStatus { Message = "Fetching currency details..." });
+            sw.Restart();
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null;
+            if (_currencyMetadataService != null)
+            {
+                currencyMetadata = await _currencyMetadataService.GetAllAsync(ct);
+            }
+            sw.Stop();
+            timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
+
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
             var craftingTree = treeBuilder.BuildTree(tree, solveResult.Decisions, metadata);
@@ -149,7 +166,8 @@ namespace GW2CraftingHelper.Services
                 Plan = solveResult.Plan,
                 ItemMetadata = metadata,
                 CraftingTree = craftingTree,
-                DebugLog = debugLog
+                DebugLog = debugLog,
+                CurrencyMetadata = currencyMetadata
             };
         }
 
@@ -281,7 +299,21 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
-            // Step 9: Fetch learned recipe IDs (if permission available)
+            // Step 9: Fetch currency name/icon metadata for CurrencyCost rows.
+            // Optional dependency: null when not wired up (e.g. the CLI
+            // harness), in which case CurrencyCost rows stay text-only via
+            // the offline Gw2Constants fallback (see PlanViewModelBuilder).
+            progress?.Report(new PlanStatus { Message = "Fetching currency details..." });
+            sw.Restart();
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null;
+            if (_currencyMetadataService != null)
+            {
+                currencyMetadata = await _currencyMetadataService.GetAllAsync(ct);
+            }
+            sw.Stop();
+            timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
+
+            // Step 10: Fetch learned recipe IDs (if permission available)
             progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
             sw.Restart();
             ISet<int> learnedRecipeIds = null;
@@ -292,11 +324,12 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");
 
-            // Step 10: Build structured result
+            // Step 11: Build structured result
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
+            result.CurrencyMetadata = currencyMetadata;
 
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
@@ -320,7 +353,8 @@ namespace GW2CraftingHelper.Services
                 UsedMaterials = usedMaterials,
                 PriceBasis = priceBasis,
                 CurrencyValuation = valuation,
-                OwnMaterialsMode = ownMaterialsMode
+                OwnMaterialsMode = ownMaterialsMode,
+                CurrencyMetadata = currencyMetadata
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -354,6 +388,7 @@ namespace GW2CraftingHelper.Services
             var result = resultBuilder.Build(
                 solveResult.Plan, context.Tree, context.Metadata,
                 context.UsedMaterials, context.LearnedRecipeIds);
+            result.CurrencyMetadata = context.CurrencyMetadata;
 
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(
