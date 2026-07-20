@@ -75,6 +75,18 @@ namespace GW2CraftingHelper.Views
         // Resize tracking
         private int _lastRenderedWidth;
 
+        // Trailing debounce for resize-triggered re-renders. A re-render is a
+        // full dispose+rebuild of the plan tree, which restarts nested
+        // AutoSize height convergence; firing it on every >=1px resize tick
+        // during a window drag flickers and transiently squashes deep tree
+        // nodes. _resizeRenderPending gates a single in-flight debounce
+        // chain; the chain requeues itself until ResizeDebounceMs elapses
+        // since the last resize tick, then fires one render.
+        private const int ResizeDebounceMs = 150;
+        private int _resizeDebounceGeneration;
+        private DateTime _lastResizeEventUtc;
+        private bool _resizeRenderPending;
+
         // Bumped by every PreserveScrollAcross call; an in-flight restore
         // Tick loop compares its captured value against the current one
         // each frame and bails as soon as a newer restore has superseded it.
@@ -404,11 +416,68 @@ namespace GW2CraftingHelper.Views
             _separator.Size = new Point(w - RightEdgePadding, 2);
             _contentPanel.Size = new Point(w, h - TopRegionHeight);
 
-            // Re-render plan content when width changes (centered title, right-aligned timestamps)
+            // Re-render plan content when width changes (centered title, right-aligned
+            // timestamps). Debounced to a single trailing render fired once the
+            // resize drag settles - see ResizeDebounceTick and the _resize*
+            // fields for why.
             if (_currentPlan != null && w != _lastRenderedWidth)
             {
-                _lastRenderedWidth = w;
-                PreserveScrollAcross(() => RenderPlan(_currentPlan));
+                _lastResizeEventUtc = DateTime.UtcNow;
+                _resizeDebounceGeneration++;
+                if (!_resizeRenderPending)
+                {
+                    _resizeRenderPending = true;
+                    GameService.Overlay.QueueMainThreadUpdate(ResizeDebounceTick);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Trailing edge of the resize debounce. Requeues itself on the main
+        /// thread while resize events keep landing within ResizeDebounceMs of
+        /// one another, then fires a single re-render once the drag settles.
+        /// _resizeRenderPending guarantees only one of these chains is ever
+        /// running, so repeated resize ticks just extend _lastResizeEventUtc
+        /// rather than spawning parallel chains.
+        /// </summary>
+        private void ResizeDebounceTick(GameTime gameTime)
+        {
+            // The view may have been unloaded (tab switched away, module
+            // disabled) while this was pending - nothing to render into.
+            if (_contentPanel == null)
+            {
+                _resizeRenderPending = false;
+                return;
+            }
+
+            if ((DateTime.UtcNow - _lastResizeEventUtc).TotalMilliseconds < ResizeDebounceMs)
+            {
+                GameService.Overlay.QueueMainThreadUpdate(ResizeDebounceTick);
+                return;
+            }
+
+            _resizeRenderPending = false;
+
+            try
+            {
+                // Re-read the panel width fresh rather than trust whatever w
+                // was captured by the resize tick that queued this chain -
+                // only the width at the moment the drag actually settled
+                // matters.
+                int currentWidth = _contentPanel.Width;
+                if (_currentPlan != null && currentWidth != _lastRenderedWidth)
+                {
+                    _lastRenderedWidth = currentWidth;
+                    PreserveScrollAcross(() => RenderPlan(_currentPlan));
+                }
+            }
+            catch (Exception ex)
+            {
+                // The content panel was disposed between the last resize tick
+                // and the debounce firing (e.g. Build() ran again for a tab
+                // reload mid-drag). Degrade silently: whichever Build() call
+                // is current already rendered fresh content at its own width.
+                Logger.Warn(ex, "Resize debounce render skipped; content panel unavailable");
             }
         }
 
