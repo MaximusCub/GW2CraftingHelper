@@ -22,6 +22,7 @@ namespace GW2CraftingHelper.Views
         private readonly Func<Task<AccountSnapshot>> _refreshAsync;
         private readonly Action _clearCache;
         private readonly Action<string> _saveStatus;
+        private readonly Action<string> _saveStatusThreadSafe;
 
         // Layout constants
         private const int HeaderRowY = 5;
@@ -50,13 +51,15 @@ namespace GW2CraftingHelper.Views
             string initialStatus,
             Func<Task<AccountSnapshot>> refreshAsync,
             Action clearCache,
-            Action<string> saveStatus)
+            Action<string> saveStatus,
+            Action<string> saveStatusThreadSafe)
         {
             _snapshot = snapshot;
             _initialStatus = initialStatus;
             _refreshAsync = refreshAsync;
             _clearCache = clearCache;
             _saveStatus = saveStatus;
+            _saveStatusThreadSafe = saveStatusThreadSafe;
         }
 
         public void SetSnapshot(AccountSnapshot snapshot)
@@ -143,18 +146,43 @@ namespace GW2CraftingHelper.Views
                 try
                 {
                     var snapshot = await _refreshAsync();
+                    string status = snapshot != null
+                        ? $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}"
+                        : null;
+
+                    // Persist BEFORE marshaling, while still on this
+                    // continuation thread - StatusStore.Save is blocking
+                    // file I/O and is safe to run off the UI thread.
+                    // _saveStatusThreadSafe (Module.SaveStatusThreadSafe)
+                    // persists via the dirty-flag path rather than
+                    // _saveStatus (Module.SaveStatus), which also calls
+                    // _snapshotContent.SetStatus directly - a control
+                    // mutation that would itself be unsafe to run off-thread
+                    // here.
+                    if (status != null)
+                    {
+                        _saveStatusThreadSafe(status);
+                    }
 
                     // Blish HUD's XNA host has no SynchronizationContext, so
                     // this continuation may resume on a ThreadPool thread;
-                    // marshal the control mutations back to the main thread.
+                    // marshal ONLY the remaining control mutations back to
+                    // the main thread.
                     MainThreadMarshal.Run(() =>
                     {
+                        // The view may have been torn down (tab switched
+                        // away, module disabled) while the refresh was in
+                        // flight - a disposed control's Parent is nulled on
+                        // disposal, mirroring CraftingPlanView's
+                        // ResizeDebounceStep check. Persistence above
+                        // already happened regardless, so bailing here
+                        // cannot strand any state.
+                        if (_headerPanel == null || _headerPanel.Parent == null) return;
+
                         if (snapshot != null)
                         {
                             SetSnapshot(snapshot);
-                            var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
                             SetStatus(status);
-                            _saveStatus(status);
                         }
                         else
                         {
@@ -166,10 +194,11 @@ namespace GW2CraftingHelper.Views
                 {
                     Logger.Warn(ex, "Refresh Now failed");
                     var status = $"Refresh failed \u2014 {DateTime.Now:t}";
+                    _saveStatusThreadSafe(status);
                     MainThreadMarshal.Run(() =>
                     {
+                        if (_headerPanel == null || _headerPanel.Parent == null) return;
                         SetStatus(status);
-                        _saveStatus(status);
                     });
                 }
                 finally
@@ -180,6 +209,7 @@ namespace GW2CraftingHelper.Views
                     // executes and Run always queues.
                     MainThreadMarshal.Run(() =>
                     {
+                        if (_headerPanel == null || _headerPanel.Parent == null) return;
                         _refreshButton.Enabled = true;
                         _clearButton.Enabled = true;
                     });

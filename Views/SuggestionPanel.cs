@@ -96,10 +96,14 @@ namespace GW2CraftingHelper.Views
             // stale-query guard stays inside the marshaled action so stale
             // results are still discarded against current state at the
             // moment of UI application, not at the moment the search
-            // finished.
+            // finished. The focus check guards against a slower path: the
+            // textbox can lose focus (OnFocusChanged hides the panel) while
+            // this search is still in flight, and without re-checking focus
+            // here a queued result could ShowPanel() again right after
+            // dismissal.
             MainThreadMarshal.Run(() =>
             {
-                if (ct.IsCancellationRequested || _disposed) return;
+                if (ct.IsCancellationRequested || _disposed || !_textBox.Focused) return;
                 if (_textBox.Text == null || _textBox.Text.Trim() != query) return;
 
                 if (results == null || results.Count == 0)

@@ -15,8 +15,10 @@ namespace GW2CraftingHelper.Views
     /// passed to <see cref="Run"/>. GameService.Overlay.QueueMainThreadUpdate
     /// drains a re-queued callback again within the SAME frame instead of
     /// waiting for the next real Update() tick, so it cannot be used to
-    /// step work across multiple frames. For multi-frame work, drive it
-    /// from Control.DoUpdate instead - see FrameTicker in CraftingPlanView.
+    /// step work across multiple frames (empirically confirmed via live
+    /// trace during M30 - 400 same-frame re-queues observed in one drain).
+    /// For multi-frame work, drive it from Control.DoUpdate instead - see
+    /// FrameTicker in CraftingPlanView.
     /// </para>
     /// </summary>
     internal static class MainThreadMarshal
@@ -34,7 +36,18 @@ namespace GW2CraftingHelper.Views
         {
             if (action == null) return;
 
-            GameService.Overlay?.QueueMainThreadUpdate(_ =>
+            var overlay = GameService.Overlay;
+            if (overlay == null)
+            {
+                // Overlay is only null before module init completes or
+                // after it has begun tearing down; either way the action
+                // has nowhere to run. Previously dropped silently - logged
+                // here so a caller who expected this to fire has a trail.
+                Logger.Debug("MainThreadMarshal.Run dropped an action - GameService.Overlay was null");
+                return;
+            }
+
+            overlay.QueueMainThreadUpdate(_ =>
             {
                 try
                 {
