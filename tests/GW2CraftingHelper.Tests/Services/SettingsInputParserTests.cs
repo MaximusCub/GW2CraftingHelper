@@ -1,0 +1,98 @@
+using GW2CraftingHelper.Services;
+using Xunit;
+
+namespace GW2CraftingHelper.Tests.Services
+{
+    public class SettingsInputParserTests
+    {
+        [Theory]
+        [InlineData("1")]
+        [InlineData("150")]
+        [InlineData("007")]
+        [InlineData("  42  ")]
+        [InlineData("9223372036854775807")] // long.MaxValue
+        public void TryParseCopperValue_ValidPositiveIntegerText_ReturnsTrueWithValue(string text)
+        {
+            bool ok = SettingsInputParser.TryParseCopperValue(text, out long value);
+
+            Assert.True(ok);
+            Assert.True(value > 0);
+        }
+
+        [Fact]
+        public void TryParseCopperValue_TypicalValue_ParsesExactAmount()
+        {
+            bool ok = SettingsInputParser.TryParseCopperValue("1200", out long value);
+
+            Assert.True(ok);
+            Assert.Equal(1200, value);
+        }
+
+        [Fact]
+        public void TryParseCopperValue_SurroundingWhitespace_IsTrimmed()
+        {
+            bool ok = SettingsInputParser.TryParseCopperValue("  250  ", out long value);
+
+            Assert.True(ok);
+            Assert.Equal(250, value);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void TryParseCopperValue_NullOrBlank_ReturnsFalseWithZero(string text)
+        {
+            bool ok = SettingsInputParser.TryParseCopperValue(text, out long value);
+
+            Assert.False(ok);
+            Assert.Equal(0, value);
+        }
+
+        [Fact]
+        public void TryParseCopperValue_Zero_ReturnsFalse()
+        {
+            bool ok = SettingsInputParser.TryParseCopperValue("0", out long value);
+
+            Assert.False(ok);
+            Assert.Equal(0, value);
+        }
+
+        [Theory]
+        [InlineData("-5")]
+        [InlineData("-1")]
+        public void TryParseCopperValue_Negative_ReturnsFalse(string text)
+        {
+            bool ok = SettingsInputParser.TryParseCopperValue(text, out long value);
+
+            Assert.False(ok);
+            Assert.Equal(0, value);
+        }
+
+        [Theory]
+        [InlineData("1.5")]
+        [InlineData("1,000")]
+        [InlineData("+5")]
+        [InlineData("abc")]
+        [InlineData("5g")]
+        [InlineData("5 5")]
+        [InlineData("1e5")]
+        public void TryParseCopperValue_NonIntegerOrMalformedText_ReturnsFalse(string text)
+        {
+            bool ok = SettingsInputParser.TryParseCopperValue(text, out long value);
+
+            Assert.False(ok);
+            Assert.Equal(0, value);
+        }
+
+        [Fact]
+        public void TryParseCopperValue_OverflowsLong_ReturnsFalse()
+        {
+            // long.MaxValue + a trailing digit
+            bool ok = SettingsInputParser.TryParseCopperValue("92233720368547758070", out long value);
+
+            Assert.False(ok);
+            Assert.Equal(0, value);
+        }
+    }
+}
