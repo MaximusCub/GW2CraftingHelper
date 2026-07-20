@@ -30,6 +30,12 @@ namespace GW2CraftingHelper.Views
         private const int RightEdgePadding = 20;
         private const int SectionSpacing = 16;
 
+        // Shared divider greys. Both readable against the parchment texture;
+        // SectionDividerColor is the brighter of the two, one tier below the
+        // 180-grey structural separators (window chrome, unrelated to these).
+        private static readonly Color RowDividerColor = new Color(100, 100, 100);
+        private static readonly Color SectionDividerColor = new Color(130, 130, 130);
+
         private readonly Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
         private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
@@ -828,7 +834,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(panelWidth, 1),
                 Location = new Point(0, 29),
-                BackgroundColor = new Color(90, 90, 90),
+                BackgroundColor = SectionDividerColor,
                 Parent = headerPanel
             };
 
@@ -915,7 +921,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(panelWidth, 1),
                 Location = new Point(0, rowHeight - 1),
-                BackgroundColor = new Color(70, 70, 70),
+                BackgroundColor = RowDividerColor,
                 Parent = rowPanel
             };
         }
