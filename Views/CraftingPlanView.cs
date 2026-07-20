@@ -800,11 +800,15 @@ namespace GW2CraftingHelper.Views
                 ? "Quantity was invalid - reset to 1. Generating..."
                 : "Generating...");
 
+            // Progress<T> captures the SynchronizationContext at construction
+            // time and posts callbacks through it; with none installed (see
+            // MainThreadMarshal), the callback runs on a ThreadPool thread,
+            // so the SetStatus call must be marshaled.
             var statusProgress = new Progress<PlanStatus>(ps =>
             {
                 if (ps != null && !string.IsNullOrEmpty(ps.Message))
                 {
-                    SetStatus(ps.Message);
+                    MainThreadMarshal.Run(() => SetStatus(ps.Message));
                 }
             });
 
@@ -814,27 +818,45 @@ namespace GW2CraftingHelper.Views
                     _selectedItemId, _quantity, _useOwnMaterials, _priceBasis,
                     CancellationToken.None, statusProgress);
 
-                _nodeOverrides.Clear();
-                _nodeExpansion.Clear();
-                _sectionExpansion.Clear();
-                _lastResult = result;
-                _lastDebugLog = result.DebugLog;
+                // Blish HUD's XNA host has no SynchronizationContext, so this
+                // continuation may resume on a ThreadPool thread. vm-building
+                // is pure CPU work over already-fetched data - no controls
+                // touched - so it stays off the UI thread. The rest mutates
+                // shared view state (_nodeOverrides etc.) as well as Blish
+                // HUD controls (RenderPlan, SetStatus); bundling the state
+                // mutation into the same main-thread callback as the control
+                // mutation also serializes it against an overlapping
+                // TriggerGenerate call, closing what would otherwise be a
+                // data race on these fields between two ThreadPool
+                // continuations.
                 var vm = _vmBuilder.Build(result);
-                _currentPlan = vm;
-                _planGeneratedAt = DateTime.Now;
-                _lastRenderedWidth = _contentPanel?.Width ?? 0;
-                RenderPlan(vm);
-                SetStatus($"Plan generated - {_planGeneratedAt:MMM d, yyyy h:mm tt}");
+                MainThreadMarshal.Run(() =>
+                {
+                    _nodeOverrides.Clear();
+                    _nodeExpansion.Clear();
+                    _sectionExpansion.Clear();
+                    _lastResult = result;
+                    _lastDebugLog = result.DebugLog;
+                    _currentPlan = vm;
+                    _planGeneratedAt = DateTime.Now;
+                    _lastRenderedWidth = _contentPanel?.Width ?? 0;
+                    RenderPlan(vm);
+                    SetStatus($"Plan generated - {_planGeneratedAt:MMM d, yyyy h:mm tt}");
+                });
             }
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Plan generation failed");
                 _lastDebugLog = new[] { $"Generation failed: {ex.Message}" };
-                SetStatus($"Error: {ex.Message}");
+                MainThreadMarshal.Run(() => SetStatus($"Error: {ex.Message}"));
             }
             finally
             {
-                _generateButton.Enabled = true;
+                // Runs later on the main thread once queued - the button is
+                // still guaranteed to re-enable on every path (success,
+                // exception, or cancellation) since finally always executes
+                // and Run always queues.
+                MainThreadMarshal.Run(() => _generateButton.Enabled = true);
             }
         }
 

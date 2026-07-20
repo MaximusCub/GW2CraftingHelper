@@ -143,29 +143,46 @@ namespace GW2CraftingHelper.Views
                 try
                 {
                     var snapshot = await _refreshAsync();
-                    if (snapshot != null)
+
+                    // Blish HUD's XNA host has no SynchronizationContext, so
+                    // this continuation may resume on a ThreadPool thread;
+                    // marshal the control mutations back to the main thread.
+                    MainThreadMarshal.Run(() =>
                     {
-                        SetSnapshot(snapshot);
-                        var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
-                        SetStatus(status);
-                        _saveStatus(status);
-                    }
-                    else
-                    {
-                        SetStatus("Refresh in progress...");
-                    }
+                        if (snapshot != null)
+                        {
+                            SetSnapshot(snapshot);
+                            var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
+                            SetStatus(status);
+                            _saveStatus(status);
+                        }
+                        else
+                        {
+                            SetStatus("Refresh in progress...");
+                        }
+                    });
                 }
                 catch (Exception ex)
                 {
                     Logger.Warn(ex, "Refresh Now failed");
                     var status = $"Refresh failed \u2014 {DateTime.Now:t}";
-                    SetStatus(status);
-                    _saveStatus(status);
+                    MainThreadMarshal.Run(() =>
+                    {
+                        SetStatus(status);
+                        _saveStatus(status);
+                    });
                 }
                 finally
                 {
-                    _refreshButton.Enabled = true;
-                    _clearButton.Enabled = true;
+                    // Runs later on the main thread once queued - both
+                    // buttons still re-enable on every path (success,
+                    // exception, or cancellation) since finally always
+                    // executes and Run always queues.
+                    MainThreadMarshal.Run(() =>
+                    {
+                        _refreshButton.Enabled = true;
+                        _clearButton.Enabled = true;
+                    });
                 }
             };
 

@@ -62,6 +62,7 @@ namespace GW2CraftingHelper
         private AccountSnapshot _pendingSnapshot;
         private bool _snapshotDirty;
         private string _lastStatus;
+        private bool _statusDirty;
 
         private HttpClient _httpClient;
         private CraftingPlanPipeline _craftingPipeline;
@@ -367,6 +368,15 @@ namespace GW2CraftingHelper
                 _snapshotContent?.SetStatus(_lastStatus);
             }
 
+            // Status updates saved from a ThreadPool continuation (Blish's
+            // XNA host has no SynchronizationContext) land here instead of
+            // touching the view directly - see SaveStatusThreadSafe.
+            if (_statusDirty)
+            {
+                _statusDirty = false;
+                _snapshotContent?.SetStatus(_lastStatus);
+            }
+
             if (_refreshInProgress) return;
             if (_currentSnapshot == null) return;
             if (DateTime.UtcNow - _currentSnapshot.CapturedAt < StaleThreshold) return;
@@ -427,7 +437,7 @@ namespace GW2CraftingHelper
             {
                 var snapshot = await FetchAndSaveSnapshotAsync(_refreshCts.Token);
                 var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
-                SaveStatus(status);
+                SaveStatusThreadSafe(status);
             }
             catch (OperationCanceledException)
             {
@@ -437,7 +447,7 @@ namespace GW2CraftingHelper
             {
                 Logger.Warn(ex, "Failed to refresh account snapshot");
                 var status = $"Refresh failed \u2014 {DateTime.Now:t}";
-                SaveStatus(status);
+                SaveStatusThreadSafe(status);
             }
             finally
             {
@@ -475,11 +485,33 @@ namespace GW2CraftingHelper
             _snapshotDirty = false;
         }
 
-        private void SaveStatus(string status)
+        private void PersistStatus(string status)
         {
             _lastStatus = status ?? "";
             _statusStore.Save(_lastStatus);
+        }
+
+        // Called directly from contexts already known to be on the main
+        // thread: MainView's Clear Cache click handler (synchronous, no
+        // await) and post-await MainView code that has already marshaled
+        // itself back via MainThreadMarshal before invoking this callback.
+        private void SaveStatus(string status)
+        {
+            PersistStatus(status);
             _snapshotContent?.SetStatus(_lastStatus);
+        }
+
+        // Thread-safe variant for callers that may run on a ThreadPool
+        // continuation (Blish HUD's XNA host installs no
+        // SynchronizationContext, so await continuations do not resume on
+        // the main thread). Persists the status immediately - file I/O is
+        // safe off the UI thread - but defers the control mutation to
+        // Update() via the same dirty-flag polling pattern already used for
+        // snapshots, rather than touching _snapshotContent here.
+        private void SaveStatusThreadSafe(string status)
+        {
+            PersistStatus(status);
+            _statusDirty = true;
         }
 
         private static void BuildPlaceholder(Container container)
