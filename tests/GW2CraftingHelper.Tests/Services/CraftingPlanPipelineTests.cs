@@ -678,6 +678,67 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task VendorOfferItemCost_OutsideTree_PriceFetchedAndOfferUsed()
+        {
+            // Regression (Gift of Glory): a vendor offer charging an ITEM
+            // that appears nowhere in the recipe tree was skipped as
+            // unpriceable because the cost item's TP price was never
+            // fetched, leaving the target as UnknownSource.
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe and no TP price for target item 1
+            var priceApi = new InMemoryPriceApiClient();
+            // Cost item 999 (not in any tree) has a TP price of 2c
+            priceApi.AddPrice(999, buyUnitPrice: 1, sellUnitPrice: 2);
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Gifted Item", "g.png");
+            itemApi.AddItem(999, "Cost Token", "t.png");
+
+            var tempDir = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
+            System.IO.Directory.CreateDirectory(tempDir);
+            try
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tempDir, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-item-cost-outside-tree",
+                        OutputItemId = 1,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Item", Id = 999, Count = 250 }
+                        },
+                        MerchantName = "Token Vendor",
+                        Locations = new List<string>()
+                    }
+                });
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store);
+
+                var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+
+                Assert.Single(result.Plan.Steps);
+                Assert.Equal(AcquisitionSource.BuyFromVendor, result.Plan.Steps[0].Source);
+                // 250 x 2c (instant-buy basis) = 500
+                Assert.Equal(500, result.Plan.TotalCoinCost);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
         public async Task Structured_TargetHasBuyOrders_ProfitFieldsComputed()
         {
             var pipeline = BuildEconomicsPipeline(out var priceApi);

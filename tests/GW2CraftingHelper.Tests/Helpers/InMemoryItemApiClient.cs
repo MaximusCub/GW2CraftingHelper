@@ -13,6 +13,12 @@ namespace GW2CraftingHelper.Tests.Helpers
 
         public IReadOnlyList<IReadOnlyList<int>> Calls => _calls;
 
+        /// <summary>
+        /// Ids omitted from the next response that requests them (then
+        /// cleared), simulating the API's transient partial responses.
+        /// </summary>
+        public HashSet<int> DropOnce { get; } = new HashSet<int>();
+
         public void AddItem(int id, string name, string icon, string rarity = null)
         {
             _items[id] = new RawItem { Id = id, Name = name, Icon = icon, Rarity = rarity };
@@ -24,9 +30,14 @@ namespace GW2CraftingHelper.Tests.Helpers
             _calls.Add(itemIds);
 
             var results = itemIds
-                .Where(id => _items.ContainsKey(id))
+                .Where(id => _items.ContainsKey(id) && !DropOnce.Contains(id))
                 .Select(id => _items[id])
                 .ToList();
+
+            foreach (var id in itemIds)
+            {
+                DropOnce.Remove(id);
+            }
 
             return Task.FromResult<IReadOnlyList<RawItem>>(results);
         }

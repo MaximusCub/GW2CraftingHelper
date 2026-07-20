@@ -61,14 +61,17 @@ namespace GW2CraftingHelper.Views
             // does not sit flush against the border chrome. The bordered
             // panel's own internal padding (4px L/R, 7px T/B, 36px header)
             // is not enough visual breathing room.
+            // Deliberately NOT scrollable: every hosted view provides its
+            // own CanScroll panel. Nesting two CanScroll panels parents an
+            // invisible outer Scrollbar over the same strip as the visible
+            // inner one, and it swallows every click-drag on the thumb.
             var contentPanel = new Panel()
             {
                 Parent = borderedPanel,
                 Location = new Point(INNER_PADDING, INNER_PADDING),
                 Size = new Point(
                     borderedPanel.ContentRegion.Width - 2 * INNER_PADDING,
-                    borderedPanel.ContentRegion.Height - 2 * INNER_PADDING),
-                CanScroll = true
+                    borderedPanel.ContentRegion.Height - 2 * INNER_PADDING)
             };
 
             buildPanel.Resized += (s, e) =>

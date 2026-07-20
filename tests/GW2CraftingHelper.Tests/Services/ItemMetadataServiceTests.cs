@@ -25,6 +25,53 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task TransientPartialResponse_RetriedOnce()
+        {
+            var api = new InMemoryItemApiClient();
+            api.AddItem(1, "A", "a.png");
+            api.AddItem(2, "B", "b.png");
+            api.DropOnce.Add(2);
+            var svc = new ItemMetadataService(api);
+
+            var result = await svc.GetMetadataAsync(new[] { 1, 2 }, CancellationToken.None);
+
+            // Second request healed the dropped id
+            Assert.True(result.ContainsKey(2));
+            Assert.Equal("B", result[2].Name);
+            Assert.Equal(2, api.Calls.Count);
+        }
+
+        [Fact]
+        public async Task SeedFallback_UsedOnlyForMissingIds_AndNotCached()
+        {
+            var api = new InMemoryItemApiClient();
+            api.AddItem(1, "Api Name", "api.png", "Exotic");
+            var seed = new GW2CraftingHelper.Services.Recipes.ItemNameSeedData(
+                new List<GW2CraftingHelper.Services.Recipes.ItemNameEntry>
+                {
+                    new GW2CraftingHelper.Services.Recipes.ItemNameEntry
+                    {
+                        Id = 2, Name = "Seed Name", Icon = "seed.png"
+                    }
+                });
+            var svc = new ItemMetadataService(api, seed);
+
+            var first = await svc.GetMetadataAsync(new[] { 1, 2 }, CancellationToken.None);
+
+            Assert.Equal("Api Name", first[1].Name);
+            Assert.Equal("Seed Name", first[2].Name);
+            Assert.Equal("seed.png", first[2].IconUrl);
+            Assert.Null(first[2].Rarity);
+
+            // The API recovers: a later call must retry rather than serve
+            // the cached seed fallback forever.
+            api.AddItem(2, "Api Late", "late.png", "Rare");
+            var second = await svc.GetMetadataAsync(new[] { 2 }, CancellationToken.None);
+            Assert.Equal("Api Late", second[2].Name);
+            Assert.Equal("Rare", second[2].Rarity);
+        }
+
+        [Fact]
         public async Task Rarity_FlowsThroughFromApi()
         {
             var api = new InMemoryItemApiClient();
