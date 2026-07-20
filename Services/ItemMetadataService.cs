@@ -16,6 +16,13 @@ namespace GW2CraftingHelper.Services
         private readonly Dictionary<int, ItemMetadata> _cache = new Dictionary<int, ItemMetadata>();
         private readonly Dictionary<int, ItemNameEntry> _seedById;
 
+        // Ids confirmed absent from the API after a first-wave + retry
+        // round trip. Skipped on every later toFetch so a genuinely-missing
+        // id does not pay the double round-trip cost on every plan
+        // generation; misses stay negative-cached for the service's
+        // lifetime (module session).
+        private readonly HashSet<int> _knownMissing = new HashSet<int>();
+
         public ItemMetadataService(IItemApiClient api, ItemNameSeedData seedFallback = null)
         {
             _api = api;
@@ -37,7 +44,7 @@ namespace GW2CraftingHelper.Services
 
             foreach (var id in uniqueIds)
             {
-                if (!_cache.ContainsKey(id))
+                if (!_cache.ContainsKey(id) && !_knownMissing.Contains(id))
                 {
                     toFetch.Add(id);
                 }
@@ -59,7 +66,28 @@ namespace GW2CraftingHelper.Services
                 for (int i = 0; i < missing.Count; i += BatchSize)
                 {
                     int count = Math.Min(BatchSize, missing.Count - i);
-                    await FetchBatchIntoCacheAsync(missing.GetRange(i, count), ct);
+                    try
+                    {
+                        await FetchBatchIntoCacheAsync(missing.GetRange(i, count), ct);
+                    }
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    {
+                        // The retry wave is best-effort: a transient failure
+                        // here degrades to seed fallback/omission instead of
+                        // aborting the whole plan generation. A total outage
+                        // still surfaces via the first wave's throw above.
+                    }
+                }
+
+                // Ids still missing after the retry wave are treated as
+                // genuinely absent from the API for the rest of this
+                // service's lifetime.
+                foreach (var id in missing)
+                {
+                    if (!_cache.ContainsKey(id))
+                    {
+                        _knownMissing.Add(id);
+                    }
                 }
             }
 

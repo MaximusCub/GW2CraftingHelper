@@ -74,6 +74,11 @@ namespace GW2CraftingHelper.Views
         // Resize tracking
         private int _lastRenderedWidth;
 
+        // Bumped by every PreserveScrollAcross call; an in-flight restore
+        // Tick loop compares its captured value against the current one
+        // each frame and bails as soon as a newer restore has superseded it.
+        private int _scrollRestoreGeneration;
+
         public CraftingPlanView(
             Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
@@ -114,40 +119,45 @@ namespace GW2CraftingHelper.Views
         private void PreserveScrollAcross(Action mutate)
         {
             int saved = _contentPanel?.VerticalScrollOffset ?? 0;
+            int capturedGeneration = ++_scrollRestoreGeneration;
             mutate();
             if (saved > 0)
             {
-                RestoreScrollOffset(saved);
+                RestoreScrollOffset(saved, capturedGeneration);
             }
         }
 
-        private void RestoreScrollOffset(int savedOffset)
+        private void RestoreScrollOffset(int savedOffset, int capturedGeneration)
         {
             if (_contentPanel == null || PanelScrollbarField == null)
             {
                 return;
             }
 
+            var capturedPanel = _contentPanel;
             int attempts = 0;
             float lastRatio = -1f;
 
             void Tick(GameTime _)
             {
+                // A newer restore superseded this loop, or Build() swapped
+                // in a fresh content panel: stop immediately rather than
+                // fight the current restore or scroll a stale/disposed panel.
+                if (capturedGeneration != _scrollRestoreGeneration || capturedPanel != _contentPanel)
+                {
+                    return;
+                }
+
                 try
                 {
-                    var panel = _contentPanel;
-                    if (panel == null)
-                    {
-                        return;
-                    }
-                    var scrollbar = PanelScrollbarField.GetValue(panel) as Scrollbar;
+                    var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
                     if (scrollbar == null)
                     {
                         return;
                     }
 
                     int contentHeight = 0;
-                    foreach (var child in panel.Children)
+                    foreach (var child in capturedPanel.Children)
                     {
                         if (child.Visible && child.Bottom > contentHeight)
                         {
@@ -156,7 +166,7 @@ namespace GW2CraftingHelper.Views
                     }
 
                     float ratio = ScrollMath.RatioForOffset(
-                        savedOffset, contentHeight, panel.Height);
+                        savedOffset, contentHeight, capturedPanel.Height);
                     scrollbar.ScrollDistance = ratio;
 
                     attempts++;
@@ -337,7 +347,7 @@ namespace GW2CraftingHelper.Views
             if (_currentPlan != null && w != _lastRenderedWidth)
             {
                 _lastRenderedWidth = w;
-                RenderPlan(_currentPlan);
+                PreserveScrollAcross(() => RenderPlan(_currentPlan));
             }
         }
 
