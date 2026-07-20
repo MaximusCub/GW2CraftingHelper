@@ -831,6 +831,8 @@ namespace GW2CraftingHelper.Views
                 Text = nameText,
                 Font = titleFont,
                 TextColor = GetRarityNameColor(vm.TargetRarity),
+                ShowShadow = true,
+                ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(textX, textY),
@@ -1138,6 +1140,8 @@ namespace GW2CraftingHelper.Views
                 Text = displayName,
                 Font = font,
                 TextColor = GetRarityNameColor(row.Rarity),
+                ShowShadow = true,
+                ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(nameX, 9),
@@ -1251,6 +1255,8 @@ namespace GW2CraftingHelper.Views
                 Text = displayName,
                 Font = font,
                 TextColor = GetRarityNameColor(row.Rarity),
+                ShowShadow = true,
+                ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(nameX, 9),
@@ -1360,6 +1366,7 @@ namespace GW2CraftingHelper.Views
             new Label()
             {
                 Text = row.Label ?? "", Font = textFont, TextColor = GetRarityNameColor(row.Rarity),
+                ShowShadow = true, ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(x, 13), Parent = rowPanel
             };
@@ -1446,6 +1453,8 @@ namespace GW2CraftingHelper.Views
                 Text = row.Label ?? "",
                 Font = font,
                 TextColor = GetRarityNameColor(row.Rarity),
+                ShowShadow = true,
+                ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(50, nameY),
@@ -1893,8 +1902,10 @@ namespace GW2CraftingHelper.Views
             Color nameColor = GetRarityNameColor(node.Rarity);
             if (dimmed)
             {
-                qtyColor *= 0.35f;
-                nameColor *= 0.35f;
+                qtyColor *= 0.45f;
+                // Lift dark hues toward readable before dimming (premultiplied-
+                // correct: Lerp opaque colors first, then apply alpha via *).
+                nameColor = Color.Lerp(nameColor, Color.White, 0.30f) * 0.50f;
             }
 
             if (qtyPrefix.Length > 0)
@@ -1915,6 +1926,8 @@ namespace GW2CraftingHelper.Views
                 Text = displayName,
                 Font = nameFont,
                 TextColor = nameColor,
+                ShowShadow = true,
+                ShadowColor = dimmed ? Color.Black * 0.4f : Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(nameX + qtyWidth, 12),
@@ -2283,7 +2296,7 @@ namespace GW2CraftingHelper.Views
                 case "Rare": return new Color(252, 208, 11);
                 case "Exotic": return new Color(255, 164, 5);
                 case "Ascended": return new Color(251, 62, 141);
-                case "Legendary": return new Color(76, 19, 157);
+                case "Legendary": return new Color(160, 95, 240);
                 default: return new Color(60, 60, 60);
             }
         }
@@ -2305,7 +2318,7 @@ namespace GW2CraftingHelper.Views
                 case "Rare": return new Color(252, 208, 11);
                 case "Exotic": return new Color(255, 164, 5);
                 case "Ascended": return new Color(251, 62, 141);
-                case "Legendary": return new Color(76, 19, 157);
+                case "Legendary": return new Color(160, 95, 240);
                 default: return new Color(200, 200, 200);
             }
         }
