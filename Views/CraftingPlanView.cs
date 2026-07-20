@@ -2208,7 +2208,10 @@ namespace GW2CraftingHelper.Views
                 int pillWidth = textWidth + 12;
 
                 GetPillColors(spec.Kind, out Color borderColor, out Color fillColor);
-                Color textColor = borderColor;
+                // White, not borderColor: Selected/Available fills expose the
+                // border hue behind the label, so border-colored text has zero
+                // contrast against its own backdrop (M30 #11).
+                Color textColor = Color.White;
                 if (dimmed)
                 {
                     borderColor *= 0.35f;
