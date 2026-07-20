@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -125,6 +126,80 @@ namespace GW2CraftingHelper.Tests.Services
             // Second call should only contain item 3
             Assert.Single(api.Calls[1]);
             Assert.Equal(3, api.Calls[1][0]);
+        }
+
+        [Fact]
+        public async Task Ttl_ExpiredEntryIsRefetchedOnNextRequest()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            await svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            clock = clock.AddMinutes(16); // past the 15 minute TTL
+            var result = await svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            Assert.Equal(2, api.Calls.Count);
+            Assert.Equal(200, result[1].BuyInstant);
+        }
+
+        [Fact]
+        public async Task Ttl_FreshEntryWithinTtlIsServedFromCache()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            await svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            clock = clock.AddMinutes(10); // still within the 15 minute TTL
+            var result = await svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            Assert.Single(api.Calls); // no second API call
+            Assert.Equal(200, result[1].BuyInstant);
+        }
+
+        [Fact]
+        public async Task Ttl_MixedFreshAndStaleBatchOnlyRefetchesStaleIds()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            api.AddPrice(2, buyUnitPrice: 300, sellUnitPrice: 400);
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            // Item 1 fetched first, then left to go stale.
+            await svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+            clock = clock.AddMinutes(16);
+
+            // Item 2 fetched fresh, right before the mixed request.
+            await svc.GetPricesAsync(new[] { 2 }, CancellationToken.None);
+
+            // Third call requests both: item 1 is stale (16 min old), item 2 is fresh (0 min old).
+            var result = await svc.GetPricesAsync(new[] { 1, 2 }, CancellationToken.None);
+
+            Assert.Equal(3, api.Calls.Count);
+            Assert.Single(api.Calls[2]);
+            Assert.Equal(1, api.Calls[2][0]);
+            Assert.Equal(200, result[1].BuyInstant);
+            Assert.Equal(400, result[2].BuyInstant);
+        }
+
+        [Fact]
+        public async Task Constructor_DefaultClockCachesWithinTtlWithoutExplicitClock()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            var svc = new TradingPostService(api); // utcNow omitted -> defaults to DateTime.UtcNow
+
+            await svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+            var result = await svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            Assert.Single(api.Calls); // second call served from cache, well within the TTL
+            Assert.Equal(200, result[1].BuyInstant);
         }
     }
 }
