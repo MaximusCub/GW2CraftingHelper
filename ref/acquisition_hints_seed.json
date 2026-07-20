@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-20T00:00:00Z",
+  "source": "wiki.guildwars2.com (manual research)",
+  "hints": [
+    {
+      "itemId": 71994,
+      "hint": "Salvaged from ascended weapons and armor with an Ascended Salvage Kit (guaranteed) or ascended trinkets/back items (low chance). Account bound; not tradable.",
+      "badge": "SALVAGE",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Ball_of_Dark_Energy",
+      "lastVerified": "2026-07-20"
+    },
+    {
+      "itemId": 70698,
+      "hint": "Received for completing map exploration of Dragon's Stand. Account bound; not tradable; no recipe.",
+      "badge": "EXPLORE",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Jungle",
+      "lastVerified": "2026-07-20"
+    },
+    {
+      "itemId": 70797,
+      "hint": "Received for completing map exploration of Verdant Brink. Account bound; not tradable; no recipe.",
+      "badge": "EXPLORE",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Fleet",
+      "lastVerified": "2026-07-20"
+    },
+    {
+      "itemId": 71943,
+      "hint": "Received for completing map exploration of Auric Basin. Account bound; not tradable; no recipe.",
+      "badge": "EXPLORE",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_Tarir",
+      "lastVerified": "2026-07-20"
+    },
+    {
+      "itemId": 74528,
+      "hint": "Received for completing map exploration of Tangled Depths. Account bound; not tradable; no recipe.",
+      "badge": "EXPLORE",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Chak",
+      "lastVerified": "2026-07-20"
+    }
+  ]
+}

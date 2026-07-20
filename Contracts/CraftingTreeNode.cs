@@ -37,6 +37,17 @@ namespace GW2CraftingHelper.Contracts
         // The view renders these dimmed and collapsed by default.
         public bool IsReferenceBranch { get; set; }
 
+        // Wiki-derived acquisition guidance (see AcquisitionHintService),
+        // set only for Decision == Unknown nodes with a seeded hint.
+        // Tooltip-only text, never an id.
+        public string AcquisitionHint { get; set; }
+
+        // Short pill label (e.g. "SALVAGE", "EXPLORE") for the same seeded
+        // hint entry as AcquisitionHint, set only under the same
+        // Decision == Unknown guard. Null/empty when the hint has no badge
+        // (or no hint at all) - the view falls back to "UNKNOWN".
+        public string AcquisitionBadge { get; set; }
+
         public IReadOnlyList<CraftingTreeNode> Children
         {
             get => _children;

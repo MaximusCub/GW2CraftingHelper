@@ -580,6 +580,131 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(node.Children);
         }
 
+        // --- Acquisition hints (M32) ---
+
+        [Fact]
+        public void UnknownDecision_WithHint_SetsAcquisitionHint()
+        {
+            var node = Leaf(71994, 1);
+            node.NodeId = 5; // not present in decisions -> Unknown
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta((71994, "Ball of Dark Energy", "b.png"));
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Salvaged from ascended gear." } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, hints);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Equal("Salvaged from ascended gear.", treeNode.AcquisitionHint);
+        }
+
+        [Fact]
+        public void UnknownDecision_NoHintEntry_StaysNull()
+        {
+            var node = Leaf(99, 1);
+            node.NodeId = 5;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta((99, "Mystery", "m.png"));
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Unrelated item's hint." } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, hints);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Null(treeNode.AcquisitionHint);
+        }
+
+        [Fact]
+        public void NonUnknownDecision_HintEntryPresent_NeverSet()
+        {
+            // Item 1 is bought via TP (a real, priced source) but a hint
+            // entry happens to exist for it anyway - hints must never
+            // bleed onto a node that actually has a known source.
+            var tree = Leaf(1, 5);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var metadata = Meta((1, "Copper Ore", "copper.png"));
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 1, new AcquisitionHint { ItemId = 1, Hint = "Should never appear on a priced node.", Badge = "SALVAGE" } }
+            };
+
+            var solver = new PlanSolver();
+            var solveResult = solver.Solve(tree, prices, null);
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(tree, solveResult.Decisions, metadata, hints);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, treeNode.Decision);
+            Assert.Null(treeNode.AcquisitionHint);
+            Assert.Null(treeNode.AcquisitionBadge);
+        }
+
+        [Fact]
+        public void UnknownDecision_WithBadge_SetsAcquisitionBadge()
+        {
+            var node = Leaf(71994, 1);
+            node.NodeId = 5; // not present in decisions -> Unknown
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta((71994, "Ball of Dark Energy", "b.png"));
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, hints);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Equal("SALVAGE", treeNode.AcquisitionBadge);
+        }
+
+        [Fact]
+        public void UnknownDecision_HintWithoutBadge_AcquisitionBadgeStaysNull()
+        {
+            var node = Leaf(70698, 1);
+            node.NodeId = 5; // not present in decisions -> Unknown
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta((70698, "Gift of the Jungle", "g.png"));
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 70698, new AcquisitionHint { ItemId = 70698, Hint = "Received for map completion." } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, hints);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Equal("Received for map completion.", treeNode.AcquisitionHint);
+            Assert.Null(treeNode.AcquisitionBadge);
+        }
+
+        [Fact]
+        public void UnknownDecision_NoHintEntry_AcquisitionBadgeStaysNull()
+        {
+            var node = Leaf(99, 1);
+            node.NodeId = 5;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta((99, "Mystery", "m.png"));
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Unrelated item's hint.", Badge = "SALVAGE" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, hints);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Null(treeNode.AcquisitionBadge);
+        }
+
         private static void AssertChildrenNeverNull(CraftingTreeNode node)
         {
             Assert.NotNull(node.Children);

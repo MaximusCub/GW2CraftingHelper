@@ -75,13 +75,17 @@ both light and dark texture regions via captures.
 Fixed in M30: dividers now use a consistent higher-contrast color,
 verified legible over both light and dark parchment texture regions.
 
-## 8. Ball of Dark Energy (71994) - unpriceable, needs acquisition hint
-Wiki-verified: salvaged from ascended gear with ascended salvage kits
-(guaranteed from weapons/armor, very low chance from trinkets); account
-bound; no producing recipe; not TP-tradable. Current behavior (honest
-"Acquire (no known source)") is correct but unhelpful. Fix direction:
-acquisition-hints data source (wiki-derived, seeder work - same family
-as the collections/achievements pillar). NEVER invent pricing for it.
+## 8. Ball of Dark Energy (71994) - unpriceable, needs acquisition hint (FIXED in M32)
+Fixed in M32: curated wiki-verified seed (ref/acquisition_hints_seed.json,
+5 entries: Ball of Dark Energy plus the four HoT map-completion Gifts
+feeding Gift of Maguuma) rendered as tooltips on unknown-source tree
+pills and shopping rows; the misleading "Only available source" tooltip
+on true-unknown pills now falls back to "No known acquisition source".
+No pricing invented. Live-verified via tooltip capture. Follow-up: a
+dev-time seeder tool (wiki fetch -> seed JSON) when the list grows past
+hand-curation; same tooling family as the collections/achievements
+pillar. Note: hovering must target row whitespace - name labels capture
+the mouse and suppress the row tooltip (pre-existing Blish behavior).
 
 ## 9. Rarity text unreadable over parchment texture (FIXED in M30)
 Legendary rarity text measured luminance ~52 against the parchment

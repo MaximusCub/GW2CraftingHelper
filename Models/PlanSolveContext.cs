@@ -49,5 +49,14 @@ namespace GW2CraftingHelper.Models
         /// next full Generate.
         /// </summary>
         public OwnMaterialsMode OwnMaterialsMode { get; set; }
+
+        /// <summary>
+        /// Wiki-derived acquisition hints snapshotted at GENERATION time, so
+        /// that ResolveWithOverrides' local re-solve can keep hint text on
+        /// unpriceable nodes without any refetch (same reasoning as
+        /// CurrencyMetadata above - this is a static local seed, not a live
+        /// fetch, but the snapshot keeps the two code paths symmetric).
+        /// </summary>
+        public IReadOnlyDictionary<int, AcquisitionHint> AcquisitionHints { get; set; }
     }
 }

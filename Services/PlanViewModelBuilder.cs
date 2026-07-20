@@ -215,11 +215,59 @@ namespace GW2CraftingHelper.Services
                     Rarity = rarity,
                     Quantity = step.Quantity,
                     CoinValue = step.TotalCost,
-                    UnitCoinValue = step.UnitCost
+                    UnitCoinValue = step.UnitCost,
+                    HintText = ResolveHintText(rowType, step.ItemId, result.AcquisitionHints),
+                    BadgeText = ResolveBadgeText(rowType, step.ItemId, result.AcquisitionHints)
                 });
             }
 
             return section;
+        }
+
+        /// <summary>
+        /// Acquisition-hint tooltip text for shopping rows. Only ever
+        /// populated for ShoppingUnknown rows - a hint entry existing for
+        /// an item that actually has a priced/vendor source must not bleed
+        /// onto that row's tooltip.
+        /// </summary>
+        private static string ResolveHintText(
+            PlanRowType rowType,
+            int itemId,
+            IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints)
+        {
+            if (rowType != PlanRowType.ShoppingUnknown || acquisitionHints == null)
+            {
+                return null;
+            }
+            if (acquisitionHints.TryGetValue(itemId, out var hint) &&
+                hint != null && !string.IsNullOrEmpty(hint.Hint))
+            {
+                return hint.Hint;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Badge/pill-tag text for shopping rows, same "ShoppingUnknown
+        /// only" guard as ResolveHintText - a badge existing for an item
+        /// that actually has a priced/vendor source must not bleed onto
+        /// that row's tag.
+        /// </summary>
+        private static string ResolveBadgeText(
+            PlanRowType rowType,
+            int itemId,
+            IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints)
+        {
+            if (rowType != PlanRowType.ShoppingUnknown || acquisitionHints == null)
+            {
+                return null;
+            }
+            if (acquisitionHints.TryGetValue(itemId, out var hint) &&
+                hint != null && !string.IsNullOrEmpty(hint.Badge))
+            {
+                return hint.Badge;
+            }
+            return null;
         }
 
         private PlanSectionViewModel BuildCraftingStepsSection(
