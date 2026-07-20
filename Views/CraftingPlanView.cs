@@ -1440,13 +1440,17 @@ namespace GW2CraftingHelper.Views
             CreateRightAlignedLabel(rowPanel, "Total", font, color, totalRightEdge, 4);
         }
 
-        private static string ShoppingSourceTag(PlanRowType rowType)
+        private static string ShoppingSourceTag(PlanRowViewModel row)
         {
-            switch (rowType)
+            switch (row.RowType)
             {
                 case PlanRowType.ShoppingVendor: return "VENDOR";
                 case PlanRowType.ShoppingCurrency: return "CURRENCY";
-                case PlanRowType.ShoppingUnknown: return "UNKNOWN";
+                case PlanRowType.ShoppingUnknown:
+                    // Prefer the seeded wiki hint's badge (e.g. "SALVAGE",
+                    // "EXPLORE") when one exists - "UNKNOWN" remains the
+                    // fallback for no-source items with no seeded hint.
+                    return !string.IsNullOrEmpty(row.BadgeText) ? row.BadgeText : "UNKNOWN";
                 default: return null; // ShoppingBuy: plain TP purchase, no tag needed
             }
         }
@@ -1494,7 +1498,7 @@ namespace GW2CraftingHelper.Views
                 rowPanel.BasicTooltipText = string.Join("\n", tooltipParts);
             }
 
-            string sourceTag = ShoppingSourceTag(row.RowType);
+            string sourceTag = ShoppingSourceTag(row);
             if (!string.IsNullOrEmpty(sourceTag))
             {
                 CreateSmallTag(rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9);
@@ -2356,7 +2360,13 @@ namespace GW2CraftingHelper.Views
 
             if (options.Count == 0)
             {
-                specs.Add(new PillSpec { Text = "UNKNOWN", Source = null, Kind = PillKind.Locked });
+                // Prefer the seeded wiki hint's badge (e.g. "SALVAGE",
+                // "EXPLORE") when one exists - "UNKNOWN" remains the
+                // fallback for no-source items with no seeded hint at all.
+                string badgeText = !string.IsNullOrEmpty(node.AcquisitionBadge)
+                    ? node.AcquisitionBadge
+                    : "UNKNOWN";
+                specs.Add(new PillSpec { Text = badgeText, Source = null, Kind = PillKind.Locked });
                 return specs;
             }
             if (options.Count == 1)

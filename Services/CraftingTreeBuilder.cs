@@ -123,11 +123,13 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Sets AcquisitionHint from the seeded hint dictionary, but only
-        /// for Decision == Unknown nodes - hints must never bleed onto a
-        /// node that has a real (even if unappealing) priced source, since
-        /// the hint text describes how to acquire an item with NO known
-        /// source at all.
+        /// Sets AcquisitionHint/AcquisitionBadge from the seeded hint
+        /// dictionary, but only for Decision == Unknown nodes - hints must
+        /// never bleed onto a node that has a real (even if unappealing)
+        /// priced source, since the hint text describes how to acquire an
+        /// item with NO known source at all. Hint and Badge are set
+        /// independently (each only when its own value is non-empty) so a
+        /// seed entry can supply one without the other.
         /// </summary>
         private static void ApplyAcquisitionHint(
             CraftingTreeNode treeNode,
@@ -137,10 +139,17 @@ namespace GW2CraftingHelper.Services
             {
                 return;
             }
-            if (hints.TryGetValue(treeNode.ItemId, out var hint) &&
-                hint != null && !string.IsNullOrEmpty(hint.Hint))
+            if (!hints.TryGetValue(treeNode.ItemId, out var hint) || hint == null)
+            {
+                return;
+            }
+            if (!string.IsNullOrEmpty(hint.Hint))
             {
                 treeNode.AcquisitionHint = hint.Hint;
+            }
+            if (!string.IsNullOrEmpty(hint.Badge))
+            {
+                treeNode.AcquisitionBadge = hint.Badge;
             }
         }
 

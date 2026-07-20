@@ -75,5 +75,11 @@ namespace GW2CraftingHelper.Models
         // tooltip-only. Deliberately separate from Sublabel, which renders
         // inline in the row itself - HintText never renders inline.
         public string HintText { get; set; }
+
+        // Short pill/tag label (e.g. "SALVAGE", "EXPLORE") for
+        // ShoppingUnknown rows, from the same seeded hint entry as
+        // HintText. Null when the hint has no badge (or no hint at all) -
+        // the view falls back to "UNKNOWN".
+        public string BadgeText { get; set; }
     }
 }

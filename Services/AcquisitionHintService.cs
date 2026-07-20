@@ -30,6 +30,7 @@ namespace GW2CraftingHelper.Services
         {
             public int ItemId { get; set; }
             public string Hint { get; set; }
+            public string Badge { get; set; }
             public string SourceUrl { get; set; }
             public string LastVerified { get; set; }
         }
@@ -68,6 +69,7 @@ namespace GW2CraftingHelper.Services
                         {
                             ItemId = entry.ItemId,
                             Hint = entry.Hint,
+                            Badge = entry.Badge,
                             SourceUrl = entry.SourceUrl,
                             LastVerified = entry.LastVerified
                         };

@@ -216,7 +216,8 @@ namespace GW2CraftingHelper.Services
                     Quantity = step.Quantity,
                     CoinValue = step.TotalCost,
                     UnitCoinValue = step.UnitCost,
-                    HintText = ResolveHintText(rowType, step.ItemId, result.AcquisitionHints)
+                    HintText = ResolveHintText(rowType, step.ItemId, result.AcquisitionHints),
+                    BadgeText = ResolveBadgeText(rowType, step.ItemId, result.AcquisitionHints)
                 });
             }
 
@@ -238,9 +239,33 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
-            if (acquisitionHints.TryGetValue(itemId, out var hint) && hint != null)
+            if (acquisitionHints.TryGetValue(itemId, out var hint) &&
+                hint != null && !string.IsNullOrEmpty(hint.Hint))
             {
                 return hint.Hint;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Badge/pill-tag text for shopping rows, same "ShoppingUnknown
+        /// only" guard as ResolveHintText - a badge existing for an item
+        /// that actually has a priced/vendor source must not bleed onto
+        /// that row's tag.
+        /// </summary>
+        private static string ResolveBadgeText(
+            PlanRowType rowType,
+            int itemId,
+            IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints)
+        {
+            if (rowType != PlanRowType.ShoppingUnknown || acquisitionHints == null)
+            {
+                return null;
+            }
+            if (acquisitionHints.TryGetValue(itemId, out var hint) &&
+                hint != null && !string.IsNullOrEmpty(hint.Badge))
+            {
+                return hint.Badge;
             }
             return null;
         }

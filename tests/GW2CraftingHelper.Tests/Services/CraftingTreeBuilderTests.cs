@@ -634,7 +634,7 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = Meta((1, "Copper Ore", "copper.png"));
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                { 1, new AcquisitionHint { ItemId = 1, Hint = "Should never appear on a priced node." } }
+                { 1, new AcquisitionHint { ItemId = 1, Hint = "Should never appear on a priced node.", Badge = "SALVAGE" } }
             };
 
             var solver = new PlanSolver();
@@ -644,6 +644,65 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(CraftingDecision.BuyFromTp, treeNode.Decision);
             Assert.Null(treeNode.AcquisitionHint);
+            Assert.Null(treeNode.AcquisitionBadge);
+        }
+
+        [Fact]
+        public void UnknownDecision_WithBadge_SetsAcquisitionBadge()
+        {
+            var node = Leaf(71994, 1);
+            node.NodeId = 5; // not present in decisions -> Unknown
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta((71994, "Ball of Dark Energy", "b.png"));
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, hints);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Equal("SALVAGE", treeNode.AcquisitionBadge);
+        }
+
+        [Fact]
+        public void UnknownDecision_HintWithoutBadge_AcquisitionBadgeStaysNull()
+        {
+            var node = Leaf(70698, 1);
+            node.NodeId = 5; // not present in decisions -> Unknown
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta((70698, "Gift of the Jungle", "g.png"));
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 70698, new AcquisitionHint { ItemId = 70698, Hint = "Received for map completion." } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, hints);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Equal("Received for map completion.", treeNode.AcquisitionHint);
+            Assert.Null(treeNode.AcquisitionBadge);
+        }
+
+        [Fact]
+        public void UnknownDecision_NoHintEntry_AcquisitionBadgeStaysNull()
+        {
+            var node = Leaf(99, 1);
+            node.NodeId = 5;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta((99, "Mystery", "m.png"));
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Unrelated item's hint.", Badge = "SALVAGE" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, hints);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Null(treeNode.AcquisitionBadge);
         }
 
         private static void AssertChildrenNeverNull(CraftingTreeNode node)
