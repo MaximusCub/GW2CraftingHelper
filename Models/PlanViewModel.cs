@@ -10,7 +10,13 @@ namespace GW2CraftingHelper.Models
         ShoppingList,
         CraftingSteps,
         RequiredDisciplines,
-        RequiredRecipes
+        RequiredRecipes,
+
+        // Not a member of PlanViewModel.Sections (the tree renders from
+        // PlanViewModel.TreeRoot, not a row list) - used only as a
+        // dictionary key so its header expansion persists like every
+        // other section's.
+        RecipeTree
     }
 
     public enum PlanRowType
@@ -31,6 +37,9 @@ namespace GW2CraftingHelper.Models
     {
         public string TargetItemName { get; set; }
         public string TargetIconUrl { get; set; }
+
+        // GW2 API rarity string; null/empty = unknown (neutral color/border).
+        public string TargetRarity { get; set; }
         public int TargetQuantity { get; set; }
         public List<PlanSectionViewModel> Sections { get; set; } = new List<PlanSectionViewModel>();
         public CraftingTreeNode TreeRoot { get; set; }

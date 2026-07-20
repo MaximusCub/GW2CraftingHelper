@@ -87,6 +87,20 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal("Unknown Item", vm.TargetItemName);
             Assert.Null(vm.TargetIconUrl);
+            Assert.Null(vm.TargetRarity);
+        }
+
+        [Fact]
+        public void TargetItem_ResolvesRarity()
+        {
+            var meta = new Dictionary<int, ItemMetadata>
+            {
+                [1] = new ItemMetadata { ItemId = 1, Name = "Zojja's Claymore", IconUrl = "c.png", Rarity = "Exotic" }
+            };
+            var result = MakeResult(targetItemId: 1, metadata: meta);
+            var vm = _builder.Build(result);
+
+            Assert.Equal("Exotic", vm.TargetRarity);
         }
 
         // --- Summary section ---
@@ -513,9 +527,9 @@ namespace GW2CraftingHelper.Tests.Services
                 PlanSectionType.Summary,
                 PlanSectionType.UsedMaterials,
                 PlanSectionType.ShoppingList,
-                PlanSectionType.CraftingSteps,
                 PlanSectionType.RequiredDisciplines,
-                PlanSectionType.RequiredRecipes
+                PlanSectionType.RequiredRecipes,
+                PlanSectionType.CraftingSteps
             }, types);
         }
 
