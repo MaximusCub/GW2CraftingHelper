@@ -1386,48 +1386,59 @@ namespace GW2CraftingHelper.Views
 
         // --- Shopping List section ---
 
+        // Right-aligned price columns for the shopping list's Each and
+        // Total prices: both anchor to a fixed right edge and grow
+        // LEFTWARD, so a gold-value amount in either column can never grow
+        // into the other's space. Previously each column reserved a fixed
+        // width (150/90) regardless of content; a 3+ digit gold value in
+        // Each or Total could still exceed its fixed band and bleed into
+        // the Amount column to its left. Column widths are now derived from
+        // the actual widest rendered value per column, clamped to those
+        // same fixed minimums so short/low-value lists don't look cramped -
+        // see ShoppingColumnMath (Blish-free, unit-tested arithmetic).
         private void CreateShoppingListBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            CreateShoppingListHeaderRow(contentFlow, panelWidth);
+            var coinFont = GameService.Content.DefaultFont14;
+
+            // Pre-scan: widest actual coin-value width per column this
+            // render. One pass over the section's rows (shopping lists run
+            // to maybe 50-60 rows in practice) - negligible next to the
+            // per-row control creation this method already does.
+            int maxEachWidth = 0;
+            int maxTotalWidth = 0;
+            foreach (var row in section.Rows)
+            {
+                if (row.UnitCoinValue > 0)
+                {
+                    int w = MeasureCoinValueWidth(row.UnitCoinValue, coinFont);
+                    if (w > maxEachWidth) maxEachWidth = w;
+                }
+                if (row.CoinValue > 0)
+                {
+                    int w = MeasureCoinValueWidth(row.CoinValue, coinFont);
+                    if (w > maxTotalWidth) maxTotalWidth = w;
+                }
+            }
+
+            int totalRightEdge = panelWidth - 8;
+            var edges = ShoppingColumnMath.ComputeEdges(totalRightEdge, maxEachWidth, maxTotalWidth);
+
+            // Both the header and every data row are handed this SAME
+            // ColumnEdges instance, so they cannot drift apart for this
+            // render.
+            CreateShoppingListHeaderRow(contentFlow, panelWidth, edges);
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
+                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, edges, i == section.Rows.Count - 1);
             }
         }
 
-        // Reserved right-aligned price columns for the shopping list's Each
-        // and Total prices: both anchor to a fixed right edge and grow
-        // LEFTWARD, so a gold-value amount in either column can never grow
-        // into the other's space. Previously "Each" was left-aligned at a
-        // fixed start x with no bound on its right edge, sharing an
-        // effectively unbounded budget with "Total" - the two overlapped
-        // for routine gold-value rows.
-        private const int ShoppingColTotalWidth = 150;
-        private const int ShoppingColAmountWidth = 90;
-        private const int ShoppingColGap = 20;
-
-        /// <summary>
-        /// Right edges for the shopping list's Amount/Each/Total columns,
-        /// derived right-to-left off the fixed panel edge so header and data
-        /// rows can never drift apart. Total anchors first; Each reserves
-        /// ShoppingColTotalWidth plus a gap to its left; Amount reserves
-        /// ShoppingColAmountWidth plus another gap to its left in turn.
-        /// </summary>
-        private static void ComputeShoppingColumnEdges(
-            int panelWidth, out int totalRightEdge, out int eachRightEdge, out int qtyRightEdge)
-        {
-            totalRightEdge = panelWidth - 8;
-            eachRightEdge = totalRightEdge - ShoppingColTotalWidth - ShoppingColGap;
-            qtyRightEdge = eachRightEdge - ShoppingColAmountWidth - ShoppingColGap;
-        }
-
-        private static void CreateShoppingListHeaderRow(FlowPanel parent, int panelWidth)
+        private static void CreateShoppingListHeaderRow(
+            FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges)
         {
             var rowPanel = new Panel() { Size = new Point(panelWidth, 22), Parent = parent };
             var font = GameService.Content.DefaultFont12;
             var color = new Color(153, 153, 153);
-
-            ComputeShoppingColumnEdges(panelWidth, out int totalRightEdge, out int eachRightEdge, out int qtyRightEdge);
 
             new Label()
             {
@@ -1435,9 +1446,9 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(50, 4), Parent = rowPanel
             };
-            CreateRightAlignedLabel(rowPanel, "Amount", font, color, qtyRightEdge, 4);
-            CreateRightAlignedLabel(rowPanel, "Each", font, color, eachRightEdge, 4);
-            CreateRightAlignedLabel(rowPanel, "Total", font, color, totalRightEdge, 4);
+            CreateRightAlignedLabel(rowPanel, "Amount", font, color, edges.QtyRightEdge, 4);
+            CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
+            CreateRightAlignedLabel(rowPanel, "Total", font, color, edges.TotalRightEdge, 4);
         }
 
         private static string ShoppingSourceTag(PlanRowViewModel row)
@@ -1455,7 +1466,8 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateShoppingRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        private static void CreateShoppingRow(
+            PlanRowViewModel row, FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges, bool isLast)
         {
             const int rowHeight = 36;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
@@ -1463,12 +1475,11 @@ namespace GW2CraftingHelper.Views
             CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
 
             const int nameX = 50;
-            ComputeShoppingColumnEdges(panelWidth, out int totalRightEdge, out int eachRightEdge, out int qtyRightEdge);
             var font = GameService.Content.DefaultFont14;
 
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
-            int nameMaxWidth = System.Math.Max(20, qtyRightEdge - qtyWidth - 12 - nameX);
+            int nameMaxWidth = System.Math.Max(20, edges.QtyRightEdge - qtyWidth - 12 - nameX);
 
             string fullName = row.Label ?? "";
             string displayName = EllipsizeToWidth(font, fullName, nameMaxWidth);
@@ -1511,17 +1522,17 @@ namespace GW2CraftingHelper.Views
                 TextColor = new Color(200, 200, 200),
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(qtyRightEdge - qtyWidth, 9),
+                Location = new Point(edges.QtyRightEdge - qtyWidth, 9),
                 Parent = rowPanel
             };
 
             if (row.UnitCoinValue > 0)
             {
-                LayoutCoinSegmentsRightAligned(rowPanel, BuildCoinSegments(row.UnitCoinValue, font), eachRightEdge, 9, font);
+                LayoutCoinSegmentsRightAligned(rowPanel, BuildCoinSegments(row.UnitCoinValue, font), edges.EachRightEdge, 9, font);
             }
             if (row.CoinValue > 0)
             {
-                LayoutCoinSegmentsRightAligned(rowPanel, BuildCoinSegments(row.CoinValue, font), totalRightEdge, 9, font);
+                LayoutCoinSegmentsRightAligned(rowPanel, BuildCoinSegments(row.CoinValue, font), edges.TotalRightEdge, 9, font);
             }
 
             if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
@@ -2675,6 +2686,19 @@ namespace GW2CraftingHelper.Views
                 width += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
             }
             return width - CoinSegmentGap;
+        }
+
+        /// <summary>
+        /// Pixel width a coin value would occupy if laid out via
+        /// LayoutCoinSegments/LayoutCoinSegmentsRightAligned at the given
+        /// font - built from the exact same BuildCoinSegments +
+        /// TotalCoinSegmentsWidth path those layout calls use, so the
+        /// shopping list's pre-scan (CreateShoppingListBody) can never
+        /// drift from what actually renders.
+        /// </summary>
+        private static int MeasureCoinValueWidth(long copper, BitmapFont font)
+        {
+            return TotalCoinSegmentsWidth(BuildCoinSegments(copper, font));
         }
 
         /// <summary>
