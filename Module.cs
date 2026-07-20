@@ -236,16 +236,17 @@ namespace GW2CraftingHelper
                     }
 
                     var currencyValuation = _settings.GetCurrencyValuation();
+                    var ownMaterialsMode = _settings.GetOwnMaterialsMode();
 
                     if (useOwn)
                     {
                         return _craftingPipeline.GenerateStructuredAsync(
                             itemId, qty, _currentSnapshot, ct, progress,
-                            activeChar, priceBasis, currencyValuation);
+                            activeChar, priceBasis, currencyValuation, ownMaterialsMode);
                     }
                     return _craftingPipeline.GenerateStructuredAsync(
                         itemId, qty, null, ct, progress,
-                        null, priceBasis, currencyValuation);
+                        null, priceBasis, currencyValuation, ownMaterialsMode);
                 },
                 _modalDialog,
                 _itemSearchProvider,

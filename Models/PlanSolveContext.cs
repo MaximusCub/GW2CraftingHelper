@@ -31,5 +31,15 @@ namespace GW2CraftingHelper.Models
         /// starting with the next full Generate.
         /// </summary>
         public CurrencyValuation CurrencyValuation { get; set; }
+
+        /// <summary>
+        /// The own-materials valuation mode in effect at GENERATION time,
+        /// snapshotted here for the same reason as CurrencyValuation: a
+        /// local override re-solve must keep pricing owned materials the
+        /// way the original Generate did, not whatever the setting reads
+        /// right now. A freshly toggled setting applies starting with the
+        /// next full Generate.
+        /// </summary>
+        public OwnMaterialsMode OwnMaterialsMode { get; set; }
     }
 }
