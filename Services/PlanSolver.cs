@@ -10,7 +10,22 @@ namespace GW2CraftingHelper.Services
         private struct Decision
         {
             public AcquisitionSource Source;
+
+            // REAL coin cost of this decision: what display, PlanStep, and
+            // CraftingTreeNode.SubtreeCost show. Never includes a valued
+            // currency's coin-equivalent - only the coin actually spent.
             public long? TotalCost;
+
+            // The value used to compare this decision against siblings at
+            // the PARENT level: same as TotalCost for TP buys, but for a
+            // comparable vendor offer it also folds in valued non-coin
+            // currency lines (see EvaluateVendorOffers), and for a craft it
+            // is the sum of the chosen recipe's ingredient ComparisonValues
+            // (not their TotalCost). Keeping this separate from TotalCost
+            // stops a valued vendor offer's currency value from being
+            // "laundered" away when an ancestor sums child costs to decide
+            // buy vs. craft.
+            public long? ComparisonValue;
             public int RecipeId;
             public List<CostLine> VendorCurrencyCosts;
             public bool CanCraft;
@@ -122,6 +137,14 @@ namespace GW2CraftingHelper.Services
             };
         }
 
+        /// <summary>
+        /// Evaluates the cheapest acquisition for <paramref name="node"/> and
+        /// commits it to <paramref name="memo"/>. Returns the decision's
+        /// ComparisonValue (see Decision), NOT its real coin TotalCost -
+        /// callers summing ingredient costs for a parent craft are summing
+        /// comparison values, which is required for the parent's own
+        /// craft-vs-buy comparison to be correct (see Decision.ComparisonValue).
+        /// </summary>
         private long? Evaluate(
             RecipeNode node,
             IReadOnlyDictionary<int, ItemPrice> prices,
@@ -164,11 +187,18 @@ namespace GW2CraftingHelper.Services
             // Evaluate recipe options (children are always evaluated so their
             // decisions exist even if this node ends up bought).
             long? bestCraftCost = null;
+            long? bestCraftRealCost = null;
             int bestRecipeId = 0;
 
             foreach (var recipe in node.Recipes)
             {
+                // craftCost sums ingredient ComparisonValues (Evaluate's
+                // return value) and drives recipe selection/PickCheapest.
+                // craftRealCost sums the same ingredients' REAL TotalCost
+                // (read back from memo, since Evaluate no longer returns it)
+                // and becomes the committed decision's real coin cost.
                 long craftCost = 0L;
+                long craftRealCost = 0L;
                 bool allPriceable = true;
 
                 foreach (var ingredient in recipe.Ingredients)
@@ -187,6 +217,7 @@ namespace GW2CraftingHelper.Services
                     }
 
                     craftCost += ingredientCost.Value;
+                    craftRealCost += memo[ingredient.NodeId].TotalCost ?? 0L;
                 }
 
                 if (allPriceable)
@@ -198,6 +229,7 @@ namespace GW2CraftingHelper.Services
                         (craftCost == bestCraftCost.Value && recipe.RecipeId < bestRecipeId))
                     {
                         bestCraftCost = craftCost;
+                        bestCraftRealCost = craftRealCost;
                         bestRecipeId = recipe.RecipeId;
                     }
                 }
@@ -218,19 +250,26 @@ namespace GW2CraftingHelper.Services
             bool canBuyVendor = comparableVendorValue.HasValue ||
                                 fallbackVendorCoinCost.HasValue;
 
-            long? Commit(AcquisitionSource src, long? cost, int recipeId, List<CostLine> vendorCurrencyCosts)
+            // cost = real coin (Decision.TotalCost / display); comparisonValue
+            // = parent-comparison value (Decision.ComparisonValue). Commit
+            // returns comparisonValue - see Decision.ComparisonValue and the
+            // Evaluate summary doc for why the two must stay separate.
+            long? Commit(
+                AcquisitionSource src, long? cost, long? comparisonValue,
+                int recipeId, List<CostLine> vendorCurrencyCosts)
             {
                 memo[node.NodeId] = new Decision
                 {
                     Source = src,
                     TotalCost = cost,
+                    ComparisonValue = comparisonValue,
                     RecipeId = recipeId,
                     VendorCurrencyCosts = vendorCurrencyCosts,
                     CanCraft = canCraft,
                     CanBuyTp = canBuyTp,
                     CanBuyVendor = canBuyVendor
                 };
-                return cost;
+                return comparisonValue;
             }
 
             // A user override wins whenever it is feasible for this node;
@@ -240,17 +279,17 @@ namespace GW2CraftingHelper.Services
             {
                 if (forced == AcquisitionSource.Craft && canCraft)
                 {
-                    return Commit(AcquisitionSource.Craft, bestCraftCost, bestRecipeId, null);
+                    return Commit(AcquisitionSource.Craft, bestCraftRealCost, bestCraftCost, bestRecipeId, null);
                 }
                 if (forced == AcquisitionSource.BuyFromTp && canBuyTp)
                 {
-                    return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, 0, null);
+                    return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, buyTotalCost, 0, null);
                 }
                 if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
                 {
                     return comparableVendorValue.HasValue
-                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, 0, comparableVendorCurrencyCosts)
-                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
+                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts)
+                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
                 }
             }
 
@@ -260,17 +299,17 @@ namespace GW2CraftingHelper.Services
 
             if (source == AcquisitionSource.BuyFromVendor)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, 0, comparableVendorCurrencyCosts);
+                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts);
             }
 
             if (source == AcquisitionSource.BuyFromTp)
             {
-                return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, 0, null);
+                return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, buyTotalCost, 0, null);
             }
 
             if (source == AcquisitionSource.Craft)
             {
-                return Commit(AcquisitionSource.Craft, bestCraftCost, bestRecipeId, null);
+                return Commit(AcquisitionSource.Craft, bestCraftRealCost, bestCraftCost, bestRecipeId, null);
             }
 
             // Fallback order when nothing is coin-priceable: a mixed-currency
@@ -278,15 +317,15 @@ namespace GW2CraftingHelper.Services
             // preferred over descending into an unpriceable craft subtree.
             if (fallbackVendorCoinCost.HasValue)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
+                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
             }
 
             if (bestRecipeId != 0)
             {
-                return Commit(AcquisitionSource.Craft, bestCraftCost, bestRecipeId, null);
+                return Commit(AcquisitionSource.Craft, bestCraftRealCost, bestCraftCost, bestRecipeId, null);
             }
 
-            return Commit(AcquisitionSource.UnknownSource, null, 0, null);
+            return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);
         }
 
         /// <summary>

@@ -30,7 +30,12 @@ namespace GW2CraftingHelper.Services
         /// Deserializes a previously-persisted JSON string back into a
         /// CurrencyValuation. Returns CurrencyValuation.None for null,
         /// blank, or malformed input rather than throwing - a corrupt
-        /// settings value must never crash plan generation.
+        /// settings value must never crash plan generation. Entries with a
+        /// non-positive copper-per-unit rate or keyed on the coin currency
+        /// id are individually SKIPPED (CurrencyValuation's constructor
+        /// rejects them outright) rather than discarding the whole
+        /// valuation - a single bad entry, however it got into settings,
+        /// must not silently drop every other currency the user priced.
         /// </summary>
         internal static CurrencyValuation Deserialize(string json)
         {
@@ -42,9 +47,24 @@ namespace GW2CraftingHelper.Services
             try
             {
                 var entries = JsonConvert.DeserializeObject<Dictionary<int, long>>(json);
-                return entries == null || entries.Count == 0
+                if (entries == null || entries.Count == 0)
+                {
+                    return CurrencyValuation.None;
+                }
+
+                var valid = new Dictionary<int, long>();
+                foreach (var kvp in entries)
+                {
+                    if (kvp.Key == Gw2Constants.CoinCurrencyId || kvp.Value <= 0)
+                    {
+                        continue;
+                    }
+                    valid[kvp.Key] = kvp.Value;
+                }
+
+                return valid.Count == 0
                     ? CurrencyValuation.None
-                    : new CurrencyValuation(entries);
+                    : new CurrencyValuation(valid);
             }
             catch (JsonException)
             {

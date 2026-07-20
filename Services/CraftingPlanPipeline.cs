@@ -42,8 +42,10 @@ namespace GW2CraftingHelper.Services
 
         public async Task<CraftingPlanResult> GenerateAsync(
             int targetItemId, int quantity, CancellationToken ct,
-            IProgress<PlanStatus> progress = null)
+            IProgress<PlanStatus> progress = null,
+            CurrencyValuation currencyValuation = null)
         {
+            var valuation = currencyValuation ?? CurrencyValuation.None;
             var sw = new Stopwatch();
             var timingLog = new List<string>();
 
@@ -116,7 +118,8 @@ namespace GW2CraftingHelper.Services
             // Step 6: Solve
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
-            var solveResult = _solver.Solve(tree, prices, vendorOffers);
+            var solveResult = _solver.Solve(
+                tree, prices, vendorOffers, currencyValuation: valuation);
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
 

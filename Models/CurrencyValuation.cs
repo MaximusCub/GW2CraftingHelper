@@ -1,5 +1,5 @@
+using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace GW2CraftingHelper.Models
 {
@@ -21,13 +21,39 @@ namespace GW2CraftingHelper.Models
 
         public CurrencyValuation(IReadOnlyDictionary<int, long> copperPerUnit)
         {
+            if (copperPerUnit == null)
+            {
+                _copperPerUnit = new Dictionary<int, long>();
+                return;
+            }
+
             // Defensively copied: instances are stored long-term on
             // PlanSolveContext, so a caller mutating the dictionary it
             // passed in must never retroactively change an already-built
-            // valuation.
-            _copperPerUnit = copperPerUnit == null
-                ? new Dictionary<int, long>()
-                : copperPerUnit.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            // valuation. Validated while copying: an invalid entry here
+            // would either be inert (<=0 copper never beats a coin option)
+            // or nonsensical (coin priced in terms of itself), so callers
+            // must fix the input rather than have it silently accepted.
+            var validated = new Dictionary<int, long>(copperPerUnit.Count);
+            foreach (var kvp in copperPerUnit)
+            {
+                if (kvp.Key == Gw2Constants.CoinCurrencyId)
+                {
+                    throw new ArgumentException(
+                        "Currency valuation cannot be keyed on the coin currency id.",
+                        nameof(copperPerUnit));
+                }
+                if (kvp.Value <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(copperPerUnit),
+                        kvp.Value,
+                        $"Currency {kvp.Key} must have a positive copper-per-unit valuation.");
+                }
+                validated[kvp.Key] = kvp.Value;
+            }
+
+            _copperPerUnit = validated;
         }
 
         /// <summary>CurrencyId -> copper value of a single unit of that currency.</summary>
