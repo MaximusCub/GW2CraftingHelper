@@ -32,7 +32,7 @@ namespace GW2CraftingHelper.Tests.Services
         public async Task ItemAbsentFromApi_NotInDictionary()
         {
             var api = new InMemoryPriceApiClient();
-            // Item 99999 not added — simulates account-bound / non-tradeable item
+            // Item 99999 not added - simulates account-bound / non-tradeable item
             var svc = new TradingPostService(api);
 
             var result = await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
