@@ -254,7 +254,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void SameItemInMultipleBranches_DeduplicatedStep()
         {
-            // Item 1 crafts from: 3x item 2 + 5x item 2 (same item, two ingredients — simulating
+            // Item 1 crafts from: 3x item 2 + 5x item 2 (same item, two ingredients - simulating
             // what happens when item 2 appears via two branches in a real tree)
             // Actually, let's make it: item 1 -> recipe with 2 ingredients that are both item 2
             // More realistically: item 1 -> (item 2, item 3), item 3 -> item 2
