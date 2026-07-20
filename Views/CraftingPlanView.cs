@@ -28,6 +28,7 @@ namespace GW2CraftingHelper.Views
         private const int ContentY = 107;
         private const int TopRegionHeight = 112;
         private const int RightEdgePadding = 20;
+        private const int SectionSpacing = 16;
 
         private readonly Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
         private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> _resolveOverridesSync;
@@ -771,6 +772,14 @@ namespace GW2CraftingHelper.Views
             string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
             Func<bool> suppressToggle = null)
         {
+            // Consistent top gap before every section (including the tree),
+            // so sections do not sit flush against whatever preceded them.
+            new Panel()
+            {
+                Size = new Point(panelWidth, SectionSpacing),
+                Parent = _contentPanel
+            };
+
             bool expanded = _sectionExpansion.TryGetValue(sectionKey, out bool userExpanded)
                 ? userExpanded
                 : defaultExpanded;
