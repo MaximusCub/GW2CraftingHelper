@@ -19,5 +19,6 @@ namespace GW2CraftingHelper.Models
         public ISet<int> LearnedRecipeIds { get; set; }
         public List<UsedMaterial> UsedMaterials { get; set; }
         public PriceBasis PriceBasis { get; set; }
+        public CurrencyValuation CurrencyValuation { get; set; }
     }
 }

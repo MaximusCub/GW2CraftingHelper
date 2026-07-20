@@ -154,8 +154,10 @@ namespace GW2CraftingHelper.Services
             int targetItemId, int quantity, AccountSnapshot snapshot,
             CancellationToken ct, IProgress<PlanStatus> progress = null,
             string activeCharacterName = null,
-            PriceBasis priceBasis = PriceBasis.InstantBuy)
+            PriceBasis priceBasis = PriceBasis.InstantBuy,
+            CurrencyValuation currencyValuation = null)
         {
+            var valuation = currencyValuation ?? CurrencyValuation.None;
             var sw = new Stopwatch();
             var timingLog = new List<string>();
 
@@ -244,7 +246,9 @@ namespace GW2CraftingHelper.Services
             // Step 7: Solve
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
-            var solveResult = _solver.Solve(treeUsedForSolve, prices, vendorOffers, priceBasis);
+            var solveResult = _solver.Solve(
+                treeUsedForSolve, prices, vendorOffers, priceBasis,
+                currencyValuation: valuation);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -310,7 +314,8 @@ namespace GW2CraftingHelper.Services
                 Metadata = metadata,
                 LearnedRecipeIds = learnedRecipeIds,
                 UsedMaterials = usedMaterials,
-                PriceBasis = priceBasis
+                PriceBasis = priceBasis,
+                CurrencyValuation = valuation
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -338,7 +343,7 @@ namespace GW2CraftingHelper.Services
         {
             var solveResult = _solver.Solve(
                 context.Tree, context.Prices, context.VendorOffers,
-                context.PriceBasis, overrides);
+                context.PriceBasis, overrides, context.CurrencyValuation);
 
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(
