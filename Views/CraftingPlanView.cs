@@ -87,8 +87,9 @@ namespace GW2CraftingHelper.Views
         // AutoSize height convergence; firing it on every >=1px resize tick
         // during a window drag flickers and transiently squashes deep tree
         // nodes. _resizeRenderPending gates a single in-flight debounce
-        // chain; the chain requeues itself until ResizeDebounceMs elapses
-        // since the last resize tick, then fires one render.
+        // ticker; each real frame it checks whether ResizeDebounceMs has
+        // elapsed since the last resize tick, then fires one render once it
+        // has - see ResizeDebounceStep and FrameTicker.
         private const int ResizeDebounceMs = 150;
         private DateTime _lastResizeEventUtc;
         private bool _resizeRenderPending;
@@ -98,18 +99,31 @@ namespace GW2CraftingHelper.Views
         // each frame and bails as soon as a newer restore has superseded it.
         private int _scrollRestoreGeneration;
 
+        // Live FrameTicker instances (null when idle). Tracked so Build()
+        // can cancel a leftover ticker from the previous build cycle before
+        // starting a new one, using the same SpriteScreen-parented cleanup
+        // pattern _suggestionPanel uses: these tickers are parented to the
+        // SpriteScreen rather than this view's own control tree, so nothing
+        // else tears them down when a tab is torn down or the module
+        // unloads. Each ticker also bails itself out on its own next frame
+        // (generation mismatch, panel swap, or panel detached) as a second
+        // line of defense.
+        private FrameTicker _scrollRestoreTicker;
+        private FrameTicker _scrollGuardTicker;
+        private FrameTicker _resizeDebounceTicker;
+
         // GameService.Overlay.QueueMainThreadUpdate, when re-queued from
         // inside its own queued callback, drains in the SAME frame rather
         // than waiting for the next real Update() tick (confirmed by
-        // identical-millisecond [M30#1] trace lines). ScrollFrameGate tells
-        // real frame advances apart from same-frame re-queues; these tune
-        // how many real frames the restore loop and its post-convergence
-        // guard run for, and the safety valve for a same-frame stall.
+        // identical-millisecond [M30#1] trace lines), so it cannot step
+        // frames at all. FrameTicker drives these from Control.DoUpdate
+        // instead, which the SpriteScreen invokes exactly once per real
+        // frame; these constants tune how many real frames the restore loop
+        // and its post-convergence guard run for.
         private const int ScrollRestoreMaxRealFrames = 30;
         private const int ScrollRestoreRequiredStableStreak = 3;
         private const int ScrollGuardWindowFrames = 20;
         private const int ScrollGuardHardCapFrames = 120;
-        private const int ScrollMaxSameFrameSpins = 400;
 
         public CraftingPlanView(
             Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
@@ -150,7 +164,8 @@ namespace GW2CraftingHelper.Views
         /// (up to ScrollRestoreMaxRealFrames), then a ScrollGuard keeps
         /// re-asserting for a further window of real frames to contest any
         /// late scrollbar reset Blish's Panel performs once layout finishes
-        /// settling. See RestoreScrollOffset and ScrollFrameGate.
+        /// settling. See RestoreScrollOffset, StartScrollGuard, and
+        /// FrameTicker.
         /// </summary>
         private void PreserveScrollAcross(Action mutate)
         {
@@ -168,33 +183,94 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Tells a real engine frame advance apart from QueueMainThreadUpdate
-        /// re-queuing itself and draining again within the SAME frame. A
-        /// call is a "real frame" the first time it is asked (no prior frame
-        /// to compare against) or whenever GameTime.TotalGameTime differs
-        /// from the previous real frame's; otherwise it is a same-frame spin.
-        /// SpinCount resets on every real frame so it budgets each stall
-        /// independently rather than accumulating across the whole loop.
+        /// Drives a per-real-frame step callback from Control.DoUpdate,
+        /// which the SpriteScreen invokes exactly once per real engine
+        /// Update() pass (GraphicsService.Update -> SpriteScreen.Update ->
+        /// Container.DoUpdate iterates its visible children -> child.Update
+        /// -> child.DoUpdate). Unlike GameService.Overlay.QueueMainThread-
+        /// Update - which drains a re-queued callback again within the SAME
+        /// frame instead of waiting for the next Update() tick, the defect
+        /// this class replaces - DoUpdate never fires more than once per
+        /// real frame, so no frame-gating is needed here.
+        ///
+        /// The step callback returns true to keep ticking next frame, false
+        /// to stop. A false return or an unhandled exception from the step
+        /// both dispose the ticker (detaching it from the SpriteScreen) so
+        /// it cannot keep running against stale state. A 1x1, fully
+        /// transparent, empty-Paint control parented to the SpriteScreen is
+        /// imperceptible; Visible must stay true because Container only
+        /// calls Update on children that are Visible (or not yet laid out).
         /// </summary>
-        private sealed class ScrollFrameGate
+        private sealed class FrameTicker : Control
         {
+            private readonly Func<GameTime, bool> _step;
             private TimeSpan? _lastFrameTime;
+            private bool _canceled;
 
-            public int SpinCount { get; private set; }
-
-            public bool IsRealFrame(GameTime gameTime)
+            public FrameTicker(Func<GameTime, bool> step)
             {
-                TimeSpan? current = gameTime?.TotalGameTime;
-                bool isNewFrame = !_lastFrameTime.HasValue || !current.HasValue || current.Value != _lastFrameTime.Value;
-                if (isNewFrame)
+                _step = step ?? throw new ArgumentNullException(nameof(step));
+                Size = new Point(1, 1);
+                Location = new Point(0, 0);
+                Visible = true;
+
+                var screen = GameService.Graphics?.SpriteScreen;
+                if (screen != null)
                 {
-                    _lastFrameTime = current;
-                    SpinCount = 0;
-                    return true;
+                    Parent = screen;
+                }
+            }
+
+            public override void DoUpdate(GameTime gameTime)
+            {
+                // Cheap belt-and-braces: DoUpdate is documented to fire
+                // once per real frame, so this should never trigger, but
+                // guards against a duplicate call with an unchanged
+                // TotalGameTime regardless.
+                TimeSpan? current = gameTime?.TotalGameTime;
+                if (_lastFrameTime.HasValue && current.HasValue && current.Value == _lastFrameTime.Value)
+                {
+                    return;
+                }
+                _lastFrameTime = current;
+
+                bool keepGoing;
+                try
+                {
+                    keepGoing = _step(gameTime);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex, "[M30#1] FrameTicker step failed; stopping");
+                    keepGoing = false;
                 }
 
-                SpinCount++;
-                return false;
+                if (!keepGoing)
+                {
+                    Cancel();
+                }
+            }
+
+            protected override void Paint(Microsoft.Xna.Framework.Graphics.SpriteBatch spriteBatch, Rectangle bounds)
+            {
+                // Intentionally empty - this control exists only to receive
+                // per-frame DoUpdate calls and must never draw anything.
+            }
+
+            protected override CaptureType CapturesInput()
+            {
+                // A default Control intercepts mouse input over its bounds;
+                // this one sits at the screen's (0,0) corner purely to
+                // receive DoUpdate calls and must never intercept a click or
+                // hover meant for whatever else is at that pixel.
+                return CaptureType.None;
+            }
+
+            public void Cancel()
+            {
+                if (_canceled) return;
+                _canceled = true;
+                Dispose();
             }
         }
 
@@ -219,41 +295,25 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            var frameGate = new ScrollFrameGate();
             int realFrame = 0;
             float lastWrittenRatio = -1f;
             int lastContentHeight = -1;
             int stableStreak = 0;
 
-            void Tick(GameTime gameTime)
+            bool Tick(GameTime gameTime)
             {
-                // A newer restore superseded this loop, or Build() swapped
-                // in a fresh content panel: stop immediately rather than
-                // fight the current restore or scroll a stale/disposed panel.
-                if (capturedGeneration != _scrollRestoreGeneration || capturedPanel != _contentPanel)
+                // A newer restore superseded this loop, Build() swapped in
+                // a fresh content panel, or the panel was torn down (tab
+                // switch / module unload): stop immediately rather than
+                // fight the current restore or scroll a stale/disposed
+                // panel.
+                if (capturedGeneration != _scrollRestoreGeneration ||
+                    capturedPanel != _contentPanel || capturedPanel.Parent == null)
                 {
-                    Logger.Info("[M30#1] ScrollRestore bail gen={0} currentGen={1} panelSwapped={2} realFrame={3}",
-                        capturedGeneration, _scrollRestoreGeneration, capturedPanel != _contentPanel, realFrame);
-                    return;
-                }
-
-                // Same-frame drain guard: QueueMainThreadUpdate re-queued
-                // from inside its own callback runs immediately in the same
-                // frame instead of waiting for the next Update(). Re-queue
-                // without touching attempts/stability/the scrollbar until a
-                // real frame actually arrives, with a safety valve so a
-                // pathological same-frame loop cannot spin forever.
-                if (!frameGate.IsRealFrame(gameTime))
-                {
-                    if (frameGate.SpinCount >= ScrollMaxSameFrameSpins)
-                    {
-                        Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=spin-cap finalRatio={2:F4} finalContentH={3}",
-                            capturedGeneration, realFrame, lastWrittenRatio, lastContentHeight);
-                        return;
-                    }
-
-                    GameService.Overlay.QueueMainThreadUpdate(Tick);
-                    return;
+                    Logger.Info("[M30#1] ScrollRestore bail gen={0} currentGen={1} panelSwapped={2} panelDetached={3} realFrame={4}",
+                        capturedGeneration, _scrollRestoreGeneration, capturedPanel != _contentPanel,
+                        capturedPanel.Parent == null, realFrame);
+                    return false;
                 }
 
                 try
@@ -284,14 +344,12 @@ namespace GW2CraftingHelper.Views
                     {
                         Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason=user-scroll finalRatio={2:F4} finalContentH={3}",
                             capturedGeneration, realFrame, lastWrittenRatio, contentHeight);
-                        return;
+                        return false;
                     }
 
                     float ratio = ScrollMath.RatioForOffset(
                         savedOffset, contentHeight, capturedPanel.Height);
                     realFrame++;
-                    Logger.Info("[M30#1] ScrollRestore tick gen={0} realFrame={1} savedOffsetPx={2} contentH={3} panelH={4} ratio={5:F4} lastRatio={6:F4}",
-                        capturedGeneration, realFrame, savedOffset, contentHeight, capturedPanel.Height, ratio, lastWrittenRatio);
                     scrollbar.ScrollDistance = ratio;
 
                     bool ratioStable = System.Math.Abs(ratio - lastWrittenRatio) < 0.0005f;
@@ -302,26 +360,27 @@ namespace GW2CraftingHelper.Views
                     bool converged = stableStreak >= ScrollRestoreRequiredStableStreak;
                     if (realFrame < ScrollRestoreMaxRealFrames && !converged)
                     {
-                        GameService.Overlay.QueueMainThreadUpdate(Tick);
+                        return true;
                     }
-                    else
-                    {
-                        string reason = converged ? "stable" : "max-attempts";
-                        Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason={2} finalRatio={3:F4} finalContentH={4}",
-                            capturedGeneration, realFrame, reason, ratio, contentHeight);
 
-                        StartScrollGuard(capturedPanel, capturedGeneration, savedOffset, scrollbar);
-                    }
+                    string reason = converged ? "stable" : "max-attempts";
+                    Logger.Info("[M30#1] ScrollRestore stop gen={0} attempts={1} reason={2} finalRatio={3:F4} finalContentH={4}",
+                        capturedGeneration, realFrame, reason, ratio, contentHeight);
+
+                    StartScrollGuard(capturedPanel, capturedGeneration, savedOffset, scrollbar);
+                    return false;
                 }
                 catch (Exception ex)
                 {
                     // Reflection/layout mismatch, or the panel/scrollbar was
                     // disposed out from under us: degrade to reset-to-top.
                     Logger.Warn(ex, "[M30#1] scroll restore/guard degraded");
+                    return false;
                 }
             }
 
-            GameService.Overlay.QueueMainThreadUpdate(Tick);
+            _scrollRestoreTicker?.Cancel();
+            _scrollRestoreTicker = new FrameTicker(Tick);
         }
 
         /// <summary>
@@ -339,30 +398,19 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void StartScrollGuard(Panel capturedPanel, int capturedGeneration, int savedOffset, Scrollbar scrollbar)
         {
-            var frameGate = new ScrollFrameGate();
             int totalFrames = 0;
             int remaining = ScrollGuardWindowFrames;
             int lastContentHeight = -1;
 
-            void GuardTick(GameTime gameTime)
+            bool GuardTick(GameTime gameTime)
             {
-                if (capturedGeneration != _scrollRestoreGeneration || capturedPanel != _contentPanel)
+                if (capturedGeneration != _scrollRestoreGeneration ||
+                    capturedPanel != _contentPanel || capturedPanel.Parent == null)
                 {
-                    Logger.Info("[M30#1] ScrollGuard bail gen={0} currentGen={1} panelSwapped={2} frames={3}",
-                        capturedGeneration, _scrollRestoreGeneration, capturedPanel != _contentPanel, totalFrames);
-                    return;
-                }
-
-                if (!frameGate.IsRealFrame(gameTime))
-                {
-                    if (frameGate.SpinCount >= ScrollMaxSameFrameSpins)
-                    {
-                        Logger.Info("[M30#1] ScrollGuard end frames={0} reason=spin-cap", totalFrames);
-                        return;
-                    }
-
-                    GameService.Overlay.QueueMainThreadUpdate(GuardTick);
-                    return;
+                    Logger.Info("[M30#1] ScrollGuard bail gen={0} currentGen={1} panelSwapped={2} panelDetached={3} frames={4}",
+                        capturedGeneration, _scrollRestoreGeneration, capturedPanel != _contentPanel,
+                        capturedPanel.Parent == null, totalFrames);
+                    return false;
                 }
 
                 try
@@ -408,7 +456,7 @@ namespace GW2CraftingHelper.Views
                         // re-arming from here is now impossible.
                         Logger.Info("[M30#1] ScrollGuard end gen={0} frames={1} reason=user-scroll",
                             capturedGeneration, totalFrames);
-                        return;
+                        return false;
                     }
                     else
                     {
@@ -417,12 +465,11 @@ namespace GW2CraftingHelper.Views
 
                     if (remaining > 0 && totalFrames < ScrollGuardHardCapFrames)
                     {
-                        GameService.Overlay.QueueMainThreadUpdate(GuardTick);
+                        return true;
                     }
-                    else
-                    {
-                        Logger.Info("[M30#1] ScrollGuard end frames={0}", totalFrames);
-                    }
+
+                    Logger.Info("[M30#1] ScrollGuard end frames={0}", totalFrames);
+                    return false;
                 }
                 catch (Exception ex)
                 {
@@ -430,10 +477,12 @@ namespace GW2CraftingHelper.Views
                     // panel/scrollbar was disposed out from under us - stop
                     // guarding.
                     Logger.Warn(ex, "[M30#1] scroll restore/guard degraded");
+                    return false;
                 }
             }
 
-            GameService.Overlay.QueueMainThreadUpdate(GuardTick);
+            _scrollGuardTicker?.Cancel();
+            _scrollGuardTicker = new FrameTicker(GuardTick);
         }
 
         private void OnSelectedItemChanged(int itemId)
@@ -445,6 +494,19 @@ namespace GW2CraftingHelper.Views
         {
             // Clean up screen-parented popup from previous build cycle
             _suggestionPanel?.Dispose();
+
+            // Same cleanup for any leftover scroll-restore/guard/resize-
+            // debounce tickers from the previous build cycle - see the
+            // field comments above. Reset _resizeRenderPending too, or a
+            // ticker canceled mid-debounce here would leave it stuck true
+            // and silently disable all future resize debouncing.
+            _scrollRestoreTicker?.Cancel();
+            _scrollRestoreTicker = null;
+            _scrollGuardTicker?.Cancel();
+            _scrollGuardTicker = null;
+            _resizeDebounceTicker?.Cancel();
+            _resizeDebounceTicker = null;
+            _resizeRenderPending = false;
 
             int w = buildPanel.ContentRegion.Width;
 
@@ -595,7 +657,7 @@ namespace GW2CraftingHelper.Views
 
             // Re-render plan content when width changes (centered title, right-aligned
             // timestamps). Debounced to a single trailing render fired once the
-            // resize drag settles - see ResizeDebounceTick and the _resize*
+            // resize drag settles - see ResizeDebounceStep and the _resize*
             // fields for why.
             if (_currentPlan != null && w != _lastRenderedWidth)
             {
@@ -603,33 +665,33 @@ namespace GW2CraftingHelper.Views
                 if (!_resizeRenderPending)
                 {
                     _resizeRenderPending = true;
-                    GameService.Overlay.QueueMainThreadUpdate(ResizeDebounceTick);
+                    _resizeDebounceTicker?.Cancel();
+                    _resizeDebounceTicker = new FrameTicker(ResizeDebounceStep);
                 }
             }
         }
 
         /// <summary>
-        /// Trailing edge of the resize debounce. Requeues itself on the main
-        /// thread while resize events keep landing within ResizeDebounceMs of
-        /// one another, then fires a single re-render once the drag settles.
-        /// _resizeRenderPending guarantees only one of these chains is ever
+        /// Trailing edge of the resize debounce. Ticks once per real frame
+        /// while resize events keep landing within ResizeDebounceMs of one
+        /// another, then fires a single re-render once the drag settles.
+        /// _resizeRenderPending guarantees only one of these tickers is ever
         /// running, so repeated resize ticks just extend _lastResizeEventUtc
-        /// rather than spawning parallel chains.
+        /// rather than spawning parallel tickers.
         /// </summary>
-        private void ResizeDebounceTick(GameTime gameTime)
+        private bool ResizeDebounceStep(GameTime gameTime)
         {
             // The view may have been unloaded (tab switched away, module
             // disabled) while this was pending - nothing to render into.
-            if (_contentPanel == null)
+            if (_contentPanel == null || _contentPanel.Parent == null)
             {
                 _resizeRenderPending = false;
-                return;
+                return false;
             }
 
             if ((DateTime.UtcNow - _lastResizeEventUtc).TotalMilliseconds < ResizeDebounceMs)
             {
-                GameService.Overlay.QueueMainThreadUpdate(ResizeDebounceTick);
-                return;
+                return true;
             }
 
             _resizeRenderPending = false;
@@ -637,7 +699,7 @@ namespace GW2CraftingHelper.Views
             try
             {
                 // Re-read the panel width fresh rather than trust whatever w
-                // was captured by the resize tick that queued this chain -
+                // was captured by the resize tick that started this ticker -
                 // only the width at the moment the drag actually settled
                 // matters.
                 int currentWidth = _contentPanel.Width;
@@ -655,6 +717,8 @@ namespace GW2CraftingHelper.Views
                 // is current already rendered fresh content at its own width.
                 Logger.Warn(ex, "Resize debounce render skipped; content panel unavailable");
             }
+
+            return false;
         }
 
         private void OnOwnMaterialsToggled(object sender, CheckChangedEvent e)
