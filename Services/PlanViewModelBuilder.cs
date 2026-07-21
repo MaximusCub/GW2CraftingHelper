@@ -224,7 +224,7 @@ namespace GW2CraftingHelper.Services
                     CurrencyCosts = CurrencyDisplayResolver.ResolveAmounts(
                         step.VendorCurrencyCosts, result.CurrencyMetadata),
                     UnitCurrencyCosts = CurrencyDisplayResolver.ResolveUnitAmounts(
-                        step.VendorCurrencyCosts, step.Quantity, result.CurrencyMetadata)
+                        step.VendorOfferOutputCount, step.VendorOfferCurrencyCostLinesPerBatch, result.CurrencyMetadata)
                 });
             }
 

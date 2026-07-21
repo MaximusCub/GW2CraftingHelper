@@ -72,6 +72,14 @@ namespace GW2CraftingHelper.Models
         public long Amount { get; set; }
         public string Name { get; set; }
         public string IconUrl { get; set; }
+
+        // Non-null only for a fractional-per-unit "Each" amount (M34-B1
+        // #2): when a vendor offer's true per-unit rate does not divide
+        // evenly (e.g. "2 for 3"), the renderer displays this literal
+        // bundle text instead of Amount, rather than inventing a rounded
+        // number. Null for every whole-number amount and for every Total
+        // (non-"Each") amount - see CurrencyDisplayResolver.ResolveUnitAmounts.
+        public string BundleLabel { get; set; }
     }
 
     public class PlanSectionViewModel

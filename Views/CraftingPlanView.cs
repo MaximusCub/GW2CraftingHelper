@@ -3672,7 +3672,11 @@ namespace GW2CraftingHelper.Views
 
             foreach (var amount in amounts)
             {
-                string text = amount.Amount.ToString();
+                // M34-B1 #2: a fractional-per-unit "Each" amount carries a
+                // literal "N for M" bundle label instead of a whole-number
+                // Amount (CurrencyDisplayResolver.ResolveUnitAmounts) -
+                // render that text verbatim rather than the numeric amount.
+                string text = amount.BundleLabel ?? amount.Amount.ToString();
                 int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
                 segments.Add(new CurrencySegmentSpec { IconUrl = amount.IconUrl, Text = text, TextWidth = width });
             }

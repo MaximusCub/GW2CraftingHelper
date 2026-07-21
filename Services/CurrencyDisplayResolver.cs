@@ -83,29 +83,51 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Per-unit counterpart of ResolveAmounts: each line's total Count
-        /// is integer-divided by quantity, the same truncating division
-        /// PlanSolver.AggregateStep already uses for UnitCost. quantity
-        /// &lt;= 0 (should not happen for a real row, but a plan step can
-        /// in principle be malformed) returns null rather than dividing by
-        /// zero.
+        /// Per-unit ("Each") counterpart of ResolveAmounts for a vendor-
+        /// priced currency cost - the WINNING OFFER's true per-unit rate
+        /// (its own per-batch cost line divided by its own OutputCount), not
+        /// a truncated average over the row's aggregated total/Quantity
+        /// (M34-B1 #2). The previous total/quantity truncating-average
+        /// approach could show a misleading "1" for a merged row whose real
+        /// purchases were e.g. 3-for-3 plus 1-for-1 batches; this resolves
+        /// the actual offer rate instead.
+        ///
+        /// perBatchCostLines/outputCount come from PlanStep.
+        /// VendorOfferCurrencyCostLinesPerBatch/VendorOfferOutputCount,
+        /// which are only populated when every tree occurrence merged into
+        /// that step used the identical winning offer (see
+        /// PlanSolver.FinalizeVendorBatches) - null/0 otherwise (mixed
+        /// offers, or a non-vendor row), in which case this returns null
+        /// rather than reviving the old misleading average: gw2efficiency
+        /// itself never shows a per-unit currency price at all (docs/
+        /// gw2e-parity-spec.md Section 4.3/directive 5), so omitting the
+        /// Each cell is the closer parity choice than guessing.
+        ///
+        /// When a line's per-batch count does not divide evenly by
+        /// outputCount, the true rate is not a whole number; rather than
+        /// round (inventing data the spec doesn't ask for), the amount
+        /// carries a literal "N for M" bundle label instead (see
+        /// CurrencyAmountViewModel.BundleLabel) for the caller to render as
+        /// text.
         /// </summary>
         public static List<CurrencyAmountViewModel> ResolveUnitAmounts(
-            IReadOnlyList<CostLine> costLines,
-            int quantity,
+            int outputCount,
+            IReadOnlyList<CostLine> perBatchCostLines,
             IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
         {
-            if (costLines == null || costLines.Count == 0 || quantity <= 0)
+            if (perBatchCostLines == null || perBatchCostLines.Count == 0 || outputCount <= 0)
             {
                 return null;
             }
 
-            var result = new List<CurrencyAmountViewModel>(costLines.Count);
-            foreach (var line in costLines)
+            var result = new List<CurrencyAmountViewModel>(perBatchCostLines.Count);
+            foreach (var line in perBatchCostLines)
             {
+                bool evenly = line.Count % outputCount == 0;
                 result.Add(new CurrencyAmountViewModel
                 {
-                    Amount = line.Count / quantity,
+                    Amount = evenly ? line.Count / outputCount : 0,
+                    BundleLabel = evenly ? null : $"{line.Count} for {outputCount}",
                     Name = ResolveName(line.Id, currencyMetadata),
                     IconUrl = ResolveIconUrl(line.Id, currencyMetadata)
                 });

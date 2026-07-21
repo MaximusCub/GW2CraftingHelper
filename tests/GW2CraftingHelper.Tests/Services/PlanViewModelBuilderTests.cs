@@ -472,22 +472,50 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ShoppingList_VendorRow_UnitCurrencyCosts_DividedByQuantity()
+        public void ShoppingList_VendorRow_UnitCurrencyCosts_UsesWinningOfferRate()
         {
+            // M34-B1 #2: Each is the winning offer's own per-batch rate
+            // (VendorOfferCurrencyCostLinesPerBatch / VendorOfferOutputCount
+            // - here a 4-for-4 batch bought 100 times = 400 total), not a
+            // total/Quantity average over the aggregated row.
             var result = MakeResult(steps: new List<PlanStep>
             {
                 new PlanStep
                 {
-                    ItemId = 1, Quantity = 4, Source = AcquisitionSource.BuyFromVendor,
+                    ItemId = 1, Quantity = 400, Source = AcquisitionSource.BuyFromVendor,
                     TotalCost = 0, UnitCost = 0,
-                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 400 } }
+                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 400 } },
+                    VendorOfferOutputCount = 4,
+                    VendorOfferCurrencyCostLinesPerBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 4 } }
                 }
             });
             var vm = _builder.Build(result);
 
             var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
-            Assert.Equal(100, row.UnitCurrencyCosts[0].Amount);
+            Assert.Equal(1, row.UnitCurrencyCosts[0].Amount);
             Assert.Equal(400, row.CurrencyCosts[0].Amount);
+        }
+
+        [Fact]
+        public void ShoppingList_VendorRow_MixedOfferConflict_NoBatchInfo_UnitCurrencyCostsNull()
+        {
+            // A step whose tree occurrences resolved to more than one
+            // distinct offer (PlanSolver's Conflict case) carries no batch
+            // info - Each must be omitted, never an invented/guessed rate.
+            var result = MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep
+                {
+                    ItemId = 1, Quantity = 101, Source = AcquisitionSource.BuyFromVendor,
+                    TotalCost = 0, UnitCost = 0,
+                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 152 } }
+                }
+            });
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Null(row.UnitCurrencyCosts);
+            Assert.Equal(152, row.CurrencyCosts[0].Amount);
         }
 
         [Fact]
