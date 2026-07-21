@@ -505,7 +505,15 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public CraftingPlanResult ResolveWithOverrides(
             PlanSolveContext context,
-            IReadOnlyDictionary<int, AcquisitionSource> overrides)
+            IReadOnlyDictionary<int, AcquisitionSource> overrides,
+            // M34-B2b (gw2e "Ignore" pill): item ids the user has manually
+            // marked "fully in-hand" for this session, re-applied on every
+            // local re-solve the same way `overrides` is - see
+            // PlanSolver.Solve's ignoredItemIds parameter. Not part of
+            // PlanSolveContext: unlike ForceBuyOnlyNodeIds (computed once at
+            // GENERATION time), this is live session state supplied fresh by
+            // the caller on every re-solve, exactly like `overrides` itself.
+            ISet<int> ignoredItemIds = null)
         {
             // M34-B2a #3: reapply the SAME force-buy pre-pass result the
             // original generation computed, so a local per-node override
@@ -523,7 +531,8 @@ namespace GW2CraftingHelper.Services
                 context.Tree, context.Prices, context.VendorOffers,
                 context.PriceBasis, overrides, context.CurrencyValuation,
                 forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
-                assignNodeIds: false);
+                assignNodeIds: false,
+                ignoredItemIds: ignoredItemIds);
 
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(
@@ -536,7 +545,7 @@ namespace GW2CraftingHelper.Services
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(
                 context.Tree, solveResult.Decisions, context.Metadata, context.AcquisitionHints,
-                context.OwnedQuantityUsedByNodeId);
+                context.OwnedQuantityUsedByNodeId, ignoredItemIds);
 
             ApplySellSideEconomics(
                 result, context.Tree, solveResult, context.Prices,
@@ -549,7 +558,7 @@ namespace GW2CraftingHelper.Services
                 result.DebugLog = new List<string>();
             }
             result.DebugLog.Insert(0,
-                $"Local re-solve with {overrides?.Count ?? 0} override(s)");
+                $"Local re-solve with {overrides?.Count ?? 0} override(s), {ignoredItemIds?.Count ?? 0} ignored item(s)");
 
             return result;
         }

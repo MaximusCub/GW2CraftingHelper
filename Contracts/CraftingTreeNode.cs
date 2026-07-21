@@ -34,6 +34,17 @@ namespace GW2CraftingHelper.Contracts
         // Decision.Have) were visible at all.
         public int OwnedQuantityUsed { get; set; }
 
+        // True when the user manually marked this item's id "Ignore" (M34-
+        // B2b, gw2e parity - see PlanSolver's ignoredItemIds parameter and
+        // the "IGNORE"/"IGNORED" pill). Distinct from genuine full ownership
+        // (Quantity == 0 via real inventory reduction): CraftingTreeBuilder
+        // sets Decision = Have for an ignored node too (its cost is zero and
+        // it generates no crafting step, same as a truly-owned node), but
+        // this flag lets the pill layer still show an active, clickable
+        // "IGNORED" toggle alongside HAVE instead of the plain single HAVE
+        // pill a naturally-owned node gets.
+        public bool IsIgnored { get; set; }
+
         // Feasible acquisition paths for this node (drives override cycling).
         public bool CanCraft { get; set; }
         public bool CanBuyTp { get; set; }

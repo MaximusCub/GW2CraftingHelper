@@ -293,6 +293,113 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, treeNode.Quantity);
             Assert.False(treeNode.IsReferenceBranch);
             Assert.Empty(treeNode.Children);
+            Assert.False(treeNode.IsIgnored); // genuine ownership, not the M34-B2b Ignore toggle
+        }
+
+        // ---- M34-B2b: manually "Ignore"-d items collapse to Have + IsIgnored ----
+
+        [Fact]
+        public void IgnoredItem_CollapsesToHave_SetsIsIgnored()
+        {
+            var node = Leaf(1, 5); // real, non-zero demand
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>
+            {
+                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } }
+            };
+            var metadata = Meta((1, "Ignored Item", "ignored.png"));
+            var ignoredItemIds = new HashSet<int> { 1 };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, ignoredItemIds: ignoredItemIds);
+
+            Assert.Equal(CraftingDecision.Have, treeNode.Decision);
+            Assert.True(treeNode.IsIgnored);
+            Assert.Equal(5, treeNode.Quantity); // Quantity itself is untouched - only the display/decision collapses
+            Assert.Empty(treeNode.Children);
+        }
+
+        [Fact]
+        public void IgnoredItemIds_DifferentItemId_NotAffected()
+        {
+            var node = Leaf(1, 5);
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>
+            {
+                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } }
+            };
+            var metadata = Meta((1, "Item", "i.png"));
+            var ignoredItemIds = new HashSet<int> { 999 }; // different item id
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, ignoredItemIds: ignoredItemIds);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, treeNode.Decision);
+            Assert.False(treeNode.IsIgnored);
+        }
+
+        [Fact]
+        public void IgnoredItemIds_Null_BehavesExactlyAsBefore()
+        {
+            var node = Leaf(1, 5);
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>
+            {
+                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } }
+            };
+            var metadata = Meta((1, "Item", "i.png"));
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, treeNode.Decision);
+            Assert.False(treeNode.IsIgnored);
+        }
+
+        [Fact]
+        public void IgnoredItemIds_CurrencyNode_NeverCollapsedByIgnore()
+        {
+            // Ignore is scoped to Item nodes only (M34-B2b) - a Currency
+            // node sharing the same numeric id must keep its normal
+            // Currency treatment, never collapse to Have.
+            var node = Leaf(23, 100, "Currency");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+            var ignoredItemIds = new HashSet<int> { 23 };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, ignoredItemIds: ignoredItemIds);
+
+            Assert.Equal(CraftingDecision.Currency, treeNode.Decision);
+            Assert.False(treeNode.IsIgnored);
+        }
+
+        [Fact]
+        public void IgnoredItemIds_PropagatesToMatchingChild()
+        {
+            var ingredient = Leaf(2, 3);
+            var option = Option(10, 1, 1, ingredient);
+            var root = Craftable(1, 1, option);
+
+            var solver = new PlanSolver();
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+            };
+            var solveResult = solver.Solve(root, prices, null);
+
+            var metadata = Meta((1, "Root", "r.png"), (2, "Child", "c.png"));
+            var ignoredItemIds = new HashSet<int> { 2 }; // ingredient's item id, not root's
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(root, solveResult.Decisions, metadata, ignoredItemIds: ignoredItemIds);
+
+            Assert.NotEqual(CraftingDecision.Have, treeNode.Decision); // root unaffected
+            Assert.Single(treeNode.Children);
+            Assert.Equal(CraftingDecision.Have, treeNode.Children[0].Decision);
+            Assert.True(treeNode.Children[0].IsIgnored);
         }
 
         [Fact]

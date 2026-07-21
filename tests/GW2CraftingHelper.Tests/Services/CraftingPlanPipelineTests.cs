@@ -1275,6 +1275,73 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(result.MaterialOpportunityCost);
         }
 
+        // --- M34-B2b: "Ignore" pill threaded through ResolveWithOverrides ---
+
+        [Fact]
+        public async Task ResolveWithOverrides_IgnoredItemIds_ZeroesIngredientCost()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi, ingredientCount: 5);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000); // buying the target outright is far pricier - craft wins
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100); // BuyInstant (craft-cost basis) = 100
+
+            // No snapshot: nothing owned via real reduction, so the baseline
+            // craft cost is the full 5x100=500.
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            Assert.Equal(500, initial.Plan.TotalCoinCost);
+
+            var resolved = pipeline.ResolveWithOverrides(
+                initial.SolveContext, null, new HashSet<int> { 2 });
+
+            Assert.Equal(0, resolved.Plan.TotalCoinCost);
+            // Item 2 (the ignored ingredient) generates no step at all;
+            // item 1 (the root) still crafts, now at zero cost.
+            Assert.DoesNotContain(resolved.Plan.Steps, s => s.ItemId == 2);
+            Assert.Contains(resolved.Plan.Steps, s => s.ItemId == 1 && s.Source == AcquisitionSource.Craft && s.TotalCost == 0);
+            Assert.Equal(Contracts.CraftingDecision.Have, resolved.CraftingTree.Children[0].Decision);
+            Assert.True(resolved.CraftingTree.Children[0].IsIgnored);
+        }
+
+        [Fact]
+        public async Task ResolveWithOverrides_NullIgnoredItemIds_BehavesExactlyAsBefore()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi, ingredientCount: 5);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100); // BuyInstant (craft-cost basis) = 100
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, null);
+
+            Assert.Equal(500, resolved.Plan.TotalCoinCost);
+            Assert.False(resolved.CraftingTree.Children[0].IsIgnored);
+        }
+
+        [Fact]
+        public async Task ResolveWithOverrides_IgnoredItemIds_ManualOverrideOnSameNodeStillApplies()
+        {
+            // Ignore and the craft/buy override pill are documented as
+            // orthogonal (r2 report Section 3.2) - overriding the ROOT to
+            // BuyFromTp while its ingredient is separately ignored must
+            // still switch the root to BuyFromTp; the two mechanisms key
+            // off different things (NodeId vs ItemId) and must not collide.
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi, ingredientCount: 5);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100); // BuyInstant (craft-cost basis) = 100
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            int rootNodeId = initial.SolveContext.Tree.NodeId;
+
+            var overrides = new Dictionary<int, AcquisitionSource> { { rootNodeId, AcquisitionSource.BuyFromTp } };
+            var resolved = pipeline.ResolveWithOverrides(
+                initial.SolveContext, overrides, new HashSet<int> { 2 });
+
+            Assert.Equal(Contracts.CraftingDecision.BuyFromTp, resolved.CraftingTree.Decision);
+            Assert.Equal(20000, resolved.Plan.TotalCoinCost); // manual override wins on the root regardless of the sibling Ignore
+        }
+
         [Fact]
         public async Task Structured_ValuedMode_UsedMaterialPrices_AlreadyCoveredByTreeFetch()
         {

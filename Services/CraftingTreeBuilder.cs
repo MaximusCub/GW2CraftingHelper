@@ -12,10 +12,12 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, SolverDecision> decisions,
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             IReadOnlyDictionary<int, AcquisitionHint> hints = null,
-            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId = null)
+            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId = null,
+            ISet<int> ignoredItemIds = null)
         {
             return BuildNode(node: root, decisions: decisions, metadata: metadata, hints: hints,
-                insideReferenceBranch: false, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId);
+                insideReferenceBranch: false, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId,
+                ignoredItemIds: ignoredItemIds);
         }
 
         private static CraftingTreeNode BuildNode(
@@ -24,7 +26,8 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             IReadOnlyDictionary<int, AcquisitionHint> hints,
             bool insideReferenceBranch,
-            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId)
+            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
+            ISet<int> ignoredItemIds)
         {
             var treeNode = new CraftingTreeNode
             {
@@ -49,6 +52,21 @@ namespace GW2CraftingHelper.Services
             if (node.Quantity == 0)
             {
                 treeNode.Decision = CraftingDecision.Have;
+                return treeNode;
+            }
+
+            // M34-B2b: a manually "Ignore"-d item id (per PlanSolver's own
+            // matching short-circuit in Evaluate/Collect, which already
+            // zeroed this node's cost and generated no step) collapses to
+            // the same Have display a genuinely-owned node gets - IsIgnored
+            // is the only thing that distinguishes the two for the pill
+            // layer (see DecisionPillPlanner). Item-only, matching the
+            // solver's own scope decision.
+            if (node.IngredientType == "Item" &&
+                ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+            {
+                treeNode.Decision = CraftingDecision.Have;
+                treeNode.IsIgnored = true;
                 return treeNode;
             }
 
@@ -96,7 +114,7 @@ namespace GW2CraftingHelper.Services
                     // a reference branch is still hypothetical content, and
                     // must keep suppressing further reference branches
                     // below it - see the cap comment below for why.
-                    treeNode.Children = BuildChildren(recipe, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId);
+                    treeNode.Children = BuildChildren(recipe, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId, ignoredItemIds);
                 }
             }
             else if (!insideReferenceBranch &&
@@ -129,7 +147,7 @@ namespace GW2CraftingHelper.Services
                 // reference branches restart at every such alternation
                 // measured as an effectively unbounded hang on a real deep
                 // item (Deldrimor Steel Ingot) during manual verification.
-                treeNode.Children = BuildChildren(node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId);
+                treeNode.Children = BuildChildren(node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId, ignoredItemIds: ignoredItemIds);
                 treeNode.IsReferenceBranch = true;
             }
 
@@ -174,12 +192,13 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             IReadOnlyDictionary<int, AcquisitionHint> hints,
             bool insideReferenceBranch,
-            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId)
+            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
+            ISet<int> ignoredItemIds)
         {
             var children = new List<CraftingTreeNode>(recipe.Ingredients.Count);
             foreach (var ingredient in recipe.Ingredients)
             {
-                children.Add(BuildNode(ingredient, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId));
+                children.Add(BuildNode(ingredient, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId, ignoredItemIds));
             }
             return children;
         }

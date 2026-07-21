@@ -112,7 +112,18 @@ namespace GW2CraftingHelper.Services
             // under the pre-pass's own already-computed forceBuyOnlyNodeIds
             // set. Every other caller keeps the default (true), unchanged
             // from this method's original always-reassign behavior.
-            bool assignNodeIds = true)
+            bool assignNodeIds = true,
+            // M34-B2b (gw2e "Ignore" pill): item ids in this set are
+            // treated as fully in-hand tree-wide for THIS solve only -
+            // every occurrence contributes zero cost, generates no
+            // crafting step or shopping row, and does not recurse into its
+            // own recipe's ingredients (matching gw2e's usedQuantity == 0
+            // => free/no-step rule - see m34-r2-gw2e-owned-materials.md
+            // Section 2.1/5). Unlike `overrides` (a per-NodeId craft/buy
+            // choice), this is per-ItemId, matching gw2e's own "Ignore
+            // marks every occurrence of that item id, tree-wide" semantics.
+            // Null (the default) behaves exactly as before this feature.
+            ISet<int> ignoredItemIds = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
             var memo = new Dictionary<int, Decision>();
@@ -127,7 +138,7 @@ namespace GW2CraftingHelper.Services
             }
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics);
+            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -136,7 +147,7 @@ namespace GW2CraftingHelper.Services
             var vendorBatchTracking = new Dictionary<(int, AcquisitionSource, int), VendorBatchState>();
             int craftCounter = 0;
 
-            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, ref craftCounter);
+            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, ref craftCounter, ignoredItemIds);
 
             // Pass 2b (M34-B1 #1/#3): re-derive each merged vendor step's
             // true cost from its AGGREGATE Quantity and the winning offer's
@@ -239,11 +250,39 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, AcquisitionSource> overrides,
             CurrencyValuation currencyValuation,
             ISet<int> forceBuyOnlyNodeIds = null,
-            Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null)
+            Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
+            ISet<int> ignoredItemIds = null)
         {
             if (node.IngredientType == "Currency")
             {
                 return null;
+            }
+
+            // M34-B2b: an "Ignore"-d item id is treated as fully in-hand for
+            // THIS node - zero cost, no recipe/vendor/TP evaluation, and (by
+            // never recursing into node.Recipes here) no draw on this
+            // node's own ingredients either, matching gw2e's "an un-crafted
+            // branch never asks for its ingredients" rule (Section 1.3 of
+            // the r2 report) applied to the synthetic fully-owned case.
+            // CanCraft/CanBuyTp/CanBuyVendor are left false: this node's own
+            // real feasibility is irrelevant once ignored, and
+            // CraftingTreeBuilder never reads them for an ignored node
+            // anyway (it short-circuits to Have, same as Quantity == 0).
+            if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+            {
+                memo[node.NodeId] = new Decision
+                {
+                    Source = AcquisitionSource.UnknownSource,
+                    TotalCost = 0L,
+                    ComparisonValue = 0L,
+                    RecipeId = 0,
+                    VendorCurrencyCosts = null,
+                    CanCraft = false,
+                    CanBuyTp = false,
+                    CanBuyVendor = false,
+                    VendorBatch = null
+                };
+                return 0L;
             }
 
             long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices, priceBasis);
@@ -354,7 +393,7 @@ namespace GW2CraftingHelper.Services
 
                     long? ingredientCost = Evaluate(
                         ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation,
-                        forceBuyOnlyNodeIds, costDiagnostics);
+                        forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds);
                     craftCost += ingredientCost ?? 0L;
                     craftRealCost += memo[ingredient.NodeId].TotalCost ?? 0L;
                 }
@@ -771,7 +810,8 @@ namespace GW2CraftingHelper.Services
             Dictionary<int, long> currencyMap,
             Dictionary<(int, int), int> craftOrder,
             Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
-            ref int craftCounter)
+            ref int craftCounter,
+            ISet<int> ignoredItemIds = null)
         {
             if (node.IngredientType == "Currency")
             {
@@ -783,6 +823,18 @@ namespace GW2CraftingHelper.Services
                 {
                     currencyMap[node.Id] = node.Quantity;
                 }
+                return;
+            }
+
+            // M34-B2b: an ignored item generates no crafting step and no
+            // shopping row at all - it is fully in-hand, same as a real
+            // Quantity == 0 node's "usedQuantity == 0 -> no step" gw2e
+            // parity target (Section 5 of the r2 report). Evaluate already
+            // committed a zero-cost memo entry for it (never recursing into
+            // its own ingredients), so skipping it here as well keeps the
+            // plan free of a bogus "buy 0-cost N units" row.
+            if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+            {
                 return;
             }
 
@@ -799,7 +851,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var ingredient in chosenRecipe.Ingredients)
                     {
-                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, ref craftCounter);
+                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, ref craftCounter, ignoredItemIds);
                     }
                 }
 
