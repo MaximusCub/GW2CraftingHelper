@@ -912,6 +912,11 @@ left unset for a multi-item batch - see 21.3's divergence note.
   echoing gw2e's "Profit numbers..." text verbatim, since this module
   currently shows no profit figure at all in multi mode to be "the sum
   of." A future milestone could add a batch-level profit rollup.
+  FIXED in M37 - see item #25 below for the full mechanism and
+  divergence record; the per-root "sell excess crafted components for
+  profit" pill (gw2e's `showprofit` per-node display) remains out of
+  scope, and the `MultiItemNote` text now echoes gw2e's banner
+  verbatim instead of the placeholder wording described above.
 
 **VERIFICATION STATE**: build green, full test suite green (Blish-free
 production-path tests: `ItemRowRequestBuilderTests` for the row-list pure
@@ -1174,7 +1179,7 @@ ground truth for the conversions (rates, daily limits, unlock state).
 Then: wiki-verified static seed for the conversions, a Settings toggle,
 solver participation mirroring gw2e, display. No invented data.
 
-## 25. Multi-item sell-side economics (parity gap, deliberate M35 gap)
+## 25. Multi-item sell-side economics (parity gap, deliberate M35 gap) (FIXED in M37)
 M35 left SellableQuantity/NetSaleValue/CraftingProfit unset for batches
 (documented in GenerateStructuredMultiAsync). gw2e's multi mode shows a
 Cost Breakdown that sums Cost/Savings/Profit across items, a "Profit
@@ -1185,6 +1190,134 @@ bundle). Research the exact semantics from the live bundle (what counts
 as excess, the 0.85 fee basis, tradability gating per item, display
 layout), then implement for MultiItemRoots batches. Single-item
 economics (M20) must be byte-identical after.
+
+FIXED in M37 (research: docs/research/m37-r2-batch-economics.md,
+re-fetched live from the app bundle 2026-07-21 since the earlier M34
+report referenced above was lost). Mechanism:
+- Extracted the M20 single-item per-item arithmetic (over-production
+  bump, sell-price lookup, own-materials opportunity cost) out of
+  `CraftingPlanPipeline.ApplySellSideEconomics` into two pure helpers -
+  `ComputePerItemEconomics` (one requested root's own
+  SellableQuantity/NetSaleValue/TargetUnitSellPrice/ItemCraftCost/IsCraft)
+  and `ComputeMaterialOpportunityCost` (the batch-merged UsedMaterials
+  sum). `ApplySellSideEconomics` itself is a pure extraction - same
+  fields, same order, same arithmetic - proved byte-identical by the
+  full pre-existing single-item economics test suite
+  (`CraftingPlanPipelineTests`' `Structured_*`/`ResolveWithOverrides_*`
+  hand-computed-value tests) passing unmodified, plus a new
+  `MultiItemPlanTests.GenerateStructuredAsync_SingleEntryList_MatchesLegacySingleItemCall`
+  assertion comparing every economics field between the direct
+  single-item call and the list-of-one entry point.
+- New `CraftingPlanPipeline.ApplyBatchSellSideEconomics`: calls
+  `ComputePerItemEconomics` once per requested root (paired by index
+  with the wrapper recipe's own `Ingredients`, both built in request
+  order by `RecipeService.BuildMultiItemTreeAsync`), then sums the
+  qualifying roots' SellableQuantity/NetSaleValue into the batch
+  totals and `NetSaleValue - ItemCraftCost` (each root's own
+  post-correction `SolverDecision.TotalCost` - see the isolated-root-
+  cost note below) into CraftingProfit, minus the batch's single
+  MaterialOpportunityCost. Wired into both
+  `GenerateStructuredMultiAsync` (fresh generation) and
+  `ResolveWithOverrides`'s wrapper-context branch (so an override/
+  Ignore re-solve of a batch keeps the rollup live, mirroring how every
+  other part of a re-solve already behaves).
+- Bonus fix found in review: `ApplyBatchSellSideEconomics` also now sets
+  `result.PriceBasis` unconditionally (mirroring the single-item
+  method), which fixes a latent M35 gap - NOTHING ever set
+  `CraftingPlanResult.PriceBasis` for a multi-item batch before this
+  change (`PlanResultBuilder.Build` never touches it, and
+  `GenerateStructuredMultiAsync` never called `ApplySellSideEconomics`,
+  the only other place that did), so it silently stayed at the enum
+  default (`PriceBasis.InstantBuy`) regardless of the actual basis used
+  to solve the plan - a batch generated with the module's own default
+  (`BuyOrder`) never showed the "Total (buy-order prices)" label
+  suffix. Regression-tested:
+  `GenerateStructuredAsync_MultiItem_PriceBasisIsSetEvenWithNoQualifyingRoots`.
+- MaterialOpportunityCost is unaffected by the per-root filter below -
+  it stays a single sum over the batch's already-merged UsedMaterials
+  list (unchanged from M35), set whenever Valued mode produced any
+  usedMaterials at all, even if zero roots qualify for the sell/profit
+  rollup.
+
+Divergences from gw2e (recorded M34-style, per this file's convention):
+- **ECHOED, not diverged**: gw2e's rollup sums only roots whose
+  committed decision is `craft === true`, filtering out any requested
+  item the solver decided to buy. This module's requested roots CAN
+  resolve to a buy decision (`PlanSolver.Evaluate` has no root-only
+  special case - proven live by
+  `GenerateStructuredAsync_MultiItem_PerRootDecision_MatchesStandaloneSingleItemSolve`,
+  M35), so the filter is a real, meaningful gate here, not a vacuous
+  echo - a bought-but-tradable root is excluded from the batch sum
+  exactly like gw2e's own rollup would exclude it
+  (`GenerateStructuredAsync_MultiItem_OneRootBoughtNotCrafted_ExcludedFromSum`).
+- **DIVERGED**: gw2e's rollup still includes an untradable CRAFTED
+  root as a hidden `-cost` drag (Section 1.4 of the research report -
+  the per-node "Crafting Profit" pill would never show this item at
+  all, since it is gated on `tradable`, but the top rollup silently
+  absorbs its full craft cost as a loss anyway - an upstream quirk,
+  not a design). This module excludes such a root entirely instead
+  (contributes 0, not a penalty) - both its revenue AND its own craft
+  cost drop out together, matching this module's own single-item
+  `NetSaleValue` convention (null/absent rather than a hidden
+  negative) - see
+  `GenerateStructuredAsync_MultiItem_OneRootUntradable_ExcludedFromSumNotNegative`.
+- **DIVERGED**: single profit basis (SellInstant/buy-order, the M20
+  module convention) instead of gw2e's `profit_buy`/`profit_sell` dual
+  buy-order/sell-listing variants - this module has never shown a
+  second sell-listing figure, and the batch rollup stays consistent
+  with the single-item row rather than doubling the Total Cost
+  section's row count.
+- gw2e's per-node "Crafting Profit" pill (shown only on the N
+  top-level item roots of a batch, gated on `showprofit`/`craft`/
+  `tradable` together - research report Section 1.3a) is explicitly
+  OUT OF SCOPE for this fix, as directed - only the aggregate rollup
+  rows are added. A future milestone could add per-root pills.
+- gw2e's unrelated `excessiveComponents`/`step.excessAmount` feature
+  ("sell excess crafted components for profit" - the bulk-crafting-
+  granularity warning, not `craftedComponentsBreakdown`) remains
+  unimplemented; the research report explicitly found no code path
+  connecting the two upstream features despite similar-sounding names.
+
+Isolated per-root craft cost: `Services/PlanSolver.cs`'s
+`SolverDecision.TotalCost`, read via
+`solveResult.Decisions[itemRoot.NodeId].TotalCost` - the same
+post-correction (after `AllocateVendorNodeCosts`/`RecomputeCraftCosts`)
+real-coin figure `CraftingTreeBuilder` already copies onto
+`CraftingTreeNode.SubtreeCost` for that node's own pill display. Using
+it (rather than `Plan.TotalCoinCost`, the whole batch's cost) is what
+lets a shared-material batch attribute cost proportionally to each
+root instead of double-counting or dropping the shared portion.
+
+Display: the Total Cost/Cost Breakdown section's existing `CoinTotal`
+row machinery (`CreateCostTileRow`) already handles an arbitrary
+simultaneous tile count generically (M33), so no View changes were
+needed - only `PlanViewModelBuilder.BuildSummarySection`'s row
+wording, gated on `isMultiItem`: "Sell value (batch total, after 15%
+TP fees)" and "Profit if sold"/"Loss if sold" with a "(batch total)"
+qualifier (concatenated before any existing "(coin costs only)"
+qualifier), dropping the single-item "Nx overproduction" quantity
+qualifier (no single requested quantity to compare a batch sum
+against). The `MultiItemNote` row now echoes gw2e's own Cost
+Breakdown banner text verbatim - "Profit numbers are the sum of all
+crafted recipes." - rather than M35's placeholder wording, since the
+underlying filter now genuinely matches (module's own additional
+untradable-crafted-root exclusion divergence, above, is a smaller
+nuance gw2e's own banner text does not spell out either). Single-item
+mode's summary rows/labels are unchanged (verified by the full
+pre-existing `PlanViewModelBuilderTests` single-item economics suite
+passing unmodified).
+
+VERIFICATION STATE: build green, full test suite green (827 tests -
+Blish-free, real production-path tests throughout:
+`MultiItemPlanTests` for the pipeline aggregation/re-solve-recompute
+behavior including the craft-filter and untradable-exclusion
+divergences, `PlanViewModelBuilderTests` for the batch row
+wording/note text, `PlanContentHeightMathTests` for the first-time-at-4-
+tiles multi-item height case). Not yet verified by a live in-game
+desktop check - a fresh batch generation with a mix of crafted/bought
+and tradable/untradable requested items should be screenshot-loop
+verified before this is treated as visually confirmed, matching this
+file's existing convention for other M35/M37 UI changes.
 
 ## 26. Achievement-bit ingredient dedup (parity micro-gap)
 gw2e ships ~274 achievement-discipline custom recipes (achievement_id,
