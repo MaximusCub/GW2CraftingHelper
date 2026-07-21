@@ -67,6 +67,8 @@
     <Compile Include="Services\TradingPostMath.cs" />
     <Compile Include="Services\ScrollMath.cs" />
     <Compile Include="Services\ShoppingColumnMath.cs" />
+    <Compile Include="Services\PlanContentHeightMath.cs" />
+    <Compile Include="Services\PlanRelayoutMath.cs" />
     <Compile Include="Services\IPriceApiClient.cs" />
     <Compile Include="Services\TradingPostService.cs" />
     <Compile Include="Models\AcquisitionSource.cs" />

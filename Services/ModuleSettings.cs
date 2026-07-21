@@ -22,6 +22,14 @@ namespace GW2CraftingHelper.Services
         // profit calculation.
         public SettingEntry<bool> ValueOwnMaterials { get; private set; }
 
+        // M33 C1 (#12 diagnostics): gates the scroll-machinery diagnostic
+        // logging in CraftingPlanView (wheel events, restore/guard writes
+        // and state transitions). Default false; instrumentation only -
+        // never changes scroll/guard/restore behavior. Like ValueOwnMaterials,
+        // this has no checkbox in the Settings tab (see SettingsTabContent);
+        // it is flipped via the persisted settings JSON for diagnosis.
+        public SettingEntry<bool> ScrollDiagnosticsEnabled { get; private set; }
+
         public ModuleSettings(SettingCollection settings)
         {
             ModalDialogX = settings.DefineSetting(
@@ -43,6 +51,11 @@ namespace GW2CraftingHelper.Services
                 "ValueOwnMaterials", false,
                 () => "Value own materials",
                 () => "Value owned materials at their sell opportunity cost instead of treating them as free");
+
+            ScrollDiagnosticsEnabled = settings.DefineSetting(
+                "ScrollDiagnosticsEnabled", false,
+                () => "Scroll diagnostics",
+                () => "Log scroll machinery events for debugging");
         }
 
         /// <summary>
@@ -78,6 +91,7 @@ namespace GW2CraftingHelper.Services
             ModalDialogY.Value = -1;
             CurrencyValuationsJson.Value = string.Empty;
             ValueOwnMaterials.Value = false;
+            ScrollDiagnosticsEnabled.Value = false;
         }
     }
 }

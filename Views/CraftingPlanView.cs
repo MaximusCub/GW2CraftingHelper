@@ -40,6 +40,7 @@ namespace GW2CraftingHelper.Views
         private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
+        private readonly ModuleSettings _settings;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
 
         private PlanViewModel _currentPlan;
@@ -96,22 +97,62 @@ namespace GW2CraftingHelper.Views
         // Resize tracking
         private int _lastRenderedWidth;
 
-        // Trailing debounce for resize-triggered re-renders. A re-render is a
-        // full dispose+rebuild of the plan tree, which restarts nested
-        // AutoSize height convergence; firing it on every >=1px resize tick
-        // during a window drag flickers and transiently squashes deep tree
-        // nodes. _resizeRenderPending gates a single in-flight debounce
-        // ticker; each real frame it checks whether ResizeDebounceMs has
-        // elapsed since the last resize tick, then fires one render once it
-        // has - see ResizeDebounceStep and FrameTicker.
+        // M33 C2b: per-render relayout registry, lifecycle mirrors
+        // _treeNodeStates (cleared and repopulated by every full RenderPlan
+        // rebuild; appended to by lazy tree-node expansion afterwards).
+        // _relayoutActions holds cheap, position/width-only closures (no
+        // MeasureString) replayed on EVERY resize tick via OnPanelResized -
+        // see ReplayRelayout. _reellipsisActions holds the small subset of
+        // sections that truncate text (Used Materials name, Shopping row
+        // name, Tree row name - the 3 EllipsizeToWidth call sites m2's
+        // research inventoried); these are text-only (Label.Text/tooltip)
+        // updates on already-existing controls, replayed only once at drag
+        // settle - see RunReellipsis. Neither list ever changes a control's
+        // Height, so neither can perturb AutoSize/scroll state (M33 C2a
+        // made every row height explicit; a pure width/text write on a
+        // fixed-height row cannot re-trigger convergence).
+        private readonly List<Action<int>> _relayoutActions = new List<Action<int>>();
+        private readonly List<Action<int>> _reellipsisActions = new List<Action<int>>();
+
+        // Trailing debounce for the resize-settle re-ellipsis pass. Every
+        // relayout tick already runs synchronously in OnPanelResized (no
+        // debounce needed for pure width/position writes - see
+        // ReplayRelayout); this debounce exists ONLY to bound how often the
+        // 3 EllipsizeToWidth call sites re-measure text, which is
+        // comparatively expensive over a long shopping list or deep tree.
+        // _resizeSettlePending gates a single in-flight settle ticker; each
+        // real frame it checks whether ResizeDebounceMs has elapsed since
+        // the last resize tick, then runs the re-ellipsis pass (plus one
+        // best-effort full relayout replay, as a defensive correctness net)
+        // once it has - see ResizeSettleStep and FrameTicker.
         private const int ResizeDebounceMs = 150;
         private DateTime _lastResizeEventUtc;
-        private bool _resizeRenderPending;
+        private bool _resizeSettlePending;
 
-        // Bumped by every PreserveScrollAcross call; an in-flight restore
-        // Tick loop compares its captured value against the current one
-        // each frame and bails as soon as a newer restore has superseded it.
+        // Bumped by every PreserveScrollAcross call; an in-flight
+        // StartScrollVerify loop compares its captured value against the
+        // current one each frame and bails as soon as a newer restore has
+        // superseded it.
         private int _scrollRestoreGeneration;
+
+        // M33 C2c (resize-scroll-preserve regression fix): set by
+        // PreserveScrollAcrossResize whenever a height-changing resize tick
+        // (dragging the window's bottom edge or a corner) wrote a per-tick
+        // scroll-preserve during the current drag. ResizeSettleStep arms a
+        // single bounded verify window for it at drag settle (not per
+        // tick) via StartResizeScrollVerify, then clears the flag.
+        // _resizeScrollSavedOffset holds the last known-good pre-tick
+        // pixel offset to verify against - PreserveScrollAcrossResize only
+        // updates it when a tick's freshly captured offset is > 0, so an
+        // uncontested reset that lands on some frame between two ticks
+        // (and would otherwise corrupt the NEXT tick's own capture to 0)
+        // cannot erase the real target. PreserveScrollAcross (the rebuild
+        // path) clears _resizeScrollRestorePending up front, since a
+        // rebuild disposes and recreates the content panel's children -
+        // any resize-drag offset captured against the old content is
+        // meaningless once that happens.
+        private bool _resizeScrollRestorePending;
+        private int _resizeScrollSavedOffset;
 
         // Live FrameTicker instances (null when idle). Tracked so Build()
         // can cancel a leftover ticker from the previous build cycle before
@@ -122,32 +163,90 @@ namespace GW2CraftingHelper.Views
         // unloads. Each ticker also bails itself out on its own next frame
         // (generation mismatch, panel swap, or panel detached) as a second
         // line of defense.
-        private FrameTicker _scrollRestoreTicker;
-        private FrameTicker _scrollGuardTicker;
+        private FrameTicker _scrollVerifyTicker;
         private FrameTicker _resizeDebounceTicker;
 
-        // GameService.Overlay.QueueMainThreadUpdate, when re-queued from
-        // inside its own queued callback, drains in the SAME frame rather
-        // than waiting for the next real Update() tick (confirmed by
-        // identical-millisecond trace lines during diagnosis), so it cannot
-        // step frames at all. FrameTicker drives these from Control.DoUpdate
-        // instead, which the SpriteScreen invokes exactly once per real
-        // frame; these constants tune how many real frames the restore loop
-        // and its post-convergence guard run for.
-        private const int ScrollRestoreMaxRealFrames = 30;
-        private const int ScrollRestoreRequiredStableStreak = 3;
-        private const int ScrollGuardWindowFrames = 20;
-        private const int ScrollGuardHardCapFrames = 120;
+        // M33 C2a (directive B): with container heights now finalized
+        // synchronously during build (PlanContentHeightMath), the restore
+        // ratio is correct the instant PreserveScrollAcross writes it - no
+        // multi-frame AutoSize convergence remains to wait out. The
+        // FrameTicker that used to run RestoreScrollOffset's up-to-30-frame
+        // convergence loop, then hand off to a further 20-frame (up to
+        // 120-frame hard-capped) guard, shrinks to a short defensive verify
+        // that only exists to contest a genuine LATE Blish-internal
+        // scrollbar reset (Scrollbar.RecalculateLayout zeroes ScrollDistance
+        // whenever _scrollbarPercent changes, which can still land on the
+        // frame or two right after the synchronous write) and to yield
+        // immediately the moment real user input is observed.
+        private const int ScrollVerifyMaxFrames = 3;
+
+        // M33 C2a (directive C): bounds the guard's zero-reassert
+        // back-and-forth (Blish resets the bar to 0, we contest, it resets
+        // again...) so a user genuinely holding the bar at top through
+        // repeated library resets eventually wins rather than being fought
+        // forever - see docs/KNOWN-ISSUES.md's carried follow-up note.
+        // Naturally bounded further by ScrollVerifyMaxFrames itself now
+        // that the window is only 2-3 frames long.
+        private const int ScrollVerifyZeroReassertCap = 4;
+
+        // M33 C2a (directive C): timestamp of the most recent user
+        // mouse-wheel event observed over the content panel. Tracked
+        // unconditionally - not gated on ScrollDiagnosticsEnabled, unlike
+        // the diagnostic wheel logging below - because StartScrollVerify
+        // uses it for one real behavioral decision: any wheel event
+        // observed since a verify window armed yields that window
+        // immediately, no further contest. (M33 fix-pass: a second,
+        // recency-only "suppress the zero-reassert" use of this timestamp
+        // was removed - it could only ever fire for a wheel that predated
+        // the window's arm time, in which case suppressing was wrong: see
+        // StartScrollVerify's zero-reassert comment.) Reset at the top of
+        // every Build() so a stale value from a previous render cannot
+        // influence a brand new one.
+        private DateTime? _lastWheelEventUtc;
+
+        // M33 C1 (#12 diagnostics): instrumentation-only. Gated on
+        // ModuleSettings.ScrollDiagnosticsEnabled (default false); every
+        // call site below checks the live setting value BEFORE doing any
+        // work so the cost when disabled is a single bool read, not a
+        // formatted-string allocation. Never read by, or fed back into,
+        // any scroll/guard/restore decision - diagnostics only observe.
+        private const string ScrollDiagTag = "[scrolldiag]";
+
+        // Monotonic frame index shared by every scroll-diagnostic log line
+        // (wheel handler, SyncRestore, Verify) so a human reading the log can
+        // tell same-frame vs cross-frame ordering apart even when wall-clock
+        // log timestamps collide. GameService.Overlay.CurrentGameTime
+        // already advances exactly once per real engine frame (the vendor
+        // Scrollbar/Control use it the same way for double-click timing), so
+        // comparing it to the last-seen value is a cheap, ticker-free way to
+        // detect "a new real frame happened" without adding a dedicated
+        // always-on ticker. Only ever touched from diagnostics-gated call
+        // sites.
+        private TimeSpan? _scrollDiagLastFrameTime;
+        private long _scrollDiagFrameCounter;
+
+        private long ScrollDiagFrame()
+        {
+            TimeSpan? current = GameService.Overlay?.CurrentGameTime?.TotalGameTime;
+            if (current.HasValue && current.Value != _scrollDiagLastFrameTime)
+            {
+                _scrollDiagFrameCounter++;
+                _scrollDiagLastFrameTime = current.Value;
+            }
+            return _scrollDiagFrameCounter;
+        }
 
         public CraftingPlanView(
             Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
             IItemSearchProvider itemSearchProvider,
+            ModuleSettings settings,
             Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> resolveOverridesSync = null)
         {
             _generateAsync = generateAsync;
             _modalDialog = modalDialog;
             _itemSearchProvider = itemSearchProvider;
+            _settings = settings;
             _resolveOverridesSync = resolveOverridesSync;
         }
 
@@ -172,23 +271,36 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Runs a layout-mutating action and restores the content panel's
-        /// scroll position afterwards. Nested AutoSize flow panels converge
-        /// height over several REAL frames, so the restore re-asserts each
-        /// real frame until the computed ratio and content height stabilize
-        /// (up to ScrollRestoreMaxRealFrames), then a ScrollGuard keeps
-        /// re-asserting for a further window of real frames to contest any
-        /// late scrollbar reset Blish's Panel performs once layout finishes
-        /// settling. See RestoreScrollOffset, StartScrollGuard, and
-        /// FrameTicker.
+        /// scroll position afterwards. M33 C2a (directive A/B): every
+        /// container mutate() rebuilds now finalizes its explicit Height
+        /// synchronously (PlanContentHeightMath), so mutate()'s return means
+        /// the new content's true height is already valid - no nested
+        /// AutoSize convergence remains to wait out. The restore ratio is
+        /// therefore computed and written to the scrollbar synchronously,
+        /// in this same call, before the next paint (ApplySavedScrollSynchronously);
+        /// a short FrameTicker-driven verify then only defends against a
+        /// LATE Blish-internal scrollbar reset over the following couple of
+        /// real frames (StartScrollVerify).
         /// </summary>
         private void PreserveScrollAcross(Action mutate)
         {
             int saved = _contentPanel?.VerticalScrollOffset ?? 0;
             int capturedGeneration = ++_scrollRestoreGeneration;
+
+            // M33 C2c: a rebuild is about to dispose and recreate every
+            // content-panel child, so any resize-drag scroll-preserve still
+            // pending from before it (see _resizeScrollRestorePending) is
+            // now meaningless - clear it so a later ResizeSettleStep tick
+            // never arms a stale-offset verify (StartResizeScrollVerify)
+            // against the new content using the old content's dimensions,
+            // which could otherwise cancel and replace this rebuild's own
+            // in-flight verify with wrong math.
+            _resizeScrollRestorePending = false;
+
             mutate();
             if (saved > 0)
             {
-                RestoreScrollOffset(saved, capturedGeneration);
+                ApplySavedScrollSynchronously(saved, capturedGeneration);
             }
         }
 
@@ -216,6 +328,16 @@ namespace GW2CraftingHelper.Views
             private readonly Func<GameTime, bool> _step;
             private TimeSpan? _lastFrameTime;
             private bool _canceled;
+
+            // M33 C1 (#12 diagnostics): observation-only - lets external
+            // code (the wheel diagnostic handler) ask "is this ticker still
+            // running" without altering any ticker behavior. _scrollVerifyTicker
+            // is never nulled out when a ticker self-cancels (only
+            // reassigned or explicitly cleared at the top of the next
+            // Build()), so a plain null-check on that field cannot tell
+            // "never started" apart from "ran once and finished long ago" -
+            // this property is the accurate signal.
+            public bool IsActive => !_canceled;
 
             public FrameTicker(Func<GameTime, bool> step)
             {
@@ -284,7 +406,16 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void RestoreScrollOffset(int savedOffset, int capturedGeneration)
+        /// <summary>
+        /// M33 C2a (directive B): writes the restore ratio to the scrollbar
+        /// synchronously, using the content height that mutate() already
+        /// finalized before this method runs (directive A). This is the
+        /// change that eliminates the #14 flash: nothing paints between
+        /// mutate() returning and this write landing, so the viewport never
+        /// visibly reaches a wrong position at all - there is no "restore a
+        /// frame late" gap left to close.
+        /// </summary>
+        private void ApplySavedScrollSynchronously(int savedOffset, int capturedGeneration)
         {
             if (_contentPanel == null || PanelScrollbarField == null)
             {
@@ -293,23 +424,105 @@ namespace GW2CraftingHelper.Views
 
             var capturedPanel = _contentPanel;
 
-            // Resolved once for the whole restore+guard run rather than via
-            // reflection on every frame - see the perf note on
-            // PanelScrollbarField. A missing scrollbar degrades to today's
-            // reset-to-top, same as before this was hoisted.
+            // Resolved once per restore run rather than via reflection on
+            // every frame - see the perf note on PanelScrollbarField. A
+            // missing scrollbar degrades to today's reset-to-top.
             var scrollbar = PanelScrollbarField.GetValue(capturedPanel) as Scrollbar;
             if (scrollbar == null)
             {
                 return;
             }
 
-            int realFrame = 0;
-            float lastWrittenRatio = -1f;
-            int lastContentHeight = -1;
-            int stableStreak = 0;
+            bool diagEnabled = _settings != null && _settings.ScrollDiagnosticsEnabled.Value;
 
-            bool Tick(GameTime gameTime)
+            int contentHeight = MeasureContentHeight(capturedPanel);
+            float ratio = ScrollMath.RatioForOffset(savedOffset, contentHeight, capturedPanel.Height);
+            float before = scrollbar.ScrollDistance;
+            scrollbar.ScrollDistance = ratio;
+
+            if (diagEnabled)
             {
+                Logger.Debug("{0} write writer=SyncRestore frame={1} before={2:0.0000} after={3:0.0000} contentHeight={4} savedOffset={5} generation={6}",
+                    ScrollDiagTag, ScrollDiagFrame(), before, ratio, contentHeight, savedOffset, capturedGeneration);
+            }
+
+            StartScrollVerify(capturedPanel, capturedGeneration, savedOffset, scrollbar);
+        }
+
+        /// <summary>
+        /// Sum-free measure of a scroll-restorable panel's real content
+        /// height: the furthest Bottom edge among its currently VISIBLE
+        /// direct children (an invisible child - a collapsed section, a
+        /// collapsed tree childFlow - contributes nothing, matching how
+        /// Blish's own FlowPanel reflow already excludes invisible children
+        /// from its own layout accumulation). Shared by
+        /// ApplySavedScrollSynchronously and StartScrollVerify's per-frame
+        /// tick so the two can never compute this differently.
+        /// </summary>
+        private static int MeasureContentHeight(Panel panel)
+        {
+            int contentHeight = 0;
+            foreach (var child in panel.Children)
+            {
+                if (child.Visible && child.Bottom > contentHeight)
+                {
+                    contentHeight = child.Bottom;
+                }
+            }
+            return contentHeight;
+        }
+
+        /// <summary>
+        /// M33 C2a (directives A-C): short defensive verify that runs after
+        /// ApplySavedScrollSynchronously's write. With container heights
+        /// finalized synchronously at build time, no multi-frame AutoSize
+        /// convergence remains to race - this only exists to contest a
+        /// single expected class of LATE write: Blish's own
+        /// Scrollbar.RecalculateLayout zeroes ScrollDistance whenever the
+        /// panel's content/viewport ratio changes, which the scrollbar
+        /// re-evaluates every real frame (Scrollbar.DoUpdate calls
+        /// Invalidate() unconditionally) and so can still land on the frame
+        /// or two immediately following our synchronous write. The window
+        /// exits on the FIRST frame that confirms the write is holding
+        /// (directive B - no multi-frame stable streak required, since
+        /// height is not still drifting) and is capped at
+        /// ScrollVerifyMaxFrames regardless.
+        ///
+        /// Directive C: any user wheel event observed since this window
+        /// armed yields it immediately and unconditionally - no
+        /// heightUnchanged precondition, since height is already valid at
+        /// arm time. This is the ONLY wheel-driven exit: a zero-reassert
+        /// (scrollbar reads exactly 0 while target sits well above it) is
+        /// always contested and never suppressed by wheel recency. A wheel
+        /// at or after armedAtUtc already exits via the check above before
+        /// reaching the zero-reassert branch; a wheel that predates
+        /// armedAtUtc is the input that produced savedOffset in the first
+        /// place (PreserveScrollAcross captures it before mutate() runs),
+        /// so treating it as "user meant to land at the top" would abandon
+        /// restoring their real, non-top position - exactly the #14 flash
+        /// this window exists to prevent. (An earlier revision suppressed
+        /// the reassert on any wheel within a short recency window
+        /// regardless of arm time; that bled across the mutation boundary
+        /// and was removed in the M33 fix-pass.) The zero-reassert cap
+        /// (ScrollVerifyZeroReassertCap) is kept as a last-resort guarantee
+        /// that a persistent fight eventually ends.
+        /// </summary>
+        private void StartScrollVerify(Panel capturedPanel, int capturedGeneration, int savedOffset, Scrollbar scrollbar)
+        {
+            int frame = 0;
+            int zeroReassert = 0;
+            DateTime armedAtUtc = DateTime.UtcNow;
+
+            if (_settings != null && _settings.ScrollDiagnosticsEnabled.Value)
+            {
+                Logger.Debug("{0} verify-armed frame={1} savedOffset={2} generation={3}",
+                    ScrollDiagTag, ScrollDiagFrame(), savedOffset, capturedGeneration);
+            }
+
+            bool VerifyTick(GameTime gameTime)
+            {
+                bool diagEnabled = _settings != null && _settings.ScrollDiagnosticsEnabled.Value;
+
                 // A newer restore superseded this loop, Build() swapped in
                 // a fresh content panel, or the panel was torn down (tab
                 // switch / module unload): stop immediately rather than
@@ -318,214 +531,179 @@ namespace GW2CraftingHelper.Views
                 if (capturedGeneration != _scrollRestoreGeneration ||
                     capturedPanel != _contentPanel || capturedPanel.Parent == null)
                 {
+                    if (diagEnabled)
+                    {
+                        Logger.Debug("{0} verify exit reason=stale-generation frame={1} realFrame={2} generation={3} liveGeneration={4}",
+                            ScrollDiagTag, ScrollDiagFrame(), frame, capturedGeneration, _scrollRestoreGeneration);
+                    }
                     return false;
                 }
 
                 try
                 {
-                    int contentHeight = 0;
-                    foreach (var child in capturedPanel.Children)
+                    frame++;
+
+                    // Directive C: yield hardening. Any wheel event observed
+                    // since this window armed is real user input landing
+                    // inside a live verify window - never contest it,
+                    // regardless of what the scrollbar currently reads.
+                    if (_lastWheelEventUtc.HasValue && _lastWheelEventUtc.Value >= armedAtUtc)
                     {
-                        if (child.Visible && child.Bottom > contentHeight)
+                        if (diagEnabled)
                         {
-                            contentHeight = child.Bottom;
+                            Logger.Debug("{0} verify exit reason=wheel-observed frame={1} realFrame={2}",
+                                ScrollDiagTag, ScrollDiagFrame(), frame);
                         }
+                        return false;
                     }
 
-                    // Before writing anything: distinguish Blish's own
-                    // reset-to-top from real user input. The naive signal -
-                    // height unchanged since the previous real frame but the
-                    // scrollbar drifted from what we last wrote - matches
-                    // BOTH a user scroll AND a library reset, because
-                    // Blish's Panel zeroes ScrollDistance during its layout
-                    // pass one real frame after a height change: by the
-                    // time we observe it here, height already reads stable
-                    // again (it changed last frame, not this one) while the
-                    // scrollbar reads 0. The fingerprint that tells them
-                    // apart: a library reset always lands exactly at (or
-                    // within float tolerance of) zero while our own target
-                    // sits meaningfully above it; a user scroll can land
-                    // anywhere. Near-top targets are ambiguous (a genuine
-                    // user scroll also lands near zero) and a wrong restore
-                    // there is imperceptible, so they fall through to the
-                    // user-scroll branch rather than being contested. Gated
-                    // on lastWrittenRatio >= 0 so the first real frame (no
-                    // prior write to compare against) never false-triggers.
-                    float ratio = ScrollMath.RatioForOffset(
-                        savedOffset, contentHeight, capturedPanel.Height);
-                    float currentDistance = scrollbar.ScrollDistance;
-                    bool heightUnchanged = contentHeight == lastContentHeight;
-                    bool diverged = lastWrittenRatio >= 0f && heightUnchanged &&
-                        System.Math.Abs(currentDistance - lastWrittenRatio) > 0.004f;
-                    bool isLibraryReset = false;
+                    int contentHeight = MeasureContentHeight(capturedPanel);
+                    float target = ScrollMath.RatioForOffset(savedOffset, contentHeight, capturedPanel.Height);
+                    float current = scrollbar.ScrollDistance;
 
-                    if (diverged)
+                    if (current <= 0.0005f && target > 0.01f)
                     {
-                        isLibraryReset = currentDistance <= 0.0005f && ratio > 0.01f;
-                        if (!isLibraryReset)
+                        // Scrollbar reads exactly zero while our target sits
+                        // well above it: Blish's own reset landed on this
+                        // frame (see the class doc comment). This is
+                        // ALWAYS a library reset, never a genuine "user
+                        // wheeled to exactly top" - any wheel event at or
+                        // after armedAtUtc already exited via the
+                        // wheel-observed check above before reaching this
+                        // line, and a wheel event that predates armedAtUtc
+                        // reflects the user's real pre-mutation position
+                        // (the ratio ApplySavedScrollSynchronously just
+                        // wrote), which this reassert must restore rather
+                        // than treat as "user meant to be at the top".
+                        // (M33 fix-pass: a recency-only suppression here
+                        // previously let a wheel just BEFORE the mutation
+                        // veto the restore of a real non-top position -
+                        // see git history for the removed check.)
+                        scrollbar.ScrollDistance = target;
+                        zeroReassert++;
+
+                        if (diagEnabled)
                         {
+                            Logger.Debug("{0} write writer=Verify/zeroReassert frame={1} realFrame={2} before={3:0.0000} after={4:0.0000} contentHeight={5} bounceCount={6}",
+                                ScrollDiagTag, ScrollDiagFrame(), frame, current, target, contentHeight, zeroReassert);
+                        }
+
+                        if (zeroReassert >= ScrollVerifyZeroReassertCap)
+                        {
+                            if (diagEnabled)
+                            {
+                                Logger.Debug("{0} verify exit reason=zero-reassert-cap-exceeded frame={1} realFrame={2} bounceCount={3}",
+                                    ScrollDiagTag, ScrollDiagFrame(), frame, zeroReassert);
+                            }
                             return false;
                         }
-
-                        // Library reset: rewrite the target below and reset
-                        // the stability streak (this frame does not count
-                        // toward convergence) - still bounded by the
-                        // real-frame cap. Kept quiet; this is a routine,
-                        // expected event on the hot path.
+                    }
+                    else if (System.Math.Abs(current - target) > 0.004f)
+                    {
+                        // Scrollbar reads something other than our target
+                        // and it is not the zero-reset pattern above: real
+                        // user scroll. Stop contesting entirely - never
+                        // re-assert over legitimate user input.
+                        if (diagEnabled)
+                        {
+                            Logger.Debug("{0} verify exit reason=user-scroll-detected frame={1} realFrame={2} observed={3:0.0000} target={4:0.0000} contentHeight={5}",
+                                ScrollDiagTag, ScrollDiagFrame(), frame, current, target, contentHeight);
+                        }
+                        return false;
+                    }
+                    else
+                    {
+                        // Matches target within tolerance: the write is
+                        // holding. Exit on this first confirmed-stable
+                        // frame rather than requiring a multi-frame streak -
+                        // height is not still drifting (directive A), so one
+                        // clean frame is sufficient evidence nothing is
+                        // fighting the restore.
+                        if (diagEnabled)
+                        {
+                            Logger.Debug("{0} verify exit reason=stable frame={1} realFrame={2} target={3:0.0000} contentHeight={4}",
+                                ScrollDiagTag, ScrollDiagFrame(), frame, target, contentHeight);
+                        }
+                        return false;
                     }
 
-                    realFrame++;
-                    scrollbar.ScrollDistance = ratio;
-
-                    bool ratioStable = !isLibraryReset &&
-                        System.Math.Abs(ratio - lastWrittenRatio) < 0.0005f;
-                    stableStreak = (ratioStable && heightUnchanged) ? stableStreak + 1 : 0;
-                    lastWrittenRatio = ratio;
-                    lastContentHeight = contentHeight;
-
-                    bool converged = stableStreak >= ScrollRestoreRequiredStableStreak;
-                    if (realFrame < ScrollRestoreMaxRealFrames && !converged)
+                    if (frame < ScrollVerifyMaxFrames)
                     {
                         return true;
                     }
 
-                    StartScrollGuard(capturedPanel, capturedGeneration, savedOffset, scrollbar);
+                    if (diagEnabled)
+                    {
+                        Logger.Debug("{0} verify exit reason=max-frames frame={1} realFrame={2} target={3:0.0000} contentHeight={4}",
+                            ScrollDiagTag, ScrollDiagFrame(), frame, target, contentHeight);
+                    }
                     return false;
                 }
                 catch (Exception ex)
                 {
                     // Reflection/layout mismatch, or the panel/scrollbar was
-                    // disposed out from under us: degrade to reset-to-top.
-                    Logger.Warn(ex, "Scroll restore degraded; falling back to top");
+                    // disposed out from under us: stop verifying.
+                    Logger.Warn(ex, "Scroll verify stopped by exception");
+                    if (diagEnabled)
+                    {
+                        Logger.Debug("{0} verify exit reason=disposed-exception frame={1} realFrame={2} error={3}",
+                            ScrollDiagTag, ScrollDiagFrame(), frame, ex.GetType().Name);
+                    }
                     return false;
                 }
             }
 
-            _scrollRestoreTicker?.Cancel();
-            _scrollRestoreTicker = new FrameTicker(Tick);
+            _scrollVerifyTicker?.Cancel();
+            _scrollVerifyTicker = new FrameTicker(VerifyTick);
         }
 
         /// <summary>
-        /// Active guard that runs after RestoreScrollOffset's Tick loop
-        /// converges (or hits its attempt cap). Blish's Panel can still
-        /// reset the scrollbar to top once the nested-AutoSize section stack
-        /// finishes converging over later real frames, after Tick has
-        /// already let go of the scrollbar; the guard keeps re-asserting the
-        /// target ratio - recomputed each real frame from the ORIGINAL
-        /// savedOffset against the current content height - for a further
-        /// window of real frames so a late reset gets contested rather than
-        /// observed and ignored. The window slides forward on every
-        /// re-assert or content-height change; a hard cap guarantees
-        /// termination even if content height never settles.
+        /// M33 C2a (directive C): unconditional (NOT diagnostics-gated) tap
+        /// on the same MouseWheelScrolled event OnScrollDiagWheelScrolled
+        /// below observes, recording only a timestamp. StartScrollVerify
+        /// reads _lastWheelEventUtc to yield a live verify window
+        /// immediately the moment a wheel event lands in it (scoped to
+        /// wheels at or after the window's arm time - see that method's
+        /// doc comment). This is a real behavioral decision now, not
+        /// diagnostics, so unlike the tap below this must run regardless
+        /// of ScrollDiagnosticsEnabled - cost is a single DateTime.UtcNow
+        /// call per wheel notch, not per frame.
         /// </summary>
-        private void StartScrollGuard(Panel capturedPanel, int capturedGeneration, int savedOffset, Scrollbar scrollbar)
+        private void OnContentWheelObserved(object sender, MouseEventArgs e)
         {
-            int totalFrames = 0;
-            int remaining = ScrollGuardWindowFrames;
-            int lastContentHeight = -1;
+            _lastWheelEventUtc = DateTime.UtcNow;
+        }
 
-            // Counts library reset-to-zero contests across the guard's
-            // ENTIRE lifetime (never reset on height changes or normal
-            // countdown frames). Caps a persistent user-vs-guard fight: if
-            // a user is genuinely holding the bar at top through repeated
-            // library resets, they must eventually win rather than being
-            // fought forever.
-            int zeroReassert = 0;
-
-            bool GuardTick(GameTime gameTime)
+        /// <summary>
+        /// M33 C1 (#12 diagnostics): observation-only wheel handler.
+        /// Subscribes to the same MouseWheelScrolled event Blish's own
+        /// Scrollbar subscribes to in its constructor (which runs before
+        /// this handler is ever wired up, since _contentPanel must exist
+        /// first) - so this always observes the scrollbar AFTER Blish's own
+        /// HandleWheelScroll has already run for the same event (tween
+        /// created, not yet applied). Never writes to the scrollbar, never
+        /// influences restore/verify decisions - purely a read-and-log tap
+        /// (OnContentWheelObserved above is what actually drives behavior).
+        /// </summary>
+        private void OnScrollDiagWheelScrolled(object sender, MouseEventArgs e)
+        {
+            if (_settings == null || !_settings.ScrollDiagnosticsEnabled.Value)
             {
-                if (capturedGeneration != _scrollRestoreGeneration ||
-                    capturedPanel != _contentPanel || capturedPanel.Parent == null)
-                {
-                    return false;
-                }
-
-                try
-                {
-                    int contentHeight = 0;
-                    foreach (var child in capturedPanel.Children)
-                    {
-                        if (child.Visible && child.Bottom > contentHeight)
-                        {
-                            contentHeight = child.Bottom;
-                        }
-                    }
-
-                    totalFrames++;
-                    float target = ScrollMath.RatioForOffset(savedOffset, contentHeight, capturedPanel.Height);
-                    float current = scrollbar.ScrollDistance;
-                    bool heightChanged = contentHeight != lastContentHeight;
-                    lastContentHeight = contentHeight;
-
-                    if (heightChanged)
-                    {
-                        // Content height moved: this is the library-reset
-                        // contest path (Blish's Panel resets the scrollbar
-                        // whenever content height changes). Recompute the
-                        // target and re-assert if it drifted, and always
-                        // slide the window forward regardless - unchanged
-                        // from prior behavior.
-                        bool reasserted = System.Math.Abs(current - target) > 0.002f;
-                        if (reasserted)
-                        {
-                            scrollbar.ScrollDistance = target;
-                        }
-
-                        remaining = ScrollGuardWindowFrames;
-                    }
-                    else if (current <= 0.0005f && target > 0.01f)
-                    {
-                        // Height stable but the scrollbar reads exactly
-                        // zero while our target sits well above it: Blish's
-                        // Panel reset the scrollbar to top on a layout pass
-                        // that landed between two of our real frames (see
-                        // the fingerprint comment in RestoreScrollOffset).
-                        // Contest it like a height-change reset, but cap
-                        // the back-and-forth via zeroReassert - a user
-                        // genuinely holding the bar at top must eventually
-                        // win.
-                        scrollbar.ScrollDistance = target;
-                        zeroReassert++;
-
-                        if (zeroReassert > 4)
-                        {
-                            return false;
-                        }
-
-                        remaining = ScrollGuardWindowFrames;
-                    }
-                    else if (System.Math.Abs(current - target) > 0.004f)
-                    {
-                        // Height stable but the scrollbar moved on its own:
-                        // the user scrolled. Stop contesting entirely -
-                        // never re-assert over legitimate user input, and
-                        // re-arming from here is now impossible.
-                        return false;
-                    }
-                    else
-                    {
-                        remaining--;
-                    }
-
-                    if (remaining > 0 && totalFrames < ScrollGuardHardCapFrames)
-                    {
-                        return true;
-                    }
-
-                    return false;
-                }
-                catch (Exception ex)
-                {
-                    // Diagnostic-only: reflection/layout mismatch, or the
-                    // panel/scrollbar was disposed out from under us - stop
-                    // guarding.
-                    Logger.Warn(ex, "Scroll guard stopped by exception");
-                    return false;
-                }
+                return;
             }
 
-            _scrollGuardTicker?.Cancel();
-            _scrollGuardTicker = new FrameTicker(GuardTick);
+            var scrollbar = PanelScrollbarField != null
+                ? PanelScrollbarField.GetValue(_contentPanel) as Scrollbar
+                : null;
+
+            int contentHeight = MeasureContentHeight(_contentPanel);
+            int wheelValue = GameService.Input.Mouse.State.ScrollWheelValue;
+            bool verifyLive = _scrollVerifyTicker != null && _scrollVerifyTicker.IsActive;
+
+            Logger.Debug(
+                "{0} wheel frame={1} sign={2} raw={3} scrollDistance={4:0.0000} contentHeight={5} verifyLive={6}",
+                ScrollDiagTag, ScrollDiagFrame(), System.Math.Sign(wheelValue), wheelValue,
+                scrollbar?.ScrollDistance ?? -1f, contentHeight, verifyLive);
         }
 
         private void OnSelectedItemChanged(int itemId)
@@ -538,18 +716,21 @@ namespace GW2CraftingHelper.Views
             // Clean up screen-parented popup from previous build cycle
             _suggestionPanel?.Dispose();
 
-            // Same cleanup for any leftover scroll-restore/guard/resize-
-            // debounce tickers from the previous build cycle - see the
-            // field comments above. Reset _resizeRenderPending too, or a
-            // ticker canceled mid-debounce here would leave it stuck true
-            // and silently disable all future resize debouncing.
-            _scrollRestoreTicker?.Cancel();
-            _scrollRestoreTicker = null;
-            _scrollGuardTicker?.Cancel();
-            _scrollGuardTicker = null;
+            // Same cleanup for any leftover scroll-verify/resize-debounce
+            // tickers from the previous build cycle - see the field
+            // comments above. Reset _resizeSettlePending too, or a ticker
+            // canceled mid-debounce here would leave it stuck true and
+            // silently disable all future resize debouncing. Also drop any
+            // wheel-recency state from the previous render's tab so it
+            // cannot influence a brand new one's verify window.
+            _scrollVerifyTicker?.Cancel();
+            _scrollVerifyTicker = null;
             _resizeDebounceTicker?.Cancel();
             _resizeDebounceTicker = null;
-            _resizeRenderPending = false;
+            _resizeSettlePending = false;
+            _resizeScrollRestorePending = false;
+            _resizeScrollSavedOffset = 0;
+            _lastWheelEventUtc = null;
 
             int w = buildPanel.ContentRegion.Width;
 
@@ -675,6 +856,16 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
+            // M33 C2a (directive C): unconditional wheel-recency tracking
+            // that StartScrollVerify's yield/suppress logic depends on,
+            // plus the pre-existing diagnostic-only tap (gated inside the
+            // handler on ScrollDiagnosticsEnabled). _contentPanel is a
+            // fresh instance every Build() call, so there is nothing stale
+            // to unsubscribe here - the previous cycle's panel (and its
+            // subscriptions) is discarded with the previous buildPanel.
+            _contentPanel.MouseWheelScrolled += OnContentWheelObserved;
+            _contentPanel.MouseWheelScrolled += OnScrollDiagWheelScrolled;
+
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
 
@@ -691,44 +882,321 @@ namespace GW2CraftingHelper.Views
             int w = container.ContentRegion.Width;
             int h = container.ContentRegion.Height;
 
-            // Update widths of layout panels
+            // M33 C2c: capture the content panel's absolute scroll offset
+            // (pixels) and height BEFORE either changes below - see
+            // PreserveScrollAcrossResize's doc comment for why this must
+            // happen pre-mutation.
+            int savedScrollOffset = _contentPanel?.VerticalScrollOffset ?? 0;
+            int previousContentHeight = _contentPanel?.Height ?? 0;
+
+            // Update widths of layout panels. Top-strip controls keep their
+            // pre-existing direct updates (M33 C2b directive 1) - these were
+            // never part of the dispose+rebuild problem the relayout
+            // registry below replaces.
             _inputPanel.Size = new Point(w, RowHeight);
             _controlsPanel.Size = new Point(w, RowHeight);
             _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
             _separator.Size = new Point(w - RightEdgePadding, 2);
             _contentPanel.Size = new Point(w, h - TopRegionHeight);
 
-            // Re-render plan content when width changes (centered title, right-aligned
-            // timestamps). Debounced to a single trailing render fired once the
-            // resize drag settles - see ResizeDebounceStep and the _resize*
-            // fields for why.
-            if (_currentPlan != null && w != _lastRenderedWidth)
+            bool widthChanged = w != _lastRenderedWidth;
+            bool heightChanged = _contentPanel.Height != previousContentHeight;
+
+            // M33 C2c (KNOWN-ISSUES resize-scroll regression): a
+            // height-changing drag tick (dragging the window's bottom edge
+            // or a corner) resets Blish's own scrollbar to top one real
+            // frame later - see PreserveScrollAcrossResize's doc comment
+            // for the vendor-source-grounded mechanism. Gated on
+            // _currentPlan so an empty content panel never does this work;
+            // the offset/height capture above stays unconditional since it
+            // is two cheap property reads either way.
+            if (_currentPlan != null && heightChanged)
+            {
+                PreserveScrollAcrossResize(savedScrollOffset, _contentPanel.Height);
+            }
+
+            // M33 C2b: live in-place relayout, every real drag tick - no
+            // dispose+rebuild, no debounce wait. Perf guard: skip entirely
+            // when the width genuinely did not change (e.g. a height-only
+            // resize, or a duplicate event) so an idle window never pays
+            // for a registry walk.
+            if (_currentPlan != null && widthChanged)
+            {
+                _lastRenderedWidth = w;
+
+                int panelWidth = w - RightEdgePadding;
+                ReplayRelayout(panelWidth);
+            }
+
+            // M33 C2c: the trailing settle pass (re-ellipsis, a defensive
+            // relayout replay, and now the resize-scroll verify armed by
+            // PreserveScrollAcrossResize above) must be scheduled whenever
+            // EITHER dimension changed. Previously this ticker was
+            // scheduled only on a width change, which silently starved a
+            // pure height-only drag (e.g. dragging just the bottom edge) of
+            // any settle handling at all - exactly the drag shape the live
+            // regression was found under. Bounded to a single in-flight
+            // ticker (_resizeSettlePending) so repeated ticks during a drag
+            // just extend _lastResizeEventUtc rather than spawning parallel
+            // tickers - see ResizeSettleStep.
+            if (_currentPlan != null && (widthChanged || heightChanged))
             {
                 _lastResizeEventUtc = DateTime.UtcNow;
-                if (!_resizeRenderPending)
+
+                if (!_resizeSettlePending)
                 {
-                    _resizeRenderPending = true;
+                    _resizeSettlePending = true;
                     _resizeDebounceTicker?.Cancel();
-                    _resizeDebounceTicker = new FrameTicker(ResizeDebounceStep);
+                    _resizeDebounceTicker = new FrameTicker(ResizeSettleStep);
                 }
             }
         }
 
         /// <summary>
-        /// Trailing edge of the resize debounce. Ticks once per real frame
-        /// while resize events keep landing within ResizeDebounceMs of one
-        /// another, then fires a single re-render once the drag settles.
-        /// _resizeRenderPending guarantees only one of these tickers is ever
-        /// running, so repeated resize ticks just extend _lastResizeEventUtc
-        /// rather than spawning parallel tickers.
+        /// M33 C2c: per-tick counterpart to ApplySavedScrollSynchronously
+        /// for a resize drag that changes the content panel's viewport
+        /// HEIGHT, as opposed to a content rebuild (PreserveScrollAcross's
+        /// case). Root cause, confirmed by decompiling the vendor assembly
+        /// (packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe,
+        /// Blish_HUD.Controls.Scrollbar and Panel):
+        ///
+        /// Scrollbar.RecalculateLayout caches
+        /// _scrollbarPercent = ContentRegion.Height / containerLowestContent
+        /// and zeroes ScrollDistance (and, via UpdateAssocContainer,
+        /// VerticalScrollOffset) whenever that ratio differs from the
+        /// previously cached value. RecalculateLayout runs from two places:
+        /// (1) synchronously, nested inside Panel's own "Height"
+        /// PropertyChanged handler (UpdatePanelScrollbarOnOwnPropertyChanged
+        /// sets _panelScrollbar.Height, itself a Control.Height write that
+        /// invalidates/recalculates the scrollbar) - but .NET's
+        /// PropertyChanged event fires BEFORE Control.Size's own
+        /// OnPropertyChanged("Height", invalidateLayout: true) call to
+        /// Invalidate(), so this nested call runs before Panel's own
+        /// RecalculateLayout has refreshed ContentRegion for the new size
+        /// and reads the STALE (pre-resize) ContentRegion.Height, seeing no
+        /// change; and (2) once every real engine frame, unconditionally,
+        /// from Scrollbar.DoUpdate's own Invalidate() call - by the time
+        /// THAT runs, ContentRegion.Height has already been refreshed (the
+        /// panel's own RecalculateLayout already ran synchronously earlier
+        /// in the same Height-setter chain), so it now sees a genuine
+        /// change and resets. Net effect: the reset lands on a later real
+        /// frame - typically the next one - not synchronously inside this
+        /// tick's Size write. This is the same delayed-reset window
+        /// ApplySavedScrollSynchronously's class doc already describes for
+        /// rebuilds (StartScrollVerify exists there for exactly this
+        /// reason).
+        ///
+        /// A write here keeps the visible position correct for the
+        /// remainder of THIS tick (no flash mid-drag, matching directive
+        /// B's zero-flash goal); OnPanelResized separately arms a bounded
+        /// verify window at drag SETTLE (ResizeSettleStep), not per tick,
+        /// to contest that trailing later-frame reset once the drag stops
+        /// producing new ticks - see StartResizeScrollVerify. A per-tick
+        /// verify window was deliberately not used: it would spawn (or
+        /// cancel-and-replace) a FrameTicker on every single drag frame,
+        /// which is the "spam" the task explicitly ruled out, and the
+        /// per-tick synchronous write already keeps each tick visually
+        /// correct without one.
         /// </summary>
-        private bool ResizeDebounceStep(GameTime gameTime)
+        private void PreserveScrollAcrossResize(int savedOffsetPx, int newContentPanelHeight)
+        {
+            if (_contentPanel == null || PanelScrollbarField == null || savedOffsetPx <= 0)
+            {
+                return;
+            }
+
+            var scrollbar = PanelScrollbarField.GetValue(_contentPanel) as Scrollbar;
+            if (scrollbar == null)
+            {
+                return;
+            }
+
+            // Force the scrollbar to resolve its own cached _scrollbarPercent
+            // (ContentRegion.Height / containerLowestContent) against the
+            // ALREADY-fresh ContentRegion.Height _contentPanel.Size just set,
+            // BEFORE writing our restore ratio below. Skipping this call
+            // would make our own write below self-defeating: Scrollbar.
+            // ScrollDistance's setter always calls Invalidate(), and on a
+            // pure height-only tick nothing else has touched the scrollbar
+            // yet this tick, so _scrollbarPercent is still stale (last
+            // refreshed against the OLD height); OUR write would then be the
+            // first thing to trigger Scrollbar.RecalculateLayout against the
+            // new ratio, which would detect the just-changed percent and
+            // reset ScrollDistance back to 0 synchronously, inside the same
+            // statement, undoing our own write before this method even
+            // returns. Calling RecalculateLayout directly (bypassing
+            // Control.UpdateLayout's once-per-LayoutState guard - see that
+            // guard's own doc comment) lets this expected reset happen NOW,
+            // harmlessly (nothing paints between these two statements), so
+            // the restore write immediately below is the one that actually
+            // sticks: _scrollbarPercent is stable by then, so ScrollDistance's
+            // own cascading RecalculateLayout finds no further change to
+            // react to. (A rebuild does not need this: PreserveScrollAcross's
+            // mutate() churns through many of _contentPanel's own direct
+            // children - each write reaching Panel.UpdateContentRegionBounds
+            // - which already forces this same stale-to-fresh transition
+            // organically before ApplySavedScrollSynchronously's write runs.
+            // A pure height-only resize tick has no such churn: ReplayRelayout
+            // does not even run when only height changed, since it is gated
+            // on widthChanged.)
+            scrollbar.RecalculateLayout();
+
+            int contentHeight = MeasureContentHeight(_contentPanel);
+            float ratio = ScrollMath.RatioForOffset(savedOffsetPx, contentHeight, newContentPanelHeight);
+            float before = scrollbar.ScrollDistance;
+            scrollbar.ScrollDistance = ratio;
+
+            // Remember the last known-good pre-tick offset so the
+            // settle-time verify (StartResizeScrollVerify) restores the
+            // user's real position even if this was not the final tick of
+            // the drag - see the field comment on _resizeScrollSavedOffset.
+            _resizeScrollRestorePending = true;
+            _resizeScrollSavedOffset = savedOffsetPx;
+
+            if (_settings != null && _settings.ScrollDiagnosticsEnabled.Value)
+            {
+                Logger.Debug("{0} write writer=ResizePreserve frame={1} before={2:0.0000} after={3:0.0000} contentHeight={4} savedOffset={5} newHeight={6}",
+                    ScrollDiagTag, ScrollDiagFrame(), before, ratio, contentHeight, savedOffsetPx, newContentPanelHeight);
+            }
+        }
+
+        /// <summary>
+        /// M33 C2c: arms StartScrollVerify's existing bounded window once,
+        /// at resize-drag settle, using the last known-good offset a
+        /// resize tick captured via PreserveScrollAcrossResize. Reuses
+        /// StartScrollVerify unmodified, so the existing wheel-yield,
+        /// zero-reassert-cap, and generation-staleness semantics all apply
+        /// unchanged - see that method's doc comment. Deliberately called
+        /// only from ResizeSettleStep (once per settled drag), never per
+        /// tick.
+        /// </summary>
+        private void StartResizeScrollVerify()
+        {
+            if (_contentPanel == null || PanelScrollbarField == null || _resizeScrollSavedOffset <= 0)
+            {
+                return;
+            }
+
+            var scrollbar = PanelScrollbarField.GetValue(_contentPanel) as Scrollbar;
+            if (scrollbar == null)
+            {
+                return;
+            }
+
+            int capturedGeneration = ++_scrollRestoreGeneration;
+            StartScrollVerify(_contentPanel, capturedGeneration, _resizeScrollSavedOffset, scrollbar);
+        }
+
+        /// <summary>
+        /// M33 C2b: replays every registered relayout closure at the given
+        /// panelWidth - position/width writes on already-existing controls
+        /// only, never a MeasureString call, never a Height change (see the
+        /// _relayoutActions field comment). Wrapped in the vendor
+        /// SuspendLayout/ResumeLayout pair (m2 risk 2): resizing a row
+        /// Panel's Width fires its own Resized event, which FlowPanel wires
+        /// to a full sibling reflow of its parent on every single write:
+        /// for a long shopping list or deep tree, replaying dozens of
+        /// per-row closures in a single tick would otherwise trigger that
+        /// many redundant reflow passes in the same frame (m2's O(rows^2)
+        /// comparison-cost risk). SuspendLayout on _contentPanel propagates
+        /// down (Blish's own IsLayoutSuspended check walks the parent
+        /// chain), so every nested FlowPanel's reflow this tick is
+        /// deferred; ResumeLayout(false) does not force it back
+        /// synchronously - Blish's own per-frame Control.Update ->
+        /// UpdateLayout call resolves any still-Invalidated FlowPanel
+        /// automatically on the very next real frame, so nothing is lost,
+        /// only coalesced. Since these writes only ever touch Width/X (row
+        /// heights stay fixed per M33 C2a), the coalesced reflow is a no-op
+        /// for vertical position anyway - SingleTopToBottom flow positions
+        /// children from cumulative Height, not Width.
+        ///
+        /// PERF CAVEAT (KNOWN-ISSUES #13): this replaces a ONE-TIME
+        /// dispose+rebuild 150ms after the drag settled with a full replay
+        /// of _relayoutActions on EVERY real drag frame - a genuine change
+        /// in perf character, not just a different trigger. The mitigation
+        /// above is reasoned, not measured: no live drag-resize check on a
+        /// large, fully-expanded plan (deep tree + long shopping list) has
+        /// been performed against a running Blish instance. If this ever
+        /// needs tightening, look here first.
+        /// </summary>
+        private void ReplayRelayout(int panelWidth)
+        {
+            if (_contentPanel == null || _relayoutActions.Count == 0) return;
+
+#if DEBUG
+            // M33 C2b invariant (task directive 6): a pure width/text
+            // relayout must never touch scroll position. DEBUG-only (reuses
+            // the same cached PanelScrollbarField reflection handle the
+            // scroll-restore machinery already resolved once) so this costs
+            // nothing in Release builds; a violation here would mean some
+            // relayout closure reached into the scrollbar, which no closure
+            // in this file is supposed to do.
+            var debugScrollbar = PanelScrollbarField?.GetValue(_contentPanel) as Scrollbar;
+            float debugScrollBefore = debugScrollbar?.ScrollDistance ?? -1f;
+#endif
+
+            _contentPanel.SuspendLayout();
+            try
+            {
+                foreach (var relayout in _relayoutActions)
+                {
+                    relayout(panelWidth);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Unlike the settle pass (already inside a try/catch-guarded
+                // FrameTicker step), this runs synchronously and directly
+                // off Blish's own Resized event - an uncaught exception here
+                // would propagate into the library's event dispatch on
+                // every remaining drag tick, not just degrade this one
+                // resize. A stale-control edge case (e.g. Build() ran again
+                // mid-drag, disposing the very controls a closure captured)
+                // must degrade to "this tick's relayout is incomplete", not
+                // take down the resize interaction.
+                Logger.Warn(ex, "Relayout tick failed partway through; some controls may be stale until the next resize or rebuild");
+            }
+            finally
+            {
+                _contentPanel.ResumeLayout(false);
+            }
+
+#if DEBUG
+            if (debugScrollbar != null && debugScrollbar.ScrollDistance != debugScrollBefore)
+            {
+                Logger.Warn(
+                    "M33 C2b invariant violated: a relayout closure changed the scrollbar position (before={0:0.0000} after={1:0.0000}) - relayout must be scroll-neutral.",
+                    debugScrollBefore, debugScrollbar.ScrollDistance);
+            }
+#endif
+        }
+
+        /// <summary>
+        /// M33 C2b: the settle-only text-measurement pass. Every relayout
+        /// closure already ran (and re-ran) synchronously on every drag
+        /// tick via ReplayRelayout; this only re-runs the 3 EllipsizeToWidth
+        /// call sites' MEASURE work (Used Materials, Shopping List, Tree row
+        /// names), since MeasureString is comparatively expensive to run on
+        /// every tick across a long list/deep tree and the visible cost of
+        /// deferring it (truncated text unchanged mid-drag, corrected once
+        /// the drag settles) is small - per M33 C2b directive 2. Neither
+        /// this pass nor the defensive ReplayRelayout repeat below ever
+        /// changes a row's Height, so - unlike the pre-C2a settle rebuild
+        /// this replaces - nothing in RunReellipsis/ReplayRelayout can
+        /// perturb scroll position; no PreserveScrollAcross wrapper is
+        /// needed around them. M33 C2c: this method also arms the resize
+        /// drag's single settle-time scroll-verify window, if a
+        /// height-changing tick during the drag needs one - see
+        /// StartResizeScrollVerify and _resizeScrollRestorePending.
+        /// </summary>
+        private bool ResizeSettleStep(GameTime gameTime)
         {
             // The view may have been unloaded (tab switched away, module
             // disabled) while this was pending - nothing to render into.
             if (_contentPanel == null || _contentPanel.Parent == null)
             {
-                _resizeRenderPending = false;
+                _resizeSettlePending = false;
+                _resizeScrollRestorePending = false;
                 return false;
             }
 
@@ -737,7 +1205,7 @@ namespace GW2CraftingHelper.Views
                 return true;
             }
 
-            _resizeRenderPending = false;
+            _resizeSettlePending = false;
 
             try
             {
@@ -745,12 +1213,13 @@ namespace GW2CraftingHelper.Views
                 // was captured by the resize tick that started this ticker -
                 // only the width at the moment the drag actually settled
                 // matters.
-                int currentWidth = _contentPanel.Width;
-                if (_currentPlan != null && currentWidth != _lastRenderedWidth)
-                {
-                    _lastRenderedWidth = currentWidth;
-                    PreserveScrollAcross(() => RenderPlan(_currentPlan));
-                }
+                int panelWidth = _contentPanel.Width - RightEdgePadding;
+                RunReellipsis(panelWidth);
+                // Defensive correctness net (m2 4.2): a single extra
+                // position-only replay at the final settled width, in case
+                // any per-tick relayout closure was ever skipped or landed
+                // on a stale intermediate width. Cheap - no MeasureString.
+                ReplayRelayout(panelWidth);
             }
             catch (Exception ex)
             {
@@ -758,10 +1227,32 @@ namespace GW2CraftingHelper.Views
                 // and the debounce firing (e.g. Build() ran again for a tab
                 // reload mid-drag). Degrade silently: whichever Build() call
                 // is current already rendered fresh content at its own width.
-                Logger.Warn(ex, "Resize debounce render skipped; content panel unavailable");
+                Logger.Warn(ex, "Resize settle pass skipped; content panel unavailable");
+            }
+
+            // M33 C2c: bounded to a single window per settled drag (not per
+            // tick) - see PreserveScrollAcrossResize's doc comment for why
+            // one settle-time window is sufficient to contest the trailing
+            // Blish-internal reset.
+            if (_resizeScrollRestorePending)
+            {
+                _resizeScrollRestorePending = false;
+                StartResizeScrollVerify();
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// M33 C2b: replays every registered re-ellipsis closure - see
+        /// ResizeSettleStep and the _reellipsisActions field comment.
+        /// </summary>
+        private void RunReellipsis(int panelWidth)
+        {
+            foreach (var reellipsis in _reellipsisActions)
+            {
+                reellipsis(panelWidth);
+            }
         }
 
         private void OnOwnMaterialsToggled(object sender, CheckChangedEvent e)
@@ -927,6 +1418,23 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        /// <summary>
+        /// The content panel's LIVE usable width (RightEdgePadding already
+        /// subtracted). M33 C2b: OnPanelResized updates _contentPanel's own
+        /// Width synchronously on every drag tick (no rebuild, no debounce),
+        /// so this is always current - unlike a panelWidth value captured
+        /// once at a control's build time (e.g. a TreeNodeState created
+        /// before a since-completed resize), which the removal of the
+        /// settle rebuild would otherwise leave stale indefinitely. Callers
+        /// that need "the width this plan was last rendered at" (tree
+        /// height/width bookkeeping, lazy child construction) read this
+        /// instead of a stored field.
+        /// </summary>
+        private int GetCurrentPanelWidth()
+        {
+            return _contentPanel != null ? _contentPanel.Width - RightEdgePadding : 0;
+        }
+
         private void RenderPlan(PlanViewModel vm)
         {
             if (_contentPanel == null) return;
@@ -934,6 +1442,16 @@ namespace GW2CraftingHelper.Views
             // Drop tree states up front so a plan without a tree section
             // does not retain disposed controls from the previous render.
             _treeNodeStates.Clear();
+            _treeRoot = null;
+            _treeFlow = null;
+
+            // M33 C2b: the relayout/re-ellipsis registries are rebuilt from
+            // scratch alongside every other per-render state above - same
+            // lifecycle as _treeNodeStates. Every closure captures controls
+            // from the render about to happen below; nothing here can
+            // outlive the dispose loop that follows.
+            _relayoutActions.Clear();
+            _reellipsisActions.Clear();
 
             foreach (var child in _contentPanel.Children.ToArray())
             {
@@ -945,12 +1463,13 @@ namespace GW2CraftingHelper.Views
             CreatePlanHeader(vm, panelWidth);
 
             // Separator under header
-            new Panel()
+            var headerSeparator = new Panel()
             {
                 Size = new Point(panelWidth, 2),
                 BackgroundColor = new Color(180, 180, 180),
                 Parent = _contentPanel
             };
+            _relayoutActions.Add(w => headerSeparator.Size = new Point(w, 2));
 
             // Section order mirrors gw2efficiency's calculator page: total
             // cost breakdown, then the recipe tree, then everything else in
@@ -1021,7 +1540,7 @@ namespace GW2CraftingHelper.Views
             }
 
             int totalTitleWidth = frameSize + iconPad + prefixWidth + nameWidth + qtyWidth;
-            int startX = System.Math.Max(0, (panelWidth - totalTitleWidth) / 2);
+            int startX = PlanRelayoutMath.CenterX(panelWidth, totalTitleWidth);
             int centerRegion = headerHeight - headerTopPad - headerBottomPad;
             int iconY = headerTopPad + (centerRegion - frameSize) / 2;
             // Anchor text to icon's visual center with -2px optical nudge for descenders
@@ -1033,12 +1552,12 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            CreateRarityFramedIcon(
+            var iconFrame = CreateRarityFramedIcon(
                 titlePanel, vm.TargetIconUrl, vm.TargetRarity, startX, iconY,
                 iconSize: iconSize, borderThickness: iconBorder);
 
             int textX = startX + frameSize + iconPad;
-            new Label()
+            var prefixLabel = new Label()
             {
                 Text = prefixText,
                 Font = titleFont,
@@ -1049,7 +1568,7 @@ namespace GW2CraftingHelper.Views
             };
             textX += prefixWidth;
 
-            new Label()
+            var nameLabel = new Label()
             {
                 Text = nameText,
                 Font = titleFont,
@@ -1063,12 +1582,13 @@ namespace GW2CraftingHelper.Views
             };
             textX += nameWidth;
 
+            Label qtyLabel = null;
             if (qtyText.Length > 0)
             {
                 // DefaultFont16 sits a little taller than Font18's cap
                 // height at this weight; +3 keeps its baseline visually
                 // aligned with the name label instead of reading "raised".
-                new Label()
+                qtyLabel = new Label()
                 {
                     Text = qtyText,
                     Font = qtyFont,
@@ -1092,15 +1612,39 @@ namespace GW2CraftingHelper.Views
             var tsMeasured = tsFont.MeasureString(tsText);
             int tsWidth = (int)System.Math.Ceiling(tsMeasured.Width);
 
-            new Label()
+            var tsLabel = new Label()
             {
                 Text = tsText,
                 Font = tsFont,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(System.Math.Max(0, panelWidth - tsWidth - 8), 2),
+                Location = new Point(PlanRelayoutMath.RightAlignedX(panelWidth - 8, tsWidth), 2),
                 Parent = tsPanel
             };
+
+            // M33 C2b: every measured width here (prefixWidth, nameWidth,
+            // qtyWidth, tsWidth) is font-only and invariant to panelWidth -
+            // only the centering/right-alignment anchors shift, so this is a
+            // pure reposition, no re-measure, on every drag tick.
+            _relayoutActions.Add(w =>
+            {
+                int newStartX = PlanRelayoutMath.CenterX(w, totalTitleWidth);
+                titlePanel.Size = new Point(w, headerHeight);
+                iconFrame.Location = new Point(newStartX, iconY);
+
+                int x = newStartX + frameSize + iconPad;
+                prefixLabel.Location = new Point(x, textY);
+                x += prefixWidth;
+                nameLabel.Location = new Point(x, textY);
+                x += nameWidth;
+                if (qtyLabel != null)
+                {
+                    qtyLabel.Location = new Point(x, textY + 3);
+                }
+
+                tsPanel.Size = new Point(w, 22);
+                tsLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, tsWidth), 2);
+            });
         }
 
         /// <summary>
@@ -1131,7 +1675,7 @@ namespace GW2CraftingHelper.Views
         {
             // Consistent top gap before every section (including the tree),
             // so sections do not sit flush against whatever preceded them.
-            new Panel()
+            var topGap = new Panel()
             {
                 Size = new Point(panelWidth, SectionSpacing),
                 Parent = _contentPanel
@@ -1181,7 +1725,7 @@ namespace GW2CraftingHelper.Views
             };
 
             // Divider under the header - identical chrome for every section.
-            new Panel()
+            var headerDivider = new Panel()
             {
                 Size = new Point(panelWidth, 1),
                 Location = new Point(0, 29),
@@ -1189,13 +1733,22 @@ namespace GW2CraftingHelper.Views
                 Parent = headerPanel
             };
 
+            // M33 C2a (directive A): Standard (explicit) height, not
+            // AutoSize - every row this FlowPanel will ever hold is a fixed
+            // constant height (PlanContentHeightMath), so the caller sets
+            // Height synchronously right after populating rows instead of
+            // waiting for Blish's per-frame AutoSize convergence. Starts at
+            // 0 and is corrected before the first paint in every case: a
+            // caller that builds rows immediately (every CreateXBody, and
+            // RenderTreeNode's own root call) sets the true height in the
+            // same call; nothing observes this FlowPanel's height between
+            // construction and that set.
             var contentFlow = new FlowPanel()
             {
                 Size = new Point(panelWidth, 0),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 Visible = expanded,
-                Parent = _contentPanel,
-                HeightSizingMode = SizingMode.AutoSize
+                Parent = _contentPanel
             };
 
             headerPanel.Click += (_, __) =>
@@ -1213,6 +1766,19 @@ namespace GW2CraftingHelper.Views
                 });
             };
 
+            // M33 C2b: shared chrome relayout for every section (and the
+            // tree) - width-only writes, contentFlow's Height is preserved
+            // exactly (whatever it was most recently finalized to by
+            // PlanContentHeightMath) so this can never disturb scroll
+            // state.
+            _relayoutActions.Add(w =>
+            {
+                topGap.Size = new Point(w, SectionSpacing);
+                headerPanel.Size = new Point(w, 30);
+                headerDivider.Size = new Point(w, 1);
+                contentFlow.Size = new Point(w, contentFlow.Height);
+            });
+
             return new SectionHeaderHandle
             {
                 HeaderPanel = headerPanel,
@@ -1225,6 +1791,15 @@ namespace GW2CraftingHelper.Views
         {
             var header = CreateSectionHeader(section.Title, section.SectionType, panelWidth, section.IsDefaultExpanded);
             var contentFlow = header.ContentFlow;
+
+#if DEBUG
+            // M33 C2b (m2 risk 3): a section type added later without
+            // registering its own width relayout would silently freeze at
+            // build-time width on every future resize - labels just stop
+            // moving, easy to miss in review. Fail loud in DEBUG builds
+            // instead of relying on call-site discipline alone.
+            int relayoutCountBeforeBody = _relayoutActions.Count;
+#endif
 
             // Every section gets its own table-column layout (spec: aligned
             // columns everywhere, not free-flowing text rows), so each has a
@@ -1259,6 +1834,22 @@ namespace GW2CraftingHelper.Views
                     }
                     break;
             }
+
+#if DEBUG
+            if (section.Rows.Count > 0 && _relayoutActions.Count == relayoutCountBeforeBody)
+            {
+                Logger.Warn(
+                    "M33 C2b: section {0} rendered {1} row(s) but its body registered no relayout closures - it will not track live window resize. See CreateCollapsibleSection.",
+                    section.SectionType, section.Rows.Count);
+            }
+#endif
+
+            // M33 C2a (directive A): finalize contentFlow's real height
+            // synchronously now that every row is populated, instead of
+            // leaving it to Blish's per-frame AutoSize convergence. Pure
+            // function of the same section data just rendered above, so it
+            // cannot drift from what was actually built.
+            contentFlow.Size = new Point(panelWidth, PlanContentHeightMath.SectionBodyHeight(section.SectionType, section.Rows));
         }
 
         /// <summary>
@@ -1266,9 +1857,9 @@ namespace GW2CraftingHelper.Views
         /// row" chrome used by every table-style section except the tree
         /// (which uses indent guidelines instead, per gw2e's own convention).
         /// </summary>
-        private static void CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight)
+        private static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight)
         {
-            new Panel()
+            return new Panel()
             {
                 Size = new Point(panelWidth, 1),
                 Location = new Point(0, rowHeight - 1),
@@ -1298,7 +1889,7 @@ namespace GW2CraftingHelper.Views
         /// styling) - used for the shopping list's source tag and anywhere
         /// else a short non-interactive label needs pill chrome.
         /// </summary>
-        private static void CreateSmallTag(Panel parent, string text, int x, int y)
+        private static Panel CreateSmallTag(Panel parent, string text, int x, int y)
         {
             var font = GameService.Content.DefaultFont12;
             int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
@@ -1333,6 +1924,8 @@ namespace GW2CraftingHelper.Views
                 Location = new Point((width - 2 - textWidth) / 2, 1),
                 Parent = inner
             };
+
+            return outer;
         }
 
         // --- Used Materials section ---
@@ -1345,9 +1938,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateUsedMaterialRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        private void CreateUsedMaterialRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
         {
-            const int rowHeight = 36;
+            const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
             CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
@@ -1358,11 +1951,11 @@ namespace GW2CraftingHelper.Views
 
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
-            int nameMaxWidth = System.Math.Max(20, qtyRightEdge - qtyWidth - 12 - nameX);
+            int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(qtyRightEdge, qtyWidth, 12, nameX);
 
             string fullName = row.Label ?? "";
             string displayName = EllipsizeToWidth(font, fullName, nameMaxWidth);
-            new Label()
+            var nameLabel = new Label()
             {
                 Text = displayName,
                 Font = font,
@@ -1379,7 +1972,7 @@ namespace GW2CraftingHelper.Views
                 rowPanel.BasicTooltipText = fullName;
             }
 
-            new Label()
+            var qtyLabel = new Label()
             {
                 Text = qtyText,
                 Font = font,
@@ -1390,7 +1983,28 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
-            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+
+            // M33 C2b: qty label position is a pure reposition (qtyWidth is
+            // font-only); the name is left untouched during drag ticks and
+            // only re-ellipsized at settle (RunReellipsis) to avoid a
+            // MeasureString call per row per tick.
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, rowHeight);
+                qtyLabel.Location = new Point(w - 8 - qtyWidth, 9);
+                if (divider != null) divider.Size = new Point(w, 1);
+            });
+            _reellipsisActions.Add(w =>
+            {
+                int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(w - 8, qtyWidth, 12, nameX);
+                string newDisplayName = EllipsizeToWidth(font, fullName, newMaxWidth);
+                if (nameLabel.Text != newDisplayName)
+                {
+                    nameLabel.Text = newDisplayName;
+                    rowPanel.BasicTooltipText = newDisplayName != fullName ? fullName : null;
+                }
+            });
         }
 
         // --- Shopping List section ---
@@ -1430,19 +2044,27 @@ namespace GW2CraftingHelper.Views
             var edges = ShoppingColumnMath.ComputeEdges(totalRightEdge, maxEachWidth, maxTotalWidth);
 
             // Both the header and every data row are handed this SAME
-            // ColumnEdges instance, so they cannot drift apart for this
-            // render.
-            CreateShoppingListHeaderRow(contentFlow, panelWidth, edges);
+            // ColumnEdges instance (for the build), and the same cached
+            // maxEachWidth/maxTotalWidth (for their relayout closures) - a
+            // relayout tick re-invokes ShoppingColumnMath.ComputeEdges with
+            // the new panelWidth but these SAME data-derived maxima (M33
+            // C2b: the pre-scan above depends only on row data, never on
+            // panelWidth, so it does not need to re-run on resize at all).
+            CreateShoppingListHeaderRow(contentFlow, panelWidth, edges, maxEachWidth, maxTotalWidth);
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, edges, i == section.Rows.Count - 1);
+                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, edges, maxEachWidth, maxTotalWidth, i == section.Rows.Count - 1);
             }
         }
 
-        private static void CreateShoppingListHeaderRow(
-            FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges)
+        private void CreateShoppingListHeaderRow(
+            FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges, int maxEachWidth, int maxTotalWidth)
         {
-            var rowPanel = new Panel() { Size = new Point(panelWidth, 22), Parent = parent };
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, PlanContentHeightMath.ShoppingHeaderRowHeight),
+                Parent = parent
+            };
             var font = GameService.Content.DefaultFont12;
             var color = new Color(153, 153, 153);
 
@@ -1452,9 +2074,23 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(50, 4), Parent = rowPanel
             };
-            CreateRightAlignedLabel(rowPanel, "Amount", font, color, edges.QtyRightEdge, 4);
-            CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
-            CreateRightAlignedLabel(rowPanel, "Total", font, color, edges.TotalRightEdge, 4);
+            var amountLabel = CreateRightAlignedLabel(rowPanel, "Amount", font, color, edges.QtyRightEdge, 4);
+            var eachLabel = CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
+            var totalLabel = CreateRightAlignedLabel(rowPanel, "Total", font, color, edges.TotalRightEdge, 4);
+
+            // M33 C2b: header column labels are font-only (fixed text) -
+            // pure reposition on every drag tick, recomputing edges from
+            // the SAME cached maxEachWidth/maxTotalWidth ComputeEdges was
+            // built with (ShoppingColumnMath is the single source of truth
+            // both paths call).
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, PlanContentHeightMath.ShoppingHeaderRowHeight);
+                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
+                amountLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), 4);
+                eachLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), 4);
+                totalLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), 4);
+            });
         }
 
         private static string ShoppingSourceTag(PlanRowViewModel row)
@@ -1472,10 +2108,11 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateShoppingRow(
-            PlanRowViewModel row, FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges, bool isLast)
+        private void CreateShoppingRow(
+            PlanRowViewModel row, FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges,
+            int maxEachWidth, int maxTotalWidth, bool isLast)
         {
-            const int rowHeight = 36;
+            const int rowHeight = PlanContentHeightMath.ShoppingRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
             CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
@@ -1485,9 +2122,10 @@ namespace GW2CraftingHelper.Views
 
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
-            int nameMaxWidth = System.Math.Max(20, edges.QtyRightEdge - qtyWidth - 12 - nameX);
+            int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(edges.QtyRightEdge, qtyWidth, 12, nameX);
 
             string fullName = row.Label ?? "";
+            string hintText = row.HintText;
             string displayName = EllipsizeToWidth(font, fullName, nameMaxWidth);
             var nameLabel = new Label()
             {
@@ -1506,9 +2144,9 @@ namespace GW2CraftingHelper.Views
             {
                 tooltipParts.Add(fullName);
             }
-            if (!string.IsNullOrEmpty(row.HintText))
+            if (!string.IsNullOrEmpty(hintText))
             {
-                tooltipParts.Add(row.HintText);
+                tooltipParts.Add(hintText);
             }
             if (tooltipParts.Count > 0)
             {
@@ -1516,12 +2154,11 @@ namespace GW2CraftingHelper.Views
             }
 
             string sourceTag = ShoppingSourceTag(row);
-            if (!string.IsNullOrEmpty(sourceTag))
-            {
-                CreateSmallTag(rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9);
-            }
+            Panel tagPanel = !string.IsNullOrEmpty(sourceTag)
+                ? CreateSmallTag(rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9)
+                : null;
 
-            new Label()
+            var qtyLabel = new Label()
             {
                 Text = qtyText,
                 Font = font,
@@ -1538,10 +2175,43 @@ namespace GW2CraftingHelper.Views
             // alongside/instead of coin; a row with neither (genuinely
             // unpriceable - gw2e: "Not sold or crafted") renders a dash,
             // never a blank cell (KNOWN-ISSUES #16).
-            RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
-            RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
+            var eachCell = RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
+            var totalCell = RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
 
-            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+
+            // M33 C2b: qty + Each/Total cells reposition every drag tick
+            // (no MeasureString - RepositionValueCellRightAligned uses only
+            // cached segment text widths). The name label and its source
+            // tag are untouched here; both depend on ellipsis truncation
+            // and only update at settle (RunReellipsis) below.
+            _relayoutActions.Add(w =>
+            {
+                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
+                rowPanel.Size = new Point(w, rowHeight);
+                qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
+                RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
+                RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
+                if (divider != null) divider.Size = new Point(w, 1);
+            });
+            _reellipsisActions.Add(w =>
+            {
+                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
+                int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(e.QtyRightEdge, qtyWidth, 12, nameX);
+                string newDisplayName = EllipsizeToWidth(font, fullName, newMaxWidth);
+                if (nameLabel.Text != newDisplayName)
+                {
+                    nameLabel.Text = newDisplayName;
+                    var parts = new List<string>();
+                    if (newDisplayName != fullName) parts.Add(fullName);
+                    if (!string.IsNullOrEmpty(hintText)) parts.Add(hintText);
+                    rowPanel.BasicTooltipText = parts.Count > 0 ? string.Join("\n", parts) : null;
+                }
+                if (tagPanel != null)
+                {
+                    tagPanel.Location = new Point(nameX + nameLabel.Width + 8, 9);
+                }
+            });
         }
 
         // --- Crafting Steps section ---
@@ -1554,10 +2224,10 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateCraftStepRow(
+        private void CreateCraftStepRow(
             PlanRowViewModel row, int stepNumber, FlowPanel parent, int panelWidth, bool isLast)
         {
-            const int rowHeight = 44;
+            const int rowHeight = PlanContentHeightMath.CraftStepRowHeight;
             const int badgeSize = 36;
             const int badgeX = 8;
             const int badgeY = 4;
@@ -1619,24 +2289,39 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(x, 13), Parent = rowPanel
             };
 
+            Label sublabelLabel = null;
             if (!string.IsNullOrEmpty(row.Sublabel))
             {
-                CreateRightAlignedLabel(
+                sublabelLabel = CreateRightAlignedLabel(
                     rowPanel, row.Sublabel, GameService.Content.DefaultFont12,
                     new Color(153, 153, 153), panelWidth - 8, 16);
             }
 
-            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+
+            // M33 C2b: name/qty labels sit at a fixed x (font-only, not
+            // width-dependent - textX never depended on panelWidth); only
+            // the row width, its divider, and the right-aligned sublabel
+            // need to move.
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, rowHeight);
+                if (sublabelLabel != null)
+                {
+                    sublabelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, sublabelLabel.Width), 16);
+                }
+                if (divider != null) divider.Size = new Point(w, 1);
+            });
         }
 
         // --- Required Disciplines / Required Recipes sections (c-table) ---
 
-        private static void CreateCTableHeaderRow(
+        private void CreateCTableHeaderRow(
             FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel)
         {
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, 26),
+                Size = new Point(panelWidth, PlanContentHeightMath.CTableHeaderRowHeight),
                 BackgroundColor = new Color(35, 35, 35),
                 Parent = parent
             };
@@ -1647,7 +2332,13 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(leftX, 5), Parent = rowPanel
             };
-            CreateRightAlignedLabel(rowPanel, rightLabel, font, Color.White, panelWidth - 8, 5);
+            var rightLabelControl = CreateRightAlignedLabel(rowPanel, rightLabel, font, Color.White, panelWidth - 8, 5);
+
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, PlanContentHeightMath.CTableHeaderRowHeight);
+                rightLabelControl.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, rightLabelControl.Width), 5);
+            });
         }
 
         private void CreateDisciplinesBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
@@ -1659,9 +2350,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateDisciplineRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        private void CreateDisciplineRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
         {
-            const int rowHeight = 32;
+            const int rowHeight = PlanContentHeightMath.DisciplineRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
             var font = GameService.Content.DefaultFont14;
 
@@ -1671,9 +2362,16 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(8, 7), Parent = rowPanel
             };
-            CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
+            var levelLabel = CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
 
-            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, rowHeight);
+                levelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, levelLabel.Width), 7);
+                if (divider != null) divider.Size = new Point(w, 1);
+            });
         }
 
         private void CreateRecipesBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
@@ -1685,10 +2383,12 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        private void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
         {
             bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
-            int rowHeight = hasSublabel ? 44 : 32;
+            int rowHeight = hasSublabel
+                ? PlanContentHeightMath.RecipeRowHeightWithSublabel
+                : PlanContentHeightMath.RecipeRowHeightNoSublabel;
 
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
@@ -1723,6 +2423,7 @@ namespace GW2CraftingHelper.Views
                 };
             }
 
+            Label statusLabel = null;
             if (!string.IsNullOrEmpty(row.StatusTag))
             {
                 Color statusColor = Color.White;
@@ -1734,10 +2435,20 @@ namespace GW2CraftingHelper.Views
                 {
                     statusColor = new Color(150, 200, 150);
                 }
-                CreateRightAlignedLabel(rowPanel, row.StatusTag, font, statusColor, panelWidth - 8, hasSublabel ? 10 : 8);
+                statusLabel = CreateRightAlignedLabel(rowPanel, row.StatusTag, font, statusColor, panelWidth - 8, hasSublabel ? 10 : 8);
             }
 
-            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, rowHeight);
+                if (statusLabel != null)
+                {
+                    statusLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, statusLabel.Width), hasSublabel ? 10 : 8);
+                }
+                if (divider != null) divider.Size = new Point(w, 1);
+            });
         }
 
         /// <summary>
@@ -1746,17 +2457,27 @@ namespace GW2CraftingHelper.Views
         /// spec's 5 when all are applicable). Non-coin rows (currency costs)
         /// are handled separately as full-width rows underneath.
         /// </summary>
-        private static void CreateCostTileRow(List<PlanRowViewModel> coinRows, FlowPanel parent, int panelWidth)
+        /// <summary>
+        /// One tile's already-created controls, cached for relayout - m2
+        /// 3.5's [FANOUT] case: unlike a single-anchor row, every tile's
+        /// caption AND coin segments are independently re-centered inside
+        /// their own tileWidth-wide slice on every drag tick.
+        /// </summary>
+        private sealed class CostTileHandle
+        {
+            public Label CaptionLabel;
+            public SegmentLayoutHandle Segments;
+        }
+
+        private void CreateCostTileRow(List<PlanRowViewModel> coinRows, FlowPanel parent, int panelWidth)
         {
             int tileCount = coinRows.Count;
             if (tileCount == 0) return;
 
-            const int rowHeight = 56;
+            const int rowHeight = PlanContentHeightMath.CostTileRowHeight;
             const int totalMargin = 40;
             const int minTileWidth = 80;
-            int tileWidth = System.Math.Max(minTileWidth, (panelWidth - totalMargin) / tileCount);
-            int rowContentWidth = tileWidth * tileCount;
-            int startX = System.Math.Max(0, (panelWidth - rowContentWidth) / 2);
+            var geometry = PlanRelayoutMath.ComputeCostTileGeometry(panelWidth, tileCount, totalMargin, minTileWidth);
 
             var rowPanel = new Panel()
             {
@@ -1768,29 +2489,52 @@ namespace GW2CraftingHelper.Views
             var amountFont = GameService.Content.DefaultFont16;
             var captionColor = new Color(153, 153, 153);
 
+            var tiles = new List<CostTileHandle>(tileCount);
             for (int i = 0; i < tileCount; i++)
             {
-                int tileX = startX + i * tileWidth;
+                int tileX = geometry.StartX + i * geometry.TileWidth;
                 var row = coinRows[i];
 
                 string caption = TileCaptionFor(row.Label);
                 int captionWidth = (int)System.Math.Ceiling(captionFont.MeasureString(caption).Width);
-                new Label()
+                var captionLabel = new Label()
                 {
                     Text = caption,
                     Font = captionFont,
                     TextColor = captionColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(tileX + System.Math.Max(0, (tileWidth - captionWidth) / 2), 6),
+                    Location = new Point(tileX + PlanRelayoutMath.CenterX(geometry.TileWidth, captionWidth), 6),
                     Parent = rowPanel
                 };
 
                 var segments = BuildCoinSegments(row.CoinValue, amountFont);
                 int segmentsWidth = TotalCoinSegmentsWidth(segments);
-                int coinStartX = tileX + System.Math.Max(0, (tileWidth - segmentsWidth) / 2);
-                LayoutCoinSegments(rowPanel, segments, coinStartX, 30, amountFont);
+                int coinStartX = tileX + PlanRelayoutMath.CenterX(geometry.TileWidth, segmentsWidth);
+                var segmentHandle = LayoutCoinSegments(rowPanel, segments, coinStartX, 30, amountFont);
+
+                tiles.Add(new CostTileHandle { CaptionLabel = captionLabel, Segments = segmentHandle });
             }
+
+            // M33 C2b [FANOUT]: every tile's caption + coin segments are
+            // font-only (invariant to panelWidth) - only tileWidth/startX
+            // and each tile's own centering offset move. No MeasureString.
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, rowHeight);
+                var g = PlanRelayoutMath.ComputeCostTileGeometry(w, tileCount, totalMargin, minTileWidth);
+                for (int i = 0; i < tiles.Count; i++)
+                {
+                    int tileX = g.StartX + i * g.TileWidth;
+                    var tile = tiles[i];
+
+                    tile.CaptionLabel.Location = new Point(tileX + PlanRelayoutMath.CenterX(g.TileWidth, tile.CaptionLabel.Width), 6);
+
+                    int segmentsWidth = ShoppingColumnMath.SegmentRunWidth(tile.Segments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
+                    int coinStartX = tileX + PlanRelayoutMath.CenterX(g.TileWidth, segmentsWidth);
+                    RepositionSegments(tile.Segments, coinStartX, 30);
+                }
+            });
         }
 
         /// <summary>
@@ -1831,7 +2575,7 @@ namespace GW2CraftingHelper.Views
         {
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, 28),
+                Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
                 Parent = parent
             };
             new Label()
@@ -1842,6 +2586,10 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(8, 4),
                 Parent = rowPanel
             };
+
+            // Not width-dependent beyond the row's own cosmetic width (fixed
+            // left-anchored text, m2 3.6's "no relayout needed" case).
+            _relayoutActions.Add(w => rowPanel.Size = new Point(w, PlanContentHeightMath.FallbackTextRowHeight));
         }
 
         // Sized between the tree/row item-icon (32px) and the coin-segment
@@ -1849,7 +2597,7 @@ namespace GW2CraftingHelper.Views
         // CoinLabelIconGap (below, in the coin display helpers) for the
         // text-to-icon gap so both follow the same "number/text first, gap,
         // icon" convention.
-        private const int CurrencyRowHeight = 28;
+        private const int CurrencyRowHeight = PlanContentHeightMath.CurrencyRowHeight;
         private const int CurrencyIconSize = 18;
 
         /// <summary>
@@ -1882,6 +2630,11 @@ namespace GW2CraftingHelper.Views
                 int iconY = (CurrencyRowHeight - CurrencyIconSize) / 2;
                 CreateItemIcon(rowPanel, row.IconUrl, iconX, iconY, CurrencyIconSize);
             }
+
+            // Not width-dependent beyond the row's own cosmetic width (m2
+            // 3.6): label/icon sit at a fixed left-anchored x regardless of
+            // panelWidth.
+            _relayoutActions.Add(w => rowPanel.Size = new Point(w, CurrencyRowHeight));
         }
 
         // --- Recipe tree section ---
@@ -1894,7 +2647,11 @@ namespace GW2CraftingHelper.Views
             public Label ArrowLabel;
             public CraftingTreeNode Node;
             public int Depth;
-            public int PanelWidth;
+
+            // M33 C2b: PanelWidth removed - a captured build-time width
+            // would go stale once resize no longer triggers a full rebuild
+            // (see GetCurrentPanelWidth, which every remaining reader of
+            // "current tree width" uses instead).
 
             // Whether lazily-built children (built on first expand) should
             // render dimmed - computed once from this node's own dimmed
@@ -1905,6 +2662,15 @@ namespace GW2CraftingHelper.Views
 
         // States for the current render pass; rebuilt with the tree itself.
         private readonly List<TreeNodeState> _treeNodeStates = new List<TreeNodeState>();
+
+        // Root node + top-level content FlowPanel for the current render's
+        // Recipe Tree section (null when the plan has no tree). Held so
+        // RefreshTreeContainerHeights - called from the tree row toggle
+        // handler deep inside RenderTreeNode's recursion, as well as from
+        // CreateTreeSection itself - can recompute treeFlow's own explicit
+        // Height without threading both through every recursive call.
+        private CraftingTreeNode _treeRoot;
+        private FlowPanel _treeFlow;
 
         private void CreateTreeSection(CraftingTreeNode treeRoot, int panelWidth)
         {
@@ -1930,12 +2696,15 @@ namespace GW2CraftingHelper.Views
                 suppressToggle: () => pressStartedOnButton);
             var headerPanel = header.HeaderPanel;
             var treeFlow = header.ContentFlow;
+            _treeRoot = treeRoot;
+            _treeFlow = treeFlow;
 
             // Header-row buttons, right-to-left per the spec's fixed
             // offsets-from-the-right layout: Collapse All, Expand All, then
             // the presets (Buy All / Craft All / Best Path) continuing
             // leftward with 4px gaps so they never collide with the title.
             int cursorX = panelWidth;
+            var headerButtons = new List<(StandardButton Button, int Width)>(5);
             StandardButton PlaceButtonRight(string text, int width)
             {
                 cursorX -= width;
@@ -1946,6 +2715,7 @@ namespace GW2CraftingHelper.Views
                     Location = new Point(cursorX, 3),
                     Parent = headerPanel
                 };
+                headerButtons.Add((button, width));
                 cursorX -= 4;
                 return button;
             }
@@ -1956,7 +2726,45 @@ namespace GW2CraftingHelper.Views
             craftAllButton = PlaceButtonRight("Craft All", 76);
             bestPathButton = PlaceButtonRight("Best Path", 80);
 
+            // M33 C2b: right-to-left button placement is font-only (fixed
+            // widths) - pure reposition on every drag tick, same order as
+            // PlaceButtonRight built them so the right-to-left offsets
+            // reproduce identically.
+            _relayoutActions.Add(w =>
+            {
+                int x = w;
+                foreach (var (button, width) in headerButtons)
+                {
+                    x -= width;
+                    button.Location = new Point(x, 3);
+                    x -= 4;
+                }
+            });
+
+#if DEBUG
+            int relayoutCountBeforeTree = _relayoutActions.Count;
+#endif
             RenderTreeNode(treeRoot, treeFlow, panelWidth, 0, dimmed: false);
+#if DEBUG
+            // M33 C2b (m2 risk 3): every RenderTreeNode call registers its
+            // own relayout closure (see the field comment on
+            // _relayoutActions) - a single root node still yields at least
+            // one. Zero growth here would mean that mechanism itself
+            // silently broke.
+            if (_relayoutActions.Count == relayoutCountBeforeTree)
+            {
+                Logger.Warn("M33 C2b: Recipe Tree root rendered but registered no relayout closures - it will not track live window resize.");
+            }
+#endif
+
+            // M33 C2a (directive A): every container this initial build
+            // populated (treeFlow plus every childFlow created for a
+            // default-expanded node) still reads its construction-time
+            // Size.Y of 0 at this point - one synchronous pass now finalizes
+            // every one of them from the same PlanContentHeightMath
+            // arithmetic the rows above were just laid out with, before
+            // this method returns to RenderPlan/PreserveScrollAcross.
+            RefreshTreeContainerHeights();
 
             // Decision presets: clear overrides / force craft-everywhere /
             // force buy-everywhere (feasibility respected by the solver).
@@ -1980,7 +2788,7 @@ namespace GW2CraftingHelper.Views
                     {
                         foreach (var child in s.Node.Children)
                         {
-                            RenderTreeNode(child, s.ChildContainer, s.PanelWidth, s.Depth + 1, s.ChildDimmed);
+                            RenderTreeNode(child, s.ChildContainer, GetCurrentPanelWidth(), s.Depth + 1, s.ChildDimmed);
                         }
                         s.ChildrenBuilt = true;
                     }
@@ -1989,8 +2797,7 @@ namespace GW2CraftingHelper.Views
                     s.ChildContainer.Visible = true;
                     s.ArrowLabel.Text = "\u25BC";
                 }
-                treeFlow.Invalidate();
-                InvalidateUpToContentPanel(treeFlow);
+                RefreshTreeContainerHeights();
             });
 
             collapseAllButton.Click += (_, __) => PreserveScrollAcross(() =>
@@ -2002,8 +2809,7 @@ namespace GW2CraftingHelper.Views
                     s.ChildContainer.Visible = false;
                     s.ArrowLabel.Text = "\u25B6";
                 }
-                treeFlow.Invalidate();
-                InvalidateUpToContentPanel(treeFlow);
+                RefreshTreeContainerHeights();
             });
 
             headerPanel.LeftMouseButtonPressed += (_, __) =>
@@ -2066,35 +2872,49 @@ namespace GW2CraftingHelper.Views
         private const int TreeIconBorder = 1;
         private const int TreeIconFrameSize = TreeIconSize + TreeIconBorder * 2;
         private const int TreeNameGap = 6;
-        private const int TreeRowHeight = 40;
+        private const int TreeRowHeight = PlanContentHeightMath.TreeRowHeight;
         private const int TreePillColumnWidth = 240;
         private const int TreeCostColumnWidth = 150;
         private const int TreeRightMargin = 8;
 
         /// <summary>
-        /// Walks up from start's Parent chain, calling Invalidate() on every
-        /// ancestor Container up to and including _contentPanel. AutoSize
-        /// FlowPanels only re-measure their own height on Invalidate, so a
-        /// toggle deep in the tree that invalidates only its immediate
-        /// parent leaves every ancestor above that stale - visible as leftover
-        /// whitespace before the next section after collapsing a deep
-        /// subtree. Bounded to guard against a control that is somehow never
-        /// an ancestor of _contentPanel (would otherwise walk to a null
-        /// Parent anyway, but the cap keeps this defensively finite).
+        /// M33 C2a (directive A): recomputes and re-assigns the explicit
+        /// Height of every tree childFlow container plus the top-level
+        /// treeFlow, from the SAME PlanContentHeightMath arithmetic used to
+        /// build the rows in the first place. Replaces the old
+        /// InvalidateUpToContentPanel, which only repositioned siblings and
+        /// relied on Blish's AutoSize convergence (one nested level per real
+        /// frame) to eventually grow/shrink ancestor containers to match -
+        /// the direct cause of #12/#14's multi-frame windows. Setting each
+        /// container's Size fires its own Resized event, which FlowPanel
+        /// already wires to reflow its own parent's sibling positions (see
+        /// ChangedChildOnResized in the vendored FlowPanel source) - so this
+        /// call alone both resizes and repositions every affected row,
+        /// synchronously, with no separate Invalidate() needed.
+        /// Recomputes every node currently in _treeNodeStates rather than
+        /// walking only the toggled node's ancestor chain: each computation
+        /// is a pure function of that node's own structure + the shared
+        /// _nodeExpansion map, independent of any other container's current
+        /// state, so recomputing a few unaffected containers alongside the
+        /// affected ones is harmless - and this only runs once per user
+        /// toggle, never per frame, so the extra work is not a hot-path
+        /// concern.
         /// </summary>
-        private void InvalidateUpToContentPanel(Control start)
+        private void RefreshTreeContainerHeights()
         {
-            Container current = start?.Parent;
-            int hops = 0;
-            while (current != null && hops < 50)
+            int panelWidth = GetCurrentPanelWidth();
+            foreach (var state in _treeNodeStates)
             {
-                current.Invalidate();
-                if (current == _contentPanel)
-                {
-                    break;
-                }
-                current = current.Parent;
-                hops++;
+                state.ChildContainer.Size = new Point(
+                    panelWidth,
+                    PlanContentHeightMath.ChildrenHeight(
+                        state.Node.Children, state.Depth + 1, state.ChildDimmed, _nodeExpansion));
+            }
+
+            if (_treeRoot != null && _treeFlow != null)
+            {
+                _treeFlow.Size = new Point(
+                    panelWidth, PlanContentHeightMath.TreeNodeHeight(_treeRoot, 0, false, _nodeExpansion));
             }
         }
 
@@ -2130,10 +2950,12 @@ namespace GW2CraftingHelper.Views
             // below) always start collapsed regardless of depth, so a bought
             // node's "what it would cost to craft instead" subtree does not
             // visually explode the plan the moment its parent expands.
-            // Non-reference nodes keep the existing depth<2 default.
-            bool isExpanded = _nodeExpansion.TryGetValue(node.NodeId, out bool userExpanded)
-                ? userExpanded
-                : (!dimmed && depth < 2);
+            // Non-reference nodes keep the existing depth<2 default. Calls
+            // PlanContentHeightMath.IsNodeExpanded (not a hand-duplicated
+            // ternary) so this decision and RefreshTreeContainerHeights'
+            // height arithmetic share one formula and cannot silently
+            // desync - see that method's doc comment.
+            bool isExpanded = PlanContentHeightMath.IsNodeExpanded(node.NodeId, depth, dimmed, _nodeExpansion);
             Label arrowLabel = null;
             if (hasChildren)
             {
@@ -2170,19 +2992,26 @@ namespace GW2CraftingHelper.Views
             // Name column: fixed x regardless of depth's remaining width;
             // clipped with an ellipsis against the pill column so long names
             // never collide with the fixed-position columns to its right.
+            // M33 C2b: pillColX/costRightEdge/nameMaxWidth now come from
+            // PlanRelayoutMath.ComputeTreeColumnEdges - the SAME pure
+            // function the relayout/re-ellipsis closures below call, so the
+            // build and every later resize tick can never disagree about
+            // these columns.
             int nameX = indent + TreeCaretColWidth + TreeIconFrameSize + TreeNameGap;
-            int pillColX = panelWidth - (TreeRightMargin + TreeCostColumnWidth) - TreePillColumnWidth;
-            int costRightEdge = panelWidth - TreeRightMargin;
-            int nameMaxWidth = System.Math.Max(20, pillColX - nameX - 8);
 
             var nameFont = GameService.Content.DefaultFont14;
             string qtyPrefix = node.Quantity > 0 ? $"{node.Quantity}x " : "";
             int qtyWidth = qtyPrefix.Length > 0
                 ? (int)System.Math.Ceiling(nameFont.MeasureString(qtyPrefix).Width)
                 : 0;
-            int nameAvailWidth = System.Math.Max(10, nameMaxWidth - qtyWidth);
+
+            var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+            int pillColX = edges.PillColX;
+            int costRightEdge = edges.CostRightEdge;
+
             string fullName = node.Name ?? "";
-            string displayName = EllipsizeToWidth(nameFont, fullName, nameAvailWidth);
+            string displayName = EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
 
             Color qtyColor = new Color(170, 170, 170);
             Color nameColor = GetRarityNameColor(node.Rarity);
@@ -2207,7 +3036,7 @@ namespace GW2CraftingHelper.Views
                     Parent = rowPanel
                 };
             }
-            new Label()
+            var nameLabel = new Label()
             {
                 Text = displayName,
                 Font = nameFont,
@@ -2220,25 +3049,23 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
-            var tooltipParts = new List<string>();
-            if (displayName != fullName)
-            {
-                tooltipParts.Add(fullName);
-            }
+            // M33 C2b: extraTooltipLines never depends on panelWidth (unit
+            // price / acquisition hint text is fixed), so it is computed
+            // once and reused verbatim by the settle re-ellipsis pass -
+            // only the "is the name actually truncated" line needs to be
+            // reconsidered when nameMaxWidth changes.
+            var extraTooltipLines = new List<string>();
             if (node.UnitCost.HasValue && node.Quantity > 1 &&
                 (node.Decision == CraftingDecision.BuyFromTp ||
                  node.Decision == CraftingDecision.BuyFromVendor))
             {
-                tooltipParts.Add("Unit price: " + FormatCoinText(node.UnitCost.Value));
+                extraTooltipLines.Add("Unit price: " + FormatCoinText(node.UnitCost.Value));
             }
             if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
             {
-                tooltipParts.Add(node.AcquisitionHint);
+                extraTooltipLines.Add(node.AcquisitionHint);
             }
-            if (tooltipParts.Count > 0)
-            {
-                rowPanel.BasicTooltipText = string.Join("\n", tooltipParts);
-            }
+            UpdateTreeRowTooltip(rowPanel, displayName, fullName, extraTooltipLines);
 
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
@@ -2257,12 +3084,13 @@ namespace GW2CraftingHelper.Views
             // fix, same RenderValueCellRightAligned entry point); a
             // decision whose real cost is genuinely zero-and-uncosted
             // renders a dash instead of an invented "0".
+            ValueCellHandle costCell = null;
             if (node.SubtreeCost.HasValue)
             {
                 var costFont = GameService.Content.DefaultFont14;
                 var currencyAmounts = CurrencyDisplayResolver.ResolveAmounts(
                     node.VendorCurrencyCosts, _currentPlan?.CurrencyMetadata);
-                RenderValueCellRightAligned(
+                costCell = RenderValueCellRightAligned(
                     rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
             }
 
@@ -2270,16 +3098,23 @@ namespace GW2CraftingHelper.Views
             // ".not-crafted" informational reference branch (what it would
             // cost to craft instead) - dimmed, and the flag does not stack
             // on already-dimmed branches.
+            FlowPanel childFlow = null;
             if (hasChildren)
             {
                 bool childDimmed = dimmed || node.Decision != CraftingDecision.Craft;
 
-                var childFlow = new FlowPanel()
+                // M33 C2a (directive A): Standard (explicit) height, same
+                // as the section header's contentFlow - see that
+                // construction site's comment. Starts at 0; the caller that
+                // ultimately owns this build pass (CreateTreeSection's
+                // initial call, or a toggle handler below) finalizes the
+                // real height via RefreshTreeContainerHeights before
+                // control returns to PreserveScrollAcross's caller.
+                childFlow = new FlowPanel()
                 {
                     Size = new Point(panelWidth, 0),
                     FlowDirection = ControlFlowDirection.SingleTopToBottom,
-                    Parent = parent,
-                    HeightSizingMode = SizingMode.AutoSize
+                    Parent = parent
                 };
 
                 var state = new TreeNodeState
@@ -2288,7 +3123,6 @@ namespace GW2CraftingHelper.Views
                     Depth = depth,
                     ChildContainer = childFlow,
                     ArrowLabel = arrowLabel,
-                    PanelWidth = panelWidth,
                     ChildDimmed = childDimmed
                 };
                 _treeNodeStates.Add(state);
@@ -2323,10 +3157,15 @@ namespace GW2CraftingHelper.Views
                     {
                         if (!state.ChildrenBuilt)
                         {
+                            // M33 C2b: read the LIVE width rather than the
+                            // (possibly long-stale, since resize no longer
+                            // triggers a rebuild) width this node itself was
+                            // built at - see GetCurrentPanelWidth.
+                            int currentWidth = GetCurrentPanelWidth();
                             foreach (var child in state.Node.Children)
                             {
                                 RenderTreeNode(
-                                    child, state.ChildContainer, state.PanelWidth, state.Depth + 1, state.ChildDimmed);
+                                    child, state.ChildContainer, currentWidth, state.Depth + 1, state.ChildDimmed);
                             }
                             state.ChildrenBuilt = true;
                         }
@@ -2334,11 +3173,72 @@ namespace GW2CraftingHelper.Views
                         _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
                         state.ChildContainer.Visible = state.IsExpanded;
                         state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
-                        InvalidateUpToContentPanel(state.ChildContainer);
+                        RefreshTreeContainerHeights();
                     });
                 };
                 rowPanel.Click += toggleHandler;
             }
+
+            // M33 C2b: pills/cost cell reposition every drag tick (no
+            // MeasureString - pill widths are already-known control Width,
+            // RepositionValueCellRightAligned uses only cached segment text
+            // widths); childFlow's width tracks panelWidth with its Height
+            // preserved exactly (never perturbs scroll - M33 C2a already
+            // made every row/container height explicit). The name label is
+            // untouched here; it only re-ellipsizes at settle below.
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, TreeRowHeight);
+                var e = PlanRelayoutMath.ComputeTreeColumnEdges(
+                    w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+
+                if (pillPanels.Count > 0)
+                {
+                    int x = e.PillColX;
+                    foreach (var pill in pillPanels)
+                    {
+                        pill.Location = new Point(x, 10);
+                        x += pill.Width + 6;
+                    }
+                }
+                if (costCell != null)
+                {
+                    RepositionValueCellRightAligned(costCell, e.CostRightEdge, 12);
+                }
+                if (childFlow != null)
+                {
+                    childFlow.Size = new Point(w, childFlow.Height);
+                }
+            });
+            _reellipsisActions.Add(w =>
+            {
+                var e = PlanRelayoutMath.ComputeTreeColumnEdges(
+                    w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+                string newDisplayName = EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
+                if (nameLabel.Text != newDisplayName)
+                {
+                    nameLabel.Text = newDisplayName;
+                    UpdateTreeRowTooltip(rowPanel, newDisplayName, fullName, extraTooltipLines);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Rebuilds a tree row's tooltip from its (possibly re-ellipsized)
+        /// display name plus its width-invariant extra lines - shared by
+        /// RenderTreeNode's initial build and its settle re-ellipsis
+        /// closure so the two can never disagree about tooltip content.
+        /// </summary>
+        private static void UpdateTreeRowTooltip(
+            Panel rowPanel, string displayName, string fullName, List<string> extraLines)
+        {
+            var parts = new List<string>();
+            if (displayName != fullName)
+            {
+                parts.Add(fullName);
+            }
+            parts.AddRange(extraLines);
+            rowPanel.BasicTooltipText = parts.Count > 0 ? string.Join("\n", parts) : null;
         }
 
         // --- Decision pills ---
@@ -2627,20 +3527,40 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
+        /// M33 C2b: a coin/currency segment run's already-created controls
+        /// plus each segment's cached (font-only, panelWidth-invariant)
+        /// text width, so a relayout closure can reposition the whole run
+        /// at a new x without ever calling MeasureString again - see
+        /// RepositionSegments. Controls/TextWidths are always the same
+        /// length and share indices.
+        /// </summary>
+        private struct SegmentLayoutHandle
+        {
+            public (Label Label, Panel Icon)[] Controls;
+            public int[] TextWidths;
+
+            public static readonly SegmentLayoutHandle Empty =
+                new SegmentLayoutHandle { Controls = System.Array.Empty<(Label, Panel)>(), TextWidths = System.Array.Empty<int>() };
+        }
+
+        /// <summary>
         /// Lays out coin segments left-to-right starting at x. alphaScale
         /// dims the number labels (not the icons - Panel has no tint
         /// property) for dimmed not-crafted subtree rows.
         /// </summary>
-        private static void LayoutCoinSegments(
+        private static SegmentLayoutHandle LayoutCoinSegments(
             Panel parent, List<CoinSegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
         {
+            var controls = new (Label, Panel)[segments.Count];
+            var widths = new int[segments.Count];
             int x = startX;
-            foreach (var seg in segments)
+            for (int i = 0; i < segments.Count; i++)
             {
+                var seg = segments[i];
                 Color textColor = GetCoinColor(seg.AssetId);
                 if (alphaScale < 1f) textColor *= alphaScale;
 
-                new Label()
+                var label = new Label()
                 {
                     Text = seg.Text,
                     Font = font,
@@ -2651,7 +3571,7 @@ namespace GW2CraftingHelper.Views
                     Parent = parent
                 };
 
-                new Panel()
+                var icon = new Panel()
                 {
                     Size = new Point(CoinIconSize, CoinIconSize),
                     Location = new Point(x + seg.TextWidth + CoinLabelIconGap, y),
@@ -2659,7 +3579,33 @@ namespace GW2CraftingHelper.Views
                     Parent = parent
                 };
 
+                controls[i] = (label, icon);
+                widths[i] = seg.TextWidth;
                 x += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
+            }
+
+            return new SegmentLayoutHandle { Controls = controls, TextWidths = widths };
+        }
+
+        /// <summary>
+        /// M33 C2b: non-allocating reposition twin to LayoutCoinSegments/
+        /// LayoutCurrencySegments (m2 3.7/4) - moves EXISTING segment
+        /// controls to new x-positions using the cached TextWidths, never
+        /// creating a control or calling MeasureString. Shared by both coin
+        /// and currency segment runs since they follow the identical
+        /// "label, gap, icon, gap" geometry (same CoinIconSize/
+        /// CoinLabelIconGap/CoinSegmentGap constants).
+        /// </summary>
+        private static void RepositionSegments(SegmentLayoutHandle handle, int startX, int y)
+        {
+            int x = startX;
+            for (int i = 0; i < handle.Controls.Length; i++)
+            {
+                var (label, icon) = handle.Controls[i];
+                int textWidth = handle.TextWidths[i];
+                label.Location = new Point(x, y);
+                icon.Location = new Point(x + textWidth + CoinLabelIconGap, y);
+                x += textWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
             }
         }
 
@@ -2732,16 +3678,19 @@ namespace GW2CraftingHelper.Views
             return ShoppingColumnMath.SegmentRunWidth(widths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
         }
 
-        private static void LayoutCurrencySegments(
+        private static SegmentLayoutHandle LayoutCurrencySegments(
             Panel parent, List<CurrencySegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
         {
+            var controls = new (Label, Panel)[segments.Count];
+            var widths = new int[segments.Count];
             int x = startX;
             Color textColor = new Color(220, 220, 220);
             if (alphaScale < 1f) textColor *= alphaScale;
 
-            foreach (var seg in segments)
+            for (int i = 0; i < segments.Count; i++)
             {
-                new Label()
+                var seg = segments[i];
+                var label = new Label()
                 {
                     Text = seg.Text,
                     Font = font,
@@ -2752,10 +3701,14 @@ namespace GW2CraftingHelper.Views
                     Parent = parent
                 };
 
-                CreateItemIcon(parent, seg.IconUrl, x + seg.TextWidth + CoinLabelIconGap, y, CoinIconSize);
+                var icon = CreateItemIcon(parent, seg.IconUrl, x + seg.TextWidth + CoinLabelIconGap, y, CoinIconSize);
 
+                controls[i] = (label, icon);
+                widths[i] = seg.TextWidth;
                 x += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
             }
+
+            return new SegmentLayoutHandle { Controls = controls, TextWidths = widths };
         }
 
         /// <summary>
@@ -2776,13 +3729,29 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
+        /// M33 C2b: everything a relayout closure needs to reposition an
+        /// already-rendered value cell (RenderValueCellRightAligned's
+        /// result) at a new rightEdgeX without any MeasureString call -
+        /// either DashLabel is set (genuinely unpriceable row) or the two
+        /// SegmentLayoutHandles are (each individually empty when that half
+        /// of the mix is absent - e.g. CoinSegments.Controls.Length == 0
+        /// for a currency-only row).
+        /// </summary>
+        private sealed class ValueCellHandle
+        {
+            public SegmentLayoutHandle CoinSegments;
+            public SegmentLayoutHandle CurrencySegments;
+            public Label DashLabel;
+        }
+
+        /// <summary>
         /// Right-aligns coin segments (if copper &gt; 0) followed by
         /// currency segments (if any) to rightEdgeX - the "mixed
         /// coin+currency renders coin segments then currency segments"
         /// rule. Callers must not invoke this for a value with neither
         /// (RenderValueCellRightAligned handles that dash case instead).
         /// </summary>
-        private static void LayoutValueSegmentsRightAligned(
+        private static ValueCellHandle LayoutValueSegmentsRightAligned(
             Panel parent, long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts,
             int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
         {
@@ -2793,8 +3762,10 @@ namespace GW2CraftingHelper.Views
             int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentGap : 0;
 
             int startX = rightEdgeX - (coinWidth + gap + currencyWidth);
-            LayoutCoinSegments(parent, coinSegments, startX, y, font, alphaScale);
-            LayoutCurrencySegments(parent, currencySegments, startX + coinWidth + gap, y, font, alphaScale);
+            var coinHandle = LayoutCoinSegments(parent, coinSegments, startX, y, font, alphaScale);
+            var currencyHandle = LayoutCurrencySegments(parent, currencySegments, startX + coinWidth + gap, y, font, alphaScale);
+
+            return new ValueCellHandle { CoinSegments = coinHandle, CurrencySegments = currencyHandle };
         }
 
         /// <summary>
@@ -2804,8 +3775,10 @@ namespace GW2CraftingHelper.Views
         /// currency/mixed, newly matching) the coin invariant; a value with
         /// neither a coin price nor a currency cost renders a plain dash
         /// instead of a blank cell or an invented "0" (KNOWN-ISSUES #16b).
+        /// Returns a handle so a relayout closure can reposition the cell
+        /// at a new rightEdgeX later - see RepositionValueCellRightAligned.
         /// </summary>
-        private static void RenderValueCellRightAligned(
+        private static ValueCellHandle RenderValueCellRightAligned(
             Panel parent, long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts,
             int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
         {
@@ -2815,11 +3788,42 @@ namespace GW2CraftingHelper.Views
             if (!hasCoin && !hasCurrency)
             {
                 Color dashColor = alphaScale < 1f ? UnpricedDashColor * alphaScale : UnpricedDashColor;
-                CreateRightAlignedLabel(parent, UnpricedDashText, font, dashColor, rightEdgeX, y);
+                var dashLabel = CreateRightAlignedLabel(parent, UnpricedDashText, font, dashColor, rightEdgeX, y);
+                return new ValueCellHandle
+                {
+                    CoinSegments = SegmentLayoutHandle.Empty,
+                    CurrencySegments = SegmentLayoutHandle.Empty,
+                    DashLabel = dashLabel
+                };
+            }
+
+            return LayoutValueSegmentsRightAligned(parent, copper, currencyAmounts, rightEdgeX, y, font, alphaScale);
+        }
+
+        /// <summary>
+        /// M33 C2b: non-allocating reposition twin to
+        /// RenderValueCellRightAligned - moves an EXISTING value cell's
+        /// controls to a new rightEdgeX, using only the cached per-segment
+        /// TextWidths (ShoppingColumnMath.SegmentRunWidth, the same pure
+        /// function the shopping column pre-scan uses, so the width this
+        /// computes can never drift from what LayoutValueSegmentsRightAligned
+        /// actually laid out). No MeasureString, no new controls.
+        /// </summary>
+        private static void RepositionValueCellRightAligned(ValueCellHandle handle, int rightEdgeX, int y)
+        {
+            if (handle.DashLabel != null)
+            {
+                handle.DashLabel.Location = new Point(rightEdgeX - handle.DashLabel.Width, y);
                 return;
             }
 
-            LayoutValueSegmentsRightAligned(parent, copper, currencyAmounts, rightEdgeX, y, font, alphaScale);
+            int coinWidth = ShoppingColumnMath.SegmentRunWidth(handle.CoinSegments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
+            int currencyWidth = ShoppingColumnMath.SegmentRunWidth(handle.CurrencySegments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
+            int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentGap : 0;
+
+            int startX = rightEdgeX - (coinWidth + gap + currencyWidth);
+            RepositionSegments(handle.CoinSegments, startX, y);
+            RepositionSegments(handle.CurrencySegments, startX + coinWidth + gap, y);
         }
 
         // --- Icon helper ---
@@ -2829,19 +3833,22 @@ namespace GW2CraftingHelper.Views
         /// size (32px icon, 1px border = 34px overall); the plan header uses
         /// a larger 40px/2px variant (44px overall, gw2e's .tooltip-item).
         /// </summary>
-        private static void CreateRarityFramedIcon(
+        private static Panel CreateRarityFramedIcon(
             Panel parent, string iconUrl, string rarity, int x, int y,
             int iconSize = 32, int borderThickness = 1)
         {
-            CreateRarityFramedIcon(
+            return CreateRarityFramedIcon(
                 parent, iconUrl, GetRarityBorderColor(rarity), x, y, iconSize, borderThickness);
         }
 
         /// <summary>
         /// Same as above with an explicit frame color, for dimmed
         /// not-crafted subtree rows (neutral grey frame instead of rarity).
+        /// Returns the outer frame Panel so a caller whose icon position
+        /// depends on panelWidth (currently only the plan header's centered
+        /// title) can reposition it on relayout without recreating it.
         /// </summary>
-        private static void CreateRarityFramedIcon(
+        private static Panel CreateRarityFramedIcon(
             Panel parent, string iconUrl, Color frameColor, int x, int y,
             int iconSize = 32, int borderThickness = 1)
         {
@@ -2854,25 +3861,25 @@ namespace GW2CraftingHelper.Views
                 Parent = parent
             };
             CreateItemIcon(frame, iconUrl, borderThickness, borderThickness, iconSize);
+            return frame;
         }
 
-        private static void CreateItemIcon(Panel parent, string iconUrl, int x, int y, int size = 32)
+        private static Panel CreateItemIcon(Panel parent, string iconUrl, int x, int y, int size = 32)
         {
             // Missing icon: render a neutral empty-slot square, not the
             // alarming red error texture - a data gap is not a failure.
             if (string.IsNullOrEmpty(iconUrl))
             {
-                new Panel()
+                return new Panel()
                 {
                     Size = new Point(size, size),
                     Location = new Point(x, y),
                     BackgroundColor = new Color(45, 45, 45),
                     Parent = parent
                 };
-                return;
             }
 
-            new Panel()
+            return new Panel()
             {
                 Size = new Point(size, size),
                 Location = new Point(x, y),

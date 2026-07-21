@@ -279,6 +279,7 @@ namespace GW2CraftingHelper
                 },
                 _modalDialog,
                 _itemSearchProvider,
+                _settings,
                 (ctx, overrides) => _craftingPipeline.ResolveWithOverrides(ctx, overrides)
             );
 
