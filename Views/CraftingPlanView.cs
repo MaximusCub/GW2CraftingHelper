@@ -1318,7 +1318,11 @@ namespace GW2CraftingHelper.Views
             {
                 Text = text,
                 Font = font,
-                TextColor = border,
+                // White, not border: the fill exposes the border hue behind
+                // the label, so border-colored text has zero contrast
+                // against its own backdrop - same fix as RenderDecisionPills
+                // (M30 #11); KNOWN-ISSUES #15 is this same bug on this tag.
+                TextColor = Color.White,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point((width - 2 - textWidth) / 2, 1),
