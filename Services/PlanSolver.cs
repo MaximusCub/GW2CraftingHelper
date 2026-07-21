@@ -146,9 +146,18 @@ namespace GW2CraftingHelper.Services
             var craftOrder = new Dictionary<(int, int), int>();
             var vendorBatchTracking = new Dictionary<(int, AcquisitionSource, int), VendorBatchState>();
             var vendorOccurrences = new Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>>();
+            // M34 fix (wave-validator finding, post-fcbb277): every tree
+            // occurrence's own NodeId that fed a merged Craft-type stepKey,
+            // in first-seen (DFS) order - the Craft-side twin of
+            // vendorOccurrences above, needed for the same reason: a Craft
+            // PlanStep's TotalCost is Collect()'s running sum of
+            // decision.TotalCost across every occurrence of that
+            // (ItemId, RecipeId) craft, taken BEFORE the correction passes
+            // below ever run (see RefreshCraftStepCosts's doc comment).
+            var craftOccurrences = new Dictionary<(int, AcquisitionSource, int), List<int>>();
             int craftCounter = 0;
 
-            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, ref craftCounter, ignoredItemIds);
+            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
 
             // Pass 2b (M34-B1 #1/#3): re-derive each merged vendor step's
             // true cost from its AGGREGATE Quantity and the winning offer's
@@ -173,9 +182,28 @@ namespace GW2CraftingHelper.Services
             // ancestor bottom-up from those corrected leaf values
             // (RecomputeCraftCosts) so the correction propagates all the way
             // to the root, exactly mirroring Evaluate's own bottom-up
-            // craftRealCost aggregation.
+            // craftRealCost aggregation. RecomputeCraftCosts itself has no
+            // depth bound - it walks the ENTIRE chosen-path tree from
+            // `tree` down, so `memo`/Decisions/SubtreeCost are already
+            // fully correct at every level after this line, however deep.
             AllocateVendorNodeCosts(stepMap, vendorOccurrences, memo);
             RecomputeCraftCosts(tree, memo, ignoredItemIds);
+
+            // Pass 2d (M34 fix - wave-validator finding): stepMap's
+            // Craft-type PlanStep entries are NOT touched by anything
+            // above - AggregateStep (inside Collect, pass 2) summed
+            // decision.TotalCost across occurrences BEFORE this line ever
+            // ran, so every Craft row of the "Crafting Steps" shopping
+            // list would otherwise permanently show the stale
+            // pre-correction total even though `memo`/the Recipe Tree
+            // (just corrected above) and plan.TotalCoinCost (summed from
+            // FinalizeVendorBatches' already-corrected vendor/TP steps
+            // below) both show the right number - see
+            // RefreshCraftStepCosts's doc comment for why a full
+            // restructure to avoid this snapshot-then-correct ordering
+            // entirely was assessed and rejected in favor of this
+            // targeted refresh.
+            RefreshCraftStepCosts(stepMap, craftOccurrences, memo);
 
             // Build ordered step list: buys/unknowns first, then crafts in bottom-up order
             var buysAndUnknowns = new List<PlanStep>();
@@ -831,6 +859,7 @@ namespace GW2CraftingHelper.Services
             Dictionary<(int, int), int> craftOrder,
             Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
             Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
+            Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences,
             ref int craftCounter,
             ISet<int> ignoredItemIds = null)
         {
@@ -872,7 +901,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var ingredient in chosenRecipe.Ingredients)
                     {
-                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, ref craftCounter, ignoredItemIds);
+                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
                     }
                 }
 
@@ -884,7 +913,7 @@ namespace GW2CraftingHelper.Services
                 }
 
                 var stepKey = (node.Id, AcquisitionSource.Craft, decision.RecipeId);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
             }
             else if (decision.Source == AcquisitionSource.BuyFromVendor)
             {
@@ -896,12 +925,12 @@ namespace GW2CraftingHelper.Services
                 // re-introduce the exact per-occurrence-then-sum overcount
                 // FinalizeVendorBatches exists to fix (M34-B1 #1).
                 var stepKey = (node.Id, AcquisitionSource.BuyFromVendor, 0);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
             }
             else
             {
                 var stepKey = (node.Id, decision.Source, 0);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
             }
         }
 
@@ -911,8 +940,26 @@ namespace GW2CraftingHelper.Services
             RecipeNode node,
             Decision decision,
             Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
-            Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences)
+            Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
+            Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences)
         {
+            if (decision.Source == AcquisitionSource.Craft)
+            {
+                // M34 fix (wave-validator finding): remembers every
+                // individual tree occurrence's own NodeId that fed this
+                // merged Craft stepKey, in first-seen (DFS) order, so
+                // RefreshCraftStepCosts can re-sum this step's true total
+                // from `memo` AFTER RecomputeCraftCosts corrects it - see
+                // that method's doc comment. Mirrors the vendor-side
+                // occurrence bookkeeping just below for BuyFromVendor.
+                if (!craftOccurrences.TryGetValue(stepKey, out var craftOccurrenceList))
+                {
+                    craftOccurrenceList = new List<int>();
+                    craftOccurrences[stepKey] = craftOccurrenceList;
+                }
+                craftOccurrenceList.Add(node.NodeId);
+            }
+
             if (decision.Source == AcquisitionSource.BuyFromVendor && decision.VendorBatch.HasValue)
             {
                 if (vendorBatchTracking.TryGetValue(stepKey, out var trackedState))
@@ -1235,6 +1282,22 @@ namespace GW2CraftingHelper.Services
         /// the alternate, non-chosen recipes' ingredient nodes Evaluate also
         /// memoized for comparison purposes, since those never fed the
         /// solved plan and are not what the real tree displays.
+        ///
+        /// Depth is NOT bounded: this recurses down the entire chosen-path
+        /// subtree from whatever `node` it is called with (Solve calls it
+        /// once, with the tree root), so every Craft ancestor's `memo`
+        /// entry - and therefore every CraftingTreeNode.SubtreeCost derived
+        /// from it - is correct however many Craft levels separate it from
+        /// a corrected leaf. Confirmed by a 4-Craft-level, multi-branch
+        /// regression (see PlanSolverTests) and by a real-tree Harness dump
+        /// against the live Exordium recipe tree: root and every
+        /// intermediate Craft node's SubtreeCost already reconcile with
+        /// their children's corrected costs after this call returns. The
+        /// gap this class of bug actually hid in was elsewhere - see
+        /// RefreshCraftStepCosts below, which fixes the Craft-type
+        /// PlanStep (shopping-list row) side of the same correction that
+        /// this method already handled correctly for the Decisions/tree
+        /// side.
         /// </summary>
         private static long? RecomputeCraftCosts(
             RecipeNode node, Dictionary<int, Decision> memo, ISet<int> ignoredItemIds)
@@ -1278,6 +1341,71 @@ namespace GW2CraftingHelper.Services
             decision.TotalCost = craftRealCost;
             memo[node.NodeId] = decision;
             return craftRealCost;
+        }
+
+        /// <summary>
+        /// M34 fix (wave-validator finding, post-fcbb277): re-derives every
+        /// Craft-type PlanStep's TotalCost from `memo` - AFTER
+        /// AllocateVendorNodeCosts/RecomputeCraftCosts have already
+        /// corrected it there - instead of trusting AggregateStep's running
+        /// sum from Collect(), which is built BEFORE those correction
+        /// passes ever run. Without this, a Craft row in the "Crafting
+        /// Steps" shopping list stayed permanently stale (the pre-merge,
+        /// per-occurrence-overcounted total) even though the SAME item's
+        /// Recipe Tree row (CraftingTreeNode.SubtreeCost, sourced from the
+        /// now-corrected `memo` via the public Decisions dict) and
+        /// plan.TotalCoinCost (summed from FinalizeVendorBatches' own
+        /// already-corrected Buy/Vendor steps) both showed the right
+        /// number - the exact "two sections of the same page disagree"
+        /// defect fcbb277 set out to eliminate, left half-fixed for the
+        /// Craft-step side.
+        ///
+        /// A full restructure - running the vendor-batch merge/allocation
+        /// BEFORE Collect ever builds a PlanStep, so no stale snapshot
+        /// could exist in the first place - was considered and rejected:
+        /// the merge needs each item's AGGREGATE demand across every tree
+        /// occurrence (FinalizeVendorBatches' whole premise), which is
+        /// only known once a full tree walk has completed, i.e. after a
+        /// Collect-shaped pass has already run. Reordering would therefore
+        /// mean two full tree walks (one to gather occurrence/demand data,
+        /// a second to build the now-correct PlanSteps) instead of the one
+        /// walk plus this narrow refresh - more moving parts for the same
+        /// asymptotic cost, not less. This method is the second walk's
+        /// cheaper equivalent: it revisits only the (few) Craft stepKeys
+        /// that exist, not the tree.
+        ///
+        /// Uses <paramref name="craftOccurrences"/> (built by AggregateStep,
+        /// the Craft-side twin of vendorOccurrences) rather than
+        /// re-deriving occurrences from the tree, so this stays a flat
+        /// stepMap-sized pass regardless of tree depth or branching. A
+        /// missing/null memo TotalCost (an unpriceable ingredient
+        /// somewhere in that craft's chosen recipe) contributes 0, matching
+        /// AggregateStep's own original null-handling (a null decision.
+        /// TotalCost never increments the running total there either).
+        /// </summary>
+        private static void RefreshCraftStepCosts(
+            Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
+            Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences,
+            Dictionary<int, Decision> memo)
+        {
+            foreach (var kvp in craftOccurrences)
+            {
+                if (!stepMap.TryGetValue(kvp.Key, out var step))
+                {
+                    continue;
+                }
+
+                long total = 0L;
+                foreach (var nodeId in kvp.Value)
+                {
+                    if (memo.TryGetValue(nodeId, out var decision) && decision.TotalCost.HasValue)
+                    {
+                        total += decision.TotalCost.Value;
+                    }
+                }
+
+                step.TotalCost = total;
+            }
         }
 
         /// <summary>

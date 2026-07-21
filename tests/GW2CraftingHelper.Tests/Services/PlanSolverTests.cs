@@ -1442,6 +1442,88 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void MultiOccurrenceBulkVendorOffer_CorrectionPropagatesThroughFourCraftLevelsAndBranches()
+        {
+            // Wave-validator regression: the same 4/4/4/83/84 = 179 demand
+            // for the vendor-bought leaf (99) as the two-level sibling test
+            // above, but now spread across FOUR Craft levels on one branch
+            // AND multiple sibling branches at different depths - the exact
+            // shape (root -> Exitare-like intermediate -> ... -> vendor
+            // leaf, several levels deep, several branches merging into the
+            // same vendor item) that hid the real gap: NOT a depth bound in
+            // RecomputeCraftCosts/AllocateVendorNodeCosts (both already
+            // walk the whole chosen-path tree and were verified correct at
+            // this depth), but Collect()'s Craft-type PlanStep totals,
+            // snapshotted BEFORE those correction passes ever run - see
+            // PlanSolver.RefreshCraftStepCosts.
+            //
+            // Tree shape:
+            //   root(1) -[recipe 10]-> craftA(2), craftD(5), craftE(6)
+            //   craftA(2) -[recipe 20]-> craftB(3)
+            //   craftB(3) -[recipe 30]-> craftC(4)
+            //   craftC(4) -[recipe 40]-> leaf99 x3 occurrences @ qty 4 each
+            //   craftD(5) -[recipe 50]-> leaf99 @ qty 83
+            //   craftE(6) -[recipe 60]-> leaf99 @ qty 84
+            //
+            // A "3 for 3" vendor offer merges all five leaf99 occurrences
+            // tree-wide: naive per-occurrence sum would be
+            // 3*ceil(4/3)*3 + ceil(83/3)*3 + ceil(84/3)*3 = 18 + 84 + 84 = 186;
+            // the corrected, ceil-once-on-aggregate-demand total is
+            // ceil(179/3)*3 = 180 (matching the real Exordium 179 -> 180,
+            // not 186, live repro this whole correction chain exists for).
+            var craftC = Craftable(4, 1,
+                Option(40, 1, 1, Leaf(99, 4), Leaf(99, 4), Leaf(99, 4)));
+            var craftB = Craftable(3, 1, Option(30, 1, 1, craftC));
+            var craftA = Craftable(2, 1, Option(20, 1, 1, craftB));
+            var craftD = Craftable(5, 1, Option(50, 1, 1, Leaf(99, 83)));
+            var craftE = Craftable(6, 1, Option(60, 1, 1, Leaf(99, 84)));
+            var tree = Craftable(1, 1, Option(10, 1, 1, craftA, craftD, craftE));
+
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var plan = result.Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(179, vendorStep.Quantity);
+            Assert.Equal(180, vendorStep.TotalCost);
+            Assert.Equal(180, plan.TotalCoinCost);
+
+            // Decisions/Recipe-Tree side (memo, via RecomputeCraftCosts):
+            // must reconcile bottom-up through all FOUR Craft levels on the
+            // deep branch (craftC directly above the merged leaf, then
+            // craftB, craftA, then root two levels further up), not just
+            // the two the pre-existing sibling test covered.
+            Assert.Equal(12, result.Decisions[craftC.NodeId].TotalCost);
+            Assert.Equal(12, result.Decisions[craftB.NodeId].TotalCost);
+            Assert.Equal(12, result.Decisions[craftA.NodeId].TotalCost);
+            Assert.Equal(83, result.Decisions[craftD.NodeId].TotalCost);
+            // craftE's leaf occurrence is last in DFS order, so
+            // AllocateVendorNodeCosts' remainder-absorption lands its
+            // corrected share here (180 - 12 - 83 = 85) rather than the
+            // naively-corrected-in-isolation 84 - see
+            // AllocateVendorNodeCosts' doc comment.
+            Assert.Equal(85, result.Decisions[craftE.NodeId].TotalCost);
+            Assert.Equal(180, result.Decisions[tree.NodeId].TotalCost);
+
+            // Crafting Steps (shopping list) side: every Craft-type
+            // PlanStep must show the SAME corrected totals as the
+            // Decisions/tree side above - this is the half of the
+            // correction fcbb277 left unfixed (RefreshCraftStepCosts).
+            Assert.Equal(12, Assert.Single(plan.Steps, s => s.ItemId == 4).TotalCost);
+            Assert.Equal(12, Assert.Single(plan.Steps, s => s.ItemId == 3).TotalCost);
+            Assert.Equal(12, Assert.Single(plan.Steps, s => s.ItemId == 2).TotalCost);
+            Assert.Equal(83, Assert.Single(plan.Steps, s => s.ItemId == 5).TotalCost);
+            Assert.Equal(85, Assert.Single(plan.Steps, s => s.ItemId == 6).TotalCost);
+            Assert.Equal(180, Assert.Single(plan.Steps, s => s.ItemId == 1).TotalCost);
+        }
+
+        [Fact]
         public void MultiOccurrenceDifferentWinningOffers_LeavesPerOccurrenceSumUnmerged()
         {
             // Two tree occurrences of the same item can, at their own local
