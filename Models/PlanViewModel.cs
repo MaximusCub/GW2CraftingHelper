@@ -37,7 +37,21 @@ namespace GW2CraftingHelper.Models
         // offer's daily/weekly purchase cap. Never numbered/badged like a
         // CraftStep row; rendered via the same plain-text row pattern as
         // any other fallback text row.
-        TimegatedNotice
+        TimegatedNotice,
+
+        // M35 (gw2efficiency parity - multi-item plans): a single plain
+        // informational line appended to the Summary/Total Cost section
+        // ONLY for a genuine multi-item batch (2+ requested items) -
+        // echoes gw2e's own Cost Breakdown banner ("Profit numbers are the
+        // sum of all crafted recipes" - docs/gw2e-parity-spec.md, the M34
+        // r1 multi-item research report), reworded here to describe what
+        // this module actually combines (coin/currency TOTALS, not a
+        // profit figure - see PlanViewModelBuilder.BuildSummarySection and
+        // CraftingPlanPipeline.GenerateStructuredMultiAsync's own doc
+        // comment on why sell-side economics are not yet computed for a
+        // batch). Rendered via the same plain-text row pattern as
+        // TimegatedNotice.
+        MultiItemNote
     }
 
     public class PlanViewModel
@@ -50,6 +64,16 @@ namespace GW2CraftingHelper.Models
         public int TargetQuantity { get; set; }
         public List<PlanSectionViewModel> Sections { get; set; } = new List<PlanSectionViewModel>();
         public CraftingTreeNode TreeRoot { get; set; }
+
+        // M35 (gw2efficiency parity - multi-item plans): populated INSTEAD
+        // of TreeRoot for a genuine multi-item batch (2+ requested items) -
+        // one full CraftingTreeNode per requested item, in request order,
+        // mirrors CraftingPlanResult.MultiItemRoots' own doc comment
+        // exactly (the synthetic wrapper root never surfaces here either).
+        // Null for a single-item plan, which continues to populate
+        // TreeRoot as before - CraftingPlanView.RenderPlan branches on
+        // whichever of the two is non-null.
+        public List<CraftingTreeNode> MultiItemRoots { get; set; }
 
         // Passthrough of CraftingPlanResult.CurrencyMetadata (see that
         // field's doc comment) so the recipe-tree renderer can resolve a

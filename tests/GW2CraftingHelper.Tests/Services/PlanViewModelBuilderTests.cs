@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
@@ -22,7 +23,9 @@ namespace GW2CraftingHelper.Tests.Services
             List<RequiredRecipe> requiredRecipes = null,
             Dictionary<int, CurrencyMetadata> currencyMetadata = null,
             Dictionary<int, AcquisitionHint> acquisitionHints = null,
-            List<TimegatedItem> timegatedItems = null)
+            List<TimegatedItem> timegatedItems = null,
+            List<PlanRequestItem> requestedItems = null,
+            List<CraftingTreeNode> multiItemRoots = null)
         {
             return new CraftingPlanResult
             {
@@ -43,7 +46,9 @@ namespace GW2CraftingHelper.Tests.Services
                 RequiredRecipes = requiredRecipes ?? new List<RequiredRecipe>(),
                 DebugLog = new List<string>(),
                 CurrencyMetadata = currencyMetadata,
-                AcquisitionHints = acquisitionHints
+                AcquisitionHints = acquisitionHints,
+                RequestedItems = requestedItems,
+                MultiItemRoots = multiItemRoots
             };
         }
 
@@ -1482,6 +1487,147 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Single(rows);
             Assert.Equal("Total", rows[0].Label);
+        }
+
+        // --- Multi-item plans (M35, gw2efficiency parity) ---
+
+        private static Contracts.CraftingTreeNode RootNode(int nodeId, int itemId, string name)
+        {
+            return new Contracts.CraftingTreeNode
+            {
+                NodeId = nodeId,
+                ItemId = itemId,
+                Name = name,
+                Quantity = 1,
+                Decision = Contracts.CraftingDecision.Craft
+            };
+        }
+
+        [Fact]
+        public void SingleItemRequest_RequestedItemsNull_UsesSingleItemBranchUnchanged()
+        {
+            // RequestedItems is null even when the caller went through the
+            // multi-item entry point with exactly one item (the pipeline's
+            // own short-circuit never populates it) - PlanViewModelBuilder
+            // must not treat a null/absent list as "multi-item".
+            var meta = MetaFor((1, "Zojja's Claymore", "claymore.png"));
+            var result = MakeResult(targetItemId: 1, targetQuantity: 5, metadata: meta);
+
+            var vm = _builder.Build(result);
+
+            Assert.Equal(5, vm.TargetQuantity);
+            Assert.Equal("Zojja's Claymore", vm.TargetItemName);
+            Assert.Null(vm.MultiItemRoots);
+        }
+
+        [Fact]
+        public void MultiItemRequest_TwoOrMoreItems_PopulatesMultiItemRootsNotTreeRoot()
+        {
+            var meta = MetaFor((1, "Gift of Exordium", "a.png"), (2, "Second Item", "b.png"));
+            var roots = new List<Contracts.CraftingTreeNode>
+            {
+                RootNode(10, 1, "Gift of Exordium"),
+                RootNode(11, 2, "Second Item")
+            };
+            var requested = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 3 }
+            };
+            var result = MakeResult(metadata: meta, requestedItems: requested, multiItemRoots: roots);
+
+            var vm = _builder.Build(result);
+
+            Assert.Null(vm.TreeRoot);
+            Assert.NotNull(vm.MultiItemRoots);
+            Assert.Equal(2, vm.MultiItemRoots.Count);
+            Assert.Same(roots[0], vm.MultiItemRoots[0]);
+            Assert.Same(roots[1], vm.MultiItemRoots[1]);
+        }
+
+        [Fact]
+        public void MultiItemRequest_TargetQuantitySuppressedToZero()
+        {
+            var meta = MetaFor((1, "A", "a.png"), (2, "B", "b.png"));
+            var requested = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+            var result = MakeResult(targetQuantity: 999, metadata: meta, requestedItems: requested,
+                multiItemRoots: new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
+
+            var vm = _builder.Build(result);
+
+            Assert.Equal(0, vm.TargetQuantity);
+        }
+
+        [Fact]
+        public void MultiItemRequest_TitleIsFirstItemNamePlusOthersCount()
+        {
+            var meta = MetaFor((1, "Gift of Exordium", "a.png"), (2, "B", "b.png"), (3, "C", "c.png"));
+            var requested = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
+                new PlanRequestItem { ItemId = 3, Quantity = 1 }
+            };
+            var result = MakeResult(metadata: meta, requestedItems: requested,
+                multiItemRoots: new List<Contracts.CraftingTreeNode>
+                {
+                    RootNode(1, 1, "Gift of Exordium"), RootNode(2, 2, "B"), RootNode(3, 3, "C")
+                });
+
+            var vm = _builder.Build(result);
+
+            Assert.Equal("Gift of Exordium and 2 others", vm.TargetItemName);
+            Assert.Null(vm.TargetIconUrl);
+            Assert.Null(vm.TargetRarity);
+        }
+
+        [Fact]
+        public void MultiItemRequest_TwoItems_TitleUsesSingularOther()
+        {
+            var meta = MetaFor((1, "Gift of Exordium", "a.png"), (2, "B", "b.png"));
+            var requested = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+            var result = MakeResult(metadata: meta, requestedItems: requested,
+                multiItemRoots: new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "Gift of Exordium"), RootNode(2, 2, "B") });
+
+            var vm = _builder.Build(result);
+
+            Assert.Equal("Gift of Exordium and 1 other", vm.TargetItemName);
+        }
+
+        [Fact]
+        public void MultiItemRequest_AppendsMultiItemNoteRowToSummarySection()
+        {
+            var meta = MetaFor((1, "A", "a.png"), (2, "B", "b.png"));
+            var requested = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+            var result = MakeResult(totalCoinCost: 500, metadata: meta, requestedItems: requested,
+                multiItemRoots: new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
+
+            var vm = _builder.Build(result);
+            var summaryRows = vm.Sections[0].Rows;
+
+            Assert.Equal(PlanRowType.MultiItemNote, summaryRows[summaryRows.Count - 1].RowType);
+        }
+
+        [Fact]
+        public void SingleItemRequest_NoMultiItemNoteRow()
+        {
+            var result = MakeResult(totalCoinCost: 500);
+            var vm = _builder.Build(result);
+            var summaryRows = vm.Sections[0].Rows;
+
+            Assert.DoesNotContain(summaryRows, r => r.RowType == PlanRowType.MultiItemNote);
         }
     }
 }

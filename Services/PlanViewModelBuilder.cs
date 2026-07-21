@@ -10,15 +10,35 @@ namespace GW2CraftingHelper.Services
     {
         public PlanViewModel Build(CraftingPlanResult result)
         {
+            // M35 (gw2efficiency parity - multi-item plans): RequestedItems
+            // is populated ONLY for a genuine multi-item batch (2+ items -
+            // see CraftingPlanResult.RequestedItems' own doc comment); a
+            // single-item request, including one made through the
+            // multi-item entry point, always has it null and continues
+            // through the untouched single-item branch below byte-for-byte.
+            bool isMultiItem = result.RequestedItems != null && result.RequestedItems.Count > 1;
+
             var vm = new PlanViewModel
             {
-                TargetQuantity = result.Plan.TargetQuantity,
-                TreeRoot = result.CraftingTree,
+                TargetQuantity = isMultiItem ? 0 : result.Plan.TargetQuantity,
+                TreeRoot = isMultiItem ? null : result.CraftingTree,
+                MultiItemRoots = isMultiItem ? result.MultiItemRoots : null,
                 CurrencyMetadata = result.CurrencyMetadata
             };
 
-            // Resolve target name/icon/rarity
-            if (result.ItemMetadata != null &&
+            if (isMultiItem)
+            {
+                // No single target item/icon/rarity exists for a batch - the
+                // header instead shows gw2e's own document-title convention
+                // ("Gift of Exordium and 2 others" - see the M34 r1 multi-
+                // item research report) and TargetQuantity is suppressed
+                // (0) so CraftingPlanView's existing "x{qty}" suffix never
+                // renders a meaningless combined number.
+                vm.TargetItemName = BuildMultiItemTitle(result.RequestedItems, result.ItemMetadata);
+                vm.TargetIconUrl = null;
+                vm.TargetRarity = null;
+            }
+            else if (result.ItemMetadata != null &&
                 result.ItemMetadata.TryGetValue(result.Plan.TargetItemId, out var targetMeta))
             {
                 vm.TargetItemName = !string.IsNullOrEmpty(targetMeta.Name)
@@ -42,7 +62,7 @@ namespace GW2CraftingHelper.Services
             // everything else below is exactly the gw2e ordering.
 
             // 1. Total Cost section (always present)
-            vm.Sections.Add(BuildSummarySection(result));
+            vm.Sections.Add(BuildSummarySection(result, isMultiItem));
 
             // 2. Used Materials section (only if non-null and non-empty)
             if (result.UsedMaterials != null && result.UsedMaterials.Count > 0)
@@ -87,7 +107,25 @@ namespace GW2CraftingHelper.Services
             return vm;
         }
 
-        private PlanSectionViewModel BuildSummarySection(CraftingPlanResult result)
+        /// <summary>
+        /// gw2e's own document-title convention for a multi-item batch
+        /// (M34 r1 report): the first requested item's name, plus " and N
+        /// other(s)" when 2+ items are selected. items is guaranteed
+        /// non-empty by the isMultiItem gate above (2+ entries).
+        /// </summary>
+        private static string BuildMultiItemTitle(
+            IReadOnlyList<PlanRequestItem> items, IReadOnlyDictionary<int, ItemMetadata> metadata)
+        {
+            string firstName = ResolveName(items[0].ItemId, metadata);
+            int rest = items.Count - 1;
+            if (rest <= 0)
+            {
+                return firstName;
+            }
+            return $"{firstName} and {rest} other" + (rest > 1 ? "s" : "");
+        }
+
+        private PlanSectionViewModel BuildSummarySection(CraftingPlanResult result, bool isMultiItem)
         {
             var section = new PlanSectionViewModel
             {
@@ -172,6 +210,20 @@ namespace GW2CraftingHelper.Services
                         CurrencyOwnedQuantity = ownedQuantity
                     });
                 }
+            }
+
+            // M35 (gw2efficiency parity - multi-item plans): echoes gw2e's
+            // own Cost Breakdown banner for a multi-item batch (M34 r1
+            // report), reworded to describe what this module actually
+            // combines - see PlanRowType.MultiItemNote's own doc comment
+            // for why "profit" is not the right word here yet.
+            if (isMultiItem)
+            {
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.MultiItemNote,
+                    Label = "Totals above are the sum of all crafted recipes in this batch."
+                });
             }
 
             return section;

@@ -263,5 +263,91 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Equal(0, PlanContentHeightMath.ChildrenHeight(null, 0, false, null));
         }
+
+        // --- MultiRootTreeFlowHeight (M35, gw2efficiency parity: multi-item plans) ---
+
+        [Fact]
+        public void MultiRootTreeFlowHeight_NullRoots_IsZero()
+        {
+            Assert.Equal(0, PlanContentHeightMath.MultiRootTreeFlowHeight(null, null));
+        }
+
+        [Fact]
+        public void MultiRootTreeFlowHeight_EmptyRoots_IsZero()
+        {
+            Assert.Equal(0, PlanContentHeightMath.MultiRootTreeFlowHeight(new List<CraftingTreeNode>(), null));
+        }
+
+        [Fact]
+        public void MultiRootTreeFlowHeight_SingleRoot_MatchesTreeNodeHeightExactly()
+        {
+            // The single-item case must be byte-identical to calling
+            // TreeNodeHeight directly - no separate per-root header row.
+            var children = new List<CraftingTreeNode> { Node(2), Node(3) };
+            var root = Node(1, children: children);
+            var roots = new List<CraftingTreeNode> { root };
+
+            int expected = PlanContentHeightMath.TreeNodeHeight(root, 0, false, null);
+            Assert.Equal(expected, PlanContentHeightMath.MultiRootTreeFlowHeight(roots, null));
+        }
+
+        [Fact]
+        public void MultiRootTreeFlowHeight_MultipleRoots_SumsEachRootsOwnHeightPlusDividers()
+        {
+            var rootA = Node(1, children: new List<CraftingTreeNode> { Node(2) });
+            var rootB = Node(3);
+            var rootC = Node(4, children: new List<CraftingTreeNode> { Node(5), Node(6) });
+            var roots = new List<CraftingTreeNode> { rootA, rootB, rootC };
+
+            // One divider between each pair of consecutive roots (2 gaps
+            // for 3 roots) - never before the first or after the last.
+            int expected =
+                PlanContentHeightMath.TreeNodeHeight(rootA, 0, false, null) +
+                PlanContentHeightMath.TreeNodeHeight(rootB, 0, false, null) +
+                PlanContentHeightMath.TreeNodeHeight(rootC, 0, false, null) +
+                2 * PlanContentHeightMath.MultiRootDividerHeight;
+            Assert.Equal(expected, PlanContentHeightMath.MultiRootTreeFlowHeight(roots, null));
+        }
+
+        [Fact]
+        public void MultiRootTreeFlowHeight_RespectsPerNodeExpansionOverrides()
+        {
+            var rootA = Node(1, children: new List<CraftingTreeNode> { Node(2) });
+            var rootB = Node(3, children: new List<CraftingTreeNode> { Node(4) });
+            var roots = new List<CraftingTreeNode> { rootA, rootB };
+            var overrides = new Dictionary<int, bool> { { 1, false } }; // collapse root A only
+
+            int expected =
+                PlanContentHeightMath.TreeRowHeight + // rootA collapsed - own row only
+                PlanContentHeightMath.MultiRootDividerHeight +
+                (PlanContentHeightMath.TreeRowHeight + PlanContentHeightMath.TreeRowHeight); // rootB expanded (default)
+            Assert.Equal(expected, PlanContentHeightMath.MultiRootTreeFlowHeight(roots, overrides));
+        }
+
+        // --- SummaryBodyHeight + MultiItemNote (M35) ---
+
+        [Fact]
+        public void Summary_MultiItemNoteRow_AddsFallbackTextRowHeight()
+        {
+            var rows = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CoinTotal),
+                Row(PlanRowType.MultiItemNote)
+            };
+            int expected = PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
+            Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.Summary, rows));
+        }
+
+        [Fact]
+        public void Summary_NoMultiItemNoteRow_UnaffectedByNewBranch()
+        {
+            var rows = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CoinTotal),
+                Row(PlanRowType.CurrencyCost)
+            };
+            int expected = PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.CurrencyRowHeight;
+            Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.Summary, rows));
+        }
     }
 }
