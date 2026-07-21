@@ -118,5 +118,66 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(isWrapped);
             Assert.Equal(5520, intendedDelta);
         }
+
+        // MUSTFIX-4 (M36 fix-pass): lattice-edge tests locking the
+        // documented N*120 boundary the threshold derivation promises.
+        // N=46 (46*120 - 65536 = -60016) is the largest coalesced up-flick
+        // count the -60000 threshold still classifies as wrapped; N=47
+        // (47*120 - 65536 = -59896) sits just above the threshold and is
+        // NOT corrected - an already-absurd 47-notch coalesced single
+        // wheel event stays uncorrected by design (the threshold's own
+        // safety margin against misclassifying a genuine down-delta is
+        // worth more than covering a notch count this implausible).
+        [Fact]
+        public void FortySixNotchUpFlick_AtLatticeEdge_ClassifiedAsWrapped()
+        {
+            var (isWrapped, intendedDelta) = WheelDeltaSanitizer.Classify(-60016);
+
+            Assert.True(isWrapped);
+            Assert.Equal(5520, intendedDelta);
+        }
+
+        [Fact]
+        public void FortySevenNotchUpFlick_JustPastLatticeEdge_NotWrapped()
+        {
+            var (isWrapped, intendedDelta) = WheelDeltaSanitizer.Classify(-59896);
+
+            Assert.False(isWrapped);
+            Assert.Equal(-59896, intendedDelta);
+        }
+
+        // --- SanitizeScrollLines (MUSTFIX-2) ---
+
+        [Theory]
+        [InlineData(1)]
+        [InlineData(3)]
+        [InlineData(5)]
+        [InlineData(int.MaxValue)]
+        public void SanitizeScrollLines_Positive_PassesThroughUnchanged(int rawLines)
+        {
+            Assert.Equal(rawLines, WheelDeltaSanitizer.SanitizeScrollLines(rawLines));
+        }
+
+        [Fact]
+        public void SanitizeScrollLines_NegativeOne_WindowsOneScreenAtATimeSetting_ReturnsWindowsDefault()
+        {
+            // -1 is Windows' real reported value for the "one screen at a
+            // time" mouse option; used directly it flips the correction's
+            // sign (MUSTFIX-2) - substitute Windows' documented default of
+            // 3 lines instead.
+            Assert.Equal(3, WheelDeltaSanitizer.SanitizeScrollLines(-1));
+        }
+
+        [Fact]
+        public void SanitizeScrollLines_Zero_ReturnsWindowsDefault()
+        {
+            Assert.Equal(3, WheelDeltaSanitizer.SanitizeScrollLines(0));
+        }
+
+        [Fact]
+        public void SanitizeScrollLines_UnexpectedLargeNegative_StillDefensivelyReturnsWindowsDefault()
+        {
+            Assert.Equal(3, WheelDeltaSanitizer.SanitizeScrollLines(int.MinValue));
+        }
     }
 }

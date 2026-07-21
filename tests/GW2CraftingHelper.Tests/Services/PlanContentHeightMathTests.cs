@@ -103,6 +103,19 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void RecipeRowHeightNoSublabel_ExactlyFitsIconFramePlusDivider()
+        {
+            // M36 fix-pass (MUSTFIX-3): CraftingPlanView.CreateRecipeRow's
+            // no-sublabel branch places a 34px rarity-framed icon at y=0
+            // and a bottom-anchored 2px row divider inside rowHeight - the
+            // constant must equal exactly icon + divider (34 + 2 = 36) with
+            // no overlap or slack, locking the fix that closed the
+            // pre-existing overflow KNOWN-ISSUES #23 mis-described as
+            // "several pixels of headroom" for this row.
+            Assert.Equal(36, PlanContentHeightMath.RecipeRowHeightNoSublabel);
+        }
+
+        [Fact]
         public void Recipes_MixOfSublabelAndNoSublabel_UsesPerRowHeight()
         {
             var rows = new List<PlanRowViewModel>
