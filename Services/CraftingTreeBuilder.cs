@@ -253,7 +253,12 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, SolverDecision> decisions,
             HashSet<int> ids)
         {
-            if (node.IngredientType == "Item")
+            // M35: never collect the synthetic multi-item wrapper's own
+            // sentinel id (see Gw2Constants.MultiItemWrapperItemId) - it is
+            // not a real item and must never trigger a metadata fetch. The
+            // recursion below still walks past it into its recipe's
+            // Ingredients (the N real item roots) unaffected.
+            if (node.IngredientType == "Item" && node.Id != Gw2Constants.MultiItemWrapperItemId)
             {
                 ids.Add(node.Id);
             }

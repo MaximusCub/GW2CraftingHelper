@@ -893,6 +893,34 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
+            // M35 (gw2e parity, multi-item plans): the synthetic multi-item
+            // wrapper root (see Gw2Constants.MultiItemWrapperItemId) is
+            // never a real acquisition - it exists purely so Evaluate can
+            // price N selected item roots together under one throwaway
+            // "recipe". Recurse straight into that recipe's own Ingredients
+            // (the N real item roots) WITHOUT ever generating a step/
+            // craftOrder entry for the wrapper's own Craft decision -
+            // echoes gw2e's componentTree.html hiding the fake
+            // `multipleRecipeTree` node from the rendered Crafting Steps
+            // list (docs/gw2e-parity-spec.md, the M34 r1 multi-item
+            // research report). Evaluate always force-crafts this node
+            // (it has a recipe and no buy price - Gw2Constants sentinel ids
+            // are never in `prices`), so decision.Source is always Craft
+            // here; the explicit check still guards against future change.
+            if (node.Id == Gw2Constants.MultiItemWrapperItemId &&
+                decision.Source == AcquisitionSource.Craft)
+            {
+                var wrapperRecipe = node.Recipes.FirstOrDefault(r => r.RecipeId == decision.RecipeId);
+                if (wrapperRecipe != null)
+                {
+                    foreach (var itemRoot in wrapperRecipe.Ingredients)
+                    {
+                        Collect(itemRoot, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+                    }
+                }
+                return;
+            }
+
             if (decision.Source == AcquisitionSource.Craft)
             {
                 // Recurse into the chosen recipe's ingredients first (bottom-up)
