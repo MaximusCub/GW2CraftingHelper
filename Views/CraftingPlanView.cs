@@ -174,15 +174,15 @@ namespace GW2CraftingHelper.Views
         // mouse-wheel event observed over the content panel. Tracked
         // unconditionally - not gated on ScrollDiagnosticsEnabled, unlike
         // the diagnostic wheel logging below - because StartScrollVerify
-        // uses it for two real behavioral decisions: (1) any wheel event
+        // uses it for one real behavioral decision: any wheel event
         // observed since a verify window armed yields that window
-        // immediately, no further contest; (2) a wheel event observed
-        // within the last ~250ms suppresses the zero-reassert contest (a
-        // user who just wheeled to exactly the top is not indistinguishable
-        // from a library reset the way an idle bar reading zero is). Reset
-        // at the top of every Build() so a stale value from a previous
-        // render cannot influence a brand new one.
-        private const int WheelSuppressWindowMs = 250;
+        // immediately, no further contest. (M33 fix-pass: a second,
+        // recency-only "suppress the zero-reassert" use of this timestamp
+        // was removed - it could only ever fire for a wheel that predated
+        // the window's arm time, in which case suppressing was wrong: see
+        // StartScrollVerify's zero-reassert comment.) Reset at the top of
+        // every Build() so a stale value from a previous render cannot
+        // influence a brand new one.
         private DateTime? _lastWheelEventUtc;
 
         // M33 C1 (#12 diagnostics): instrumentation-only. Gated on
@@ -461,15 +461,21 @@ namespace GW2CraftingHelper.Views
         /// Directive C: any user wheel event observed since this window
         /// armed yields it immediately and unconditionally - no
         /// heightUnchanged precondition, since height is already valid at
-        /// arm time. A wheel event observed within WheelSuppressWindowMs of
-        /// a would-be zero-reassert suppresses that contest instead of
-        /// bouncing the bar back down: a user who just wheeled to exactly
-        /// the top is not distinguishable from a library reset by value
-        /// alone (both read exactly 0), so recency of real input breaks the
-        /// tie in the user's favor. The zero-reassert cap
+        /// arm time. This is the ONLY wheel-driven exit: a zero-reassert
+        /// (scrollbar reads exactly 0 while target sits well above it) is
+        /// always contested and never suppressed by wheel recency. A wheel
+        /// at or after armedAtUtc already exits via the check above before
+        /// reaching the zero-reassert branch; a wheel that predates
+        /// armedAtUtc is the input that produced savedOffset in the first
+        /// place (PreserveScrollAcross captures it before mutate() runs),
+        /// so treating it as "user meant to land at the top" would abandon
+        /// restoring their real, non-top position - exactly the #14 flash
+        /// this window exists to prevent. (An earlier revision suppressed
+        /// the reassert on any wheel within a short recency window
+        /// regardless of arm time; that bled across the mutation boundary
+        /// and was removed in the M33 fix-pass.) The zero-reassert cap
         /// (ScrollVerifyZeroReassertCap) is kept as a last-resort guarantee
-        /// that a persistent fight eventually ends even without a wheel
-        /// signal to disambiguate it.
+        /// that a persistent fight eventually ends.
         /// </summary>
         private void StartScrollVerify(Panel capturedPanel, int capturedGeneration, int savedOffset, Scrollbar scrollbar)
         {
@@ -529,22 +535,20 @@ namespace GW2CraftingHelper.Views
                     {
                         // Scrollbar reads exactly zero while our target sits
                         // well above it: Blish's own reset landed on this
-                        // frame (see the class doc comment). Directive C:
-                        // a wheel event inside the last WheelSuppressWindowMs
-                        // means the user just wheeled to top themselves -
-                        // that is not a library reset, so do not contest it.
-                        bool recentWheel = _lastWheelEventUtc.HasValue &&
-                            (DateTime.UtcNow - _lastWheelEventUtc.Value).TotalMilliseconds < WheelSuppressWindowMs;
-                        if (recentWheel)
-                        {
-                            if (diagEnabled)
-                            {
-                                Logger.Debug("{0} verify exit reason=user-wheel-to-top frame={1} realFrame={2} target={3:0.0000}",
-                                    ScrollDiagTag, ScrollDiagFrame(), frame, target);
-                            }
-                            return false;
-                        }
-
+                        // frame (see the class doc comment). This is
+                        // ALWAYS a library reset, never a genuine "user
+                        // wheeled to exactly top" - any wheel event at or
+                        // after armedAtUtc already exited via the
+                        // wheel-observed check above before reaching this
+                        // line, and a wheel event that predates armedAtUtc
+                        // reflects the user's real pre-mutation position
+                        // (the ratio ApplySavedScrollSynchronously just
+                        // wrote), which this reassert must restore rather
+                        // than treat as "user meant to be at the top".
+                        // (M33 fix-pass: a recency-only suppression here
+                        // previously let a wheel just BEFORE the mutation
+                        // veto the restore of a real non-top position -
+                        // see git history for the removed check.)
                         scrollbar.ScrollDistance = target;
                         zeroReassert++;
 
@@ -627,13 +631,13 @@ namespace GW2CraftingHelper.Views
         /// M33 C2a (directive C): unconditional (NOT diagnostics-gated) tap
         /// on the same MouseWheelScrolled event OnScrollDiagWheelScrolled
         /// below observes, recording only a timestamp. StartScrollVerify
-        /// reads _lastWheelEventUtc to (1) yield a live verify window
-        /// immediately the moment a wheel event lands in it, and (2)
-        /// suppress a zero-reassert contest when a wheel event landed
-        /// within the last WheelSuppressWindowMs. Both are real behavioral
-        /// decisions now, not diagnostics, so unlike the tap below this
-        /// must run regardless of ScrollDiagnosticsEnabled - cost is a
-        /// single DateTime.UtcNow call per wheel notch, not per frame.
+        /// reads _lastWheelEventUtc to yield a live verify window
+        /// immediately the moment a wheel event lands in it (scoped to
+        /// wheels at or after the window's arm time - see that method's
+        /// doc comment). This is a real behavioral decision now, not
+        /// diagnostics, so unlike the tap below this must run regardless
+        /// of ScrollDiagnosticsEnabled - cost is a single DateTime.UtcNow
+        /// call per wheel notch, not per frame.
         /// </summary>
         private void OnContentWheelObserved(object sender, MouseEventArgs e)
         {
@@ -904,6 +908,15 @@ namespace GW2CraftingHelper.Views
         /// heights stay fixed per M33 C2a), the coalesced reflow is a no-op
         /// for vertical position anyway - SingleTopToBottom flow positions
         /// children from cumulative Height, not Width.
+        ///
+        /// PERF CAVEAT (KNOWN-ISSUES #13): this replaces a ONE-TIME
+        /// dispose+rebuild 150ms after the drag settled with a full replay
+        /// of _relayoutActions on EVERY real drag frame - a genuine change
+        /// in perf character, not just a different trigger. The mitigation
+        /// above is reasoned, not measured: no live drag-resize check on a
+        /// large, fully-expanded plan (deep tree + long shopping list) has
+        /// been performed against a running Blish instance. If this ever
+        /// needs tightening, look here first.
         /// </summary>
         private void ReplayRelayout(int panelWidth)
         {
@@ -2721,10 +2734,12 @@ namespace GW2CraftingHelper.Views
             // below) always start collapsed regardless of depth, so a bought
             // node's "what it would cost to craft instead" subtree does not
             // visually explode the plan the moment its parent expands.
-            // Non-reference nodes keep the existing depth<2 default.
-            bool isExpanded = _nodeExpansion.TryGetValue(node.NodeId, out bool userExpanded)
-                ? userExpanded
-                : (!dimmed && depth < 2);
+            // Non-reference nodes keep the existing depth<2 default. Calls
+            // PlanContentHeightMath.IsNodeExpanded (not a hand-duplicated
+            // ternary) so this decision and RefreshTreeContainerHeights'
+            // height arithmetic share one formula and cannot silently
+            // desync - see that method's doc comment.
+            bool isExpanded = PlanContentHeightMath.IsNodeExpanded(node.NodeId, depth, dimmed, _nodeExpansion);
             Label arrowLabel = null;
             if (hasChildren)
             {
