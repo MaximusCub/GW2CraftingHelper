@@ -41,16 +41,21 @@ namespace GW2CraftingHelper.Models
 
         // M35 (gw2efficiency parity - multi-item plans): a single plain
         // informational line appended to the Summary/Total Cost section
-        // ONLY for a genuine multi-item batch (2+ requested items) -
-        // echoes gw2e's own Cost Breakdown banner ("Profit numbers are the
-        // sum of all crafted recipes" - docs/gw2e-parity-spec.md, the M34
-        // r1 multi-item research report), reworded here to describe what
-        // this module actually combines (coin/currency TOTALS, not a
-        // profit figure - see PlanViewModelBuilder.BuildSummarySection and
-        // CraftingPlanPipeline.GenerateStructuredMultiAsync's own doc
-        // comment on why sell-side economics are not yet computed for a
-        // batch). Rendered via the same plain-text row pattern as
-        // TimegatedNotice.
+        // ONLY for a genuine multi-item batch (2+ requested items). M37
+        // (KNOWN-ISSUES #25) added a real batch-level Sell value/Profit
+        // rollup - see CraftingPlanPipeline.ApplyBatchSellSideEconomics
+        // and PlanViewModelBuilder.BuildSummarySection - and reworded
+        // this note's Label text to describe it. The rollup has NO
+        // craft-vs-buy filter at all (ApplyBatchSellSideEconomics' own
+        // doc comment, divergence item 1): a bought-but-tradable root
+        // with a live sell price still contributes to the sum. The
+        // Label text is therefore deliberately NOT gw2e's own verbatim
+        // Cost Breakdown banner ("Profit numbers are the sum of all
+        // crafted recipes." - docs/gw2e-parity-spec.md, the M34 r1
+        // multi-item research report) - "crafted recipes" would be
+        // inaccurate for a craft-agnostic, tradable-only rollup; see
+        // docs/KNOWN-ISSUES.md #25's divergence record. Rendered via
+        // the same plain-text row pattern as TimegatedNotice.
         MultiItemNote
     }
 

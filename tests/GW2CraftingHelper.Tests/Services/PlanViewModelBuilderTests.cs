@@ -1613,11 +1613,39 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var result = MakeResult(totalCoinCost: 500, metadata: meta, requestedItems: requested,
                 multiItemRoots: new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
+            // M37 review fix: the note row is gated on the SAME
+            // result.NetSaleValue.HasValue condition as the Sell value/
+            // Profit rows above it - it must never be shown next to zero
+            // profit numbers, so this test now provides a live rollup.
+            result.NetSaleValue = 850;
+            result.CraftingProfit = 550;
 
             var vm = _builder.Build(result);
             var summaryRows = vm.Sections[0].Rows;
 
             Assert.Equal(PlanRowType.MultiItemNote, summaryRows[summaryRows.Count - 1].RowType);
+        }
+
+        [Fact]
+        public void MultiItemRequest_NoQualifyingRoots_NoMultiItemNoteRow()
+        {
+            // M37 review fix: a multi-item batch where every requested root
+            // is excluded from the sell/profit rollup (NetSaleValue stays
+            // null) must NOT show the note row - there would be no Sell
+            // value/Profit rows above it for the note to describe.
+            var meta = MetaFor((1, "A", "a.png"), (2, "B", "b.png"));
+            var requested = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+            var result = MakeResult(totalCoinCost: 500, metadata: meta, requestedItems: requested,
+                multiItemRoots: new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
+
+            var vm = _builder.Build(result);
+            var summaryRows = vm.Sections[0].Rows;
+
+            Assert.DoesNotContain(summaryRows, r => r.RowType == PlanRowType.MultiItemNote);
         }
 
         [Fact]
@@ -1628,6 +1656,115 @@ namespace GW2CraftingHelper.Tests.Services
             var summaryRows = vm.Sections[0].Rows;
 
             Assert.DoesNotContain(summaryRows, r => r.RowType == PlanRowType.MultiItemNote);
+        }
+
+        // --- Multi-item batch sell-side economics (M37, KNOWN-ISSUES #25) ---
+
+        private static List<PlanRequestItem> TwoRequestedItems()
+        {
+            return new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+        }
+
+        private static List<Contracts.CraftingTreeNode> TwoRoots()
+        {
+            return new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") };
+        }
+
+        [Fact]
+        public void MultiItemRequest_SellValuePresent_AddsBatchWordedSellAndProfitRows()
+        {
+            var result = MakeResult(
+                totalCoinCost: 300, requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+            result.SellableQuantity = 2;
+            result.NetSaleValue = 850;
+            result.CraftingProfit = 550;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal("Sell value (batch total, after 15% TP fees)", rows[1].Label);
+            Assert.Equal(850L, rows[1].CoinValue);
+            Assert.Equal("Profit if sold (batch total)", rows[2].Label);
+            Assert.Equal(550L, rows[2].CoinValue);
+        }
+
+        [Fact]
+        public void MultiItemRequest_NegativeProfit_RendersAsLossWithBatchQualifier()
+        {
+            var result = MakeResult(
+                totalCoinCost: 900, requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+            result.NetSaleValue = 340;
+            result.CraftingProfit = -160;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal("Loss if sold (batch total)", rows[2].Label);
+            Assert.Equal(160L, rows[2].CoinValue);
+        }
+
+        [Fact]
+        public void MultiItemRequest_CurrencyCostsPresent_ProfitRowGetsBatchAndCoinOnlyQualifier()
+        {
+            var result = MakeResult(
+                totalCoinCost: 100,
+                currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 2, Amount = 50 } },
+                requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 240;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal("Profit if sold (batch total, coin costs only)", rows[2].Label);
+        }
+
+        [Fact]
+        public void MultiItemRequest_SellRowNeverShowsPerItemQuantityQualifier()
+        {
+            // Single-item mode shows "Sell value (Nx, ...)" when
+            // SellableQuantity overproduces the target quantity - that
+            // qualifier has no meaning for a batch SUM across N different
+            // items' own quantities, so it must never appear here.
+            var result = MakeResult(
+                targetQuantity: 1, totalCoinCost: 300,
+                requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+            result.SellableQuantity = 5;
+            result.NetSaleValue = 1700;
+            result.CraftingProfit = 1400;
+
+            var vm = _builder.Build(result);
+
+            Assert.Equal("Sell value (batch total, after 15% TP fees)", vm.Sections[0].Rows[1].Label);
+        }
+
+        [Fact]
+        public void MultiItemRequest_NoteRowText_DescribesTradableOnlyRollupNotGw2eCraftOnlyBanner()
+        {
+            // M37 review fix: the batch rollup has NO craft-vs-buy filter
+            // (a bought-but-tradable root still contributes - see
+            // CraftingPlanPipeline.ApplyBatchSellSideEconomics' own doc
+            // comment, divergence item 1), so the note text must not claim
+            // gw2e's own "sum of all crafted recipes" wording verbatim -
+            // that would be inaccurate here.
+            var result = MakeResult(
+                totalCoinCost: 500, requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+            result.NetSaleValue = 850;
+            result.CraftingProfit = 550;
+
+            var vm = _builder.Build(result);
+            var summaryRows = vm.Sections[0].Rows;
+            var noteRow = summaryRows[summaryRows.Count - 1];
+
+            Assert.Equal(PlanRowType.MultiItemNote, noteRow.RowType);
+            Assert.Equal(
+                "Sell value and profit are the sum across every requested item that has a live Trading Post sell price.",
+                noteRow.Label);
+            Assert.DoesNotContain("crafted recipes", noteRow.Label);
         }
     }
 }

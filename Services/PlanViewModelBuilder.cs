@@ -158,12 +158,27 @@ namespace GW2CraftingHelper.Services
                 });
             }
 
-            // Sell-side rows: only when the target has a live sell price.
+            // Sell-side rows: only when the target(s) have a live sell
+            // price. M37 (KNOWN-ISSUES #25): in multi-item mode,
+            // NetSaleValue/CraftingProfit are the BATCH sum across every
+            // requested item that has one (see
+            // CraftingPlanPipeline.ApplyBatchSellSideEconomics) - labels
+            // are worded as a batch total, and the single-item "Nx"
+            // overproduction qualifier is dropped since there is no single
+            // requested quantity to compare a batch sum against.
             if (result.NetSaleValue.HasValue)
             {
-                string sellLabel = result.SellableQuantity > result.Plan.TargetQuantity
-                    ? $"Sell value ({result.SellableQuantity}x, after 15% TP fees)"
-                    : "Sell value (after 15% TP fees)";
+                string sellLabel;
+                if (isMultiItem)
+                {
+                    sellLabel = "Sell value (batch total, after 15% TP fees)";
+                }
+                else
+                {
+                    sellLabel = result.SellableQuantity > result.Plan.TargetQuantity
+                        ? $"Sell value ({result.SellableQuantity}x, after 15% TP fees)"
+                        : "Sell value (after 15% TP fees)";
+                }
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.CoinTotal,
@@ -174,7 +189,15 @@ namespace GW2CraftingHelper.Services
                 long profit = result.CraftingProfit ?? 0L;
                 bool hasCurrencyCosts = result.Plan.CurrencyCosts != null &&
                                         result.Plan.CurrencyCosts.Count > 0;
-                string qualifier = hasCurrencyCosts ? " (coin costs only)" : "";
+                string qualifier;
+                if (isMultiItem)
+                {
+                    qualifier = hasCurrencyCosts ? " (batch total, coin costs only)" : " (batch total)";
+                }
+                else
+                {
+                    qualifier = hasCurrencyCosts ? " (coin costs only)" : "";
+                }
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.CoinTotal,
@@ -213,16 +236,26 @@ namespace GW2CraftingHelper.Services
             }
 
             // M35 (gw2efficiency parity - multi-item plans): echoes gw2e's
-            // own Cost Breakdown banner for a multi-item batch (M34 r1
-            // report), reworded to describe what this module actually
-            // combines - see PlanRowType.MultiItemNote's own doc comment
-            // for why "profit" is not the right word here yet.
-            if (isMultiItem)
+            // own Cost Breakdown banner concept for a multi-item batch (M34
+            // r1 report). M37 (KNOWN-ISSUES #25) added the real batch-level
+            // Sell value/Profit rows above (see
+            // CraftingPlanPipeline.ApplyBatchSellSideEconomics) - gated on
+            // the SAME result.NetSaleValue.HasValue condition as those rows
+            // (mirroring gw2e's own shared ng-show condition, research
+            // report Section 1.3b) so this note never references a profit
+            // figure that is not actually on the page (e.g. every requested
+            // root bought outright, or none tradable). The wording is NOT
+            // gw2e's own verbatim banner text ("...sum of all crafted
+            // recipes") because this module's rollup has no craft-vs-buy
+            // filter at all (ApplyBatchSellSideEconomics' own doc comment,
+            // divergence item 1) - a bought-but-tradable root can
+            // contribute too, so "crafted recipes" would be inaccurate.
+            if (isMultiItem && result.NetSaleValue.HasValue)
             {
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.MultiItemNote,
-                    Label = "Totals above are the sum of all crafted recipes in this batch."
+                    Label = "Sell value and profit are the sum across every requested item that has a live Trading Post sell price."
                 });
             }
 

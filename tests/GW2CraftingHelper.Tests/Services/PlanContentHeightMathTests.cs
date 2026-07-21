@@ -362,5 +362,31 @@ namespace GW2CraftingHelper.Tests.Services
             int expected = PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.CurrencyRowHeight;
             Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.Summary, rows));
         }
+
+        // --- Multi-item batch sell-side economics (M37, KNOWN-ISSUES #25) ---
+
+        /// <summary>
+        /// M37 populates real batch Sell value/Profit rows, so a multi-item
+        /// plan can now reach the same 4-simultaneous-CoinTotal-row maximum
+        /// single-item mode already exercised (Total, Own materials, Sell
+        /// value, Profit) - the FIRST time 4 tiles occur in MULTI-item mode.
+        /// The boolean "hasCoinRow ? CostTileRowHeight : 0" logic (not a
+        /// per-tile count) means this must still collapse to exactly one
+        /// CostTileRowHeight, same as any other coin-row count.
+        /// </summary>
+        [Fact]
+        public void Summary_MultiItemFourCoinRowsPlusNoteRow_StillOneCostTileRowHeight()
+        {
+            var rows = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CoinTotal), // Total
+                Row(PlanRowType.CoinTotal), // Own materials
+                Row(PlanRowType.CoinTotal), // Sell value (batch total)
+                Row(PlanRowType.CoinTotal), // Profit if sold (batch total)
+                Row(PlanRowType.MultiItemNote)
+            };
+            int expected = PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
+            Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.Summary, rows));
+        }
     }
 }
