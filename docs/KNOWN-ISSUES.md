@@ -152,7 +152,7 @@ module ECHO that behavior rather than inventing an approach. New
 dev-time seeders (vendor pricing, Mystic Forge recipes) are welcome;
 they must write static seed JSON, never scrape at runtime.
 
-## 12. Fast wheel-up scroll: net-downward stutter (FIXED in M33)
+## 12. Fast wheel-up scroll: net-downward stutter (FIXED in M33, code-verified only)
 Rapid successive wheel-up events make the viewport scroll up then jump
 back down further than it went up - net downward movement with an
 upward stutter. Hypothesis: scroll guard/restore machinery (or some
@@ -171,11 +171,28 @@ bodies, recipe-tree child containers) are now finalized synchronously
 at build time via PlanContentHeightMath, removing the fluctuating-height
 window entirely. On top of that, the post-restore verify window now
 yields immediately on any observed wheel event (no heightUnchanged
-precondition), and a wheel event within the last 250ms suppresses the
-zero-reassert contest so a user who just wheeled to exactly the top is
-never bounced back down.
+precondition), so a user's wheel input during a live restore/verify
+window is never contested.
+VERIFICATION STATE: the above is confirmed against the c12-baseline-
+analysis (2026-07-20) live instrumented capture of the OLD code, plus
+Blish-free unit tests of the pure math helpers (PlanContentHeightMath,
+ScrollMath) and a green build against the vendored Blish HUD v1.3.0
+source. It has NOT been confirmed by a live instrumented capture of
+THIS code with ScrollDiagnosticsEnabled - that follow-up capture is
+still outstanding. Treat a fresh #12-shaped report as reopening this
+item, not as "already fixed, must be something else."
+(M33 fix-pass note: an earlier revision of this fix also suppressed the
+zero-reassert contest whenever a wheel event had landed within the last
+250ms of wall clock, intending to protect a user who "just wheeled to
+exactly the top." That suppression was removed - it could only ever
+trigger for a wheel that predated the restore window arming, in which
+case the saved scroll offset reflects the user's real, non-top
+position, and suppressing the reassert would abandon restoring it,
+reintroducing the #14 top-jump. The genuine "wheeled to exactly top"
+case never reaches the verify window at all: PreserveScrollAcross skips
+the restore/verify entirely when the saved offset is already 0.)
 
-## 13. Resize UX rework: live reflow, no settle stutter (FIXED in M33)
+## 13. Resize UX rework: live reflow, no settle stutter (FIXED in M33, code-verified only)
 The 150ms debounce-only approach is REJECTED by user feedback: content
 must reflow smoothly WHILE dragging, not lag until the mouse holds
 still. Additionally the settle rebuild itself is visibly ugly: stray
@@ -217,8 +234,24 @@ relayout closure ever moves the scrollbar, and a DEBUG-only log fires if
 a section renders rows but registers no relayout closure, so a future
 section type that forgets to wire this up fails loud instead of
 silently freezing at build-time width on later resizes.
+VERIFICATION STATE: the visible-glitch elimination above (no dispose+
+rebuild, no scroll disturbance) is confirmed by construction against
+the M33 C2a height work plus Blish-free unit tests of
+Services/PlanRelayoutMath.cs, and a green build. It has NOT been
+confirmed by a live in-game drag-resize check (screenshot loop) on a
+large, fully-expanded Exordium-scale plan (deep tree + long shopping
+list). In particular, ReplayRelayout now replays the full relayout
+closure registry synchronously on every real drag frame (previously:
+once, 150ms after the drag settled) - a genuine change in perf
+character. The SuspendLayout/ResumeLayout batching is a real,
+reasoned mitigation (see ReplayRelayout's doc comment), but its
+wall-clock cost per drag tick on a large plan has not been measured
+against a live running Blish instance. If a user reports stutter/lag
+while dragging the window edge on a large plan, treat it as this
+still-open measurement gap, not a regression to re-diagnose from
+scratch.
 
-## 14. Pill-click viewport flash (jump to top and back) (FIXED in M33)
+## 14. Pill-click viewport flash (jump to top and back) (FIXED in M33, code-verified only)
 Clicking a TP/VENDOR override pill visibly flashes the view to the top
 for an instant before the scroll restore re-asserts. The restore
 converges but applies a frame+ late. Direction: apply the saved scroll
@@ -234,6 +267,13 @@ position left for the user to see. A short (2-3 real frame) FrameTicker
 verify still runs afterward, but only to contest Blish's own single
 expected post-rebuild scrollbar reset, not to converge toward a still-
 moving target.
+VERIFICATION STATE: confirmed by construction against the M33 C2a
+height work (the c12-baseline-analysis trace was captured against the
+OLD code) plus Blish-free unit tests of the pure math helpers and a
+green build. It has NOT been confirmed by a live in-game capture of
+THIS code (ScrollDiagnosticsEnabled + a pill-click screenshot loop)
+showing zero visible frames at scroll position 0. Treat a fresh
+#14-shaped report as reopening this item.
 
 ## 15. Shopping tag text contrast (VENDOR / SALVAGE / UNKNOWN)
 The grey shopping-list source tags have poor text-vs-fill contrast.
