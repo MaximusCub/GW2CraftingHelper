@@ -80,6 +80,21 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(legacy.RequiredDisciplines.Count, viaList.RequiredDisciplines.Count);
             Assert.Equal(legacy.RequiredRecipes.Count, viaList.RequiredRecipes.Count);
 
+            // M37 (KNOWN-ISSUES #25): the ComputePerItemEconomics/
+            // ComputeMaterialOpportunityCost extraction must not change the
+            // single-item sell-side economics fields either - both entry
+            // points call the SAME (refactored) ApplySellSideEconomics.
+            // Item 1's own price (buyUnitPrice: 5000) gives it a live
+            // SellInstant, so these fields are genuinely populated here,
+            // not just both-null.
+            Assert.NotNull(legacy.NetSaleValue);
+            Assert.Equal(legacy.PriceBasis, viaList.PriceBasis);
+            Assert.Equal(legacy.SellableQuantity, viaList.SellableQuantity);
+            Assert.Equal(legacy.TargetUnitSellPrice, viaList.TargetUnitSellPrice);
+            Assert.Equal(legacy.NetSaleValue, viaList.NetSaleValue);
+            Assert.Equal(legacy.CraftingProfit, viaList.CraftingProfit);
+            Assert.Equal(legacy.MaterialOpportunityCost, viaList.MaterialOpportunityCost);
+
             // No wrapper metadata leaks into a single-item result reached
             // through the list overload - it short-circuited straight to
             // the untouched single-item method, exactly like gw2e's own
@@ -693,6 +708,346 @@ namespace GW2CraftingHelper.Tests.Services
             // The now-unneeded craft ingredients never surface as steps.
             Assert.DoesNotContain(batch.Plan.Steps, s => s.ItemId == 901);
             Assert.DoesNotContain(batch.Plan.Steps, s => s.ItemId == 903);
+        }
+
+        // --- M37 (gw2efficiency parity - multi-item sell-side economics,
+        // closes KNOWN-ISSUES #25) ---
+
+        /// <summary>
+        /// Fix pass (M37 review): before ApplyBatchSellSideEconomics
+        /// existed, NOTHING ever set CraftingPlanResult.PriceBasis for a
+        /// multi-item batch (PlanResultBuilder.Build never touches it, and
+        /// GenerateStructuredMultiAsync never called ApplySellSideEconomics,
+        /// the only other place that did) - it silently stayed at the enum
+        /// default (PriceBasis.InstantBuy = 0) regardless of which basis
+        /// actually priced the plan, so a batch generated with the
+        /// module's own default (BuyOrder) never showed the "Total
+        /// (buy-order prices)" label suffix. ApplyBatchSellSideEconomics
+        /// now sets it unconditionally (mirroring ApplySellSideEconomics'
+        /// own single-item behavior) even when zero roots qualify for the
+        /// sell/profit rollup below.
+        /// </summary>
+        [Fact]
+        public async Task GenerateStructuredAsync_MultiItem_PriceBasisIsSetEvenWithNoQualifyingRoots()
+        {
+            var pipeline = BuildTwoIndependentItemsPipeline(out _);
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 300, Quantity = 1 },
+                new PlanRequestItem { ItemId = 400, Quantity = 1 }
+            };
+
+            // Default priceBasis is PriceBasis.BuyOrder (see
+            // GenerateStructuredAsync's own default parameter) - deliberately
+            // NOT overridden here, unlike every other test in this file.
+            var batch = await pipeline.GenerateStructuredAsync(items, null, CancellationToken.None);
+
+            Assert.Equal(PriceBasis.BuyOrder, batch.PriceBasis);
+        }
+
+        /// <summary>
+        /// Both requested roots are crafted and have a live TP sell price -
+        /// no shared materials between them (301/401 are distinct), so the
+        /// batch sum is exactly the two standalone single-item results
+        /// combined.
+        /// </summary>
+        [Fact]
+        public async Task GenerateStructuredAsync_MultiItem_BothCraftedAndTradable_SumsAcrossBothRoots()
+        {
+            var pipeline = BuildTwoIndependentItemsPipeline(out _);
+
+            var standaloneA = await pipeline.GenerateStructuredAsync(
+                300, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            var standaloneB = await pipeline.GenerateStructuredAsync(
+                400, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            Assert.Equal(CraftingDecision.Craft, standaloneA.CraftingTree.Decision);
+            Assert.Equal(CraftingDecision.Craft, standaloneB.CraftingTree.Decision);
+            Assert.NotNull(standaloneA.NetSaleValue);
+            Assert.NotNull(standaloneB.NetSaleValue);
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 300, Quantity = 1 },
+                new PlanRequestItem { ItemId = 400, Quantity = 1 }
+            };
+
+            var batch = await pipeline.GenerateStructuredAsync(
+                items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(standaloneA.SellableQuantity + standaloneB.SellableQuantity, batch.SellableQuantity);
+            Assert.Equal(standaloneA.NetSaleValue.Value + standaloneB.NetSaleValue.Value, batch.NetSaleValue);
+            Assert.Equal(standaloneA.CraftingProfit.Value + standaloneB.CraftingProfit.Value, batch.CraftingProfit);
+            // A batch has N per-item unit prices, not one - never a
+            // meaningless "average".
+            Assert.Null(batch.TargetUnitSellPrice);
+        }
+
+        /// <summary>
+        /// Mixed tradable/untradable roots: item 500 is crafted and has a
+        /// live TP sell price; item 600 is ALSO crafted (force-crafted -
+        /// it has a recipe but no TP price of its own at all, like an
+        /// account-bound material) but has no sell price. Plan.TotalCoinCost
+        /// includes BOTH items' craft cost, but the sell/profit rollup must
+        /// include ONLY item 500's contribution - proving the M37
+        /// divergence from gw2e's own rollup (which would instead drag the
+        /// total down by item 600's full craft cost as a hidden negative -
+        /// see ApplyBatchSellSideEconomics's own doc comment, divergence
+        /// item 2).
+        /// </summary>
+        [Fact]
+        public async Task GenerateStructuredAsync_MultiItem_OneRootUntradable_ExcludedFromSumNotNegative()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(500, 510);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 510,
+                OutputItemId = 500,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 501, Count = 2 }
+                }
+            });
+            recipeApi.AddSearchResult(600, 610);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 610,
+                OutputItemId = 600,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 601, Count = 3 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(501, buyUnitPrice: 5, sellUnitPrice: 50);
+            priceApi.AddPrice(601, buyUnitPrice: 5, sellUnitPrice: 20);
+            // Item 500 has its own TP price (tradable); item 600 does NOT -
+            // no AddPrice call at all, matching an account-bound/unlisted
+            // item that still has a known recipe.
+            priceApi.AddPrice(500, buyUnitPrice: 1000, sellUnitPrice: 9000);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(500, "Item K", "k.png");
+            itemApi.AddItem(501, "Ingredient K", "ik.png");
+            itemApi.AddItem(600, "Item L (untradable)", "l.png");
+            itemApi.AddItem(601, "Ingredient L", "il.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var standalone500 = await pipeline.GenerateStructuredAsync(
+                500, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            Assert.Equal(CraftingDecision.Craft, standalone500.CraftingTree.Decision);
+            Assert.NotNull(standalone500.NetSaleValue);
+
+            var standalone600 = await pipeline.GenerateStructuredAsync(
+                600, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            Assert.Equal(CraftingDecision.Craft, standalone600.CraftingTree.Decision);
+            Assert.Null(standalone600.NetSaleValue);
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 500, Quantity = 1 },
+                new PlanRequestItem { ItemId = 600, Quantity = 1 }
+            };
+
+            var batch = await pipeline.GenerateStructuredAsync(
+                items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(CraftingDecision.Craft, batch.MultiItemRoots[0].Decision);
+            Assert.Equal(CraftingDecision.Craft, batch.MultiItemRoots[1].Decision);
+            Assert.Equal(160, batch.Plan.TotalCoinCost);
+
+            Assert.Equal(standalone500.SellableQuantity, batch.SellableQuantity);
+            Assert.Equal(standalone500.NetSaleValue, batch.NetSaleValue);
+            Assert.Equal(standalone500.CraftingProfit, batch.CraftingProfit);
+        }
+
+        /// <summary>
+        /// Item 1100's own TP buy price is cheaper than crafting it (like
+        /// GenerateStructuredAsync_MultiItem_PerRootDecision_MatchesStandaloneSingleItemSolve
+        /// above), so the solver buys it rather than crafting - even though
+        /// it DOES have a live TP sell price. Item 1200 is crafted and also
+        /// has a live sell price. M37 echoes gw2e's own craft===true
+        /// rollup filter literally here (FIXED DESIGN, KNOWN-ISSUES #25):
+        /// a bought-but-tradable root is excluded from the batch sum, not
+        /// just an untradable one.
+        /// </summary>
+        [Fact]
+        public async Task GenerateStructuredAsync_MultiItem_OneRootBoughtNotCrafted_ExcludedFromSum()
+        {
+            var pipeline = BuildBuyVsCraftPipeline();
+
+            var standalone1200 = await pipeline.GenerateStructuredAsync(
+                1200, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            Assert.Equal(CraftingDecision.Craft, standalone1200.CraftingTree.Decision);
+            Assert.NotNull(standalone1200.NetSaleValue);
+
+            var standalone1100 = await pipeline.GenerateStructuredAsync(
+                1100, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            Assert.Equal(CraftingDecision.BuyFromTp, standalone1100.CraftingTree.Decision);
+            // The single-item path never filters by craft-vs-buy (M20) - a
+            // bought target still shows economics (a flip/arbitrage
+            // number), unlike the M37 batch rollup below.
+            Assert.NotNull(standalone1100.NetSaleValue);
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1100, Quantity = 1 },
+                new PlanRequestItem { ItemId = 1200, Quantity = 1 }
+            };
+
+            var batch = await pipeline.GenerateStructuredAsync(
+                items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, batch.MultiItemRoots[0].Decision);
+            Assert.Equal(CraftingDecision.Craft, batch.MultiItemRoots[1].Decision);
+
+            Assert.Equal(standalone1200.SellableQuantity, batch.SellableQuantity);
+            Assert.Equal(standalone1200.NetSaleValue, batch.NetSaleValue);
+            Assert.Equal(standalone1200.CraftingProfit, batch.CraftingProfit);
+        }
+
+        /// <summary>
+        /// Re-solve recompute (override): forcing the bought root from
+        /// GenerateStructuredAsync_MultiItem_OneRootBoughtNotCrafted_ExcludedFromSum
+        /// to Craft via a per-node override must ADD it to the batch
+        /// rollup on the very next local re-solve - proving
+        /// ApplyBatchSellSideEconomics reruns (via ResolveWithOverrides'
+        /// else branch) exactly like every other part of a re-solve.
+        /// </summary>
+        [Fact]
+        public async Task ResolveWithOverrides_MultiItem_OverrideRootFromBuyToCraft_AddsItToRollup()
+        {
+            var pipeline = BuildBuyVsCraftPipeline();
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1100, Quantity = 1 },
+                new PlanRequestItem { ItemId = 1200, Quantity = 1 }
+            };
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            Assert.Equal(CraftingDecision.BuyFromTp, initial.MultiItemRoots[0].Decision);
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { initial.MultiItemRoots[0].NodeId, AcquisitionSource.Craft }
+            };
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
+
+            Assert.Equal(CraftingDecision.Craft, resolved.MultiItemRoots[0].Decision);
+
+            // Item 1100 crafted: 5 x 100 = 500 coin; SellInstant 1000,
+            // qty 1 -> TradingPostMath.NetSaleRevenue(1000, 1) net revenue.
+            long addedNetSaleValue = TradingPostMath.NetSaleRevenue(1000, 1);
+            Assert.Equal(initial.SellableQuantity + 1, resolved.SellableQuantity);
+            Assert.Equal(initial.NetSaleValue.Value + addedNetSaleValue, resolved.NetSaleValue);
+            Assert.Equal(initial.CraftingProfit.Value + (addedNetSaleValue - 500), resolved.CraftingProfit);
+        }
+
+        /// <summary>
+        /// Re-solve recompute (ignore): marking one requested root's own
+        /// item id "Ignore" flips its decision to Have/UnknownSource (see
+        /// PlanSolver.Evaluate's ignoredItemIds early-return), which is NOT
+        /// Craft - the M37 rollup must drop it on the next local re-solve,
+        /// the same way an override does.
+        /// </summary>
+        [Fact]
+        public async Task ResolveWithOverrides_MultiItem_IgnoreRootItemId_RemovesItFromRollup()
+        {
+            var pipeline = BuildTwoIndependentItemsPipeline(out _);
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 300, Quantity = 1 },
+                new PlanRequestItem { ItemId = 400, Quantity = 1 }
+            };
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(initial.NetSaleValue);
+
+            var standaloneB = await pipeline.GenerateStructuredAsync(
+                400, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            var ignored = new HashSet<int> { 300 };
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, null, ignored);
+
+            Assert.True(resolved.MultiItemRoots[0].IsIgnored);
+            Assert.Equal(CraftingDecision.Have, resolved.MultiItemRoots[0].Decision);
+
+            // Only root 400 survives the rollup now.
+            Assert.Equal(1, resolved.SellableQuantity);
+            Assert.Equal(standaloneB.NetSaleValue, resolved.NetSaleValue);
+            Assert.Equal(standaloneB.CraftingProfit, resolved.CraftingProfit);
+        }
+
+        /// <summary>
+        /// Item 1100: craft cost (5 x 100 = 500) is more expensive than its
+        /// own TP buy price (50), so the solver buys it - even though it
+        /// also has a live sell price (1000), used by
+        /// GenerateStructuredAsync_MultiItem_OneRootBoughtNotCrafted_ExcludedFromSum
+        /// and ResolveWithOverrides_MultiItem_OverrideRootFromBuyToCraft_AddsItToRollup
+        /// above. Item 1200's craft cost (10) beats its own buy price
+        /// (99999), so it always force-crafts.
+        /// </summary>
+        private static CraftingPlanPipeline BuildBuyVsCraftPipeline()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1100, 1110);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 1110,
+                OutputItemId = 1100,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 1101, Count = 5 }
+                }
+            });
+            recipeApi.AddSearchResult(1200, 1210);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 1210,
+                OutputItemId = 1200,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 1201, Count = 1 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1101, buyUnitPrice: 5, sellUnitPrice: 100);
+            priceApi.AddPrice(1201, buyUnitPrice: 5, sellUnitPrice: 10);
+            // Item 1100: SellInstant 1000 (tradable), BuyInstant 50 (cheaper
+            // than the 500-coin craft cost - solver buys).
+            priceApi.AddPrice(1100, buyUnitPrice: 1000, sellUnitPrice: 50);
+            // Item 1200: SellInstant 2000 (tradable), BuyInstant 99999 (far
+            // more than the 10-coin craft cost - solver crafts).
+            priceApi.AddPrice(1200, buyUnitPrice: 2000, sellUnitPrice: 99999);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1100, "Item M (bought)", "m.png");
+            itemApi.AddItem(1101, "Ingredient M", "im.png");
+            itemApi.AddItem(1200, "Item N (crafted)", "n.png");
+            itemApi.AddItem(1201, "Ingredient N", "in.png");
+
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
         }
     }
 }
