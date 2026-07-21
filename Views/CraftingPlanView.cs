@@ -194,7 +194,7 @@ namespace GW2CraftingHelper.Views
         private const string ScrollDiagTag = "[scrolldiag]";
 
         // Monotonic frame index shared by every scroll-diagnostic log line
-        // (wheel handler, Tick, GuardTick) so a human reading the log can
+        // (wheel handler, SyncRestore, Verify) so a human reading the log can
         // tell same-frame vs cross-frame ordering apart even when wall-clock
         // log timestamps collide. GameService.Overlay.CurrentGameTime
         // already advances exactly once per real engine frame (the vendor
