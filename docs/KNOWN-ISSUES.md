@@ -175,7 +175,7 @@ precondition), and a wheel event within the last 250ms suppresses the
 zero-reassert contest so a user who just wheeled to exactly the top is
 never bounced back down.
 
-## 13. Resize UX rework: live reflow, no settle stutter
+## 13. Resize UX rework: live reflow, no settle stutter (FIXED in M33)
 The 150ms debounce-only approach is REJECTED by user feedback: content
 must reflow smoothly WHILE dragging, not lag until the mouse holds
 still. Additionally the settle rebuild itself is visibly ugly: stray
@@ -185,6 +185,38 @@ in-place width relayout of EXISTING controls during drag (update
 widths/x-positions; no dispose+rebuild), making the settle rebuild
 unnecessary or invisible. This is the previously-rejected "option b" -
 now required; design it to avoid drift between build and relayout paths.
+Fixed in M33 (C2b): the 150ms dispose+rebuild (ResizeDebounceStep calling
+PreserveScrollAcross(() => RenderPlan(...))) is gone entirely. Every
+CreateX... builder now also registers a small closure (a per-render
+List<Action<int>> relayout registry, lifecycle mirrors the tree's own
+per-render node-state list) that repositions/resizes its EXISTING
+controls for a new panelWidth; OnPanelResized replays the full registry
+synchronously on every real drag tick - live reflow while dragging, no
+debounce wait. This was provable safe specifically because of the M33
+C2a height work already on this branch: since every row/container height
+is finalized synchronously at build time (PlanContentHeightMath) rather
+than left to Blish's multi-frame AutoSize convergence, a pure width/X
+write on a fixed-height row cannot re-trigger that convergence window -
+the exact "blind-overwrite window" and paint-at-scroll-0 mechanism the
+#12/#14 baseline capture (c12-baseline-analysis, 2026-07-20) measured
+only ever opens when a rebuild changes content height. A relayout that
+never touches Height therefore cannot open it, so the settle rebuild's
+flash/divider-glitch/scroll-contest triad simply has no trigger left -
+confirmed by construction, not raced against. The one remaining
+text-measurement cost (the 3 EllipsizeToWidth call sites - Used
+Materials, Shopping List, and Tree row names) is deferred to a short
+trailing settle pass (same FrameTicker debounce mechanism, repurposed)
+that only reassigns Label.Text/tooltip on existing labels - still no
+rebuild, no height change, no scroll disturbance. Width-dependent
+arithmetic (tree column anchors, cost-tile geometry, header centering,
+name-column budgeting) was extracted into a new Blish-free
+Services/PlanRelayoutMath.cs (unit tested), mirroring ShoppingColumnMath,
+so the build path and every relayout/re-ellipsis closure share one
+source of truth and cannot drift apart. A DEBUG-only check asserts no
+relayout closure ever moves the scrollbar, and a DEBUG-only log fires if
+a section renders rows but registers no relayout closure, so a future
+section type that forgets to wire this up fails loud instead of
+silently freezing at build-time width on later resizes.
 
 ## 14. Pill-click viewport flash (jump to top and back) (FIXED in M33)
 Clicking a TP/VENDOR override pill visibly flashes the view to the top
