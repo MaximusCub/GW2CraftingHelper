@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
@@ -88,6 +90,50 @@ namespace GW2CraftingHelper.Services
                 CostRightEdge = costRightEdge,
                 NameMaxWidth = nameAvailWidth
             };
+        }
+
+        /// <summary>
+        /// M34 fix (MustFix review finding): how many of the recipe tree's
+        /// decision pills (already-measured widths, in
+        /// DecisionPillPlanner.BuildPillSpecs emission order - source pills
+        /// first, then the supplementary OwnedInfo/Ignore pills) fit
+        /// left-to-right starting at startX before the next one would cross
+        /// maxRightEdge (the boundary before the right-aligned cost
+        /// column). The tree row has no wrap/second-line support
+        /// (TreeRowHeight is a single fixed height shared by every
+        /// scroll/layout-height calculation in CraftingPlanView), so pills
+        /// that would overlap the cost column are dropped instead of
+        /// rendered - CraftingPlanView.RenderDecisionPills is the only
+        /// caller.
+        ///
+        /// Always returns at least 1 when pillWidths is non-empty, even if
+        /// that first pill alone would exceed the budget: a completely
+        /// empty pill column reads worse than one slightly-overflowing
+        /// pill, and every pill after the first is dropped strictly once it
+        /// would not entirely fit (a node's pills only ever grow wider
+        /// left-to-right, so once one is cut every later one would be too).
+        /// </summary>
+        public static int ComputeVisiblePillCount(
+            IReadOnlyList<int> pillWidths, int gap, int startX, int maxRightEdge)
+        {
+            if (pillWidths == null || pillWidths.Count == 0)
+            {
+                return 0;
+            }
+
+            int x = startX;
+            int count = 0;
+            for (int i = 0; i < pillWidths.Count; i++)
+            {
+                int width = pillWidths[i];
+                if (i > 0 && x + width > maxRightEdge)
+                {
+                    break;
+                }
+                x += width + gap;
+                count++;
+            }
+            return count;
         }
 
         public struct CostTileGeometry

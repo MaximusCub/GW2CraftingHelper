@@ -30,7 +30,14 @@ namespace GW2CraftingHelper.Models
         ShoppingUnknown,
         CraftStep,
         DisciplineRow,
-        RecipeRow
+        RecipeRow,
+
+        // Plain informational line in the Crafting Steps section (M34-B1
+        // #3) - a vendor-capped item whose merged demand exceeds its
+        // offer's daily/weekly purchase cap. Never numbered/badged like a
+        // CraftStep row; rendered via the same plain-text row pattern as
+        // any other fallback text row.
+        TimegatedNotice
     }
 
     public class PlanViewModel
@@ -65,6 +72,23 @@ namespace GW2CraftingHelper.Models
         public long Amount { get; set; }
         public string Name { get; set; }
         public string IconUrl { get; set; }
+
+        // Non-null only for a fractional-per-unit "Each" amount (M34-B1
+        // #2): when a vendor offer's true per-unit rate does not divide
+        // evenly (e.g. "2 for 3"), the renderer displays this literal
+        // bundle text instead of Amount, rather than inventing a rounded
+        // number. Null for every whole-number amount and for every Total
+        // (non-"Each") amount - see CurrencyDisplayResolver.ResolveUnitAmounts.
+        public string BundleLabel { get; set; }
+
+        // Owned/needed split for a shopping-row currency Total amount
+        // (M34-B2b, gw2e parity - mirrors PlanRowViewModel.
+        // CurrencyOwnedQuantity's doc comment): min(Amount, wallet amount)
+        // of this currency the account already holds. Null (not 0) when no
+        // wallet snapshot was available, or this amount is a per-unit
+        // "Each" figure (ownership is a total-quantity concept - see
+        // CurrencyDisplayResolver.ResolveAmounts/ResolveUnitAmounts).
+        public int? OwnedQuantity { get; set; }
     }
 
     public class PlanSectionViewModel
@@ -115,5 +139,13 @@ namespace GW2CraftingHelper.Models
         // divided by Quantity the same way UnitCoinValue divides CoinValue.
         // Null/empty under the same condition as CurrencyCosts.
         public List<CurrencyAmountViewModel> UnitCurrencyCosts { get; set; }
+
+        // Owned/needed split for a CurrencyCost row (M34-B2a #4, gw2e
+        // parity - see AccountCurrencyIndex): min(Quantity, wallet amount)
+        // of this currency the account already holds; the renderer derives
+        // "still needed" as Quantity - CurrencyOwnedQuantity. Null (not 0)
+        // when no wallet snapshot was available at all, distinct from "0
+        // owned" - only ever set on CurrencyCost rows.
+        public int? CurrencyOwnedQuantity { get; set; }
     }
 }

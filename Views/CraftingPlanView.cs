@@ -37,7 +37,7 @@ namespace GW2CraftingHelper.Views
         private static readonly Color SectionDividerColor = new Color(130, 130, 130);
 
         private readonly Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
-        private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> _resolveOverridesSync;
+        private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly ModuleSettings _settings;
@@ -65,11 +65,30 @@ namespace GW2CraftingHelper.Views
         // overlap in flight.
         private int _generateSequence;
 
+        // M34-B1 #4: set true the instant the CURRENT generation (myGen ==
+        // _generateSequence) writes its own completion/error status text.
+        // Reset to false at the start of every TriggerGenerate call. Guards
+        // against a late-draining trailing progress tick from that SAME
+        // generation overwriting the completion text it already wrote (see
+        // StatusUpdateGuard) - a race myGen alone cannot catch, since both
+        // callbacks share the same generation number.
+        private bool _statusClosedForCurrentGeneration;
+
         // Per-node user decision overrides (keyed by solver NodeId) and
         // explicit tree expansion state; both survive local re-solves and
         // reset on a fresh Generate.
         private readonly Dictionary<int, AcquisitionSource> _nodeOverrides =
             new Dictionary<int, AcquisitionSource>();
+
+        // Item ids manually marked "Ignore" this session (M34-B2b, gw2e
+        // parity) - keyed by ItemId (not NodeId), matching gw2e's own
+        // "Ignore marks every occurrence of that item id, tree-wide"
+        // semantics (see PlanSolver.Solve's ignoredItemIds parameter).
+        // Independent of _nodeOverrides: neither "Best Path" nor "Craft
+        // All"/"Buy All" clears this (gw2e's bulk actions are documented as
+        // unrelated to ownership - r2 report Section 3.3); it is only ever
+        // toggled per item id (the pill click) or on a fresh Generate.
+        private readonly HashSet<int> _ignoredItemIds = new HashSet<int>();
         private readonly Dictionary<int, bool> _nodeExpansion =
             new Dictionary<int, bool>();
         private readonly Dictionary<PlanSectionType, bool> _sectionExpansion =
@@ -241,7 +260,7 @@ namespace GW2CraftingHelper.Views
             ModalDialog modalDialog,
             IItemSearchProvider itemSearchProvider,
             ModuleSettings settings,
-            Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> resolveOverridesSync = null)
+            Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> resolveOverridesSync = null)
         {
             _generateAsync = generateAsync;
             _modalDialog = modalDialog;
@@ -1297,6 +1316,7 @@ namespace GW2CraftingHelper.Views
             // deferred callback below reads _generateSequence from the main
             // thread too (inside a MainThreadMarshal.Run callback).
             int myGen = ++_generateSequence;
+            _statusClosedForCurrentGeneration = false;
 
             // Parse quantity; tell the user when their input was discarded
             // instead of silently resetting it.
@@ -1326,7 +1346,13 @@ namespace GW2CraftingHelper.Views
                 {
                     MainThreadMarshal.Run(() =>
                     {
-                        if (myGen != _generateSequence) return;
+                        // M34-B1 #4: rechecked at drain time (not queue
+                        // time) - a trailing tick from this same generation
+                        // must not overwrite a completion status that
+                        // generation has already written, however the two
+                        // callbacks actually happened to drain relative to
+                        // each other. See StatusUpdateGuard.
+                        if (!StatusUpdateGuard.ShouldApply(myGen, _generateSequence, _statusClosedForCurrentGeneration)) return;
                         SetStatus(ps.Message);
                     });
                 }
@@ -1360,6 +1386,7 @@ namespace GW2CraftingHelper.Views
                     // so a disposed-control bail below can never strand this
                     // generation's state half-applied.
                     _nodeOverrides.Clear();
+                    _ignoredItemIds.Clear();
                     _nodeExpansion.Clear();
                     _sectionExpansion.Clear();
                     _lastResult = result;
@@ -1375,6 +1402,12 @@ namespace GW2CraftingHelper.Views
 
                     _lastRenderedWidth = _contentPanel.Width;
                     RenderPlan(vm);
+                    // M34-B1 #4: close this generation's status stream
+                    // right before writing its completion text, so any
+                    // trailing progress tick for this same generation that
+                    // drains AFTER this point (StatusUpdateGuard) is
+                    // dropped instead of overwriting it.
+                    _statusClosedForCurrentGeneration = true;
                     SetStatus($"Plan generated - {_planGeneratedAt:MMM d, yyyy h:mm tt}");
                 });
             }
@@ -1391,6 +1424,9 @@ namespace GW2CraftingHelper.Views
                     _lastDebugLog = new[] { $"Generation failed: {ex.Message}" };
 
                     if (_contentPanel == null || _contentPanel.Parent == null) return;
+                    // M34-B1 #4: see the matching comment on the success
+                    // path above.
+                    _statusClosedForCurrentGeneration = true;
                     SetStatus($"Error: {ex.Message}");
                 });
             }
@@ -1894,7 +1930,7 @@ namespace GW2CraftingHelper.Views
             var font = GameService.Content.DefaultFont12;
             int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
             int width = textWidth + 12;
-            GetPillColors(PillKind.Locked, out Color border, out Color fill);
+            GetPillColors(PillKind.Locked, false, out Color border, out Color fill);
 
             var outer = new Panel()
             {
@@ -2148,6 +2184,20 @@ namespace GW2CraftingHelper.Views
             {
                 tooltipParts.Add(hintText);
             }
+            // M34-B2b: owned/needed split for this row's currency cost(s),
+            // cosmetic-only tooltip (avoids new inline layout math for a
+            // fixed-height shopping row - see PlanContentHeightMath).
+            if (row.CurrencyCosts != null)
+            {
+                foreach (var cc in row.CurrencyCosts)
+                {
+                    if (cc.OwnedQuantity.HasValue)
+                    {
+                        long needed = cc.Amount - cc.OwnedQuantity.Value;
+                        tooltipParts.Add($"{cc.Name}: {cc.OwnedQuantity.Value} owned, {needed} needed");
+                    }
+                }
+            }
             if (tooltipParts.Count > 0)
             {
                 rowPanel.BasicTooltipText = string.Join("\n", tooltipParts);
@@ -2218,9 +2268,24 @@ namespace GW2CraftingHelper.Views
 
         private void CreateCraftingStepsBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
+            // M34-B1 #3: a TimegatedNotice row (vendor-cap informational
+            // line) is a plain text row, not a numbered craft step - render
+            // it via the same generic CreateTextRow pattern every other
+            // section's fallback rows use, and don't consume a step number
+            // for it (stepNumber only advances for real CraftStep rows).
+            int stepNumber = 1;
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateCraftStepRow(section.Rows[i], i + 1, contentFlow, panelWidth, i == section.Rows.Count - 1);
+                var row = section.Rows[i];
+                bool isLast = i == section.Rows.Count - 1;
+                if (row.RowType == PlanRowType.TimegatedNotice)
+                {
+                    CreateTextRow(row.Label, contentFlow, panelWidth);
+                }
+                else
+                {
+                    CreateCraftStepRow(row, stepNumber++, contentFlow, panelWidth, isLast);
+                }
             }
         }
 
@@ -2606,7 +2671,10 @@ namespace GW2CraftingHelper.Views
         /// IconUrl null (no data available - service not wired up, fetch
         /// not yet complete, or the currency was absent from the API
         /// response) renders exactly like CreateTextRow - never a
-        /// placeholder guess for a missing icon.
+        /// placeholder guess for a missing icon. When CurrencyOwnedQuantity
+        /// is set (M34-B2b, wallet data present), an "(X owned, Y needed)"
+        /// annotation follows the icon - gw2e's ownedCurrencies/
+        /// shoppingCurrencies split (r2 report Section 4.3), cosmetic only.
         /// </summary>
         private void CreateCurrencyRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
         {
@@ -2624,16 +2692,32 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
+            int cursorX = 8 + label.Width;
             if (!string.IsNullOrEmpty(row.IconUrl))
             {
-                int iconX = 8 + label.Width + CoinLabelIconGap;
+                int iconX = cursorX + CoinLabelIconGap;
                 int iconY = (CurrencyRowHeight - CurrencyIconSize) / 2;
                 CreateItemIcon(rowPanel, row.IconUrl, iconX, iconY, CurrencyIconSize);
+                cursorX = iconX + CurrencyIconSize;
+            }
+
+            if (row.CurrencyOwnedQuantity.HasValue)
+            {
+                int needed = row.Quantity - row.CurrencyOwnedQuantity.Value;
+                new Label()
+                {
+                    Text = $"({row.CurrencyOwnedQuantity.Value} owned, {needed} needed)",
+                    TextColor = new Color(153, 153, 153),
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(cursorX + CoinLabelIconGap, 4),
+                    Parent = rowPanel
+                };
             }
 
             // Not width-dependent beyond the row's own cosmetic width (m2
-            // 3.6): label/icon sit at a fixed left-anchored x regardless of
-            // panelWidth.
+            // 3.6): label/icon/owned-annotation sit at a fixed left-anchored
+            // x regardless of panelWidth.
             _relayoutActions.Add(w => rowPanel.Size = new Point(w, CurrencyRowHeight));
         }
 
@@ -2845,7 +2929,7 @@ namespace GW2CraftingHelper.Views
 
             try
             {
-                var result = _resolveOverridesSync(_lastResult.SolveContext, _nodeOverrides);
+                var result = _resolveOverridesSync(_lastResult.SolveContext, _nodeOverrides, _ignoredItemIds);
                 _lastResult = result;
                 _lastDebugLog = result.DebugLog;
                 var vm = _vmBuilder.Build(result);
@@ -3249,7 +3333,12 @@ namespace GW2CraftingHelper.Views
         // tested (DecisionPillPlannerTests) - so only the actual
         // Panel/Label rendering below stays view-only.
 
-        private static void GetPillColors(PillKind kind, out Color border, out Color fill)
+        /// <summary>
+        /// isIgnoreActive is only meaningful for PillKind.Ignore (whether
+        /// THIS specific Ignore pill is the active/"IGNORED" state, i.e.
+        /// node.IsIgnored) - ignored for every other kind.
+        /// </summary>
+        private static void GetPillColors(PillKind kind, bool isIgnoreActive, out Color border, out Color fill)
         {
             switch (kind)
             {
@@ -3265,6 +3354,21 @@ namespace GW2CraftingHelper.Views
                     border = new Color(138, 138, 138); // #8A8A8A
                     fill = Color.Transparent;
                     break;
+                case PillKind.OwnedInfo:
+                    // Muted gold, distinct from every other pill hue -
+                    // informational only, never confused with a selectable
+                    // source (M34-B2b).
+                    border = new Color(201, 162, 39); // #C9A227
+                    fill = border * 0.15f;
+                    break;
+                case PillKind.Ignore:
+                    // Amber when active ("IGNORED", currently toggled on);
+                    // plain clickable grey (matching Available) otherwise -
+                    // never Selected's green, to avoid reading as "the
+                    // chosen acquisition source" (M34-B2b).
+                    border = isIgnoreActive ? new Color(229, 168, 60) : new Color(138, 138, 138); // #E5A83C / #8A8A8A
+                    fill = isIgnoreActive ? border * 0.15f : Color.Transparent;
+                    break;
                 case PillKind.Locked:
                 default:
                     border = new Color(107, 107, 107); // #6B6B6B
@@ -3277,6 +3381,20 @@ namespace GW2CraftingHelper.Views
         /// Renders the pill column and returns the created pill panels so
         /// the row's expand/collapse click handler can exclude them from
         /// its own hit-test (a pill click is a decision, not a toggle).
+        ///
+        /// M34 fix (MustFix review finding): TreePillColumnWidth (240px) is
+        /// a fixed budget, but DecisionPillPlanner.AppendOwnershipPills now
+        /// unconditionally adds an "IGNORE" pill (plus "USING N OWNED" when
+        /// applicable) to every ordinary node, on top of its 1-3 source
+        /// pills - realistic combinations regularly exceed 240px. Rather
+        /// than let trailing pills render on top of the right-aligned cost
+        /// column (this row has no wrap/second-line support - TreeRowHeight
+        /// is a fixed per-row height shared by every layout/scroll-height
+        /// calculation in this file), only as many pills as
+        /// PlanRelayoutMath.ComputeVisiblePillCount says fit are rendered -
+        /// see that method's doc comment for why this naturally drops the
+        /// lower-priority (OwnedInfo/Ignore) pills first while always
+        /// keeping at least the first (most important) pill.
         /// </summary>
         private List<Panel> RenderDecisionPills(
             Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
@@ -3286,12 +3404,22 @@ namespace GW2CraftingHelper.Views
             var pillPanels = new List<Panel>(specs.Count);
             int x = pillColX;
 
+            var pillWidths = new List<int>(specs.Count);
             foreach (var spec in specs)
             {
-                int textWidth = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width);
-                int pillWidth = textWidth + 12;
+                int measuredWidth = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width) + 12;
+                pillWidths.Add(measuredWidth);
+            }
+            int maxRightEdge = pillColX + TreePillColumnWidth - 4;
+            int visibleCount = PlanRelayoutMath.ComputeVisiblePillCount(pillWidths, 6, pillColX, maxRightEdge);
 
-                GetPillColors(spec.Kind, out Color borderColor, out Color fillColor);
+            for (int specIndex = 0; specIndex < visibleCount; specIndex++)
+            {
+                var spec = specs[specIndex];
+                int pillWidth = pillWidths[specIndex];
+                int textWidth = pillWidth - 12;
+
+                GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
                 // White, not borderColor: Selected/Available fills expose the
                 // border hue behind the label, so border-colored text has zero
                 // contrast against its own backdrop (M30 #11).
@@ -3331,6 +3459,7 @@ namespace GW2CraftingHelper.Views
                 };
 
                 bool interactive = !dimmed && spec.Source.HasValue && _resolveOverridesSync != null;
+                bool ignoreInteractive = !dimmed && spec.Kind == PillKind.Ignore && _resolveOverridesSync != null;
                 if (interactive)
                 {
                     outer.BasicTooltipText = $"Switch to {spec.Text}";
@@ -3338,6 +3467,27 @@ namespace GW2CraftingHelper.Views
                     outer.Click += (_, __) =>
                     {
                         _nodeOverrides[node.NodeId] = source;
+                        ApplyOverridesAndResolve();
+                    };
+                    Color restingBorder = borderColor;
+                    outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
+                    outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
+                }
+                else if (ignoreInteractive)
+                {
+                    // M34-B2b: toggles this ITEM id (not just this node) in
+                    // or out of _ignoredItemIds, matching gw2e's own
+                    // tree-wide-by-item-id "Ignore" semantics.
+                    outer.BasicTooltipText = node.IsIgnored
+                        ? "Stop treating this item as fully in-hand"
+                        : "Treat this item as fully in-hand (ignore its owned-stock requirement)";
+                    int itemId = node.ItemId;
+                    outer.Click += (_, __) =>
+                    {
+                        if (!_ignoredItemIds.Remove(itemId))
+                        {
+                            _ignoredItemIds.Add(itemId);
+                        }
                         ApplyOverridesAndResolve();
                     };
                     Color restingBorder = borderColor;
@@ -3657,7 +3807,11 @@ namespace GW2CraftingHelper.Views
 
             foreach (var amount in amounts)
             {
-                string text = amount.Amount.ToString();
+                // M34-B1 #2: a fractional-per-unit "Each" amount carries a
+                // literal "N for M" bundle label instead of a whole-number
+                // Amount (CurrencyDisplayResolver.ResolveUnitAmounts) -
+                // render that text verbatim rather than the numeric amount.
+                string text = amount.BundleLabel ?? amount.Amount.ToString();
                 int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
                 segments.Add(new CurrencySegmentSpec { IconUrl = amount.IconUrl, Text = text, TextWidth = width });
             }

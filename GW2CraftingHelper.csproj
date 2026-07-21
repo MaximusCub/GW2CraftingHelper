@@ -76,7 +76,9 @@
     <Compile Include="Models\CurrencyCost.cs" />
     <Compile Include="Models\CurrencyValuation.cs" />
     <Compile Include="Models\CraftingPlan.cs" />
+    <Compile Include="Models\TimegatedItem.cs" />
     <Compile Include="Services\PlanSolver.cs" />
+    <Compile Include="Services\StatusUpdateGuard.cs" />
     <Compile Include="Services\SolverDecision.cs" />
     <Compile Include="Services\SolveResult.cs" />
     <Compile Include="Models\ItemMetadata.cs" />
@@ -122,7 +124,10 @@
     <Compile Include="Models\UsedMaterial.cs" />
     <Compile Include="Models\ReducedTreeResult.cs" />
     <Compile Include="Services\AccountItemIndex.cs" />
+    <Compile Include="Services\AccountCurrencyIndex.cs" />
     <Compile Include="Services\InventoryReducer.cs" />
+    <Compile Include="Services\OwnedMaterialsForceBuyPrePass.cs" />
+    <Compile Include="Services\RecipeNodeIds.cs" />
     <Compile Include="Models\RequiredDiscipline.cs" />
     <Compile Include="Models\RequiredRecipe.cs" />
     <Compile Include="Services\PlanResultBuilder.cs" />

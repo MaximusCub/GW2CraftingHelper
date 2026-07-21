@@ -21,7 +21,8 @@ namespace GW2CraftingHelper.Tests.Services
             List<RequiredDiscipline> requiredDisciplines = null,
             List<RequiredRecipe> requiredRecipes = null,
             Dictionary<int, CurrencyMetadata> currencyMetadata = null,
-            Dictionary<int, AcquisitionHint> acquisitionHints = null)
+            Dictionary<int, AcquisitionHint> acquisitionHints = null,
+            List<TimegatedItem> timegatedItems = null)
         {
             return new CraftingPlanResult
             {
@@ -31,7 +32,8 @@ namespace GW2CraftingHelper.Tests.Services
                     TargetQuantity = targetQuantity,
                     TotalCoinCost = totalCoinCost,
                     Steps = steps ?? new List<PlanStep>(),
-                    CurrencyCosts = currencyCosts ?? new List<CurrencyCost>()
+                    CurrencyCosts = currencyCosts ?? new List<CurrencyCost>(),
+                    TimegatedItems = timegatedItems ?? new List<TimegatedItem>()
                 },
                 ItemMetadata = metadata != null
                     ? metadata
@@ -136,6 +138,76 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(2, ccRows.Count);
             Assert.Equal("50x Spirit Shards", ccRows[0].Label);
             Assert.Equal("100x Volatile Magic", ccRows[1].Label);
+        }
+
+        // --- M34-B2b (view-model wiring dates to M34-B2a #4): owned/needed
+        // split on Total Cost currency rows ---
+
+        [Fact]
+        public void SummarySection_CurrencyCost_OwnedAmountPresent_SetsCurrencyOwnedQuantity()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+            });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 200 } };
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections
+                .First(s => s.SectionType == PlanSectionType.Summary)
+                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal(200, ccRow.CurrencyOwnedQuantity);
+        }
+
+        [Fact]
+        public void SummarySection_CurrencyCost_OwnedExceedsNeeded_ClampedToAmount()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+            });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 999999 } };
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections
+                .First(s => s.SectionType == PlanSectionType.Summary)
+                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal(500, ccRow.CurrencyOwnedQuantity);
+        }
+
+        [Fact]
+        public void SummarySection_CurrencyCost_NoOwnedCurrencyAmounts_CurrencyOwnedQuantityNull()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+            });
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections
+                .First(s => s.SectionType == PlanSectionType.Summary)
+                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Null(ccRow.CurrencyOwnedQuantity);
+        }
+
+        [Fact]
+        public void SummarySection_CurrencyCost_OwnedAmountsMissingThisId_CurrencyOwnedQuantityNull()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+            });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 2, 100 } }; // different currency id
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections
+                .First(s => s.SectionType == PlanSectionType.Summary)
+                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Null(ccRow.CurrencyOwnedQuantity);
         }
 
         [Fact]
@@ -469,23 +541,118 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("s.png", row.CurrencyCosts[0].IconUrl);
         }
 
+        // --- M34-B2b: owned/needed split on shopping-row currency Total cells ---
+
         [Fact]
-        public void ShoppingList_VendorRow_UnitCurrencyCosts_DividedByQuantity()
+        public void ShoppingList_VendorRow_OwnedCurrencyAmountsPresent_SetsOwnedQuantityOnCurrencyCosts()
         {
+            var result = MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep
+                    {
+                        ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromVendor,
+                        TotalCost = 0, UnitCost = 0,
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } }
+                    }
+                });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 40 } };
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Equal(40, row.CurrencyCosts[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ShoppingList_VendorRow_NoOwnedCurrencyAmounts_OwnedQuantityStaysNull()
+        {
+            var result = MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep
+                    {
+                        ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromVendor,
+                        TotalCost = 0, UnitCost = 0,
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } }
+                    }
+                });
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Null(row.CurrencyCosts[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ShoppingList_VendorRow_UnitCurrencyCosts_NeverGetsOwnedQuantity()
+        {
+            // Ownership is a total-quantity concept - the Each column's
+            // per-unit rate must never carry an owned/needed split even
+            // when wallet data is present.
+            var result = MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep
+                    {
+                        ItemId = 1, Quantity = 100, Source = AcquisitionSource.BuyFromVendor,
+                        TotalCost = 0, UnitCost = 0,
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 400 } },
+                        VendorOfferOutputCount = 1,
+                        VendorOfferCurrencyCostLinesPerBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 4 } }
+                    }
+                });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 40 } };
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Null(row.UnitCurrencyCosts[0].OwnedQuantity);
+            Assert.Equal(40, row.CurrencyCosts[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ShoppingList_VendorRow_UnitCurrencyCosts_UsesWinningOfferRate()
+        {
+            // M34-B1 #2: Each is the winning offer's own per-batch rate
+            // (VendorOfferCurrencyCostLinesPerBatch / VendorOfferOutputCount
+            // - here a 4-for-4 batch bought 100 times = 400 total), not a
+            // total/Quantity average over the aggregated row.
             var result = MakeResult(steps: new List<PlanStep>
             {
                 new PlanStep
                 {
-                    ItemId = 1, Quantity = 4, Source = AcquisitionSource.BuyFromVendor,
+                    ItemId = 1, Quantity = 400, Source = AcquisitionSource.BuyFromVendor,
                     TotalCost = 0, UnitCost = 0,
-                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 400 } }
+                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 400 } },
+                    VendorOfferOutputCount = 4,
+                    VendorOfferCurrencyCostLinesPerBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 4 } }
                 }
             });
             var vm = _builder.Build(result);
 
             var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
-            Assert.Equal(100, row.UnitCurrencyCosts[0].Amount);
+            Assert.Equal(1, row.UnitCurrencyCosts[0].Amount);
             Assert.Equal(400, row.CurrencyCosts[0].Amount);
+        }
+
+        [Fact]
+        public void ShoppingList_VendorRow_MixedOfferConflict_NoBatchInfo_UnitCurrencyCostsNull()
+        {
+            // A step whose tree occurrences resolved to more than one
+            // distinct offer (PlanSolver's Conflict case) carries no batch
+            // info - Each must be omitted, never an invented/guessed rate.
+            var result = MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep
+                {
+                    ItemId = 1, Quantity = 101, Source = AcquisitionSource.BuyFromVendor,
+                    TotalCost = 0, UnitCost = 0,
+                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 152 } }
+                }
+            });
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Null(row.UnitCurrencyCosts);
+            Assert.Equal(152, row.CurrencyCosts[0].Amount);
         }
 
         [Fact]
@@ -756,6 +923,57 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             Assert.DoesNotContain(vm.Sections, s => s.SectionType == PlanSectionType.CraftingSteps);
+        }
+
+        [Fact]
+        public void TimegatedItems_AppendedAsNoticeRowsInCraftingSteps()
+        {
+            // M34-B1 #3: a timegated (vendor purchase cap) notice renders as
+            // a plain informational row alongside real craft steps, never
+            // altering the numbered CraftStep rows themselves.
+            var meta = MetaFor((2, "Blade", "blade.png"), (9, "Obsidian Shard", "shard.png"));
+            var result = MakeResult(
+                metadata: meta,
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                },
+                timegatedItems: new List<TimegatedItem>
+                {
+                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Daily, CapValue = 3, NeededCount = 4 }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            Assert.Equal(2, section.Rows.Count);
+            Assert.Equal(PlanRowType.CraftStep, section.Rows[0].RowType);
+            Assert.Equal(PlanRowType.TimegatedNotice, section.Rows[1].RowType);
+            Assert.Contains("Obsidian Shard", section.Rows[1].Label);
+            Assert.Contains("Daily", section.Rows[1].Label);
+            Assert.Contains("3", section.Rows[1].Label);
+            Assert.Contains("4", section.Rows[1].Label);
+        }
+
+        [Fact]
+        public void TimegatedItems_NoCraftSteps_StillCreatesCraftingSection()
+        {
+            // A plan with zero real craft steps but a timegated vendor buy
+            // must still surface the notice - the section is no longer
+            // gated purely on craftSteps.Count.
+            var result = MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 9, Quantity = 4, Source = AcquisitionSource.BuyFromVendor }
+                },
+                timegatedItems: new List<TimegatedItem>
+                {
+                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Weekly, CapValue = 3, NeededCount = 4 }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            Assert.Single(section.Rows);
+            Assert.Equal(PlanRowType.TimegatedNotice, section.Rows[0].RowType);
         }
 
         // --- Required Disciplines ---

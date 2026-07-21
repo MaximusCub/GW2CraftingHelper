@@ -61,6 +61,7 @@ namespace GW2CraftingHelper.Views
 
         private FlowPanel _rootPanel;
         private Label _statusLabel;
+        private Checkbox _valueOwnMaterialsCheckbox;
 
         public SettingsTabContent(ModuleSettings settings)
         {
@@ -113,6 +114,47 @@ namespace GW2CraftingHelper.Views
             AddSectionHeader("Plan Defaults", panelWidth);
             AddInfoLine("Price basis (Instant Buy / Buy Orders) is chosen per plan in the Crafting Plan tab.", panelWidth);
             AddInfoLine("The \"Use Own Materials\" default is also set per plan in the Crafting Plan tab.", panelWidth);
+            AddValueOwnMaterialsRow(panelWidth);
+        }
+
+        /// <summary>
+        /// M34-B2a #3: the "Value own materials" checkbox previously had no
+        /// in-window affordance at all (ModuleSettings.ValueOwnMaterials
+        /// was only reachable via Blish HUD's own generic settings panel,
+        /// or by hand-editing the persisted JSON). Applies immediately -
+        /// no Save button, matching a plain Blish SettingEntry&lt;bool&gt;
+        /// (unlike the currency valuation rows above, which need text
+        /// parsing/validation before they can be persisted).
+        /// </summary>
+        private void AddValueOwnMaterialsRow(int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, RowHeight),
+                Parent = _rootPanel
+            };
+
+            _valueOwnMaterialsCheckbox = new Checkbox()
+            {
+                Text = "Value own materials",
+                Checked = _settings.ValueOwnMaterials.Value,
+                Location = new Point(NameColumnX, 7),
+                Parent = rowPanel
+            };
+            _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
+            {
+                _settings.ValueOwnMaterials.Value = e.Checked;
+            };
+
+            new Label()
+            {
+                Text = "Force-buy where cheaper than crafting fresh; value owned materials at sell price instead of free",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = InfoTextColor,
+                Location = new Point(NameColumnX + 170, 7),
+                Parent = rowPanel
+            };
         }
 
         private void AddSectionHeader(string title, int panelWidth)

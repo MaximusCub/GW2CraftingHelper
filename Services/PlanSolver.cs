@@ -34,6 +34,42 @@ namespace GW2CraftingHelper.Services
             public bool CanCraft;
             public bool CanBuyTp;
             public bool CanBuyVendor;
+
+            // Winning vendor offer's batch shape (Source == BuyFromVendor
+            // only, null otherwise): the offer's own OutputCount and its
+            // UNSCALED per-batch coin/currency cost (one purchase, before
+            // this node's own occurrence-local unitsNeeded scaling). Carried
+            // so Collect/AggregateStep/FinalizeVendorBatches can re-derive a
+            // merged step's true cost from AGGREGATE demand and ceil once
+            // (M34-B1 #1 - gw2e parity), instead of trusting the sum of
+            // several already-independently-ceil'd per-occurrence costs.
+            public VendorOfferBatch? VendorBatch;
+        }
+
+        // See Decision.VendorBatch's doc comment.
+        private struct VendorOfferBatch
+        {
+            public int OutputCount;
+            public long CoinCostPerBatch;
+            public List<CostLine> CurrencyCostLinesPerBatch;
+            public int? DailyCap;
+            public int? WeeklyCap;
+        }
+
+        // Per-item-id (BuyFromVendor stepKey) bookkeeping built up across
+        // every tree occurrence during Collect/AggregateStep: which offer
+        // batch shape was seen, and whether every occurrence agreed (a
+        // node's own per-occurrence ceil can, in principle, pick a
+        // different offer at a different local quantity - see
+        // AggregateStep). Conflict is a one-way ratchet: once true, it
+        // never resets, and FinalizeVendorBatches leaves that step's
+        // already-per-occurrence-summed cost alone rather than guessing
+        // which of several genuinely different offers should apply to the
+        // merged total.
+        private sealed class VendorBatchState
+        {
+            public VendorOfferBatch Batch;
+            public bool Conflict;
         }
 
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
@@ -47,7 +83,47 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             PriceBasis priceBasis = PriceBasis.InstantBuy,
             IReadOnlyDictionary<int, AcquisitionSource> overrides = null,
-            CurrencyValuation currencyValuation = null)
+            CurrencyValuation currencyValuation = null,
+            // M34-B2a #3 (gw2e "Value Own Materials" force-buy pre-pass):
+            // nodes in this set have craft excluded from the AUTOMATIC
+            // buy-vs-craft-vs-vendor comparison for this solve (buying
+            // outright beats crafting fresh components by gw2e's 15%
+            // margin - see OwnedMaterialsForceBuyPrePass). A manual
+            // per-node override in `overrides` still wins over this set,
+            // same as gw2e's own manual craft/buy pill always overriding
+            // its automatic pre-pass (docs/gw2e-parity-spec.md /
+            // m34-r2-gw2e-owned-materials.md Section 3.2).
+            ISet<int> forceBuyOnlyNodeIds = null,
+            // M34-B2a #3: when non-null, populated with this node's raw
+            // (buyCost, craftCost) - the SAME numbers Evaluate already
+            // computes for every "Item" node regardless of decision - so a
+            // caller (OwnedMaterialsForceBuyPrePass) can apply gw2e's exact
+            // buyPrice &lt; craftDecisionPrice * 0.85 rule without
+            // duplicating this method's cost-aggregation logic. Never
+            // affects this solve's own Decisions/Plan.
+            Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
+            // M34-B2a #3: when false, this tree's existing node.NodeId
+            // values are trusted as-is instead of being reassigned from
+            // scratch - see RecipeNodeIds' doc comment for why a caller
+            // (CraftingPlanPipeline, when the force-buy pre-pass is active)
+            // needs this: the tree's ids were pre-assigned, and survived
+            // pruning via InventoryReducer.CloneNode's NodeId preservation,
+            // BEFORE this Solve() call, and must not be renumbered out from
+            // under the pre-pass's own already-computed forceBuyOnlyNodeIds
+            // set. Every other caller keeps the default (true), unchanged
+            // from this method's original always-reassign behavior.
+            bool assignNodeIds = true,
+            // M34-B2b (gw2e "Ignore" pill): item ids in this set are
+            // treated as fully in-hand tree-wide for THIS solve only -
+            // every occurrence contributes zero cost, generates no
+            // crafting step or shopping row, and does not recurse into its
+            // own recipe's ingredients (matching gw2e's usedQuantity == 0
+            // => free/no-step rule - see m34-r2-gw2e-owned-materials.md
+            // Section 2.1/5). Unlike `overrides` (a per-NodeId craft/buy
+            // choice), this is per-ItemId, matching gw2e's own "Ignore
+            // marks every occurrence of that item id, tree-wide" semantics.
+            // Null (the default) behaves exactly as before this feature.
+            ISet<int> ignoredItemIds = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
             var memo = new Dictionary<int, Decision>();
@@ -56,19 +132,78 @@ namespace GW2CraftingHelper.Services
             // Assignment is deterministic (DFS order), so NodeIds - and any
             // overrides keyed on them - are stable across re-solves of the
             // same tree.
-            int nextNodeId = 0;
-            AssignNodeIds(tree, ref nextNodeId);
+            if (assignNodeIds)
+            {
+                RecipeNodeIds.Assign(tree);
+            }
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation);
+            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
             var currencyMap = new Dictionary<int, long>();
             var craftOrder = new Dictionary<(int, int), int>();
+            var vendorBatchTracking = new Dictionary<(int, AcquisitionSource, int), VendorBatchState>();
+            var vendorOccurrences = new Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>>();
+            // M34 fix (wave-validator finding, post-fcbb277): every tree
+            // occurrence's own NodeId that fed a merged Craft-type stepKey,
+            // in first-seen (DFS) order - the Craft-side twin of
+            // vendorOccurrences above, needed for the same reason: a Craft
+            // PlanStep's TotalCost is Collect()'s running sum of
+            // decision.TotalCost across every occurrence of that
+            // (ItemId, RecipeId) craft, taken BEFORE the correction passes
+            // below ever run (see RefreshCraftStepCosts's doc comment).
+            var craftOccurrences = new Dictionary<(int, AcquisitionSource, int), List<int>>();
             int craftCounter = 0;
 
-            Collect(tree, memo, stepMap, currencyMap, craftOrder, ref craftCounter);
+            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+
+            // Pass 2b (M34-B1 #1/#3): re-derive each merged vendor step's
+            // true cost from its AGGREGATE Quantity and the winning offer's
+            // batch shape, ceiling once instead of trusting the sum of
+            // several already-per-occurrence-ceil'd costs; also folds the
+            // (now-correct) vendor currency costs into currencyMap and
+            // collects any post-solve "timegated" (cap-exceeded) notices.
+            var timegatedItems = FinalizeVendorBatches(stepMap, vendorBatchTracking, currencyMap);
+
+            // Pass 2c (M34 fix - Critical review finding): FinalizeVendorBatches
+            // only corrects the MERGED PlanStep/currencyMap view; it never
+            // touches `memo`, which is what the public Decisions dict (and,
+            // via CraftingTreeBuilder, every CraftingTreeNode.SubtreeCost -
+            // including the root row) is built from below. Without this,
+            // the Recipe Tree's own displayed totals kept showing the stale,
+            // per-occurrence-overcounted sum while the Total Cost summary
+            // (plan.TotalCoinCost, built from the corrected stepMap) showed
+            // the right number - the two sections of the same page
+            // disagreeing by exactly the rounding waste this fix eliminates.
+            // Re-derives each corrected vendor step's true per-occurrence
+            // share (AllocateVendorNodeCosts), then re-sums every Craft
+            // ancestor bottom-up from those corrected leaf values
+            // (RecomputeCraftCosts) so the correction propagates all the way
+            // to the root, exactly mirroring Evaluate's own bottom-up
+            // craftRealCost aggregation. RecomputeCraftCosts itself has no
+            // depth bound - it walks the ENTIRE chosen-path tree from
+            // `tree` down, so `memo`/Decisions/SubtreeCost are already
+            // fully correct at every level after this line, however deep.
+            AllocateVendorNodeCosts(stepMap, vendorOccurrences, memo);
+            RecomputeCraftCosts(tree, memo, ignoredItemIds);
+
+            // Pass 2d (M34 fix - wave-validator finding): stepMap's
+            // Craft-type PlanStep entries are NOT touched by anything
+            // above - AggregateStep (inside Collect, pass 2) summed
+            // decision.TotalCost across occurrences BEFORE this line ever
+            // ran, so every Craft row of the "Crafting Steps" shopping
+            // list would otherwise permanently show the stale
+            // pre-correction total even though `memo`/the Recipe Tree
+            // (just corrected above) and plan.TotalCoinCost (summed from
+            // FinalizeVendorBatches' already-corrected vendor/TP steps
+            // below) both show the right number - see
+            // RefreshCraftStepCosts's doc comment for why a full
+            // restructure to avoid this snapshot-then-correct ordering
+            // entirely was assessed and rejected in favor of this
+            // targeted refresh.
+            RefreshCraftStepCosts(stepMap, craftOccurrences, memo);
 
             // Build ordered step list: buys/unknowns first, then crafts in bottom-up order
             var buysAndUnknowns = new List<PlanStep>();
@@ -115,7 +250,8 @@ namespace GW2CraftingHelper.Services
                 TargetQuantity = tree.Quantity,
                 Steps = steps,
                 TotalCoinCost = totalCoinCost,
-                CurrencyCosts = currencyCosts
+                CurrencyCosts = currencyCosts,
+                TimegatedItems = timegatedItems
             };
 
             // Convert internal memo to public decisions dict
@@ -160,11 +296,41 @@ namespace GW2CraftingHelper.Services
             Dictionary<int, Decision> memo,
             PriceBasis priceBasis,
             IReadOnlyDictionary<int, AcquisitionSource> overrides,
-            CurrencyValuation currencyValuation)
+            CurrencyValuation currencyValuation,
+            ISet<int> forceBuyOnlyNodeIds = null,
+            Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
+            ISet<int> ignoredItemIds = null)
         {
             if (node.IngredientType == "Currency")
             {
                 return null;
+            }
+
+            // M34-B2b: an "Ignore"-d item id is treated as fully in-hand for
+            // THIS node - zero cost, no recipe/vendor/TP evaluation, and (by
+            // never recursing into node.Recipes here) no draw on this
+            // node's own ingredients either, matching gw2e's "an un-crafted
+            // branch never asks for its ingredients" rule (Section 1.3 of
+            // the r2 report) applied to the synthetic fully-owned case.
+            // CanCraft/CanBuyTp/CanBuyVendor are left false: this node's own
+            // real feasibility is irrelevant once ignored, and
+            // CraftingTreeBuilder never reads them for an ignored node
+            // anyway (it short-circuits to Have, same as Quantity == 0).
+            if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+            {
+                memo[node.NodeId] = new Decision
+                {
+                    Source = AcquisitionSource.UnknownSource,
+                    TotalCost = 0L,
+                    ComparisonValue = 0L,
+                    RecipeId = 0,
+                    VendorCurrencyCosts = null,
+                    CanCraft = false,
+                    CanBuyTp = false,
+                    CanBuyVendor = false,
+                    VendorBatch = null
+                };
+                return 0L;
             }
 
             long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices, priceBasis);
@@ -189,8 +355,10 @@ namespace GW2CraftingHelper.Services
                 out long? comparableVendorValue,
                 out long? comparableVendorCoinCost,
                 out List<CostLine> comparableVendorCurrencyCosts,
+                out VendorOfferBatch? comparableVendorBatch,
                 out long? fallbackVendorCoinCost,
-                out List<CostLine> fallbackVendorCurrencyCosts);
+                out List<CostLine> fallbackVendorCurrencyCosts,
+                out VendorOfferBatch? fallbackVendorBatch);
 
             // Evaluate recipe options. EVERY non-currency ingredient of
             // EVERY recipe is always evaluated (M33 Finding 1 fix) - no
@@ -272,7 +440,8 @@ namespace GW2CraftingHelper.Services
                     }
 
                     long? ingredientCost = Evaluate(
-                        ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation);
+                        ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation,
+                        forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds);
                     craftCost += ingredientCost ?? 0L;
                     craftRealCost += memo[ingredient.NodeId].TotalCost ?? 0L;
                 }
@@ -300,13 +469,31 @@ namespace GW2CraftingHelper.Services
             bool canBuyVendor = comparableVendorValue.HasValue ||
                                 fallbackVendorCoinCost.HasValue;
 
+            // M34-B2a #3: raw diagnostics for OwnedMaterialsForceBuyPrePass -
+            // recorded regardless of forceBuyOnlyNodeIds/decision, so the
+            // pre-pass (a throwaway solve with neither set) can read the
+            // same numbers the real solve would have used.
+            if (costDiagnostics != null)
+            {
+                costDiagnostics[node.NodeId] = (buyTotalCost, bestCraftCost);
+            }
+
+            // M34-B2a #3: gw2e's "Value Own Materials" force-buy pre-pass
+            // marks this node craft:false BEFORE the automatic comparison
+            // below - a manual override (checked next, using the
+            // unmodified canCraft flag above) still always wins, matching
+            // gw2e's own manual pill always beating its automatic pre-pass.
+            bool craftExcludedFromAutoPick = forceBuyOnlyNodeIds != null &&
+                forceBuyOnlyNodeIds.Contains(node.NodeId);
+
             // cost = real coin (Decision.TotalCost / display); comparisonValue
             // = parent-comparison value (Decision.ComparisonValue). Commit
             // returns comparisonValue - see Decision.ComparisonValue and the
             // Evaluate summary doc for why the two must stay separate.
             long? Commit(
                 AcquisitionSource src, long? cost, long? comparisonValue,
-                int recipeId, List<CostLine> vendorCurrencyCosts)
+                int recipeId, List<CostLine> vendorCurrencyCosts,
+                VendorOfferBatch? vendorBatch = null)
             {
                 memo[node.NodeId] = new Decision
                 {
@@ -317,7 +504,8 @@ namespace GW2CraftingHelper.Services
                     VendorCurrencyCosts = vendorCurrencyCosts,
                     CanCraft = canCraft,
                     CanBuyTp = canBuyTp,
-                    CanBuyVendor = canBuyVendor
+                    CanBuyVendor = canBuyVendor,
+                    VendorBatch = vendorBatch
                 };
                 return comparisonValue;
             }
@@ -338,18 +526,21 @@ namespace GW2CraftingHelper.Services
                 if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
                 {
                     return comparableVendorValue.HasValue
-                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts)
-                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
+                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch)
+                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch);
                 }
             }
 
             // Three-way comparison: vendor (coin part + any valued currency
             // lines) vs TP buy vs craft
-            var source = PickCheapest(buyTotalCost, bestCraftCost, comparableVendorValue);
+            var source = PickCheapest(
+                buyTotalCost,
+                craftExcludedFromAutoPick ? null : bestCraftCost,
+                comparableVendorValue);
 
             if (source == AcquisitionSource.BuyFromVendor)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts);
+                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch);
             }
 
             if (source == AcquisitionSource.BuyFromTp)
@@ -373,7 +564,7 @@ namespace GW2CraftingHelper.Services
             // crafted" - no recipe, no price, genuinely no known source.
             if (fallbackVendorCoinCost.HasValue)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
+                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch);
             }
 
             return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);
@@ -400,16 +591,15 @@ namespace GW2CraftingHelper.Services
         /// no exchange rate and unit counts of different currencies must never
         /// be compared.
         ///
-        /// V1 purchase-cap semantics: an offer with a positive DailyCap (or a
-        /// positive WeeklyCap when DailyCap is absent/zero) that cannot supply
-        /// the node's needed quantity within a single cap period - i.e. the
-        /// node needs more purchases than the cap allows - is excluded from
-        /// this node's evaluation entirely, from both the comparable and the
-        /// fallback tier. Zero or absent caps mean uncapped, matching most
-        /// offers. Non-goal: this does not split a node's need across a capped
-        /// offer plus a second source once the cap is exhausted - a node is
-        /// still sourced from exactly one acquisition (partial cap-split
-        /// sourcing is left for a future milestone).
+        /// V2 purchase-cap semantics (M34-B1 #3, gw2efficiency parity): a
+        /// DailyCap/WeeklyCap NEVER excludes an offer or affects which tier
+        /// it lands in - gw2efficiency itself only ever surfaces a cap as a
+        /// post-solve "this is timegated" notice (dailyCooldowns.ts), it
+        /// never re-routes the tree. Both tiers below carry the offer's raw
+        /// DailyCap/WeeklyCap through via <see cref="VendorOfferBatch"/> so
+        /// PlanSolver.FinalizeVendorBatches can produce that notice once,
+        /// against the item's AGGREGATE (post-merge) demand rather than any
+        /// single tree occurrence's local quantity.
         /// </summary>
         private static void EvaluateVendorOffers(
             RecipeNode node,
@@ -420,14 +610,18 @@ namespace GW2CraftingHelper.Services
             out long? bestComparableValue,
             out long? bestComparableCoinCost,
             out List<CostLine> bestComparableCurrencyCosts,
+            out VendorOfferBatch? bestComparableBatch,
             out long? fallbackCoinCost,
-            out List<CostLine> fallbackCurrencyCosts)
+            out List<CostLine> fallbackCurrencyCosts,
+            out VendorOfferBatch? fallbackBatch)
         {
             bestComparableValue = null;
             bestComparableCoinCost = null;
             bestComparableCurrencyCosts = null;
+            bestComparableBatch = null;
             fallbackCoinCost = null;
             fallbackCurrencyCosts = null;
+            fallbackBatch = null;
             long fallbackCurrencyUnits = 0;
             int fallbackSingleCurrencyId = -1;
 
@@ -484,19 +678,6 @@ namespace GW2CraftingHelper.Services
                 }
 
                 int unitsNeeded = (int)Math.Ceiling((double)node.Quantity / offer.OutputCount);
-
-                // Purchase cap (see V1 semantics above): DailyCap wins when
-                // positive, else WeeklyCap when positive, else the offer is
-                // uncapped. If the node needs more purchases than fit in one
-                // cap period, the offer cannot fully supply this node and is
-                // excluded from both tiers below.
-                int? purchaseCap = offer.DailyCap.HasValue && offer.DailyCap.Value > 0
-                    ? offer.DailyCap
-                    : (offer.WeeklyCap.HasValue && offer.WeeklyCap.Value > 0 ? offer.WeeklyCap : null);
-                if (purchaseCap.HasValue && unitsNeeded > purchaseCap.Value)
-                {
-                    continue;
-                }
 
                 long totalCoinCost = coinCost * unitsNeeded;
 
@@ -579,6 +760,14 @@ namespace GW2CraftingHelper.Services
                         bestComparableValue = comparisonValue;
                         bestComparableCoinCost = totalCoinCost;
                         bestComparableCurrencyCosts = scaledCurrencyCosts;
+                        bestComparableBatch = new VendorOfferBatch
+                        {
+                            OutputCount = offer.OutputCount,
+                            CoinCostPerBatch = coinCost,
+                            CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
+                            DailyCap = offer.DailyCap,
+                            WeeklyCap = offer.WeeklyCap
+                        };
                     }
                     continue;
                 }
@@ -601,6 +790,14 @@ namespace GW2CraftingHelper.Services
                     fallbackCurrencyCosts = scaledCurrencyCosts;
                     fallbackCurrencyUnits = totalCurrencyUnits;
                     fallbackSingleCurrencyId = singleCurrencyId;
+                    fallbackBatch = new VendorOfferBatch
+                    {
+                        OutputCount = offer.OutputCount,
+                        CoinCostPerBatch = coinCost,
+                        CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
+                        DailyCap = offer.DailyCap,
+                        WeeklyCap = offer.WeeklyCap
+                    };
                 }
             }
         }
@@ -660,7 +857,11 @@ namespace GW2CraftingHelper.Services
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
             Dictionary<int, long> currencyMap,
             Dictionary<(int, int), int> craftOrder,
-            ref int craftCounter)
+            Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
+            Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
+            Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences,
+            ref int craftCounter,
+            ISet<int> ignoredItemIds = null)
         {
             if (node.IngredientType == "Currency")
             {
@@ -672,6 +873,18 @@ namespace GW2CraftingHelper.Services
                 {
                     currencyMap[node.Id] = node.Quantity;
                 }
+                return;
+            }
+
+            // M34-B2b: an ignored item generates no crafting step and no
+            // shopping row at all - it is fully in-hand, same as a real
+            // Quantity == 0 node's "usedQuantity == 0 -> no step" gw2e
+            // parity target (Section 5 of the r2 report). Evaluate already
+            // committed a zero-cost memo entry for it (never recursing into
+            // its own ingredients), so skipping it here as well keeps the
+            // plan free of a bogus "buy 0-cost N units" row.
+            if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+            {
                 return;
             }
 
@@ -688,7 +901,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var ingredient in chosenRecipe.Ingredients)
                     {
-                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, ref craftCounter);
+                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
                     }
                 }
 
@@ -700,33 +913,24 @@ namespace GW2CraftingHelper.Services
                 }
 
                 var stepKey = (node.Id, AcquisitionSource.Craft, decision.RecipeId);
-                AggregateStep(stepMap, stepKey, node, decision);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
             }
             else if (decision.Source == AcquisitionSource.BuyFromVendor)
             {
-                // Add vendor currency costs to the currency map
-                if (decision.VendorCurrencyCosts != null)
-                {
-                    foreach (var cc in decision.VendorCurrencyCosts)
-                    {
-                        if (currencyMap.ContainsKey(cc.Id))
-                        {
-                            currencyMap[cc.Id] = checked(currencyMap[cc.Id] + cc.Count);
-                        }
-                        else
-                        {
-                            currencyMap[cc.Id] = cc.Count;
-                        }
-                    }
-                }
-
+                // Vendor currency costs are folded into currencyMap once,
+                // after the whole tree is collected and every merged vendor
+                // step's true (aggregate-then-ceil) cost is known - see
+                // PlanSolver.FinalizeVendorBatches. Folding the still-
+                // per-occurrence decision.VendorCurrencyCosts in here would
+                // re-introduce the exact per-occurrence-then-sum overcount
+                // FinalizeVendorBatches exists to fix (M34-B1 #1).
                 var stepKey = (node.Id, AcquisitionSource.BuyFromVendor, 0);
-                AggregateStep(stepMap, stepKey, node, decision);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
             }
             else
             {
                 var stepKey = (node.Id, decision.Source, 0);
-                AggregateStep(stepMap, stepKey, node, decision);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
             }
         }
 
@@ -734,8 +938,65 @@ namespace GW2CraftingHelper.Services
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
             (int, AcquisitionSource, int) stepKey,
             RecipeNode node,
-            Decision decision)
+            Decision decision,
+            Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
+            Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
+            Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences)
         {
+            if (decision.Source == AcquisitionSource.Craft)
+            {
+                // M34 fix (wave-validator finding): remembers every
+                // individual tree occurrence's own NodeId that fed this
+                // merged Craft stepKey, in first-seen (DFS) order, so
+                // RefreshCraftStepCosts can re-sum this step's true total
+                // from `memo` AFTER RecomputeCraftCosts corrects it - see
+                // that method's doc comment. Mirrors the vendor-side
+                // occurrence bookkeeping just below for BuyFromVendor.
+                if (!craftOccurrences.TryGetValue(stepKey, out var craftOccurrenceList))
+                {
+                    craftOccurrenceList = new List<int>();
+                    craftOccurrences[stepKey] = craftOccurrenceList;
+                }
+                craftOccurrenceList.Add(node.NodeId);
+            }
+
+            if (decision.Source == AcquisitionSource.BuyFromVendor && decision.VendorBatch.HasValue)
+            {
+                if (vendorBatchTracking.TryGetValue(stepKey, out var trackedState))
+                {
+                    if (!trackedState.Conflict && !VendorBatchesEqual(trackedState.Batch, decision.VendorBatch.Value))
+                    {
+                        // Ratchet only: a later occurrence agreeing with the
+                        // tracked batch must not clear a conflict a prior
+                        // occurrence already raised.
+                        trackedState.Conflict = true;
+                    }
+                }
+                else
+                {
+                    vendorBatchTracking[stepKey] = new VendorBatchState
+                    {
+                        Batch = decision.VendorBatch.Value,
+                        Conflict = false
+                    };
+                }
+
+                // M34 fix (Critical review finding, PlanSolver.cs:1038):
+                // remembers every individual tree occurrence's own NodeId
+                // and Quantity that fed this merged vendor stepKey, in
+                // first-seen (DFS) order, so AllocateVendorNodeCosts can
+                // redistribute FinalizeVendorBatches' corrected merged total
+                // back to each occurrence's own memo entry afterward - see
+                // that method's doc comment for why this per-node fixup is
+                // necessary in addition to the stepMap-level one.
+                if (!vendorOccurrences.TryGetValue(stepKey, out var occurrenceList))
+                {
+                    occurrenceList = new List<(int NodeId, int Quantity)>();
+                    vendorOccurrences[stepKey] = occurrenceList;
+                }
+                occurrenceList.Add((node.NodeId, node.Quantity));
+            }
+
             if (stepMap.TryGetValue(stepKey, out var existing))
             {
                 existing.Quantity += node.Quantity;
@@ -811,7 +1072,7 @@ namespace GW2CraftingHelper.Services
                     {
                         Type = merged[idx].Type,
                         Id = merged[idx].Id,
-                        Count = summed > int.MaxValue ? int.MaxValue : (int)summed
+                        Count = ClampToInt(summed)
                     };
                 }
                 else
@@ -823,16 +1084,405 @@ namespace GW2CraftingHelper.Services
             return merged;
         }
 
-        private static void AssignNodeIds(RecipeNode node, ref int nextNodeId)
+        /// <summary>
+        /// M34-B1 #1/#3: re-derives every merged BuyFromVendor PlanStep's
+        /// true cost from its AGGREGATE Quantity (summed across every tree
+        /// occurrence by AggregateStep) and the winning offer's batch shape,
+        /// ceiling the purchase count exactly ONCE - matching gw2efficiency's
+        /// own documented convention for bulk-output steps (`docs/gw2e-parity-spec.md`
+        /// Section 6.5: quantities are merged across the whole tree before
+        /// `Math.ceil` ever runs). This replaces the sum of several
+        /// already-independently-ceil'd per-occurrence costs (AggregateStep's
+        /// running total), which overstates the true cost whenever the same
+        /// item is needed via 2+ tree occurrences and bought via a bulk
+        /// (OutputCount > 1) offer - see PlanSolverTests for the exact
+        /// 4/4/4/83/84 -&gt; 179 -&gt; 180 (not 186) live repro.
+        ///
+        /// Only applied when every occurrence of that item resolved to the
+        /// IDENTICAL winning offer (vendorBatchTracking's Conflict flag is
+        /// false) - a node's own per-occurrence ceil can, at a different
+        /// local quantity, legitimately prefer a different offer (bulk
+        /// discount thresholds), and re-deriving a single "true" cost across
+        /// genuinely different offers has no principled answer. When
+        /// occurrences disagree, this step is left exactly as AggregateStep
+        /// already computed it (sum of real, individually-correct
+        /// per-occurrence purchases) - a documented, intentionally
+        /// conservative fallback, not a regression.
+        ///
+        /// Also folds every vendor step's final (possibly just-recomputed)
+        /// VendorCurrencyCosts into currencyMap - the single place vendor
+        /// currency contributions reach the plan-wide currency total, now
+        /// that Collect no longer folds the still-per-occurrence amounts in
+        /// directly (see Collect's BuyFromVendor branch) - and collects a
+        /// post-solve "timegated" notice (gw2e parity, M34-B1 #3) for any
+        /// uniform step whose aggregate purchase count exceeds the winning
+        /// offer's daily (preferred) or weekly cap. Caps never exclude an
+        /// offer or change Source/TotalCost - purely informational.
+        ///
+        /// The recomputed step.UnitCost (M34 fix, sibling to B1 #2's
+        /// identical currency-side fix) is the winning offer's own
+        /// CoinCostPerBatch/OutputCount rate, not a truncating total/
+        /// Quantity average of the just-corrected aggregate - see the
+        /// inline comment at the assignment for the exact misleading-price
+        /// example this replaces. Unlike the currency "Each" cell
+        /// (CurrencyDisplayResolver.ResolveUnitAmounts), PlanStep.UnitCost/
+        /// PlanRowViewModel.UnitCoinValue are plain non-nullable longs with
+        /// no "N for M" bundle-label concept, so a non-evenly-divisible rate
+        /// still truncates here rather than gaining new model/UI surface for
+        /// a MustFix-level display nuance - a deliberate, narrower scope
+        /// than the currency fix, not an oversight.
+        /// </summary>
+        private static List<TimegatedItem> FinalizeVendorBatches(
+            Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
+            Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
+            Dictionary<int, long> currencyMap)
         {
-            node.NodeId = nextNodeId++;
-            foreach (var recipe in node.Recipes)
+            var timegatedItems = new List<TimegatedItem>();
+
+            foreach (var kvp in stepMap)
             {
-                foreach (var ingredient in recipe.Ingredients)
+                var step = kvp.Value;
+                if (step.Source != AcquisitionSource.BuyFromVendor)
                 {
-                    AssignNodeIds(ingredient, ref nextNodeId);
+                    continue;
+                }
+
+                if (vendorBatchTracking.TryGetValue(kvp.Key, out var state) &&
+                    !state.Conflict && state.Batch.OutputCount > 0)
+                {
+                    var batch = state.Batch;
+                    int unitsNeeded = step.Quantity > 0
+                        ? (int)Math.Ceiling((double)step.Quantity / batch.OutputCount)
+                        : 0;
+
+                    step.TotalCost = batch.CoinCostPerBatch * unitsNeeded;
+                    // M34 fix (MustFix review finding, PlanSolver.cs:1062):
+                    // the coin "Each" cell must show the winning offer's own
+                    // true per-unit rate (its per-batch coin cost divided by
+                    // its own OutputCount), not a truncating average of the
+                    // corrected AGGREGATE total over aggregate Quantity -
+                    // the same defect class B1 #2 already fixed for the
+                    // currency "Each" cell via CurrencyDisplayResolver.
+                    // ResolveUnitAmounts. Example: a "2 for 5" offer merged
+                    // to demand 3 gives TotalCost=10 (2 batches); the old
+                    // 10/3=3 truncated average implied a per-unit price no
+                    // real purchase of this offer ever charges, whereas the
+                    // offer's actual rate is 5/2=2 (batch.OutputCount is
+                    // already guarded > 0 by the branch condition above).
+                    step.UnitCost = batch.CoinCostPerBatch / batch.OutputCount;
+                    step.VendorCurrencyCosts = ScaleCostLines(batch.CurrencyCostLinesPerBatch, unitsNeeded);
+                    step.VendorOfferOutputCount = batch.OutputCount;
+                    step.VendorOfferCurrencyCostLinesPerBatch = batch.CurrencyCostLinesPerBatch;
+
+                    int? cap = batch.DailyCap.HasValue && batch.DailyCap.Value > 0
+                        ? batch.DailyCap
+                        : (batch.WeeklyCap.HasValue && batch.WeeklyCap.Value > 0 ? batch.WeeklyCap : (int?)null);
+                    if (cap.HasValue && unitsNeeded > cap.Value)
+                    {
+                        timegatedItems.Add(new TimegatedItem
+                        {
+                            ItemId = step.ItemId,
+                            CapType = (batch.DailyCap.HasValue && batch.DailyCap.Value > 0)
+                                ? TimegatedCapType.Daily
+                                : TimegatedCapType.Weekly,
+                            CapValue = cap.Value,
+                            NeededCount = unitsNeeded
+                        });
+                    }
+                }
+
+                if (step.VendorCurrencyCosts != null)
+                {
+                    foreach (var cc in step.VendorCurrencyCosts)
+                    {
+                        currencyMap[cc.Id] = currencyMap.TryGetValue(cc.Id, out var existing)
+                            ? checked(existing + cc.Count)
+                            : cc.Count;
+                    }
                 }
             }
+
+            return timegatedItems;
+        }
+
+        /// <summary>
+        /// Redistributes each FinalizeVendorBatches-corrected merged vendor
+        /// step's true aggregate TotalCost back to the individual per-
+        /// occurrence memo (Decision) entries that fed it - the fix for the
+        /// Critical review finding that CraftingTreeNode.SubtreeCost (via
+        /// the public Decisions dict) kept showing the stale, per-
+        /// occurrence-overcounted sum after FinalizeVendorBatches corrected
+        /// only the merged PlanStep/currencyMap view.
+        ///
+        /// Only touches stepKeys FinalizeVendorBatches actually corrected
+        /// (step.VendorOfferOutputCount &gt; 0 - only ever set inside that
+        /// method's own single-winning-offer branch, 0 for the Conflict/
+        /// mixed-offer case - see FinalizeVendorBatches). When occurrences
+        /// disagreed on the winning offer, each occurrence's own memo
+        /// TotalCost is already individually correct (a genuinely different
+        /// real purchase), so redistributing a uniform rate across them
+        /// would REPLACE correct values with a wrong blended one - the same
+        /// reasoning FinalizeVendorBatches itself already applies to
+        /// step.TotalCost.
+        ///
+        /// Allocation uses the corrected step's own UnitCost (already the
+        /// winning offer's true per-unit rate - see FinalizeVendorBatches)
+        /// times each occurrence's own Quantity, with the LAST occurrence
+        /// (in first-seen DFS order, per vendorOccurrences' construction in
+        /// AggregateStep) absorbing the exact remainder so the allocated
+        /// shares always sum to precisely step.TotalCost - no drift, no
+        /// invented precision.
+        /// </summary>
+        private static void AllocateVendorNodeCosts(
+            Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
+            Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
+            Dictionary<int, Decision> memo)
+        {
+            foreach (var kvp in vendorOccurrences)
+            {
+                if (!stepMap.TryGetValue(kvp.Key, out var step) || step.VendorOfferOutputCount <= 0)
+                {
+                    continue;
+                }
+
+                var occurrences = kvp.Value;
+                long allocated = 0L;
+                for (int i = 0; i < occurrences.Count; i++)
+                {
+                    var (nodeId, quantity) = occurrences[i];
+                    long share = (i == occurrences.Count - 1)
+                        ? step.TotalCost - allocated
+                        : step.UnitCost * quantity;
+                    allocated += share;
+
+                    if (memo.TryGetValue(nodeId, out var decision))
+                    {
+                        decision.TotalCost = share;
+                        memo[nodeId] = decision;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Re-sums every Craft decision's TotalCost bottom-up from its
+        /// chosen recipe's (now possibly AllocateVendorNodeCosts-corrected)
+        /// ingredient TotalCosts, mirroring Evaluate's own craftRealCost
+        /// aggregation (non-currency ingredients only - a currency
+        /// ingredient never contributes to real coin TotalCost, same as
+        /// Evaluate). Necessary because Evaluate computed every Craft
+        /// node's TotalCost bottom-up BEFORE FinalizeVendorBatches/
+        /// AllocateVendorNodeCosts ever ran, so a Craft node anywhere above
+        /// a corrected vendor-bought leaf - all the way up to the tree
+        /// root - would otherwise keep summing the leaf's stale
+        /// pre-correction share.
+        ///
+        /// Walks only the CHOSEN path (node.Recipes.FirstOrDefault(r =&gt;
+        /// r.RecipeId == decision.RecipeId), exactly like Collect) - never
+        /// the alternate, non-chosen recipes' ingredient nodes Evaluate also
+        /// memoized for comparison purposes, since those never fed the
+        /// solved plan and are not what the real tree displays.
+        ///
+        /// Depth is NOT bounded: this recurses down the entire chosen-path
+        /// subtree from whatever `node` it is called with (Solve calls it
+        /// once, with the tree root), so every Craft ancestor's `memo`
+        /// entry - and therefore every CraftingTreeNode.SubtreeCost derived
+        /// from it - is correct however many Craft levels separate it from
+        /// a corrected leaf. Confirmed by a 4-Craft-level, multi-branch
+        /// regression (see PlanSolverTests) and by a real-tree Harness dump
+        /// against the live Exordium recipe tree: root and every
+        /// intermediate Craft node's SubtreeCost already reconcile with
+        /// their children's corrected costs after this call returns. The
+        /// gap this class of bug actually hid in was elsewhere - see
+        /// RefreshCraftStepCosts below, which fixes the Craft-type
+        /// PlanStep (shopping-list row) side of the same correction that
+        /// this method already handled correctly for the Decisions/tree
+        /// side.
+        /// </summary>
+        private static long? RecomputeCraftCosts(
+            RecipeNode node, Dictionary<int, Decision> memo, ISet<int> ignoredItemIds)
+        {
+            if (node.IngredientType == "Currency")
+            {
+                return null;
+            }
+
+            if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+            {
+                return memo.TryGetValue(node.NodeId, out var ignoredDecision)
+                    ? ignoredDecision.TotalCost
+                    : 0L;
+            }
+
+            if (!memo.TryGetValue(node.NodeId, out var decision))
+            {
+                return null;
+            }
+
+            if (decision.Source != AcquisitionSource.Craft)
+            {
+                return decision.TotalCost;
+            }
+
+            var chosenRecipe = node.Recipes.FirstOrDefault(r => r.RecipeId == decision.RecipeId);
+            long craftRealCost = 0L;
+            if (chosenRecipe != null)
+            {
+                foreach (var ingredient in chosenRecipe.Ingredients)
+                {
+                    if (ingredient.IngredientType == "Currency")
+                    {
+                        continue;
+                    }
+                    craftRealCost += RecomputeCraftCosts(ingredient, memo, ignoredItemIds) ?? 0L;
+                }
+            }
+
+            decision.TotalCost = craftRealCost;
+            memo[node.NodeId] = decision;
+            return craftRealCost;
+        }
+
+        /// <summary>
+        /// M34 fix (wave-validator finding, post-fcbb277): re-derives every
+        /// Craft-type PlanStep's TotalCost from `memo` - AFTER
+        /// AllocateVendorNodeCosts/RecomputeCraftCosts have already
+        /// corrected it there - instead of trusting AggregateStep's running
+        /// sum from Collect(), which is built BEFORE those correction
+        /// passes ever run. Without this, a Craft row in the "Crafting
+        /// Steps" shopping list stayed permanently stale (the pre-merge,
+        /// per-occurrence-overcounted total) even though the SAME item's
+        /// Recipe Tree row (CraftingTreeNode.SubtreeCost, sourced from the
+        /// now-corrected `memo` via the public Decisions dict) and
+        /// plan.TotalCoinCost (summed from FinalizeVendorBatches' own
+        /// already-corrected Buy/Vendor steps) both showed the right
+        /// number - the exact "two sections of the same page disagree"
+        /// defect fcbb277 set out to eliminate, left half-fixed for the
+        /// Craft-step side.
+        ///
+        /// A full restructure - running the vendor-batch merge/allocation
+        /// BEFORE Collect ever builds a PlanStep, so no stale snapshot
+        /// could exist in the first place - was considered and rejected:
+        /// the merge needs each item's AGGREGATE demand across every tree
+        /// occurrence (FinalizeVendorBatches' whole premise), which is
+        /// only known once a full tree walk has completed, i.e. after a
+        /// Collect-shaped pass has already run. Reordering would therefore
+        /// mean two full tree walks (one to gather occurrence/demand data,
+        /// a second to build the now-correct PlanSteps) instead of the one
+        /// walk plus this narrow refresh - more moving parts for the same
+        /// asymptotic cost, not less. This method is the second walk's
+        /// cheaper equivalent: it revisits only the (few) Craft stepKeys
+        /// that exist, not the tree.
+        ///
+        /// Uses <paramref name="craftOccurrences"/> (built by AggregateStep,
+        /// the Craft-side twin of vendorOccurrences) rather than
+        /// re-deriving occurrences from the tree, so this stays a flat
+        /// stepMap-sized pass regardless of tree depth or branching. A
+        /// missing/null memo TotalCost (an unpriceable ingredient
+        /// somewhere in that craft's chosen recipe) contributes 0, matching
+        /// AggregateStep's own original null-handling (a null decision.
+        /// TotalCost never increments the running total there either).
+        /// </summary>
+        private static void RefreshCraftStepCosts(
+            Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
+            Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences,
+            Dictionary<int, Decision> memo)
+        {
+            foreach (var kvp in craftOccurrences)
+            {
+                if (!stepMap.TryGetValue(kvp.Key, out var step))
+                {
+                    continue;
+                }
+
+                long total = 0L;
+                foreach (var nodeId in kvp.Value)
+                {
+                    if (memo.TryGetValue(nodeId, out var decision) && decision.TotalCost.HasValue)
+                    {
+                        total += decision.TotalCost.Value;
+                    }
+                }
+
+                step.TotalCost = total;
+            }
+        }
+
+        /// <summary>
+        /// Structural equality for the fields that determine whether two
+        /// tree occurrences of the same item genuinely used the same
+        /// vendor offer (see FinalizeVendorBatches). CurrencyCostLinesPerBatch
+        /// is compared by content/order, not reference - both occurrences'
+        /// lists ultimately come from the same offer's own CostLines, built
+        /// independently but identically each time EvaluateVendorOffers
+        /// scans that item's offer list.
+        /// </summary>
+        private static bool VendorBatchesEqual(VendorOfferBatch a, VendorOfferBatch b)
+        {
+            if (a.OutputCount != b.OutputCount || a.CoinCostPerBatch != b.CoinCostPerBatch)
+            {
+                return false;
+            }
+
+            var linesA = a.CurrencyCostLinesPerBatch;
+            var linesB = b.CurrencyCostLinesPerBatch;
+            if (linesA == null || linesB == null)
+            {
+                return linesA == null && linesB == null;
+            }
+            if (linesA.Count != linesB.Count)
+            {
+                return false;
+            }
+            for (int i = 0; i < linesA.Count; i++)
+            {
+                if (linesA[i].Id != linesB[i].Id ||
+                    linesA[i].Count != linesB[i].Count ||
+                    !string.Equals(linesA[i].Type, linesB[i].Type, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Scales a per-batch (one purchase's worth) currency cost-line list
+        /// by the number of purchases, clamping to int.MaxValue rather than
+        /// overflowing a CostLine's int Count (mirrors the identical clamp
+        /// in MergeVendorCurrencyCosts).
+        /// </summary>
+        private static List<CostLine> ScaleCostLines(List<CostLine> perBatch, int unitsNeeded)
+        {
+            if (perBatch == null || perBatch.Count == 0)
+            {
+                return null;
+            }
+
+            var scaled = new List<CostLine>(perBatch.Count);
+            foreach (var line in perBatch)
+            {
+                long count = (long)line.Count * unitsNeeded;
+                scaled.Add(new CostLine
+                {
+                    Type = line.Type,
+                    Id = line.Id,
+                    Count = ClampToInt(count)
+                });
+            }
+            return scaled;
+        }
+
+        /// <summary>
+        /// Clamps a long to int.MaxValue rather than overflowing a
+        /// CostLine's int Count - shared by MergeVendorCurrencyCosts and
+        /// ScaleCostLines, the two places a currency amount can grow beyond
+        /// int range (summing across occurrences, or scaling by a purchase
+        /// count).
+        /// </summary>
+        private static int ClampToInt(long value)
+        {
+            return value > int.MaxValue ? int.MaxValue : (int)value;
         }
 
         private long? GetBuyCost(

@@ -74,5 +74,14 @@ namespace GW2CraftingHelper.Models
         /// not wired with hint data.
         /// </summary>
         public IReadOnlyDictionary<int, AcquisitionHint> AcquisitionHints { get; set; }
+
+        /// <summary>
+        /// Owned amount per currency id referenced by Plan.CurrencyCosts
+        /// (M34-B2a #4 - see AccountCurrencyIndex). Cosmetic display data
+        /// only, computed strictly after solving from the account wallet
+        /// snapshot - never fed back into any decision or total. Null when
+        /// no wallet snapshot was available or the plan needs no currency.
+        /// </summary>
+        public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
     }
 }

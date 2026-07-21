@@ -11,9 +11,10 @@ namespace GW2CraftingHelper.Services
         {
             var pool = new Dictionary<int, int>(ownedItems);
             var usedRaw = new List<UsedMaterial>();
+            var ownedUsageByNode = new Dictionary<RecipeNode, int>();
 
             var clone = CloneNode(tree);
-            ReduceNode(clone, pool, usedRaw);
+            ReduceNode(clone, pool, usedRaw, ownedUsageByNode, consumeFromPool: true);
 
             var aggregated = usedRaw
                 .GroupBy(u => u.ItemId)
@@ -28,14 +29,44 @@ namespace GW2CraftingHelper.Services
             return new ReducedTreeResult
             {
                 ReducedTree = clone,
-                UsedMaterials = aggregated
+                UsedMaterials = aggregated,
+                OwnedQuantityUsedByNode = ownedUsageByNode
             };
         }
 
+        /// <summary>
+        /// Reduces <paramref name="node"/> and its descendants against the
+        /// shared <paramref name="pool"/>.
+        ///
+        /// <paramref name="consumeFromPool"/> (M34-B2a #2, gw2e parity / M1
+        /// Finding 5): true only along the single chosen-recipe-candidate
+        /// chain - the root, then recursively only each node's PRIMARY
+        /// option (node.Recipes[0], the option RecipeService/the upstream
+        /// recipe source puts first). PlanSolver has not run yet at
+        /// reduction time, so which recipe option will actually be chosen is
+        /// unknowable here; gw2efficiency's own tree never has this
+        /// ambiguity because recipe-nesting nests exactly ONE recipe per
+        /// node. Walking every option and letting each one drain the shared
+        /// pool (the pre-fix behavior) would let a recipe option the solver
+        /// never picks steal owned stock from a branch that IS chosen.
+        /// Once false, it stays false for the whole subtree - nothing below
+        /// a non-primary option should ever touch the pool, no matter how
+        /// deep, since the whole branch is hypothetical from here down.
+        ///
+        /// Every option's CraftsNeeded/ingredient Quantity is still rescaled
+        /// here regardless of consumeFromPool - that math reflects THIS
+        /// node's own (already-decided, pool-independent) Quantity and is
+        /// required for PlanSolver's cost comparison across recipe options
+        /// to stay internally consistent (M33 Finding 1: every ingredient of
+        /// every recipe is always evaluated, even one the solver ultimately
+        /// doesn't choose).
+        /// </summary>
         private void ReduceNode(
             RecipeNode node,
             Dictionary<int, int> pool,
-            List<UsedMaterial> used)
+            List<UsedMaterial> used,
+            Dictionary<RecipeNode, int> ownedUsageByNode,
+            bool consumeFromPool)
         {
             // In the current GW2 recipe model, only "Item" nodes are consumable
             // from inventory and can have recipes. Currency nodes are leaves.
@@ -44,19 +75,23 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            int available = 0;
-            pool.TryGetValue(node.Id, out available);
-            int consume = Math.Min(available, node.Quantity);
-
-            if (consume > 0)
+            if (consumeFromPool)
             {
-                pool[node.Id] = available - consume;
-                used.Add(new UsedMaterial
+                int available = 0;
+                pool.TryGetValue(node.Id, out available);
+                int consume = Math.Min(available, node.Quantity);
+
+                if (consume > 0)
                 {
-                    ItemId = node.Id,
-                    QuantityUsed = consume
-                });
-                node.Quantity -= consume;
+                    pool[node.Id] = available - consume;
+                    used.Add(new UsedMaterial
+                    {
+                        ItemId = node.Id,
+                        QuantityUsed = consume
+                    });
+                    ownedUsageByNode[node] = consume;
+                    node.Quantity -= consume;
+                }
             }
 
             if (node.Quantity <= 0)
@@ -71,18 +106,21 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            foreach (var option in node.Recipes)
+            for (int i = 0; i < node.Recipes.Count; i++)
             {
+                var option = node.Recipes[i];
                 int origCraftsNeeded = option.CraftsNeeded;
                 int newCraftsNeeded = ComputeCraftsNeeded(node.Quantity, option);
                 option.CraftsNeeded = newCraftsNeeded;
+
+                bool optionConsumes = consumeFromPool && i == 0;
 
                 foreach (var ingredient in option.Ingredients)
                 {
                     int perCraft = (ingredient.Quantity + origCraftsNeeded - 1) / origCraftsNeeded;
                     ingredient.Quantity = perCraft * newCraftsNeeded;
 
-                    ReduceNode(ingredient, pool, used);
+                    ReduceNode(ingredient, pool, used, ownedUsageByNode, optionConsumes);
                 }
             }
         }
@@ -95,9 +133,10 @@ namespace GW2CraftingHelper.Services
             // Build a mutable consumption pool: itemId -> source -> remaining
             var pool = new Dictionary<int, Dictionary<string, int>>();
             var usedRaw = new List<UsedMaterial>();
+            var ownedUsageByNode = new Dictionary<RecipeNode, int>();
 
             var clone = CloneNode(tree);
-            ReduceNodeSourced(clone, index, activeCharacterName, pool, usedRaw);
+            ReduceNodeSourced(clone, index, activeCharacterName, pool, usedRaw, ownedUsageByNode, consumeFromPool: true);
 
             var aggregated = usedRaw
                 .GroupBy(u => u.ItemId)
@@ -129,16 +168,27 @@ namespace GW2CraftingHelper.Services
             return new ReducedTreeResult
             {
                 ReducedTree = clone,
-                UsedMaterials = aggregated
+                UsedMaterials = aggregated,
+                OwnedQuantityUsedByNode = ownedUsageByNode
             };
         }
 
+        /// <summary>
+        /// See ReduceNode's doc comment for <paramref name="consumeFromPool"/>
+        /// (M34-B2a #2, gw2e parity / M1 Finding 5) - identical reasoning
+        /// applies to this sourced overload: only the primary (first-listed)
+        /// recipe option at each node may recurse with pool consumption
+        /// enabled, so an alternate, un-chosen recipe option never drains
+        /// owned stock a real branch needs.
+        /// </summary>
         private void ReduceNodeSourced(
             RecipeNode node,
             AccountItemIndex index,
             string activeCharacterName,
             Dictionary<int, Dictionary<string, int>> pool,
-            List<UsedMaterial> used)
+            List<UsedMaterial> used,
+            Dictionary<RecipeNode, int> ownedUsageByNode,
+            bool consumeFromPool)
         {
             // In the current GW2 recipe model, only "Item" nodes are consumable
             // from inventory and can have recipes. Currency nodes are leaves.
@@ -153,44 +203,49 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            var prioritized = AccountItemIndex.GetPrioritizedSources(
-                node.Id, index, activeCharacterName);
-
-            var allocations = new List<MaterialSourceAllocation>();
-            int totalConsumed = 0;
-
-            foreach (var source in prioritized)
+            if (consumeFromPool)
             {
-                if (needed <= 0)
-                {
-                    break;
-                }
+                var prioritized = AccountItemIndex.GetPrioritizedSources(
+                    node.Id, index, activeCharacterName);
 
-                int available = GetPoolRemaining(pool, index, node.Id, source);
-                int consume = Math.Min(available, needed);
+                var allocations = new List<MaterialSourceAllocation>();
+                int totalConsumed = 0;
+                int remaining = needed;
 
-                if (consume > 0)
+                foreach (var source in prioritized)
                 {
-                    ConsumeFromPool(pool, index, node.Id, source, consume);
-                    allocations.Add(new MaterialSourceAllocation
+                    if (remaining <= 0)
                     {
-                        Source = source,
-                        Quantity = consume
-                    });
-                    totalConsumed += consume;
-                    needed -= consume;
-                }
-            }
+                        break;
+                    }
 
-            if (totalConsumed > 0)
-            {
-                used.Add(new UsedMaterial
+                    int available = GetPoolRemaining(pool, index, node.Id, source);
+                    int consume = Math.Min(available, remaining);
+
+                    if (consume > 0)
+                    {
+                        ConsumeFromPool(pool, index, node.Id, source, consume);
+                        allocations.Add(new MaterialSourceAllocation
+                        {
+                            Source = source,
+                            Quantity = consume
+                        });
+                        totalConsumed += consume;
+                        remaining -= consume;
+                    }
+                }
+
+                if (totalConsumed > 0)
                 {
-                    ItemId = node.Id,
-                    QuantityUsed = totalConsumed,
-                    Sources = allocations
-                });
-                node.Quantity -= totalConsumed;
+                    used.Add(new UsedMaterial
+                    {
+                        ItemId = node.Id,
+                        QuantityUsed = totalConsumed,
+                        Sources = allocations
+                    });
+                    ownedUsageByNode[node] = totalConsumed;
+                    node.Quantity -= totalConsumed;
+                }
             }
 
             if (node.Quantity <= 0)
@@ -205,18 +260,21 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            foreach (var option in node.Recipes)
+            for (int i = 0; i < node.Recipes.Count; i++)
             {
+                var option = node.Recipes[i];
                 int origCraftsNeeded = option.CraftsNeeded;
                 int newCraftsNeeded = ComputeCraftsNeeded(node.Quantity, option);
                 option.CraftsNeeded = newCraftsNeeded;
+
+                bool optionConsumes = consumeFromPool && i == 0;
 
                 foreach (var ingredient in option.Ingredients)
                 {
                     int perCraft = (ingredient.Quantity + origCraftsNeeded - 1) / origCraftsNeeded;
                     ingredient.Quantity = perCraft * newCraftsNeeded;
 
-                    ReduceNodeSourced(ingredient, index, activeCharacterName, pool, used);
+                    ReduceNodeSourced(ingredient, index, activeCharacterName, pool, used, ownedUsageByNode, optionConsumes);
                 }
             }
         }

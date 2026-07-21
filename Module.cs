@@ -280,7 +280,7 @@ namespace GW2CraftingHelper
                 _modalDialog,
                 _itemSearchProvider,
                 _settings,
-                (ctx, overrides) => _craftingPipeline.ResolveWithOverrides(ctx, overrides)
+                (ctx, overrides, ignoredItemIds) => _craftingPipeline.ResolveWithOverrides(ctx, overrides, ignoredItemIds)
             );
 
             _settingsContent = new SettingsTabContent(_settings);

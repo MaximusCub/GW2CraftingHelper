@@ -456,6 +456,192 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(result.ReducedTree.IsLeaf);
         }
 
+        // ---- M34-B2a #2: multi-recipe-option pool consumption fix ----
+        // (m1 Finding 5 / m34-r2-gw2e-owned-materials.md Section 6.2.5:
+        // previously EVERY RecipeOption on a node drained the shared pool,
+        // not just the one the solver would eventually choose - untested
+        // before this milestone, since every fixture above uses a single
+        // recipe option.)
+
+        [Fact]
+        public void MultipleRecipeOptions_OnlyPrimaryOptionConsumesPool()
+        {
+            // Root item 1 (qty 1) has TWO recipe options, each needing 5 of
+            // item 2. Pool has exactly 5 of item 2 - just enough for ONE
+            // option. Only the primary (first-listed) option may consume
+            // it; the alternate option's ingredient must be left untouched,
+            // not silently double-spent against the same pool.
+            var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
+            optionA.Ingredients.Add(Leaf(2, 5));
+            var optionB = new RecipeOption { RecipeId = 20, OutputCount = 1, CraftsNeeded = 1 };
+            optionB.Ingredients.Add(Leaf(2, 5));
+
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                Recipes = new List<RecipeOption> { optionA, optionB }
+            };
+
+            var pool = new Dictionary<int, int> { { 2, 5 } };
+            var result = _reducer.Reduce(tree, pool);
+
+            var reducedOptionA = result.ReducedTree.Recipes[0];
+            var reducedOptionB = result.ReducedTree.Recipes[1];
+
+            // Primary option's ingredient fully covered by the pool
+            Assert.Equal(0, reducedOptionA.Ingredients[0].Quantity);
+            // Alternate option's ingredient untouched - still needs all 5
+            Assert.Equal(5, reducedOptionB.Ingredients[0].Quantity);
+
+            // Only the primary option's consumption is recorded (not
+            // double-counted against both options)
+            var totalUsed = result.UsedMaterials.Where(u => u.ItemId == 2).Sum(u => u.QuantityUsed);
+            Assert.Equal(5, totalUsed);
+        }
+
+        [Fact]
+        public void Sourced_MultipleRecipeOptions_OnlyPrimaryOptionConsumesPool()
+        {
+            var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
+            optionA.Ingredients.Add(Leaf(2, 5));
+            var optionB = new RecipeOption { RecipeId = 20, OutputCount = 1, CraftsNeeded = 1 };
+            optionB.Ingredients.Add(Leaf(2, 5));
+
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                Recipes = new List<RecipeOption> { optionA, optionB }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            var reducedOptionA = result.ReducedTree.Recipes[0];
+            var reducedOptionB = result.ReducedTree.Recipes[1];
+
+            Assert.Equal(0, reducedOptionA.Ingredients[0].Quantity);
+            Assert.Equal(5, reducedOptionB.Ingredients[0].Quantity);
+
+            var totalUsed = result.UsedMaterials.Where(u => u.ItemId == 2).Sum(u => u.QuantityUsed);
+            Assert.Equal(5, totalUsed);
+        }
+
+        [Fact]
+        public void MultipleRecipeOptions_BothOptionsGetCraftsNeededRescaled()
+        {
+            // Even though only the primary option consumes the pool, BOTH
+            // options' CraftsNeeded/ingredient Quantity must still be
+            // rescaled to the node's own (self-)reduced Quantity, so
+            // PlanSolver's cost comparison across options stays consistent
+            // (M33 Finding 1 parity - every option is always evaluated).
+            var optionA = new RecipeOption { RecipeId = 10, OutputCount = 2, CraftsNeeded = 5 };
+            optionA.Ingredients.Add(Leaf(2, 10)); // perCraft = 10/5 = 2
+            var optionB = new RecipeOption { RecipeId = 20, OutputCount = 2, CraftsNeeded = 5 };
+            optionB.Ingredients.Add(Leaf(3, 10)); // perCraft = 10/5 = 2
+
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 10,
+                Recipes = new List<RecipeOption> { optionA, optionB }
+            };
+
+            // Own 4 of item 1 itself -> Quantity becomes 6, newCrafts = ceil(6/2) = 3
+            var pool = new Dictionary<int, int> { { 1, 4 } };
+            var result = _reducer.Reduce(tree, pool);
+
+            Assert.Equal(6, result.ReducedTree.Quantity);
+            Assert.Equal(3, result.ReducedTree.Recipes[0].CraftsNeeded);
+            Assert.Equal(3, result.ReducedTree.Recipes[1].CraftsNeeded);
+            // perCraft(2) * newCrafts(3) = 6 for BOTH options' ingredients
+            Assert.Equal(6, result.ReducedTree.Recipes[0].Ingredients[0].Quantity);
+            Assert.Equal(6, result.ReducedTree.Recipes[1].Ingredients[0].Quantity);
+        }
+
+        // ---- M34-B2a #1: per-node owned-quantity attribution ----
+
+        [Fact]
+        public void OwnedQuantityUsedByNode_RecordsConsumptionKeyedByNodeObject()
+        {
+            var leaf = Leaf(100, 5);
+            var pool = new Dictionary<int, int> { { 100, 3 } };
+
+            var result = _reducer.Reduce(leaf, pool);
+
+            Assert.Single(result.OwnedQuantityUsedByNode);
+            var entry = result.OwnedQuantityUsedByNode.Single();
+            Assert.Same(result.ReducedTree, entry.Key);
+            Assert.Equal(3, entry.Value);
+        }
+
+        [Fact]
+        public void OwnedQuantityUsedByNode_PerNodeNotAggregatedByItemId()
+        {
+            // Two DISTINCT node objects for the same item id (2), each
+            // partially covered from the same pool - the per-node map must
+            // keep them separate (unlike UsedMaterials, which aggregates by
+            // item id), so a future per-node display can tell them apart.
+            var ing1 = Leaf(2, 3);
+            var ing2 = Leaf(2, 4);
+            var option = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
+            option.Ingredients.Add(ing1);
+            option.Ingredients.Add(ing2);
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                Recipes = new List<RecipeOption> { option }
+            };
+
+            var pool = new Dictionary<int, int> { { 2, 5 } };
+            var result = _reducer.Reduce(tree, pool);
+
+            Assert.Equal(2, result.OwnedQuantityUsedByNode.Count);
+            var reducedIng1 = result.ReducedTree.Recipes[0].Ingredients[0];
+            var reducedIng2 = result.ReducedTree.Recipes[0].Ingredients[1];
+            Assert.Equal(3, result.OwnedQuantityUsedByNode[reducedIng1]);
+            Assert.Equal(2, result.OwnedQuantityUsedByNode[reducedIng2]);
+        }
+
+        [Fact]
+        public void Sourced_OwnedQuantityUsedByNode_RecordsConsumptionKeyedByNodeObject()
+        {
+            var leaf = Leaf(100, 8);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(100, 3, AccountItemIndex.SourceBank)
+            });
+
+            var result = _reducer.Reduce(leaf, index, null);
+
+            Assert.Single(result.OwnedQuantityUsedByNode);
+            var entry = result.OwnedQuantityUsedByNode.Single();
+            Assert.Same(result.ReducedTree, entry.Key);
+            Assert.Equal(8, entry.Value); // 5 + 3, across both sources
+        }
+
+        [Fact]
+        public void OwnedQuantityUsedByNode_EmptyWhenNothingConsumed()
+        {
+            var tree = Craftable(1, 5, 10, 1, Leaf(2, 5));
+            var pool = new Dictionary<int, int>();
+
+            var result = _reducer.Reduce(tree, pool);
+
+            Assert.Empty(result.OwnedQuantityUsedByNode);
+        }
+
         // ---- Source-aware overload tests ----
 
         private static SnapshotItemEntry SnapEntry(int itemId, int count, string source)

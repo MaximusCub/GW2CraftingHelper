@@ -76,8 +76,10 @@ namespace GW2CraftingHelper.Services
                 vm.Sections.Add(BuildRecipesSection(result));
             }
 
-            // 6. Crafting Steps section (only if non-empty) - last, per gw2e order
-            if (craftSteps.Count > 0)
+            // 6. Crafting Steps section (only if non-empty, OR there is a
+            // timegated notice to show - M34-B1 #3) - last, per gw2e order
+            bool hasTimegatedItems = result.Plan.TimegatedItems != null && result.Plan.TimegatedItems.Count > 0;
+            if (craftSteps.Count > 0 || hasTimegatedItems)
             {
                 vm.Sections.Add(BuildCraftingStepsSection(craftSteps, result));
             }
@@ -150,12 +152,24 @@ namespace GW2CraftingHelper.Services
                 {
                     string currencyName = CurrencyDisplayResolver.ResolveName(cc.CurrencyId, result.CurrencyMetadata);
                     string iconUrl = CurrencyDisplayResolver.ResolveIconUrl(cc.CurrencyId, result.CurrencyMetadata);
+
+                    // M34-B2a #4: owned/needed split, cosmetic only - null
+                    // when no wallet snapshot was available (distinct from
+                    // "0 owned").
+                    int? ownedQuantity = null;
+                    if (result.OwnedCurrencyAmounts != null &&
+                        result.OwnedCurrencyAmounts.TryGetValue(cc.CurrencyId, out int owned))
+                    {
+                        ownedQuantity = Math.Min(owned, (int)cc.Amount);
+                    }
+
                     section.Rows.Add(new PlanRowViewModel
                     {
                         RowType = PlanRowType.CurrencyCost,
                         Label = $"{cc.Amount}x {currencyName}",
                         Quantity = (int)cc.Amount,
-                        IconUrl = iconUrl
+                        IconUrl = iconUrl,
+                        CurrencyOwnedQuantity = ownedQuantity
                     });
                 }
             }
@@ -219,10 +233,14 @@ namespace GW2CraftingHelper.Services
                     UnitCoinValue = step.UnitCost,
                     HintText = ResolveHintText(rowType, step.ItemId, result.AcquisitionHints),
                     BadgeText = ResolveBadgeText(rowType, step.ItemId, result.AcquisitionHints),
+                    // M34-B2b: owned/needed split, cosmetic only (mirrors
+                    // BuildSummarySection's CurrencyCost rows) - only the
+                    // Total column, never Each (a per-unit rate has no
+                    // ownership concept - see ResolveAmounts' doc comment).
                     CurrencyCosts = CurrencyDisplayResolver.ResolveAmounts(
-                        step.VendorCurrencyCosts, result.CurrencyMetadata),
+                        step.VendorCurrencyCosts, result.CurrencyMetadata, result.OwnedCurrencyAmounts),
                     UnitCurrencyCosts = CurrencyDisplayResolver.ResolveUnitAmounts(
-                        step.VendorCurrencyCosts, step.Quantity, result.CurrencyMetadata)
+                        step.VendorOfferOutputCount, step.VendorOfferCurrencyCostLinesPerBatch, result.CurrencyMetadata)
                 });
             }
 
@@ -315,6 +333,25 @@ namespace GW2CraftingHelper.Services
                     Rarity = rarity,
                     Quantity = step.Quantity
                 });
+            }
+
+            // Timegated (vendor purchase cap) notices (M34-B1 #3) - a plain
+            // informational line per item, gw2efficiency parity: caps are
+            // surfaced, never solved around. Appended after the real craft
+            // steps so a section made up ENTIRELY of notices (no craft
+            // steps at all) still renders correctly.
+            if (result.Plan.TimegatedItems != null)
+            {
+                foreach (var timegated in result.Plan.TimegatedItems)
+                {
+                    string itemName = ResolveName(timegated.ItemId, result.ItemMetadata);
+                    string capLabel = timegated.CapType == TimegatedCapType.Daily ? "Daily" : "Weekly";
+                    section.Rows.Add(new PlanRowViewModel
+                    {
+                        RowType = PlanRowType.TimegatedNotice,
+                        Label = $"{itemName} is timegated - {capLabel} limit: {timegated.CapValue} (plan needs {timegated.NeededCount})"
+                    });
+                }
             }
 
             return section;

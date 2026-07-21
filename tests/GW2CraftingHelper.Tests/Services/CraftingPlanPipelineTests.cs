@@ -1275,6 +1275,73 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(result.MaterialOpportunityCost);
         }
 
+        // --- M34-B2b: "Ignore" pill threaded through ResolveWithOverrides ---
+
+        [Fact]
+        public async Task ResolveWithOverrides_IgnoredItemIds_ZeroesIngredientCost()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi, ingredientCount: 5);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000); // buying the target outright is far pricier - craft wins
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100); // BuyInstant (craft-cost basis) = 100
+
+            // No snapshot: nothing owned via real reduction, so the baseline
+            // craft cost is the full 5x100=500.
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            Assert.Equal(500, initial.Plan.TotalCoinCost);
+
+            var resolved = pipeline.ResolveWithOverrides(
+                initial.SolveContext, null, new HashSet<int> { 2 });
+
+            Assert.Equal(0, resolved.Plan.TotalCoinCost);
+            // Item 2 (the ignored ingredient) generates no step at all;
+            // item 1 (the root) still crafts, now at zero cost.
+            Assert.DoesNotContain(resolved.Plan.Steps, s => s.ItemId == 2);
+            Assert.Contains(resolved.Plan.Steps, s => s.ItemId == 1 && s.Source == AcquisitionSource.Craft && s.TotalCost == 0);
+            Assert.Equal(Contracts.CraftingDecision.Have, resolved.CraftingTree.Children[0].Decision);
+            Assert.True(resolved.CraftingTree.Children[0].IsIgnored);
+        }
+
+        [Fact]
+        public async Task ResolveWithOverrides_NullIgnoredItemIds_BehavesExactlyAsBefore()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi, ingredientCount: 5);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100); // BuyInstant (craft-cost basis) = 100
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, null);
+
+            Assert.Equal(500, resolved.Plan.TotalCoinCost);
+            Assert.False(resolved.CraftingTree.Children[0].IsIgnored);
+        }
+
+        [Fact]
+        public async Task ResolveWithOverrides_IgnoredItemIds_ManualOverrideOnSameNodeStillApplies()
+        {
+            // Ignore and the craft/buy override pill are documented as
+            // orthogonal (r2 report Section 3.2) - overriding the ROOT to
+            // BuyFromTp while its ingredient is separately ignored must
+            // still switch the root to BuyFromTp; the two mechanisms key
+            // off different things (NodeId vs ItemId) and must not collide.
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi, ingredientCount: 5);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100); // BuyInstant (craft-cost basis) = 100
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            int rootNodeId = initial.SolveContext.Tree.NodeId;
+
+            var overrides = new Dictionary<int, AcquisitionSource> { { rootNodeId, AcquisitionSource.BuyFromTp } };
+            var resolved = pipeline.ResolveWithOverrides(
+                initial.SolveContext, overrides, new HashSet<int> { 2 });
+
+            Assert.Equal(Contracts.CraftingDecision.BuyFromTp, resolved.CraftingTree.Decision);
+            Assert.Equal(20000, resolved.Plan.TotalCoinCost); // manual override wins on the root regardless of the sibling Ignore
+        }
+
         [Fact]
         public async Task Structured_ValuedMode_UsedMaterialPrices_AlreadyCoveredByTreeFetch()
         {
@@ -1423,6 +1490,367 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.NotNull(resolved.CurrencyMetadata);
                 Assert.True(resolved.CurrencyMetadata.ContainsKey(2));
                 Assert.Equal("Karma", resolved.CurrencyMetadata[2].Name);
+            }
+        }
+
+        // --- M34-B2a #3: force-buy pre-pass (zero-owned baseline) ---
+
+        /// <summary>
+        /// Reuses BuildOwnMaterialsPipeline's identical tree shape (item 1
+        /// &lt;- recipe 10 &lt;- 5x item 2), then sets prices for the
+        /// force-buy scenario: NOTE InMemoryPriceApiClient's
+        /// (buyUnitPrice, sellUnitPrice) map to raw GW2-API
+        /// buys/sells.unit_price - TradingPostService then maps BuyInstant
+        /// (cost to instant-BUY) from the RAW sellUnitPrice param, and
+        /// SellInstant from the raw buyUnitPrice param (see
+        /// TradingPostService.cs) - so the SECOND argument here is the one
+        /// that drives GetUnitPrice at PriceBasis.InstantBuy.
+        ///
+        /// Fresh (zero-owned) check: buy(100) &lt; craft(5x30=150)*0.85=127.5
+        /// -&gt; item 1 is force-buy-flagged on a truly zero-owned baseline.
+        /// </summary>
+        private static CraftingPlanPipeline BuildForceBuyPipeline(out InMemoryPriceApiClient priceApi)
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 1000, sellUnitPrice: 100);
+            priceApi.AddPrice(2, buyUnitPrice: 300, sellUnitPrice: 30);
+            return pipeline;
+        }
+
+        private static AccountSnapshot OwnFourOfIngredient()
+        {
+            return new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry
+                    {
+                        ItemId = 2,
+                        Count = 4,
+                        Source = AccountItemIndex.SourceMaterialStorage
+                    }
+                }
+            };
+        }
+
+        [Fact]
+        public async Task Structured_ValuedMode_ForceBuyPrePass_UsesZeroOwnedBaseline()
+        {
+            // Own 4 of the 5 needed of item 2: post-reduction, item 1's
+            // craft cost collapses to 1x30=30 - misleadingly cheaper than
+            // buy(100) if evaluated AFTER reduction. The force-buy flag,
+            // computed on the zero-owned (pre-reduction) baseline, must
+            // still keep item 1 bought rather than "crafted" from an
+            // artificially cheap remainder.
+            var pipeline = BuildForceBuyPipeline(out _);
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Single(result.Plan.Steps);
+            Assert.Equal(1, result.Plan.Steps[0].ItemId);
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
+            Assert.Equal(100, result.Plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public async Task Structured_FreeMode_SameOwnershipScenario_CraftsFromReducedRemainder()
+        {
+            // Control for the test above: Free mode never runs the
+            // force-buy pre-pass, so the (misleadingly cheap) post-
+            // reduction craft path wins normally, same as before M34.
+            var pipeline = BuildForceBuyPipeline(out _);
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy); // default Free
+
+            Assert.Contains(result.Plan.Steps,
+                s => s.ItemId == 1 && s.Source == AcquisitionSource.Craft);
+            // Only the 1 remaining unit of item 2 is bought.
+            Assert.Contains(result.Plan.Steps,
+                s => s.ItemId == 2 && s.Source == AcquisitionSource.BuyFromTp && s.Quantity == 1);
+        }
+
+        [Fact]
+        public async Task Structured_ValuedMode_NoSnapshot_ForceBuyPrePassDoesNotRun()
+        {
+            // Valued mode alone (no snapshot) must not activate the
+            // force-buy pre-pass at all - see CraftingPlanPipeline's own
+            // gate comment. The full (unreduced) craft cost (5x30=150)
+            // genuinely beats buy(100)? No - buy(100) beats craft(150)
+            // outright already, so normal (non-forced) PickCheapest already
+            // buys here regardless; this test pins that no snapshot means
+            // no special force-buy machinery runs, not just that the
+            // outcome happens to match.
+            var pipeline = BuildForceBuyPipeline(out _);
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Single(result.Plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
+        }
+
+        [Fact]
+        public async Task ResolveWithOverrides_ForceBuyPrePass_ManualOverrideStillWins()
+        {
+            var pipeline = BuildForceBuyPipeline(out _);
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(Contracts.CraftingDecision.BuyFromTp, initial.CraftingTree.Decision);
+            Assert.True(initial.CraftingTree.CanCraft); // flag reflects true feasibility
+
+            // Manually force craft on the root - must win over the
+            // automatic force-buy pre-pass (gw2e parity: manual pill always
+            // beats the automatic pre-pass).
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { initial.CraftingTree.NodeId, AcquisitionSource.Craft }
+            };
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
+
+            Assert.Equal(Contracts.CraftingDecision.Craft, resolved.CraftingTree.Decision);
+            // Real (post-reduction) craft cost: only 1 remaining unit of
+            // item 2 needs buying, at 30 each.
+            Assert.Equal(30, resolved.Plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public async Task ResolveWithOverrides_NoOpResolve_ForceBuyDecisionUnchanged()
+        {
+            // A no-op local re-solve (no overrides at all) must keep
+            // applying the force-buy pre-pass exactly as the original
+            // generation did - not "forget" it on the first re-solve.
+            var pipeline = BuildForceBuyPipeline(out _);
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
+
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, null);
+
+            Assert.Equal(AcquisitionSource.BuyFromTp, resolved.Plan.Steps[0].Source);
+            Assert.Equal(100, resolved.Plan.TotalCoinCost);
+        }
+
+        // --- M34-B2a #4: owned currency (cosmetic only, never affects decisions) ---
+
+        private static CraftingPlanPipeline BuildVendorCurrencyPipeline(
+            out VendorOfferStore store, string tempDir)
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1, and (deliberately) no TP price either -
+            // a vendor-only purchase. The offer's karma cost line is never
+            // valued (no CurrencyValuation passed below), so it can only
+            // win via the "fallback" tier (PlanSolver's last-resort branch
+            // when nothing coin-priceable/craftable exists at all) - giving
+            // it a TP price here would make TP win outright instead.
+            var priceApi = new InMemoryPriceApiClient();
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Karma Item", "karma.png");
+
+            var loader = new VendorOfferLoader();
+            store = new VendorOfferStore(tempDir, loader);
+            store.LoadBaseline(null);
+            store.AddOffersToOverlay(new[]
+            {
+                new VendorOffer
+                {
+                    OfferId = "test-karma-offer",
+                    OutputItemId = 1,
+                    OutputCount = 1,
+                    CostLines = new List<CostLine>
+                    {
+                        new CostLine { Type = "Currency", Id = 2, Count = 500 }
+                    },
+                    MerchantName = "Karma Vendor",
+                    Locations = new List<string>()
+                }
+            });
+
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                store,
+                reducer: new InventoryReducer());
+        }
+
+        [Fact]
+        public async Task OwnedCurrency_DoesNotAffectDecisionsOrTotals()
+        {
+            // Regression guard (M34-B2a #4): wallet currency data is
+            // cosmetic-only annotation. A plan generated WITH wallet karma
+            // must produce the IDENTICAL decisions/costs as one generated
+            // with none - only OwnedCurrencyAmounts may differ.
+            var tempDir = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
+            System.IO.Directory.CreateDirectory(tempDir);
+            try
+            {
+                var pipeline = BuildVendorCurrencyPipeline(out _, tempDir);
+
+                var withoutWallet = await pipeline.GenerateStructuredAsync(
+                    1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+                var snapshotWithWallet = new AccountSnapshot
+                {
+                    Wallet = new List<SnapshotWalletEntry>
+                    {
+                        new SnapshotWalletEntry { CurrencyId = 2, Value = 100000 }
+                    }
+                };
+                var withWallet = await pipeline.GenerateStructuredAsync(
+                    1, 1, snapshotWithWallet, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+                // Decisions/costs identical regardless of wallet content.
+                Assert.Equal(withoutWallet.Plan.Steps.Count, withWallet.Plan.Steps.Count);
+                Assert.Equal(withoutWallet.Plan.Steps[0].Source, withWallet.Plan.Steps[0].Source);
+                Assert.Equal(withoutWallet.Plan.TotalCoinCost, withWallet.Plan.TotalCoinCost);
+                Assert.Equal(withoutWallet.Plan.CurrencyCosts.Count, withWallet.Plan.CurrencyCosts.Count);
+                Assert.Equal(withoutWallet.Plan.CurrencyCosts[0].Amount, withWallet.Plan.CurrencyCosts[0].Amount);
+                Assert.Equal(withoutWallet.CraftingTree.Decision, withWallet.CraftingTree.Decision);
+
+                // Only the annotation differs. CraftingPlanResult.
+                // OwnedCurrencyAmounts stores the RAW wallet amount
+                // (capping-at-needed is a view-model presentation concern -
+                // see PlanViewModelBuilder / the CurrencyCostRow test below).
+                Assert.Null(withoutWallet.OwnedCurrencyAmounts);
+                Assert.NotNull(withWallet.OwnedCurrencyAmounts);
+                Assert.Equal(100000, withWallet.OwnedCurrencyAmounts[2]);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task OwnedCurrency_PartialWalletAmount_CappedAtNeeded()
+        {
+            var tempDir = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
+            System.IO.Directory.CreateDirectory(tempDir);
+            try
+            {
+                var pipeline = BuildVendorCurrencyPipeline(out _, tempDir);
+
+                var snapshot = new AccountSnapshot
+                {
+                    Wallet = new List<SnapshotWalletEntry>
+                    {
+                        new SnapshotWalletEntry { CurrencyId = 2, Value = 200 }
+                    }
+                };
+                var result = await pipeline.GenerateStructuredAsync(
+                    1, 1, snapshot, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+                // Needs 500, owns only 200 - reported as-is (not capped to
+                // itself, since 200 < 500).
+                Assert.Equal(200, result.OwnedCurrencyAmounts[2]);
+                // The plan itself still needs the full 500 (owned currency
+                // never nets against the plan's own currency total).
+                Assert.Equal(500, result.Plan.CurrencyCosts[0].Amount);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task OwnedCurrency_NoWalletAtAll_AmountsNull()
+        {
+            var tempDir = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
+            System.IO.Directory.CreateDirectory(tempDir);
+            try
+            {
+                var pipeline = BuildVendorCurrencyPipeline(out _, tempDir);
+
+                var result = await pipeline.GenerateStructuredAsync(
+                    1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+                Assert.Null(result.OwnedCurrencyAmounts);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task OwnedCurrency_ViewModel_CurrencyCostRowGetsOwnedQuantity()
+        {
+            var tempDir = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
+            System.IO.Directory.CreateDirectory(tempDir);
+            try
+            {
+                var pipeline = BuildVendorCurrencyPipeline(out _, tempDir);
+
+                var snapshot = new AccountSnapshot
+                {
+                    Wallet = new List<SnapshotWalletEntry>
+                    {
+                        new SnapshotWalletEntry { CurrencyId = 2, Value = 200 }
+                    }
+                };
+                var result = await pipeline.GenerateStructuredAsync(
+                    1, 1, snapshot, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+                var vm = new PlanViewModelBuilder().Build(result);
+                var summarySection = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+                var currencyRow = summarySection.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+
+                Assert.Equal(200, currencyRow.CurrencyOwnedQuantity);
+                Assert.Equal(500, currencyRow.Quantity);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task OwnedCurrency_ViewModel_NoWallet_OwnedQuantityNull()
+        {
+            var tempDir = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
+            System.IO.Directory.CreateDirectory(tempDir);
+            try
+            {
+                var pipeline = BuildVendorCurrencyPipeline(out _, tempDir);
+
+                var result = await pipeline.GenerateStructuredAsync(
+                    1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+                var vm = new PlanViewModelBuilder().Build(result);
+                var summarySection = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
+                var currencyRow = summarySection.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+
+                Assert.Null(currencyRow.CurrencyOwnedQuantity);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(tempDir, true);
             }
         }
     }

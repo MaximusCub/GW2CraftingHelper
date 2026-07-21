@@ -23,6 +23,28 @@ namespace GW2CraftingHelper.Contracts
         public int Quantity { get; set; }
         public CraftingDecision Decision { get; set; }
 
+        // How many units of this node's OWN demand were covered by owned
+        // inventory during reduction (M34-B2a #1, gw2e parity groundwork -
+        // see InventoryReducer.ReducedTreeResult.OwnedQuantityUsedByNode).
+        // 0 when reduction never ran (no snapshot) or nothing owned was
+        // consumed for this node. Quantity + OwnedQuantityUsed recovers the
+        // node's original pre-reduction demand. This makes a PARTIALLY-owned
+        // node representable (Quantity > 0 but OwnedQuantityUsed > 0) -
+        // previously only fully-owned nodes (Quantity reduced to 0 ->
+        // Decision.Have) were visible at all.
+        public int OwnedQuantityUsed { get; set; }
+
+        // True when the user manually marked this item's id "Ignore" (M34-
+        // B2b, gw2e parity - see PlanSolver's ignoredItemIds parameter and
+        // the "IGNORE"/"IGNORED" pill). Distinct from genuine full ownership
+        // (Quantity == 0 via real inventory reduction): CraftingTreeBuilder
+        // sets Decision = Have for an ignored node too (its cost is zero and
+        // it generates no crafting step, same as a truly-owned node), but
+        // this flag lets the pill layer still show an active, clickable
+        // "IGNORED" toggle alongside HAVE instead of the plain single HAVE
+        // pill a naturally-owned node gets.
+        public bool IsIgnored { get; set; }
+
         // Feasible acquisition paths for this node (drives override cycling).
         public bool CanCraft { get; set; }
         public bool CanBuyTp { get; set; }

@@ -152,6 +152,69 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(result[1].IconUrl);
         }
 
+        // --- ResolveAmounts ownedCurrencyAmounts (M34-B2b) ---
+
+        [Fact]
+        public void ResolveAmounts_OwnedAmountsNull_OwnedQuantityStaysNull()
+        {
+            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+
+            var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, null);
+
+            Assert.Null(result[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ResolveAmounts_OwnedLessThanNeeded_OwnedQuantityIsRawWalletAmount()
+        {
+            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+            var owned = new Dictionary<int, int> { { 23, 200 } };
+
+            var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
+
+            Assert.Equal(200, result[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ResolveAmounts_OwnedExceedsNeeded_OwnedQuantityClampedToAmount()
+        {
+            // Owning MORE than this cost line needs must never surface an
+            // "owned" figure bigger than the line's own Amount.
+            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+            var owned = new Dictionary<int, int> { { 23, 999999 } };
+
+            var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
+
+            Assert.Equal(500, result[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ResolveAmounts_OwnedAmountsMissingThisCurrencyId_OwnedQuantityStaysNull()
+        {
+            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+            var owned = new Dictionary<int, int> { { 2, 100 } }; // different currency id
+
+            var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
+
+            Assert.Null(result[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ResolveAmounts_MultipleLines_OwnedQuantityResolvedPerLine()
+        {
+            var costLines = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = 23, Count = 500 },
+                new CostLine { Type = "Currency", Id = 2, Count = 1000 }
+            };
+            var owned = new Dictionary<int, int> { { 23, 100 } }; // only the first line has wallet data
+
+            var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
+
+            Assert.Equal(100, result[0].OwnedQuantity);
+            Assert.Null(result[1].OwnedQuantity);
+        }
+
         [Fact]
         public void ResolveAmounts_NeverExposesRawCurrencyId()
         {
@@ -161,51 +224,83 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(props, p => p.Name.IndexOf("Id", System.StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
-        // --- ResolveUnitAmounts ---
+        // --- ResolveUnitAmounts (M34-B1 #2: winning-offer true per-unit
+        // rate, not a truncated total/quantity average) ---
 
         [Fact]
-        public void ResolveUnitAmounts_DividesByQuantity()
+        public void ResolveUnitAmounts_EvenDivision_ResolvesWholeNumberAmount_NoBundleLabel()
         {
-            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+            // A "3 for 3" batch (the exact Obsidian Shard live-repro shape):
+            // 3 currency per 3 output units divides evenly to 1 each.
+            var perBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 3 } };
 
-            var result = CurrencyDisplayResolver.ResolveUnitAmounts(costLines, 5, null);
+            var result = CurrencyDisplayResolver.ResolveUnitAmounts(3, perBatch, null);
 
             Assert.NotNull(result);
-            Assert.Equal(100, result[0].Amount);
+            Assert.Equal(1, result[0].Amount);
+            Assert.Null(result[0].BundleLabel);
         }
 
         [Fact]
-        public void ResolveUnitAmounts_TruncatesLikeUnitCost()
+        public void ResolveUnitAmounts_UnevenDivision_UsesBundleLabel_NotRoundedAmount()
         {
-            // 500 / 3 = 166 (integer division truncates), matching
-            // PlanSolver.AggregateStep's UnitCost = TotalCost / Quantity.
-            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+            // A "2 for 3" batch does not divide evenly - the true per-unit
+            // rate is not a whole number, so the resolver must not invent a
+            // rounded figure; it carries the literal bundle text instead.
+            var perBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 2 } };
 
-            var result = CurrencyDisplayResolver.ResolveUnitAmounts(costLines, 3, null);
+            var result = CurrencyDisplayResolver.ResolveUnitAmounts(3, perBatch, null);
 
-            Assert.Equal(166, result[0].Amount);
+            Assert.NotNull(result);
+            Assert.Equal(0, result[0].Amount);
+            Assert.Equal("2 for 3", result[0].BundleLabel);
         }
 
         [Fact]
-        public void ResolveUnitAmounts_ZeroQuantity_ReturnsNull_NoDivideByZero()
+        public void ResolveUnitAmounts_NeverTruncatesAggregateTotal()
         {
-            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+            // Regression guard for the pre-fix bug: a merged row's
+            // aggregated total (186) and quantity (179) must play NO part
+            // in the Each computation at all - only the winning offer's own
+            // per-batch rate (3-for-3 = 1 each) matters, never
+            // 186/179 (which truncates to a misleading "1" too, but for the
+            // wrong reason and would differ for other aggregate shapes).
+            var perBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 3 } };
 
-            Assert.Null(CurrencyDisplayResolver.ResolveUnitAmounts(costLines, 0, null));
+            var result = CurrencyDisplayResolver.ResolveUnitAmounts(3, perBatch, null);
+
+            Assert.Equal(1, result[0].Amount);
         }
 
         [Fact]
-        public void ResolveUnitAmounts_NegativeQuantity_ReturnsNull()
+        public void ResolveUnitAmounts_ZeroOutputCount_ReturnsNull_NoDivideByZero()
         {
-            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+            var perBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 3 } };
 
-            Assert.Null(CurrencyDisplayResolver.ResolveUnitAmounts(costLines, -1, null));
+            Assert.Null(CurrencyDisplayResolver.ResolveUnitAmounts(0, perBatch, null));
+        }
+
+        [Fact]
+        public void ResolveUnitAmounts_NegativeOutputCount_ReturnsNull()
+        {
+            var perBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 3 } };
+
+            Assert.Null(CurrencyDisplayResolver.ResolveUnitAmounts(-1, perBatch, null));
         }
 
         [Fact]
         public void ResolveUnitAmounts_NullCostLines_ReturnsNull()
         {
-            Assert.Null(CurrencyDisplayResolver.ResolveUnitAmounts(null, 5, null));
+            // Covers both a non-vendor row and a vendor row whose tree
+            // occurrences resolved to more than one distinct offer (M34-B1
+            // #1's Conflict case) - PlanStep leaves this null in both cases.
+            Assert.Null(CurrencyDisplayResolver.ResolveUnitAmounts(3, null, null));
+        }
+
+        [Fact]
+        public void ResolveUnitAmounts_EmptyCostLines_ReturnsNull()
+        {
+            Assert.Null(CurrencyDisplayResolver.ResolveUnitAmounts(3, new List<CostLine>(), null));
         }
     }
 }

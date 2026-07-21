@@ -11,14 +11,17 @@ namespace GW2CraftingHelper.Tests.Services
     /// Full CanCraft/CanBuyTp/CanBuyVendor combination matrix (m3-display-
     /// decision-map.md's decision -> pill table) plus the HAVE/CURRENCY
     /// short-circuits, exercising the real DecisionPillPlanner.BuildPillSpecs
-    /// production code - KNOWN-ISSUES #18.
+    /// production code - KNOWN-ISSUES #18. Also covers the M34-B2b additions:
+    /// the non-interactive "USING N OWNED" annotation and the interactive
+    /// "IGNORE"/"IGNORED" toggle, appended to every non-Have/non-Currency
+    /// pill set (and, when active, alongside HAVE too).
     /// </summary>
     public class DecisionPillPlannerTests
     {
         private static CraftingTreeNode Node(
             CraftingDecision decision,
             bool canCraft = false, bool canBuyTp = false, bool canBuyVendor = false,
-            string acquisitionBadge = null)
+            string acquisitionBadge = null, int ownedQuantityUsed = 0, bool isIgnored = false)
         {
             return new CraftingTreeNode
             {
@@ -30,7 +33,9 @@ namespace GW2CraftingHelper.Tests.Services
                 CanCraft = canCraft,
                 CanBuyTp = canBuyTp,
                 CanBuyVendor = canBuyVendor,
-                AcquisitionBadge = acquisitionBadge
+                AcquisitionBadge = acquisitionBadge,
+                OwnedQuantityUsed = ownedQuantityUsed,
+                IsIgnored = isIgnored
             };
         }
 
@@ -49,6 +54,31 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void Have_NotIgnored_NoIgnorePill()
+        {
+            // A naturally-owned node (Quantity == 0 via real reduction, IsIgnored
+            // false) has nothing to un-ignore - stays the single plain HAVE pill.
+            var node = Node(CraftingDecision.Have, isIgnored: false);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Ignore);
+        }
+
+        [Fact]
+        public void Have_Ignored_AddsActiveIgnoredPill()
+        {
+            var node = Node(CraftingDecision.Have, isIgnored: true);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Equal(2, specs.Count);
+            Assert.Equal("HAVE", specs[0].Text);
+            var ignorePill = specs.Single(s => s.Kind == PillKind.Ignore);
+            Assert.Equal("IGNORED", ignorePill.Text);
+            Assert.Null(ignorePill.Source); // toggled via node identity, not an AcquisitionSource
+        }
+
+        [Fact]
         public void Currency_SingleLockedPill_NotInteractive()
         {
             var node = Node(CraftingDecision.Currency);
@@ -60,6 +90,19 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(specs[0].Source);
         }
 
+        [Fact]
+        public void Currency_NeverGetsIgnorePill_EvenWithOwnedQuantityUsed()
+        {
+            // Currency ownership is out of scope for the Ignore toggle (M34-B2b
+            // deliberately scopes Ignore to Item nodes - see behavioral_changes).
+            var node = Node(CraftingDecision.Currency, ownedQuantityUsed: 5);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Ignore);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
+        }
+
         // --- (F,F,F): no feasible source at all ---
 
         [Fact]
@@ -68,10 +111,12 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.Unknown);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
-            Assert.Single(specs);
+            Assert.Equal(2, specs.Count); // UNKNOWN + IGNORE
             Assert.Equal("UNKNOWN", specs[0].Text);
             Assert.Equal(PillKind.Locked, specs[0].Kind);
             Assert.Null(specs[0].Source);
+            var ignorePill = specs.Single(s => s.Kind == PillKind.Ignore);
+            Assert.Equal("IGNORE", ignorePill.Text);
         }
 
         [Fact]
@@ -80,12 +125,12 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.Unknown, acquisitionBadge: "SALVAGE");
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
-            Assert.Single(specs);
+            Assert.Equal(2, specs.Count); // SALVAGE + IGNORE
             Assert.Equal("SALVAGE", specs[0].Text);
             Assert.Equal(PillKind.Locked, specs[0].Kind);
         }
 
-        // --- Exactly one feasible source: single Locked pill ---
+        // --- Exactly one feasible source: single Locked pill (+ IGNORE) ---
 
         [Fact]
         public void OnlyTp_SingleLockedTpPill()
@@ -93,7 +138,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.BuyFromTp, canBuyTp: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
-            Assert.Single(specs);
+            Assert.Equal(2, specs.Count); // TP + IGNORE
             Assert.Equal("TP", specs[0].Text);
             Assert.Equal(PillKind.Locked, specs[0].Kind);
             Assert.Null(specs[0].Source);
@@ -105,7 +150,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.BuyFromVendor, canBuyVendor: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
-            Assert.Single(specs);
+            Assert.Equal(2, specs.Count); // VENDOR + IGNORE
             Assert.Equal("VENDOR", specs[0].Text);
             Assert.Equal(PillKind.Locked, specs[0].Kind);
         }
@@ -116,7 +161,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.Craft, canCraft: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
-            Assert.Single(specs);
+            Assert.Equal(2, specs.Count); // CRAFT + IGNORE
             Assert.Equal("CRAFT", specs[0].Text);
             Assert.Equal(PillKind.Locked, specs[0].Kind);
         }
@@ -132,7 +177,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(decision, canBuyTp: true, canBuyVendor: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
-            Assert.Equal(2, specs.Count);
+            Assert.Equal(3, specs.Count); // TP + VENDOR + IGNORE
             var selected = specs.Single(s => s.Kind == PillKind.Selected);
             var available = specs.Single(s => s.Kind == PillKind.Available);
 
@@ -140,6 +185,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(selected.Source); // selected pill is a no-op, never clickable
             Assert.Equal(availableText, available.Text);
             Assert.NotNull(available.Source); // available pill applies an override
+            Assert.Contains(specs, s => s.Kind == PillKind.Ignore && s.Text == "IGNORE");
         }
 
         [Theory]
@@ -151,7 +197,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(decision, canCraft: true, canBuyTp: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
-            Assert.Equal(2, specs.Count);
+            Assert.Equal(3, specs.Count); // CRAFT + TP + IGNORE
             Assert.Equal(selectedText, specs.Single(s => s.Kind == PillKind.Selected).Text);
             Assert.Equal(availableText, specs.Single(s => s.Kind == PillKind.Available).Text);
         }
@@ -165,7 +211,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(decision, canCraft: true, canBuyVendor: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
-            Assert.Equal(2, specs.Count);
+            Assert.Equal(3, specs.Count); // CRAFT + VENDOR + IGNORE
             Assert.Equal(selectedText, specs.Single(s => s.Kind == PillKind.Selected).Text);
             Assert.Equal(availableText, specs.Single(s => s.Kind == PillKind.Available).Text);
         }
@@ -184,16 +230,18 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(decision, canCraft: true, canBuyTp: true, canBuyVendor: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
-            Assert.Equal(3, specs.Count);
-            Assert.Equal(new[] { "CRAFT", "TP", "VENDOR" }, specs.Select(s => s.Text));
+            Assert.Equal(4, specs.Count); // CRAFT + TP + VENDOR + IGNORE
+            Assert.Equal(new[] { "CRAFT", "TP", "VENDOR", "IGNORE" }, specs.Select(s => s.Text));
 
             var selected = specs.Single(s => s.Kind == PillKind.Selected);
             Assert.Equal(expectedSelectedText, selected.Text);
             Assert.Null(selected.Source);
 
-            // Every other pill is Available and independently clickable -
-            // the M21 per-pill override model, not a single cycle button.
-            foreach (var other in specs.Where(s => s.Kind != PillKind.Selected))
+            // Every other SOURCE pill (excluding the trailing IGNORE
+            // annotation, which has its own Kind) is Available and
+            // independently clickable - the M21 per-pill override model,
+            // not a single cycle button.
+            foreach (var other in specs.Where(s => s.Kind != PillKind.Selected && s.Kind != PillKind.Ignore))
             {
                 Assert.Equal(PillKind.Available, other.Kind);
                 Assert.NotNull(other.Source);
@@ -210,6 +258,57 @@ namespace GW2CraftingHelper.Tests.Services
             var vendorPill = specs.Single(s => s.Text == "VENDOR");
             Assert.Equal(AcquisitionSource.Craft, craftPill.Source);
             Assert.Equal(AcquisitionSource.BuyFromVendor, vendorPill.Source);
+        }
+
+        // --- M34-B2b: "USING N OWNED" annotation ---
+
+        [Theory]
+        [InlineData(CraftingDecision.Craft, true, false, false, "CRAFT")]
+        [InlineData(CraftingDecision.BuyFromTp, false, true, false, "TP")]
+        [InlineData(CraftingDecision.BuyFromVendor, false, false, true, "VENDOR")]
+        [InlineData(CraftingDecision.Unknown, false, false, false, "UNKNOWN")]
+        public void PartialOwnership_AddsOwnedInfoPill_SourcePillUnchanged(
+            CraftingDecision decision, bool canCraft, bool canBuyTp, bool canBuyVendor, string expectedSourceText)
+        {
+            var node = Node(decision, canCraft, canBuyTp, canBuyVendor, ownedQuantityUsed: 4);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Equal(expectedSourceText, specs[0].Text);
+            var ownedPill = specs.Single(s => s.Kind == PillKind.OwnedInfo);
+            Assert.Equal("USING 4 OWNED", ownedPill.Text);
+            Assert.Null(ownedPill.Source);
+            Assert.Contains(specs, s => s.Kind == PillKind.Ignore && s.Text == "IGNORE");
+        }
+
+        [Theory]
+        [InlineData(CraftingDecision.Craft, true, false, false)]
+        [InlineData(CraftingDecision.BuyFromTp, false, true, false)]
+        [InlineData(CraftingDecision.BuyFromVendor, false, false, true)]
+        [InlineData(CraftingDecision.Unknown, false, false, false)]
+        public void NoOwnership_NoOwnedInfoPill(
+            CraftingDecision decision, bool canCraft, bool canBuyTp, bool canBuyVendor)
+        {
+            var node = Node(decision, canCraft, canBuyTp, canBuyVendor, ownedQuantityUsed: 0);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
+            Assert.Contains(specs, s => s.Kind == PillKind.Ignore && s.Text == "IGNORE");
+        }
+
+        [Fact]
+        public void FullOwnership_CollapsesToHave_NoOwnedInfoPill()
+        {
+            // "Full" ownership means the node's whole demand was covered,
+            // which (per CraftingTreeBuilder) always means Decision == Have
+            // in production - the OwnedInfo pill only ever fires on the
+            // real craft/tp/vendor/unknown paths for a PARTIALLY-covered
+            // node; a fully-owned node keeps the plain HAVE treatment.
+            var node = Node(CraftingDecision.Have, ownedQuantityUsed: 10);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("HAVE", specs[0].Text);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
         }
 
         // --- End-to-end via the real solver + tree builder: proves the
@@ -249,7 +348,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(CraftingDecision.BuyFromTp, node.Decision);
 
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
-            Assert.Equal(2, specs.Count); // TP, VENDOR (no recipe -> no CRAFT)
+            Assert.Equal(3, specs.Count); // TP, VENDOR (no recipe -> no CRAFT), IGNORE
             var selected = specs.Single(s => s.Kind == PillKind.Selected);
             Assert.Equal("TP", selected.Text);
         }
@@ -353,7 +452,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(node.CanCraft);
 
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
-            Assert.Single(specs);
+            Assert.Equal(2, specs.Count); // UNKNOWN + IGNORE
             Assert.Equal("UNKNOWN", specs[0].Text);
         }
     }

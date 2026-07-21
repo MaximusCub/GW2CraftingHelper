@@ -70,6 +70,31 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void CraftingSteps_MixedWithTimegatedNotice_SumsPerRowHeight()
+        {
+            // M34-B1 #3: a TimegatedNotice row renders via the shorter
+            // plain-text row pattern (FallbackTextRowHeight), not the taller
+            // numbered CraftStep row - height must be summed per row rather
+            // than assumed uniform once a section can mix row kinds.
+            var rows = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CraftStep),
+                Row(PlanRowType.TimegatedNotice)
+            };
+            int expected = PlanContentHeightMath.CraftStepRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
+            Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.CraftingSteps, rows));
+        }
+
+        [Fact]
+        public void CraftingSteps_OnlyTimegatedNotices_UsesFallbackTextRowHeight()
+        {
+            var rows = new List<PlanRowViewModel> { Row(PlanRowType.TimegatedNotice) };
+            Assert.Equal(
+                PlanContentHeightMath.FallbackTextRowHeight,
+                PlanContentHeightMath.SectionBodyHeight(PlanSectionType.CraftingSteps, rows));
+        }
+
+        [Fact]
         public void Disciplines_IncludesHeaderRowPlusRows()
         {
             var rows = new List<PlanRowViewModel> { Row(PlanRowType.DisciplineRow) };

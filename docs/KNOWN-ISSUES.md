@@ -432,6 +432,220 @@ drag. The primitives the fix reuses - pixel-offset capture,
 ScrollMath.RatioForOffset, synchronous write, StartScrollVerify - are
 each live-verified under item #14's captures.)
 
+## 20. M34: gw2efficiency owned-materials parity + correctness fixes
+
+Follow-on milestone after M33's KNOWN-ISSUES 12-18 closure (master
+`e486f86`, 636 tests). Two research reports
+(`m34-r2-gw2e-owned-materials.md`, `m34-r3-gw2e-caps-and-misc.md`) and two
+live-oddity root-cause investigations (`m34-m1-owned-materials-map.md`,
+`m34-m2-live-oddities.md`) preceded implementation. 723 tests green at
+milestone end.
+
+### 20.1 Correctness fix: Obsidian Shard 179x showed Total 186, not 180 (M34-B1 #1)
+
+Real bug, reproduced bit-for-bit via the offline Harness (`--profile 2
+--dump-tree`). Obsidian Shard (item 19925) is needed via five separate tree
+occurrences (a self-referential Mystic Forge recipe re-expands it once per
+branch - three duplicated Vision Crystal branches at qty 4 each, plus two
+direct Mystic Clover-chain branches at qty 83 and 84). The winning vendor
+offer is a 3-for-3-Laurels bulk purchase. `PlanSolver` computed
+`unitsNeeded = ceil(node.Quantity / offer.OutputCount)` **once per
+occurrence** and summed the already-rounded results:
+`ceil(4/3)+ceil(4/3)+ceil(4/3)+ceil(83/3)+ceil(84/3) = 2+2+2+28+28 = 62`
+purchases x 3 = **186 Laurels** - a real 6-Laurel (+3.3%) overcount versus
+the correct aggregate-first answer, `ceil(179/3)*3 = 180`. This directly
+contradicted gw2efficiency's own documented convention
+(`craftingSteps.ts`: batch counts are ceil'd only after all same-id steps
+across the whole tree are merged). Fixed by tracking each item's winning
+vendor offer batch shape across every occurrence and re-deriving the merged
+step's true cost from AGGREGATE demand with a single ceil
+(`PlanSolver.FinalizeVendorBatches`); occurrences that genuinely picked
+different offers are left as the sum of their own already-correct
+per-occurrence costs rather than forced through one offer's batch shape.
+The identical per-node `unitsNeeded` scaling also applies to a bulk offer's
+coin cost, so any item needed via 2+ tree occurrences and priced via a
+same-offer bulk vendor purchase was equally exposed, not just this one
+Obsidian Shard repro.
+
+Secondary, independent issue noted but only partially addressed: even at
+the correct 180 total, a truncating-average "Each" price for a
+batch-purchased currency row (`180/179` still truncates to a
+non-representative "1") is inherently a poor fit - gw2e's own shopping list
+never shows a per-unit currency price at all. M34-B1 #2 changed the Each
+cell to resolve the WINNING OFFER's own true per-batch rate
+(`PlanStep.VendorOfferOutputCount`/`VendorOfferCurrencyCostLinesPerBatch`)
+instead of the old truncated total/quantity average, rendering a literal
+"N for M" bundle label when that rate is fractional, and omitting the Each
+cell entirely (never a guessed rate) when a merged row's occurrences used
+more than one distinct offer.
+
+### 20.2 Cap-parity change: vendor purchase caps no longer hard-exclude an offer (M34-B1 #3)
+
+`m34-r3-gw2e-caps-and-misc.md` verdict: gw2efficiency's daily/weekly
+purchase caps are informational display only (a post-solve "this'll take
+you N days" banner) - they never re-route the solver, exclude an offer, or
+change a craft/buy decision. Our solver's pre-M34 `EvaluateVendorOffers`
+did the opposite: once a node's own occurrence-local quantity exceeded a
+cap, it silently excluded that vendor offer from evaluation entirely, which
+would (the moment any cap data is ever seeded - today 0 of 53,530 wiki
+offers carry cap data, so this was previously inert) make the solver pick a
+different, possibly worse, path than gw2e for the same node. Fixed to match
+upstream: caps no longer gate offer evaluation; cap-exceeding merged demand
+now surfaces as a `CraftingPlan.TimegatedItems` entry, rendered as a plain
+informational row in the Crafting Steps section instead of silently
+re-routing the plan.
+
+### 20.3 Status race: stale "Building final result..." status line (M34-B1 #4)
+
+Root-caused via `m34-m2-live-oddities.md`: a generation's own trailing
+progress tick (routed through `Progress<T>`'s default
+`SynchronizationContext`, two ThreadPool hops) and that same generation's
+completion write (an inlined task continuation, effectively one hop) race
+for Blish's `QueueMainThreadUpdate` queue with no FIFO guarantee between
+them. In practice the completion write ("Plan generated...") reliably
+drained first, so the late-arriving trailing tick overwrote it right back
+with the stale "Building final result..." text - and nothing wrote to the
+status label again for that generation. The pre-existing `myGen ==
+_generateSequence` guard could not catch this: both callbacks belong to the
+SAME generation, so the guard (designed to reject a superseded generation's
+stale callback) passed for both. Fixed with a per-generation
+`_statusClosedForCurrentGeneration` flag, set the instant a generation
+writes its own completion/error status; the progress-tick callback now
+checks this flag too (via the new, pure `StatusUpdateGuard.ShouldApply`)
+before every `SetStatus` call, closing the race at drain time regardless of
+which callback happens to actually drain first.
+
+### 20.4 Owned-materials parity scope (M34-B2a + M34-B2b)
+
+Two research reports (`m34-r2-gw2e-owned-materials.md`,
+`m34-m1-owned-materials-map.md`) found gw2efficiency's owned-materials
+model diverges from ours in several ways; M34-B2a/B2b closed the ones in
+scope:
+
+- **Per-node owned attribution** (B2a #1): a new `CraftingTreeNode.
+  OwnedQuantityUsed` field (threaded from a new `ReducedTreeResult.
+  OwnedQuantityUsedByNode` side channel, keyed by stable `NodeId`) makes a
+  PARTIALLY-owned node representable for the first time - previously only
+  fully-owned nodes (reduced to `Decision.Have`) were visible at all, and a
+  node whose item id recurred elsewhere in the tree had no way to attribute
+  "how much did THIS node use" (the old `UsedMaterials` list is aggregated
+  by item id only).
+- **Primary-option-only pool consumption** (B2a #2): `InventoryReducer`
+  previously walked EVERY `RecipeOption` on a node when consuming owned
+  stock, letting an alternate recipe the solver would never choose drain
+  the shared pool meant for a real branch. Now only the primary
+  (first-listed) option recurses with consumption; every option's
+  ingredient quantities are still rescaled so the solver's cost comparison
+  across options stays correct.
+- **"Value Own Materials" force-buy pre-pass** (B2a #3): gw2e's
+  `valueOwnItems` setting is a genuine pre-pass that force-excludes craft
+  from nodes where buying beats a 15%-discounted craft cost
+  (`buyPrice < craftDecisionPrice * 0.85`) - our prior `OwnMaterialsMode.
+  Valued` only adjusted a downstream profit number and had ZERO effect on
+  which items got crafted (a real parity gap, since the target item in
+  this project's Exordium-precursor use case is always account-bound and
+  therefore never has the sell price the old profit adjustment needed
+  anyway). `OwnedMaterialsForceBuyPrePass` now applies gw2e's exact rule
+  against a genuine zero-owned baseline solve, and `ModuleSettings.
+  ValueOwnMaterials` defaults to `true` (matching gw2e) with its first
+  Settings-tab checkbox. Deliberately narrower than gw2e's always-on gate:
+  it only activates when a real snapshot is actually driving reduction, so
+  the new default doesn't surprise a user who has never enabled "Use Own
+  Materials" with newly forced-buy decisions.
+- **Owned currency is display-only, never fed back into the tree** (B2a
+  #4 + B2b): matching gw2e's own two-tier design (item ownership is a real
+  structural input to the algorithm; currency ownership is a cosmetic
+  annotation plus a downstream summary-only netting, Section 4 of the r2
+  report), `AccountCurrencyIndex` wraps the wallet snapshot the same way
+  `AccountItemIndex` wraps owned items, but is consulted ONLY after solving
+  - `CraftingPlanResult`/`PlanSolveContext.OwnedCurrencyAmounts` are
+  populated strictly from the plan's already-final currency totals, never
+  read by `InventoryReducer` or `PlanSolver`. A regression test proves
+  decisions/costs are identical with and without wallet data. B2b then
+  surfaced this previously-plumbed-but-unrendered data: the Total Cost
+  section's currency rows and the Shopping List's vendor currency cells now
+  show an "(X owned, Y needed)" annotation when wallet data is present
+  (Total Cost inline; Shopping List as a tooltip, to avoid new row-height
+  layout math for a cosmetic-only addition) - byte-identical to before when
+  no wallet snapshot exists.
+- **"Using N owned materials" pill** (B2b): `DecisionPillPlanner` now
+  emits a non-interactive `PillKind.OwnedInfo` pill ("USING N OWNED")
+  alongside a node's normal CRAFT/TP/VENDOR/UNKNOWN pill whenever
+  `OwnedQuantityUsed > 0`, matching gw2e's own
+  `usedQuantity < totalQuantity` condition. A fully-owned node (collapsed
+  to the single `HAVE` pill) deliberately keeps that existing plain
+  treatment rather than also showing the annotation - a scope decision, not
+  an oversight (gw2e's own live tree does not collapse a fully-owned node
+  to a single pill the way this module's M28 UI simplification does, so
+  there is no exact upstream precedent to follow for this specific
+  combination).
+- **"Ignore" pill** (B2b): gw2e's per-item "treat this as fully in-hand
+  tree-wide" override is implemented as a NEW per-solve `ignoredItemIds`
+  parameter threaded through `PlanSolver.Solve`/`Evaluate`/`Collect`
+  (keyed by ItemId, not NodeId, matching gw2e's "every occurrence of that
+  item id" semantics) and `CraftingPlanPipeline.ResolveWithOverrides` -
+  reusing the same local-resolve machinery M21's craft/buy pill clicks use,
+  with the ignored-id set held as view-session state
+  (`CraftingPlanView._ignoredItemIds`) alongside, but independent of,
+  `_nodeOverrides` (neither "Best Path" nor "Craft All"/"Buy All" clears
+  it, matching gw2e's own documented "bulk actions are unrelated to
+  ownership" behavior). An ignored item contributes zero cost, generates no
+  crafting step or shopping row, and its own recipe's ingredients are never
+  evaluated (matching gw2e's "an un-crafted branch never asks for its
+  ingredients" rule) - `CraftingTreeBuilder` collapses it to the same
+  `Decision.Have` display a genuinely-owned node gets, but sets a new
+  `CraftingTreeNode.IsIgnored` flag so the pill layer keeps showing an
+  active, clickable "IGNORED" toggle (distinct from a naturally-owned
+  node's plain, non-interactive `HAVE` pill) for un-ignoring.
+  **Conservative reading recorded per the milestone brief**: gw2e's own
+  Ignore mechanism works INDIRECTLY, by injecting a synthetic
+  `source: "Ignored"` entry into the owned-materials accounting layer and
+  letting the existing `calculateTreeQuantity`/`calculateTreePrices` re-run
+  naturally re-derive zero cost and zero-quantity cascading through
+  descendants; this module's `InventoryReducer`-based reduction already ran
+  once, before `PlanSolveContext.Tree` was even captured, and re-running it
+  locally (no network calls, per the existing local-resolve contract) is
+  out of reach of the current architecture (`m34-m1-owned-materials-map.md`
+  Section 5 explicitly flags this as needing "a new mechanism"). The
+  chosen, narrower-but-correct substitute: zero the ignored node's OWN cost
+  contribution directly at solve time (matching gw2e's END STATE for that
+  node - Section 2.1's "owned units are free, full stop" - and Section
+  5.2's "no crafting step for zero demand") without attempting to cascade
+  zero-quantity scaling down through an ignored node's own descendants the
+  way gw2e's real quantity-computation pass does (out of scope; those
+  descendants simply are never visited at all here, rather than being
+  visited-but-showing-zero, since the ignored node's own recipe traversal
+  is skipped entirely). Scoped to Item nodes only (no Currency-Ignore
+  support, since gw2e's Currency-Ignore path funnels through the wallet
+  accounting layer this module doesn't have wired into the tree at all -
+  see the B2a #4 note above).
+- **Known, deliberately out-of-scope gaps** (flagged, not fixed this
+  milestone): the multi-recipe-option pool-consumption risk (m1 report
+  Section 6.2 point 5 in the r2 report / Section 1 point 5 of the m1 map)
+  is explicitly NOT the same bug as B2a #2 above (that fix was
+  primary-option-ONLY consumption in `InventoryReducer`; `PlanSolver.
+  Evaluate` itself still walks every recipe option for cost-comparison
+  purposes, which is safe there since it is read-only); achievement-bit
+  ingredient de-duplication (r2 report Section 1.5) has no equivalent in
+  this module at all - niche (only matters for the small set of GW2
+  recipes with a one-time achievement-reward ingredient reused across
+  multiple tree branches) and out of scope for this pass.
+
+**VERIFICATION STATE**: all of the above is confirmed by a green build and
+the full 723-test suite (real production code paths - `PlanSolver`,
+`CraftingTreeBuilder`, `CraftingPlanPipeline`, `DecisionPillPlanner`,
+`CurrencyDisplayResolver`, `PlanViewModelBuilder`), plus the Obsidian Shard
+180-vs-186 numbers reproduced bit-for-bit against the real Exordium tree
+via the offline Harness (`m34-m2-live-oddities.md`). **Not yet re-confirmed
+by a live in-game desktop check** (screenshot loop) for any of the M34-B1/
+B2a/B2b visual changes - the pill layout in particular (a node can now show
+up to 5 pills: one of CRAFT/TP/VENDOR/HAVE/UNKNOWN, an optional
+"USING N OWNED", and an "IGNORE"/"IGNORED" toggle) has an acknowledged,
+unverified overflow risk on a deeply-nested, narrow-panel tree row (the
+M33 m1 map's own "up to six pills" ceiling note) - treat a fresh
+pill-overflow or clipped-pill report as expected-until-checked rather than
+a regression.
+
 ## Handoff notes for the implementing session
 - Project memory holds the environment + working rules: the
   Blish-over-Paint screenshot loop (input routing: Paint focused for
