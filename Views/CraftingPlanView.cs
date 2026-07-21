@@ -2358,20 +2358,19 @@ namespace GW2CraftingHelper.Views
             // CreateRowDivider's doc comment for why 1px is unsafe under
             // Blish's non-integer UI-scale GPU transform (KNOWN-ISSUES #23).
             // NOT built via CreateRowDivider (headerPanel is not a row of a
-            // list, it has its own fixed 30px height) so it is out of scope
-            // for the M36b bottomClearance fix below - but it is built the
-            // SAME way (a Panel child bottom-anchored 2px from its parent's
-            // bottom edge) and is therefore subject to the identical
-            // Container.Paint round-trip defect. Simulation (M36b
-            // investigation) shows H=30 is immune at the default 0.897
-            // scale but becomes vulnerable (~16-17%) at the "Small" 0.81
-            // scale - unconfirmed live and left unfixed here since it was
-            // outside this fix's requested scope; flagged as a follow-up
-            // concern, not a known-safe case.
+            // list, it has its own fixed 30px height) but it is built the
+            // SAME way (a Panel child bottom-anchored near its parent's
+            // bottom edge) and is subject to the identical Container.Paint
+            // scissor round-trip defect. Simulation (M36b investigation)
+            // shows a bottom-flush 2px line under H=30 is immune at the
+            // default 0.897 scale but vulnerable (~16-17%) at the "Small"
+            // 0.81 scale, so it gets the same 1px bottom clearance as the
+            // vulnerable row types (y = 30 - 2 - 1 = 27). Title text sits
+            // at y=4 with DefaultFont18 and remains clear of y=27.
             var headerDivider = new Panel()
             {
                 Size = new Point(panelWidth, 2),
-                Location = new Point(0, 28),
+                Location = new Point(0, 27),
                 BackgroundColor = SectionDividerColor,
                 Parent = headerPanel
             };
