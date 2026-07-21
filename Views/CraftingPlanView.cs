@@ -37,7 +37,7 @@ namespace GW2CraftingHelper.Views
         private static readonly Color SectionDividerColor = new Color(130, 130, 130);
 
         private readonly Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
-        private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> _resolveOverridesSync;
+        private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly ModuleSettings _settings;
@@ -79,6 +79,16 @@ namespace GW2CraftingHelper.Views
         // reset on a fresh Generate.
         private readonly Dictionary<int, AcquisitionSource> _nodeOverrides =
             new Dictionary<int, AcquisitionSource>();
+
+        // Item ids manually marked "Ignore" this session (M34-B2b, gw2e
+        // parity) - keyed by ItemId (not NodeId), matching gw2e's own
+        // "Ignore marks every occurrence of that item id, tree-wide"
+        // semantics (see PlanSolver.Solve's ignoredItemIds parameter).
+        // Independent of _nodeOverrides: neither "Best Path" nor "Craft
+        // All"/"Buy All" clears this (gw2e's bulk actions are documented as
+        // unrelated to ownership - r2 report Section 3.3); it is only ever
+        // toggled per item id (the pill click) or on a fresh Generate.
+        private readonly HashSet<int> _ignoredItemIds = new HashSet<int>();
         private readonly Dictionary<int, bool> _nodeExpansion =
             new Dictionary<int, bool>();
         private readonly Dictionary<PlanSectionType, bool> _sectionExpansion =
@@ -250,7 +260,7 @@ namespace GW2CraftingHelper.Views
             ModalDialog modalDialog,
             IItemSearchProvider itemSearchProvider,
             ModuleSettings settings,
-            Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> resolveOverridesSync = null)
+            Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> resolveOverridesSync = null)
         {
             _generateAsync = generateAsync;
             _modalDialog = modalDialog;
@@ -1376,6 +1386,7 @@ namespace GW2CraftingHelper.Views
                     // so a disposed-control bail below can never strand this
                     // generation's state half-applied.
                     _nodeOverrides.Clear();
+                    _ignoredItemIds.Clear();
                     _nodeExpansion.Clear();
                     _sectionExpansion.Clear();
                     _lastResult = result;
@@ -1919,7 +1930,7 @@ namespace GW2CraftingHelper.Views
             var font = GameService.Content.DefaultFont12;
             int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
             int width = textWidth + 12;
-            GetPillColors(PillKind.Locked, out Color border, out Color fill);
+            GetPillColors(PillKind.Locked, false, out Color border, out Color fill);
 
             var outer = new Panel()
             {
@@ -2172,6 +2183,20 @@ namespace GW2CraftingHelper.Views
             if (!string.IsNullOrEmpty(hintText))
             {
                 tooltipParts.Add(hintText);
+            }
+            // M34-B2b: owned/needed split for this row's currency cost(s),
+            // cosmetic-only tooltip (avoids new inline layout math for a
+            // fixed-height shopping row - see PlanContentHeightMath).
+            if (row.CurrencyCosts != null)
+            {
+                foreach (var cc in row.CurrencyCosts)
+                {
+                    if (cc.OwnedQuantity.HasValue)
+                    {
+                        long needed = cc.Amount - cc.OwnedQuantity.Value;
+                        tooltipParts.Add($"{cc.Name}: {cc.OwnedQuantity.Value} owned, {needed} needed");
+                    }
+                }
             }
             if (tooltipParts.Count > 0)
             {
@@ -2646,7 +2671,10 @@ namespace GW2CraftingHelper.Views
         /// IconUrl null (no data available - service not wired up, fetch
         /// not yet complete, or the currency was absent from the API
         /// response) renders exactly like CreateTextRow - never a
-        /// placeholder guess for a missing icon.
+        /// placeholder guess for a missing icon. When CurrencyOwnedQuantity
+        /// is set (M34-B2b, wallet data present), an "(X owned, Y needed)"
+        /// annotation follows the icon - gw2e's ownedCurrencies/
+        /// shoppingCurrencies split (r2 report Section 4.3), cosmetic only.
         /// </summary>
         private void CreateCurrencyRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
         {
@@ -2664,16 +2692,32 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
+            int cursorX = 8 + label.Width;
             if (!string.IsNullOrEmpty(row.IconUrl))
             {
-                int iconX = 8 + label.Width + CoinLabelIconGap;
+                int iconX = cursorX + CoinLabelIconGap;
                 int iconY = (CurrencyRowHeight - CurrencyIconSize) / 2;
                 CreateItemIcon(rowPanel, row.IconUrl, iconX, iconY, CurrencyIconSize);
+                cursorX = iconX + CurrencyIconSize;
+            }
+
+            if (row.CurrencyOwnedQuantity.HasValue)
+            {
+                int needed = row.Quantity - row.CurrencyOwnedQuantity.Value;
+                new Label()
+                {
+                    Text = $"({row.CurrencyOwnedQuantity.Value} owned, {needed} needed)",
+                    TextColor = new Color(153, 153, 153),
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(cursorX + CoinLabelIconGap, 4),
+                    Parent = rowPanel
+                };
             }
 
             // Not width-dependent beyond the row's own cosmetic width (m2
-            // 3.6): label/icon sit at a fixed left-anchored x regardless of
-            // panelWidth.
+            // 3.6): label/icon/owned-annotation sit at a fixed left-anchored
+            // x regardless of panelWidth.
             _relayoutActions.Add(w => rowPanel.Size = new Point(w, CurrencyRowHeight));
         }
 
@@ -2885,7 +2929,7 @@ namespace GW2CraftingHelper.Views
 
             try
             {
-                var result = _resolveOverridesSync(_lastResult.SolveContext, _nodeOverrides);
+                var result = _resolveOverridesSync(_lastResult.SolveContext, _nodeOverrides, _ignoredItemIds);
                 _lastResult = result;
                 _lastDebugLog = result.DebugLog;
                 var vm = _vmBuilder.Build(result);
@@ -3289,7 +3333,12 @@ namespace GW2CraftingHelper.Views
         // tested (DecisionPillPlannerTests) - so only the actual
         // Panel/Label rendering below stays view-only.
 
-        private static void GetPillColors(PillKind kind, out Color border, out Color fill)
+        /// <summary>
+        /// isIgnoreActive is only meaningful for PillKind.Ignore (whether
+        /// THIS specific Ignore pill is the active/"IGNORED" state, i.e.
+        /// node.IsIgnored) - ignored for every other kind.
+        /// </summary>
+        private static void GetPillColors(PillKind kind, bool isIgnoreActive, out Color border, out Color fill)
         {
             switch (kind)
             {
@@ -3304,6 +3353,21 @@ namespace GW2CraftingHelper.Views
                 case PillKind.Available:
                     border = new Color(138, 138, 138); // #8A8A8A
                     fill = Color.Transparent;
+                    break;
+                case PillKind.OwnedInfo:
+                    // Muted gold, distinct from every other pill hue -
+                    // informational only, never confused with a selectable
+                    // source (M34-B2b).
+                    border = new Color(201, 162, 39); // #C9A227
+                    fill = border * 0.15f;
+                    break;
+                case PillKind.Ignore:
+                    // Amber when active ("IGNORED", currently toggled on);
+                    // plain clickable grey (matching Available) otherwise -
+                    // never Selected's green, to avoid reading as "the
+                    // chosen acquisition source" (M34-B2b).
+                    border = isIgnoreActive ? new Color(229, 168, 60) : new Color(138, 138, 138); // #E5A83C / #8A8A8A
+                    fill = isIgnoreActive ? border * 0.15f : Color.Transparent;
                     break;
                 case PillKind.Locked:
                 default:
@@ -3331,7 +3395,7 @@ namespace GW2CraftingHelper.Views
                 int textWidth = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width);
                 int pillWidth = textWidth + 12;
 
-                GetPillColors(spec.Kind, out Color borderColor, out Color fillColor);
+                GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
                 // White, not borderColor: Selected/Available fills expose the
                 // border hue behind the label, so border-colored text has zero
                 // contrast against its own backdrop (M30 #11).
@@ -3371,6 +3435,7 @@ namespace GW2CraftingHelper.Views
                 };
 
                 bool interactive = !dimmed && spec.Source.HasValue && _resolveOverridesSync != null;
+                bool ignoreInteractive = !dimmed && spec.Kind == PillKind.Ignore && _resolveOverridesSync != null;
                 if (interactive)
                 {
                     outer.BasicTooltipText = $"Switch to {spec.Text}";
@@ -3378,6 +3443,27 @@ namespace GW2CraftingHelper.Views
                     outer.Click += (_, __) =>
                     {
                         _nodeOverrides[node.NodeId] = source;
+                        ApplyOverridesAndResolve();
+                    };
+                    Color restingBorder = borderColor;
+                    outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
+                    outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
+                }
+                else if (ignoreInteractive)
+                {
+                    // M34-B2b: toggles this ITEM id (not just this node) in
+                    // or out of _ignoredItemIds, matching gw2e's own
+                    // tree-wide-by-item-id "Ignore" semantics.
+                    outer.BasicTooltipText = node.IsIgnored
+                        ? "Stop treating this item as fully in-hand"
+                        : "Treat this item as fully in-hand (ignore its owned-stock requirement)";
+                    int itemId = node.ItemId;
+                    outer.Click += (_, __) =>
+                    {
+                        if (!_ignoredItemIds.Remove(itemId))
+                        {
+                            _ignoredItemIds.Add(itemId);
+                        }
                         ApplyOverridesAndResolve();
                     };
                     Color restingBorder = borderColor;

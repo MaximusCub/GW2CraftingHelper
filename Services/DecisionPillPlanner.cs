@@ -9,7 +9,21 @@ namespace GW2CraftingHelper.Services
         Selected,
         Available,
         Locked,
-        Have
+        Have,
+
+        // Non-interactive "USING N OWNED" annotation (M34-B2b, gw2e's
+        // "Using N owned materials" pill) - informational only, never
+        // clickable, coexists alongside whichever source pill(s) this node
+        // already has (see BuildPillSpecs).
+        OwnedInfo,
+
+        // Interactive per-item "IGNORE"/"IGNORED" toggle (M34-B2b, gw2e's
+        // "Ignore" pill) - clicking marks (or unmarks) this item id as fully
+        // in-hand tree-wide for this session's re-solves. Text alone
+        // ("IGNORE" vs "IGNORED") carries the current state; Kind stays the
+        // same for both so the view can style the two states from one
+        // switch arm using CraftingTreeNode.IsIgnored.
+        Ignore
     }
 
     public struct PillSpec
@@ -54,6 +68,16 @@ namespace GW2CraftingHelper.Services
             if (node.Decision == CraftingDecision.Have)
             {
                 specs.Add(new PillSpec { Text = "HAVE", Source = null, Kind = PillKind.Have });
+                // A node collapses to Have both for genuine full ownership
+                // (Quantity == 0 via real reduction) and for a manually
+                // "Ignore"-d item (M34-B2b) - only the latter gets the extra
+                // toggle pill, so the user can still un-ignore it. A
+                // naturally-owned node has nothing to un-ignore and keeps
+                // the single plain HAVE pill unchanged.
+                if (node.IsIgnored)
+                {
+                    specs.Add(new PillSpec { Text = "IGNORED", Source = null, Kind = PillKind.Ignore });
+                }
                 return specs;
             }
             if (node.Decision == CraftingDecision.Currency)
@@ -76,11 +100,13 @@ namespace GW2CraftingHelper.Services
                     ? node.AcquisitionBadge
                     : "UNKNOWN";
                 specs.Add(new PillSpec { Text = badgeText, Source = null, Kind = PillKind.Locked });
+                AppendOwnershipPills(specs, node);
                 return specs;
             }
             if (options.Count == 1)
             {
                 specs.Add(new PillSpec { Text = options[0].text, Source = null, Kind = PillKind.Locked });
+                AppendOwnershipPills(specs, node);
                 return specs;
             }
 
@@ -106,7 +132,35 @@ namespace GW2CraftingHelper.Services
                     Kind = selected ? PillKind.Selected : PillKind.Available
                 });
             }
+            AppendOwnershipPills(specs, node);
             return specs;
+        }
+
+        /// <summary>
+        /// Appends the two owned-materials pills (M34-B2b) shared by every
+        /// non-Have/non-Currency return path in BuildPillSpecs: the
+        /// non-interactive "USING N OWNED" annotation (only when this node's
+        /// own demand was actually partly covered by real inventory - see
+        /// CraftingTreeNode.OwnedQuantityUsed's doc comment) and the
+        /// interactive "IGNORE" toggle (offered on every real item node
+        /// regardless of ownership, matching gw2e's own always-offered
+        /// "Ignore" pill - Section 3.2 of the r2 report). A node this method
+        /// is called for is, by construction, never already ignored (an
+        /// ignored node's Decision is Have, handled separately above), so
+        /// the toggle always starts from its "IGNORE" (not yet active) text.
+        /// </summary>
+        private static void AppendOwnershipPills(List<PillSpec> specs, CraftingTreeNode node)
+        {
+            if (node.OwnedQuantityUsed > 0)
+            {
+                specs.Add(new PillSpec
+                {
+                    Text = $"USING {node.OwnedQuantityUsed} OWNED",
+                    Source = null,
+                    Kind = PillKind.OwnedInfo
+                });
+            }
+            specs.Add(new PillSpec { Text = "IGNORE", Source = null, Kind = PillKind.Ignore });
         }
     }
 }
