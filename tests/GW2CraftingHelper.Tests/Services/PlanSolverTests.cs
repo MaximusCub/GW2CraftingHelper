@@ -283,9 +283,18 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void UnpriceableCraftIngredients_BuyAvailable_FallsBackToBuy()
+        public void UnpriceableCraftIngredient_ZeroFilled_CraftWinsWithPartialCost()
         {
-            // Item 1: buy = 500. Craft needs item 2 which has no TP price.
+            // M33 partial-pricing parity (superseded
+            // "UnpriceableCraftIngredients_BuyAvailable_FallsBackToBuy"):
+            // an unpriceable-and-unrecipeable ingredient no longer
+            // disqualifies the recipe - it contributes ZERO to the craft
+            // cost instead (echoing gw2e's craftPrice = sum(component
+            // .craftResultPrice || 0)). Item 1: buy = 500. Craft needs item
+            // 2, which has no TP price and no recipe, so craft "costs" 0
+            // and strictly beats the 500 buy price - Craft wins, and item
+            // 2 still surfaces as its own UnknownSource node/step (the
+            // partial total is intentional, not a display bug).
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
                     Leaf(2, 1)));
@@ -296,14 +305,504 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
+            var result = solver.Solve(tree, prices);
+            var plan = result.Plan;
+
+            Assert.Equal(2, plan.Steps.Count);
+            var craftStep = plan.Steps.Single(s => s.ItemId == 1);
+            Assert.Equal(AcquisitionSource.Craft, craftStep.Source);
+            Assert.Equal(0, craftStep.TotalCost);
+
+            var unknownStep = plan.Steps.Single(s => s.ItemId == 2);
+            Assert.Equal(AcquisitionSource.UnknownSource, unknownStep.Source);
+
+            // Finding-1 fix: item 2 still gets its own decision entry even
+            // though it contributed nothing to item 1's craft cost.
+            Assert.True(result.Decisions.ContainsKey(1)); // item 2 is NodeId 1 (DFS)
+            Assert.Equal(AcquisitionSource.UnknownSource, result.Decisions[1].Source);
+        }
+
+        [Fact]
+        public void SiblingIngredients_AfterUnpriceableFirstIngredient_AreStillEvaluated()
+        {
+            // M33 Finding 1 (m5 report): the ingredient loop used to `break`
+            // on the first unpriceable ingredient, so every LATER sibling in
+            // that same recipe never got evaluated at all - no memo entry,
+            // indistinguishable from a genuine no-data gap. Recipe 10's
+            // ingredients: item 2 (unpriceable, no recipe) first, then item
+            // 3 and item 4 (both TP-priced) - both must still resolve to
+            // BuyFromTp with a real decision entry, not just silently
+            // vanish because item 2 came first.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 1),
+                    Leaf(3, 1),
+                    Leaf(4, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                // Item 1 and item 2 intentionally have no price.
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 40 } },
+                { 4, new ItemPrice { ItemId = 4, BuyInstant = 60 } }
+            };
+            var solver = new PlanSolver();
+
+            // DFS NodeIds: root=0, item2=1, item3=2, item4=3.
+            var result = solver.Solve(tree, prices);
+
+            Assert.True(result.Decisions.ContainsKey(2), "item 3 (sibling after the unpriceable item 2) must have a decision entry");
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Decisions[2].Source);
+            Assert.Equal(40, result.Decisions[2].TotalCost);
+
+            Assert.True(result.Decisions.ContainsKey(3), "item 4 (sibling after the unpriceable item 2) must have a decision entry");
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Decisions[3].Source);
+            Assert.Equal(60, result.Decisions[3].TotalCost);
+
+            var plan = result.Plan;
+            Assert.Contains(plan.Steps, s => s.ItemId == 3 && s.Source == AcquisitionSource.BuyFromTp);
+            Assert.Contains(plan.Steps, s => s.ItemId == 4 && s.Source == AcquisitionSource.BuyFromTp);
+        }
+
+        [Fact]
+        public void RecipeWithNoBuyPriceAtAll_AlwaysForceCrafts_NeverUnknown()
+        {
+            // M33 spec item 2a (gw2e: isCheaperToCraft = craftPrice-defined
+            // && (!buyPrice || decisionPrice < buyPrice)): a node with a
+            // recipe but NO buy price (no TP price, no comparable vendor
+            // offer) is force-crafted - Craft, never Unknown - regardless
+            // of the recipe's own priceability.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 3)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                // Item 1 has NO price at all; item 2 is normally priced.
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices);
+
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.True(result.Decisions[0].CanCraft);
+            Assert.False(result.Decisions[0].CanBuyTp);
+            Assert.Equal(30, result.Plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void NoRecipeAndNoPrice_IsUnknownSource_WithAllFlagsFalse()
+        {
+            // M33 spec item 2c (gw2e's "Not sold or crafted"): a node with
+            // NO recipe and NO price gets UnknownSource with every
+            // feasibility flag false - never silently defaults to Craft.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices);
+
+            Assert.Equal(AcquisitionSource.UnknownSource, result.Decisions[0].Source);
+            Assert.False(result.Decisions[0].CanCraft);
+            Assert.False(result.Decisions[0].CanBuyTp);
+            Assert.False(result.Decisions[0].CanBuyVendor);
+        }
+
+        // --- Tie-break parity tests (M33 spec item 3) ---
+        // gw2e: craft/vendor must be STRICTLY cheaper than buy to win; an
+        // exact tie resolves to buy at every level ("Vendor beats TP beats
+        // Craft" is superseded).
+
+        [Fact]
+        public void CraftCostTiesBuyPrice_BuyWins()
+        {
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
             var plan = solver.Solve(tree, prices).Plan;
 
-            // Should buy item 1 since craft is unpriceable
             Assert.Single(plan.Steps);
-            var step = plan.Steps[0];
-            Assert.Equal(1, step.ItemId);
-            Assert.Equal(AcquisitionSource.BuyFromTp, step.Source);
-            Assert.Equal(500, step.TotalCost);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(100, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void VendorCostTiesBuyPrice_BuyWins()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 200) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(200, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void VendorAndCraftBothBeatBuy_VendorWinsTieBetweenThem()
+        {
+            // Both craft (200) and vendor (200) strictly beat buy (500);
+            // an exact craft/vendor tie keeps vendor (this engine's
+            // pre-existing precedent - not itself part of the gw2e spec,
+            // which never separates vendor from craft as its own arm).
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 200) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(200, plan.TotalCoinCost);
+        }
+
+        // --- Mystic Clover-style EV pricing tests (M33 spec item 7,
+        // CORRECTED per the M33 fix-pass Critical finding: quantity
+        // propagation - not a second cost adjustment inside PlanSolver -
+        // is where ExpectedOutputCount now takes effect. RecipeService (and
+        // InventoryReducer, when a snapshot is present) compute
+        // CraftsNeeded = ceil(quantity / ExpectedOutputCount) and scale
+        // every ingredient's Quantity by that many attempts BEFORE the tree
+        // ever reaches PlanSolver. By the time Evaluate sees an EV recipe's
+        // ingredients, their quantities already reflect the full expected
+        // cost - PlanSolver must simply sum them, never amortize again.) ---
+
+        [Fact]
+        public void FractionalExpectedOutput_PreScaledIngredients_CraftCostReconcilesWithBuySteps()
+        {
+            // Simulates what RecipeService now produces for a Mystic
+            // Clover-style recipe: needing 1 successful output at EV=0.5
+            // means ceil(1/0.5)=2 forge attempts, so the (1-per-attempt)
+            // ingredient already carries Quantity=2 by the time it reaches
+            // PlanSolver - NOT Quantity=1 with a solver-side /0.5 fixup.
+            var evOption = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                ExpectedOutputCount = 0.5,
+                CraftsNeeded = 2,
+                Ingredients = new List<RecipeNode> { Leaf(2, 2) }
+            };
+            var tree = Craftable(1, 1, evOption);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices).Plan;
+
+            var craftStep = plan.Steps.Single(s => s.Source == AcquisitionSource.Craft);
+            var buyStep = plan.Steps.Single(s => s.Source == AcquisitionSource.BuyFromTp);
+
+            // 2 units of item 2 @ 100 = 200 - PlanSolver must NOT divide
+            // this by the EV ratio again (that would double-amortize to
+            // 400). The Craft step's own TotalCost must reconcile EXACTLY
+            // with the Buy step(s) it recursively spawns - the M33 Critical
+            // finding's "two different coin figures for the same subtree"
+            // bug is fixed when this holds.
+            Assert.Equal(200, buyStep.TotalCost);
+            Assert.Equal(200, craftStep.TotalCost);
+            Assert.Equal(craftStep.TotalCost, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void FractionalExpectedOutput_PreScaledIngredients_StillLosesToCheaperBuy()
+        {
+            // Same pre-scaled tree (2 units of item 2 @ 100 = 200 real
+            // cost), but the item's own buy price (150) is now cheaper than
+            // the (correctly, non-amortized) craft cost - buy must win.
+            var evOption = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                ExpectedOutputCount = 0.5,
+                CraftsNeeded = 2,
+                Ingredients = new List<RecipeNode> { Leaf(2, 2) }
+            };
+            var tree = Craftable(1, 1, evOption);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 150 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices);
+
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Decisions[0].Source);
+            Assert.Equal(150, result.Plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void OrdinaryRecipe_ExpectedOutputDefaultsToOutputCount_NoOpOnPricing()
+        {
+            // A recipe that never sets ExpectedOutputCount (the common
+            // case - only Mystic Clover-style recipes do) must price
+            // identically to before this feature existed.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices).Plan;
+
+            var craftStep = plan.Steps.Single(s => s.Source == AcquisitionSource.Craft);
+            Assert.Equal(200, craftStep.TotalCost);
+        }
+
+        // --- Currency-ingredient decision valuation (M33 fix-pass MustFix:
+        // a recipe's Currency-type ingredient must feed the craft-vs-buy
+        // DECISION value via a caller-supplied valuation, while always
+        // contributing zero to the displayed real coin cost - r1 4.2/4.3) ---
+
+        [Fact]
+        public void CurrencyIngredient_ValuedAndExpensive_TipsDecisionToBuy()
+        {
+            // Craft option: 1x item2(@50)=50 real coin + 3x currency 23
+            // (spirit shard) valued at 3600 copper/unit by the caller for
+            // COMPARISON only = 10800. Comparison total 10850 loses to the
+            // 200 buy price, even though the real coin ingredient (50)
+            // looks cheap in isolation.
+            var evOption = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                CraftsNeeded = 1,
+                Ingredients = new List<RecipeNode>
+                {
+                    Leaf(2, 1),
+                    Leaf(23, 3, "Currency")
+                }
+            };
+            var tree = Craftable(1, 1, evOption);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 23, 3600 } });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, null, valuation).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(200, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void CurrencyIngredient_ValuedButCraftStillWins_RealCostExcludesCurrencyValue()
+        {
+            // Currency valuation (10 copper x 3 = 30) is small enough that
+            // craft still wins overall, but the COMMITTED real coin cost
+            // must be just the coin ingredient (50) - never inflated by the
+            // currency's decision-only valuation.
+            var evOption = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                CraftsNeeded = 1,
+                Ingredients = new List<RecipeNode>
+                {
+                    Leaf(2, 1),
+                    Leaf(23, 3, "Currency")
+                }
+            };
+            var tree = Craftable(1, 1, evOption);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 23, 10 } });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, null, valuation).Plan;
+
+            var craftStep = plan.Steps.Single(s => s.Source == AcquisitionSource.Craft);
+            Assert.Equal(50, craftStep.TotalCost);
+        }
+
+        [Fact]
+        public void CurrencyIngredient_Unvalued_ContributesZeroToDecisionAndCost()
+        {
+            // No CurrencyValuation supplied (null -> CurrencyValuation.None
+            // internally): the currency ingredient must be inert - same
+            // behavior as before this fix, never inventing an exchange
+            // rate. Craft (50 real coin, decision value 50) beats the 1000
+            // buy price regardless of the unvalued 3-unit currency cost.
+            var evOption = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                CraftsNeeded = 1,
+                Ingredients = new List<RecipeNode>
+                {
+                    Leaf(2, 1),
+                    Leaf(23, 3, "Currency")
+                }
+            };
+            var tree = Craftable(1, 1, evOption);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices).Plan;
+
+            var craftStep = plan.Steps.Single(s => s.Source == AcquisitionSource.Craft);
+            Assert.Equal(50, craftStep.TotalCost);
+        }
+
+        // --- VendorCurrencyCosts threading tests (M33 spec item 5) ---
+
+        [Fact]
+        public void VendorCurrencyCosts_ThreadedOntoSolverDecisionAndPlanStep()
+        {
+            var tree = Leaf(1, 2);
+            var prices = new Dictionary<int, ItemPrice>();
+            var offer = new VendorOffer
+            {
+                OfferId = "test-currency-thread",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 10 },
+                    new CostLine { Type = "Currency", Id = 23, Count = 50 }
+                },
+                MerchantName = "Miyani",
+                Locations = new List<string>()
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, result.Decisions[0].Source);
+            Assert.NotNull(result.Decisions[0].VendorCurrencyCosts);
+            Assert.Single(result.Decisions[0].VendorCurrencyCosts);
+            Assert.Equal(23, result.Decisions[0].VendorCurrencyCosts[0].Id);
+            Assert.Equal(100, result.Decisions[0].VendorCurrencyCosts[0].Count); // 50/unit * qty 2
+
+            var step = result.Plan.Steps.Single(s => s.ItemId == 1);
+            Assert.NotNull(step.VendorCurrencyCosts);
+            Assert.Single(step.VendorCurrencyCosts);
+            Assert.Equal(23, step.VendorCurrencyCosts[0].Id);
+            Assert.Equal(100, step.VendorCurrencyCosts[0].Count);
+        }
+
+        [Fact]
+        public void VendorCurrencyCosts_MergedAcrossDeduplicatedOccurrences()
+        {
+            // Same vendor-sourced item reached via two tree branches must
+            // sum its currency cost into the single aggregated PlanStep row,
+            // not just the last-seen occurrence's amount.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 1),
+                    Craftable(3, 1,
+                        Option(20, 1, 1,
+                            Leaf(2, 1)))));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100000 } }
+            };
+            var offer = new VendorOffer
+            {
+                OfferId = "test-dedup-currency",
+                OutputItemId = 2,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Currency", Id = 23, Count = 10 }
+                },
+                MerchantName = "Miyani",
+                Locations = new List<string>()
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 2, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            var item2Steps = plan.Steps.Where(s => s.ItemId == 2).ToList();
+            Assert.Single(item2Steps); // deduplicated into one row
+            Assert.NotNull(item2Steps[0].VendorCurrencyCosts);
+            Assert.Single(item2Steps[0].VendorCurrencyCosts);
+            Assert.Equal(23, item2Steps[0].VendorCurrencyCosts[0].Id);
+            Assert.Equal(20, item2Steps[0].VendorCurrencyCosts[0].Count); // 10 + 10 across both occurrences
+        }
+
+        [Fact]
+        public void VendorCurrencyCosts_MergeOverflow_ClampsRatherThanWraps()
+        {
+            // Two occurrences of the same vendor-sourced item, each with a
+            // currency count near int.MaxValue, sum past int.MaxValue -
+            // must clamp, not silently wrap to a negative/garbage count.
+            const int nearMax = 1_200_000_000;
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 1),
+                    Craftable(3, 1,
+                        Option(20, 1, 1,
+                            Leaf(2, 1)))));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100000 } }
+            };
+            var offer = new VendorOffer
+            {
+                OfferId = "test-overflow-currency",
+                OutputItemId = 2,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Currency", Id = 23, Count = nearMax }
+                },
+                MerchantName = "Miyani",
+                Locations = new List<string>()
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 2, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            var item2Step = plan.Steps.Single(s => s.ItemId == 2);
+            Assert.Equal(int.MaxValue, item2Step.VendorCurrencyCosts[0].Count);
         }
 
         // --- Backward-compat regression tests ---
@@ -622,10 +1121,19 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void MixedCurrencyVendor_FallbackForUnpriceableCraftNode()
+        public void MixedCurrencyVendor_ZeroFilledCraft_BeatsFallbackVendor()
         {
-            // Output has a recipe whose ingredient has no TP price, and a mixed
-            // vendor offer: the offer is the only complete acquisition.
+            // M33 partial-pricing parity (superseded
+            // "MixedCurrencyVendor_FallbackForUnpriceableCraftNode"): item
+            // 1 has no TP price, an unpriceable-and-unrecipeable ingredient
+            // (so its craft cost is zero-filled per the new rule, not
+            // disqualified), and a fallback-only mixed vendor offer (25
+            // coin + 50 unvalued currency). With no buy price at all, craft
+            // (0, force-craftable) beats the fallback vendor outright -
+            // craft is chosen over a real, priced vendor offer specifically
+            // BECAUSE the craft total is an artificially cheap partial
+            // total. This is intentional (gw2e's own behavior), not a
+            // regression - see M33 spec item 2d.
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
@@ -636,12 +1144,14 @@ namespace GW2CraftingHelper.Tests.Services
 
             var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
-            Assert.Single(plan.Steps);
-            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
-            Assert.Equal(25, plan.TotalCoinCost);
-            Assert.Single(plan.CurrencyCosts);
-            Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
-            Assert.Equal(50, plan.CurrencyCosts[0].Amount);
+            var craftStep = plan.Steps.Single(s => s.ItemId == 1);
+            Assert.Equal(AcquisitionSource.Craft, craftStep.Source);
+            Assert.Equal(0, craftStep.TotalCost);
+            Assert.Equal(0, plan.TotalCoinCost);
+            Assert.Empty(plan.CurrencyCosts); // the losing vendor offer never commits
+
+            var unknownStep = plan.Steps.Single(s => s.ItemId == 2);
+            Assert.Equal(AcquisitionSource.UnknownSource, unknownStep.Source);
         }
 
         [Fact]
@@ -1176,12 +1686,18 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void Override_ForcedCraftOnUnpriceableRecipe_IgnoredKeepsBuy()
+        public void UnpriceableRecipe_CanCraftIsTrue_ForceCraftSucceedsWithZeroFilledCost()
         {
-            // Item 1 is TP-priced AND has a recipe, but the recipe's
-            // ingredient has no price: forcing Craft must be refused (a null
-            // craft cost would silently understate the plan total) and the
-            // pill must not even offer Craft (CanCraft false).
+            // M33 partial-pricing parity (superseded
+            // "Override_ForcedCraftOnUnpriceableRecipe_IgnoredKeepsBuy"):
+            // CanCraft now means "has a recipe" (gw2e's hasComponents), not
+            // "recipe is fully priceable" - a recipe with an unpriceable
+            // ingredient is always force-craftable (the ingredient just
+            // zero-fills the craft cost). Item 1 is TP-priced (100) AND has
+            // a recipe whose ingredient has no price; without any override
+            // at all, craft (0, zero-filled) already strictly beats buy
+            // (100), so this also demonstrates the natural (non-forced)
+            // pick, not just the override path.
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>
             {
@@ -1189,16 +1705,20 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
+            var natural = solver.Solve(tree, prices, null);
+            Assert.Equal(AcquisitionSource.Craft, natural.Decisions[0].Source);
+            Assert.True(natural.Decisions[0].CanCraft);
+            Assert.True(natural.Decisions[0].CanBuyTp);
+            Assert.Equal(0, natural.Plan.TotalCoinCost);
+
             var overrides = new Dictionary<int, AcquisitionSource>
             {
                 { 0, AcquisitionSource.Craft }
             };
-            var result = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
+            var forced = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
 
-            Assert.Equal(AcquisitionSource.BuyFromTp, result.Decisions[0].Source);
-            Assert.Equal(100, result.Plan.TotalCoinCost);
-            Assert.False(result.Decisions[0].CanCraft);
-            Assert.True(result.Decisions[0].CanBuyTp);
+            Assert.Equal(AcquisitionSource.Craft, forced.Decisions[0].Source);
+            Assert.Equal(0, forced.Plan.TotalCoinCost);
         }
 
         [Fact]

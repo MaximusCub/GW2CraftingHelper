@@ -83,6 +83,7 @@
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
+    <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />
     <Compile Include="Services\AcquisitionHintService.cs" />
     <Compile Include="Services\CraftingTreeBuilder.cs" />
@@ -134,6 +135,7 @@
     <Compile Include="Services\RecipeClientFactory.cs" />
     <Compile Include="Contracts\CraftingDecision.cs" />
     <Compile Include="Contracts\CraftingTreeNode.cs" />
+    <Compile Include="Services\DecisionPillPlanner.cs" />
     <Compile Include="Contracts\IItemSearchProvider.cs" />
     <Compile Include="Contracts\StaticItemSearchProvider.cs" />
     <Compile Include="Services\CraftableItemSearchProvider.cs" />

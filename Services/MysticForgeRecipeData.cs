@@ -118,6 +118,24 @@ namespace GW2CraftingHelper.Services
                     continue;
                 }
 
+                // Optional fractional expected-output count (Mystic
+                // Clover-style recipes, e.g. 0.31 - see r2 report). Absent
+                // is valid (most recipes have none); present-but-invalid
+                // (<= 0) is a data error, so the recipe is skipped rather
+                // than silently treated as absent.
+                double? expectedOutputCount = null;
+                var expectedOutputToken = entry["expectedOutputCount"];
+                if (expectedOutputToken != null && expectedOutputToken.Type != JTokenType.Null)
+                {
+                    var parsed = entry.Value<double?>("expectedOutputCount");
+                    if (parsed == null || parsed.Value <= 0)
+                    {
+                        warnings.Add($"Skipped recipe id={id.Value}: expectedOutputCount must be > 0 when present");
+                        continue;
+                    }
+                    expectedOutputCount = parsed.Value;
+                }
+
                 var ingredientsToken = entry["ingredients"];
                 if (ingredientsToken == null || ingredientsToken.Type != JTokenType.Array || !ingredientsToken.Any())
                 {
@@ -159,6 +177,7 @@ namespace GW2CraftingHelper.Services
                     Id = id.Value,
                     OutputItemId = outputItemId.Value,
                     OutputItemCount = outputItemCount.Value,
+                    ExpectedOutputCount = expectedOutputCount,
                     Ingredients = ingredients,
                     Disciplines = new List<string> { "MysticForge" },
                     MinRating = 0,

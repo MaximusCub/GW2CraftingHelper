@@ -9,8 +9,9 @@ namespace GW2CraftingHelper.Tests.Services
     public class AcquisitionHintServiceTests
     {
         // Mirrors the real ref/acquisition_hints_seed.json content (the
-        // five wiki-verified entries from docs/KNOWN-ISSUES.md item 8) so
-        // this test also guards the production seed file's shape.
+        // five wiki-verified entries from docs/KNOWN-ISSUES.md item 8, plus
+        // the M33 item-17 Gift of Battle entry) so this test also guards
+        // the production seed file's shape.
         private const string ValidEnvelopeJson = @"{
             ""schemaVersion"": 1,
             ""generatedAt"": ""2026-07-20T00:00:00Z"",
@@ -20,23 +21,25 @@ namespace GW2CraftingHelper.Tests.Services
                 { ""itemId"": 70698, ""hint"": ""Received for completing map exploration of Dragon's Stand. Account bound; not tradable; no recipe."", ""badge"": ""EXPLORE"", ""sourceUrl"": ""https://wiki.guildwars2.com/wiki/Gift_of_the_Jungle"", ""lastVerified"": ""2026-07-20"" },
                 { ""itemId"": 70797, ""hint"": ""Received for completing map exploration of Verdant Brink. Account bound; not tradable; no recipe."", ""badge"": ""EXPLORE"", ""sourceUrl"": ""https://wiki.guildwars2.com/wiki/Gift_of_the_Fleet"", ""lastVerified"": ""2026-07-20"" },
                 { ""itemId"": 71943, ""hint"": ""Received for completing map exploration of Auric Basin. Account bound; not tradable; no recipe."", ""badge"": ""EXPLORE"", ""sourceUrl"": ""https://wiki.guildwars2.com/wiki/Gift_of_Tarir"", ""lastVerified"": ""2026-07-20"" },
-                { ""itemId"": 74528, ""hint"": ""Received for completing map exploration of Tangled Depths. Account bound; not tradable; no recipe."", ""badge"": ""EXPLORE"", ""sourceUrl"": ""https://wiki.guildwars2.com/wiki/Gift_of_the_Chak"", ""lastVerified"": ""2026-07-20"" }
+                { ""itemId"": 74528, ""hint"": ""Received for completing map exploration of Tangled Depths. Account bound; not tradable; no recipe."", ""badge"": ""EXPLORE"", ""sourceUrl"": ""https://wiki.guildwars2.com/wiki/Gift_of_the_Chak"", ""lastVerified"": ""2026-07-20"" },
+                { ""itemId"": 19678, ""hint"": ""Obtained from the Gift of Battle Item Reward Track (WvW). Formerly purchasable from Battle Master for 500 Badges of Honor; that vendor path was removed in the Spring 2016 Quarterly Update. Account bound; not tradable; no recipe."", ""badge"": ""WVW"", ""sourceUrl"": ""https://wiki.guildwars2.com/wiki/Gift_of_Battle"", ""lastVerified"": ""2026-07-20"" }
             ]
         }";
 
         [Fact]
-        public void Load_ValidPayload_ParsesAllFiveEntries()
+        public void Load_ValidPayload_ParsesAllSixEntries()
         {
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(ValidEnvelopeJson)))
             {
                 var hints = AcquisitionHintService.Load(stream);
 
-                Assert.Equal(5, hints.Count);
+                Assert.Equal(6, hints.Count);
                 Assert.True(hints.ContainsKey(71994));
                 Assert.True(hints.ContainsKey(70698));
                 Assert.True(hints.ContainsKey(70797));
                 Assert.True(hints.ContainsKey(71943));
                 Assert.True(hints.ContainsKey(74528));
+                Assert.True(hints.ContainsKey(19678));
 
                 var ballOfDarkEnergy = hints[71994];
                 Assert.Equal(71994, ballOfDarkEnergy.ItemId);
@@ -51,6 +54,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Equal("EXPLORE", hints[70797].Badge);
                 Assert.Equal("EXPLORE", hints[71943].Badge);
                 Assert.Equal("EXPLORE", hints[74528].Badge);
+
+                var giftOfBattle = hints[19678];
+                Assert.Equal("WVW", giftOfBattle.Badge);
+                Assert.Equal(
+                    "https://wiki.guildwars2.com/wiki/Gift_of_Battle",
+                    giftOfBattle.SourceUrl);
             }
         }
 
@@ -132,7 +141,7 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Shipped seed file (pins the real file against silent drift) ---
 
         [Fact]
-        public void Load_ShippedSeedFile_ParsesFiveEntriesWithHintAndBadge()
+        public void Load_ShippedSeedFile_ParsesSixEntriesWithHintAndBadge()
         {
             string path = FindRepoFile(Path.Combine("ref", "acquisition_hints_seed.json"));
             Assert.False(
@@ -143,7 +152,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 var hints = AcquisitionHintService.Load(stream);
 
-                Assert.Equal(5, hints.Count);
+                Assert.Equal(6, hints.Count);
                 foreach (var hint in hints.Values)
                 {
                     Assert.False(string.IsNullOrEmpty(hint.Hint));

@@ -35,6 +35,12 @@
     <Content Include="..\..\ref\recipe_seed_manifest.json" Link="ref\recipe_seed_manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\ref\item_name_seed.json" Link="ref\item_name_seed.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\ref\acquisition_hints_seed.json" Link="ref\acquisition_hints_seed.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

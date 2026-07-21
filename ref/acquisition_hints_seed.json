@@ -37,6 +37,13 @@
       "badge": "EXPLORE",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Chak",
       "lastVerified": "2026-07-20"
+    },
+    {
+      "itemId": 19678,
+      "hint": "Obtained from the Gift of Battle Item Reward Track (WvW). Formerly purchasable from Battle Master for 500 Badges of Honor; that vendor path was removed in the Spring 2016 Quarterly Update. Account bound; not tradable; no recipe.",
+      "badge": "WVW",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_Battle",
+      "lastVerified": "2026-07-20"
     }
   ]
 }

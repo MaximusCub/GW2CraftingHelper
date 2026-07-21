@@ -190,7 +190,8 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var (pipeline, _) = BuildPipeline();
             var result = await pipeline.GenerateStructuredAsync(
-                ZojjasClaymore, 1, null, CancellationToken.None);
+                ZojjasClaymore, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // 1. Target identity
             Assert.Equal(ZojjasClaymore, result.Plan.TargetItemId);
@@ -302,7 +303,8 @@ namespace GW2CraftingHelper.Tests.Services
             };
 
             var result = await pipeline.GenerateStructuredAsync(
-                ZojjasClaymore, 1, snapshot, CancellationToken.None);
+                ZojjasClaymore, 1, snapshot, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // 14. UsedMaterials reports the Blade consumed
             Assert.Contains(result.UsedMaterials,
@@ -338,7 +340,8 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var (pipeline, _) = BuildPipeline();
             var result = await pipeline.GenerateStructuredAsync(
-                ZojjasClaymore, 1, null, CancellationToken.None);
+                ZojjasClaymore, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.NotNull(result.DebugLog);
 

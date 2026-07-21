@@ -13,7 +13,8 @@ namespace GW2CraftingHelper.Services
             var vm = new PlanViewModel
             {
                 TargetQuantity = result.Plan.TargetQuantity,
-                TreeRoot = result.CraftingTree
+                TreeRoot = result.CraftingTree,
+                CurrencyMetadata = result.CurrencyMetadata
             };
 
             // Resolve target name/icon/rarity
@@ -147,8 +148,8 @@ namespace GW2CraftingHelper.Services
             {
                 foreach (var cc in result.Plan.CurrencyCosts)
                 {
-                    string currencyName = ResolveCurrencyName(cc.CurrencyId, result.CurrencyMetadata);
-                    string iconUrl = ResolveCurrencyIconUrl(cc.CurrencyId, result.CurrencyMetadata);
+                    string currencyName = CurrencyDisplayResolver.ResolveName(cc.CurrencyId, result.CurrencyMetadata);
+                    string iconUrl = CurrencyDisplayResolver.ResolveIconUrl(cc.CurrencyId, result.CurrencyMetadata);
                     section.Rows.Add(new PlanRowViewModel
                     {
                         RowType = PlanRowType.CurrencyCost,
@@ -217,7 +218,11 @@ namespace GW2CraftingHelper.Services
                     CoinValue = step.TotalCost,
                     UnitCoinValue = step.UnitCost,
                     HintText = ResolveHintText(rowType, step.ItemId, result.AcquisitionHints),
-                    BadgeText = ResolveBadgeText(rowType, step.ItemId, result.AcquisitionHints)
+                    BadgeText = ResolveBadgeText(rowType, step.ItemId, result.AcquisitionHints),
+                    CurrencyCosts = CurrencyDisplayResolver.ResolveAmounts(
+                        step.VendorCurrencyCosts, result.CurrencyMetadata),
+                    UnitCurrencyCosts = CurrencyDisplayResolver.ResolveUnitAmounts(
+                        step.VendorCurrencyCosts, step.Quantity, result.CurrencyMetadata)
                 });
             }
 
@@ -398,41 +403,6 @@ namespace GW2CraftingHelper.Services
                 case AcquisitionSource.Currency: return PlanRowType.ShoppingCurrency;
                 default: return PlanRowType.ShoppingUnknown;
             }
-        }
-
-        /// <summary>
-        /// Prefers the live-fetched currency name when CurrencyMetadataService
-        /// has resolved it, falling back to the offline Gw2Constants table
-        /// (kept as the fallback, not removed) when metadata is null/absent
-        /// for this id or came back with an empty name.
-        /// </summary>
-        private static string ResolveCurrencyName(
-            int currencyId, IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
-        {
-            if (currencyMetadata != null &&
-                currencyMetadata.TryGetValue(currencyId, out var meta) &&
-                !string.IsNullOrEmpty(meta.Name))
-            {
-                return meta.Name;
-            }
-            return Gw2Constants.ResolveCurrencyName(currencyId);
-        }
-
-        /// <summary>
-        /// Icon for a CurrencyCost row; null (never a placeholder guess)
-        /// when metadata is absent for this id or has no icon URL - the row
-        /// then renders exactly as it did before icons existed.
-        /// </summary>
-        private static string ResolveCurrencyIconUrl(
-            int currencyId, IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
-        {
-            if (currencyMetadata != null &&
-                currencyMetadata.TryGetValue(currencyId, out var meta) &&
-                !string.IsNullOrEmpty(meta.IconUrl))
-            {
-                return meta.IconUrl;
-            }
-            return null;
         }
 
         private static string ResolveName(

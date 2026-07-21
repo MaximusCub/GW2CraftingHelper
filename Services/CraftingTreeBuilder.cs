@@ -61,6 +61,9 @@ namespace GW2CraftingHelper.Services
             treeNode.CanCraft = decision.CanCraft;
             treeNode.CanBuyTp = decision.CanBuyTp;
             treeNode.CanBuyVendor = decision.CanBuyVendor;
+            treeNode.VendorCurrencyCosts = decision.Source == AcquisitionSource.BuyFromVendor
+                ? decision.VendorCurrencyCosts
+                : null;
 
             if (decision.Source == AcquisitionSource.BuyFromTp ||
                 decision.Source == AcquisitionSource.BuyFromVendor)

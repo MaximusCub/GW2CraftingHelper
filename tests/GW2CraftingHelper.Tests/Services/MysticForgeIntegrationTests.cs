@@ -372,7 +372,8 @@ namespace GW2CraftingHelper.Tests.Services
                 reducer: new InventoryReducer());
 
             var result = await pipeline.GenerateStructuredAsync(
-                MysticSalvageKitId, 1, null, CancellationToken.None);
+                MysticSalvageKitId, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // MysticForge discipline should be required
             Assert.Contains(result.RequiredDisciplines,
@@ -525,7 +526,8 @@ namespace GW2CraftingHelper.Tests.Services
                 accountRecipeClient: accountClient);
 
             var result = await pipeline.GenerateStructuredAsync(
-                MysticSalvageKitId, 1, null, CancellationToken.None);
+                MysticSalvageKitId, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // MF recipe -4 should be in RequiredRecipes
             var mfRecipe = result.RequiredRecipes.FirstOrDefault(r => r.RecipeId == -4);
@@ -567,7 +569,8 @@ namespace GW2CraftingHelper.Tests.Services
                 reducer: new InventoryReducer());
 
             var result = await pipeline.GenerateStructuredAsync(
-                MysticSalvageKitId, 1, null, CancellationToken.None);
+                MysticSalvageKitId, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // Plan is present with steps
             Assert.NotNull(result.Plan);
@@ -638,7 +641,8 @@ namespace GW2CraftingHelper.Tests.Services
                 reducer: new InventoryReducer());
 
             var resultNoMf = await pipelineNoMf.GenerateStructuredAsync(
-                500, 1, null, CancellationToken.None);
+                500, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // --- With MF data loaded (for different items) ---
             var apiWithMf = new InMemoryRecipeApiClient();
@@ -655,7 +659,8 @@ namespace GW2CraftingHelper.Tests.Services
                 reducer: new InventoryReducer());
 
             var resultWithMf = await pipelineWithMf.GenerateStructuredAsync(
-                500, 1, null, CancellationToken.None);
+                500, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // --- Stable invariants ---
 

@@ -2,6 +2,39 @@
   "schemaVersion": 1,
   "recipes": [
     {
+      "id": -1591,
+      "outputItemId": 19675,
+      "outputItemCount": 1,
+      "expectedOutputCount": 0.31,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19925,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 19976,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 19721,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 20796,
+          "count": 6
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": []
+    },
+    {
       "id": -1590,
       "outputItemId": 107222,
       "outputItemCount": 1,

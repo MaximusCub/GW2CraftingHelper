@@ -186,17 +186,58 @@ Clover) render empty Each/Total cells. Show the actual vendor cost,
 including non-coin currency costs with currency icons (pipeline for
 icons exists since M30 #3). Echo gw2e's display for the same nodes.
 
-## 17. Seed data gaps: false UNKNOWNs in the Exordium tree
-- Gift of Exordium, Gift of Metal, Gift of the Mists: believed Mystic
-  Forge recipes - missing from the recipe seed, so they render UNKNOWN.
-- Mystic Runestone: vendor-purchased (Miyani, spirit shards) - missing
-  vendor offer.
-- Sweep EVERY node of a live Exordium plan that renders UNKNOWN against
-  the wiki; classify each as (a) genuinely no-source (seed an
-  acquisition hint + badge), or (b) missing recipe/vendor seed data
-  (extend the MF recipe seeder / vendor offers seed).
-- Known related data bug: ref/recipes_seed.json has a self-referential
-  recipe for Obsidian Shard (19925) - likely MF seeder scrape artifact.
+## 17. Seed data gaps: false UNKNOWNs in the Exordium tree (FIXED in M33)
+Original hypothesis was wrong on 3 of its 4 points, confirmed by wiki
+research and an offline Harness dump. Gift of Exordium, Gift of Metal, and
+Gift of the Mists were already correctly seeded (recipes -1337, 6074,
+-1005) before this milestone - they rendered UNKNOWN because
+PlanSolver.Evaluate stopped evaluating a recipe's ingredients on the first
+unpriceable sibling, so every later sibling never got a decision at all
+(fixed in the M33 solver-parity rewrite, not a seed gap). Mystic Runestone
+was never priced in Spirit Shards; it is a 1-gold coin purchase from
+Miyani, already correctly seeded. The self-referential Obsidian Shard
+recipe (id -496: 1 Obsidian Shard + 1 Mystic Coin + 1 Pile of Putrid
+Essence + 1 Mini Risen Priest of Balthazar -> 3 Obsidian Shards) is
+genuine wiki-documented game data (a real, obscure festival-junk-to-shard
+Mystic Forge combo), not a scraper artifact - the solver's per-path
+visiting-set cycle guard already handles it safely, and the same is true
+of the ~98 similar self-referential salvage-trophy tier-up recipes found
+elsewhere in the seed (their large propagated quantities are correct,
+wiki-scale arithmetic, not a bug). The one real gap: Mystic Clover
+(19675) had no Mystic Forge recipe seeded at all despite being needed 77x
+by Mystic Tribute - added this milestone (recipe -1591: 1 Obsidian Shard +
+1 Mystic Coin + 1 Glob of Ectoplasm + 6 Philosopher's Stone, EV-priced at
+the wiki-documented 0.31 success rate from a 40k-sample community study).
+Also added: 20 missing item names (Mystic Runestone, Tribute to the
+Exitare, Mystic Clover, and 17 others an offline Harness dump showed
+rendering "Unknown Item") and one acquisition hint - Gift of Battle, whose
+only vendor-purchase path (Battle Master, 500 Badges of Honor) was removed
+in the Spring 2016 Quarterly Update per a fresh wiki check; it is WvW
+reward-track only now. Gift of Glory and Gift of War were also checked
+against this same "believed no-source" pattern and are NOT genuine gaps -
+both have a real, already-seeded Miyani vendor purchase priced in
+currently-tradable materials (Shard of Glory / Memory of Battle), just
+unresolvable in the offline Harness (no live TP data there); no hint was
+added for either, since one would be actively misleading. Verified via the
+Harness's new --dump-tree flag: Exordium, Gift of Exordium, Mystic Tribute,
+Gift of Maguuma Mastery, Gift of Condensed Magic/Might, and Mystic Clover
+all now resolve to a real Craft/Vendor decision instead of Unknown.
+Follow-up: ref/vendor_offers.json still carries a stale "Battle Master,
+500 Badges of Honor" offer for Gift of Battle scraped from the wiki's
+historical (removed) vendor section, which currently masks the new hint
+above (item 8's precedent shows the acquisition-hint system only applies
+to genuinely Unknown nodes) - worth a future VendorOfferUpdater cleanup
+pass, out of scope for this seed-data milestone.
+
+**Follow-up resolved (M33 Wave B polish, 2026-07-20):** the stale
+Battle Master / 500 Badges of Honor offer was removed from
+ref/vendor_offers.json after two independent wiki re-checks confirmed
+the purchase path was removed in the Spring 2016 Quarterly Update. Gift
+of Battle now correctly resolves Unknown with its WVW acquisition-hint
+badge visible instead of a bogus BuyFromVendor decision (confirmed via
+a rebuilt offline Harness --dump-tree run). The same pass also named the
+remaining ~26 base-tier materials (ores, dust, leather, venom sacs, Tiny
+Claw, etc.) that still rendered "Unknown Item" in the Harness dump.
 
 ## 18. Multi-source decision display is inconsistent
 Glob of Ectoplasm shows a VENDOR pill while its pricing uses TP. Items

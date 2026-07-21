@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Contracts
 {
@@ -30,6 +31,14 @@ namespace GW2CraftingHelper.Contracts
         public int? RecipeId { get; set; }
         public long? UnitCost { get; set; }
         public long? SubtreeCost { get; set; }
+
+        // Non-coin currency cost of a BuyFromVendor decision (see
+        // SolverDecision.VendorCurrencyCosts). Null for every other
+        // Decision, and also null for a BuyFromVendor decision whose offer
+        // was purely coin-priced (nothing to report). Internal ids only -
+        // a later display task is responsible for resolving these to
+        // names/icons before render.
+        public IReadOnlyList<CostLine> VendorCurrencyCosts { get; set; }
 
         // True when this node was bought (TP/vendor) but ALSO has a known
         // recipe, so Children holds gw2e's "what it would cost to craft
