@@ -135,6 +135,7 @@
     <Compile Include="Services\RecipeClientFactory.cs" />
     <Compile Include="Contracts\CraftingDecision.cs" />
     <Compile Include="Contracts\CraftingTreeNode.cs" />
+    <Compile Include="Services\DecisionPillPlanner.cs" />
     <Compile Include="Contracts\IItemSearchProvider.cs" />
     <Compile Include="Contracts\StaticItemSearchProvider.cs" />
     <Compile Include="Services\CraftableItemSearchProvider.cs" />

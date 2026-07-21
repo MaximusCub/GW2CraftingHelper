@@ -2337,91 +2337,12 @@ namespace GW2CraftingHelper.Views
         }
 
         // --- Decision pills ---
-
-        private enum PillKind
-        {
-            Selected,
-            Available,
-            Locked,
-            Have
-        }
-
-        private struct PillSpec
-        {
-            public string Text;
-            public AcquisitionSource? Source; // non-null => clickable
-            public PillKind Kind;
-        }
-
-        /// <summary>
-        /// One pill per feasible acquisition source (gw2e's multi-pill
-        /// model): 2-3 pills means a real choice, exactly 1 pill means the
-        /// source is locked - the pill count itself is the affordance.
-        /// HAVE/CURRENCY/UNKNOWN are always single, non-interactive pills
-        /// (no AcquisitionSource value represents "force use owned
-        /// materials", so there is nothing to override to).
-        /// </summary>
-        private static List<PillSpec> BuildPillSpecs(CraftingTreeNode node)
-        {
-            var specs = new List<PillSpec>(3);
-
-            if (node.Decision == CraftingDecision.Have)
-            {
-                specs.Add(new PillSpec { Text = "HAVE", Source = null, Kind = PillKind.Have });
-                return specs;
-            }
-            if (node.Decision == CraftingDecision.Currency)
-            {
-                specs.Add(new PillSpec { Text = "CURRENCY", Source = null, Kind = PillKind.Locked });
-                return specs;
-            }
-
-            var options = new List<(AcquisitionSource src, string text)>(3);
-            if (node.CanCraft) options.Add((AcquisitionSource.Craft, "CRAFT"));
-            if (node.CanBuyTp) options.Add((AcquisitionSource.BuyFromTp, "TP"));
-            if (node.CanBuyVendor) options.Add((AcquisitionSource.BuyFromVendor, "VENDOR"));
-
-            if (options.Count == 0)
-            {
-                // Prefer the seeded wiki hint's badge (e.g. "SALVAGE",
-                // "EXPLORE") when one exists - "UNKNOWN" remains the
-                // fallback for no-source items with no seeded hint at all.
-                string badgeText = !string.IsNullOrEmpty(node.AcquisitionBadge)
-                    ? node.AcquisitionBadge
-                    : "UNKNOWN";
-                specs.Add(new PillSpec { Text = badgeText, Source = null, Kind = PillKind.Locked });
-                return specs;
-            }
-            if (options.Count == 1)
-            {
-                specs.Add(new PillSpec { Text = options[0].text, Source = null, Kind = PillKind.Locked });
-                return specs;
-            }
-
-            AcquisitionSource current;
-            switch (node.Decision)
-            {
-                case CraftingDecision.Craft: current = AcquisitionSource.Craft; break;
-                case CraftingDecision.BuyFromTp: current = AcquisitionSource.BuyFromTp; break;
-                case CraftingDecision.BuyFromVendor: current = AcquisitionSource.BuyFromVendor; break;
-                default: current = options[0].src; break; // defensive; solver always matches one of the options
-            }
-
-            foreach (var opt in options)
-            {
-                bool selected = opt.src == current;
-                specs.Add(new PillSpec
-                {
-                    Text = opt.text,
-                    // The selected pill is already the active choice -
-                    // clicking it would be a no-op re-solve, so it is
-                    // rendered non-interactive rather than wired up.
-                    Source = selected ? (AcquisitionSource?)null : opt.src,
-                    Kind = selected ? PillKind.Selected : PillKind.Available
-                });
-            }
-            return specs;
-        }
+        //
+        // PillKind/PillSpec/BuildPillSpecs (the decision -> pill mapping,
+        // gw2e's multi-pill model, KNOWN-ISSUES #18) live in
+        // Services/DecisionPillPlanner.cs - Blish-free and directly unit
+        // tested (DecisionPillPlannerTests) - so only the actual
+        // Panel/Label rendering below stays view-only.
 
         private static void GetPillColors(PillKind kind, out Color border, out Color fill)
         {
@@ -2455,7 +2376,7 @@ namespace GW2CraftingHelper.Views
         private List<Panel> RenderDecisionPills(
             Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
         {
-            var specs = BuildPillSpecs(node);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
             var font = GameService.Content.DefaultFont12;
             var pillPanels = new List<Panel>(specs.Count);
             int x = pillColX;
