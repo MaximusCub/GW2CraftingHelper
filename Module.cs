@@ -246,7 +246,15 @@ namespace GW2CraftingHelper
             );
 
             _craftingContent = new CraftingPlanView(
-                (itemId, qty, useOwn, priceBasis, ct, progress) =>
+                // M35 (gw2efficiency parity - multi-item plans): always
+                // routed through the list overload - a single-entry list
+                // short-circuits straight to the untouched single-item
+                // method inside the pipeline itself (byte-identical
+                // output, no wrapper built at all - see
+                // CraftingPlanPipeline.GenerateStructuredAsync's own doc
+                // comment), so this lambda no longer needs its own
+                // single-vs-multi branch.
+                (items, useOwn, priceBasis, ct, progress) =>
                 {
                     string activeChar = null;
                     try
@@ -270,11 +278,11 @@ namespace GW2CraftingHelper
                     if (useOwn)
                     {
                         return _craftingPipeline.GenerateStructuredAsync(
-                            itemId, qty, _currentSnapshot, ct, progress,
+                            items, _currentSnapshot, ct, progress,
                             activeChar, priceBasis, currencyValuation, ownMaterialsMode);
                     }
                     return _craftingPipeline.GenerateStructuredAsync(
-                        itemId, qty, null, ct, progress,
+                        items, null, ct, progress,
                         null, priceBasis, currencyValuation, ownMaterialsMode);
                 },
                 _modalDialog,
