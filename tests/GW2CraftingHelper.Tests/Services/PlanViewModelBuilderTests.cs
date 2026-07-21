@@ -433,6 +433,145 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(5000L, section.Rows[0].CoinValue);
         }
 
+        // --- Non-coin currency rows / dash rows (KNOWN-ISSUES #16) ---
+
+        [Fact]
+        public void ShoppingList_VendorRow_ZeroCoinWithCurrencyCost_PopulatesCurrencyCosts()
+        {
+            // Vision-Crystal-style vendor decision: no coin, priced
+            // entirely in a non-coin currency - previously rendered as a
+            // blank cell (bug); the row's CoinValue stays 0 but
+            // CurrencyCosts must carry the real cost so the view can render
+            // it instead of silently dropping it.
+            var currencyMeta = new Dictionary<int, CurrencyMetadata>
+            {
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "s.png" }
+            };
+            var result = MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep
+                    {
+                        ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromVendor,
+                        TotalCost = 0, UnitCost = 0,
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } }
+                    }
+                },
+                currencyMetadata: currencyMeta);
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Equal(0L, row.CoinValue);
+            Assert.NotNull(row.CurrencyCosts);
+            Assert.Single(row.CurrencyCosts);
+            Assert.Equal(100, row.CurrencyCosts[0].Amount);
+            Assert.Equal("Spirit Shards", row.CurrencyCosts[0].Name);
+            Assert.Equal("s.png", row.CurrencyCosts[0].IconUrl);
+        }
+
+        [Fact]
+        public void ShoppingList_VendorRow_UnitCurrencyCosts_DividedByQuantity()
+        {
+            var result = MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep
+                {
+                    ItemId = 1, Quantity = 4, Source = AcquisitionSource.BuyFromVendor,
+                    TotalCost = 0, UnitCost = 0,
+                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 400 } }
+                }
+            });
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Equal(100, row.UnitCurrencyCosts[0].Amount);
+            Assert.Equal(400, row.CurrencyCosts[0].Amount);
+        }
+
+        [Fact]
+        public void ShoppingList_VendorRow_MixedCoinAndCurrency_BothPopulated()
+        {
+            // A vendor offer partly priced in coin and partly in a non-coin
+            // currency - the row must carry both, not just one.
+            var result = MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep
+                {
+                    ItemId = 1, Quantity = 1, Source = AcquisitionSource.BuyFromVendor,
+                    TotalCost = 500, UnitCost = 500,
+                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 50 } }
+                }
+            });
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Equal(500L, row.CoinValue);
+            Assert.NotNull(row.CurrencyCosts);
+            Assert.Equal(50, row.CurrencyCosts[0].Amount);
+        }
+
+        [Fact]
+        public void ShoppingList_TpRow_NeverHasCurrencyCosts()
+        {
+            var result = MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 }
+            });
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Null(row.CurrencyCosts);
+            Assert.Null(row.UnitCurrencyCosts);
+        }
+
+        [Fact]
+        public void ShoppingList_UnknownSource_ZeroCoinAndNoCurrencyCosts_DashRowCondition()
+        {
+            // Genuinely unpriceable: PlanSolver never populates TotalCost/
+            // VendorCurrencyCosts for an UnknownSource step, so the row
+            // ends up with CoinValue == 0 and CurrencyCosts == null - the
+            // exact combination the view renders as a dash instead of a
+            // blank cell (KNOWN-ISSUES #16b). This test locks in the
+            // view-model side of that condition; the dash glyph itself is
+            // rendered by CraftingPlanView.RenderValueCellRightAligned,
+            // which is Blish-only and not covered here.
+            var result = MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+            });
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Equal(0L, row.CoinValue);
+            Assert.Equal(0L, row.UnitCoinValue);
+            Assert.Null(row.CurrencyCosts);
+            Assert.Null(row.UnitCurrencyCosts);
+        }
+
+        [Fact]
+        public void Build_CurrencyMetadata_PassedThroughToViewModel()
+        {
+            var currencyMeta = new Dictionary<int, CurrencyMetadata>
+            {
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards" }
+            };
+            var result = MakeResult(currencyMetadata: currencyMeta);
+
+            var vm = _builder.Build(result);
+
+            Assert.Same(currencyMeta, vm.CurrencyMetadata);
+        }
+
+        [Fact]
+        public void Build_CurrencyMetadataNull_ViewModelCurrencyMetadataNull()
+        {
+            var result = MakeResult();
+
+            var vm = _builder.Build(result);
+
+            Assert.Null(vm.CurrencyMetadata);
+        }
+
         // --- Acquisition hints (M32) ---
 
         [Fact]

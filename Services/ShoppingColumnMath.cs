@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
@@ -47,6 +49,30 @@ namespace GW2CraftingHelper.Services
                 EachRightEdge = eachRightEdge,
                 QtyRightEdge = qtyRightEdge
             };
+        }
+
+        /// <summary>
+        /// Total width of a horizontal run of "label, gap, icon, gap"
+        /// segments - the same layout convention CraftingPlanView's coin
+        /// AND currency segments both use (KNOWN-ISSUES #16). Callers pass
+        /// their own already-measured (Blish-bound BitmapFont.MeasureString)
+        /// per-segment text widths plus their own iconSize/labelIconGap/
+        /// segmentGap constants, so this arithmetic can never drift from
+        /// what the view actually lays out - it does not bake in any of
+        /// CraftingPlanView's specific pixel values itself. Empty/null
+        /// input is 0 width (no trailing gap to subtract).
+        /// </summary>
+        public static int SegmentRunWidth(
+            IReadOnlyList<int> segmentTextWidths, int iconSize, int labelIconGap, int segmentGap)
+        {
+            if (segmentTextWidths == null || segmentTextWidths.Count == 0) return 0;
+
+            int width = 0;
+            foreach (var textWidth in segmentTextWidths)
+            {
+                width += textWidth + labelIconGap + iconSize + segmentGap;
+            }
+            return width - segmentGap;
         }
     }
 }

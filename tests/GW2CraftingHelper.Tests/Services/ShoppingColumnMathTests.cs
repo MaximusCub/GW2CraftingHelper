@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using GW2CraftingHelper.Services;
 using Xunit;
 
@@ -69,6 +70,52 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.True(edges.QtyRightEdge < edges.EachRightEdge);
             Assert.True(edges.EachRightEdge < edges.TotalRightEdge);
+        }
+
+        // --- SegmentRunWidth (currency-segment width computation, KNOWN-ISSUES #16) ---
+
+        [Fact]
+        public void SegmentRunWidth_Null_ReturnsZero()
+        {
+            Assert.Equal(0, ShoppingColumnMath.SegmentRunWidth(null, 20, 2, 6));
+        }
+
+        [Fact]
+        public void SegmentRunWidth_Empty_ReturnsZero()
+        {
+            Assert.Equal(0, ShoppingColumnMath.SegmentRunWidth(new List<int>(), 20, 2, 6));
+        }
+
+        [Fact]
+        public void SegmentRunWidth_SingleSegment_NoTrailingGap()
+        {
+            // 30 (text) + 2 (label-icon gap) + 20 (icon) = 52, no trailing
+            // segmentGap since there is only one segment.
+            var width = ShoppingColumnMath.SegmentRunWidth(new List<int> { 30 }, 20, 2, 6);
+
+            Assert.Equal(52, width);
+        }
+
+        [Fact]
+        public void SegmentRunWidth_TwoSegments_IncludesGapBetweenNotAfter()
+        {
+            // Each segment is textWidth + 2 + 20; a single segmentGap (6)
+            // separates them, none trails after the last one.
+            var width = ShoppingColumnMath.SegmentRunWidth(new List<int> { 30, 15 }, 20, 2, 6);
+
+            Assert.Equal((30 + 2 + 20) + 6 + (15 + 2 + 20), width);
+        }
+
+        [Fact]
+        public void SegmentRunWidth_UsesCallerSuppliedConstants_NotHardcoded()
+        {
+            // Different icon/gap constants than CraftingPlanView's own
+            // (20/2/6) must change the result - proves the arithmetic is
+            // fully parameterized, not silently defaulting to a baked-in
+            // set of pixel values.
+            var width = ShoppingColumnMath.SegmentRunWidth(new List<int> { 10 }, iconSize: 100, labelIconGap: 5, segmentGap: 1);
+
+            Assert.Equal(10 + 5 + 100, width);
         }
     }
 }

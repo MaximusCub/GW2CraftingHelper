@@ -83,6 +83,7 @@
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
+    <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />
     <Compile Include="Services\AcquisitionHintService.cs" />
     <Compile Include="Services\CraftingTreeBuilder.cs" />
