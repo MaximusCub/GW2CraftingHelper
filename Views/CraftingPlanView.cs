@@ -38,6 +38,15 @@ namespace GW2CraftingHelper.Views
         private const int RightEdgePadding = 20;
         private const int SectionSpacing = 16;
 
+        // M36 fix-pass (NICETOHAVE c): overall outer size (icon + both
+        // border edges) of CreateRarityFramedIcon's DEFAULT frame (32px
+        // icon + 1px border each side - see that method's own default
+        // parameters). Named so the row-height-vs-icon-frame arithmetic
+        // comments this pass touches (CreateRecipeRow) reference one
+        // source of truth instead of re-hardcoding "34" independently of
+        // CreateRarityFramedIcon's actual defaults.
+        private const int RarityFramedIconOuterSize = 34;
+
         // Shared divider greys. Both readable against the parchment texture;
         // SectionDividerColor is the brighter of the two, one tier below the
         // 180-grey structural separators (window chrome, unrelated to these).
@@ -259,6 +268,22 @@ namespace GW2CraftingHelper.Views
         private FrameTicker _scrollVerifyTicker;
         private FrameTicker _resizeDebounceTicker;
 
+        // M36 fix-pass (KNOWN-ISSUES #12, CRITICAL-1): defensive one-shot
+        // re-assert ticker for ApplyWheelWrapCorrection - see
+        // StartWheelWrapVerify's own doc comment. Kept as its own field
+        // (not shared with _scrollVerifyTicker above) since the two guard
+        // unrelated writers with different targets/semantics (a ratio
+        // derived from a saved pixel offset vs. an already-computed
+        // absolute ScrollDistance) and a rebuild/resize verify could
+        // otherwise cancel-and-replace an in-flight wheel-wrap verify (or
+        // vice versa) for no reason.
+        private FrameTicker _wheelWrapVerifyTicker;
+
+        private const int WheelWrapVerifyMaxFrames = 2;
+
+        // Matches StartScrollVerify's own stable-match tolerance.
+        private const float WheelWrapVerifyEpsilon = 0.004f;
+
         // M33 C2a (directive B): with container heights now finalized
         // synchronously during build (PlanContentHeightMath), the restore
         // ratio is correct the instant PreserveScrollAcross writes it - no
@@ -296,6 +321,19 @@ namespace GW2CraftingHelper.Views
         // every Build() so a stale value from a previous render cannot
         // influence a brand new one.
         private DateTime? _lastWheelEventUtc;
+
+        // M36 (KNOWN-ISSUES #12 reopened/root-caused): Blish HUD's
+        // Scrollbar.SCROLL_WHEEL private const (vendored Controls/
+        // Scrollbar.cs, BlishHUD v1.3.0, confirmed by decompiling the
+        // shipped "Blish HUD.exe") - one wheel EVENT (regardless of how
+        // many raw notches Windows coalesced into it) moves the bar by
+        // exactly this many pixels times SystemInformation.
+        // MouseWheelScrollLines, per Scrollbar.HandleWheelScroll/
+        // ScrollAnimated (sign-only, never magnitude-scaled). A private
+        // const has no runtime field to reflect (unlike PanelScrollbarField
+        // above), so this is hardcoded with this provenance note -
+        // re-verify against the vendored source on any BlishHUD upgrade.
+        private const int BlishScrollWheelStepPixels = 30;
 
         // M33 C1 (#12 diagnostics): instrumentation-only. Gated on
         // ModuleSettings.ScrollDiagnosticsEnabled (default false); every
@@ -765,6 +803,250 @@ namespace GW2CraftingHelper.Views
         private void OnContentWheelObserved(object sender, MouseEventArgs e)
         {
             _lastWheelEventUtc = DateTime.UtcNow;
+
+            // M36 (KNOWN-ISSUES #12 reopened/root-caused): classification
+            // is unconditional (zero-allocation, a plain value tuple) - see
+            // WheelDeltaSanitizer's own doc comment for the full root
+            // cause and threshold derivation. GameService.Input.Mouse.
+            // State.ScrollWheelValue is the SAME raw value
+            // OnScrollDiagWheelScrolled's diagnostic log already reads as
+            // "raw" - this is the field the live 2026-07-21 histogram was
+            // measured from.
+            try
+            {
+                int raw = GameService.Input.Mouse.State.ScrollWheelValue;
+                var classification = WheelDeltaSanitizer.Classify(raw);
+                if (classification.IsWrapped)
+                {
+                    ApplyWheelWrapCorrection(raw, classification.IntendedDelta);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Defensive, matching StartScrollVerify's own precedent for
+                // reflection/layout-touching scroll code (see that
+                // method's own catch): this handler runs unconditionally
+                // on every wheel event, not diagnostics-gated, so a
+                // disposed panel/scrollbar (tab switch, module unload) or
+                // a future Blish internal change must degrade to "no
+                // correction this event" rather than take down the whole
+                // wheel input pipeline.
+                Logger.Warn(ex, "Wheel-wrap correction failed");
+            }
+        }
+
+        /// <summary>
+        /// M36 (KNOWN-ISSUES #12 reopened/root-caused): corrects the
+        /// damage from a wrapped wheel delta. Blish HUD's own
+        /// Scrollbar.HandleWheelScroll looks only at Math.Sign of the
+        /// (here, corrupted-negative) raw delta, so for every wrapped
+        /// up-flick it has already queued exactly ONE step DOWN via
+        /// ScrollAnimated by the time this handler runs - OnContentWheel-
+        /// Observed is subscribed after Blish's own Scrollbar (see
+        /// OnScrollDiagWheelScrolled's doc comment), so Blish's own
+        /// HandleWheelScroll for this same event has always already run.
+        ///
+        /// MECHANISM (M36 fix-pass, re-verified against the decompiled
+        /// Glide source rather than assumed): an earlier revision of this
+        /// comment claimed Tweener.TargetCancel was a no-op here, on the
+        /// theory that Glide defers a freshly-created Tween's by-target
+        /// dictionary registration to the NEXT Tweener.Update() call. That
+        /// theory is FALSE for the vendored Glide (decompiled from the
+        /// shipped "Blish HUD.exe", Glide.Tween.TweenerImpl.Tween&lt;T&gt;()):
+        /// the SAME method that enqueues a new tween onto its private
+        /// toAdd queue also calls its own AddAndRemove() synchronously,
+        /// before returning - which dequeues toAdd and registers the
+        /// tween in the by-target "tweens" ConcurrentDictionary right
+        /// there, not deferred to any later frame. So by the time
+        /// Scrollbar.ScrollAnimated's call to Tweener.Tween(...) returns
+        /// (still inside Blish's own HandleWheelScroll, still before this
+        /// handler ever runs for the same event), the wrong duration-0
+        /// tween is ALREADY registered in that dictionary. TargetCancel
+        /// therefore finds it immediately: Tween.Cancel(string[]) nulls
+        /// the tween's own vars/lerpers slot for "ScrollDistance"
+        /// synchronously, so even if the tween's Update() runs before it
+        /// is fully removed from the per-target list (removal itself is
+        /// queued, applied by the next AddAndRemove() pass), that Update()
+        /// skips writing ScrollDistance entirely (Tween.Update() null-
+        /// guards every var/lerper slot before writing) - the wrong step
+        /// never lands, full stop, not merely "canceled one frame late".
+        /// This is why the cancel-then-direct-write shape below is kept
+        /// rather than replaced with a counter-tween or a one-frame-
+        /// deferred correction: TargetCancel already wins synchronously,
+        /// in the same call stack, with no wrong frame ever rendered - a
+        /// counter-tween would add complexity for no behavioral gain, and
+        /// a deferred correction would manufacture a wrong frame this
+        /// mechanism does not actually have.
+        /// (Also corrected: an earlier revision claimed Scrollbar.
+        /// ScrollAnimated "implicitly relies on" this same public
+        /// TargetCancel API for its own between-events overwrite
+        /// behavior. False on the literal text - decompiled Scrollbar.cs
+        /// calls only Tweener.Tween(this, new { ScrollDistance = ... },
+        /// 0f).Ease(...), with no TargetCancel call and no explicit
+        /// "overwrite: true" anywhere in that file. The real mechanism
+        /// for two rapid ScrollAnimated calls in a row is Tween&lt;T&gt;'s own
+        /// overwrite PARAMETER, true by default whenever the caller omits
+        /// it (as Scrollbar always does), which internally cancels any
+        /// PRE-EXISTING same-target/same-property tween via its own
+        /// private ForAllTweens+Cancel loop - conceptually similar to
+        /// TargetCancel, but a distinct, internal-only code path, never
+        /// the public API this method calls.)
+        ///
+        /// Despite the above, a bounded defensive re-assert
+        /// (StartWheelWrapVerify) still runs for a frame or two after this
+        /// write - insurance against a future Blish/Glide vendor change or
+        /// an interaction this analysis missed, not evidence this
+        /// mechanism is expected to fail.
+        ///
+        /// The KNOWN-ISSUES #19 "stale-cached-percent" hazard (Scrollbar.
+        /// RecalculateLayout resetting ScrollDistance to 0 the first time
+        /// _scrollbarPercent's cached value goes stale-to-fresh) does NOT
+        /// apply here: that hazard is specific to a resize tick changing
+        /// the viewport/content ratio for the first time since the last
+        /// RecalculateLayout call. A wheel event alone never changes
+        /// content or viewport height, so _scrollbarPercent is already
+        /// fresh and RecalculateLayout is not needed before this write.
+        /// </summary>
+        private void ApplyWheelWrapCorrection(int rawIn, int intendedDelta)
+        {
+            if (_contentPanel == null || PanelScrollbarField == null)
+            {
+                return;
+            }
+
+            var scrollbar = PanelScrollbarField.GetValue(_contentPanel) as Scrollbar;
+            if (scrollbar == null)
+            {
+                return;
+            }
+
+            // Baseline captured before touching the tween at all. Provably
+            // tween-independent regardless of read order: Tween.Cancel()
+            // only nulls the tween's OWN internal lerp-state slots, it
+            // never writes to ScrollDistance itself (see this method's
+            // MECHANISM note) - reading the baseline here first just makes
+            // that independence visible in the code, not just the comment.
+            float before = scrollbar.ScrollDistance;
+
+            // Cancel Blish's own mis-signed single-step-down tween before
+            // its next Update() can apply it - see this method's own doc
+            // comment for why this is synchronously effective here, not a
+            // no-op. Still harmless to call when none is pending (e.g. the
+            // scrollbar wasn't visible/scrollable when Blish's
+            // HandleWheelScroll ran, so it never queued one).
+            if (GameService.Animation?.Tweener != null)
+            {
+                GameService.Animation.Tweener.TargetCancel(scrollbar, nameof(Scrollbar.ScrollDistance));
+            }
+
+            // Blish's own per-notch step convention (Scrollbar.
+            // HandleWheelScroll/ScrollAnimated, see BlishScrollWheelStep-
+            // Pixels' own provenance comment): one wheel EVENT moves the
+            // bar by BlishScrollWheelStepPixels * MouseWheelScrollLines
+            // pixels, sign-only (never magnitude-scaled). Read live here
+            // too, matching Blish's own live read, so this stays correct
+            // for any POSITIVE MouseWheelScrollLines value if the user
+            // changes their OS mouse-wheel-lines setting. MUSTFIX-2:
+            // Windows' "one screen at a time" setting reports
+            // MouseWheelScrollLines == -1, which would flip deltaPixels'
+            // sign if used directly - Blish's own HandleWheelScroll has
+            // this identical defect (its Math.Sign(...) * -30 *
+            // MouseWheelScrollLines scrolls the WRONG direction for every
+            // wheel event under that setting, wrapped or not - we cannot
+            // fix Blish's own arithmetic). WheelDeltaSanitizer.
+            // SanitizeScrollLines substitutes Windows' documented default
+            // of 3 lines whenever the raw value is not a usable positive
+            // count, which keeps THIS correction's direction right; it
+            // cannot make a corrected flick match Blish's own (equally
+            // wrong) step size under that setting - direction-correctness
+            // is chosen over unreachable step-parity for this one OS
+            // setting value.
+            // intendedDelta is always a clean multiple of 120 in practice
+            // (the wrap always adds back a whole ushort span to a raw
+            // value that started as N*120), but this scales proportionally
+            // rather than assuming an exact multiple, so a non-multiple
+            // value degrades gracefully instead of losing a partial notch.
+            double notches = intendedDelta / 120.0;
+            int lines = WheelDeltaSanitizer.SanitizeScrollLines(System.Windows.Forms.SystemInformation.MouseWheelScrollLines);
+            int deltaPixels = (int)System.Math.Round(-notches * BlishScrollWheelStepPixels * lines);
+
+            int contentHeight = MeasureContentHeight(_contentPanel);
+            float after = ScrollMath.ApplyPixelDelta(before, deltaPixels, contentHeight, _contentPanel.Height);
+            scrollbar.ScrollDistance = after;
+
+            if (_settings != null && _settings.ScrollDiagnosticsEnabled.Value)
+            {
+                Logger.Debug("{0} write writer=WheelWrapFix frame={1} rawIn={2} intendedDelta={3} before={4:0.0000} after={5:0.0000}",
+                    ScrollDiagTag, ScrollDiagFrame(), rawIn, intendedDelta, before, after);
+            }
+
+            StartWheelWrapVerify(scrollbar, after);
+        }
+
+        /// <summary>
+        /// M36 fix-pass (KNOWN-ISSUES #12, CRITICAL-1 finding response): a
+        /// bounded, one-shot defensive re-assert for
+        /// ApplyWheelWrapCorrection's write. That method's own doc comment
+        /// verifies Tweener.TargetCancel is synchronously effective
+        /// against Blish's wrong tween here, so this ticker exists as
+        /// insurance against a future Blish/Glide vendor change or an
+        /// interaction this analysis missed - not evidence of an expected
+        /// failure. Unlike StartScrollVerify's zero-reassert loop (which
+        /// fights a KNOWN recurring adversary up to a cap), this re-
+        /// asserts AT MOST ONCE and then stops regardless of outcome - a
+        /// mundane insurance check, not an ongoing contest - and yields
+        /// immediately to any NEWER wheel event so it can never contest
+        /// genuine subsequent user input.
+        /// </summary>
+        private void StartWheelWrapVerify(Scrollbar scrollbar, float target)
+        {
+            int frame = 0;
+            DateTime correctedAtUtc = _lastWheelEventUtc ?? DateTime.UtcNow;
+            bool diagEnabled = _settings != null && _settings.ScrollDiagnosticsEnabled.Value;
+
+            bool VerifyTick(GameTime gameTime)
+            {
+                frame++;
+
+                try
+                {
+                    if (_contentPanel == null || _contentPanel.Parent == null)
+                    {
+                        return false;
+                    }
+
+                    // A newer wheel event landed since this correction -
+                    // real subsequent user input, never contest it.
+                    if (_lastWheelEventUtc.HasValue && _lastWheelEventUtc.Value > correctedAtUtc)
+                    {
+                        return false;
+                    }
+
+                    float current = scrollbar.ScrollDistance;
+                    if (System.Math.Abs(current - target) > WheelWrapVerifyEpsilon)
+                    {
+                        scrollbar.ScrollDistance = target;
+                        if (diagEnabled)
+                        {
+                            Logger.Debug("{0} write writer=WheelWrapFix/reassert frame={1} before={2:0.0000} after={3:0.0000}",
+                                ScrollDiagTag, ScrollDiagFrame(), current, target);
+                        }
+                        return false;
+                    }
+
+                    return frame < WheelWrapVerifyMaxFrames;
+                }
+                catch (Exception ex)
+                {
+                    // Disposed panel/scrollbar or a layout mismatch: stop
+                    // rather than risk touching torn-down state.
+                    Logger.Warn(ex, "Wheel-wrap verify stopped by exception");
+                    return false;
+                }
+            }
+
+            _wheelWrapVerifyTicker?.Cancel();
+            _wheelWrapVerifyTicker = new FrameTicker(VerifyTick);
         }
 
         /// <summary>
@@ -1015,17 +1297,20 @@ namespace GW2CraftingHelper.Views
             // every row already routes through - no separate loop needed
             // here.
 
-            // Cleanup for any leftover scroll-verify/resize-debounce
-            // tickers from the previous build cycle - see the field
-            // comments above. Reset _resizeSettlePending too, or a ticker
-            // canceled mid-debounce here would leave it stuck true and
-            // silently disable all future resize debouncing. Also drop any
-            // wheel-recency state from the previous render's tab so it
-            // cannot influence a brand new one's verify window.
+            // Cleanup for any leftover scroll-verify/resize-debounce/
+            // wheel-wrap-verify tickers from the previous build cycle -
+            // see the field comments above. Reset _resizeSettlePending
+            // too, or a ticker canceled mid-debounce here would leave it
+            // stuck true and silently disable all future resize
+            // debouncing. Also drop any wheel-recency state from the
+            // previous render's tab so it cannot influence a brand new
+            // one's verify window.
             _scrollVerifyTicker?.Cancel();
             _scrollVerifyTicker = null;
             _resizeDebounceTicker?.Cancel();
             _resizeDebounceTicker = null;
+            _wheelWrapVerifyTicker?.Cancel();
+            _wheelWrapVerifyTicker = null;
             _resizeSettlePending = false;
             _resizeScrollRestorePending = false;
             _resizeScrollSavedOffset = 0;
@@ -2004,7 +2289,7 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Shared chrome for every collapsible section (the 6 PlanSectionType
-        /// sections and the Recipe Tree alike): caret + Font18 title, a 1px
+        /// sections and the Recipe Tree alike): caret + Font18 title, a 2px
         /// divider spanning the full width under the header, a hover wash on
         /// the whole clickable row, and click-to-toggle with expansion state
         /// persisted in _sectionExpansion under sectionKey. suppressToggle
@@ -2068,10 +2353,14 @@ namespace GW2CraftingHelper.Views
             };
 
             // Divider under the header - identical chrome for every section.
+            // M36: 2px, bottom-anchored inside the 30px headerPanel
+            // (Location.Y = 28, i.e. headerPanel.Height - 2) - see
+            // CreateRowDivider's doc comment for why 1px is unsafe under
+            // Blish's non-integer UI-scale GPU transform (KNOWN-ISSUES #23).
             var headerDivider = new Panel()
             {
-                Size = new Point(panelWidth, 1),
-                Location = new Point(0, 29),
+                Size = new Point(panelWidth, 2),
+                Location = new Point(0, 28),
                 BackgroundColor = SectionDividerColor,
                 Parent = headerPanel
             };
@@ -2118,7 +2407,7 @@ namespace GW2CraftingHelper.Views
             {
                 topGap.Size = new Point(w, SectionSpacing);
                 headerPanel.Size = new Point(w, 30);
-                headerDivider.Size = new Point(w, 1);
+                headerDivider.Size = new Point(w, 2);
                 contentFlow.Size = new Point(w, contentFlow.Height);
             });
 
@@ -2196,16 +2485,32 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// 1px divider at the bottom edge of a row panel - the shared "list
+        /// 2px divider at the bottom edge of a row panel - the shared "list
         /// row" chrome used by every table-style section except the tree
         /// (which uses indent guidelines instead, per gw2e's own convention).
+        /// M36: was 1px, bottom-anchored via rowHeight - 1. Blish applies
+        /// its UI-scale (e.g. the "Normal" GW2 UI size's 0.897) as a real
+        /// GPU scale matrix, not an integer-pixel-snapped one, so a 1px-tall
+        /// quad rasterizes to 0.897 physical pixels - guaranteed physical
+        /// coverage is floor(0.897) = 0, i.e. it can disappear entirely
+        /// depending on scroll-offset sub-pixel alignment (KNOWN-ISSUES
+        /// #23). At 2px, floor(2 * 0.897) = floor(1.794) = 1 guarantees at
+        /// least one covered physical scanline at any offset. Bottom-
+        /// anchored (rowHeight - 2, not rowHeight - 1) so the divider grows
+        /// into the row's own bounds rather than past them - the row's
+        /// total height (PlanContentHeightMath) already accounts for the
+        /// divider living inside rowHeight, so this needed no height-math
+        /// change, only the two row types whose icon frame filled rowHeight
+        /// to within 1px (CreateUsedMaterialRow, CreateShoppingRow) needed
+        /// their icon's y nudged up by 1 to keep clear of the taller
+        /// divider - see the comment at each of those call sites.
         /// </summary>
         private static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight)
         {
             return new Panel()
             {
-                Size = new Point(panelWidth, 1),
-                Location = new Point(0, rowHeight - 1),
+                Size = new Point(panelWidth, 2),
+                Location = new Point(0, rowHeight - 2),
                 BackgroundColor = RowDividerColor,
                 Parent = rowPanel
             };
@@ -2286,7 +2591,13 @@ namespace GW2CraftingHelper.Views
             const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
+            // M36: y=0 (was 1) - the 34px icon frame previously left only
+            // 1px of clearance above rowHeight (36), which was exactly
+            // enough for the old 1px divider but would overlap the new 2px
+            // divider's top pixel by 1 row. Moving the icon up by 1 makes
+            // frame height (34) + divider height (2) exactly fill rowHeight
+            // with no overlap.
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
 
             const int nameX = 50;
             int qtyRightEdge = panelWidth - 8;
@@ -2336,7 +2647,7 @@ namespace GW2CraftingHelper.Views
             {
                 rowPanel.Size = new Point(w, rowHeight);
                 qtyLabel.Location = new Point(w - 8 - qtyWidth, 9);
-                if (divider != null) divider.Size = new Point(w, 1);
+                if (divider != null) divider.Size = new Point(w, 2);
             });
             _reellipsisActions.Add(w =>
             {
@@ -2458,7 +2769,10 @@ namespace GW2CraftingHelper.Views
             const int rowHeight = PlanContentHeightMath.ShoppingRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
+            // M36: y=0 (was 1) - see the identical note in
+            // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
+            // shape, same 1px shortfall against the new 2px divider.
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
 
             const int nameX = 50;
             var font = GameService.Content.DefaultFont14;
@@ -2549,7 +2863,7 @@ namespace GW2CraftingHelper.Views
                 qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
                 RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
                 RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
-                if (divider != null) divider.Size = new Point(w, 1);
+                if (divider != null) divider.Size = new Point(w, 2);
             });
             _reellipsisActions.Add(w =>
             {
@@ -2682,7 +2996,7 @@ namespace GW2CraftingHelper.Views
                 {
                     sublabelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, sublabelLabel.Width), 16);
                 }
-                if (divider != null) divider.Size = new Point(w, 1);
+                if (divider != null) divider.Size = new Point(w, 2);
             });
         }
 
@@ -2742,7 +3056,7 @@ namespace GW2CraftingHelper.Views
             {
                 rowPanel.Size = new Point(w, rowHeight);
                 levelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, levelLabel.Width), 7);
-                if (divider != null) divider.Size = new Point(w, 1);
+                if (divider != null) divider.Size = new Point(w, 2);
             });
         }
 
@@ -2755,6 +3069,20 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        // M36 fix-pass (MUSTFIX-3): the no-sublabel branch's rowHeight (32)
+        // left the RarityFramedIconOuterSize (34) icon frame at y=1
+        // overflowing rowHeight by 3px even BEFORE the M36 divider-width
+        // change (icon bottom = 1 + 34 = 35, rowHeight = 32) - pre-existing
+        // negative headroom, not "several pixels of headroom" as
+        // KNOWN-ISSUES #23 previously (incorrectly) claimed for this row,
+        // and made 1px worse once that row's divider grew from 1px to 2px
+        // (needed 34 + 2 = 36 to sit flush, still only had 32). Fixed
+        // coherently, mirroring the Used Materials/Shopping List pattern
+        // already on this branch: RecipeRowHeightNoSublabel raised to 36
+        // (icon at y=0, 34 tall, + the 2px divider = exact fit, zero
+        // overlap) and this branch's icon y nudged from 1 to 0 to match.
+        // The WithSublabel branch (44) already had ample headroom and is
+        // unchanged.
         private void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
         {
             bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
@@ -2764,7 +3092,7 @@ namespace GW2CraftingHelper.Views
 
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, hasSublabel ? 1 : 0);
 
             var font = GameService.Content.DefaultFont14;
             int nameY = hasSublabel ? 4 : 8;
@@ -2819,7 +3147,7 @@ namespace GW2CraftingHelper.Views
                 {
                     statusLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, statusLabel.Width), hasSublabel ? 10 : 8);
                 }
-                if (divider != null) divider.Size = new Point(w, 1);
+                if (divider != null) divider.Size = new Point(w, 2);
             });
         }
 
