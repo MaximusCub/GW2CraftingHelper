@@ -1404,24 +1404,21 @@ namespace GW2CraftingHelper.Views
         {
             var coinFont = GameService.Content.DefaultFont14;
 
-            // Pre-scan: widest actual coin-value width per column this
-            // render. One pass over the section's rows (shopping lists run
-            // to maybe 50-60 rows in practice) - negligible next to the
+            // Pre-scan: widest actual coin+currency value width per column
+            // this render (MeasureValueWidth accounts for a currency-only
+            // or mixed row's icon(s) too, not just coin - KNOWN-ISSUES
+            // #16). One pass over the section's rows (shopping lists run to
+            // maybe 50-60 rows in practice) - negligible next to the
             // per-row control creation this method already does.
             int maxEachWidth = 0;
             int maxTotalWidth = 0;
             foreach (var row in section.Rows)
             {
-                if (row.UnitCoinValue > 0)
-                {
-                    int w = MeasureCoinValueWidth(row.UnitCoinValue, coinFont);
-                    if (w > maxEachWidth) maxEachWidth = w;
-                }
-                if (row.CoinValue > 0)
-                {
-                    int w = MeasureCoinValueWidth(row.CoinValue, coinFont);
-                    if (w > maxTotalWidth) maxTotalWidth = w;
-                }
+                int eachW = MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
+                if (eachW > maxEachWidth) maxEachWidth = eachW;
+
+                int totalW = MeasureValueWidth(row.CoinValue, row.CurrencyCosts, coinFont);
+                if (totalW > maxTotalWidth) maxTotalWidth = totalW;
             }
 
             int totalRightEdge = panelWidth - 8;
@@ -1530,14 +1527,14 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
-            if (row.UnitCoinValue > 0)
-            {
-                LayoutCoinSegmentsRightAligned(rowPanel, BuildCoinSegments(row.UnitCoinValue, font), edges.EachRightEdge, 9, font);
-            }
-            if (row.CoinValue > 0)
-            {
-                LayoutCoinSegmentsRightAligned(rowPanel, BuildCoinSegments(row.CoinValue, font), edges.TotalRightEdge, 9, font);
-            }
+            // Each/Total cells: coin-only rows render exactly as before;
+            // a row priced wholly or partly in a non-coin currency (e.g. a
+            // vendor offer paid in spirit shards) renders currency segments
+            // alongside/instead of coin; a row with neither (genuinely
+            // unpriceable - gw2e: "Not sold or crafted") renders a dash,
+            // never a blank cell (KNOWN-ISSUES #16).
+            RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
+            RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
 
             if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
         }
@@ -2244,13 +2241,24 @@ namespace GW2CraftingHelper.Views
             var pillPanels = RenderDecisionPills(rowPanel, node, pillColX, 10, dimmed);
 
             // Cost column: right-aligned so coin amounts line up vertically
-            // across every row regardless of digit count.
-            if (node.SubtreeCost.HasValue && node.SubtreeCost.Value > 0)
+            // across every row regardless of digit count. Only rendered
+            // when this node has a real committed decision with a cost
+            // figure at all (SubtreeCost.HasValue) - HAVE/CURRENCY/UNKNOWN
+            // nodes carry no SubtreeCost and keep the column blank exactly
+            // as before (their own pill already communicates "no price").
+            // Within that: a BuyFromVendor node priced wholly or partly in
+            // a non-coin currency renders currency segments alongside/
+            // instead of coin (sibling site to the shopping list's #16
+            // fix, same RenderValueCellRightAligned entry point); a
+            // decision whose real cost is genuinely zero-and-uncosted
+            // renders a dash instead of an invented "0".
+            if (node.SubtreeCost.HasValue)
             {
                 var costFont = GameService.Content.DefaultFont14;
-                var segments = BuildCoinSegments(node.SubtreeCost.Value, costFont);
-                LayoutCoinSegmentsRightAligned(
-                    rowPanel, segments, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
+                var currencyAmounts = CurrencyDisplayResolver.ResolveAmounts(
+                    node.VendorCurrencyCosts, _currentPlan?.CurrencyMetadata);
+                RenderValueCellRightAligned(
+                    rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
             }
 
             // Child container. Children of a non-Craft decision are gw2e's
@@ -2693,19 +2701,6 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Pixel width a coin value would occupy if laid out via
-        /// LayoutCoinSegments/LayoutCoinSegmentsRightAligned at the given
-        /// font - built from the exact same BuildCoinSegments +
-        /// TotalCoinSegmentsWidth path those layout calls use, so the
-        /// shopping list's pre-scan (CreateShoppingListBody) can never
-        /// drift from what actually renders.
-        /// </summary>
-        private static int MeasureCoinValueWidth(long copper, BitmapFont font)
-        {
-            return TotalCoinSegmentsWidth(BuildCoinSegments(copper, font));
-        }
-
-        /// <summary>
         /// Lays out coin segments left-to-right starting at x. alphaScale
         /// dims the number labels (not the icons - Panel has no tint
         /// property) for dimmed not-crafted subtree rows.
@@ -2742,13 +2737,6 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void LayoutCoinSegmentsRightAligned(
-            Panel parent, List<CoinSegmentSpec> segments, int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
-        {
-            int startX = rightEdgeX - TotalCoinSegmentsWidth(segments);
-            LayoutCoinSegments(parent, segments, startX, y, font, alphaScale);
-        }
-
         private static Color GetCoinColor(int assetId)
         {
             switch (assetId)
@@ -2758,6 +2746,154 @@ namespace GW2CraftingHelper.Views
                 case 156902: return new Color(205, 127, 50);
                 default: return Color.White;
             }
+        }
+
+        // --- Currency + mixed value display helpers (KNOWN-ISSUES #16) ---
+        //
+        // A BuyFromVendor decision can be priced wholly or partly in a
+        // non-coin currency (spirit shards, karma, ...). CurrencyAmountViewModel
+        // (shopping rows, via PlanViewModelBuilder) and CraftingTreeNode.
+        // VendorCurrencyCosts (tree, resolved here via CurrencyDisplayResolver)
+        // both feed the same rendering below, so the two sibling sites named
+        // in KNOWN-ISSUES #16 (shopping Each/Total cells and the tree cost
+        // column) can never drift apart. Currency segments follow the exact
+        // same "amount label, then icon to the RIGHT" convention as coin
+        // segments (the coin invariant) and reuse its icon size/gaps; a
+        // mixed value renders coin segments first, then currency segments.
+        // A value with neither a coin price nor a currency cost is
+        // genuinely unpriceable (gw2e: "Not sold or crafted") and renders a
+        // plain dash - never a blank cell, never an invented "0".
+
+        // ASCII-only source rule: em dash via escape, never a raw pasted
+        // Unicode character - this IS the gw2e-style unpriceable dash
+        // itself (KNOWN-ISSUES #16b), not incidental prose.
+        private const string UnpricedDashText = "\u2014";
+        private static readonly Color UnpricedDashColor = new Color(140, 140, 140);
+
+        private struct CurrencySegmentSpec
+        {
+            public string IconUrl;
+            public string Text;
+            public int TextWidth;
+        }
+
+        private static List<CurrencySegmentSpec> BuildCurrencySegments(
+            IReadOnlyList<CurrencyAmountViewModel> amounts, BitmapFont font)
+        {
+            var segments = new List<CurrencySegmentSpec>();
+            if (amounts == null) return segments;
+
+            foreach (var amount in amounts)
+            {
+                string text = amount.Amount.ToString();
+                int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
+                segments.Add(new CurrencySegmentSpec { IconUrl = amount.IconUrl, Text = text, TextWidth = width });
+            }
+            return segments;
+        }
+
+        /// <summary>
+        /// The actual width arithmetic lives in ShoppingColumnMath
+        /// (Blish-free, tested) so the pre-scan (MeasureValueWidth) and the
+        /// real layout (LayoutValueSegmentsRightAligned) below can never
+        /// drift apart; only the per-segment text measurement
+        /// (BitmapFont.MeasureString) is Blish-bound and stays here.
+        /// </summary>
+        private static int TotalCurrencySegmentsWidth(List<CurrencySegmentSpec> segments)
+        {
+            var widths = new List<int>(segments.Count);
+            foreach (var seg in segments) widths.Add(seg.TextWidth);
+            return ShoppingColumnMath.SegmentRunWidth(widths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
+        }
+
+        private static void LayoutCurrencySegments(
+            Panel parent, List<CurrencySegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
+        {
+            int x = startX;
+            Color textColor = new Color(220, 220, 220);
+            if (alphaScale < 1f) textColor *= alphaScale;
+
+            foreach (var seg in segments)
+            {
+                new Label()
+                {
+                    Text = seg.Text,
+                    Font = font,
+                    TextColor = textColor,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(x, y),
+                    Parent = parent
+                };
+
+                CreateItemIcon(parent, seg.IconUrl, x + seg.TextWidth + CoinLabelIconGap, y, CoinIconSize);
+
+                x += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
+            }
+        }
+
+        /// <summary>
+        /// Pixel width a coin/currency/mixed value would occupy if laid out
+        /// via LayoutValueSegmentsRightAligned - built from the exact same
+        /// BuildCoinSegments/BuildCurrencySegments + Total*SegmentsWidth
+        /// path that layout call uses, so the shopping list's pre-scan
+        /// (CreateShoppingListBody) can never drift from what actually
+        /// renders. copper == 0 with at least one currency amount is a
+        /// valid, currency-only case (not a "zero width" special case).
+        /// </summary>
+        private static int MeasureValueWidth(
+            long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts, BitmapFont font)
+        {
+            int coinWidth = copper > 0 ? TotalCoinSegmentsWidth(BuildCoinSegments(copper, font)) : 0;
+            int currencyWidth = TotalCurrencySegmentsWidth(BuildCurrencySegments(currencyAmounts, font));
+            return (coinWidth > 0 && currencyWidth > 0) ? coinWidth + CoinSegmentGap + currencyWidth : coinWidth + currencyWidth;
+        }
+
+        /// <summary>
+        /// Right-aligns coin segments (if copper &gt; 0) followed by
+        /// currency segments (if any) to rightEdgeX - the "mixed
+        /// coin+currency renders coin segments then currency segments"
+        /// rule. Callers must not invoke this for a value with neither
+        /// (RenderValueCellRightAligned handles that dash case instead).
+        /// </summary>
+        private static void LayoutValueSegmentsRightAligned(
+            Panel parent, long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts,
+            int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
+        {
+            var coinSegments = copper > 0 ? BuildCoinSegments(copper, font) : new List<CoinSegmentSpec>();
+            var currencySegments = BuildCurrencySegments(currencyAmounts, font);
+            int coinWidth = TotalCoinSegmentsWidth(coinSegments);
+            int currencyWidth = TotalCurrencySegmentsWidth(currencySegments);
+            int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentGap : 0;
+
+            int startX = rightEdgeX - (coinWidth + gap + currencyWidth);
+            LayoutCoinSegments(parent, coinSegments, startX, y, font, alphaScale);
+            LayoutCurrencySegments(parent, currencySegments, startX + coinWidth + gap, y, font, alphaScale);
+        }
+
+        /// <summary>
+        /// Single entry point for a shopping/tree value cell: coin-only,
+        /// currency-only, and mixed all render via
+        /// LayoutValueSegmentsRightAligned unchanged from (or, for
+        /// currency/mixed, newly matching) the coin invariant; a value with
+        /// neither a coin price nor a currency cost renders a plain dash
+        /// instead of a blank cell or an invented "0" (KNOWN-ISSUES #16b).
+        /// </summary>
+        private static void RenderValueCellRightAligned(
+            Panel parent, long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts,
+            int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
+        {
+            bool hasCoin = copper > 0;
+            bool hasCurrency = currencyAmounts != null && currencyAmounts.Count > 0;
+
+            if (!hasCoin && !hasCurrency)
+            {
+                Color dashColor = alphaScale < 1f ? UnpricedDashColor * alphaScale : UnpricedDashColor;
+                CreateRightAlignedLabel(parent, UnpricedDashText, font, dashColor, rightEdgeX, y);
+                return;
+            }
+
+            LayoutValueSegmentsRightAligned(parent, copper, currencyAmounts, rightEdgeX, y, font, alphaScale);
         }
 
         // --- Icon helper ---
