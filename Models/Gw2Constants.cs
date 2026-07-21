@@ -9,6 +9,35 @@ namespace GW2CraftingHelper.Models
         /// </summary>
         public const int CoinCurrencyId = 1;
 
+        /// <summary>
+        /// Reserved item id for the synthetic multi-item "wrapper"
+        /// RecipeNode root (M35 - gw2efficiency parity: mirrors gw2e's own
+        /// fake `{ id: false, name: "Multiple recipes" }` parent node - see
+        /// docs/gw2e-parity-spec.md and the M34 r1 multi-item research
+        /// report). Real GW2 item ids are always positive, so this can
+        /// never collide with a genuine tree item. The wrapper this id
+        /// marks must never be displayed to the user or surface in any
+        /// public model - see RecipeService.BuildMultiItemTreeAsync,
+        /// CraftingPlanPipeline's wrapper-aware tree building, and
+        /// PlanSolver.Collect's matching skip.
+        /// </summary>
+        public const int MultiItemWrapperItemId = int.MinValue;
+
+        /// <summary>
+        /// Reserved recipe id for the multi-item wrapper's single synthetic
+        /// "recipe" (whose Ingredients are the N selected items' own real
+        /// trees, each already carrying its own requested amount as its
+        /// ingredient quantity - gw2e's mechanism verbatim). Distinct from
+        /// both real recipe ids (positive) and the small negative synthetic
+        /// ids ref/mystic_forge_recipes.json assigns to Mystic Forge
+        /// recipes, so PlanResultBuilder.IsMysticForgeRecipeId's
+        /// `recipeId &lt; 0` check can never misclassify this wrapper
+        /// recipe as an unlockable Mystic Forge recipe (moot in practice -
+        /// the wrapper's own step is never collected into a plan at all,
+        /// see PlanSolver.Collect - but kept numerically distinct anyway).
+        /// </summary>
+        public const int MultiItemWrapperRecipeId = int.MinValue;
+
         // TODO: Currency names are sourced from api.guildwars2.com/v2/currencies.
         // Verify against the official API if broadening coverage beyond this set.
         public static readonly Dictionary<int, string> KnownCurrencyNames = new Dictionary<int, string>

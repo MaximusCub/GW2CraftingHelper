@@ -88,5 +88,17 @@ namespace GW2CraftingHelper.Models
         /// OwnMaterialsMode.Free (the pre-pass never ran).
         /// </summary>
         public ISet<int> ForceBuyOnlyNodeIds { get; set; }
+
+        /// <summary>
+        /// M35 (gw2efficiency parity - multi-item plans): the original
+        /// per-item request snapshotted at GENERATION time, for the same
+        /// reason as CurrencyValuation/OwnMaterialsMode above - so a local
+        /// override re-solve (ResolveWithOverrides) can keep populating
+        /// CraftingPlanResult.RequestedItems/MultiItemRoots consistently on
+        /// every re-solve of a multi-item batch, not just the first
+        /// generation. Null for a single-item plan (Tree is then the real
+        /// item's own tree, not the synthetic wrapper).
+        /// </summary>
+        public IReadOnlyList<PlanRequestItem> RequestedItems { get; set; }
     }
 }
