@@ -155,6 +155,114 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(15, option.Ingredients[0].Quantity);
         }
 
+        // --- Mystic Clover-style EV recipe tests (M33 fix-pass Critical
+        // finding 2: CloneOption previously dropped ExpectedOutputCount,
+        // and the crafts-needed recompute previously always used the
+        // nominal OutputCount instead of ExpectedOutputCount - either bug
+        // alone silently disables EV pricing whenever an account snapshot
+        // triggers this reduction path, the normal own-materials mode for
+        // a real plan) ---
+
+        [Fact]
+        public void Reduce_ExpectedOutputCountPreservedAcrossClone()
+        {
+            // Before the fix, CloneOption dropped ExpectedOutputCount,
+            // silently zeroing it (C# default) on every reduced tree.
+            var option = new RecipeOption
+            {
+                RecipeId = -1591,
+                OutputCount = 1,
+                ExpectedOutputCount = 0.31,
+                CraftsNeeded = 249,
+                Ingredients = new List<RecipeNode> { Leaf(2, 249) }
+            };
+            var tree = new RecipeNode
+            {
+                Id = 19675,
+                IngredientType = "Item",
+                Quantity = 77,
+                Recipes = new List<RecipeOption> { option }
+            };
+            var pool = new Dictionary<int, int>(); // nothing owned
+
+            var result = _reducer.Reduce(tree, pool);
+
+            Assert.Equal(0.31, result.ReducedTree.Recipes[0].ExpectedOutputCount);
+        }
+
+        [Fact]
+        public void Reduce_EVRecipe_PartialOwnership_RecalcsCraftsNeeded_UsingExpectedOutputCount()
+        {
+            // Simulates a RecipeService-built EV tree: need 10 successes at
+            // ExpectedOutputCount=0.5 (nominal OutputCount=1) -> 20 forge
+            // attempts, ingredient (1 per attempt) scaled to 20.
+            var option = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                ExpectedOutputCount = 0.5,
+                CraftsNeeded = 20,
+                Ingredients = new List<RecipeNode> { Leaf(2, 20) }
+            };
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 10,
+                Recipes = new List<RecipeOption> { option }
+            };
+
+            // Own 4 of item 1 -> qty becomes 6. Recomputing crafts needed
+            // from ExpectedOutputCount (0.5): ceil(6/0.5) = 12. Using the
+            // (buggy) nominal OutputCount (1) instead would give 6.
+            var pool = new Dictionary<int, int> { { 1, 4 } };
+
+            var result = _reducer.Reduce(tree, pool);
+
+            Assert.Equal(6, result.ReducedTree.Quantity);
+            var reducedOption = result.ReducedTree.Recipes[0];
+            Assert.Equal(12, reducedOption.CraftsNeeded);
+            // perCraft = 20 (orig ingredient qty) / 20 (orig crafts) = 1;
+            // 1 * 12 (new crafts) = 12.
+            Assert.Equal(12, reducedOption.Ingredients[0].Quantity);
+        }
+
+        [Fact]
+        public void Sourced_EVRecipe_PartialOwnership_RecalcsCraftsNeeded_UsingExpectedOutputCount()
+        {
+            // Same scenario as above through the sourced (AccountItemIndex)
+            // overload - the actual code path a real own-materials plan
+            // with a live account snapshot exercises.
+            var option = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                ExpectedOutputCount = 0.5,
+                CraftsNeeded = 20,
+                Ingredients = new List<RecipeNode> { Leaf(2, 20) }
+            };
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 10,
+                Recipes = new List<RecipeOption> { option }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(6, result.ReducedTree.Quantity);
+            var reducedOption = result.ReducedTree.Recipes[0];
+            Assert.Equal(0.5, reducedOption.ExpectedOutputCount);
+            Assert.Equal(12, reducedOption.CraftsNeeded);
+            Assert.Equal(12, reducedOption.Ingredients[0].Quantity);
+        }
+
         [Fact]
         public void SharedItemAcrossBranches_PoolConsumedDepthFirst()
         {

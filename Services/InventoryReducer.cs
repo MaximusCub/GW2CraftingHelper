@@ -74,7 +74,7 @@ namespace GW2CraftingHelper.Services
             foreach (var option in node.Recipes)
             {
                 int origCraftsNeeded = option.CraftsNeeded;
-                int newCraftsNeeded = (int)Math.Ceiling((double)node.Quantity / option.OutputCount);
+                int newCraftsNeeded = ComputeCraftsNeeded(node.Quantity, option);
                 option.CraftsNeeded = newCraftsNeeded;
 
                 foreach (var ingredient in option.Ingredients)
@@ -208,7 +208,7 @@ namespace GW2CraftingHelper.Services
             foreach (var option in node.Recipes)
             {
                 int origCraftsNeeded = option.CraftsNeeded;
-                int newCraftsNeeded = (int)Math.Ceiling((double)node.Quantity / option.OutputCount);
+                int newCraftsNeeded = ComputeCraftsNeeded(node.Quantity, option);
                 option.CraftsNeeded = newCraftsNeeded;
 
                 foreach (var ingredient in option.Ingredients)
@@ -218,6 +218,39 @@ namespace GW2CraftingHelper.Services
 
                     ReduceNodeSourced(ingredient, index, activeCharacterName, pool, used);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Recomputes how many crafting attempts are needed to produce
+        /// <paramref name="quantity"/> of a node, using the SAME basis
+        /// RecipeService used when it first built this option's
+        /// CraftsNeeded/ingredient quantities: the fractional
+        /// ExpectedOutputCount when the recipe has one (Mystic Clover-style
+        /// EV recipes), falling back to the nominal integer OutputCount
+        /// otherwise (a no-op for every ordinary recipe, where the two are
+        /// equal). Using a DIFFERENT basis here than RecipeService used
+        /// originally would desync origCraftsNeeded's per-craft ingredient
+        /// ratio from the reduced tree's new crafts count - see M33 Finding
+        /// 2 (CloneOption dropping ExpectedOutputCount silently disabled EV
+        /// pricing whenever a snapshot triggered this reduction path).
+        /// </summary>
+        private static int ComputeCraftsNeeded(int quantity, RecipeOption option)
+        {
+            double effectiveOutputCount = option.ExpectedOutputCount > 0
+                ? option.ExpectedOutputCount
+                : option.OutputCount;
+
+            try
+            {
+                return checked((int)Math.Ceiling((double)quantity / effectiveOutputCount));
+            }
+            catch (OverflowException)
+            {
+                // Malformed seed data (an absurdly tiny ExpectedOutputCount)
+                // - fall back to the nominal integer output rather than
+                // crash the whole reduction.
+                return (int)Math.Ceiling((double)quantity / option.OutputCount);
             }
         }
 
@@ -283,6 +316,13 @@ namespace GW2CraftingHelper.Services
                 RecipeId = option.RecipeId,
                 OutputCount = option.OutputCount,
                 CraftsNeeded = option.CraftsNeeded,
+                // M33 Finding 2 fix: this field was silently dropped here,
+                // which zeroed it out (C# default) on every cloned option -
+                // defeating EV pricing (PlanSolver/RecipeService's
+                // ExpectedOutputCount-based math) whenever an account
+                // snapshot triggered a Reduce() clone, i.e. the normal
+                // own-materials path for a real plan.
+                ExpectedOutputCount = option.ExpectedOutputCount,
                 Disciplines = new List<string>(option.Disciplines),
                 MinRating = option.MinRating,
                 Flags = new List<string>(option.Flags)
