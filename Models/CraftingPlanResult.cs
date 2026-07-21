@@ -30,10 +30,11 @@ namespace GW2CraftingHelper.Models
         /// Units the plan actually produces (>= requested quantity when the
         /// chosen root recipe over-produces). Sell-side figures use this.
         /// For a multi-item batch (M37), this is the SUM across every
-        /// requested root that is both crafted and has a live sell price
-        /// (see ApplyBatchSellSideEconomics) - a root that was bought, or
-        /// has no sell price, is excluded from the sum entirely rather than
-        /// contributing 0.
+        /// requested root that has a live sell price (see
+        /// ApplyBatchSellSideEconomics) - there is NO craft-vs-buy filter,
+        /// a bought-but-tradable root is summed in exactly like a crafted
+        /// one; only a root with no sell price at all is excluded from the
+        /// sum entirely rather than contributing 0.
         /// </summary>
         public int SellableQuantity { get; set; }
 
@@ -41,9 +42,10 @@ namespace GW2CraftingHelper.Models
         /// Net coin from instant-selling the crafted quantity after the 15%
         /// Trading Post fees; null when no sell price exists. For a
         /// multi-item batch (M37), this is the SUM of NetSaleValue across
-        /// every requested root that is both crafted and has a live sell
-        /// price (see ApplyBatchSellSideEconomics); null when NOT ONE
-        /// requested root qualifies.
+        /// every requested root that has a live sell price (see
+        /// ApplyBatchSellSideEconomics) - there is NO craft-vs-buy filter,
+        /// bought and crafted roots contribute alike; null when NOT ONE
+        /// requested root has a live sell price.
         /// </summary>
         public long? NetSaleValue { get; set; }
 
@@ -51,11 +53,12 @@ namespace GW2CraftingHelper.Models
         /// NetSaleValue minus the plan's total COIN cost. Non-coin currency
         /// costs are not valued and are excluded; null when no sell price.
         /// For a multi-item batch (M37), the cost subtracted is the SUM of
-        /// only the qualifying roots' own craft cost (each root's own
-        /// SolverDecision.TotalCost) - NOT Plan.TotalCoinCost, which also
-        /// includes every non-qualifying requested root's cost (bought
-        /// roots, or crafted roots with no sell price) that this figure
-        /// deliberately excludes (see ApplyBatchSellSideEconomics).
+        /// only the sellable roots' own cost (each such root's own
+        /// SolverDecision.TotalCost, regardless of whether that root was
+        /// bought or crafted - there is NO craft-vs-buy filter) - NOT
+        /// Plan.TotalCoinCost, which also includes every requested root
+        /// that has no live sell price and so is excluded from this figure
+        /// entirely (see ApplyBatchSellSideEconomics).
         /// </summary>
         public long? CraftingProfit { get; set; }
 
@@ -75,7 +78,8 @@ namespace GW2CraftingHelper.Models
         /// than being excluded from the sum. For a multi-item batch (M37),
         /// this is computed once over the whole batch's already-merged
         /// UsedMaterials list, independent of SellableQuantity/
-        /// NetSaleValue/CraftingProfit's per-root craft/sell-price filter -
+        /// NetSaleValue/CraftingProfit's own per-root live-sell-price
+        /// filter (which, like this field, has NO craft-vs-buy component) -
         /// it is set whenever Valued mode produced any usedMaterials at
         /// all, even if the batch turns out to have zero qualifying
         /// sellable roots (see ApplyBatchSellSideEconomics).
