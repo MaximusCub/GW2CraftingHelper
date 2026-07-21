@@ -906,6 +906,62 @@ correctly but writes the status line "Best path restored" - the label
 belongs to the Best Path preset, not the ignore toggle. Pick a neutral
 re-solve status ("Decisions updated" family) for ignore clicks.
 
+## 23. Horizontal dividers appear/disappear with scroll position (FIXED in M36, code-verified; live re-verification pending)
+User report: the same rows' divider lines are present at one scroll
+offset and gone at another - not a contrast problem (that was #7, fixed
+in M30), a presence/absence flicker as the list scrolls.
+ROOT CAUSE: Blish applies the GW2 UI-size setting as a real GPU scale
+matrix (GraphicsService.UIScaleTransform = Matrix.CreateScale(
+UIScaleMultiplier)), not an integer-pixel-snapped one - confirmed by
+decompiling the shipped BlishHUD v1.3.0 binary. The default "Normal" GW2
+UI size scales by 0.897 (GetScaleRatio case 1), so a divider Panel
+declared 1px tall in logical UI space rasterizes to 0.897 PHYSICAL
+pixels. Guaranteed physical coverage is floor(0.897) = 0: depending on
+where the divider's scaled top/bottom edges land relative to the
+physical scanline grid, it can cover zero physical rows and vanish
+entirely, or one and render fine - a function of the divider's absolute
+screen Y (row position + scroll offset), which changes continuously as
+the user scrolls. Scroll offset itself is an integer in logical space;
+the non-integer scale is what turns a 1px integer height into
+fractional physical coverage. #7's fix (higher-contrast divider color)
+addressed a real but different symptom of this SAME underlying
+mechanism - a low-alpha divider composited against a varying texture is
+also inconsistent contrast, but #7 never widened the divider's height,
+so the zero-coverage vanishing case it did not address remained latent
+and is what this user report caught.
+FIX (M36): every divider in CraftingPlanView widened from 1px to 2px -
+CreateRowDivider (the shared helper behind Used Materials, Shopping
+List, Crafting Steps, Required Disciplines, and Required Recipes row
+dividers) and the per-section headerDivider under each collapsible
+section's title row. floor(2 * 0.897) = floor(1.794) = 1 guarantees at
+least one covered physical scanline at ANY scroll offset, eliminating
+the zero-coverage case. Both are bottom-anchored inside their existing
+bounds (row divider: Location.Y = rowHeight - 2; header divider:
+Location.Y = 28 inside the 30px header panel, was 29) rather than
+grown past them, so PlanContentHeightMath's row-count-based section
+height arithmetic (verified against this change) needed no adjustment -
+the divider has always lived inside rowHeight, not on top of it. Two
+row types (Used Materials, Shopping List; both rowHeight 36 with a 34px
+icon frame starting at y=1) had only 1px of clearance below their icon,
+exactly enough for the old 1px divider but not the new 2px one; their
+icon's y was nudged from 1 to 0 so icon height (34) + divider height (2)
+exactly fill rowHeight with no overlap. NOT touched: the two existing
+2px separators (title-row and section-header-row separators, already
+wide enough), the transparent multi-root rootDivider (M35, a 12px gap
+panel, not a hairline), and the Recipe Tree (uses indent guidelines
+instead of row dividers by design - no change applicable).
+VERIFICATION STATE: code-verified - the 0.897 scale factor and the GPU
+matrix mechanism were confirmed against a decompile of the shipped
+BlishHUD v1.3.0 binary (GraphicsService.GetScaleRatio /
+UIScaleTransform); the row/header geometry changes were verified by
+reading every affected call site to confirm rowHeight/headerPanel
+containment and check for icon/label crowding (only the two rows noted
+above needed a coherent adjustment; the rest had several pixels of
+existing headroom). Build and full test suite green. Live user visual
+confirmation (does the flicker actually stop across a real scroll
+range) is still pending - the honest next step before this item can be
+marked live-verified.
+
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
 capture across three desktop sessions and two machines' font stacks

@@ -2130,7 +2130,7 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Shared chrome for every collapsible section (the 6 PlanSectionType
-        /// sections and the Recipe Tree alike): caret + Font18 title, a 1px
+        /// sections and the Recipe Tree alike): caret + Font18 title, a 2px
         /// divider spanning the full width under the header, a hover wash on
         /// the whole clickable row, and click-to-toggle with expansion state
         /// persisted in _sectionExpansion under sectionKey. suppressToggle
@@ -2194,10 +2194,14 @@ namespace GW2CraftingHelper.Views
             };
 
             // Divider under the header - identical chrome for every section.
+            // M36: 2px, bottom-anchored inside the 30px headerPanel
+            // (Location.Y = 28, i.e. headerPanel.Height - 2) - see
+            // CreateRowDivider's doc comment for why 1px is unsafe under
+            // Blish's non-integer UI-scale GPU transform (KNOWN-ISSUES #23).
             var headerDivider = new Panel()
             {
-                Size = new Point(panelWidth, 1),
-                Location = new Point(0, 29),
+                Size = new Point(panelWidth, 2),
+                Location = new Point(0, 28),
                 BackgroundColor = SectionDividerColor,
                 Parent = headerPanel
             };
@@ -2244,7 +2248,7 @@ namespace GW2CraftingHelper.Views
             {
                 topGap.Size = new Point(w, SectionSpacing);
                 headerPanel.Size = new Point(w, 30);
-                headerDivider.Size = new Point(w, 1);
+                headerDivider.Size = new Point(w, 2);
                 contentFlow.Size = new Point(w, contentFlow.Height);
             });
 
@@ -2322,16 +2326,32 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// 1px divider at the bottom edge of a row panel - the shared "list
+        /// 2px divider at the bottom edge of a row panel - the shared "list
         /// row" chrome used by every table-style section except the tree
         /// (which uses indent guidelines instead, per gw2e's own convention).
+        /// M36: was 1px, bottom-anchored via rowHeight - 1. Blish applies
+        /// its UI-scale (e.g. the "Normal" GW2 UI size's 0.897) as a real
+        /// GPU scale matrix, not an integer-pixel-snapped one, so a 1px-tall
+        /// quad rasterizes to 0.897 physical pixels - guaranteed physical
+        /// coverage is floor(0.897) = 0, i.e. it can disappear entirely
+        /// depending on scroll-offset sub-pixel alignment (KNOWN-ISSUES
+        /// #23). At 2px, floor(2 * 0.897) = floor(1.794) = 1 guarantees at
+        /// least one covered physical scanline at any offset. Bottom-
+        /// anchored (rowHeight - 2, not rowHeight - 1) so the divider grows
+        /// into the row's own bounds rather than past them - the row's
+        /// total height (PlanContentHeightMath) already accounts for the
+        /// divider living inside rowHeight, so this needed no height-math
+        /// change, only the two row types whose icon frame filled rowHeight
+        /// to within 1px (CreateUsedMaterialRow, CreateShoppingRow) needed
+        /// their icon's y nudged up by 1 to keep clear of the taller
+        /// divider - see the comment at each of those call sites.
         /// </summary>
         private static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight)
         {
             return new Panel()
             {
-                Size = new Point(panelWidth, 1),
-                Location = new Point(0, rowHeight - 1),
+                Size = new Point(panelWidth, 2),
+                Location = new Point(0, rowHeight - 2),
                 BackgroundColor = RowDividerColor,
                 Parent = rowPanel
             };
@@ -2412,7 +2432,13 @@ namespace GW2CraftingHelper.Views
             const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
+            // M36: y=0 (was 1) - the 34px icon frame previously left only
+            // 1px of clearance above rowHeight (36), which was exactly
+            // enough for the old 1px divider but would overlap the new 2px
+            // divider's top pixel by 1 row. Moving the icon up by 1 makes
+            // frame height (34) + divider height (2) exactly fill rowHeight
+            // with no overlap.
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
 
             const int nameX = 50;
             int qtyRightEdge = panelWidth - 8;
@@ -2462,7 +2488,7 @@ namespace GW2CraftingHelper.Views
             {
                 rowPanel.Size = new Point(w, rowHeight);
                 qtyLabel.Location = new Point(w - 8 - qtyWidth, 9);
-                if (divider != null) divider.Size = new Point(w, 1);
+                if (divider != null) divider.Size = new Point(w, 2);
             });
             _reellipsisActions.Add(w =>
             {
@@ -2584,7 +2610,10 @@ namespace GW2CraftingHelper.Views
             const int rowHeight = PlanContentHeightMath.ShoppingRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 1);
+            // M36: y=0 (was 1) - see the identical note in
+            // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
+            // shape, same 1px shortfall against the new 2px divider.
+            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
 
             const int nameX = 50;
             var font = GameService.Content.DefaultFont14;
@@ -2675,7 +2704,7 @@ namespace GW2CraftingHelper.Views
                 qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
                 RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
                 RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
-                if (divider != null) divider.Size = new Point(w, 1);
+                if (divider != null) divider.Size = new Point(w, 2);
             });
             _reellipsisActions.Add(w =>
             {
@@ -2808,7 +2837,7 @@ namespace GW2CraftingHelper.Views
                 {
                     sublabelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, sublabelLabel.Width), 16);
                 }
-                if (divider != null) divider.Size = new Point(w, 1);
+                if (divider != null) divider.Size = new Point(w, 2);
             });
         }
 
@@ -2868,7 +2897,7 @@ namespace GW2CraftingHelper.Views
             {
                 rowPanel.Size = new Point(w, rowHeight);
                 levelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, levelLabel.Width), 7);
-                if (divider != null) divider.Size = new Point(w, 1);
+                if (divider != null) divider.Size = new Point(w, 2);
             });
         }
 
@@ -2945,7 +2974,7 @@ namespace GW2CraftingHelper.Views
                 {
                     statusLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, statusLabel.Width), hasSublabel ? 10 : 8);
                 }
-                if (divider != null) divider.Size = new Point(w, 1);
+                if (divider != null) divider.Size = new Point(w, 2);
             });
         }
 
