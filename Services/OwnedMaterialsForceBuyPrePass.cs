@@ -14,20 +14,22 @@ namespace GW2CraftingHelper.Services
     ///
     /// gw2e computes this on a strictly zero-owned baseline so that an
     /// already-owned component's cost being free never masks a bad
-    /// marginal-craft trade. This module runs the SAME rule against
-    /// whichever tree the real solve is about to use (post-reduction, when
-    /// reduction ran) rather than re-deriving a separate zero-owned tree -
-    /// a deliberate, documented simplification: PlanSolver.Evaluate's own
-    /// buy/craft cost aggregation is linear in quantity for every ordinary
-    /// (non-bulk-output) recipe, so the buyPrice/craftDecisionPrice RATIO
-    /// this rule tests is unaffected by whether quantity reflects the full
-    /// original demand or the post-reduction remainder. The one known
-    /// divergence from gw2e's literal zero-owned-baseline mechanics is a
-    /// bulk-output recipe (OutputCount &gt; 1) reduced down to a small
-    /// remaining quantity, where per-unit craft cost can look worse than it
-    /// would at full scale (an under-filled batch) - accepted rather than
-    /// building a second, separately-numbered "as if zero owned" tree and a
-    /// cross-tree node-identity correlation mechanism to close that gap.
+    /// marginal-craft trade. This module implements exactly that rule; it
+    /// is the CALLER's responsibility to pass a genuine zero-owned tree,
+    /// which is exactly what CraftingPlanPipeline's Step 6.5 does - it
+    /// invokes ComputeForceBuyOnlyNodeIds against `tree`, the pipeline's
+    /// ORIGINAL, UNREDUCED tree (InventoryReducer.Reduce only ever mutates
+    /// a clone, never `tree` itself), never the post-reduction tree the
+    /// real solve goes on to use. Evaluating this rule on an
+    /// already-reduced tree would make it a near no-op in precisely the
+    /// scenario it exists for: owning a pile of components already makes
+    /// their post-reduction craft cost look cheap regardless of what a
+    /// FRESH purchase would cost, which is exactly the masking gw2e's
+    /// zero-owned baseline is designed to prevent. See the pipeline's own
+    /// Step 6.5 comment and the passing
+    /// Structured_ValuedMode_ForceBuyPrePass_UsesZeroOwnedBaseline test
+    /// (CraftingPlanPipelineTests.cs) for confirmation this module is wired
+    /// against the correct (unreduced) tree at runtime.
     ///
     /// Never touches InventoryReducer's pool, PlanSolver's own Decision
     /// memo, or any owned-materials data directly - it only reads the
