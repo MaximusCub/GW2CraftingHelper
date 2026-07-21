@@ -65,6 +65,15 @@ namespace GW2CraftingHelper.Views
         // overlap in flight.
         private int _generateSequence;
 
+        // M34-B1 #4: set true the instant the CURRENT generation (myGen ==
+        // _generateSequence) writes its own completion/error status text.
+        // Reset to false at the start of every TriggerGenerate call. Guards
+        // against a late-draining trailing progress tick from that SAME
+        // generation overwriting the completion text it already wrote (see
+        // StatusUpdateGuard) - a race myGen alone cannot catch, since both
+        // callbacks share the same generation number.
+        private bool _statusClosedForCurrentGeneration;
+
         // Per-node user decision overrides (keyed by solver NodeId) and
         // explicit tree expansion state; both survive local re-solves and
         // reset on a fresh Generate.
@@ -1297,6 +1306,7 @@ namespace GW2CraftingHelper.Views
             // deferred callback below reads _generateSequence from the main
             // thread too (inside a MainThreadMarshal.Run callback).
             int myGen = ++_generateSequence;
+            _statusClosedForCurrentGeneration = false;
 
             // Parse quantity; tell the user when their input was discarded
             // instead of silently resetting it.
@@ -1326,7 +1336,13 @@ namespace GW2CraftingHelper.Views
                 {
                     MainThreadMarshal.Run(() =>
                     {
-                        if (myGen != _generateSequence) return;
+                        // M34-B1 #4: rechecked at drain time (not queue
+                        // time) - a trailing tick from this same generation
+                        // must not overwrite a completion status that
+                        // generation has already written, however the two
+                        // callbacks actually happened to drain relative to
+                        // each other. See StatusUpdateGuard.
+                        if (!StatusUpdateGuard.ShouldApply(myGen, _generateSequence, _statusClosedForCurrentGeneration)) return;
                         SetStatus(ps.Message);
                     });
                 }
@@ -1375,6 +1391,12 @@ namespace GW2CraftingHelper.Views
 
                     _lastRenderedWidth = _contentPanel.Width;
                     RenderPlan(vm);
+                    // M34-B1 #4: close this generation's status stream
+                    // right before writing its completion text, so any
+                    // trailing progress tick for this same generation that
+                    // drains AFTER this point (StatusUpdateGuard) is
+                    // dropped instead of overwriting it.
+                    _statusClosedForCurrentGeneration = true;
                     SetStatus($"Plan generated - {_planGeneratedAt:MMM d, yyyy h:mm tt}");
                 });
             }
@@ -1391,6 +1413,9 @@ namespace GW2CraftingHelper.Views
                     _lastDebugLog = new[] { $"Generation failed: {ex.Message}" };
 
                     if (_contentPanel == null || _contentPanel.Parent == null) return;
+                    // M34-B1 #4: see the matching comment on the success
+                    // path above.
+                    _statusClosedForCurrentGeneration = true;
                     SetStatus($"Error: {ex.Message}");
                 });
             }
