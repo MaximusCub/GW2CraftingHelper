@@ -36,15 +36,118 @@ namespace GW2CraftingHelper.Services
         {
             try
             {
-                await PreWarmCacheAsync(itemId, ct);
-
-                var visiting = new HashSet<int>();
-                return await BuildNodeAsync(itemId, "Item", quantity, visiting, ct);
+                return await BuildTreeCoreAsync(itemId, quantity, ct);
             }
             finally
             {
                 _cacheStore.Flush(force: true);
             }
+        }
+
+        /// <summary>
+        /// M35-B1 (gw2efficiency parity - multi-item plans): builds a
+        /// single item's tree via BuildTreeAsync's own logic without the
+        /// per-call cache flush, so BuildMultiItemTreeAsync below can build
+        /// N item trees and flush exactly once at the end instead of once
+        /// per item (a hot-path allocation/IO concern when N is not 1).
+        /// </summary>
+        private async Task<RecipeNode> BuildTreeCoreAsync(int itemId, int quantity, CancellationToken ct)
+        {
+            await PreWarmCacheAsync(itemId, ct);
+
+            var visiting = new HashSet<int>();
+            return await BuildNodeAsync(itemId, "Item", quantity, visiting, ct);
+        }
+
+        /// <summary>
+        /// M35-B1 (gw2efficiency parity - multi-item plans): builds each
+        /// requested item's own tree via the exact same BuildTreeAsync path
+        /// a single-item request uses, then - for 2+ items - wraps them
+        /// under a synthetic root RecipeNode the same way gw2e's frontend
+        /// does for its own Calculator (docs/gw2e-parity-spec.md, the M34
+        /// r1 multi-item research report): a reserved-id, never-rendered
+        /// "recipe" whose Ingredients are the N real item trees, each
+        /// already carrying its own requested amount as its own Quantity
+        /// (set by BuildTreeAsync itself, exactly like an ordinary recipe
+        /// ingredient's quantity). Feeding this wrapper through the
+        /// unmodified PlanSolver/InventoryReducer/CraftingTreeBuilder
+        /// pipeline is what gives merged shopping-list/steps/currency
+        /// totals "for free" via the existing per-item-id aggregation
+        /// (PlanSolver.Collect's AggregateStep) - no multi-item-specific
+        /// solver logic exists or is needed.
+        ///
+        /// A single-entry request returns that item's own tree UNCHANGED -
+        /// no wrapper at all - echoing gw2e's own `if (r.length === 1)
+        /// return r[0]` short-circuit, so a caller feeding a single-entry
+        /// list into this method gets byte-identical output to calling
+        /// BuildTreeAsync directly.
+        ///
+        /// Items are built sequentially (not concurrently): the persistent
+        /// search/recipe caches (see PreWarmCacheAsync) already make any
+        /// overlap between requested items' subtrees cheap on repeat calls,
+        /// and sequential building avoids adding concurrency surface to a
+        /// data structure not designed to be mutated from multiple item
+        /// builds in parallel.
+        /// </summary>
+        public async Task<RecipeNode> BuildMultiItemTreeAsync(
+            IReadOnlyList<PlanRequestItem> items, CancellationToken ct)
+        {
+            if (items == null || items.Count == 0)
+            {
+                throw new ArgumentException("At least one item is required.", nameof(items));
+            }
+
+            try
+            {
+                if (items.Count == 1)
+                {
+                    return await BuildTreeCoreAsync(items[0].ItemId, items[0].Quantity, ct);
+                }
+
+                var itemTrees = new List<RecipeNode>(items.Count);
+                foreach (var item in items)
+                {
+                    itemTrees.Add(await BuildTreeCoreAsync(item.ItemId, item.Quantity, ct));
+                }
+
+                return BuildWrapperNode(itemTrees);
+            }
+            finally
+            {
+                _cacheStore.Flush(force: true);
+            }
+        }
+
+        /// <summary>
+        /// See BuildMultiItemTreeAsync's doc comment. OutputCount/
+        /// CraftsNeeded/ExpectedOutputCount are all 1 (gw2e's own
+        /// `quantity: 1, output: 1`), so InventoryReducer's
+        /// ComputeCraftsNeeded ratio math is a no-op for this synthetic
+        /// node, and it never has a Disciplines entry (empty list, the
+        /// RecipeOption default) so it can never be mistaken for a real
+        /// craftable recipe by PlanResultBuilder's discipline/required-
+        /// recipe derivation - moot anyway, since PlanSolver.Collect never
+        /// generates a step for this node at all (see its own doc comment).
+        /// </summary>
+        private static RecipeNode BuildWrapperNode(List<RecipeNode> itemTrees)
+        {
+            var wrapperRecipe = new RecipeOption
+            {
+                RecipeId = Gw2Constants.MultiItemWrapperRecipeId,
+                OutputCount = 1,
+                CraftsNeeded = 1,
+                ExpectedOutputCount = 1
+            };
+            wrapperRecipe.Ingredients.AddRange(itemTrees);
+
+            var wrapper = new RecipeNode
+            {
+                Id = Gw2Constants.MultiItemWrapperItemId,
+                IngredientType = "Item",
+                Quantity = 1
+            };
+            wrapper.Recipes.Add(wrapperRecipe);
+            return wrapper;
         }
 
         private async Task PreWarmCacheAsync(int itemId, CancellationToken ct)
