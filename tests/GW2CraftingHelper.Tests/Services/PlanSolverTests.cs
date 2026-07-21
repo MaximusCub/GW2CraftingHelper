@@ -1346,13 +1346,99 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var plan = result.Plan;
 
             var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
             Assert.Equal(AcquisitionSource.BuyFromVendor, vendorStep.Source);
             Assert.Equal(179, vendorStep.Quantity);
             Assert.Equal(180, vendorStep.TotalCost);
             Assert.Equal(180, plan.TotalCoinCost);
+
+            // Critical review finding (PlanSolver.cs:1038): the root Craft
+            // decision's own TotalCost - what CraftingTreeNode.SubtreeCost
+            // shows for the Recipe Tree's root row - must agree with the
+            // Total Cost summary above, not keep the stale per-occurrence
+            // sum of 186 that FinalizeVendorBatches alone (which only fixes
+            // the merged PlanStep/currencyMap view) left behind.
+            Assert.Equal(180, result.Decisions[tree.NodeId].TotalCost);
+        }
+
+        [Fact]
+        public void MultiOccurrenceBulkVendorOffer_CoinUnitCost_UsesOfferRate_NotAggregateAverage()
+        {
+            // MustFix review finding (PlanSolver.cs:1062): the coin "Each"
+            // cell (PlanStep.UnitCost) must show the winning offer's own
+            // true per-unit rate (CoinCostPerBatch / OutputCount), not a
+            // truncating average of the corrected aggregate TotalCost over
+            // aggregate Quantity. A "2 for 5" offer merged to demand 3 needs
+            // 2 batches (TotalCost = 10); the old average (10/3 = 3,
+            // truncated) implied a per-unit price this offer never actually
+            // charges - the true rate is 5/2 = 2.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(99, 1),
+                    Leaf(99, 2)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 5, outputCount: 2) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var plan = result.Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, vendorStep.Source);
+            Assert.Equal(3, vendorStep.Quantity);
+            Assert.Equal(10, vendorStep.TotalCost);
+            Assert.Equal(2, vendorStep.UnitCost);
+            Assert.Equal(2, vendorStep.VendorOfferOutputCount);
+
+            // The root Craft decision's TotalCost must also reflect the
+            // corrected leaf allocations (5 + 5 = 10), same reconciliation
+            // as the sibling test above.
+            Assert.Equal(10, result.Decisions[tree.NodeId].TotalCost);
+        }
+
+        [Fact]
+        public void MultiOccurrenceBulkVendorOffer_CorrectionPropagatesThroughTwoCraftLevels()
+        {
+            // Critical review finding, deeper repro: the same 4/4/4/83/84
+            // demand for the vendor-bought leaf (99), but split across TWO
+            // separately-crafted intermediate items (2 and 3), each itself
+            // an ingredient of the root craft - a 3-level-deep tree
+            // (root -&gt; {item2, item3} -&gt; leaf99). RecomputeCraftCosts must
+            // re-sum EVERY Craft ancestor bottom-up, not just a single
+            // level, for the root's TotalCost to reach the corrected 180
+            // rather than stopping at an intermediate level's stale value.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Craftable(2, 1,
+                        Option(20, 1, 1,
+                            Leaf(99, 4),
+                            Leaf(99, 4))),
+                    Craftable(3, 1,
+                        Option(30, 1, 1,
+                            Leaf(99, 4),
+                            Leaf(99, 83),
+                            Leaf(99, 84)))));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var plan = result.Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(179, vendorStep.Quantity);
+            Assert.Equal(180, vendorStep.TotalCost);
+            Assert.Equal(180, plan.TotalCoinCost);
+            Assert.Equal(180, result.Decisions[tree.NodeId].TotalCost);
         }
 
         [Fact]
@@ -1384,7 +1470,8 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var plan = result.Plan;
 
             var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
             Assert.Equal(AcquisitionSource.BuyFromVendor, vendorStep.Source);
@@ -1396,6 +1483,13 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(152, vendorStep.TotalCost);
             Assert.Equal(152, plan.TotalCoinCost);
             Assert.Equal(0, vendorStep.VendorOfferOutputCount);
+
+            // Conflict case regression guard: AllocateVendorNodeCosts must
+            // NOT redistribute a blended rate across occurrences that
+            // genuinely used different offers - each occurrence's own memo
+            // TotalCost (and therefore the root Craft decision's summed
+            // TotalCost) must stay exactly the individually-correct 152.
+            Assert.Equal(152, result.Decisions[tree.NodeId].TotalCost);
         }
 
         // --- Vendor purchase-cap tests ---
