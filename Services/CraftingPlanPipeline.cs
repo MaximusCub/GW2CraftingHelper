@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services.Diagnostics;
 
@@ -499,6 +500,319 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// M35-B1 (gw2efficiency parity - multi-item plans): generates a
+        /// combined plan for N requested items in one calculation. A
+        /// single-entry list delegates STRAIGHT to the untouched single-
+        /// item overload above - byte-identical output, no wrapper built at
+        /// all - echoing gw2e's own `if (r.length === 1) return r[0]`
+        /// short-circuit (docs/gw2e-parity-spec.md, the M34 r1 multi-item
+        /// research report). For 2+ items, builds the synthetic wrapper
+        /// tree (see RecipeService.BuildMultiItemTreeAsync) and feeds it
+        /// through the SAME reduction/force-buy-pre-pass/solve/vendor-
+        /// batch-finalization pipeline a single item uses - merged
+        /// shopping-list/steps/currency totals across shared materials fall
+        /// out of the existing per-item-id aggregation for free (see
+        /// PlanSolver.Collect's AggregateStep), with zero multi-item-
+        /// specific solver code.
+        /// </summary>
+        public async Task<CraftingPlanResult> GenerateStructuredAsync(
+            IReadOnlyList<PlanRequestItem> items,
+            AccountSnapshot snapshot,
+            CancellationToken ct,
+            IProgress<PlanStatus> progress = null,
+            string activeCharacterName = null,
+            PriceBasis priceBasis = PriceBasis.BuyOrder,
+            CurrencyValuation currencyValuation = null,
+            OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free)
+        {
+            // Marked async (rather than returning the branch Tasks directly)
+            // so this validation throws INSIDE the returned Task, exactly
+            // like every other failure mode of this method - a caller that
+            // awaits (rather than merely calls) this method sees consistent
+            // exception delivery regardless of which branch below is taken.
+            if (items == null || items.Count == 0)
+            {
+                throw new ArgumentException("At least one plan request item is required.", nameof(items));
+            }
+
+            if (items.Count == 1)
+            {
+                return await GenerateStructuredAsync(
+                    items[0].ItemId, items[0].Quantity, snapshot, ct, progress,
+                    activeCharacterName, priceBasis, currencyValuation, ownMaterialsMode);
+            }
+
+            return await GenerateStructuredMultiAsync(
+                items, snapshot, ct, progress, activeCharacterName,
+                priceBasis, currencyValuation, ownMaterialsMode);
+        }
+
+        /// <summary>
+        /// The genuine (2+ item) multi-item path behind the list overload
+        /// of GenerateStructuredAsync above. Mirrors the single-item
+        /// overload's own pipeline step-for-step (reduction, M34-B2a #3's
+        /// force-buy pre-pass, solve, vendor-batch finalization, metadata
+        /// fetch, structured result build) with the wrapper tree standing
+        /// in for a single item's tree throughout - PlanSolver,
+        /// InventoryReducer, and OwnedMaterialsForceBuyPrePass are all
+        /// oblivious to the wrapper's presence (see their own doc comments)
+        /// so none of that logic needed to change.
+        ///
+        /// Deliberately does NOT compute sell-side economics
+        /// (ApplySellSideEconomics) - a single target item's "what would
+        /// selling the crafted output net" concept does not have an
+        /// obvious single-number generalization across N independently
+        /// selected items (gw2efficiency itself only exposes a distinct,
+        /// not-yet-mirrored "sell excess crafted components for profit"
+        /// rollup in its own multi-item mode - see the M34 r1 report,
+        /// section on `showprofit`). SellableQuantity/NetSaleValue/
+        /// CraftingProfit/MaterialOpportunityCost stay at their type
+        /// defaults (0/null) for a multi-item result; a future milestone
+        /// can add a batch-level equivalent if needed.
+        /// </summary>
+        private async Task<CraftingPlanResult> GenerateStructuredMultiAsync(
+            IReadOnlyList<PlanRequestItem> items,
+            AccountSnapshot snapshot,
+            CancellationToken ct,
+            IProgress<PlanStatus> progress,
+            string activeCharacterName,
+            PriceBasis priceBasis,
+            CurrencyValuation currencyValuation,
+            OwnMaterialsMode ownMaterialsMode)
+        {
+            var valuation = currencyValuation ?? CurrencyValuation.None;
+            var sw = new Stopwatch();
+            var timingLog = new List<string>();
+
+            // Step 1: Build each item's own tree, then wrap them under the
+            // synthetic multi-item root (RecipeService.BuildMultiItemTreeAsync).
+            progress?.Report(new PlanStatus
+            {
+                Message = "Building recipe trees (may take several seconds on first run)..."
+            });
+            _recipeService.OnStatusUpdate = msg =>
+                progress?.Report(new PlanStatus { Message = msg });
+            sw.Restart();
+            RecipeNode tree;
+            try
+            {
+                tree = await _recipeService.BuildMultiItemTreeAsync(items, ct);
+            }
+            finally
+            {
+                _recipeService.OnStatusUpdate = null;
+            }
+            sw.Stop();
+            timingLog.Add($"Build recipe trees: {sw.ElapsedMilliseconds}ms ({items.Count} items)");
+
+            // Step 2: Collect all item IDs from the tree for price lookup
+            progress?.Report(new PlanStatus { Message = "Collecting item IDs..." });
+            sw.Restart();
+            var allItemIds = new HashSet<int>();
+            CollectItemIds(tree, allItemIds);
+            sw.Stop();
+            timingLog.Add($"Collect item IDs: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
+
+            // Step 3: Fetch TP prices
+            progress?.Report(new PlanStatus
+            {
+                Message = $"Fetching prices ({allItemIds.Count} items)...",
+                Total = allItemIds.Count
+            });
+            sw.Restart();
+            var prices = await _tradingPostService.GetPricesAsync(allItemIds, ct);
+            sw.Stop();
+            timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
+
+            // Step 4: Resolve missing vendor offers (if resolver available)
+            progress?.Report(new PlanStatus { Message = "Resolving vendor offers..." });
+            sw.Restart();
+            if (_resolver != null && _vendorOfferStore != null)
+            {
+                await _resolver.EnsureVendorOffersAsync(allItemIds, progress, ct);
+            }
+            sw.Stop();
+            timingLog.Add($"Resolve vendor offers: {sw.ElapsedMilliseconds}ms");
+
+            // Step 5: Query vendor offers
+            progress?.Report(new PlanStatus { Message = "Looking up vendor offers..." });
+            sw.Restart();
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
+            if (_vendorOfferStore != null)
+            {
+                vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
+            }
+            sw.Stop();
+            timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
+
+            prices = await AugmentWithVendorCostPricesAsync(prices, vendorOffers, ct);
+
+            // M34-B2a #3: same force-buy pre-pass as the single-item path,
+            // applied to the WHOLE wrapper batch at once.
+            bool useForceBuyPrePass = ownMaterialsMode == OwnMaterialsMode.Valued &&
+                snapshot != null && _reducer != null;
+
+            if (useForceBuyPrePass)
+            {
+                RecipeNodeIds.Assign(tree);
+            }
+
+            // Step 6: Inventory reduction
+            progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
+            sw.Restart();
+            RecipeNode treeUsedForSolve = tree;
+            List<UsedMaterial> usedMaterials = null;
+            Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null;
+
+            if (snapshot != null && _reducer != null)
+            {
+                var index = new AccountItemIndex(snapshot.Items);
+                var reduced = _reducer.Reduce(tree, index, activeCharacterName);
+                treeUsedForSolve = reduced.ReducedTree;
+                usedMaterials = reduced.UsedMaterials;
+                ownedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
+            }
+            sw.Stop();
+            timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
+
+            ISet<int> forceBuyOnlyNodeIds = null;
+            if (useForceBuyPrePass)
+            {
+                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
+            }
+
+            // Step 7: Solve. The wrapper tree is fed through exactly like a
+            // single item's tree - see PlanSolver.Collect's own doc comment
+            // for how the wrapper's own throwaway "craft" is hidden from
+            // the resulting plan/steps.
+            progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
+            sw.Restart();
+            var solveResult = _solver.Solve(
+                treeUsedForSolve, prices, vendorOffers, priceBasis,
+                overrides: null, currencyValuation: valuation,
+                forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                assignNodeIds: !useForceBuyPrePass);
+            var plan = solveResult.Plan;
+            sw.Stop();
+            timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
+
+            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId =
+                BuildOwnedQuantityUsedByNodeId(ownedQuantityUsedByNode);
+
+            // Step 8: Fetch item metadata for every tree item + every
+            // requested item + used materials.
+            var metadataIds = new HashSet<int>(allItemIds);
+            metadataIds.UnionWith(plan.Steps.Select(s => s.ItemId));
+            foreach (var item in items)
+            {
+                metadataIds.Add(item.ItemId);
+            }
+            if (usedMaterials != null)
+            {
+                foreach (var um in usedMaterials)
+                {
+                    metadataIds.Add(um.ItemId);
+                }
+            }
+            progress?.Report(new PlanStatus
+            {
+                Message = $"Fetching item details ({metadataIds.Count} items)...",
+                Total = metadataIds.Count
+            });
+            sw.Restart();
+
+            var currencyTask = _currencyMetadataService?.GetAllAsync(ct);
+            ObserveFault(currencyTask);
+
+            var metadata = await _itemMetadataService.GetMetadataAsync(metadataIds, ct);
+            sw.Stop();
+            timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
+
+            progress?.Report(new PlanStatus { Message = "Fetching currency details..." });
+            sw.Restart();
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null;
+            if (currencyTask != null)
+            {
+                try
+                {
+                    currencyMetadata = await currencyTask;
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    currencyMetadata = null;
+                }
+            }
+            sw.Stop();
+            timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
+
+            // Step 10: Fetch learned recipe IDs (if permission available)
+            progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
+            sw.Restart();
+            ISet<int> learnedRecipeIds = null;
+            if (_accountRecipeClient != null && _accountRecipeClient.HasRequiredPermission())
+            {
+                learnedRecipeIds = await _accountRecipeClient.GetLearnedRecipeIdsAsync(ct);
+            }
+            sw.Stop();
+            timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");
+
+            // Step 11: Build structured result
+            progress?.Report(new PlanStatus { Message = "Building final result..." });
+            sw.Restart();
+            var resultBuilder = new PlanResultBuilder();
+            var result = resultBuilder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
+            result.CurrencyMetadata = currencyMetadata;
+            result.AcquisitionHints = _acquisitionHints;
+            result.RequestedItems = items;
+
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
+                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
+            result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
+
+            BuildCraftingTreeResult(
+                result, treeUsedForSolve, solveResult.Decisions, metadata,
+                _acquisitionHints, ownedQuantityUsedByNodeId, ignoredItemIds: null);
+
+            result.SolveContext = new PlanSolveContext
+            {
+                TargetItemId = Gw2Constants.MultiItemWrapperItemId,
+                Quantity = 1,
+                Tree = treeUsedForSolve,
+                Prices = prices,
+                VendorOffers = vendorOffers,
+                Metadata = metadata,
+                LearnedRecipeIds = learnedRecipeIds,
+                UsedMaterials = usedMaterials,
+                PriceBasis = priceBasis,
+                CurrencyValuation = valuation,
+                OwnMaterialsMode = ownMaterialsMode,
+                CurrencyMetadata = currencyMetadata,
+                AcquisitionHints = _acquisitionHints,
+                OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
+                OwnedCurrencyAmounts = ownedCurrencyAmounts,
+                ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
+                RequestedItems = items
+            };
+            sw.Stop();
+            timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
+
+            if (result.DebugLog == null)
+            {
+                result.DebugLog = new List<string>();
+            }
+            result.DebugLog.InsertRange(0, timingLog);
+            var summary = PlanTimingAnalyzer.Summarize(timingLog);
+            result.DebugLog.InsertRange(timingLog.Count, summary);
+
+            return result;
+        }
+
+        /// <summary>
         /// Re-solves a previously generated plan with per-node decision
         /// overrides. Purely local: reuses the context's tree, prices,
         /// offers, and metadata; no network calls.
@@ -541,16 +855,25 @@ namespace GW2CraftingHelper.Services
             result.CurrencyMetadata = context.CurrencyMetadata;
             result.AcquisitionHints = context.AcquisitionHints;
             result.OwnedCurrencyAmounts = context.OwnedCurrencyAmounts;
+            result.RequestedItems = context.RequestedItems;
 
-            var treeBuilder = new CraftingTreeBuilder();
-            result.CraftingTree = treeBuilder.BuildTree(
-                context.Tree, solveResult.Decisions, context.Metadata, context.AcquisitionHints,
-                context.OwnedQuantityUsedByNodeId, ignoredItemIds);
+            BuildCraftingTreeResult(
+                result, context.Tree, solveResult.Decisions, context.Metadata,
+                context.AcquisitionHints, context.OwnedQuantityUsedByNodeId, ignoredItemIds);
 
-            ApplySellSideEconomics(
-                result, context.Tree, solveResult, context.Prices,
-                context.TargetItemId, context.Quantity, context.PriceBasis,
-                context.UsedMaterials, context.OwnMaterialsMode);
+            // M35: sell-side economics assume a single target item (see
+            // GenerateStructuredMultiAsync's own doc comment for why a
+            // multi-item batch does not get a generalized equivalent yet in
+            // B1) - skip for a multi-item context so a re-solve doesn't
+            // introduce a SellableQuantity/etc. the original generation
+            // never had.
+            if (context.Tree.Id != Gw2Constants.MultiItemWrapperItemId)
+            {
+                ApplySellSideEconomics(
+                    result, context.Tree, solveResult, context.Prices,
+                    context.TargetItemId, context.Quantity, context.PriceBasis,
+                    context.UsedMaterials, context.OwnMaterialsMode);
+            }
             result.SolveContext = context;
 
             if (result.DebugLog == null)
@@ -655,6 +978,56 @@ namespace GW2CraftingHelper.Services
                 {
                     CollectPresetOverrides(ingredient, context, source, overrides);
                 }
+            }
+        }
+
+        /// <summary>
+        /// M35-B1 (gw2e parity, multi-item plans): builds
+        /// CraftingPlanResult.CraftingTree (single-item) or MultiItemRoots
+        /// (multi-item) from <paramref name="tree"/> - the synthetic
+        /// wrapper root (see Gw2Constants.MultiItemWrapperItemId) never
+        /// surfaces in either field, echoing gw2efficiency's own
+        /// componentTree.html hiding its equivalent fake node
+        /// (docs/gw2e-parity-spec.md, the M34 r1 multi-item research
+        /// report). Shared by GenerateStructuredMultiAsync and
+        /// ResolveWithOverrides so a local override/Ignore re-solve of a
+        /// multi-item batch keeps exposing the same N roots on every
+        /// re-solve, not just the first generation.
+        /// </summary>
+        private static void BuildCraftingTreeResult(
+            CraftingPlanResult result,
+            RecipeNode tree,
+            IReadOnlyDictionary<int, SolverDecision> decisions,
+            IReadOnlyDictionary<int, ItemMetadata> metadata,
+            IReadOnlyDictionary<int, AcquisitionHint> hints,
+            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
+            ISet<int> ignoredItemIds)
+        {
+            var treeBuilder = new CraftingTreeBuilder();
+
+            if (tree.Id == Gw2Constants.MultiItemWrapperItemId)
+            {
+                var wrapperRecipe = tree.Recipes.FirstOrDefault(
+                    r => r.RecipeId == Gw2Constants.MultiItemWrapperRecipeId);
+                var roots = new List<CraftingTreeNode>(wrapperRecipe?.Ingredients.Count ?? 0);
+                if (wrapperRecipe != null)
+                {
+                    foreach (var itemRoot in wrapperRecipe.Ingredients)
+                    {
+                        roots.Add(treeBuilder.BuildTree(
+                            itemRoot, decisions, metadata, hints,
+                            ownedQuantityUsedByNodeId, ignoredItemIds));
+                    }
+                }
+                result.CraftingTree = null;
+                result.MultiItemRoots = roots;
+            }
+            else
+            {
+                result.CraftingTree = treeBuilder.BuildTree(
+                    tree, decisions, metadata, hints,
+                    ownedQuantityUsedByNodeId, ignoredItemIds);
+                result.MultiItemRoots = null;
             }
         }
 
@@ -798,7 +1171,12 @@ namespace GW2CraftingHelper.Services
 
         private static void CollectItemIds(RecipeNode node, HashSet<int> ids)
         {
-            if (node.IngredientType == "Item")
+            // M35: never collect the synthetic multi-item wrapper's own
+            // sentinel id (see Gw2Constants.MultiItemWrapperItemId) - it is
+            // not a real GW2 item and must never trigger a TP price fetch.
+            // The recursion below still walks past it into its recipe's
+            // Ingredients (the N real item roots) unaffected.
+            if (node.IngredientType == "Item" && node.Id != Gw2Constants.MultiItemWrapperItemId)
             {
                 ids.Add(node.Id);
             }
