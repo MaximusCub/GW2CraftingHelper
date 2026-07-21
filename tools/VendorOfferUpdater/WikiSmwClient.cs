@@ -39,13 +39,20 @@ namespace VendorOfferUpdater
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
                 .Select(c => c.ToString()).ToArray();
 
+        // Note: the wiki also exposes "Has character purchase cap",
+        // "Has total purchase cap", and "Has seasonal purchase cap" on the same
+        // per-offer subobjects, but the module has no consuming model for those
+        // (Models/TimegatedItem.cs's TimegatedCapType is Daily/Weekly only) -
+        // deliberately not scraped here. See KNOWN-ISSUES.md item 28.
         private static readonly string PrintoutSuffix =
             "|?Sells item.Has game id" +
             "|?Sells item" +
             "|?Has item quantity" +
             "|?Has item cost" +
             "|?Has vendor" +
-            "|?Located in";
+            "|?Located in" +
+            "|?Has daily purchase cap" +
+            "|?Has weekly purchase cap";
 
         /// <summary>
         /// Queries the wiki for items sold by vendors, returning raw parsed results
@@ -58,6 +65,8 @@ namespace VendorOfferUpdater
         ///   Has item cost        – record: { Has item value, Has item currency }
         ///   Has vendor           – NPC page
         ///   Located in           – location pages
+        ///   Has daily purchase cap  - daily purchase limit (absent = uncapped)
+        ///   Has weekly purchase cap - weekly purchase limit (absent = uncapped)
         ///
         /// The wiki SMW API limits pagination to ~5500 results per query condition.
         /// When that limit is hit, the query is automatically partitioned by vendor
@@ -462,6 +471,20 @@ namespace VendorOfferUpdater
                 result.OutputQuantity = qty[0].GetInt32();
             }
 
+            // Has daily purchase cap - empty array means no cap (stays null, not 0)
+            if (printouts.TryGetProperty("Has daily purchase cap", out var dailyCap) &&
+                dailyCap.GetArrayLength() > 0)
+            {
+                result.DailyCap = dailyCap[0].GetInt32();
+            }
+
+            // Has weekly purchase cap - empty array means no cap (stays null, not 0)
+            if (printouts.TryGetProperty("Has weekly purchase cap", out var weeklyCap) &&
+                weeklyCap.GetArrayLength() > 0)
+            {
+                result.WeeklyCap = weeklyCap[0].GetInt32();
+            }
+
             // Has item cost — record type containing nested fields
             if (printouts.TryGetProperty("Has item cost", out var costArray))
             {
@@ -613,5 +636,7 @@ namespace VendorOfferUpdater
         public List<WikiCostEntry> CostEntries { get; set; } = new List<WikiCostEntry>();
         public string MerchantName { get; set; }
         public List<string> Locations { get; set; } = new List<string>();
+        public int? DailyCap { get; set; }
+        public int? WeeklyCap { get; set; }
     }
 }

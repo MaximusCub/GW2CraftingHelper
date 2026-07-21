@@ -19,7 +19,9 @@ namespace VendorOfferUpdater.Tests.Helpers
             int? quantity = null,
             List<(int value, string currency)> costs = null,
             string vendor = null,
-            List<string> locations = null)
+            List<string> locations = null,
+            int? dailyCap = null,
+            int? weeklyCap = null)
         {
             _results.Add(new ResultEntry
             {
@@ -29,7 +31,9 @@ namespace VendorOfferUpdater.Tests.Helpers
                 Quantity = quantity,
                 Costs = costs,
                 Vendor = vendor,
-                Locations = locations
+                Locations = locations,
+                DailyCap = dailyCap,
+                WeeklyCap = weeklyCap
             });
             return this;
         }
@@ -129,6 +133,23 @@ namespace VendorOfferUpdater.Tests.Helpers
                 }
                 writer.WriteEndArray();
 
+                // Has daily purchase cap - real SMW responses return an empty
+                // array (not a missing key) when no cap is set.
+                writer.WriteStartArray("Has daily purchase cap");
+                if (entry.DailyCap.HasValue)
+                {
+                    writer.WriteNumberValue(entry.DailyCap.Value);
+                }
+                writer.WriteEndArray();
+
+                // Has weekly purchase cap - same empty-array-means-uncapped shape.
+                writer.WriteStartArray("Has weekly purchase cap");
+                if (entry.WeeklyCap.HasValue)
+                {
+                    writer.WriteNumberValue(entry.WeeklyCap.Value);
+                }
+                writer.WriteEndArray();
+
                 writer.WriteEndObject(); // printouts
                 writer.WriteEndObject(); // pageName
             }
@@ -164,6 +185,8 @@ namespace VendorOfferUpdater.Tests.Helpers
             public List<(int value, string currency)> Costs { get; set; }
             public string Vendor { get; set; }
             public List<string> Locations { get; set; }
+            public int? DailyCap { get; set; }
+            public int? WeeklyCap { get; set; }
         }
     }
 }

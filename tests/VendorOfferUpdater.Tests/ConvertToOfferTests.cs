@@ -31,7 +31,9 @@ namespace VendorOfferUpdater.Tests
             string merchantName = "Merchant",
             int? outputQuantity = 1,
             List<WikiCostEntry> costEntries = null,
-            List<string> locations = null)
+            List<string> locations = null,
+            int? dailyCap = null,
+            int? weeklyCap = null)
         {
             return new WikiVendorResult
             {
@@ -39,7 +41,9 @@ namespace VendorOfferUpdater.Tests
                 MerchantName = merchantName,
                 OutputQuantity = outputQuantity,
                 CostEntries = costEntries ?? new List<WikiCostEntry>(),
-                Locations = locations ?? new List<string>()
+                Locations = locations ?? new List<string>(),
+                DailyCap = dailyCap,
+                WeeklyCap = weeklyCap
             };
         }
 
@@ -203,6 +207,52 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal(2, offer.Locations.Count);
             Assert.Contains("Lion's Arch", offer.Locations);
             Assert.Contains("Divinity's Reach", offer.Locations);
+        }
+
+        [Fact]
+        public async Task NoCapData_OfferCapsStayNull()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult();
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Null(offer.DailyCap);
+            Assert.Null(offer.WeeklyCap);
+        }
+
+        [Fact]
+        public async Task CapData_ThreadedIntoOffer()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(dailyCap: 5, weeklyCap: 1);
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Equal(5, offer.DailyCap);
+            Assert.Equal(1, offer.WeeklyCap);
+        }
+
+        [Fact]
+        public async Task CapData_ChangesOfferIdVersusNoCap()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var uncapped = Program.ConvertToOffer(
+                MakeResult(), helper, new Dictionary<string, int>());
+            var capped = Program.ConvertToOffer(
+                MakeResult(weeklyCap: 1), helper, new Dictionary<string, int>());
+
+            Assert.NotNull(uncapped);
+            Assert.NotNull(capped);
+            // This is the exact KNOWN-ISSUES #28 named case: a "(Weekly)" vendor
+            // offer that gains a real WeeklyCap must change OfferId, since the
+            // hasher folds dailyCap/weeklyCap into the hashed string.
+            Assert.NotEqual(uncapped.OfferId, capped.OfferId);
         }
     }
 }

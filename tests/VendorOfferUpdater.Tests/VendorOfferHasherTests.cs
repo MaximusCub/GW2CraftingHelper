@@ -163,6 +163,45 @@ namespace VendorOfferUpdater.Tests
         }
 
         [Fact]
+        public void SameCapValues_ProduceSameHash()
+        {
+            var costs = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+            };
+
+            string hash1 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), 5, 10);
+            string hash2 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), 5, 10);
+
+            Assert.Equal(hash1, hash2);
+        }
+
+        [Fact]
+        public void DifferentCapValues_ProduceDifferentHash()
+        {
+            var costs = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+            };
+
+            // Same "has a cap" shape (both non-null), different magnitude - the
+            // hasher must fold the actual value, not just presence/absence.
+            string hashDaily5 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), 5, null);
+            string hashDaily7 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), 7, null);
+            string hashWeekly1 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), null, 1);
+            string hashWeekly3 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), null, 3);
+
+            Assert.NotEqual(hashDaily5, hashDaily7);
+            Assert.NotEqual(hashWeekly1, hashWeekly3);
+        }
+
+        [Fact]
         public void HashIsLowercaseHex64Chars()
         {
             var costs = new List<CostLine>

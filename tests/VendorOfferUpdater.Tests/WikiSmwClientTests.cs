@@ -113,6 +113,73 @@ namespace VendorOfferUpdater.Tests
         }
 
         [Fact]
+        public async Task PopulatedCaps_ParsedOntoResult()
+        {
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
+            string json = new WikiJsonBuilder()
+                .AddResult("NPC#vendor1",
+                    gameId: 19721,
+                    vendor: "Candy Corn Vendor (Weekly)",
+                    dailyCap: 5,
+                    weeklyCap: 1)
+                .Build();
+
+            handler.Enqueue(json);
+
+            var (results, _) = await client.QueryVendorItemsAsync(
+                "[[Sells item::+]]", FastOptions());
+
+            Assert.Single(results);
+            Assert.Equal(5, results[0].DailyCap);
+            Assert.Equal(1, results[0].WeeklyCap);
+        }
+
+        [Fact]
+        public async Task NoCapData_LeavesCapsNull()
+        {
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
+            // No dailyCap/weeklyCap passed - WikiJsonBuilder writes the real SMW
+            // empty-array shape ("no cap" is an empty array, never a missing key).
+            string json = new WikiJsonBuilder()
+                .AddResult("NPC#vendor1", gameId: 100, vendor: "Candy Corn Vendor")
+                .Build();
+
+            handler.Enqueue(json);
+
+            var (results, _) = await client.QueryVendorItemsAsync(
+                "[[Sells item::+]]", FastOptions());
+
+            Assert.Single(results);
+            // Must be null (uncapped), never 0 - PlanSolver.FinalizeVendorBatches
+            // treats HasValue && Value > 0 as "has a real cap", so a wrongly-mapped
+            // 0 would be silently ignored, while a wrongly-mapped null-that-should-
+            // be-a-real-value would silently mask a real cap.
+            Assert.Null(results[0].DailyCap);
+            Assert.Null(results[0].WeeklyCap);
+        }
+
+        [Fact]
+        public async Task OnlyDailyCapSet_WeeklyCapStaysNull()
+        {
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
+            string json = new WikiJsonBuilder()
+                .AddResult("NPC#vendor1", gameId: 100, vendor: "Vendor", dailyCap: 5)
+                .Build();
+
+            handler.Enqueue(json);
+
+            var (results, _) = await client.QueryVendorItemsAsync(
+                "[[Sells item::+]]", FastOptions());
+
+            Assert.Single(results);
+            Assert.Equal(5, results[0].DailyCap);
+            Assert.Null(results[0].WeeklyCap);
+        }
+
+        [Fact]
         public async Task EmptyResults_ReturnsEmptyList()
         {
             var (client, handler, httpClient) = CreateClient();

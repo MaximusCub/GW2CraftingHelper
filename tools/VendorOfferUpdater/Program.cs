@@ -459,8 +459,8 @@ namespace VendorOfferUpdater
                 costLines,
                 merchant,
                 offerLocations,
-                null,
-                null);
+                result.DailyCap,
+                result.WeeklyCap);
 
             return new VendorOffer
             {
@@ -469,7 +469,9 @@ namespace VendorOfferUpdater
                 OutputCount = outputCount,
                 CostLines = costLines,
                 MerchantName = merchant,
-                Locations = offerLocations
+                Locations = offerLocations,
+                DailyCap = result.DailyCap,
+                WeeklyCap = result.WeeklyCap
             };
         }
 

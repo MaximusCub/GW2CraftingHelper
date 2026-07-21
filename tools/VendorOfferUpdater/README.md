@@ -90,6 +90,8 @@ DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
    - `Has item cost` — record type with `Has item value` (amount) and `Has item currency` (name)
    - `Has vendor` — NPC vendor page
    - `Located in` — location pages
+   - `Has daily purchase cap` - daily purchase limit (absent = uncapped)
+   - `Has weekly purchase cap` - weekly purchase limit (absent = uncapped)
 
 ## Rate Limiting
 
@@ -137,3 +139,7 @@ Offers are deduplicated by `offerId` and sorted alphabetically. Null fields are 
 - **Wiki updates** when the community documents new or corrected vendor data
 - **Periodically** (e.g. quarterly) to pick up gradual wiki improvements
 - After modifying the VendorOfferUpdater tool itself, to verify output correctness
+- **After adding new printouts/fields to `WikiSmwClient`** - `ref/wiki_vendor_cache.json`
+  is keyed by the old `WikiVendorResult` shape and does not retroactively backfill new
+  fields. Re-running Pass 2 alone (`--resolve-item-currencies-only`) against a stale
+  cache will silently omit the new data forever; a full Pass 1 re-scrape is required.
