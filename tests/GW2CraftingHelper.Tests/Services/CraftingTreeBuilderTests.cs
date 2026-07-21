@@ -418,6 +418,63 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void VendorCurrencyCosts_ThreadedOntoBuyFromVendorNode()
+        {
+            // M33 item 5 (Finding 3): a vendor offer paid partly/wholly in
+            // non-coin currency (spirit shards here) must surface its
+            // currency lines on the tree node, not just in the plan-wide
+            // currency total - see SolverDecision.VendorCurrencyCosts.
+            var tree = Leaf(1, 2);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    1, new List<VendorOffer>
+                    {
+                        new VendorOffer
+                        {
+                            OfferId = "v-currency",
+                            OutputItemId = 1,
+                            OutputCount = 1,
+                            CostLines = new List<CostLine>
+                            {
+                                new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 10 },
+                                new CostLine { Type = "Currency", Id = 23, Count = 50 }
+                            },
+                            MerchantName = "Miyani",
+                            Locations = new List<string>()
+                        }
+                    }
+                }
+            };
+            var metadata = Meta((1, "Vendor Item", "vendor.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.NotNull(node.VendorCurrencyCosts);
+            Assert.Single(node.VendorCurrencyCosts);
+            Assert.Equal(23, node.VendorCurrencyCosts[0].Id);
+            Assert.Equal(100, node.VendorCurrencyCosts[0].Count); // 50 per unit * qty 2
+        }
+
+        [Fact]
+        public void VendorCurrencyCosts_NullOnNonVendorNode()
+        {
+            var tree = Leaf(1, 5);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 50 } }
+            };
+            var metadata = Meta((1, "Item", "item.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, node.Decision);
+            Assert.Null(node.VendorCurrencyCosts);
+        }
+
+        [Fact]
         public void SameItemDifferentPositions_SeparateNodes()
         {
             // Item 1 crafts from: item 2 (qty 3) + item 3 which also needs item 2 (qty 5)

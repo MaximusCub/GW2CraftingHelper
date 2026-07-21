@@ -124,6 +124,7 @@ namespace GW2CraftingHelper.Services
                     Source = kvp.Value.Source,
                     RecipeId = kvp.Value.RecipeId,
                     TotalCost = kvp.Value.TotalCost,
+                    VendorCurrencyCosts = kvp.Value.VendorCurrencyCosts,
                     CanCraft = kvp.Value.CanCraft,
                     CanBuyTp = kvp.Value.CanBuyTp,
                     CanBuyVendor = kvp.Value.CanBuyVendor
@@ -144,6 +145,10 @@ namespace GW2CraftingHelper.Services
         /// callers summing ingredient costs for a parent craft are summing
         /// comparison values, which is required for the parent's own
         /// craft-vs-buy comparison to be correct (see Decision.ComparisonValue).
+        /// EVERY non-currency ingredient of EVERY recipe on this node is
+        /// evaluated (and therefore gets its own memo entry) regardless of
+        /// whether this node ends up bought, crafted via a different
+        /// recipe, or unpriceable itself - see the recipe loop below.
         /// </summary>
         private long? Evaluate(
             RecipeNode node,
@@ -184,8 +189,21 @@ namespace GW2CraftingHelper.Services
                 out long? fallbackVendorCoinCost,
                 out List<CostLine> fallbackVendorCurrencyCosts);
 
-            // Evaluate recipe options (children are always evaluated so their
-            // decisions exist even if this node ends up bought).
+            // Evaluate recipe options. EVERY non-currency ingredient of
+            // EVERY recipe is always evaluated (M33 Finding 1 fix) - no
+            // short-circuit on the first unpriceable ingredient - so every
+            // node in the tree always gets a memo/decision entry, even deep
+            // under a recipe this node ultimately doesn't choose.
+            //
+            // An unpriceable ingredient no longer disqualifies its recipe
+            // (M33 partial-pricing parity, echoing gw2e's craftPrice =
+            // sum(component.craftResultPrice || 0)): it contributes ZERO to
+            // this recipe's craft cost instead, so craftCost/craftRealCost
+            // are always defined whenever node.Recipes is non-empty (gw2e's
+            // "hasComponents"). This intentionally makes coin totals
+            // partial when a descendant is genuinely unpriceable - the
+            // descendant still surfaces as its own (Unknown or
+            // force-crafted) node with its own decision.
             long? bestCraftCost = null;
             long? bestCraftRealCost = null;
             int bestRecipeId = 0;
@@ -199,7 +217,6 @@ namespace GW2CraftingHelper.Services
                 // and becomes the committed decision's real coin cost.
                 long craftCost = 0L;
                 long craftRealCost = 0L;
-                bool allPriceable = true;
 
                 foreach (var ingredient in recipe.Ingredients)
                 {
@@ -210,41 +227,55 @@ namespace GW2CraftingHelper.Services
 
                     long? ingredientCost = Evaluate(
                         ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation);
-                    if (!ingredientCost.HasValue)
-                    {
-                        allPriceable = false;
-                        break;
-                    }
-
-                    craftCost += ingredientCost.Value;
+                    craftCost += ingredientCost ?? 0L;
                     craftRealCost += memo[ingredient.NodeId].TotalCost ?? 0L;
                 }
 
-                if (allPriceable)
+                // EV pricing (Mystic Clover-style fractional MF recipes,
+                // M33 item 7): amortize this recipe's cost over its
+                // EXPECTED output rather than its nominal integer output,
+                // echoing gw2e's output_item_count=0.31 model (r2 report).
+                // A no-op (ratio 1.0) for every ordinary recipe, where
+                // ExpectedOutputCount defaults to OutputCount. Quantity
+                // propagation (RecipeService's ceil-based crafts-needed)
+                // stays untouched - only this cost figure is adjusted.
+                if (recipe.OutputCount > 0 &&
+                    recipe.ExpectedOutputCount > 0 &&
+                    recipe.ExpectedOutputCount != recipe.OutputCount)
                 {
-                    // Cost tie-break: lowest RecipeId, so the choice is
-                    // deterministic regardless of recipe list order.
-                    if (!bestCraftCost.HasValue ||
-                        craftCost < bestCraftCost.Value ||
-                        (craftCost == bestCraftCost.Value && recipe.RecipeId < bestRecipeId))
+                    double evRatio = recipe.ExpectedOutputCount / recipe.OutputCount;
+                    try
                     {
-                        bestCraftCost = craftCost;
-                        bestCraftRealCost = craftRealCost;
-                        bestRecipeId = recipe.RecipeId;
+                        craftCost = checked((long)Math.Ceiling(craftCost / evRatio));
+                        craftRealCost = checked((long)Math.Ceiling(craftRealCost / evRatio));
+                    }
+                    catch (OverflowException)
+                    {
+                        // An absurdly small ExpectedOutputCount (bad seed
+                        // data) could blow past long range; fall back to
+                        // the un-adjusted cost rather than crash the whole
+                        // solve or silently wrap to a garbage value.
                     }
                 }
-                else if (!bestCraftCost.HasValue && bestRecipeId == 0)
+
+                // Cost tie-break: lowest RecipeId, so the choice is
+                // deterministic regardless of recipe list order.
+                if (!bestCraftCost.HasValue ||
+                    craftCost < bestCraftCost.Value ||
+                    (craftCost == bestCraftCost.Value && recipe.RecipeId < bestRecipeId))
                 {
+                    bestCraftCost = craftCost;
+                    bestCraftRealCost = craftRealCost;
                     bestRecipeId = recipe.RecipeId;
                 }
             }
 
-            // Craft is only a FORCEABLE path when its cost is fully
-            // priceable. bestRecipeId alone also covers the unpriceable
-            // last-resort recipe, and forcing that would commit a null cost
-            // whose branch silently drops out of the plan total (misleading
-            // pricing). The last-resort auto path below is unaffected: it
-            // only fires when nothing else is priceable at all.
+            // canCraft = "hasComponents" (gw2e): true whenever a recipe
+            // exists at all, since craft cost is now always defined (see
+            // above). A node with a recipe but no buy price therefore
+            // always force-crafts via PickCheapest below (craftBeatsBuy is
+            // true whenever buyCost is null), matching gw2e's
+            // isCheaperToCraft = craftPrice-defined && (!buyPrice || ...).
             bool canCraft = bestCraftCost.HasValue;
             bool canBuyTp = buyTotalCost.HasValue;
             bool canBuyVendor = comparableVendorValue.HasValue ||
@@ -312,17 +343,18 @@ namespace GW2CraftingHelper.Services
                 return Commit(AcquisitionSource.Craft, bestCraftRealCost, bestCraftCost, bestRecipeId, null);
             }
 
-            // Fallback order when nothing is coin-priceable: a mixed-currency
-            // vendor offer is a concrete, fully-known acquisition and is
-            // preferred over descending into an unpriceable craft subtree.
+            // Fallback: nothing coin-priceable/craftable beat buy (source ==
+            // UnknownSource here implies buyCost, bestCraftCost, and
+            // comparableVendorValue are ALL null - if bestCraftCost had a
+            // value, PickCheapest would already have returned Craft or
+            // BuyFromTp, never UnknownSource, since craftCost is now always
+            // defined whenever a recipe exists). A mixed-currency vendor
+            // offer is a concrete, fully-known acquisition and is used as
+            // the last resort; otherwise this is gw2e's "Not sold or
+            // crafted" - no recipe, no price, genuinely no known source.
             if (fallbackVendorCoinCost.HasValue)
             {
                 return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
-            }
-
-            if (bestRecipeId != 0)
-            {
-                return Commit(AcquisitionSource.Craft, bestCraftRealCost, bestCraftCost, bestRecipeId, null);
             }
 
             return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);
@@ -555,41 +587,52 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Pick cheapest among TP buy, craft, and vendor (by coin cost).
-        /// Ties: BuyFromVendor beats BuyFromTp beats Craft.
+        /// Pick cheapest among TP buy, craft, and vendor - gw2e tie-break
+        /// parity (r1 sections 1.1/3.2, normative directive #1): TP buy is
+        /// the baseline and wins every tie. Craft wins only when STRICTLY
+        /// cheaper than buy; a missing buy price counts as "beats buy"
+        /// (force-craft - gw2e's isCheaperToCraft = craftPrice-defined &&
+        /// (!buyPrice || decisionPrice &lt; buyPrice)). Vendor is modeled
+        /// like a gw2e Merchant recipe and follows the identical rule
+        /// against buy (strictly cheaper wins, tie -&gt; buy). When both
+        /// craft and vendor beat buy, the numerically cheaper of the two
+        /// wins; an exact craft/vendor tie keeps vendor (this engine's
+        /// pre-existing precedent for that specific case - not specified
+        /// by the gw2e source, which models vendor as just another recipe
+        /// candidate rather than a separate comparison arm).
         /// Returns UnknownSource if none are available.
         /// </summary>
         private static AcquisitionSource PickCheapest(
             long? buyCost, long? craftCost, long? vendorCost)
         {
-            long? best = null;
-            var source = AcquisitionSource.UnknownSource;
+            bool craftBeatsBuy = craftCost.HasValue &&
+                (!buyCost.HasValue || craftCost.Value < buyCost.Value);
+            bool vendorBeatsBuy = vendorCost.HasValue &&
+                (!buyCost.HasValue || vendorCost.Value < buyCost.Value);
 
-            if (vendorCost.HasValue)
+            if (craftBeatsBuy && vendorBeatsBuy)
             {
-                best = vendorCost.Value;
-                source = AcquisitionSource.BuyFromVendor;
+                return vendorCost.Value <= craftCost.Value
+                    ? AcquisitionSource.BuyFromVendor
+                    : AcquisitionSource.Craft;
+            }
+
+            if (vendorBeatsBuy)
+            {
+                return AcquisitionSource.BuyFromVendor;
+            }
+
+            if (craftBeatsBuy)
+            {
+                return AcquisitionSource.Craft;
             }
 
             if (buyCost.HasValue)
             {
-                if (!best.HasValue || buyCost.Value < best.Value)
-                {
-                    best = buyCost.Value;
-                    source = AcquisitionSource.BuyFromTp;
-                }
+                return AcquisitionSource.BuyFromTp;
             }
 
-            if (craftCost.HasValue)
-            {
-                if (!best.HasValue || craftCost.Value < best.Value)
-                {
-                    best = craftCost.Value;
-                    source = AcquisitionSource.Craft;
-                }
-            }
-
-            return source;
+            return AcquisitionSource.UnknownSource;
         }
 
         private void Collect(
@@ -686,6 +729,11 @@ namespace GW2CraftingHelper.Services
                 {
                     existing.UnitCost = existing.TotalCost / existing.Quantity;
                 }
+                if (decision.Source == AcquisitionSource.BuyFromVendor)
+                {
+                    existing.VendorCurrencyCosts = MergeVendorCurrencyCosts(
+                        existing.VendorCurrencyCosts, decision.VendorCurrencyCosts);
+                }
             }
             else
             {
@@ -704,9 +752,56 @@ namespace GW2CraftingHelper.Services
                     Source = decision.Source,
                     UnitCost = unitCost,
                     TotalCost = decision.TotalCost ?? 0L,
-                    RecipeId = decision.RecipeId
+                    RecipeId = decision.RecipeId,
+                    VendorCurrencyCosts = decision.Source == AcquisitionSource.BuyFromVendor
+                        ? MergeVendorCurrencyCosts(null, decision.VendorCurrencyCosts)
+                        : null
                 };
             }
+        }
+
+        /// <summary>
+        /// Sums <paramref name="add"/> into <paramref name="existing"/> by
+        /// currency id (a node can be aggregated into the same PlanStep row
+        /// from multiple tree occurrences - see AggregateStep). Always
+        /// returns a fresh list when there is anything to carry, so the
+        /// solver-internal Decision's own list is never mutated/aliased
+        /// into a PlanStep.
+        /// </summary>
+        private static List<CostLine> MergeVendorCurrencyCosts(
+            List<CostLine> existing, IReadOnlyList<CostLine> add)
+        {
+            if (add == null || add.Count == 0)
+            {
+                return existing;
+            }
+
+            var merged = existing != null
+                ? new List<CostLine>(existing)
+                : new List<CostLine>();
+
+            foreach (var line in add)
+            {
+                int idx = merged.FindIndex(c => c.Id == line.Id);
+                if (idx >= 0)
+                {
+                    // CostLine.Count is int; clamp rather than let two
+                    // near-int.MaxValue occurrences silently wrap negative.
+                    long summed = (long)merged[idx].Count + line.Count;
+                    merged[idx] = new CostLine
+                    {
+                        Type = merged[idx].Type,
+                        Id = merged[idx].Id,
+                        Count = summed > int.MaxValue ? int.MaxValue : (int)summed
+                    };
+                }
+                else
+                {
+                    merged.Add(new CostLine { Type = line.Type, Id = line.Id, Count = line.Count });
+                }
+            }
+
+            return merged;
         }
 
         private static void AssignNodeIds(RecipeNode node, ref int nextNodeId)
