@@ -152,7 +152,7 @@ module ECHO that behavior rather than inventing an approach. New
 dev-time seeders (vendor pricing, Mystic Forge recipes) are welcome;
 they must write static seed JSON, never scrape at runtime.
 
-## 12. Fast wheel-up scroll: net-downward stutter (FIXED in M33, code-verified only)
+## 12. Fast wheel-up scroll: net-downward stutter (FIXED in M33, live-verified)
 Rapid successive wheel-up events make the viewport scroll up then jump
 back down further than it went up - net downward movement with an
 upward stutter. Hypothesis: scroll guard/restore machinery (or some
@@ -177,10 +177,15 @@ VERIFICATION STATE: the above is confirmed against the c12-baseline-
 analysis (2026-07-20) live instrumented capture of the OLD code, plus
 Blish-free unit tests of the pure math helpers (PlanContentHeightMath,
 ScrollMath) and a green build against the vendored Blish HUD v1.3.0
-source. It has NOT been confirmed by a live instrumented capture of
-THIS code with ScrollDiagnosticsEnabled - that follow-up capture is
-still outstanding. Treat a fresh #12-shaped report as reopening this
-item, not as "already fixed, must be something else."
+source. LIVE-VERIFIED 2026-07-20 (instrumented desktop capture of THIS
+code): a wheel-up event landing INSIDE a live verify window (verifyLive
+=True in the trace) triggered an immediate "verify exit
+reason=wheel-observed" with no contested write, and a fast wheel-up
+burst then descended monotonically to exactly 0.0000 and stayed there
+- no zero-reassert bounce at top. Idle fast bursts remain clean.
+(Note: Blish's own per-frame wheel coalescing still drops ~40% of
+notches in very fast bursts - stock library behavior, scrolls shorter
+than intended but never backwards.)
 (M33 fix-pass note: an earlier revision of this fix also suppressed the
 zero-reassert contest whenever a wheel event had landed within the last
 250ms of wall clock, intending to protect a user who "just wheeled to
@@ -192,7 +197,7 @@ reintroducing the #14 top-jump. The genuine "wheeled to exactly top"
 case never reaches the verify window at all: PreserveScrollAcross skips
 the restore/verify entirely when the saved offset is already 0.)
 
-## 13. Resize UX rework: live reflow, no settle stutter (FIXED in M33, code-verified only)
+## 13. Resize UX rework: live reflow, no settle stutter (FIXED in M33, live-verified end-state; drag-tick perf unmeasured)
 The 150ms debounce-only approach is REJECTED by user feedback: content
 must reflow smoothly WHILE dragging, not lag until the mouse holds
 still. Additionally the settle rebuild itself is visibly ugly: stray
@@ -237,10 +242,14 @@ silently freezing at build-time width on later resizes.
 VERIFICATION STATE: the visible-glitch elimination above (no dispose+
 rebuild, no scroll disturbance) is confirmed by construction against
 the M33 C2a height work plus Blish-free unit tests of
-Services/PlanRelayoutMath.cs, and a green build. It has NOT been
-confirmed by a live in-game drag-resize check (screenshot loop) on a
-large, fully-expanded Exordium-scale plan (deep tree + long shopping
-list). In particular, ReplayRelayout now replays the full relayout
+Services/PlanRelayoutMath.cs, and a green build. LIVE-VERIFIED
+2026-07-20 (desktop screenshot loop, real Exordium plan ~8.6k px
+content): a synthetic grip drag resized the window and the end-state
+layout was fully correct at both the narrower and re-widened widths
+(header centering, right-anchored cost columns, pills, buttons), with
+zero scrollbar writes during width reflow and label ellipsis correctly
+restored at settle. NOT yet measured live: per-tick smoothness/cost on
+a fully-EXPANDED tree. In particular, ReplayRelayout now replays the full relayout
 closure registry synchronously on every real drag frame (previously:
 once, 150ms after the drag settled) - a genuine change in perf
 character. The SuspendLayout/ResumeLayout batching is a real,
@@ -251,7 +260,7 @@ while dragging the window edge on a large plan, treat it as this
 still-open measurement gap, not a regression to re-diagnose from
 scratch.
 
-## 14. Pill-click viewport flash (jump to top and back) (FIXED in M33, code-verified only)
+## 14. Pill-click viewport flash (jump to top and back) (FIXED in M33, live-verified)
 Clicking a TP/VENDOR override pill visibly flashes the view to the top
 for an instant before the scroll restore re-asserts. The restore
 converges but applies a frame+ late. Direction: apply the saved scroll
@@ -270,10 +279,15 @@ moving target.
 VERIFICATION STATE: confirmed by construction against the M33 C2a
 height work (the c12-baseline-analysis trace was captured against the
 OLD code) plus Blish-free unit tests of the pure math helpers and a
-green build. It has NOT been confirmed by a live in-game capture of
-THIS code (ScrollDiagnosticsEnabled + a pill-click screenshot loop)
-showing zero visible frames at scroll position 0. Treat a fresh
-#14-shaped report as reopening this item.
+green build. LIVE-VERIFIED 2026-07-20 (two independent instrumented
+pill-click captures of THIS code): [scrolldiag] shows writer=SyncRestore
+writing the correct ratio synchronously with content height already
+final (no convergence drift), exactly one same-frame Verify/zeroReassert
+contest of Blish's single expected reset, and "verify exit reason=stable"
+at realFrame 2; pre/post screenshots are pixel-identical in viewport
+position, including across an override that changed content height
+(absolute pixel offset correctly preserved). Baseline for comparison:
+the OLD code showed 4+ frames of contested writes with drifting ratio.
 
 ## 15. Shopping tag text contrast (VENDOR / SALVAGE / UNKNOWN)
 The grey shopping-list source tags have poor text-vs-fill contrast.
@@ -410,6 +424,13 @@ plus a green build and full test suite. Not re-confirmed by a live
 in-game drag-resize check (screenshot loop) after this specific fix -
 treat a fresh scroll-reset-on-height-drag report as reopening this item
 rather than assuming it is the same M33 C2b regression recurring.
+(2026-07-20 desktop session note: six synthetic grip-drag attempts
+across two fresh launches failed to re-catch the TabbedWindow2 resize
+grip after this fix landed - the one successful synthetic catch of the
+session predates the fix - so the pending live check needs a human
+drag. The primitives the fix reuses - pixel-offset capture,
+ScrollMath.RatioForOffset, synchronous write, StartScrollVerify - are
+each live-verified under item #14's captures.)
 
 ## Handoff notes for the implementing session
 - Project memory holds the environment + working rules: the
