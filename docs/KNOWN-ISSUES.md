@@ -229,6 +229,16 @@ above (item 8's precedent shows the acquisition-hint system only applies
 to genuinely Unknown nodes) - worth a future VendorOfferUpdater cleanup
 pass, out of scope for this seed-data milestone.
 
+**Follow-up resolved (M33 Wave B polish, 2026-07-20):** the stale
+Battle Master / 500 Badges of Honor offer was removed from
+ref/vendor_offers.json after two independent wiki re-checks confirmed
+the purchase path was removed in the Spring 2016 Quarterly Update. Gift
+of Battle now correctly resolves Unknown with its WVW acquisition-hint
+badge visible instead of a bogus BuyFromVendor decision (confirmed via
+a rebuilt offline Harness --dump-tree run). The same pass also named the
+remaining ~26 base-tier materials (ores, dust, leather, venom sacs, Tiny
+Claw, etc.) that still rendered "Unknown Item" in the Harness dump.
+
 ## 18. Multi-source decision display is inconsistent
 Glob of Ectoplasm shows a VENDOR pill while its pricing uses TP. Items
 available from multiple sources should expose all sources with the
