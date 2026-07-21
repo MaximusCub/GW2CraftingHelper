@@ -11,9 +11,11 @@ namespace GW2CraftingHelper.Services
             RecipeNode root,
             IReadOnlyDictionary<int, SolverDecision> decisions,
             IReadOnlyDictionary<int, ItemMetadata> metadata,
-            IReadOnlyDictionary<int, AcquisitionHint> hints = null)
+            IReadOnlyDictionary<int, AcquisitionHint> hints = null,
+            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId = null)
         {
-            return BuildNode(root, decisions, metadata, hints, insideReferenceBranch: false);
+            return BuildNode(node: root, decisions: decisions, metadata: metadata, hints: hints,
+                insideReferenceBranch: false, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId);
         }
 
         private static CraftingTreeNode BuildNode(
@@ -21,7 +23,8 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, SolverDecision> decisions,
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             IReadOnlyDictionary<int, AcquisitionHint> hints,
-            bool insideReferenceBranch)
+            bool insideReferenceBranch,
+            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId)
         {
             var treeNode = new CraftingTreeNode
             {
@@ -30,7 +33,16 @@ namespace GW2CraftingHelper.Services
                 Name = ResolveName(node.Id, metadata),
                 IconUrl = ResolveIcon(node.Id, metadata),
                 Rarity = ResolveRarity(node.Id, metadata),
-                Quantity = node.Quantity
+                Quantity = node.Quantity,
+                // M34-B2a #1: set uniformly for every node (including the
+                // Have/Currency/Unknown early returns below), from
+                // whichever NodeId this node was assigned by the Solve()
+                // call that produced `decisions` - see CraftingTreeNode's
+                // doc comment.
+                OwnedQuantityUsed = ownedQuantityUsedByNodeId != null &&
+                    ownedQuantityUsedByNodeId.TryGetValue(node.NodeId, out int ownedUsed)
+                        ? ownedUsed
+                        : 0
             };
 
             // Quantity-zero nodes are already owned
@@ -84,7 +96,7 @@ namespace GW2CraftingHelper.Services
                     // a reference branch is still hypothetical content, and
                     // must keep suppressing further reference branches
                     // below it - see the cap comment below for why.
-                    treeNode.Children = BuildChildren(recipe, decisions, metadata, hints, insideReferenceBranch);
+                    treeNode.Children = BuildChildren(recipe, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId);
                 }
             }
             else if (!insideReferenceBranch &&
@@ -117,7 +129,7 @@ namespace GW2CraftingHelper.Services
                 // reference branches restart at every such alternation
                 // measured as an effectively unbounded hang on a real deep
                 // item (Deldrimor Steel Ingot) during manual verification.
-                treeNode.Children = BuildChildren(node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true);
+                treeNode.Children = BuildChildren(node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId);
                 treeNode.IsReferenceBranch = true;
             }
 
@@ -161,12 +173,13 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, SolverDecision> decisions,
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             IReadOnlyDictionary<int, AcquisitionHint> hints,
-            bool insideReferenceBranch)
+            bool insideReferenceBranch,
+            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId)
         {
             var children = new List<CraftingTreeNode>(recipe.Ingredients.Count);
             foreach (var ingredient in recipe.Ingredients)
             {
-                children.Add(BuildNode(ingredient, decisions, metadata, hints, insideReferenceBranch));
+                children.Add(BuildNode(ingredient, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId));
             }
             return children;
         }

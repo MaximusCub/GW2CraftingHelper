@@ -762,6 +762,107 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(treeNode.AcquisitionBadge);
         }
 
+        // ---- M34-B2a #1: per-node owned-quantity attribution ----
+
+        [Fact]
+        public void OwnedQuantityUsedByNodeId_PopulatesMatchingNode()
+        {
+            var node = Leaf(1, 2);
+            node.NodeId = 7;
+            var decisions = new Dictionary<int, SolverDecision>
+            {
+                { 7, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 200 } }
+            };
+            var metadata = Meta((1, "Item", "i.png"));
+            var ownedUsage = new Dictionary<int, int> { { 7, 3 } };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, ownedQuantityUsedByNodeId: ownedUsage);
+
+            Assert.Equal(3, treeNode.OwnedQuantityUsed);
+        }
+
+        [Fact]
+        public void OwnedQuantityUsedByNodeId_NoEntryForNode_DefaultsToZero()
+        {
+            var node = Leaf(1, 2);
+            node.NodeId = 7;
+            var decisions = new Dictionary<int, SolverDecision>
+            {
+                { 7, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 200 } }
+            };
+            var metadata = Meta((1, "Item", "i.png"));
+            var ownedUsage = new Dictionary<int, int> { { 99, 3 } }; // different node id
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, ownedQuantityUsedByNodeId: ownedUsage);
+
+            Assert.Equal(0, treeNode.OwnedQuantityUsed);
+        }
+
+        [Fact]
+        public void OwnedQuantityUsedByNodeId_NullDictionary_DefaultsToZero()
+        {
+            var node = Leaf(1, 2);
+            node.NodeId = 7;
+            var decisions = new Dictionary<int, SolverDecision>
+            {
+                { 7, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 200 } }
+            };
+            var metadata = Meta((1, "Item", "i.png"));
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(0, treeNode.OwnedQuantityUsed);
+        }
+
+        [Fact]
+        public void OwnedQuantityUsedByNodeId_AppliesEvenToHaveNode()
+        {
+            // Quantity == 0 -> the "Have" early return - OwnedQuantityUsed
+            // must still be set (it is populated before that branch).
+            var node = Leaf(1, 0);
+            node.NodeId = 7;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta((1, "Item", "i.png"));
+            var ownedUsage = new Dictionary<int, int> { { 7, 5 } };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, ownedQuantityUsedByNodeId: ownedUsage);
+
+            Assert.Equal(CraftingDecision.Have, treeNode.Decision);
+            Assert.Equal(5, treeNode.OwnedQuantityUsed);
+        }
+
+        [Fact]
+        public void OwnedQuantityUsedByNodeId_PropagatesToChildren()
+        {
+            var ingredient = Leaf(2, 3);
+            var option = Option(10, 1, 1, ingredient);
+            var root = Craftable(1, 1, option);
+
+            var solver = new PlanSolver();
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+            };
+            var solveResult = solver.Solve(root, prices, null);
+            // Child's real NodeId, assigned by the solve above (root=0, child=1).
+            int childNodeId = ingredient.NodeId;
+
+            var metadata = Meta((1, "Root", "r.png"), (2, "Child", "c.png"));
+            var ownedUsage = new Dictionary<int, int> { { childNodeId, 2 } };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(root, solveResult.Decisions, metadata, ownedQuantityUsedByNodeId: ownedUsage);
+
+            Assert.Equal(0, treeNode.OwnedQuantityUsed);
+            Assert.Single(treeNode.Children);
+            Assert.Equal(2, treeNode.Children[0].OwnedQuantityUsed);
+        }
+
         private static void AssertChildrenNeverNull(CraftingTreeNode node)
         {
             Assert.NotNull(node.Children);

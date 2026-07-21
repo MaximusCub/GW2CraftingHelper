@@ -23,6 +23,17 @@ namespace GW2CraftingHelper.Contracts
         public int Quantity { get; set; }
         public CraftingDecision Decision { get; set; }
 
+        // How many units of this node's OWN demand were covered by owned
+        // inventory during reduction (M34-B2a #1, gw2e parity groundwork -
+        // see InventoryReducer.ReducedTreeResult.OwnedQuantityUsedByNode).
+        // 0 when reduction never ran (no snapshot) or nothing owned was
+        // consumed for this node. Quantity + OwnedQuantityUsed recovers the
+        // node's original pre-reduction demand. This makes a PARTIALLY-owned
+        // node representable (Quantity > 0 but OwnedQuantityUsed > 0) -
+        // previously only fully-owned nodes (Quantity reduced to 0 ->
+        // Decision.Have) were visible at all.
+        public int OwnedQuantityUsed { get; set; }
+
         // Feasible acquisition paths for this node (drives override cycling).
         public bool CanCraft { get; set; }
         public bool CanBuyTp { get; set; }
