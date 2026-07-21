@@ -22,11 +22,19 @@ namespace GW2CraftingHelper.Views
         // Layout constants
         private const int RowHeight = 35;
         private const int InputRowY = 5;
-        private const int ControlsRowY = 43;
-        private const int StatusRowY = 81;
-        private const int SeparatorY = 102;
-        private const int ContentY = 107;
-        private const int TopRegionHeight = 112;
+
+        // M35 (gw2efficiency parity - multi-item plans): the top strip used
+        // to be four fixed rows (search+qty, controls, status, separator);
+        // it is now InputRowsAreaHeight(N) item rows (N = _itemRows.Count)
+        // followed by the same three rows, at a gap identical to the old
+        // fixed spacing - see ComputeTopRegionLayout. With N == 1 every Y
+        // offset below reproduces the old constants exactly (5, 43, 81,
+        // 102, 107, 112), so the single-row case is byte-identical to
+        // pre-M35 layout.
+        private const int TopRegionRowGap = 3;
+        private const int StatusToSeparatorGap = 21;
+        private const int SeparatorToContentGap = 5;
+        private const int ContentToBottomPad = 5;
         private const int RightEdgePadding = 20;
         private const int SectionSpacing = 16;
 
@@ -36,7 +44,42 @@ namespace GW2CraftingHelper.Views
         private static readonly Color RowDividerColor = new Color(100, 100, 100);
         private static readonly Color SectionDividerColor = new Color(130, 130, 130);
 
-        private readonly Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
+        /// <summary>
+        /// Pure top-strip Y-offset arithmetic (Blish-free math, kept as a
+        /// plain struct/method rather than a control mutation so Build()
+        /// and every row Add/Remove reflow call the exact same formula -
+        /// M35, gw2efficiency parity multi-item plans). See the constants'
+        /// own doc comment for the rowCount==1 byte-identical guarantee.
+        /// </summary>
+        private struct TopRegionLayout
+        {
+            public int InputPanelHeight;
+            public int ControlsRowY;
+            public int StatusRowY;
+            public int SeparatorY;
+            public int ContentY;
+            public int TopRegionHeight;
+        }
+
+        private static TopRegionLayout ComputeTopRegionLayout(int rowCount)
+        {
+            int inputPanelHeight = rowCount * RowHeight;
+            int controlsRowY = InputRowY + inputPanelHeight + TopRegionRowGap;
+            int statusRowY = controlsRowY + RowHeight + TopRegionRowGap;
+            int separatorY = statusRowY + StatusToSeparatorGap;
+            int contentY = separatorY + SeparatorToContentGap;
+            return new TopRegionLayout
+            {
+                InputPanelHeight = inputPanelHeight,
+                ControlsRowY = controlsRowY,
+                StatusRowY = statusRowY,
+                SeparatorY = separatorY,
+                ContentY = contentY,
+                TopRegionHeight = contentY + ContentToBottomPad
+            };
+        }
+
+        private readonly Func<IReadOnlyList<PlanRequestItem>, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> _generateAsync;
         private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
@@ -53,8 +96,36 @@ namespace GW2CraftingHelper.Views
         // Echo that default here so a fresh plan matches gw2e's own view
         // rather than systematically overpricing every material.
         private PriceBasis _priceBasis = PriceBasis.BuyOrder;
-        private int _selectedItemId;
-        private int _quantity = 1;
+
+        /// <summary>
+        /// One row of the multi-item input strip (M35, gw2efficiency
+        /// parity): the plain session-persistent selection fields survive
+        /// across Build() calls (tab switches) exactly like _nodeOverrides/
+        /// _ignoredItemIds below - the live Blish controls do not (they are
+        /// disposed and recreated by every Build()/RebuildInputRows() call,
+        /// same lifecycle as _searchBox/_qtyInput used to have).
+        /// </summary>
+        private sealed class ItemRowState
+        {
+            public int? ItemId;
+            public string ItemName;
+            public string QuantityText = "1";
+
+            public Panel RowPanel;
+            public AutocompleteTextBox SearchBox;
+            public SuggestionPanel SuggestionPanel;
+            public TextBox QtyInput;
+        }
+
+        // Session-persistent row list (M35) - mirrors gw2e's own
+        // `e.recipes` array (`[{id: null, amount: 1}]` initial state - see
+        // docs/gw2e-parity-spec.md, the M34 r1 multi-item research report).
+        // Populated with one empty row the first time Build() ever runs;
+        // survives every later Build() call (tab switch) exactly like
+        // _nodeOverrides/_ignoredItemIds - no new file/URL persistence (gw2e
+        // itself only persists via its own URL, not applicable here - see
+        // docs/KNOWN-ISSUES.md's M35 section).
+        private readonly List<ItemRowState> _itemRows = new List<ItemRowState>();
 
         // Bumped at the start of every TriggerGenerate call (Generate button
         // and OnOwnMaterialsToggled's modal-confirm path both funnel through
@@ -102,11 +173,14 @@ namespace GW2CraftingHelper.Views
         public IReadOnlyList<string> LastDebugLog => _lastDebugLog;
 
         // UI controls (stored for resize handler)
+
+        // M35: the Container Build() was called with, retained so
+        // AddItemRow/RemoveItemRow (fired by a row button's Click, long
+        // after Build() returns) can re-read ContentRegion and reflow the
+        // top strip - see ReflowInputRegion.
+        private Container _buildPanel;
         private Panel _inputPanel;
         private Panel _controlsPanel;
-        private AutocompleteTextBox _searchBox;
-        private SuggestionPanel _suggestionPanel;
-        private TextBox _qtyInput;
         private Checkbox _ownMaterialsCheckbox;
         private StandardButton _generateButton;
         private Label _statusLabel;
@@ -256,7 +330,7 @@ namespace GW2CraftingHelper.Views
         }
 
         public CraftingPlanView(
-            Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
+            Func<IReadOnlyList<PlanRequestItem>, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
             IItemSearchProvider itemSearchProvider,
             ModuleSettings settings,
@@ -725,17 +799,223 @@ namespace GW2CraftingHelper.Views
                 scrollbar?.ScrollDistance ?? -1f, contentHeight, verifyLive);
         }
 
-        private void OnSelectedItemChanged(int itemId)
+        /// <summary>
+        /// Disposes every current item row's live controls and rebuilds
+        /// them from _itemRows (M35, gw2efficiency parity multi-item
+        /// plans). Called by Build() (initial construction) and by
+        /// AddItemRow/RemoveItemRow via ReflowInputRegion (row-count
+        /// changes) - a full rebuild rather than a patch, matching this
+        /// file's existing dispose+recreate pattern (e.g. RenderPlan
+        /// disposes all of _contentPanel's children on every render rather
+        /// than diffing). N is always small (a handful of rows at most), so
+        /// this is not a hot path.
+        /// </summary>
+        private void RebuildItemRowControls(int w)
         {
-            _selectedItemId = itemId;
+            foreach (var row in _itemRows)
+            {
+                // SuggestionPanel is SpriteScreen-parented (never a child of
+                // _inputPanel/buildPanel), so it always needs an explicit
+                // Dispose() regardless of which cycle this is - same
+                // reasoning the old single-_suggestionPanel field's Build()
+                // cleanup always had. SuggestionPanel.Dispose() itself is
+                // idempotent (`if (_disposed) return;`), so this is safe to
+                // call even on a row whose SuggestionPanel was already
+                // disposed by a previous rebuild this same Build() cycle.
+                row.SuggestionPanel?.Dispose();
+
+                // RowPanel, by contrast, IS a child of _inputPanel/buildPanel
+                // - across a tab-switch Build() cycle it (and its own
+                // children) were already torn down by ViewAdapter's own
+                // "clear existing children before rebuilding" cascade before
+                // this method ever runs again, which nulls a disposed
+                // control's Parent (see TriggerGenerate's own "a disposed
+                // control's Parent is nulled on disposal" comment). Disposing
+                // it again here would be a double-Dispose on an
+                // already-torn-down control; only a genuine same-cycle
+                // Add/Remove reflow (ReflowInputRegion, _inputPanel still
+                // live) leaves RowPanel.Parent non-null, meaning THIS row
+                // genuinely still needs disposing before its replacement is
+                // built.
+                if (row.RowPanel != null && row.RowPanel.Parent != null)
+                {
+                    row.RowPanel.Dispose();
+                }
+
+                row.SuggestionPanel = null;
+                row.RowPanel = null;
+                row.SearchBox = null;
+                row.QtyInput = null;
+            }
+
+            for (int i = 0; i < _itemRows.Count; i++)
+            {
+                CreateItemRowControls(_itemRows[i], i, w);
+            }
+        }
+
+        /// <summary>
+        /// One input row's controls: search box + qty (unchanged from the
+        /// pre-M35 single row), plus a Remove button (gw2e's own
+        /// `ng-if="recipes.length > 1"` gate - ItemRowRequestBuilder.
+        /// CanRemoveRow) and, on the last row only, an Add button (echoing
+        /// gw2e's own single trailing "Add another item" link, attached to
+        /// the last row instead of its own separate strip row so the
+        /// single-row case keeps today's exact row height/position - see
+        /// the TopRegionRowGap constants' own doc comment).
+        /// </summary>
+        private void CreateItemRowControls(ItemRowState row, int index, int w)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(w, RowHeight),
+                Location = new Point(0, index * RowHeight),
+                Parent = _inputPanel
+            };
+            row.RowPanel = rowPanel;
+
+            var searchBox = new AutocompleteTextBox()
+            {
+                PlaceholderText = "Search items...",
+                Text = row.ItemName ?? "",
+                Size = new Point(200, 28),
+                Location = new Point(0, 3),
+                Parent = rowPanel
+            };
+            row.SearchBox = searchBox;
+
+            var suggestionPanel = new SuggestionPanel(searchBox, _itemSearchProvider);
+            suggestionPanel.ItemSelected += (_, args) =>
+            {
+                row.ItemId = args.ItemId;
+                row.ItemName = args.Name;
+            };
+            row.SuggestionPanel = suggestionPanel;
+
+            new Label()
+            {
+                Text = "Qty:",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(210, 7),
+                Parent = rowPanel
+            };
+
+            var qtyInput = new TextBox()
+            {
+                Text = string.IsNullOrEmpty(row.QuantityText) ? "1" : row.QuantityText,
+                Size = new Point(50, 28),
+                Location = new Point(240, 3),
+                Parent = rowPanel
+            };
+            qtyInput.TextChanged += (_, __) => row.QuantityText = qtyInput.Text;
+            row.QtyInput = qtyInput;
+
+            int nextX = 300;
+            if (ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count))
+            {
+                var removeButton = new StandardButton()
+                {
+                    Text = "-",
+                    Size = new Point(24, 24),
+                    Location = new Point(nextX, 3),
+                    Parent = rowPanel
+                };
+                removeButton.Click += (_, __) => RemoveItemRow(row);
+                nextX += 24 + 8;
+            }
+
+            if (index == _itemRows.Count - 1)
+            {
+                var addButton = new StandardButton()
+                {
+                    Text = "+",
+                    Size = new Point(24, 24),
+                    Location = new Point(nextX, 3),
+                    Parent = rowPanel
+                };
+                addButton.Click += (_, __) => AddItemRow();
+            }
+        }
+
+        private void AddItemRow()
+        {
+            _itemRows.Add(new ItemRowState());
+            ReflowInputRegion();
+        }
+
+        private void RemoveItemRow(ItemRowState row)
+        {
+            if (!ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count)) return;
+
+            int index = _itemRows.IndexOf(row);
+            if (index < 0) return;
+
+            row.SuggestionPanel?.Dispose();
+            row.RowPanel?.Dispose();
+            _itemRows.RemoveAt(index);
+            ReflowInputRegion();
+        }
+
+        /// <summary>
+        /// Rebuilds the item-row controls and repositions every fixed
+        /// element below them (controls/status/separator/content) after
+        /// the row count changes - M35's Add/Remove counterpart to
+        /// OnPanelResized's own width-driven repositioning. Row add/remove
+        /// never changes width, only the top strip's total height, so this
+        /// mirrors OnPanelResized's heightChanged branch (scroll-preserve)
+        /// without needing its widthChanged branch (no relayout replay).
+        /// </summary>
+        private void ReflowInputRegion()
+        {
+            if (_buildPanel == null || _inputPanel == null) return;
+
+            int w = _buildPanel.ContentRegion.Width;
+            int h = _buildPanel.ContentRegion.Height;
+            var layout = ComputeTopRegionLayout(_itemRows.Count);
+
+            int savedScrollOffset = _contentPanel?.VerticalScrollOffset ?? 0;
+            int previousContentHeight = _contentPanel?.Height ?? 0;
+
+            _inputPanel.Size = new Point(w, layout.InputPanelHeight);
+            RebuildItemRowControls(w);
+
+            _controlsPanel.Location = new Point(0, layout.ControlsRowY);
+            _statusLabel.Location = new Point(0, layout.StatusRowY);
+            _separator.Location = new Point(0, layout.SeparatorY);
+            _contentPanel.Location = new Point(0, layout.ContentY);
+            _contentPanel.Size = new Point(w, h - layout.TopRegionHeight);
+
+            if (_currentPlan != null && _contentPanel.Height != previousContentHeight)
+            {
+                PreserveScrollAcrossResize(savedScrollOffset, _contentPanel.Height);
+
+                // Row add/remove is a discrete one-shot action, not a
+                // continuous drag - ResizeSettleStep's own debounced follow-
+                // up verify (armed only while further drag ticks keep
+                // resetting _lastResizeEventUtc) would never naturally fire
+                // for it. Arm the settle-time verify directly here instead,
+                // the same way ResizeSettleStep itself does right after a
+                // drag settles - see PreserveScrollAcrossResize's own doc
+                // comment for why a late Blish-internal scrollbar reset
+                // still needs contesting even for a single height change.
+                if (_resizeScrollRestorePending)
+                {
+                    _resizeScrollRestorePending = false;
+                    StartResizeScrollVerify();
+                }
+            }
         }
 
         public void Build(Container buildPanel)
         {
-            // Clean up screen-parented popup from previous build cycle
-            _suggestionPanel?.Dispose();
+            // Screen-parented popups from the previous build cycle (one per
+            // item row - M35 replaces the single _suggestionPanel this used
+            // to be) are cleaned up by RebuildItemRowControls below, which
+            // every row already routes through - no separate loop needed
+            // here.
 
-            // Same cleanup for any leftover scroll-verify/resize-debounce
+            // Cleanup for any leftover scroll-verify/resize-debounce
             // tickers from the previous build cycle - see the field
             // comments above. Reset _resizeSettlePending too, or a ticker
             // canceled mid-debounce here would leave it stuck true and
@@ -751,52 +1031,34 @@ namespace GW2CraftingHelper.Views
             _resizeScrollSavedOffset = 0;
             _lastWheelEventUtc = null;
 
+            _buildPanel = buildPanel;
             int w = buildPanel.ContentRegion.Width;
 
-            // Input row: search box + quantity
+            // M35: gw2e's own initial state is one empty row
+            // (`e.recipes = [{id: null, amount: 1}]`) - see _itemRows' own
+            // doc comment. Only ever seeded once; every later Build() call
+            // (tab switch) reuses whatever the session already has.
+            if (_itemRows.Count == 0)
+            {
+                _itemRows.Add(new ItemRowState());
+            }
+
+            var layout = ComputeTopRegionLayout(_itemRows.Count);
+
+            // Input rows: search box + quantity per requested item.
             _inputPanel = new Panel()
             {
-                Size = new Point(w, RowHeight),
+                Size = new Point(w, layout.InputPanelHeight),
                 Location = new Point(0, InputRowY),
                 Parent = buildPanel
             };
-
-            _searchBox = new AutocompleteTextBox()
-            {
-                PlaceholderText = "Search items...",
-                Size = new Point(200, 28),
-                Location = new Point(0, 3),
-                Parent = _inputPanel
-            };
-
-            _suggestionPanel = new SuggestionPanel(_searchBox, _itemSearchProvider);
-            _suggestionPanel.ItemSelected += (_, args) =>
-            {
-                OnSelectedItemChanged(args.ItemId);
-            };
-
-            new Label()
-            {
-                Text = "Qty:",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(210, 7),
-                Parent = _inputPanel
-            };
-
-            _qtyInput = new TextBox()
-            {
-                Text = "1",
-                Size = new Point(50, 28),
-                Location = new Point(240, 3),
-                Parent = _inputPanel
-            };
+            RebuildItemRowControls(w);
 
             // Controls row: checkbox + generate button
             _controlsPanel = new Panel()
             {
                 Size = new Point(w, RowHeight),
-                Location = new Point(0, ControlsRowY),
+                Location = new Point(0, layout.ControlsRowY),
                 Parent = buildPanel
             };
 
@@ -851,7 +1113,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Ready",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, StatusRowY),
+                Location = new Point(0, layout.StatusRowY),
                 Parent = buildPanel
             };
 
@@ -859,7 +1121,7 @@ namespace GW2CraftingHelper.Views
             _separator = new Panel()
             {
                 Size = new Point(w - RightEdgePadding, 2),
-                Location = new Point(0, SeparatorY),
+                Location = new Point(0, layout.SeparatorY),
                 BackgroundColor = new Color(180, 180, 180),
                 Parent = buildPanel
             };
@@ -868,8 +1130,8 @@ namespace GW2CraftingHelper.Views
             // Children use (Width - RightEdgePadding) to keep content clear of the scrollbar.
             _contentPanel = new FlowPanel()
             {
-                Size = new Point(w, buildPanel.ContentRegion.Height - TopRegionHeight),
-                Location = new Point(0, ContentY),
+                Size = new Point(w, buildPanel.ContentRegion.Height - layout.TopRegionHeight),
+                Location = new Point(0, layout.ContentY),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
                 Parent = buildPanel
@@ -911,12 +1173,28 @@ namespace GW2CraftingHelper.Views
             // Update widths of layout panels. Top-strip controls keep their
             // pre-existing direct updates (M33 C2b directive 1) - these were
             // never part of the dispose+rebuild problem the relayout
-            // registry below replaces.
-            _inputPanel.Size = new Point(w, RowHeight);
+            // registry below replaces. M35: the input strip is now N rows
+            // (_itemRows.Count) rather than a fixed one, so its own and
+            // every row panel's width need updating too, and the Y offsets
+            // below it come from the same ComputeTopRegionLayout formula
+            // Build()/ReflowInputRegion use rather than fixed constants.
+            var layout = ComputeTopRegionLayout(_itemRows.Count);
+            _inputPanel.Size = new Point(w, layout.InputPanelHeight);
+            foreach (var row in _itemRows)
+            {
+                if (row.RowPanel != null)
+                {
+                    row.RowPanel.Size = new Point(w, RowHeight);
+                }
+            }
             _controlsPanel.Size = new Point(w, RowHeight);
+            _controlsPanel.Location = new Point(0, layout.ControlsRowY);
             _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
+            _statusLabel.Location = new Point(0, layout.StatusRowY);
             _separator.Size = new Point(w - RightEdgePadding, 2);
-            _contentPanel.Size = new Point(w, h - TopRegionHeight);
+            _separator.Location = new Point(0, layout.SeparatorY);
+            _contentPanel.Location = new Point(0, layout.ContentY);
+            _contentPanel.Size = new Point(w, h - layout.TopRegionHeight);
 
             bool widthChanged = w != _lastRenderedWidth;
             bool heightChanged = _contentPanel.Height != previousContentHeight;
@@ -1318,19 +1596,37 @@ namespace GW2CraftingHelper.Views
             int myGen = ++_generateSequence;
             _statusClosedForCurrentGeneration = false;
 
-            // Parse quantity; tell the user when their input was discarded
-            // instead of silently resetting it.
-            bool qtyInvalid = !int.TryParse(_qtyInput?.Text, out int qty) || qty < 1;
-            if (qtyInvalid)
+            // M35 (gw2efficiency parity - multi-item plans): gather every
+            // row's selection + quantity into the request list the
+            // pipeline needs. Per-row quantity validation mirrors the
+            // pre-M35 single-quantity-box behavior exactly (invalid/blank/
+            // &lt;1 silently corrected to 1, with a user-visible notice) -
+            // just applied once per row instead of once total.
+            bool anyQtyInvalid = false;
+            var rowInputs = new List<ItemRowRequestBuilder.RowInput>(_itemRows.Count);
+            foreach (var row in _itemRows)
             {
-                qty = 1;
-                if (_qtyInput != null) _qtyInput.Text = "1";
+                bool qtyInvalid = !int.TryParse(row.QtyInput?.Text, out int qty) || qty < 1;
+                if (qtyInvalid)
+                {
+                    qty = 1;
+                    if (row.QtyInput != null) row.QtyInput.Text = "1";
+                    anyQtyInvalid = true;
+                }
+                row.QuantityText = qty.ToString();
+                rowInputs.Add(new ItemRowRequestBuilder.RowInput { ItemId = row.ItemId, QuantityText = row.QuantityText });
             }
-            _quantity = qty;
+
+            var requestItems = ItemRowRequestBuilder.Build(rowInputs);
+            if (requestItems.Count == 0)
+            {
+                SetStatus("Select at least one item before generating.");
+                return;
+            }
 
             _generateButton.Enabled = false;
             _lastDebugLog = null;
-            SetStatus(qtyInvalid
+            SetStatus(anyQtyInvalid
                 ? "Quantity was invalid - reset to 1. Generating..."
                 : "Generating...");
 
@@ -1361,7 +1657,7 @@ namespace GW2CraftingHelper.Views
             try
             {
                 var result = await _generateAsync(
-                    _selectedItemId, _quantity, _useOwnMaterials, _priceBasis,
+                    requestItems, _useOwnMaterials, _priceBasis,
                     CancellationToken.None, statusProgress);
 
                 // Blish HUD's XNA host has no SynchronizationContext, so this
@@ -1478,7 +1774,7 @@ namespace GW2CraftingHelper.Views
             // Drop tree states up front so a plan without a tree section
             // does not retain disposed controls from the previous render.
             _treeNodeStates.Clear();
-            _treeRoot = null;
+            _treeRoots = null;
             _treeFlow = null;
 
             // M33 C2b: the relayout/re-ellipsis registries are rebuilt from
@@ -1511,8 +1807,9 @@ namespace GW2CraftingHelper.Views
             // cost breakdown, then the recipe tree, then everything else in
             // the builder's emission order (used materials, shopping list,
             // required disciplines, required recipes, crafting steps). The
-            // tree lives outside vm.Sections (it renders from vm.TreeRoot),
-            // so it is positioned explicitly between the two loops below.
+            // tree lives outside vm.Sections (it renders from vm.TreeRoot/
+            // vm.MultiItemRoots), so it is positioned explicitly between the
+            // two loops below.
             PlanSectionViewModel summarySection = null;
             foreach (var section in vm.Sections)
             {
@@ -1527,9 +1824,19 @@ namespace GW2CraftingHelper.Views
                 CreateCollapsibleSection(summarySection, panelWidth);
             }
 
-            if (vm.TreeRoot != null)
+            // M35 (gw2efficiency parity - multi-item plans): a multi-item
+            // batch supplies N roots directly (vm.MultiItemRoots); a
+            // single-item plan is wrapped into a one-element list here so
+            // CreateTreeSection/RefreshTreeContainerHeights always deal
+            // with "a list of roots" - one root renders byte-identically to
+            // the pre-M35 single-tree path (see PlanContentHeightMath.
+            // MultiRootTreeFlowHeight's own doc comment).
+            List<CraftingTreeNode> treeRoots = vm.MultiItemRoots != null && vm.MultiItemRoots.Count > 0
+                ? vm.MultiItemRoots
+                : (vm.TreeRoot != null ? new List<CraftingTreeNode> { vm.TreeRoot } : null);
+            if (treeRoots != null)
             {
-                CreateTreeSection(vm.TreeRoot, panelWidth);
+                CreateTreeSection(treeRoots, panelWidth);
             }
 
             foreach (var section in vm.Sections)
@@ -2618,9 +2925,16 @@ namespace GW2CraftingHelper.Views
         {
             var coinRows = new List<PlanRowViewModel>();
             var otherRows = new List<PlanRowViewModel>();
+            var noteRows = new List<PlanRowViewModel>();
             foreach (var row in section.Rows)
             {
                 if (row.RowType == PlanRowType.CoinTotal) coinRows.Add(row);
+                // M35 (gw2efficiency parity - multi-item plans): the
+                // multi-item batch note is a plain text row, not a
+                // CurrencyCost row - must not fall into the CreateCurrencyRow
+                // branch below (which assumes an icon/quantity that a note
+                // row never has).
+                else if (row.RowType == PlanRowType.MultiItemNote) noteRows.Add(row);
                 else otherRows.Add(row);
             }
 
@@ -2633,6 +2947,11 @@ namespace GW2CraftingHelper.Views
             foreach (var row in otherRows)
             {
                 CreateCurrencyRow(row, contentFlow, panelWidth);
+            }
+
+            foreach (var row in noteRows)
+            {
+                CreateTextRow(row.Label, contentFlow, panelWidth);
             }
         }
 
@@ -2747,16 +3066,31 @@ namespace GW2CraftingHelper.Views
         // States for the current render pass; rebuilt with the tree itself.
         private readonly List<TreeNodeState> _treeNodeStates = new List<TreeNodeState>();
 
-        // Root node + top-level content FlowPanel for the current render's
+        // Root nodes + top-level content FlowPanel for the current render's
         // Recipe Tree section (null when the plan has no tree). Held so
         // RefreshTreeContainerHeights - called from the tree row toggle
         // handler deep inside RenderTreeNode's recursion, as well as from
         // CreateTreeSection itself - can recompute treeFlow's own explicit
-        // Height without threading both through every recursive call.
-        private CraftingTreeNode _treeRoot;
+        // Height without threading both through every recursive call. M35
+        // (gw2efficiency parity - multi-item plans): a single-item plan
+        // still populates this with exactly one root, so every consumer
+        // below is unchanged in that case (see MultiRootTreeFlowHeight's
+        // own doc comment for the "N==1 is byte-identical" guarantee).
+        private List<CraftingTreeNode> _treeRoots;
         private FlowPanel _treeFlow;
 
-        private void CreateTreeSection(CraftingTreeNode treeRoot, int panelWidth)
+        /// <summary>
+        /// Renders the Recipe Tree section's single shared content
+        /// FlowPanel: one root per requested item, stacked - N top-level
+        /// trees for a multi-item batch (the synthetic wrapper root never
+        /// surfacing - see CraftingPlanResult.MultiItemRoots' own doc
+        /// comment), or the familiar single tree when treeRoots has one
+        /// element. Each root node already carries its own full icon/name/
+        /// quantity/pill/cost row (RenderTreeNode), so no separate
+        /// per-root header row is needed - gw2e's own "N independent
+        /// top-level recipe trees" look falls out for free.
+        /// </summary>
+        private void CreateTreeSection(IReadOnlyList<CraftingTreeNode> treeRoots, int panelWidth)
         {
             _treeNodeStates.Clear();
 
@@ -2780,7 +3114,7 @@ namespace GW2CraftingHelper.Views
                 suppressToggle: () => pressStartedOnButton);
             var headerPanel = header.HeaderPanel;
             var treeFlow = header.ContentFlow;
-            _treeRoot = treeRoot;
+            _treeRoots = treeRoots as List<CraftingTreeNode> ?? new List<CraftingTreeNode>(treeRoots);
             _treeFlow = treeFlow;
 
             // Header-row buttons, right-to-left per the spec's fixed
@@ -2828,7 +3162,25 @@ namespace GW2CraftingHelper.Views
 #if DEBUG
             int relayoutCountBeforeTree = _relayoutActions.Count;
 #endif
-            RenderTreeNode(treeRoot, treeFlow, panelWidth, 0, dimmed: false);
+            // M35 (gw2efficiency parity - multi-item plans): a thin gap
+            // between consecutive roots so N stacked full item trees read
+            // as N distinct blocks (PlanContentHeightMath.
+            // MultiRootDividerHeight) - never inserted for a single root,
+            // which keeps that case's rendered rows byte-identical to
+            // pre-M35.
+            for (int i = 0; i < _treeRoots.Count; i++)
+            {
+                if (i > 0)
+                {
+                    var rootDivider = new Panel()
+                    {
+                        Size = new Point(panelWidth, PlanContentHeightMath.MultiRootDividerHeight),
+                        Parent = treeFlow
+                    };
+                    _relayoutActions.Add(w => rootDivider.Size = new Point(w, PlanContentHeightMath.MultiRootDividerHeight));
+                }
+                RenderTreeNode(_treeRoots[i], treeFlow, panelWidth, 0, dimmed: false);
+            }
 #if DEBUG
             // M33 C2b (m2 risk 3): every RenderTreeNode call registers its
             // own relayout closure (see the field comment on
@@ -2995,10 +3347,10 @@ namespace GW2CraftingHelper.Views
                         state.Node.Children, state.Depth + 1, state.ChildDimmed, _nodeExpansion));
             }
 
-            if (_treeRoot != null && _treeFlow != null)
+            if (_treeRoots != null && _treeRoots.Count > 0 && _treeFlow != null)
             {
                 _treeFlow.Size = new Point(
-                    panelWidth, PlanContentHeightMath.TreeNodeHeight(_treeRoot, 0, false, _nodeExpansion));
+                    panelWidth, PlanContentHeightMath.MultiRootTreeFlowHeight(_treeRoots, _nodeExpansion));
             }
         }
 

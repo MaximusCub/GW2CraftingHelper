@@ -100,12 +100,19 @@ namespace GW2CraftingHelper.Services
         {
             bool hasCoinRow = false;
             int currencyRowCount = 0;
+            int noteRowCount = 0;
             foreach (var row in rows)
             {
                 if (row.RowType == PlanRowType.CoinTotal) hasCoinRow = true;
+                // M35 (gw2efficiency parity - multi-item plans): the
+                // multi-item batch note renders via the plain-text row
+                // pattern (FallbackTextRowHeight), not a CurrencyCost tile.
+                else if (row.RowType == PlanRowType.MultiItemNote) noteRowCount++;
                 else currencyRowCount++;
             }
-            return (hasCoinRow ? CostTileRowHeight : 0) + currencyRowCount * CurrencyRowHeight;
+            return (hasCoinRow ? CostTileRowHeight : 0)
+                + currencyRowCount * CurrencyRowHeight
+                + noteRowCount * FallbackTextRowHeight;
         }
 
         private static int RecipeRowsHeight(IReadOnlyList<PlanRowViewModel> rows)
@@ -186,6 +193,43 @@ namespace GW2CraftingHelper.Services
             foreach (var child in children)
             {
                 total += TreeNodeHeight(child, childDepth, childDimmed, expansionOverrides);
+            }
+            return total;
+        }
+
+        // M35 (gw2efficiency parity - multi-item plans): thin visual gap
+        // CraftingPlanView draws between two consecutive top-level trees in
+        // a multi-item batch, so N stacked full item trees read as N
+        // distinct blocks rather than blending into one continuous list of
+        // rows. Never inserted for a single root (roots.Count == 1), which
+        // is what keeps that case byte-identical to the pre-M35 height.
+        public const int MultiRootDividerHeight = 12;
+
+        /// <summary>
+        /// M35 (gw2efficiency parity - multi-item plans): total height of
+        /// the Recipe Tree section's single shared content FlowPanel when
+        /// it holds N top-level trees stacked (gw2e's own "N independent
+        /// top-level recipe trees" render, its synthetic wrapper node never
+        /// surfacing - docs/gw2e-parity-spec.md, the M34 r1 report) rather
+        /// than one. Each requested item's own root node already IS its own
+        /// full icon/name/quantity/pill/cost row (CraftingTreeNode, same
+        /// shape TreeNodeHeight already sizes for a single-item plan) - so
+        /// this is simply that same per-root arithmetic summed across every
+        /// root, plus one MultiRootDividerHeight gap between each pair of
+        /// consecutive roots (never before the first or after the last). A
+        /// one-element roots list (the single-item case) has no divider at
+        /// all and is therefore byte-identical to calling
+        /// TreeNodeHeight(roots[0], 0, false, ...) directly.
+        /// </summary>
+        public static int MultiRootTreeFlowHeight(
+            IReadOnlyList<CraftingTreeNode> roots, IReadOnlyDictionary<int, bool> expansionOverrides)
+        {
+            if (roots == null || roots.Count == 0) return 0;
+            int total = 0;
+            for (int i = 0; i < roots.Count; i++)
+            {
+                if (i > 0) total += MultiRootDividerHeight;
+                total += TreeNodeHeight(roots[i], 0, false, expansionOverrides);
             }
             return total;
         }

@@ -605,5 +605,83 @@ namespace GW2CraftingHelper.Tests.Services
             var option = node.Recipes[0];
             Assert.DoesNotContain("AutoLearned", option.Flags);
         }
+
+        // --- M35-B1: BuildMultiItemTreeAsync (gw2e parity, multi-item plans) ---
+
+        [Fact]
+        public async Task BuildMultiItemTreeAsync_SingleEntry_ReturnsItemTreeUnwrapped_NoSyntheticRoot()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(1, 10);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                }
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildMultiItemTreeAsync(
+                new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 5 } },
+                CancellationToken.None);
+
+            // Echoes gw2e's own `if (r.length === 1) return r[0]` - the real
+            // item's own tree, completely unwrapped.
+            Assert.Equal(1, node.Id);
+            Assert.Equal(5, node.Quantity);
+            Assert.NotEqual(Gw2Constants.MultiItemWrapperItemId, node.Id);
+            Assert.Single(node.Recipes);
+            Assert.Equal(2, node.Recipes[0].Ingredients[0].Id);
+        }
+
+        [Fact]
+        public async Task BuildMultiItemTreeAsync_MultipleItems_WrapsUnderSyntheticRoot()
+        {
+            var api = new InMemoryRecipeApiClient();
+            // Item 1: leaf, no recipe. Item 2: leaf, no recipe.
+            var svc = new RecipeService(api);
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 3 },
+                new PlanRequestItem { ItemId = 2, Quantity = 7 }
+            };
+
+            var wrapper = await svc.BuildMultiItemTreeAsync(items, CancellationToken.None);
+
+            Assert.Equal(Gw2Constants.MultiItemWrapperItemId, wrapper.Id);
+            Assert.Equal("Item", wrapper.IngredientType);
+            Assert.Equal(1, wrapper.Quantity);
+            Assert.Single(wrapper.Recipes);
+
+            var wrapperRecipe = wrapper.Recipes[0];
+            Assert.Equal(Gw2Constants.MultiItemWrapperRecipeId, wrapperRecipe.RecipeId);
+            Assert.Equal(1, wrapperRecipe.OutputCount);
+            Assert.Equal(1, wrapperRecipe.CraftsNeeded);
+            Assert.Equal(2, wrapperRecipe.Ingredients.Count);
+
+            // Each item tree is carried under the wrapper with its own
+            // requested amount as its Quantity - exactly like an ordinary
+            // recipe ingredient's quantity.
+            Assert.Equal(1, wrapperRecipe.Ingredients[0].Id);
+            Assert.Equal(3, wrapperRecipe.Ingredients[0].Quantity);
+            Assert.Equal(2, wrapperRecipe.Ingredients[1].Id);
+            Assert.Equal(7, wrapperRecipe.Ingredients[1].Quantity);
+        }
+
+        [Fact]
+        public async Task BuildMultiItemTreeAsync_NullOrEmptyList_Throws()
+        {
+            var svc = new RecipeService(new InMemoryRecipeApiClient());
+
+            await Assert.ThrowsAsync<System.ArgumentException>(
+                () => svc.BuildMultiItemTreeAsync(null, CancellationToken.None));
+            await Assert.ThrowsAsync<System.ArgumentException>(
+                () => svc.BuildMultiItemTreeAsync(new List<PlanRequestItem>(), CancellationToken.None));
+        }
     }
 }

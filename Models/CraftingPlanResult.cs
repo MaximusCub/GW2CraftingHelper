@@ -83,5 +83,38 @@ namespace GW2CraftingHelper.Models
         /// no wallet snapshot was available or the plan needs no currency.
         /// </summary>
         public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
+
+        /// <summary>
+        /// M35 (gw2efficiency parity - multi-item plans): the original
+        /// per-item request (item id + quantity) this result was generated
+        /// for, in request order. Populated ONLY for a genuine multi-item
+        /// batch (2+ requested items, solved via the synthetic wrapper -
+        /// see Gw2Constants.MultiItemWrapperItemId); null for a single-item
+        /// plan, including a single-item request made through the
+        /// multi-item entry point (which short-circuits straight to the
+        /// untouched single-item path, echoing gw2e's own `if
+        /// (r.length===1) return r[0]` - see
+        /// CraftingPlanPipeline.GenerateStructuredAsync's list overload).
+        /// A caller must not fall back to Plan.TargetItemId/TargetQuantity
+        /// for a multi-item batch: those hold the internal wrapper's own
+        /// placeholder id/quantity there and must never be displayed - use
+        /// MultiItemRoots (or this list) instead.
+        /// </summary>
+        public IReadOnlyList<PlanRequestItem> RequestedItems { get; set; }
+
+        /// <summary>
+        /// Populated instead of CraftingTree for a multi-item plan
+        /// (RequestedItems has 2+ entries): one full CraftingTreeNode per
+        /// requested item, in request order, each built exactly as
+        /// CraftingTree would be for a single-item plan of that same
+        /// item/quantity. The synthetic wrapper root used to solve them
+        /// together never surfaces here - echoes gw2efficiency's own
+        /// componentTree.html hiding its equivalent fake
+        /// `multipleRecipeTree` node from the rendered tree
+        /// (docs/gw2e-parity-spec.md, the M34 r1 multi-item research
+        /// report). Null for a single-item plan, which continues to
+        /// populate CraftingTree as before.
+        /// </summary>
+        public List<CraftingTreeNode> MultiItemRoots { get; set; }
     }
 }
