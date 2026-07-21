@@ -297,6 +297,19 @@ namespace GW2CraftingHelper.Views
         // influence a brand new one.
         private DateTime? _lastWheelEventUtc;
 
+        // M36 (KNOWN-ISSUES #12 reopened/root-caused): Blish HUD's
+        // Scrollbar.SCROLL_WHEEL private const (vendored Controls/
+        // Scrollbar.cs, BlishHUD v1.3.0, confirmed by decompiling the
+        // shipped "Blish HUD.exe") - one wheel EVENT (regardless of how
+        // many raw notches Windows coalesced into it) moves the bar by
+        // exactly this many pixels times SystemInformation.
+        // MouseWheelScrollLines, per Scrollbar.HandleWheelScroll/
+        // ScrollAnimated (sign-only, never magnitude-scaled). A private
+        // const has no runtime field to reflect (unlike PanelScrollbarField
+        // above), so this is hardcoded with this provenance note -
+        // re-verify against the vendored source on any BlishHUD upgrade.
+        private const int BlishScrollWheelStepPixels = 30;
+
         // M33 C1 (#12 diagnostics): instrumentation-only. Gated on
         // ModuleSettings.ScrollDiagnosticsEnabled (default false); every
         // call site below checks the live setting value BEFORE doing any
@@ -765,6 +778,119 @@ namespace GW2CraftingHelper.Views
         private void OnContentWheelObserved(object sender, MouseEventArgs e)
         {
             _lastWheelEventUtc = DateTime.UtcNow;
+
+            // M36 (KNOWN-ISSUES #12 reopened/root-caused): classification
+            // is unconditional (zero-allocation, a plain value tuple) - see
+            // WheelDeltaSanitizer's own doc comment for the full root
+            // cause and threshold derivation. GameService.Input.Mouse.
+            // State.ScrollWheelValue is the SAME raw value
+            // OnScrollDiagWheelScrolled's diagnostic log already reads as
+            // "raw" - this is the field the live 2026-07-21 histogram was
+            // measured from.
+            try
+            {
+                int raw = GameService.Input.Mouse.State.ScrollWheelValue;
+                var classification = WheelDeltaSanitizer.Classify(raw);
+                if (classification.IsWrapped)
+                {
+                    ApplyWheelWrapCorrection(raw, classification.IntendedDelta);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Defensive, matching StartScrollVerify's own precedent for
+                // reflection/layout-touching scroll code (see that
+                // method's own catch): this handler runs unconditionally
+                // on every wheel event, not diagnostics-gated, so a
+                // disposed panel/scrollbar (tab switch, module unload) or
+                // a future Blish internal change must degrade to "no
+                // correction this event" rather than take down the whole
+                // wheel input pipeline.
+                Logger.Warn(ex, "Wheel-wrap correction failed");
+            }
+        }
+
+        /// <summary>
+        /// M36 (KNOWN-ISSUES #12 reopened/root-caused): corrects the
+        /// damage from a wrapped wheel delta. Blish HUD's own
+        /// Scrollbar.HandleWheelScroll looks only at Math.Sign of the
+        /// (here, corrupted-negative) raw delta, so for every wrapped
+        /// up-flick it has already queued exactly ONE step DOWN via
+        /// ScrollAnimated by the time this handler runs - OnContentWheel-
+        /// Observed is subscribed after Blish's own Scrollbar (see
+        /// OnScrollDiagWheelScrolled's doc comment), so Blish's own
+        /// HandleWheelScroll for this same event has always already run.
+        /// That wrong step exists only as a not-yet-applied Glide tween at
+        /// this point (Scrollbar.ScrollAnimated sets TargetScrollDistance
+        /// and creates a tween; the tween's own next Tweener.Update() call
+        /// is what would actually write ScrollDistance, not this call
+        /// stack) - so "undo the one-step-down" means canceling that tween
+        /// before it ever lands, via the same public Tweener.TargetCancel
+        /// API Blish's own ScrollAnimated implicitly relies on for its
+        /// "overwrite: true" behavior between successive wheel events.
+        /// Once canceled, this writes the position N clean up-notches
+        /// would have produced instead, computed in the SAME pixel space
+        /// Blish's own per-notch step operates in (ScrollMath.
+        /// ApplyPixelDelta) so a corrected fast flick composes exactly
+        /// like N clean single notches, not a differently-scaled jump.
+        ///
+        /// The KNOWN-ISSUES #19 "stale-cached-percent" hazard (Scrollbar.
+        /// RecalculateLayout resetting ScrollDistance to 0 the first time
+        /// _scrollbarPercent's cached value goes stale-to-fresh) does NOT
+        /// apply here: that hazard is specific to a resize tick changing
+        /// the viewport/content ratio for the first time since the last
+        /// RecalculateLayout call. A wheel event alone never changes
+        /// content or viewport height, so _scrollbarPercent is already
+        /// fresh and RecalculateLayout is not needed before this write.
+        /// </summary>
+        private void ApplyWheelWrapCorrection(int rawIn, int intendedDelta)
+        {
+            if (_contentPanel == null || PanelScrollbarField == null)
+            {
+                return;
+            }
+
+            var scrollbar = PanelScrollbarField.GetValue(_contentPanel) as Scrollbar;
+            if (scrollbar == null)
+            {
+                return;
+            }
+
+            // Cancel Blish's own mis-signed single-step-down tween before
+            // its next Update() can apply it. A no-op if none is pending
+            // (e.g. the scrollbar wasn't visible/scrollable when Blish's
+            // HandleWheelScroll ran, so it never queued one).
+            if (GameService.Animation?.Tweener != null)
+            {
+                GameService.Animation.Tweener.TargetCancel(scrollbar, nameof(Scrollbar.ScrollDistance));
+            }
+
+            // Blish's own per-notch step convention (Scrollbar.
+            // HandleWheelScroll/ScrollAnimated, see BlishScrollWheelStep-
+            // Pixels' own provenance comment): one wheel EVENT moves the
+            // bar by BlishScrollWheelStepPixels * MouseWheelScrollLines
+            // pixels, sign-only (never magnitude-scaled). Read live here
+            // too, matching Blish's own live read, so this stays correct
+            // if the user changes their OS mouse-wheel-lines setting.
+            // intendedDelta is always a clean multiple of 120 in practice
+            // (the wrap always adds back a whole ushort span to a raw
+            // value that started as N*120), but this scales proportionally
+            // rather than assuming an exact multiple, so a non-multiple
+            // value degrades gracefully instead of losing a partial notch.
+            double notches = intendedDelta / 120.0;
+            int deltaPixels = (int)System.Math.Round(
+                -notches * BlishScrollWheelStepPixels * System.Windows.Forms.SystemInformation.MouseWheelScrollLines);
+
+            int contentHeight = MeasureContentHeight(_contentPanel);
+            float before = scrollbar.ScrollDistance;
+            float after = ScrollMath.ApplyPixelDelta(before, deltaPixels, contentHeight, _contentPanel.Height);
+            scrollbar.ScrollDistance = after;
+
+            if (_settings != null && _settings.ScrollDiagnosticsEnabled.Value)
+            {
+                Logger.Debug("{0} write writer=WheelWrapFix frame={1} rawIn={2} intendedDelta={3} before={4:0.0000} after={5:0.0000}",
+                    ScrollDiagTag, ScrollDiagFrame(), rawIn, intendedDelta, before, after);
+            }
         }
 
         /// <summary>
