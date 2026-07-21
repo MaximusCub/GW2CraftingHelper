@@ -1126,14 +1126,6 @@ namespace GW2CraftingHelper.Services
             public long? NetSaleValue;
             public long? TargetUnitSellPrice;
             public long ItemCraftCost;
-
-            // True only when this root's committed decision was Craft (not
-            // BuyFromTp/BuyFromVendor/unknown) - false, including when the
-            // root has no decision entry at all. Read only by
-            // ApplyBatchSellSideEconomics (see its own doc comment,
-            // divergence item 1) to echo gw2e's craft===true rollup filter;
-            // the single-item path never reads it.
-            public bool IsCraft;
         }
 
         private static PerItemEconomics ComputePerItemEconomics(
@@ -1149,12 +1141,10 @@ namespace GW2CraftingHelper.Services
             // whole batch, so the extra units are sellable too.
             int sellableQuantity = requestedQuantity;
             long itemCraftCost = 0L;
-            bool isCraft = false;
             if (solveResult.Decisions.TryGetValue(itemRoot.NodeId, out var rootDecision))
             {
                 itemCraftCost = rootDecision.TotalCost ?? 0L;
-                isCraft = rootDecision.Source == AcquisitionSource.Craft;
-                if (isCraft)
+                if (rootDecision.Source == AcquisitionSource.Craft)
                 {
                     var chosenRecipe = itemRoot.Recipes
                         .FirstOrDefault(r => r.RecipeId == rootDecision.RecipeId);
@@ -1182,8 +1172,7 @@ namespace GW2CraftingHelper.Services
                 SellableQuantity = sellableQuantity,
                 NetSaleValue = netSaleValue,
                 TargetUnitSellPrice = targetUnitSellPrice,
-                ItemCraftCost = itemCraftCost,
-                IsCraft = isCraft
+                ItemCraftCost = itemCraftCost
             };
         }
 
@@ -1233,19 +1222,20 @@ namespace GW2CraftingHelper.Services
         /// single-item path already uses) and sums the survivors into the
         /// batch-level CraftingPlanResult fields. See
         /// docs/KNOWN-ISSUES.md #25's "FIXED in M37" record for the full
-        /// echo-design rationale; summary of how this echoes vs. diverges
-        /// from gw2e's own multi-item rollup (the `o()` function in the
-        /// live app bundle - see docs/research/m37-r2-batch-economics.md
-        /// Sections 1.2/4.1):
-        ///   1. ECHOED (not diverged): only a root whose committed decision
-        ///      is Craft contributes to the sum - a root the solver decided
-        ///      to buy is excluded entirely, matching gw2e's own
-        ///      craft===true filter literally. This module's requested
-        ///      roots CAN resolve to a buy decision (PlanSolver.Evaluate has
-        ///      no root-only special case - see
-        ///      MultiItemPlanTests.GenerateStructuredAsync_MultiItem_PerRootDecision_MatchesStandaloneSingleItemSolve),
-        ///      so the filter is a real, meaningful gate here, not a
-        ///      vacuous echo.
+        /// design rationale; summary of how this diverges from gw2e's own
+        /// multi-item rollup (the `o()` function in the live app bundle -
+        /// see docs/research/m37-r2-batch-economics.md Sections 1.2/4.1):
+        ///   1. DIVERGED: unlike gw2e's rollup, there is NO craft-vs-buy
+        ///      filter here - any requested root with a live TP sell price
+        ///      contributes its own SellableQuantity/NetSaleValue/
+        ///      CraftingProfit regardless of whether the solver bought or
+        ///      crafted it. This matches this module's own already-shipped
+        ///      single-item ApplySellSideEconomics semantics (which has
+        ///      never filtered by craft-vs-buy - a flip/arbitrage number is
+        ///      still meaningful) and the research report's explicit
+        ///      recommendation (Section 4.1.1) NOT to add gw2e's own
+        ///      craft===true filter - see
+        ///      MultiItemPlanTests.GenerateStructuredAsync_MultiItem_OneRootBoughtButTradable_IncludedInSum.
         ///   2. DIVERGED: a CRAFTED root with no live TP sell price still
         ///      contributes NOTHING to the sum (excluded entirely - both
         ///      its revenue AND its own craft cost drop out together) -
@@ -1271,6 +1261,22 @@ namespace GW2CraftingHelper.Services
         /// defaults (0/null/null) when NOT ONE requested root has a live
         /// sell price - the batch equivalent of the single-item "no sell
         /// price at all" case.
+        ///
+        /// Documented nuance (M37 review): MaterialOpportunityCost is a
+        /// SINGLE sum over the batch's whole merged UsedMaterials list
+        /// (Reduce runs on the entire wrapper tree before Solve ever picks
+        /// Buy vs Craft per root - see GenerateStructuredMultiAsync's own
+        /// step ordering) - it is NOT scoped down to only the roots that
+        /// end up contributing to SellableQuantity/NetSaleValue/
+        /// CraftingProfit above. A root the solver decides to buy can
+        /// still have owned ingredient stock recorded as "used" against
+        /// its own never-crafted subtree, and that forgone value is
+        /// deducted from the batch's CraftingProfit regardless. This
+        /// matches the single-item path's own pre-existing behavior
+        /// exactly (ApplySellSideEconomics' MaterialOpportunityCost is
+        /// likewise never gated on the target's own craft/buy decision),
+        /// so it is intentional, not a new gap - see
+        /// MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostIsWholeTreeSum.
         /// </summary>
         private static void ApplyBatchSellSideEconomics(
             CraftingPlanResult result,
@@ -1314,11 +1320,11 @@ namespace GW2CraftingHelper.Services
                     wrapperRecipe.Ingredients[i], items[i].ItemId, items[i].Quantity,
                     solveResult, prices);
 
-                // Item 1 (echoed craft===true filter) and item 2 (diverged
-                // untradable-crafted-root exclusion) from the doc comment
-                // above: a bought root, or a crafted root with no live sell
-                // price, contributes nothing.
-                if (!itemEconomics.IsCraft || !itemEconomics.NetSaleValue.HasValue)
+                // Divergence item 2 from the doc comment above: a root
+                // with no live sell price contributes nothing, regardless
+                // of whether the solver bought or crafted it - no
+                // craft-vs-buy filter (divergence item 1) here at all.
+                if (!itemEconomics.NetSaleValue.HasValue)
                 {
                     continue;
                 }

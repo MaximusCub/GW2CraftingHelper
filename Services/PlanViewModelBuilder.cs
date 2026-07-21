@@ -236,22 +236,26 @@ namespace GW2CraftingHelper.Services
             }
 
             // M35 (gw2efficiency parity - multi-item plans): echoes gw2e's
-            // own Cost Breakdown banner for a multi-item batch (M34 r1
-            // report). M37 (KNOWN-ISSUES #25) added the real batch-level
-            // Sell value/Profit rows above, driven by the same craft===true
-            // filter gw2e's own rollup uses (see
-            // CraftingPlanPipeline.ApplyBatchSellSideEconomics) - the note
-            // now echoes gw2e's own banner text verbatim rather than the
-            // pre-M37 placeholder wording, since the underlying filter now
-            // genuinely matches (the module's own additional untradable-
-            // crafted-root exclusion divergence is a smaller nuance gw2e's
-            // own banner text does not spell out either).
-            if (isMultiItem)
+            // own Cost Breakdown banner concept for a multi-item batch (M34
+            // r1 report). M37 (KNOWN-ISSUES #25) added the real batch-level
+            // Sell value/Profit rows above (see
+            // CraftingPlanPipeline.ApplyBatchSellSideEconomics) - gated on
+            // the SAME result.NetSaleValue.HasValue condition as those rows
+            // (mirroring gw2e's own shared ng-show condition, research
+            // report Section 1.3b) so this note never references a profit
+            // figure that is not actually on the page (e.g. every requested
+            // root bought outright, or none tradable). The wording is NOT
+            // gw2e's own verbatim banner text ("...sum of all crafted
+            // recipes") because this module's rollup has no craft-vs-buy
+            // filter at all (ApplyBatchSellSideEconomics' own doc comment,
+            // divergence item 1) - a bought-but-tradable root can
+            // contribute too, so "crafted recipes" would be inaccurate.
+            if (isMultiItem && result.NetSaleValue.HasValue)
             {
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.MultiItemNote,
-                    Label = "Profit numbers are the sum of all crafted recipes."
+                    Label = "Sell value and profit are the sum across every requested item that has a live Trading Post sell price."
                 });
             }
 
