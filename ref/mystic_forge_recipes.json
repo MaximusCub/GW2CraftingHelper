@@ -44520,6 +44520,35 @@
         }
       ],
       "comment": "Lucky Great Horse Lantern (from wiki)"
+    },
+    {
+      "id": -1591,
+      "outputItemId": 19675,
+      "outputItemCount": 1,
+      "expectedOutputCount": 0.31,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 19925,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 19976,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 19721,
+          "count": 1
+        },
+        {
+          "type": "Item",
+          "id": 20796,
+          "count": 6
+        }
+      ],
+      "comment": "Mystic Clover (from wiki, r3 M33 research - 1-clover Mystic Forge gamble, ~31% success rate per 40k-sample community study)"
     }
   ]
 }
