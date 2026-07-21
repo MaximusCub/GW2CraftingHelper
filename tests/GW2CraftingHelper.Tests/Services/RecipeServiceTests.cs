@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Services;
@@ -196,6 +197,204 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Currency", currencyNode.IngredientType);
             Assert.Equal(50, currencyNode.Quantity);
             Assert.True(currencyNode.IsLeaf);
+        }
+
+        [Fact]
+        public async Task SelfReferentialIngredient_BecomesLeaf_QuantityDoesNotCompound()
+        {
+            // M33 item 4 (m5 Finding 2 / r2 report): a real, wiki-verified
+            // Mystic Forge "trophy tier-up" recipe shape - N of the tier
+            // below + 1 of ITS OWN output + junk items -> a few of itself
+            // (Obsidian Shard, id 19925, is the exact real example already
+            // in ref/recipes_seed.json). Echoes gw2e's recipe-nesting
+            // "the component is the recipe! Abort!" rule: the self-ingredient
+            // becomes an inert leaf (no further recipe expansion), so its
+            // quantity is a single scale-up from THIS craft only - it must
+            // NOT recurse into its own recipe again and compound.
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(19925, -496);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = -496,
+                OutputItemId = 19925,
+                OutputItemCount = 3,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 19925, Count = 1 }, // self
+                    new RawIngredient { Type = "Item", Id = 19976, Count = 1 }, // Mystic Coin
+                    new RawIngredient { Type = "Item", Id = 24335, Count = 1 },
+                    new RawIngredient { Type = "Item", Id = 39090, Count = 1 }
+                }
+            });
+
+            var svc = new RecipeService(api);
+            // Need 300 Obsidian Shards; recipe makes 3 -> ceil(300/3) = 100 crafts.
+            var node = await svc.BuildTreeAsync(19925, 300, CancellationToken.None);
+
+            Assert.False(node.IsLeaf);
+            var option = node.Recipes[0];
+            Assert.Equal(100, option.CraftsNeeded);
+
+            var selfIngredient = option.Ingredients.Single(i => i.Id == 19925);
+            // One-time scale-up (100 crafts * 1 per craft) - a sane,
+            // wiki-scale number, NOT a recursively-compounded explosion.
+            Assert.Equal(100, selfIngredient.Quantity);
+            Assert.True(selfIngredient.IsLeaf, "the self-referential ingredient must not re-expand its own recipe");
+            Assert.Empty(selfIngredient.Recipes);
+
+            var coinIngredient = option.Ingredients.Single(i => i.Id == 19976);
+            Assert.Equal(100, coinIngredient.Quantity);
+        }
+
+        [Fact]
+        public async Task SelfReferentialMultiTierChain_SaneWikiScaleQuantities()
+        {
+            // Realistic 4-tier salvage-trophy chain (Small/Claw/Sharp/Large
+            // Claw shape from the real seed, ref/recipes_seed.json ids
+            // -592..-595): each tier needs 50 of the tier below + 1 of ITS
+            // OWN output + dust + Philosopher's Stones -> 7 of itself.
+            // Verified (m5's "explosion to millions" is real wiki-scale
+            // math for this brutal ratio, not a compounding bug - see the
+            // M33 structured-output concerns for the full trace): the
+            // demand must grow by a bounded, deterministic multiplier per
+            // tier (not runaway/unbounded), and every self-ingredient at
+            // every tier must stay an inert, non-recursing leaf.
+            var api = new InMemoryRecipeApiClient();
+            const int tinyClaw = 90101, smallClaw = 90102, claw = 90103, sharpClaw = 90104, largeClaw = 90105;
+            const int dustA = 90201, dustB = 90202, dustC = 90203, dustD = 90204, philStone = 90300;
+
+            api.AddSearchResult(smallClaw, -1592);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = -1592,
+                OutputItemId = smallClaw,
+                OutputItemCount = 7,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = tinyClaw, Count = 50 },
+                    new RawIngredient { Type = "Item", Id = smallClaw, Count = 1 },
+                    new RawIngredient { Type = "Item", Id = dustA, Count = 5 },
+                    new RawIngredient { Type = "Item", Id = philStone, Count = 1 }
+                }
+            });
+            api.AddSearchResult(claw, -1593);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = -1593,
+                OutputItemId = claw,
+                OutputItemCount = 7,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = smallClaw, Count = 50 },
+                    new RawIngredient { Type = "Item", Id = claw, Count = 1 },
+                    new RawIngredient { Type = "Item", Id = dustB, Count = 5 },
+                    new RawIngredient { Type = "Item", Id = philStone, Count = 2 }
+                }
+            });
+            api.AddSearchResult(sharpClaw, -1594);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = -1594,
+                OutputItemId = sharpClaw,
+                OutputItemCount = 7,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = claw, Count = 50 },
+                    new RawIngredient { Type = "Item", Id = sharpClaw, Count = 1 },
+                    new RawIngredient { Type = "Item", Id = dustC, Count = 5 },
+                    new RawIngredient { Type = "Item", Id = philStone, Count = 3 }
+                }
+            });
+            api.AddSearchResult(largeClaw, -1595);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = -1595,
+                OutputItemId = largeClaw,
+                OutputItemCount = 7,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = sharpClaw, Count = 50 },
+                    new RawIngredient { Type = "Item", Id = largeClaw, Count = 1 },
+                    new RawIngredient { Type = "Item", Id = dustD, Count = 5 },
+                    new RawIngredient { Type = "Item", Id = philStone, Count = 4 }
+                }
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(largeClaw, 500, CancellationToken.None);
+
+            int LargeCraftsNeeded = node.Recipes[0].CraftsNeeded;
+            Assert.Equal(72, LargeCraftsNeeded); // ceil(500/7)
+
+            var sharpNode = node.Recipes[0].Ingredients.Single(i => i.Id == sharpClaw);
+            Assert.Equal(72 * 50, sharpNode.Quantity); // 3600 - one-time scale-up, sane
+            Assert.False(sharpNode.IsLeaf);
+
+            var selfLarge = node.Recipes[0].Ingredients.Single(i => i.Id == largeClaw);
+            Assert.Equal(72, selfLarge.Quantity);
+            Assert.True(selfLarge.IsLeaf);
+
+            var sharpOption = sharpNode.Recipes[0];
+            var selfSharp = sharpOption.Ingredients.Single(i => i.Id == sharpClaw);
+            Assert.True(selfSharp.IsLeaf);
+            Assert.Equal(sharpOption.CraftsNeeded, selfSharp.Quantity);
+
+            // Every level's demand is a deterministic, bounded multiple of
+            // its parent's need (real 50-per-craft/7-out ratio compounding
+            // across genuinely distinct tiers) - not an unbounded/incorrect
+            // blow-up. The whole chain resolves without infinite recursion.
+            var tinyNode = sharpNode.Recipes[0]
+                .Ingredients.Single(i => i.Id == claw).Recipes[0]
+                .Ingredients.Single(i => i.Id == smallClaw).Recipes[0]
+                .Ingredients.Single(i => i.Id == tinyClaw);
+            Assert.True(tinyNode.IsLeaf); // no recipe seeded for Tiny Claw
+            Assert.True(tinyNode.Quantity > 0);
+        }
+
+        [Fact]
+        public async Task RawRecipe_ExpectedOutputCountSet_PropagatesToRecipeOption()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(19675, -1);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = -1,
+                OutputItemId = 19675,
+                OutputItemCount = 1,
+                ExpectedOutputCount = 0.31,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                }
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(19675, 1, CancellationToken.None);
+
+            Assert.Equal(0.31, node.Recipes[0].ExpectedOutputCount);
+        }
+
+        [Fact]
+        public async Task RawRecipe_NoExpectedOutputCount_DefaultsToOutputCount()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(1, 10);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 5,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                }
+                // ExpectedOutputCount left null (the common case)
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);
+
+            Assert.Equal(5.0, node.Recipes[0].ExpectedOutputCount);
         }
 
         [Fact]

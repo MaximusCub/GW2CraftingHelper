@@ -386,5 +386,141 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(data.GetRecipe(5));
             Assert.Single(data.LoadWarnings);
         }
+
+        // --- expectedOutputCount (M33 item 7: Mystic Clover EV support) ---
+
+        [Fact]
+        public void Load_ExpectedOutputCount_ParsedAsFractionalDouble()
+        {
+            // Mystic Clover shape: nominal outputItemCount=1, real gw2e
+            // expected yield 0.31 (r2 report).
+            var json = @"{
+                ""schemaVersion"": 1,
+                ""recipes"": [
+                    {
+                        ""id"": -1,
+                        ""outputItemId"": 19675,
+                        ""outputItemCount"": 1,
+                        ""expectedOutputCount"": 0.31,
+                        ""ingredients"": [
+                            { ""type"": ""Item"", ""id"": 19925, ""count"": 1 },
+                            { ""type"": ""Item"", ""id"": 19976, ""count"": 1 },
+                            { ""type"": ""Item"", ""id"": 19721, ""count"": 1 },
+                            { ""type"": ""Item"", ""id"": 20796, ""count"": 6 }
+                        ]
+                    }
+                ]
+            }";
+
+            var data = MysticForgeRecipeData.Load(ToStream(json));
+            var recipe = data.GetRecipe(-1);
+
+            Assert.NotNull(recipe);
+            Assert.Equal(1, recipe.OutputItemCount);
+            Assert.Equal(0.31, recipe.ExpectedOutputCount);
+        }
+
+        [Fact]
+        public void Load_NoExpectedOutputCount_DefaultsToNull()
+        {
+            // The overwhelming majority of recipes never set this field -
+            // RecipeService is responsible for defaulting it to
+            // OutputItemCount (a no-op) when null.
+            var json = @"{
+                ""schemaVersion"": 1,
+                ""recipes"": [
+                    {
+                        ""id"": -1,
+                        ""outputItemId"": 19673,
+                        ""outputItemCount"": 1,
+                        ""ingredients"": [
+                            { ""type"": ""Item"", ""id"": 24295, ""count"": 250 }
+                        ]
+                    }
+                ]
+            }";
+
+            var data = MysticForgeRecipeData.Load(ToStream(json));
+            var recipe = data.GetRecipe(-1);
+
+            Assert.NotNull(recipe);
+            Assert.Null(recipe.ExpectedOutputCount);
+        }
+
+        [Fact]
+        public void Load_ZeroExpectedOutputCount_SkipsWithWarning()
+        {
+            var json = @"{
+                ""schemaVersion"": 1,
+                ""recipes"": [
+                    {
+                        ""id"": -1,
+                        ""outputItemId"": 19675,
+                        ""outputItemCount"": 1,
+                        ""expectedOutputCount"": 0,
+                        ""ingredients"": [
+                            { ""type"": ""Item"", ""id"": 19925, ""count"": 1 }
+                        ]
+                    }
+                ]
+            }";
+
+            var data = MysticForgeRecipeData.Load(ToStream(json));
+
+            Assert.Null(data.GetRecipe(-1));
+            Assert.Single(data.LoadWarnings);
+            Assert.Contains("expectedOutputCount must be > 0", data.LoadWarnings[0]);
+        }
+
+        [Fact]
+        public void Load_NegativeExpectedOutputCount_SkipsWithWarning()
+        {
+            var json = @"{
+                ""schemaVersion"": 1,
+                ""recipes"": [
+                    {
+                        ""id"": -1,
+                        ""outputItemId"": 19675,
+                        ""outputItemCount"": 1,
+                        ""expectedOutputCount"": -0.5,
+                        ""ingredients"": [
+                            { ""type"": ""Item"", ""id"": 19925, ""count"": 1 }
+                        ]
+                    }
+                ]
+            }";
+
+            var data = MysticForgeRecipeData.Load(ToStream(json));
+
+            Assert.Null(data.GetRecipe(-1));
+            Assert.Single(data.LoadWarnings);
+            Assert.Contains("expectedOutputCount must be > 0", data.LoadWarnings[0]);
+        }
+
+        [Fact]
+        public void Load_NullExpectedOutputCount_TreatedAsAbsent()
+        {
+            var json = @"{
+                ""schemaVersion"": 1,
+                ""recipes"": [
+                    {
+                        ""id"": -1,
+                        ""outputItemId"": 19673,
+                        ""outputItemCount"": 1,
+                        ""expectedOutputCount"": null,
+                        ""ingredients"": [
+                            { ""type"": ""Item"", ""id"": 24295, ""count"": 250 }
+                        ]
+                    }
+                ]
+            }";
+
+            var data = MysticForgeRecipeData.Load(ToStream(json));
+            var recipe = data.GetRecipe(-1);
+
+            Assert.NotNull(recipe);
+            Assert.Empty(data.LoadWarnings);
+            Assert.Null(recipe.ExpectedOutputCount);
+        }
     }
 }

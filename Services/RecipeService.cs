@@ -205,6 +205,11 @@ namespace GW2CraftingHelper.Services
                         RecipeId = raw.Id,
                         OutputCount = raw.OutputItemCount,
                         CraftsNeeded = craftsNeeded,
+                        // Defaults to the nominal OutputItemCount (a no-op)
+                        // whenever the source recipe has no fractional EV.
+                        ExpectedOutputCount = raw.ExpectedOutputCount.HasValue && raw.ExpectedOutputCount.Value > 0
+                            ? raw.ExpectedOutputCount.Value
+                            : raw.OutputItemCount,
                         Disciplines = new List<string>(raw.Disciplines),
                         MinRating = raw.MinRating,
                         Flags = new List<string>(raw.Flags)
