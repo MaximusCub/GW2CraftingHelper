@@ -154,7 +154,7 @@ module ECHO that behavior rather than inventing an approach. New
 dev-time seeders (vendor pricing, Mystic Forge recipes) are welcome;
 they must write static seed JSON, never scrape at runtime.
 
-## 12. Fast wheel-up scroll: net-downward stutter (FIXED in M33, live-verified; REOPENED 2026-07-21, root-caused and fixed in M36)
+## 12. Fast wheel-up scroll: net-downward stutter (REOPENED 2026-07-21; root-caused and FIXED in M36, live-verified)
 Rapid successive wheel-up events make the viewport scroll up then jump
 back down further than it went up - net downward movement with an
 upward stutter. Hypothesis: scroll guard/restore machinery (or some
@@ -311,9 +311,16 @@ Blish-free unit test suite (WheelDeltaSanitizerTests covers the entire
 measured histogram, boundary values, the N=46/N=47 lattice edge, and
 SanitizeScrollLines; ScrollMathTests covers the pixel-delta arithmetic,
 including that a single multi-notch correction composes identically to N
-single-notch steps). NOT yet re-verified live by the user - a fresh
-instrumented capture of a fast wheel-up flick under this fix is the
-honest next step before this item can be marked live-verified again.
+single-notch steps). LIVE-VERIFIED 2026-07-21 (instrumented desktop
+capture of THIS fix on the merged build): synthetic single-event
+multi-notch up-deltas (+240 and +360, which Blish's WheelDelta getter
+wraps to -65296/-65176 exactly as in the user's original trace) each
+produced a [scrolldiag] writer=WheelWrapFix correction with the right
+intendedDelta and moved the bar UP by exactly N clean notches
+(0.1261->0.1031 for 2 notches, 0.1031->0.0688 for 3) - no down-step,
+no snap-back on subsequent frames, and the defensive re-assert never
+needed to fire (empirically confirming the synchronous-registration
+TargetCancel mechanism the fix-pass decompilation predicted).
 
 ## 13. Resize UX rework: live reflow, no settle stutter (FIXED in M33, live-verified end-state; drag-tick perf live-verified 2026-07-21)
 The 150ms debounce-only approach is REJECTED by user feedback: content
@@ -946,7 +953,7 @@ correctly but writes the status line "Best path restored" - the label
 belongs to the Best Path preset, not the ignore toggle. Pick a neutral
 re-solve status ("Decisions updated" family) for ignore clicks.
 
-## 23. Horizontal dividers appear/disappear with scroll position (FIXED in M36, code-verified; live re-verification pending)
+## 23. Horizontal dividers appear/disappear with scroll position (FIXED in M36, live-verified)
 User report: the same rows' divider lines are present at one scroll
 offset and gone at another - not a contrast problem (that was #7, fixed
 in M30), a presence/absence flicker as the list scrolls.
@@ -1020,10 +1027,14 @@ from bounding-box containment only - actual glyph ascent/descent metrics
 for DefaultFont18 were not measured, so whether 28 (down from 29) reads
 as visually tighter under real glyphs is unverified; treat a future
 title/divider crowding report as expected-until-checked rather than a
-surprise regression. Build and full test suite green. Live user visual
-confirmation (does the flicker actually stop across a real scroll
-range) is still pending - the honest next step before this item can be
-marked live-verified.
+surprise regression. Build and full test suite green. LIVE-VERIFIED
+2026-07-21 (desktop screenshot loop on the merged build): the Shopping
+List captured at three successive one-notch scroll offsets shows a
+visible divider between EVERY adjacent row pair at every offset - the
+same rows that previously lost their divider at unlucky positions keep
+it across all sampled offsets. Header divider and section-title glyph
+clearance looked normal in the same captures (no crowding observed),
+though no glyph-metric measurement was taken.
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
