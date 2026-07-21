@@ -792,6 +792,37 @@ a second/third row are reasoned from the same explicit-height math this
 file already relies on elsewhere, but have not been visually confirmed
 against a running Blish HUD instance. Treat a fresh multi-row layout
 report as expected-until-checked rather than an automatic regression.
+LIVE-VERIFIED 2026-07-21 (desktop screenshot loop on merged master,
+Exordium + Gift of Fortune batch): multi-row input strip (add/remove
+rows, dynamic top-strip reflow), batch generation, "Exordium and 1
+other" title, merged Total Cost (Laurels 264 = both items' merged
+demand), the sum-of-all-crafted-recipes note, both root trees stacked
+above one merged 77/78-item Shopping List, and multi-source pill
+highlighting all render correctly. The M34 additions were verified in
+the same session: status line completes ("Plan generated - <time>",
+never stuck), Exordium's Laurel total shows the merged-ceil 180 (the
+old 186 overcount is gone on live data), and the IGNORE pill round-trips
+correctly with proper tree-wide economics (ignoring Pile of Crystalline
+Dust flipped every T6 promotion to craft and re-priced the batch;
+un-ignoring restored the original plan exactly). Scroll restore stayed
+zero-flash under the multi-root tree during ignore re-solves
+([scrolldiag]: SyncRestore + single same-frame contest + stable at
+realFrame 2). Still unverified live: USING N OWNED pill and
+owned-currency annotations (need an account snapshot with relevant
+stock - covered by unit tests), KNOWN-ISSUES #19's resize-preserve
+(needs a human drag), drag-tick relayout perf on a fully-expanded tree.
+
+## 22. Ignore-pill click sets status to "Best path restored" (cosmetic)
+Observed live 2026-07-21: clicking an IGNORE/IGNORED pill re-solves
+correctly but writes the status line "Best path restored" - the label
+belongs to the Best Path preset, not the ignore toggle. Pick a neutral
+re-solve status ("Decisions updated" family) for ignore clicks.
+
+## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
+ASCII carets ("v" / ">" section headers) rendered reliably in every
+capture across three desktop sessions and two machines' font stacks
+this milestone cycle; the unicode-triangle alternative is unnecessary.
+Settled: keep ASCII carets.
 
 ## Handoff notes for the implementing session
 - Project memory holds the environment + working rules: the
