@@ -121,9 +121,14 @@ Fixed in M30: pill labels now render in white.
   mechanism proven live for scroll restore; a positive in-game
   observation of the single settle rebuild is still pending (synthetic
   input could not catch the TabbedWindow2 resize grip).
-- Scroll guard's reset-vs-user discriminator: a user dragging to exactly
-  top within ~0.3s of a layout mutation may be bounced up to 4 times
-  before winning (accepted tradeoff; revisit only if reported).
+- Scroll verify's reset-vs-user discriminator (M33 C2a superseded the
+  M30-era guard): the verify window is now only 2-3 real frames and
+  suppresses its own zero-reassert whenever a wheel event landed in the
+  last 250ms, so a user who just wheeled to exactly the top is not
+  bounced at all. A non-wheel-driven arrival at exactly zero (e.g. a
+  script/automation setting VerticalScrollOffset directly) within that
+  short window could still be bounced up to 4 times before the cap gives
+  up contesting it (accepted tradeoff; revisit only if reported).
 - Currency rows now use API names from /v2/currencies (may differ
   slightly from the old hardcoded fallbacks, e.g. singular forms);
   Gw2Constants remains the offline fallback.
@@ -147,7 +152,7 @@ module ECHO that behavior rather than inventing an approach. New
 dev-time seeders (vendor pricing, Mystic Forge recipes) are welcome;
 they must write static seed JSON, never scrape at runtime.
 
-## 12. Fast wheel-up scroll: net-downward stutter
+## 12. Fast wheel-up scroll: net-downward stutter (FIXED in M33)
 Rapid successive wheel-up events make the viewport scroll up then jump
 back down further than it went up - net downward movement with an
 upward stutter. Hypothesis: scroll guard/restore machinery (or some
@@ -155,6 +160,20 @@ per-frame interaction with Blish's Panel wheel handling) contesting
 rapid user input. Reproduce with the proven instrument-first loop
 (synthetic rapid wheel-up while a guard window could be live and while
 idle) before designing a fix.
+Fixed in M33 (C2a): a live instrumented capture (c12-baseline-analysis,
+2026-07-20) confirmed the root cause - the old restore Tick's
+divergence check required contentHeight to be unchanged frame-to-frame
+before it could trust the scrollbar's live value over its own target,
+and nested AutoSize convergence kept contentHeight fluctuating for
+several real frames after every rebuild, so a wheel notch landing in
+that window was silently overwritten. Container heights (section
+bodies, recipe-tree child containers) are now finalized synchronously
+at build time via PlanContentHeightMath, removing the fluctuating-height
+window entirely. On top of that, the post-restore verify window now
+yields immediately on any observed wheel event (no heightUnchanged
+precondition), and a wheel event within the last 250ms suppresses the
+zero-reassert contest so a user who just wheeled to exactly the top is
+never bounced back down.
 
 ## 13. Resize UX rework: live reflow, no settle stutter
 The 150ms debounce-only approach is REJECTED by user feedback: content
@@ -167,13 +186,22 @@ widths/x-positions; no dispose+rebuild), making the settle rebuild
 unnecessary or invisible. This is the previously-rejected "option b" -
 now required; design it to avoid drift between build and relayout paths.
 
-## 14. Pill-click viewport flash (jump to top and back)
+## 14. Pill-click viewport flash (jump to top and back) (FIXED in M33)
 Clicking a TP/VENDOR override pill visibly flashes the view to the top
 for an instant before the scroll restore re-asserts. The restore
 converges but applies a frame+ late. Direction: apply the saved scroll
 ratio synchronously inside PreserveScrollAcross immediately after the
 rebuild (before first paint), with the FrameTicker loop only defending
 convergence afterward - target: zero visible movement.
+Fixed in M33 (C2a): PreserveScrollAcross now writes the restore ratio to
+the scrollbar synchronously immediately after the rebuild returns, using
+container heights that are already finalized (not still collapsed at
+Height=0 awaiting AutoSize convergence) - nothing paints between the
+rebuild and the correct restore write landing, so there is no wrong
+position left for the user to see. A short (2-3 real frame) FrameTicker
+verify still runs afterward, but only to contest Blish's own single
+expected post-rebuild scrollbar reset, not to converge toward a still-
+moving target.
 
 ## 15. Shopping tag text contrast (VENDOR / SALVAGE / UNKNOWN)
 The grey shopping-list source tags have poor text-vs-fill contrast.
