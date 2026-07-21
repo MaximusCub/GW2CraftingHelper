@@ -947,11 +947,28 @@ owned-currency annotations (need an account snapshot with relevant
 stock - covered by unit tests), KNOWN-ISSUES #19's resize-preserve
 (needs a human drag), drag-tick relayout perf on a fully-expanded tree.
 
-## 22. Ignore-pill click sets status to "Best path restored" (cosmetic)
+## 22. Ignore-pill click sets status to "Best path restored" (cosmetic) (FIXED in M37)
 Observed live 2026-07-21: clicking an IGNORE/IGNORED pill re-solves
 correctly but writes the status line "Best path restored" - the label
 belongs to the Best Path preset, not the ignore toggle. Pick a neutral
 re-solve status ("Decisions updated" family) for ignore clicks.
+FIXED in M37: root cause was CraftingPlanView.ApplyOverridesAndResolve
+choosing the status text from `_nodeOverrides.Count == 0` as a proxy for
+"the Best Path preset fired", instead of from which control actually
+fired the re-solve. Every trigger that funnels through that one shared
+method (Best Path, Craft All, Buy All, per-node craft/tp/vendor pill
+cycling, and the ignore toggle) inherited the same ternary, so the
+ignore toggle - which never touches `_nodeOverrides` at all - hit the
+`== 0` branch and printed the Best Path preset's own label. Fixed by
+threading an explicit `isBestPathPreset` flag from the one call site
+that is actually the Best Path preset (bestPathButton.Click) through to
+a new pure `StatusText.ForOverrideResolve(isBestPathPreset,
+overrideCount)` helper (Services layer, Blish-free, unit-tested); every
+other call site keeps its implicit `false` default and gets the neutral
+"Decisions updated (N override(s))" text regardless of count. See #27
+for the full trigger sweep this also covers (Craft All/Buy All could hit
+the identical mislabel in the edge case where their preset legitimately
+resolves to zero overrides).
 
 ## 23. Horizontal dividers appear/disappear with scroll position (FIXED in M36; see M36b follow-up below for 44px/32px rows)
 User report: the same rows' divider lines are present at one scroll
@@ -1178,10 +1195,42 @@ real affected item for verification, e.g. a legendary with an
 achievement-gated collection component). Research exact dedup semantics
 from gw2e sources first; echo. Small.
 
-## 27. Ignore-pill click status label (open defect, see #22)
+## 27. Ignore-pill click status label (FIXED in M37, closes #22)
 Item #22 above: clicking IGNORE/IGNORED re-solves correctly but writes
 "Best path restored" - a preset label, not an ignore label. Use the
 neutral "Decisions updated" status family. Trivial; close #22 when done.
+FIXED in M37: see #22's resolution note for the mechanism. Full sweep of
+every user-triggered re-solve entry point that shares
+ApplyOverridesAndResolve, and the status text each now writes:
+  - Best Path preset (bestPathButton.Click) -> "Best path restored"
+    (the only trigger that legitimately gets this label; passes
+    isBestPathPreset: true explicitly).
+  - Craft All preset (craftAllButton.Click -> ApplyPreset) ->
+    "Decisions updated (N override(s))".
+  - Buy All preset (buyAllButton.Click -> ApplyPreset) ->
+    "Decisions updated (N override(s))".
+  - Per-node craft/tp/vendor pill cycling (the `interactive` pill
+    branch) -> "Decisions updated (N override(s))" (unchanged; this
+    site was never mislabeled since a pill click always adds at least
+    one override).
+  - Ignore/un-ignore toggle (the `ignoreInteractive` pill branch) ->
+    "Decisions updated (N override(s))" (the reported defect; N reflects
+    unrelated per-node overrides, not the ignore set, since ignore state
+    lives in a separate `_ignoredItemIds` set).
+Same-class sibling bug also fixed by this change: Craft All/Buy All
+could hit the identical "Best path restored" mislabel in the edge case
+where CraftingPlanPipeline.BuildPresetOverrides legitimately returns an
+empty override map (e.g. a tree with no craftable nodes for Craft All,
+or none priced on the TP for Buy All) - previously indistinguishable
+from the Best Path preset's own zero-overrides state. Now decoupled
+entirely: only an explicit isBestPathPreset: true reaches the Best Path
+text, regardless of resulting count.
+Not a Blish-free seam originally (the ternary lived inline in the
+CraftingPlanView method), but the module already has an established
+Services-layer pure-helper pattern for status strings (StatusText.
+Normalize, used by MainView); StatusText.ForOverrideResolve extends
+that existing seam rather than inventing a new one, and is covered by
+StatusTextTests (Blish-free, per repo invariants).
 
 ## 28. Vendor cap data seeding + stale-offer sweep (data)
 M34 shipped gw2e-parity warn-only cap machinery (TimegatedItems +

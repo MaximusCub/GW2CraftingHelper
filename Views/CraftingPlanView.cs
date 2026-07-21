@@ -3605,7 +3605,7 @@ namespace GW2CraftingHelper.Views
             {
                 if (_nodeOverrides.Count == 0) return;
                 _nodeOverrides.Clear();
-                ApplyOverridesAndResolve();
+                ApplyOverridesAndResolve(isBestPathPreset: true);
             };
             craftAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.Craft);
             buyAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.BuyFromTp);
@@ -3669,7 +3669,10 @@ namespace GW2CraftingHelper.Views
             ApplyOverridesAndResolve();
         }
 
-        private void ApplyOverridesAndResolve()
+        // M37 (KNOWN-ISSUES #22/#27): isBestPathPreset must come from which
+        // control fired this call, not be inferred from the resulting
+        // _nodeOverrides count - see StatusText.ForOverrideResolve for why.
+        private void ApplyOverridesAndResolve(bool isBestPathPreset = false)
         {
             if (_lastResult?.SolveContext == null || _resolveOverridesSync == null)
             {
@@ -3684,9 +3687,7 @@ namespace GW2CraftingHelper.Views
                 var vm = _vmBuilder.Build(result);
                 _currentPlan = vm;
                 PreserveScrollAcross(() => RenderPlan(vm));
-                SetStatus(_nodeOverrides.Count == 0
-                    ? "Best path restored"
-                    : $"Decisions updated ({_nodeOverrides.Count} override(s))");
+                SetStatus(StatusText.ForOverrideResolve(isBestPathPreset, _nodeOverrides.Count));
             }
             catch (Exception ex)
             {
