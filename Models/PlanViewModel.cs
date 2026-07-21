@@ -42,15 +42,15 @@ namespace GW2CraftingHelper.Models
         // M35 (gw2efficiency parity - multi-item plans): a single plain
         // informational line appended to the Summary/Total Cost section
         // ONLY for a genuine multi-item batch (2+ requested items) -
-        // echoes gw2e's own Cost Breakdown banner ("Profit numbers are the
-        // sum of all crafted recipes" - docs/gw2e-parity-spec.md, the M34
-        // r1 multi-item research report), reworded here to describe what
-        // this module actually combines (coin/currency TOTALS, not a
-        // profit figure - see PlanViewModelBuilder.BuildSummarySection and
-        // CraftingPlanPipeline.GenerateStructuredMultiAsync's own doc
-        // comment on why sell-side economics are not yet computed for a
-        // batch). Rendered via the same plain-text row pattern as
-        // TimegatedNotice.
+        // echoes gw2e's own Cost Breakdown banner verbatim ("Profit
+        // numbers are the sum of all crafted recipes." -
+        // docs/gw2e-parity-spec.md, the M34 r1 multi-item research
+        // report). M37 (KNOWN-ISSUES #25) added a real batch-level Sell
+        // value/Profit rollup driven by the same craft===true filter
+        // gw2e's own rollup uses - see
+        // CraftingPlanPipeline.ApplyBatchSellSideEconomics and
+        // PlanViewModelBuilder.BuildSummarySection. Rendered via the same
+        // plain-text row pattern as TimegatedNotice.
         MultiItemNote
     }
 

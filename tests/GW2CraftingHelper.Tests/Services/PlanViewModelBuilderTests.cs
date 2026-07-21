@@ -1629,5 +1629,103 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.DoesNotContain(summaryRows, r => r.RowType == PlanRowType.MultiItemNote);
         }
+
+        // --- Multi-item batch sell-side economics (M37, KNOWN-ISSUES #25) ---
+
+        private static List<PlanRequestItem> TwoRequestedItems()
+        {
+            return new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+        }
+
+        private static List<Contracts.CraftingTreeNode> TwoRoots()
+        {
+            return new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") };
+        }
+
+        [Fact]
+        public void MultiItemRequest_SellValuePresent_AddsBatchWordedSellAndProfitRows()
+        {
+            var result = MakeResult(
+                totalCoinCost: 300, requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+            result.SellableQuantity = 2;
+            result.NetSaleValue = 850;
+            result.CraftingProfit = 550;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal("Sell value (batch total, after 15% TP fees)", rows[1].Label);
+            Assert.Equal(850L, rows[1].CoinValue);
+            Assert.Equal("Profit if sold (batch total)", rows[2].Label);
+            Assert.Equal(550L, rows[2].CoinValue);
+        }
+
+        [Fact]
+        public void MultiItemRequest_NegativeProfit_RendersAsLossWithBatchQualifier()
+        {
+            var result = MakeResult(
+                totalCoinCost: 900, requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+            result.NetSaleValue = 340;
+            result.CraftingProfit = -160;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal("Loss if sold (batch total)", rows[2].Label);
+            Assert.Equal(160L, rows[2].CoinValue);
+        }
+
+        [Fact]
+        public void MultiItemRequest_CurrencyCostsPresent_ProfitRowGetsBatchAndCoinOnlyQualifier()
+        {
+            var result = MakeResult(
+                totalCoinCost: 100,
+                currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 2, Amount = 50 } },
+                requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 240;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal("Profit if sold (batch total, coin costs only)", rows[2].Label);
+        }
+
+        [Fact]
+        public void MultiItemRequest_SellRowNeverShowsPerItemQuantityQualifier()
+        {
+            // Single-item mode shows "Sell value (Nx, ...)" when
+            // SellableQuantity overproduces the target quantity - that
+            // qualifier has no meaning for a batch SUM across N different
+            // items' own quantities, so it must never appear here.
+            var result = MakeResult(
+                targetQuantity: 1, totalCoinCost: 300,
+                requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+            result.SellableQuantity = 5;
+            result.NetSaleValue = 1700;
+            result.CraftingProfit = 1400;
+
+            var vm = _builder.Build(result);
+
+            Assert.Equal("Sell value (batch total, after 15% TP fees)", vm.Sections[0].Rows[1].Label);
+        }
+
+        [Fact]
+        public void MultiItemRequest_NoteRowTextIsGw2eBannerVerbatim()
+        {
+            var result = MakeResult(
+                totalCoinCost: 500, requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+
+            var vm = _builder.Build(result);
+            var summaryRows = vm.Sections[0].Rows;
+            var noteRow = summaryRows[summaryRows.Count - 1];
+
+            Assert.Equal(PlanRowType.MultiItemNote, noteRow.RowType);
+            Assert.Equal("Profit numbers are the sum of all crafted recipes.", noteRow.Label);
+        }
     }
 }

@@ -158,12 +158,27 @@ namespace GW2CraftingHelper.Services
                 });
             }
 
-            // Sell-side rows: only when the target has a live sell price.
+            // Sell-side rows: only when the target(s) have a live sell
+            // price. M37 (KNOWN-ISSUES #25): in multi-item mode,
+            // NetSaleValue/CraftingProfit are the BATCH sum across every
+            // requested item that has one (see
+            // CraftingPlanPipeline.ApplyBatchSellSideEconomics) - labels
+            // are worded as a batch total, and the single-item "Nx"
+            // overproduction qualifier is dropped since there is no single
+            // requested quantity to compare a batch sum against.
             if (result.NetSaleValue.HasValue)
             {
-                string sellLabel = result.SellableQuantity > result.Plan.TargetQuantity
-                    ? $"Sell value ({result.SellableQuantity}x, after 15% TP fees)"
-                    : "Sell value (after 15% TP fees)";
+                string sellLabel;
+                if (isMultiItem)
+                {
+                    sellLabel = "Sell value (batch total, after 15% TP fees)";
+                }
+                else
+                {
+                    sellLabel = result.SellableQuantity > result.Plan.TargetQuantity
+                        ? $"Sell value ({result.SellableQuantity}x, after 15% TP fees)"
+                        : "Sell value (after 15% TP fees)";
+                }
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.CoinTotal,
@@ -174,7 +189,15 @@ namespace GW2CraftingHelper.Services
                 long profit = result.CraftingProfit ?? 0L;
                 bool hasCurrencyCosts = result.Plan.CurrencyCosts != null &&
                                         result.Plan.CurrencyCosts.Count > 0;
-                string qualifier = hasCurrencyCosts ? " (coin costs only)" : "";
+                string qualifier;
+                if (isMultiItem)
+                {
+                    qualifier = hasCurrencyCosts ? " (batch total, coin costs only)" : " (batch total)";
+                }
+                else
+                {
+                    qualifier = hasCurrencyCosts ? " (coin costs only)" : "";
+                }
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.CoinTotal,
@@ -214,15 +237,21 @@ namespace GW2CraftingHelper.Services
 
             // M35 (gw2efficiency parity - multi-item plans): echoes gw2e's
             // own Cost Breakdown banner for a multi-item batch (M34 r1
-            // report), reworded to describe what this module actually
-            // combines - see PlanRowType.MultiItemNote's own doc comment
-            // for why "profit" is not the right word here yet.
+            // report). M37 (KNOWN-ISSUES #25) added the real batch-level
+            // Sell value/Profit rows above, driven by the same craft===true
+            // filter gw2e's own rollup uses (see
+            // CraftingPlanPipeline.ApplyBatchSellSideEconomics) - the note
+            // now echoes gw2e's own banner text verbatim rather than the
+            // pre-M37 placeholder wording, since the underlying filter now
+            // genuinely matches (the module's own additional untradable-
+            // crafted-root exclusion divergence is a smaller nuance gw2e's
+            // own banner text does not spell out either).
             if (isMultiItem)
             {
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.MultiItemNote,
-                    Label = "Totals above are the sum of all crafted recipes in this batch."
+                    Label = "Profit numbers are the sum of all crafted recipes."
                 });
             }
 
