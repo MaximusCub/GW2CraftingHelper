@@ -40,6 +40,7 @@ namespace GW2CraftingHelper.Views
         private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
+        private readonly ModuleSettings _settings;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
 
         private PlanViewModel _currentPlan;
@@ -139,15 +140,49 @@ namespace GW2CraftingHelper.Views
         private const int ScrollGuardWindowFrames = 20;
         private const int ScrollGuardHardCapFrames = 120;
 
+        // M33 C1 (#12 diagnostics): instrumentation-only. Gated on
+        // ModuleSettings.ScrollDiagnosticsEnabled (default false); every
+        // call site below checks the live setting value BEFORE doing any
+        // work so the cost when disabled is a single bool read, not a
+        // formatted-string allocation. Never read by, or fed back into,
+        // any scroll/guard/restore decision - diagnostics only observe.
+        private const string ScrollDiagTag = "[scrolldiag]";
+
+        // Monotonic frame index shared by every scroll-diagnostic log line
+        // (wheel handler, Tick, GuardTick) so a human reading the log can
+        // tell same-frame vs cross-frame ordering apart even when wall-clock
+        // log timestamps collide. GameService.Overlay.CurrentGameTime
+        // already advances exactly once per real engine frame (the vendor
+        // Scrollbar/Control use it the same way for double-click timing), so
+        // comparing it to the last-seen value is a cheap, ticker-free way to
+        // detect "a new real frame happened" without adding a dedicated
+        // always-on ticker. Only ever touched from diagnostics-gated call
+        // sites.
+        private TimeSpan? _scrollDiagLastFrameTime;
+        private long _scrollDiagFrameCounter;
+
+        private long ScrollDiagFrame()
+        {
+            TimeSpan? current = GameService.Overlay?.CurrentGameTime?.TotalGameTime;
+            if (current.HasValue && current.Value != _scrollDiagLastFrameTime)
+            {
+                _scrollDiagFrameCounter++;
+                _scrollDiagLastFrameTime = current.Value;
+            }
+            return _scrollDiagFrameCounter;
+        }
+
         public CraftingPlanView(
             Func<int, int, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
             IItemSearchProvider itemSearchProvider,
+            ModuleSettings settings,
             Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, CraftingPlanResult> resolveOverridesSync = null)
         {
             _generateAsync = generateAsync;
             _modalDialog = modalDialog;
             _itemSearchProvider = itemSearchProvider;
+            _settings = settings;
             _resolveOverridesSync = resolveOverridesSync;
         }
 
@@ -216,6 +251,16 @@ namespace GW2CraftingHelper.Views
             private readonly Func<GameTime, bool> _step;
             private TimeSpan? _lastFrameTime;
             private bool _canceled;
+
+            // M33 C1 (#12 diagnostics): observation-only - lets external
+            // code (the wheel diagnostic handler) ask "is this ticker still
+            // running" without altering any ticker behavior. _scrollRestoreTicker/
+            // _scrollGuardTicker are never nulled out when a ticker
+            // self-cancels (only reassigned or explicitly cleared at the
+            // top of the next Build()), so a plain null-check on those
+            // fields cannot tell "never started" apart from "ran once and
+            // finished long ago" - this property is the accurate signal.
+            public bool IsActive => !_canceled;
 
             public FrameTicker(Func<GameTime, bool> step)
             {
@@ -308,8 +353,16 @@ namespace GW2CraftingHelper.Views
             int lastContentHeight = -1;
             int stableStreak = 0;
 
+            if (_settings != null && _settings.ScrollDiagnosticsEnabled.Value)
+            {
+                Logger.Debug("{0} restore-armed frame={1} savedOffset={2} generation={3}",
+                    ScrollDiagTag, ScrollDiagFrame(), savedOffset, capturedGeneration);
+            }
+
             bool Tick(GameTime gameTime)
             {
+                bool diagEnabled = _settings != null && _settings.ScrollDiagnosticsEnabled.Value;
+
                 // A newer restore superseded this loop, Build() swapped in
                 // a fresh content panel, or the panel was torn down (tab
                 // switch / module unload): stop immediately rather than
@@ -318,6 +371,11 @@ namespace GW2CraftingHelper.Views
                 if (capturedGeneration != _scrollRestoreGeneration ||
                     capturedPanel != _contentPanel || capturedPanel.Parent == null)
                 {
+                    if (diagEnabled)
+                    {
+                        Logger.Debug("{0} tick exit reason=stale-generation frame={1} realFrame={2} generation={3} liveGeneration={4}",
+                            ScrollDiagTag, ScrollDiagFrame(), realFrame, capturedGeneration, _scrollRestoreGeneration);
+                    }
                     return false;
                 }
 
@@ -364,6 +422,11 @@ namespace GW2CraftingHelper.Views
                         isLibraryReset = currentDistance <= 0.0005f && ratio > 0.01f;
                         if (!isLibraryReset)
                         {
+                            if (diagEnabled)
+                            {
+                                Logger.Debug("{0} tick exit reason=user-scroll-detected frame={1} realFrame={2} observed={3:0.0000} lastWritten={4:0.0000} contentHeight={5}",
+                                    ScrollDiagTag, ScrollDiagFrame(), realFrame, currentDistance, lastWrittenRatio, contentHeight);
+                            }
                             return false;
                         }
 
@@ -372,10 +435,24 @@ namespace GW2CraftingHelper.Views
                         // toward convergence) - still bounded by the
                         // real-frame cap. Kept quiet; this is a routine,
                         // expected event on the hot path.
+                        if (diagEnabled)
+                        {
+                            Logger.Debug("{0} tick library-reset-contested frame={1} realFrame={2} observed={3:0.0000} ratio={4:0.0000} contentHeight={5}",
+                                ScrollDiagTag, ScrollDiagFrame(), realFrame, currentDistance, ratio, contentHeight);
+                        }
                     }
 
                     realFrame++;
                     scrollbar.ScrollDistance = ratio;
+
+                    if (diagEnabled)
+                    {
+                        // currentDistance still holds the pre-write value:
+                        // the scrollbar.ScrollDistance assignment above does
+                        // not mutate this local.
+                        Logger.Debug("{0} write writer=Tick frame={1} realFrame={2} before={3:0.0000} after={4:0.0000} contentHeight={5} generation={6}",
+                            ScrollDiagTag, ScrollDiagFrame(), realFrame, currentDistance, ratio, contentHeight, capturedGeneration);
+                    }
 
                     bool ratioStable = !isLibraryReset &&
                         System.Math.Abs(ratio - lastWrittenRatio) < 0.0005f;
@@ -389,6 +466,12 @@ namespace GW2CraftingHelper.Views
                         return true;
                     }
 
+                    if (diagEnabled)
+                    {
+                        Logger.Debug("{0} tick exit reason={1} frame={2} realFrame={3} ratio={4:0.0000} contentHeight={5}",
+                            ScrollDiagTag, ScrollDiagFrame(), converged ? "converged" : "real-frame-cap", realFrame, ratio, contentHeight);
+                    }
+
                     StartScrollGuard(capturedPanel, capturedGeneration, savedOffset, scrollbar);
                     return false;
                 }
@@ -397,6 +480,11 @@ namespace GW2CraftingHelper.Views
                     // Reflection/layout mismatch, or the panel/scrollbar was
                     // disposed out from under us: degrade to reset-to-top.
                     Logger.Warn(ex, "Scroll restore degraded; falling back to top");
+                    if (diagEnabled)
+                    {
+                        Logger.Debug("{0} tick exit reason=disposed-exception frame={1} realFrame={2} error={3}",
+                            ScrollDiagTag, ScrollDiagFrame(), realFrame, ex.GetType().Name);
+                    }
                     return false;
                 }
             }
@@ -432,11 +520,24 @@ namespace GW2CraftingHelper.Views
             // fought forever.
             int zeroReassert = 0;
 
+            if (_settings != null && _settings.ScrollDiagnosticsEnabled.Value)
+            {
+                Logger.Debug("{0} guard-armed frame={1} savedOffset={2} generation={3} window={4}",
+                    ScrollDiagTag, ScrollDiagFrame(), savedOffset, capturedGeneration, ScrollGuardWindowFrames);
+            }
+
             bool GuardTick(GameTime gameTime)
             {
+                bool diagEnabled = _settings != null && _settings.ScrollDiagnosticsEnabled.Value;
+
                 if (capturedGeneration != _scrollRestoreGeneration ||
                     capturedPanel != _contentPanel || capturedPanel.Parent == null)
                 {
+                    if (diagEnabled)
+                    {
+                        Logger.Debug("{0} guard exit reason=stale-generation frame={1} totalFrames={2} generation={3} liveGeneration={4}",
+                            ScrollDiagTag, ScrollDiagFrame(), totalFrames, capturedGeneration, _scrollRestoreGeneration);
+                    }
                     return false;
                 }
 
@@ -469,6 +570,12 @@ namespace GW2CraftingHelper.Views
                         if (reasserted)
                         {
                             scrollbar.ScrollDistance = target;
+
+                            if (diagEnabled)
+                            {
+                                Logger.Debug("{0} write writer=GuardTick/heightChanged frame={1} totalFrames={2} before={3:0.0000} after={4:0.0000} contentHeight={5}",
+                                    ScrollDiagTag, ScrollDiagFrame(), totalFrames, current, target, contentHeight);
+                            }
                         }
 
                         remaining = ScrollGuardWindowFrames;
@@ -487,8 +594,19 @@ namespace GW2CraftingHelper.Views
                         scrollbar.ScrollDistance = target;
                         zeroReassert++;
 
+                        if (diagEnabled)
+                        {
+                            Logger.Debug("{0} write writer=GuardTick/zeroReassert frame={1} totalFrames={2} before={3:0.0000} after={4:0.0000} contentHeight={5} bounceCount={6}",
+                                ScrollDiagTag, ScrollDiagFrame(), totalFrames, current, target, contentHeight, zeroReassert);
+                        }
+
                         if (zeroReassert > 4)
                         {
+                            if (diagEnabled)
+                            {
+                                Logger.Debug("{0} guard exit reason=zero-reassert-cap-exceeded frame={1} totalFrames={2} bounceCount={3}",
+                                    ScrollDiagTag, ScrollDiagFrame(), totalFrames, zeroReassert);
+                            }
                             return false;
                         }
 
@@ -500,6 +618,11 @@ namespace GW2CraftingHelper.Views
                         // the user scrolled. Stop contesting entirely -
                         // never re-assert over legitimate user input, and
                         // re-arming from here is now impossible.
+                        if (diagEnabled)
+                        {
+                            Logger.Debug("{0} guard exit reason=user-scroll-detected frame={1} totalFrames={2} observed={3:0.0000} target={4:0.0000} contentHeight={5}",
+                                ScrollDiagTag, ScrollDiagFrame(), totalFrames, current, target, contentHeight);
+                        }
                         return false;
                     }
                     else
@@ -512,6 +635,14 @@ namespace GW2CraftingHelper.Views
                         return true;
                     }
 
+                    if (diagEnabled)
+                    {
+                        Logger.Debug("{0} guard exit reason={1} frame={2} totalFrames={3} target={4:0.0000} contentHeight={5}",
+                            ScrollDiagTag, ScrollDiagFrame(),
+                            totalFrames >= ScrollGuardHardCapFrames ? "hard-cap" : "converged",
+                            totalFrames, target, contentHeight);
+                    }
+
                     return false;
                 }
                 catch (Exception ex)
@@ -520,12 +651,62 @@ namespace GW2CraftingHelper.Views
                     // panel/scrollbar was disposed out from under us - stop
                     // guarding.
                     Logger.Warn(ex, "Scroll guard stopped by exception");
+                    if (diagEnabled)
+                    {
+                        Logger.Debug("{0} guard exit reason=disposed-exception frame={1} totalFrames={2} error={3}",
+                            ScrollDiagTag, ScrollDiagFrame(), totalFrames, ex.GetType().Name);
+                    }
                     return false;
                 }
             }
 
             _scrollGuardTicker?.Cancel();
             _scrollGuardTicker = new FrameTicker(GuardTick);
+        }
+
+        /// <summary>
+        /// M33 C1 (#12 diagnostics): observation-only wheel handler.
+        /// Subscribes to the same MouseWheelScrolled event Blish's own
+        /// Scrollbar subscribes to in its constructor (which runs before
+        /// this handler is ever wired up, since _contentPanel must exist
+        /// first) - so this always observes the scrollbar AFTER Blish's own
+        /// HandleWheelScroll has already run for the same event (tween
+        /// created, not yet applied). Never writes to the scrollbar, never
+        /// influences restore/guard decisions - purely a read-and-log tap.
+        /// The content-height loop below is intentionally a separate,
+        /// isolated copy of the one in Tick/GuardTick rather than a shared
+        /// helper: sharing would mean touching those methods' bodies beyond
+        /// adding log lines, which is out of scope for an instrumentation-
+        /// only change.
+        /// </summary>
+        private void OnScrollDiagWheelScrolled(object sender, MouseEventArgs e)
+        {
+            if (_settings == null || !_settings.ScrollDiagnosticsEnabled.Value)
+            {
+                return;
+            }
+
+            var scrollbar = PanelScrollbarField != null
+                ? PanelScrollbarField.GetValue(_contentPanel) as Scrollbar
+                : null;
+
+            int contentHeight = 0;
+            foreach (var child in _contentPanel.Children)
+            {
+                if (child.Visible && child.Bottom > contentHeight)
+                {
+                    contentHeight = child.Bottom;
+                }
+            }
+
+            int wheelValue = GameService.Input.Mouse.State.ScrollWheelValue;
+            bool restoreLive = _scrollRestoreTicker != null && _scrollRestoreTicker.IsActive;
+            bool guardLive = _scrollGuardTicker != null && _scrollGuardTicker.IsActive;
+
+            Logger.Debug(
+                "{0} wheel frame={1} sign={2} raw={3} scrollDistance={4:0.0000} contentHeight={5} restoreLive={6} guardLive={7}",
+                ScrollDiagTag, ScrollDiagFrame(), System.Math.Sign(wheelValue), wheelValue,
+                scrollbar?.ScrollDistance ?? -1f, contentHeight, restoreLive, guardLive);
         }
 
         private void OnSelectedItemChanged(int itemId)
@@ -674,6 +855,13 @@ namespace GW2CraftingHelper.Views
                 CanScroll = true,
                 Parent = buildPanel
             };
+
+            // M33 C1 (#12 diagnostics): diagnostic-only subscription, gated
+            // inside the handler on ScrollDiagnosticsEnabled. _contentPanel
+            // is a fresh instance every Build() call, so there is nothing
+            // stale to unsubscribe here - the previous cycle's panel (and
+            // its subscription) is discarded with the previous buildPanel.
+            _contentPanel.MouseWheelScrolled += OnScrollDiagWheelScrolled;
 
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
