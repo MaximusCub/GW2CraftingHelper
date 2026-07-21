@@ -20,11 +20,14 @@ namespace GW2CraftingHelper.Services
             // the PARENT level: same as TotalCost for TP buys, but for a
             // comparable vendor offer it also folds in valued non-coin
             // currency lines (see EvaluateVendorOffers), and for a craft it
-            // is the sum of the chosen recipe's ingredient ComparisonValues
-            // (not their TotalCost). Keeping this separate from TotalCost
-            // stops a valued vendor offer's currency value from being
-            // "laundered" away when an ancestor sums child costs to decide
-            // buy vs. craft.
+            // is the sum of the chosen recipe's non-currency ingredient
+            // ComparisonValues PLUS any valued Currency ingredient of that
+            // same recipe (see the currency branch in Evaluate's recipe
+            // loop) - never their TotalCost. Keeping this separate from
+            // TotalCost stops a valued vendor offer's or currency
+            // ingredient's coin-equivalent value from being "laundered"
+            // away when an ancestor sums child costs to decide buy vs.
+            // craft.
             public long? ComparisonValue;
             public int RecipeId;
             public List<CostLine> VendorCurrencyCosts;
@@ -215,6 +218,24 @@ namespace GW2CraftingHelper.Services
                 // craftRealCost sums the same ingredients' REAL TotalCost
                 // (read back from memo, since Evaluate no longer returns it)
                 // and becomes the committed decision's real coin cost.
+                //
+                // EV pricing (Mystic Clover-style fractional MF recipes,
+                // M33 item 7 - CORRECTED): this recipe's ingredient
+                // quantities were already scaled by RecipeService (and kept
+                // in sync by InventoryReducer) using CraftsNeeded =
+                // ceil(quantity / ExpectedOutputCount), i.e. the number of
+                // Mystic Forge ATTEMPTS needed at the recipe's expected
+                // success rate, not the nominal integer output. That means
+                // every ingredient node's Quantity - and therefore its
+                // already-summed cost below - already reflects the full
+                // expected cost of producing enough successes. No further
+                // ratio adjustment happens here: doing so on top of the
+                // pre-scaled quantities would double-amortize the cost and
+                // (per the M33 Critical fix) make this Craft decision's own
+                // TotalCost unreconcilable with the sum of the Buy steps it
+                // recursively spawns. A no-op for every ordinary recipe
+                // either way, since ExpectedOutputCount defaults to
+                // OutputCount there.
                 long craftCost = 0L;
                 long craftRealCost = 0L;
 
@@ -222,6 +243,31 @@ namespace GW2CraftingHelper.Services
                 {
                     if (ingredient.IngredientType == "Currency")
                     {
+                        // Currencies contribute to the craft-vs-buy
+                        // DECISION value only (via a caller-supplied
+                        // per-unit valuation - the same CurrencyValuation
+                        // mechanism EvaluateVendorOffers already uses below
+                        // for vendor currency lines), never to the
+                        // displayed real coin cost - matches r1 sections
+                        // 4.2/4.3: a currency cost can tip a recipe out of
+                        // being the cheapest option, but the plan's gold
+                        // total never invents an exchange rate for it. An
+                        // unvalued currency (the default - no invented
+                        // rate) contributes zero to both, same as before
+                        // this fix.
+                        if (currencyValuation != null &&
+                            currencyValuation.TryGetCopperValue(ingredient.Id, out long copperPerUnit))
+                        {
+                            try
+                            {
+                                craftCost = checked(craftCost + (long)ingredient.Quantity * copperPerUnit);
+                            }
+                            catch (OverflowException)
+                            {
+                                // Absurd valuation input; ignore rather than
+                                // crash or silently misrank the recipe.
+                            }
+                        }
                         continue;
                     }
 
@@ -229,33 +275,6 @@ namespace GW2CraftingHelper.Services
                         ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation);
                     craftCost += ingredientCost ?? 0L;
                     craftRealCost += memo[ingredient.NodeId].TotalCost ?? 0L;
-                }
-
-                // EV pricing (Mystic Clover-style fractional MF recipes,
-                // M33 item 7): amortize this recipe's cost over its
-                // EXPECTED output rather than its nominal integer output,
-                // echoing gw2e's output_item_count=0.31 model (r2 report).
-                // A no-op (ratio 1.0) for every ordinary recipe, where
-                // ExpectedOutputCount defaults to OutputCount. Quantity
-                // propagation (RecipeService's ceil-based crafts-needed)
-                // stays untouched - only this cost figure is adjusted.
-                if (recipe.OutputCount > 0 &&
-                    recipe.ExpectedOutputCount > 0 &&
-                    recipe.ExpectedOutputCount != recipe.OutputCount)
-                {
-                    double evRatio = recipe.ExpectedOutputCount / recipe.OutputCount;
-                    try
-                    {
-                        craftCost = checked((long)Math.Ceiling(craftCost / evRatio));
-                        craftRealCost = checked((long)Math.Ceiling(craftRealCost / evRatio));
-                    }
-                    catch (OverflowException)
-                    {
-                        // An absurdly small ExpectedOutputCount (bad seed
-                        // data) could blow past long range; fall back to
-                        // the un-adjusted cost rather than crash the whole
-                        // solve or silently wrap to a garbage value.
-                    }
                 }
 
                 // Cost tie-break: lowest RecipeId, so the choice is

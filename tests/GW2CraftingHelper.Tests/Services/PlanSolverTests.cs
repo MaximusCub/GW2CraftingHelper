@@ -474,23 +474,70 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, plan.TotalCoinCost);
         }
 
-        // --- Mystic Clover-style EV pricing tests (M33 spec item 7) ---
+        // --- Mystic Clover-style EV pricing tests (M33 spec item 7,
+        // CORRECTED per the M33 fix-pass Critical finding: quantity
+        // propagation - not a second cost adjustment inside PlanSolver -
+        // is where ExpectedOutputCount now takes effect. RecipeService (and
+        // InventoryReducer, when a snapshot is present) compute
+        // CraftsNeeded = ceil(quantity / ExpectedOutputCount) and scale
+        // every ingredient's Quantity by that many attempts BEFORE the tree
+        // ever reaches PlanSolver. By the time Evaluate sees an EV recipe's
+        // ingredients, their quantities already reflect the full expected
+        // cost - PlanSolver must simply sum them, never amortize again.) ---
 
         [Fact]
-        public void FractionalExpectedOutput_AmortizesCraftCost_FlipsDecisionToBuy()
+        public void FractionalExpectedOutput_PreScaledIngredients_CraftCostReconcilesWithBuySteps()
         {
-            // Raw ingredient cost = 100 (1x item 2 @ 100). Nominal
-            // OutputCount=1 but ExpectedOutputCount=0.5 (Mystic
-            // Clover-style EV) means the true cost is amortized:
-            // 100 / 0.5 = 200 - which now loses to the 150 buy price (the
-            // raw, un-adjusted 100 would have won craft outright).
+            // Simulates what RecipeService now produces for a Mystic
+            // Clover-style recipe: needing 1 successful output at EV=0.5
+            // means ceil(1/0.5)=2 forge attempts, so the (1-per-attempt)
+            // ingredient already carries Quantity=2 by the time it reaches
+            // PlanSolver - NOT Quantity=1 with a solver-side /0.5 fixup.
             var evOption = new RecipeOption
             {
                 RecipeId = 10,
                 OutputCount = 1,
                 ExpectedOutputCount = 0.5,
-                CraftsNeeded = 1,
-                Ingredients = new List<RecipeNode> { Leaf(2, 1) }
+                CraftsNeeded = 2,
+                Ingredients = new List<RecipeNode> { Leaf(2, 2) }
+            };
+            var tree = Craftable(1, 1, evOption);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices).Plan;
+
+            var craftStep = plan.Steps.Single(s => s.Source == AcquisitionSource.Craft);
+            var buyStep = plan.Steps.Single(s => s.Source == AcquisitionSource.BuyFromTp);
+
+            // 2 units of item 2 @ 100 = 200 - PlanSolver must NOT divide
+            // this by the EV ratio again (that would double-amortize to
+            // 400). The Craft step's own TotalCost must reconcile EXACTLY
+            // with the Buy step(s) it recursively spawns - the M33 Critical
+            // finding's "two different coin figures for the same subtree"
+            // bug is fixed when this holds.
+            Assert.Equal(200, buyStep.TotalCost);
+            Assert.Equal(200, craftStep.TotalCost);
+            Assert.Equal(craftStep.TotalCost, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void FractionalExpectedOutput_PreScaledIngredients_StillLosesToCheaperBuy()
+        {
+            // Same pre-scaled tree (2 units of item 2 @ 100 = 200 real
+            // cost), but the item's own buy price (150) is now cheaper than
+            // the (correctly, non-amortized) craft cost - buy must win.
+            var evOption = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                ExpectedOutputCount = 0.5,
+                CraftsNeeded = 2,
+                Ingredients = new List<RecipeNode> { Leaf(2, 2) }
             };
             var tree = Craftable(1, 1, evOption);
             var prices = new Dictionary<int, ItemPrice>
@@ -504,40 +551,6 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(AcquisitionSource.BuyFromTp, result.Decisions[0].Source);
             Assert.Equal(150, result.Plan.TotalCoinCost);
-        }
-
-        [Fact]
-        public void FractionalExpectedOutput_CraftStillWinsWhenExpectedCostCheaper()
-        {
-            var evOption = new RecipeOption
-            {
-                RecipeId = 10,
-                OutputCount = 1,
-                ExpectedOutputCount = 0.5,
-                CraftsNeeded = 1,
-                Ingredients = new List<RecipeNode> { Leaf(2, 1) }
-            };
-            var tree = Craftable(1, 1, evOption);
-            var prices = new Dictionary<int, ItemPrice>
-            {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
-            };
-            var solver = new PlanSolver();
-
-            var plan = solver.Solve(tree, prices).Plan;
-
-            var craftStep = plan.Steps.Single(s => s.Source == AcquisitionSource.Craft);
-            Assert.Equal(1, craftStep.ItemId);
-            // 100 (raw ingredient cost) / 0.5 (EV ratio) = 200 - the real
-            // committed coin cost is EV-adjusted too, not just the
-            // comparison value used to pick the winner. plan.TotalCoinCost
-            // stays 100 (only BuyFromTp/BuyFromVendor steps are summed
-            // into it - item 2's 100 - matching the pre-existing
-            // no-double-counting design; the Craft step's own 200 is a
-            // derived total, not additional coin spent).
-            Assert.Equal(200, craftStep.TotalCost);
-            Assert.Equal(100, plan.TotalCoinCost);
         }
 
         [Fact]
@@ -560,31 +573,110 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, craftStep.TotalCost);
         }
 
+        // --- Currency-ingredient decision valuation (M33 fix-pass MustFix:
+        // a recipe's Currency-type ingredient must feed the craft-vs-buy
+        // DECISION value via a caller-supplied valuation, while always
+        // contributing zero to the displayed real coin cost - r1 4.2/4.3) ---
+
         [Fact]
-        public void FractionalExpectedOutput_AbsurdlyTinyValue_OverflowFallsBackGracefully()
+        public void CurrencyIngredient_ValuedAndExpensive_TipsDecisionToBuy()
         {
-            // A corrupt/malicious seed could set an ExpectedOutputCount so
-            // small that dividing by it overflows long - must fall back to
-            // the un-adjusted cost rather than crash the whole solve or
-            // silently wrap to a garbage (possibly negative) total.
+            // Craft option: 1x item2(@50)=50 real coin + 3x currency 23
+            // (spirit shard) valued at 3600 copper/unit by the caller for
+            // COMPARISON only = 10800. Comparison total 10850 loses to the
+            // 200 buy price, even though the real coin ingredient (50)
+            // looks cheap in isolation.
             var evOption = new RecipeOption
             {
                 RecipeId = 10,
                 OutputCount = 1,
-                ExpectedOutputCount = 1e-15,
                 CraftsNeeded = 1,
-                Ingredients = new List<RecipeNode> { Leaf(2, 1) }
+                Ingredients = new List<RecipeNode>
+                {
+                    Leaf(2, 1),
+                    Leaf(23, 3, "Currency")
+                }
             };
             var tree = Craftable(1, 1, evOption);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 23, 3600 } });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, null, valuation).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(200, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void CurrencyIngredient_ValuedButCraftStillWins_RealCostExcludesCurrencyValue()
+        {
+            // Currency valuation (10 copper x 3 = 30) is small enough that
+            // craft still wins overall, but the COMMITTED real coin cost
+            // must be just the coin ingredient (50) - never inflated by the
+            // currency's decision-only valuation.
+            var evOption = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                CraftsNeeded = 1,
+                Ingredients = new List<RecipeNode>
+                {
+                    Leaf(2, 1),
+                    Leaf(23, 3, "Currency")
+                }
+            };
+            var tree = Craftable(1, 1, evOption);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 23, 10 } });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, null, valuation).Plan;
+
+            var craftStep = plan.Steps.Single(s => s.Source == AcquisitionSource.Craft);
+            Assert.Equal(50, craftStep.TotalCost);
+        }
+
+        [Fact]
+        public void CurrencyIngredient_Unvalued_ContributesZeroToDecisionAndCost()
+        {
+            // No CurrencyValuation supplied (null -> CurrencyValuation.None
+            // internally): the currency ingredient must be inert - same
+            // behavior as before this fix, never inventing an exchange
+            // rate. Craft (50 real coin, decision value 50) beats the 1000
+            // buy price regardless of the unvalued 3-unit currency cost.
+            var evOption = new RecipeOption
+            {
+                RecipeId = 10,
+                OutputCount = 1,
+                CraftsNeeded = 1,
+                Ingredients = new List<RecipeNode>
+                {
+                    Leaf(2, 1),
+                    Leaf(23, 3, "Currency")
+                }
+            };
+            var tree = Craftable(1, 1, evOption);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
             };
             var solver = new PlanSolver();
 
-            var exception = Record.Exception(() => solver.Solve(tree, prices));
+            var plan = solver.Solve(tree, prices).Plan;
 
-            Assert.Null(exception);
+            var craftStep = plan.Steps.Single(s => s.Source == AcquisitionSource.Craft);
+            Assert.Equal(50, craftStep.TotalCost);
         }
 
         // --- VendorCurrencyCosts threading tests (M33 spec item 5) ---
