@@ -154,7 +154,7 @@ module ECHO that behavior rather than inventing an approach. New
 dev-time seeders (vendor pricing, Mystic Forge recipes) are welcome;
 they must write static seed JSON, never scrape at runtime.
 
-## 12. Fast wheel-up scroll: net-downward stutter (FIXED in M33, live-verified)
+## 12. Fast wheel-up scroll: net-downward stutter (FIXED in M33, live-verified; REOPENED 2026-07-21, root-caused and fixed in M36)
 Rapid successive wheel-up events make the viewport scroll up then jump
 back down further than it went up - net downward movement with an
 upward stutter. Hypothesis: scroll guard/restore machinery (or some
@@ -187,7 +187,11 @@ burst then descended monotonically to exactly 0.0000 and stayed there
 - no zero-reassert bounce at top. Idle fast bursts remain clean.
 (Note: Blish's own per-frame wheel coalescing still drops ~40% of
 notches in very fast bursts - stock library behavior, scrolls shorter
-than intended but never backwards.)
+than intended but never backwards. SUPERSEDED 2026-07-21: that
+"never backwards" characterization held for the specific burst captured
+in this 2026-07-20 session but is not the general case - see the
+REOPENED record below for a real vendor bug that does make specific
+coalesced multi-notch up-bursts scroll backwards, not just shorter.)
 (M33 fix-pass note: an earlier revision of this fix also suppressed the
 zero-reassert contest whenever a wheel event had landed within the last
 250ms of wall clock, intending to protect a user who "just wheeled to
@@ -199,7 +203,82 @@ reintroducing the #14 top-jump. The genuine "wheeled to exactly top"
 case never reaches the verify window at all: PreserveScrollAcross skips
 the restore/verify entirely when the saved offset is already 0.)
 
-## 13. Resize UX rework: live reflow, no settle stutter (FIXED in M33, live-verified end-state; drag-tick perf unmeasured)
+REOPENED 2026-07-21 (live user report, after the M33 machinery-side fixes
+above and the intervening M34/M35 milestones): the user reported the
+original symptom again - fast wheel-up flicks still net downward. An
+instrumented [scrolldiag] capture of the user's own physical mouse over
+the live Blish-on-Paint session EXONERATED the M33 restore/verify
+machinery itself: zero writer interference (no SyncRestore/Verify/
+ResizePreserve writes) anywhere near the wheel events in question - the
+machinery this milestone's fixes targeted was never the cause of the
+reopened report. The trace instead revealed a real bug in the vendored
+library: fast multi-notch wheel-UP flicks arrive at the content panel's
+MouseWheelScrolled with corrupted raw deltas, exactly (N*120) - 65536 for
+the coalesced up-notch count N=2..8 (measured histogram: N=2 -> -65296,
+N=3 -> -65176, N=4 -> -65056, N=5 -> -64936, N=6 -> -64816, N=7 -> -64696,
+N=8 -> -64576; 47 occurrences), and Blish's own Scrollbar scrolls ONE STEP
+DOWN for each such event (it looks only at Math.Sign of the corrupted,
+negative-looking delta, never the magnitude). Fast multi-notch DOWN
+flicks coalesce cleanly (-240..-840, no corruption); single notches both
+directions are clean. Net effect: every fast pair of up-notches produced
+a down-step, reproducing the original report exactly.
+
+ROOT CAUSE (confirmed by decompiling the shipped BlishHUD v1.3.0 "Blish
+HUD.exe" with ilspycmd, cross-checked against a clone of the matching
+public source): Blish_HUD.Input.MouseEventArgs.WheelDelta extracts a
+Win32 low-level mouse hook's signed 16-bit wheel delta as unsigned, then
+tries to recover the sign by subtracting 65536 whenever the unsigned
+value exceeds SystemInformation.MouseWheelScrollDelta (120) - a threshold
+that only correctly discriminates a SINGLE notch's two directions. A
+coalesced 2+ up-notch event (unsigned 240, 360, ...) is well above 120
+and gets "corrected" anyway even though it was never actually a wrapped
+negative value, turning e.g. a legitimate +240 into 240 - 65536 = -65296.
+See Services/WheelDeltaSanitizer.cs's class doc comment for the full
+derivation, including why single notches and coalesced down-flicks are
+unaffected.
+VERDICT - NOT DebugHelper-only: both Blish_HUD.Input.WinApiMouseHookManager
+(the normal path used when directly attached to a running, focused GW2
+client) and DebugHelperMouseHookManager (used under this dev machine's
+dummy-window mode) construct MouseEventArgs from the identical raw
+mouseData field and feed it through the SAME buggy WheelDelta getter -
+InputService's ApplicationSettings.Instance.DebugEnabled only chooses
+which hook manager supplies that field, not how it gets interpreted. A
+real GW2-attached player fast-flicking the wheel upward is exposed to the
+identical corruption; this is not a dummy-window/dev-tooling artifact.
+
+Fixed module-side (M36) via a new Services/WheelDeltaSanitizer.cs (pure,
+Blish-free, exhaustively unit-tested against the full histogram above
+plus boundary values) that classifies a raw delta as wrapped-positive
+whenever raw <= -60000 (a threshold with a wide safety margin from every
+plausible genuine delta - see the class doc comment for the derivation)
+and recovers the intended positive delta. CraftingPlanView's
+OnContentWheelObserved (already unconditionally subscribed to
+_contentPanel.MouseWheelScrolled since M33 C2a) now, on a wrapped event,
+cancels Blish's own not-yet-applied single-step-down Glide tween
+(GameService.Animation.Tweener.TargetCancel - the tween exists but has
+not yet written ScrollDistance at the point this handler runs, since
+Blish's own Scrollbar is subscribed before this handler) before it can
+land, then writes the position N clean up-notches would have produced
+instead, computed in the same pixel space Blish's own per-notch step
+operates in (new ScrollMath.ApplyPixelDelta) so a corrected fast flick
+composes exactly like N clean single notches rather than a differently-
+scaled jump. [scrolldiag] gated logging (writer=WheelWrapFix) records
+every correction (rawIn, intendedDelta, before, after); the sanitizer
+classification itself is unconditional and zero-allocation.
+VERIFICATION STATE: root cause confirmed against the live 2026-07-21
+instrumented user trace and independently cross-verified by decompiling
+the shipped BlishHUD v1.3.0 binary (Blish_HUD.Input.MouseEventArgs.
+WheelDelta, Blish_HUD.Controls.Scrollbar.HandleWheelScroll/ScrollAnimated,
+Blish_HUD.InputService's hook-manager selection). Fix confirmed by a
+green build and the full Blish-free unit test suite (WheelDeltaSanitizer-
+Tests covers the entire measured histogram plus boundary values;
+ScrollMathTests covers the new pixel-delta arithmetic, including that a
+single multi-notch correction composes identically to N single-notch
+steps). NOT yet re-verified live by the user - a fresh instrumented
+capture of a fast wheel-up flick under this fix is the honest next step
+before this item can be marked live-verified again.
+
+## 13. Resize UX rework: live reflow, no settle stutter (FIXED in M33, live-verified end-state; drag-tick perf live-verified 2026-07-21)
 The 150ms debounce-only approach is REJECTED by user feedback: content
 must reflow smoothly WHILE dragging, not lag until the mouse holds
 still. Additionally the settle rebuild itself is visibly ugly: stray
@@ -250,17 +329,21 @@ content): a synthetic grip drag resized the window and the end-state
 layout was fully correct at both the narrower and re-widened widths
 (header centering, right-anchored cost columns, pills, buttons), with
 zero scrollbar writes during width reflow and label ellipsis correctly
-restored at settle. NOT yet measured live: per-tick smoothness/cost on
-a fully-EXPANDED tree. In particular, ReplayRelayout now replays the full relayout
-closure registry synchronously on every real drag frame (previously:
-once, 150ms after the drag settled) - a genuine change in perf
-character. The SuspendLayout/ResumeLayout batching is a real,
-reasoned mitigation (see ReplayRelayout's doc comment), but its
-wall-clock cost per drag tick on a large plan has not been measured
-against a live running Blish instance. If a user reports stutter/lag
-while dragging the window edge on a large plan, treat it as this
-still-open measurement gap, not a regression to re-diagnose from
-scratch.
+restored at settle. In particular, ReplayRelayout replays the full
+relayout closure registry synchronously on every real drag frame
+(previously: once, 150ms after the drag settled) - a genuine change in
+perf character versus the pre-M33 debounce-only approach. The
+SuspendLayout/ResumeLayout batching is a real, reasoned mitigation (see
+ReplayRelayout's doc comment).
+LIVE-VERIFIED 2026-07-21: the user confirmed the live drag feel is
+smooth ("genuinely works well") across a drag session on a ~9,400px
+multi-item plan (Exordium + Gift of Fortune) that replayed the relayout
+registry 435+ ticks over the course of the drag, with no felt lag or
+stutter on real hardware. This closes the drag-tick perf caveat by
+direct user experience rather than by profiling - no profiler numbers
+were captured, so a future report of stutter on a much larger plan or a
+lower-end machine should still be taken seriously and re-measured
+properly rather than dismissed against this note.
 
 ## 14. Pill-click viewport flash (jump to top and back) (FIXED in M33, live-verified)
 Clicking a TP/VENDOR override pill visibly flashes the view to the top
@@ -422,17 +505,22 @@ it disposes and recreates the very content the pending verify would
 otherwise be measured against.
 VERIFICATION STATE: confirmed by construction against the decompiled
 vendor Scrollbar/Panel source and the existing ScrollMath unit coverage,
-plus a green build and full test suite. Not re-confirmed by a live
-in-game drag-resize check (screenshot loop) after this specific fix -
-treat a fresh scroll-reset-on-height-drag report as reopening this item
-rather than assuming it is the same M33 C2b regression recurring.
+plus a green build and full test suite. LIVE-VERIFIED 2026-07-21 by the
+user's own manual resize drags with ScrollDiagnosticsEnabled: 435
+writer=ResizePreserve writes captured; on every height-changing tick the
+vendor's own reset zeroed the bar (before=0.0000) and ResizePreserve
+synchronously re-applied the constant absolute pixel offset
+(savedOffset=1529 held across newHeight 678->794, with the ratio
+adapting 0.1758->0.1782 as the viewport height changed) - drag-settle
+verify exited reason=stable at realFrame=1.
 (2026-07-20 desktop session note: six synthetic grip-drag attempts
 across two fresh launches failed to re-catch the TabbedWindow2 resize
 grip after this fix landed - the one successful synthetic catch of the
-session predates the fix - so the pending live check needs a human
-drag. The primitives the fix reuses - pixel-offset capture,
-ScrollMath.RatioForOffset, synchronous write, StartScrollVerify - are
-each live-verified under item #14's captures.)
+session predates the fix, which is why the live check above needed a
+human drag rather than the screenshot-loop's synthetic input. The
+primitives the fix reuses - pixel-offset capture, ScrollMath.
+RatioForOffset, synchronous write, StartScrollVerify - are each
+live-verified under item #14's captures.)
 
 ## 20. M34: gw2efficiency owned-materials parity + correctness fixes
 
