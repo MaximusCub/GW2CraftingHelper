@@ -466,5 +466,233 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(CraftingDecision.BuyFromTp, batch.MultiItemRoots[0].Decision);
             Assert.Equal(CraftingDecision.Craft, batch.MultiItemRoots[1].Decision);
         }
+
+        /// <summary>
+        /// Fix pass (M35 review): every prior multi-item test passed
+        /// snapshot=null, so InventoryReducer.Reduce's shared consumption
+        /// pool (created once per GenerateStructuredMultiAsync call and
+        /// walked depth-first through the wrapper's N item-root
+        /// ingredients in request order - see InventoryReducer.ReduceNode's
+        /// own doc comment) was never exercised across two roots.
+        ///
+        /// Two items (800, 801) each need 3 of the SAME owned raw material
+        /// (900); the account owns 4. Root 800 is walked first (request
+        /// order) and fully satisfies its need of 3, draining the shared
+        /// pool to 1 remaining unit BEFORE root 801 is ever reduced. Root
+        /// 801 then only finds 1 unit left and must buy the other 2.
+        ///
+        /// This is the behavior that distinguishes a genuinely SHARED pool
+        /// from a bug where each root were (incorrectly) reduced against
+        /// its own fresh copy of the ownership index: in that buggy
+        /// scenario both roots would independently see all 4 owned units
+        /// and neither would need to buy anything (0 total purchases)
+        /// instead of the 2 asserted below.
+        /// </summary>
+        [Fact]
+        public async Task GenerateStructuredAsync_MultiItem_WithSnapshot_SharedOwnedRawMaterial_PoolDrainsAcrossRootsInRequestOrder()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(800, 810);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 810,
+                OutputItemId = 800,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 900, Count = 3 }
+                }
+            });
+            recipeApi.AddSearchResult(801, 811);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 811,
+                OutputItemId = 801,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 900, Count = 3 }
+                }
+            });
+
+            // No TP price for 800/801 (force-craft, they have a recipe).
+            // Shared material 900 is TP-buyable: InstantBuy cost per unit
+            // is driven by the raw sellUnitPrice param (see
+            // CraftingPlanPipelineTests.BuildForceBuyPipeline's own doc
+            // comment on this InMemoryPriceApiClient/TradingPostService
+            // mapping) - 10 coin per unit here.
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(900, buyUnitPrice: 1, sellUnitPrice: 10);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(800, "Item G", "g.png");
+            itemApi.AddItem(801, "Item H", "h.png");
+            itemApi.AddItem(900, "Shared Owned Material", "m.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var snapshot = new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry { ItemId = 900, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
+                }
+            };
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 800, Quantity = 1 },
+                new PlanRequestItem { ItemId = 801, Quantity = 1 }
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(
+                items, snapshot, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            // Both crafts still present (no TP price of their own).
+            Assert.Contains(result.Plan.Steps, s => s.ItemId == 800 && s.Source == AcquisitionSource.Craft);
+            Assert.Contains(result.Plan.Steps, s => s.ItemId == 801 && s.Source == AcquisitionSource.Craft);
+
+            // Only 2 of the 6 total needed units of 900 are bought - the
+            // other 4 came from the shared pool (3 to root 800, 1 to root
+            // 801), proving the pool is shared and drained in request
+            // order rather than re-initialized per root.
+            var buyStep = Assert.Single(
+                result.Plan.Steps.Where(s => s.ItemId == 900 && s.Source == AcquisitionSource.BuyFromTp));
+            Assert.Equal(2, buyStep.Quantity);
+            Assert.Equal(20, buyStep.TotalCost);
+            Assert.Equal(20, result.Plan.TotalCoinCost);
+
+            // All 4 owned units were consumed (aggregated across both
+            // roots into a single UsedMaterials entry, per-item-id).
+            var used = Assert.Single(result.UsedMaterials.Where(u => u.ItemId == 900));
+            Assert.Equal(4, used.QuantityUsed);
+        }
+
+        /// <summary>
+        /// Fix pass (M35 review): no multi-item test exercised the M34-B2a
+        /// #3 "Value Own Materials" force-buy pre-pass
+        /// (OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds),
+        /// which only runs when OwnMaterialsMode.Valued AND a non-null
+        /// snapshot are both supplied - the gate every prior multi-item
+        /// test's snapshot=null call skipped entirely.
+        ///
+        /// Two INDEPENDENT roots (900 and 902, sharing no ingredients) are
+        /// each shaped exactly like
+        /// CraftingPlanPipelineTests.BuildForceBuyPipeline's single-item
+        /// scenario: owning 4 of the 5 needed ingredient collapses the
+        /// POST-reduction craft cost below the fresh buy price, so without
+        /// the force-buy pre-pass's zero-owned baseline each root would
+        /// wrongly flip to Craft. Asserting the batch result against the
+        /// two standalone single-item Valued-mode solves (using the same
+        /// snapshot) proves the pre-pass, computed against the UNREDUCED
+        /// wrapper tree, still applies per-root inside the wrapper.
+        /// </summary>
+        [Fact]
+        public async Task GenerateStructuredAsync_MultiItem_ValuedMode_ForceBuyPrePass_MatchesStandaloneResultsPerRoot()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(900, 910);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 910,
+                OutputItemId = 900,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 901, Count = 5 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+            recipeApi.AddSearchResult(902, 920);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 920,
+                OutputItemId = 902,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 903, Count = 5 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            // Same InstantBuy pricing shape as BuildForceBuyPipeline: fresh
+            // buy(100) < craft(5x30=150) beats craft on a zero-owned
+            // baseline for BOTH roots.
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(900, buyUnitPrice: 1000, sellUnitPrice: 100);
+            priceApi.AddPrice(901, buyUnitPrice: 300, sellUnitPrice: 30);
+            priceApi.AddPrice(902, buyUnitPrice: 1000, sellUnitPrice: 100);
+            priceApi.AddPrice(903, buyUnitPrice: 300, sellUnitPrice: 30);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(900, "Item I", "i.png");
+            itemApi.AddItem(901, "Ingredient I", "ii.png");
+            itemApi.AddItem(902, "Item J", "j.png");
+            itemApi.AddItem(903, "Ingredient J", "ij.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            // Own 4 of each root's own (unshared) ingredient.
+            var snapshot = new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry { ItemId = 901, Count = 4, Source = AccountItemIndex.SourceMaterialStorage },
+                    new SnapshotItemEntry { ItemId = 903, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
+                }
+            };
+
+            var standaloneA = await pipeline.GenerateStructuredAsync(
+                900, 1, snapshot, CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued, priceBasis: PriceBasis.InstantBuy);
+            var standaloneB = await pipeline.GenerateStructuredAsync(
+                902, 1, snapshot, CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued, priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, standaloneA.CraftingTree.Decision);
+            Assert.Equal(CraftingDecision.BuyFromTp, standaloneB.CraftingTree.Decision);
+            Assert.Equal(100, standaloneA.Plan.TotalCoinCost);
+            Assert.Equal(100, standaloneB.Plan.TotalCoinCost);
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 900, Quantity = 1 },
+                new PlanRequestItem { ItemId = 902, Quantity = 1 }
+            };
+
+            var batch = await pipeline.GenerateStructuredAsync(
+                items, snapshot, CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued, priceBasis: PriceBasis.InstantBuy);
+
+            // Batch result equals the two standalone results combined: both
+            // roots still buy (the pre-pass's zero-owned baseline held per
+            // root inside the wrapper), and the merged total is exactly
+            // their sum since the two ingredient items (901, 903) share
+            // nothing.
+            Assert.Equal(CraftingDecision.BuyFromTp, batch.MultiItemRoots[0].Decision);
+            Assert.Equal(CraftingDecision.BuyFromTp, batch.MultiItemRoots[1].Decision);
+            Assert.Equal(standaloneA.Plan.TotalCoinCost + standaloneB.Plan.TotalCoinCost, batch.Plan.TotalCoinCost);
+            Assert.Equal(200, batch.Plan.TotalCoinCost);
+            Assert.Contains(batch.Plan.Steps, s => s.ItemId == 900 && s.Source == AcquisitionSource.BuyFromTp);
+            Assert.Contains(batch.Plan.Steps, s => s.ItemId == 902 && s.Source == AcquisitionSource.BuyFromTp);
+            // The now-unneeded craft ingredients never surface as steps.
+            Assert.DoesNotContain(batch.Plan.Steps, s => s.ItemId == 901);
+            Assert.DoesNotContain(batch.Plan.Steps, s => s.ItemId == 903);
+        }
     }
 }
