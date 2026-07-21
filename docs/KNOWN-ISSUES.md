@@ -248,16 +248,15 @@ identical corruption; this is not a dummy-window/dev-tooling artifact.
 
 Fixed module-side (M36) via a new Services/WheelDeltaSanitizer.cs (pure,
 Blish-free, exhaustively unit-tested against the full histogram above
-plus boundary values) that classifies a raw delta as wrapped-positive
-whenever raw <= -60000 (a threshold with a wide safety margin from every
-plausible genuine delta - see the class doc comment for the derivation)
-and recovers the intended positive delta. CraftingPlanView's
-OnContentWheelObserved (already unconditionally subscribed to
-_contentPanel.MouseWheelScrolled since M33 C2a) now, on a wrapped event,
-cancels Blish's own not-yet-applied single-step-down Glide tween
-(GameService.Animation.Tweener.TargetCancel - the tween exists but has
-not yet written ScrollDistance at the point this handler runs, since
-Blish's own Scrollbar is subscribed before this handler) before it can
+plus boundary values, including lattice-edge tests at the documented
+N=46/N=47 threshold boundary) that classifies a raw delta as
+wrapped-positive whenever raw <= -60000 (a threshold with a wide safety
+margin from every plausible genuine delta - see the class doc comment
+for the derivation) and recovers the intended positive delta.
+CraftingPlanView's OnContentWheelObserved (already unconditionally
+subscribed to _contentPanel.MouseWheelScrolled since M33 C2a) now, on a
+wrapped event, cancels Blish's own not-yet-applied single-step-down
+Glide tween (GameService.Animation.Tweener.TargetCancel) before it can
 land, then writes the position N clean up-notches would have produced
 instead, computed in the same pixel space Blish's own per-notch step
 operates in (new ScrollMath.ApplyPixelDelta) so a corrected fast flick
@@ -265,18 +264,56 @@ composes exactly like N clean single notches rather than a differently-
 scaled jump. [scrolldiag] gated logging (writer=WheelWrapFix) records
 every correction (rawIn, intendedDelta, before, after); the sanitizer
 classification itself is unconditional and zero-allocation.
+
+MECHANISM (M36 fix-pass, re-verified against decompiled Glide rather
+than assumed): a review of this fix theorized TargetCancel was a no-op
+here, on the premise that Glide defers a new Tween's by-target
+dictionary registration to the NEXT Tweener.Update() call - decompiling
+Glide.Tween.TweenerImpl.Tween<T>() from the shipped Blish HUD.exe
+disproved that premise: Tween<T>() enqueues the new tween to its
+private toAdd queue AND calls its own AddAndRemove() synchronously,
+before returning - registering the tween in the by-target
+ConcurrentDictionary in the SAME call, not deferred. So by the time this
+handler runs (subscribed after Blish's own Scrollbar, confirmed by
+construction - _contentPanel's Scrollbar is created via its CanScroll
+property setter inside the same object-initializer statement that
+constructs _contentPanel, strictly before this view's own
+MouseWheelScrolled subscription line runs), Blish's wrong tween is
+already registered, and TargetCancel finds and neutralizes it
+synchronously (Tween.Cancel nulls its var/lerper slot, so even an
+Update() before its removal from the list skips writing ScrollDistance
+entirely) - not "canceled a frame late". The cancel-then-direct-write
+shape is therefore kept as-is rather than replaced with a counter-tween
+or a one-frame-deferred correction (both considered and rejected - see
+CraftingPlanView.ApplyWheelWrapCorrection's own doc comment for the full
+decompiled-evidence walkthrough). A bounded, one-shot defensive
+re-assert (StartWheelWrapVerify: at most 2 real frames, re-asserts once
+if ScrollDistance has drifted from the corrected target and no newer
+wheel event has landed, [scrolldiag] writer=WheelWrapFix/reassert) was
+added regardless, as insurance against a future Blish/Glide vendor
+change - not because this mechanism is expected to fail.
+Also fixed in the same pass: MouseWheelScrollLines == -1 (Windows' "one
+screen at a time" setting) would otherwise flip this correction's sign;
+WheelDeltaSanitizer.SanitizeScrollLines substitutes Windows' documented
+default of 3 lines whenever the OS-reported value is not a usable
+positive count (Blish's own HandleWheelScroll has the identical defect
+under that setting and cannot be fixed here, so direction-correctness is
+chosen over exact step-size parity for that one OS setting value).
+
 VERIFICATION STATE: root cause confirmed against the live 2026-07-21
 instrumented user trace and independently cross-verified by decompiling
 the shipped BlishHUD v1.3.0 binary (Blish_HUD.Input.MouseEventArgs.
 WheelDelta, Blish_HUD.Controls.Scrollbar.HandleWheelScroll/ScrollAnimated,
-Blish_HUD.InputService's hook-manager selection). Fix confirmed by a
-green build and the full Blish-free unit test suite (WheelDeltaSanitizer-
-Tests covers the entire measured histogram plus boundary values;
-ScrollMathTests covers the new pixel-delta arithmetic, including that a
-single multi-notch correction composes identically to N single-notch
-steps). NOT yet re-verified live by the user - a fresh instrumented
-capture of a fast wheel-up flick under this fix is the honest next step
-before this item can be marked live-verified again.
+Blish_HUD.InputService's hook-manager selection, and - this fix-pass -
+Glide.Tween.TweenerImpl.Tween<T>()/AddAndRemove() for the TargetCancel
+timing question above). Fix confirmed by a green build and the full
+Blish-free unit test suite (WheelDeltaSanitizerTests covers the entire
+measured histogram, boundary values, the N=46/N=47 lattice edge, and
+SanitizeScrollLines; ScrollMathTests covers the pixel-delta arithmetic,
+including that a single multi-notch correction composes identically to N
+single-notch steps). NOT yet re-verified live by the user - a fresh
+instrumented capture of a fast wheel-up flick under this fix is the
+honest next step before this item can be marked live-verified again.
 
 ## 13. Resize UX rework: live reflow, no settle stutter (FIXED in M33, live-verified end-state; drag-tick perf live-verified 2026-07-21)
 The 150ms debounce-only approach is REJECTED by user feedback: content
@@ -338,12 +375,15 @@ ReplayRelayout's doc comment).
 LIVE-VERIFIED 2026-07-21: the user confirmed the live drag feel is
 smooth ("genuinely works well") across a drag session on a ~9,400px
 multi-item plan (Exordium + Gift of Fortune) that replayed the relayout
-registry 435+ ticks over the course of the drag, with no felt lag or
-stutter on real hardware. This closes the drag-tick perf caveat by
-direct user experience rather than by profiling - no profiler numbers
-were captured, so a future report of stutter on a much larger plan or a
-lower-end machine should still be taken seriously and re-measured
-properly rather than dismissed against this note.
+registry 435 ticks over the course of the drag (M36 fix-pass, NICETOHAVE
+a: this is the exact same drag-session capture #19's "435
+writer=ResizePreserve writes" count below comes from - one drag, one
+relayout-registry-replay-per-tick mechanism, counted from two angles),
+with no felt lag or stutter on real hardware. This closes the drag-tick
+perf caveat by direct user experience rather than by profiling - no
+profiler numbers were captured, so a future report of stutter on a much
+larger plan or a lower-end machine should still be taken seriously and
+re-measured properly rather than dismissed against this note.
 
 ## 14. Pill-click viewport flash (jump to top and back) (FIXED in M33, live-verified)
 Clicking a TP/VENDOR override pill visibly flashes the view to the top
@@ -950,14 +990,37 @@ exactly fill rowHeight with no overlap. NOT touched: the two existing
 wide enough), the transparent multi-root rootDivider (M35, a 12px gap
 panel, not a hairline), and the Recipe Tree (uses indent guidelines
 instead of row dividers by design - no change applicable).
+
+CORRECTION (M36 fix-pass): the verification note below originally
+claimed "the rest had several pixels of existing headroom" for every row
+type not listed above. That was wrong for the Required Recipes section's
+no-sublabel row: RecipeRowHeightNoSublabel (32) plus its 34px icon frame
+at y=1 already overflowed the row by 3px BEFORE this divider change
+(icon bottom = 35 against a 32px row), and the divider width increase
+made the shortfall 1px worse (34 + 2 = 36 needed, only 32 available) - a
+real, pre-existing overflow this fix's own verification pass missed, not
+a case with headroom to spare. Fixed as its own item this same
+fix-pass: RecipeRowHeightNoSublabel raised to 36 (icon y nudged to 0,
+exact fit, mirroring the Used Materials/Shopping List pattern above) -
+see PlanContentHeightMath.RecipeRowHeightNoSublabel and
+CraftingPlanView.CreateRecipeRow.
+
 VERIFICATION STATE: code-verified - the 0.897 scale factor and the GPU
 matrix mechanism were confirmed against a decompile of the shipped
 BlishHUD v1.3.0 binary (GraphicsService.GetScaleRatio /
 UIScaleTransform); the row/header geometry changes were verified by
 reading every affected call site to confirm rowHeight/headerPanel
-containment and check for icon/label crowding (only the two rows noted
-above needed a coherent adjustment; the rest had several pixels of
-existing headroom). Build and full test suite green. Live user visual
+containment and check for icon/label crowding (the Required Recipes
+no-sublabel row needed a coherent adjustment per the correction above,
+in addition to the two rows originally noted; every other row type has
+several pixels of genuine existing headroom, re-checked this pass). The
+header divider's own clearance (Location.Y = 28 inside the 30px
+headerPanel, under a DefaultFont18 section title at y=4) was reasoned
+from bounding-box containment only - actual glyph ascent/descent metrics
+for DefaultFont18 were not measured, so whether 28 (down from 29) reads
+as visually tighter under real glyphs is unverified; treat a future
+title/divider crowding report as expected-until-checked rather than a
+surprise regression. Build and full test suite green. Live user visual
 confirmation (does the flicker actually stop across a real scroll
 range) is still pending - the honest next step before this item can be
 marked live-verified.
