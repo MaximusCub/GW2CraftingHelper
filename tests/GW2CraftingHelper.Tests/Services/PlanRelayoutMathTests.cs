@@ -159,5 +159,82 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, geometry.TileWidth);
             Assert.Equal(0, geometry.StartX);
         }
+
+        // --- ComputeVisiblePillCount ---
+        // MustFix review finding: DecisionPillPlanner's now-unconditional
+        // OwnedInfo/Ignore pills regularly overflow the tree row's fixed
+        // 240px pill column, overlapping the right-aligned cost column.
+        // CraftingPlanView.RenderDecisionPills uses this pure helper to
+        // decide how many (already width-measured, emission-order) pills
+        // to actually render.
+
+        [Fact]
+        public void ComputeVisiblePillCount_AllPillsFit_ReturnsFullCount()
+        {
+            var widths = new[] { 50, 60, 40 };
+
+            int count = PlanRelayoutMath.ComputeVisiblePillCount(
+                widths, gap: 6, startX: 0, maxRightEdge: 300);
+
+            Assert.Equal(3, count);
+        }
+
+        [Fact]
+        public void ComputeVisiblePillCount_TrailingPillsOverflow_TruncatesFromFirstThatDoesNotFit()
+        {
+            // Mirrors the live regression: CRAFT/TP/VENDOR (fits) followed
+            // by "USING 12 OWNED" and "IGNORE" (the pair that overflows).
+            var widths = new[] { 60, 55, 60, 120, 55 };
+
+            int count = PlanRelayoutMath.ComputeVisiblePillCount(
+                widths, gap: 6, startX: 0, maxRightEdge: 240);
+
+            Assert.Equal(3, count);
+        }
+
+        [Fact]
+        public void ComputeVisiblePillCount_ExactFit_IncludesTheExactlyFittingPill()
+        {
+            // Two 50-wide pills with a 6px gap need exactly 106px; a budget
+            // of precisely 106 must include both, not truncate at the
+            // boundary.
+            var widths = new[] { 50, 50 };
+
+            int count = PlanRelayoutMath.ComputeVisiblePillCount(
+                widths, gap: 6, startX: 0, maxRightEdge: 106);
+
+            Assert.Equal(2, count);
+        }
+
+        [Fact]
+        public void ComputeVisiblePillCount_FirstPillAloneExceedsBudget_StillRendersIt()
+        {
+            // A completely empty pill column reads worse than a single
+            // pill that slightly overflows a pathologically narrow panel.
+            var widths = new[] { 500 };
+
+            int count = PlanRelayoutMath.ComputeVisiblePillCount(
+                widths, gap: 6, startX: 0, maxRightEdge: 240);
+
+            Assert.Equal(1, count);
+        }
+
+        [Fact]
+        public void ComputeVisiblePillCount_EmptyWidths_ReturnsZero()
+        {
+            int count = PlanRelayoutMath.ComputeVisiblePillCount(
+                new int[0], gap: 6, startX: 0, maxRightEdge: 240);
+
+            Assert.Equal(0, count);
+        }
+
+        [Fact]
+        public void ComputeVisiblePillCount_NullWidths_ReturnsZero()
+        {
+            int count = PlanRelayoutMath.ComputeVisiblePillCount(
+                null, gap: 6, startX: 0, maxRightEdge: 240);
+
+            Assert.Equal(0, count);
+        }
     }
 }

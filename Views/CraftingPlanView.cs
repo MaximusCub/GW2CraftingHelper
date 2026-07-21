@@ -3381,6 +3381,20 @@ namespace GW2CraftingHelper.Views
         /// Renders the pill column and returns the created pill panels so
         /// the row's expand/collapse click handler can exclude them from
         /// its own hit-test (a pill click is a decision, not a toggle).
+        ///
+        /// M34 fix (MustFix review finding): TreePillColumnWidth (240px) is
+        /// a fixed budget, but DecisionPillPlanner.AppendOwnershipPills now
+        /// unconditionally adds an "IGNORE" pill (plus "USING N OWNED" when
+        /// applicable) to every ordinary node, on top of its 1-3 source
+        /// pills - realistic combinations regularly exceed 240px. Rather
+        /// than let trailing pills render on top of the right-aligned cost
+        /// column (this row has no wrap/second-line support - TreeRowHeight
+        /// is a fixed per-row height shared by every layout/scroll-height
+        /// calculation in this file), only as many pills as
+        /// PlanRelayoutMath.ComputeVisiblePillCount says fit are rendered -
+        /// see that method's doc comment for why this naturally drops the
+        /// lower-priority (OwnedInfo/Ignore) pills first while always
+        /// keeping at least the first (most important) pill.
         /// </summary>
         private List<Panel> RenderDecisionPills(
             Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
@@ -3390,10 +3404,20 @@ namespace GW2CraftingHelper.Views
             var pillPanels = new List<Panel>(specs.Count);
             int x = pillColX;
 
+            var pillWidths = new List<int>(specs.Count);
             foreach (var spec in specs)
             {
-                int textWidth = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width);
-                int pillWidth = textWidth + 12;
+                int measuredWidth = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width) + 12;
+                pillWidths.Add(measuredWidth);
+            }
+            int maxRightEdge = pillColX + TreePillColumnWidth - 4;
+            int visibleCount = PlanRelayoutMath.ComputeVisiblePillCount(pillWidths, 6, pillColX, maxRightEdge);
+
+            for (int specIndex = 0; specIndex < visibleCount; specIndex++)
+            {
+                var spec = specs[specIndex];
+                int pillWidth = pillWidths[specIndex];
+                int textWidth = pillWidth - 12;
 
                 GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
                 // White, not borderColor: Selected/Available fills expose the
