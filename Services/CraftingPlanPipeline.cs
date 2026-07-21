@@ -204,7 +204,10 @@ namespace GW2CraftingHelper.Services
             int targetItemId, int quantity, AccountSnapshot snapshot,
             CancellationToken ct, IProgress<PlanStatus> progress = null,
             string activeCharacterName = null,
-            PriceBasis priceBasis = PriceBasis.InstantBuy,
+            // M33 spec item 8: default to gw2efficiency's own "buy price"
+            // (buy orders) basis rather than instant-buy - see
+            // Views/CraftingPlanView.cs's matching field default.
+            PriceBasis priceBasis = PriceBasis.BuyOrder,
             CurrencyValuation currencyValuation = null,
             OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free)
         {

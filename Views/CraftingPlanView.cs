@@ -46,7 +46,12 @@ namespace GW2CraftingHelper.Views
         private CraftingPlanResult _lastResult;
         private DateTime _planGeneratedAt;
         private bool _useOwnMaterials;
-        private PriceBasis _priceBasis = PriceBasis.InstantBuy;
+        // M33 spec item 8 (r1 section 2.1): gw2efficiency's own default is
+        // "buy price" (buy orders - patient, usually cheaper), with a
+        // per-item fallback to instant-buy only when a listing is missing.
+        // Echo that default here so a fresh plan matches gw2e's own view
+        // rather than systematically overpricing every material.
+        private PriceBasis _priceBasis = PriceBasis.BuyOrder;
         private int _selectedItemId;
         private int _quantity = 1;
 

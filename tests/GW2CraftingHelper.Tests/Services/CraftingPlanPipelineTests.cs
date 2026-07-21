@@ -262,7 +262,8 @@ namespace GW2CraftingHelper.Tests.Services
                 reducer: new InventoryReducer());
 
             var original = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
-            var structured = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+            var structured = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // Same plan steps
             Assert.Equal(original.Plan.Steps.Count, structured.Plan.Steps.Count);
@@ -322,8 +323,10 @@ namespace GW2CraftingHelper.Tests.Services
                 }
             };
 
-            var withoutSnapshot = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
-            var withSnapshot = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None);
+            var withoutSnapshot = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            var withSnapshot = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // With snapshot should buy fewer of item 2
             var buyStepWithout = withoutSnapshot.Plan.Steps
@@ -404,7 +407,8 @@ namespace GW2CraftingHelper.Tests.Services
                 }
             };
 
-            var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // Item 2's Craft step (recipe 20) should be gone
             Assert.DoesNotContain(result.Plan.Steps,
@@ -492,7 +496,8 @@ namespace GW2CraftingHelper.Tests.Services
                 }
             };
 
-            var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // UsedMaterials includes item 2
             Assert.Contains(result.UsedMaterials, u => u.ItemId == 2);
@@ -602,7 +607,8 @@ namespace GW2CraftingHelper.Tests.Services
             var progress = new CapturingProgress<PlanStatus>();
 
             await pipeline.GenerateStructuredAsync(
-                1, 1, null, CancellationToken.None, progress);
+                1, 1, null, CancellationToken.None, progress,
+                priceBasis: PriceBasis.InstantBuy);
 
             // All 10 expected phase messages in pipeline order
             var expectedSubstrings = new[]
@@ -727,7 +733,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new ItemMetadataService(itemApi),
                     store);
 
-                var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+                var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy);
 
                 Assert.Single(result.Plan.Steps);
                 Assert.Equal(AcquisitionSource.BuyFromVendor, result.Plan.Steps[0].Source);
@@ -749,7 +756,8 @@ namespace GW2CraftingHelper.Tests.Services
             priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
             priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
 
-            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.Equal(300, result.Plan.TotalCoinCost);
             Assert.Equal(400, result.TargetUnitSellPrice);
@@ -766,7 +774,8 @@ namespace GW2CraftingHelper.Tests.Services
             priceApi.AddPrice(1, buyUnitPrice: 0, sellUnitPrice: 1000);
             priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
 
-            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.Null(result.TargetUnitSellPrice);
             Assert.Null(result.NetSaleValue);
@@ -805,7 +814,8 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanSolver(),
                 new ItemMetadataService(itemApi));
 
-            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             // Craft cost: 3x100 = 300 for a batch of 5
             Assert.Equal(300, result.Plan.TotalCoinCost);
@@ -823,7 +833,8 @@ namespace GW2CraftingHelper.Tests.Services
             priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
             priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
 
-            var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+            var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
             Assert.NotNull(initial.SolveContext);
             Assert.Equal(300, initial.Plan.TotalCoinCost);
 
@@ -898,7 +909,8 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanSolver(),
                 new ItemMetadataService(itemApi));
 
-            var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+            var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
             // Baseline: craft 1 from bought 2 (50)
             Assert.Equal(50, initial.Plan.TotalCoinCost);
 
@@ -992,7 +1004,8 @@ namespace GW2CraftingHelper.Tests.Services
 
                 var result = await pipeline.GenerateStructuredAsync(
                     1, 1, null, CancellationToken.None,
-                    currencyValuation: valuation);
+                    currencyValuation: valuation,
+                    priceBasis: PriceBasis.InstantBuy);
 
                 // Vendor wins: 50 karma x 5 copper = 250 < 1000 TP
                 Assert.Single(result.Plan.Steps);
@@ -1035,7 +1048,8 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanSolver(),
                 new ItemMetadataService(itemApi));
 
-            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.NotNull(result.SolveContext.CurrencyValuation);
             Assert.False(result.SolveContext.CurrencyValuation.TryGetCopperValue(2, out _));
@@ -1103,7 +1117,8 @@ namespace GW2CraftingHelper.Tests.Services
             // Own 3 of the 5 needed; the other 2 are bought.
             var result = await pipeline.GenerateStructuredAsync(
                 1, 1, OwnIngredient(3), CancellationToken.None,
-                ownMaterialsMode: OwnMaterialsMode.Valued);
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
 
             // Craft cost: (5 - 3) x 100 = 200
             Assert.Equal(200, result.Plan.TotalCoinCost);
@@ -1128,7 +1143,8 @@ namespace GW2CraftingHelper.Tests.Services
 
             // Default mode (no ownMaterialsMode argument) - Free.
             var result = await pipeline.GenerateStructuredAsync(
-                1, 1, OwnIngredient(3), CancellationToken.None);
+                1, 1, OwnIngredient(3), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.Equal(200, result.Plan.TotalCoinCost);
             Assert.Null(result.MaterialOpportunityCost);
@@ -1147,7 +1163,8 @@ namespace GW2CraftingHelper.Tests.Services
             // materials, so there is nothing to have forgone selling.
             var result = await pipeline.GenerateStructuredAsync(
                 1, 1, null, CancellationToken.None,
-                ownMaterialsMode: OwnMaterialsMode.Valued);
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.Empty(result.UsedMaterials);
             Assert.Null(result.MaterialOpportunityCost);
@@ -1208,7 +1225,8 @@ namespace GW2CraftingHelper.Tests.Services
 
             var result = await pipeline.GenerateStructuredAsync(
                 1, 1, snapshot, CancellationToken.None,
-                ownMaterialsMode: OwnMaterialsMode.Valued);
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.Equal(2, result.UsedMaterials.Count);
 
@@ -1226,7 +1244,8 @@ namespace GW2CraftingHelper.Tests.Services
 
             var initial = await pipeline.GenerateStructuredAsync(
                 1, 1, OwnIngredient(3), CancellationToken.None,
-                ownMaterialsMode: OwnMaterialsMode.Valued);
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.Equal(OwnMaterialsMode.Valued, initial.SolveContext.OwnMaterialsMode);
             Assert.Equal(25, initial.MaterialOpportunityCost);
@@ -1249,7 +1268,8 @@ namespace GW2CraftingHelper.Tests.Services
             priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
 
             var result = await pipeline.GenerateStructuredAsync(
-                1, 1, OwnIngredient(3), CancellationToken.None);
+                1, 1, OwnIngredient(3), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.Equal(OwnMaterialsMode.Free, result.SolveContext.OwnMaterialsMode);
             Assert.Null(result.MaterialOpportunityCost);
@@ -1278,7 +1298,8 @@ namespace GW2CraftingHelper.Tests.Services
             // be null/0 instead of the expected net value.
             var result = await pipeline.GenerateStructuredAsync(
                 1, 1, OwnIngredient(5), CancellationToken.None,
-                ownMaterialsMode: OwnMaterialsMode.Valued);
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.DoesNotContain(result.Plan.Steps, s => s.ItemId == 2 && s.Quantity > 0);
             Assert.Equal(5, result.UsedMaterials[0].QuantityUsed);
@@ -1385,7 +1406,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new ItemMetadataService(itemApi),
                     currencyMetadataService: currencyService);
 
-                var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None);
+                var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy);
                 Assert.NotNull(initial.CurrencyMetadata);
                 Assert.True(initial.CurrencyMetadata.ContainsKey(2));
                 Assert.NotNull(initial.SolveContext.CurrencyMetadata);
