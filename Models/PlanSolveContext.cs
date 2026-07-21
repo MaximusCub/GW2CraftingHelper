@@ -58,5 +58,35 @@ namespace GW2CraftingHelper.Models
         /// fetch, but the snapshot keeps the two code paths symmetric).
         /// </summary>
         public IReadOnlyDictionary<int, AcquisitionHint> AcquisitionHints { get; set; }
+
+        /// <summary>
+        /// Per-node owned-quantity attribution snapshotted at GENERATION
+        /// time (M34-B2a #1, see ReducedTreeResult.OwnedQuantityUsedByNode
+        /// and CraftingPlanPipeline.BuildOwnedQuantityUsedByNodeId) - NodeId
+        /// is stable across repeat Solve() calls on the same Tree object, so
+        /// ResolveWithOverrides' local re-solve reuses this as-is rather
+        /// than recomputing it (reduction itself never re-runs locally -
+        /// see Tree's own doc comment).
+        /// </summary>
+        public IReadOnlyDictionary<int, int> OwnedQuantityUsedByNodeId { get; set; }
+
+        /// <summary>
+        /// Owned amount per currency id referenced by the plan's
+        /// CurrencyCosts, snapshotted at GENERATION time (M34-B2a #4 - see
+        /// AccountCurrencyIndex). Cosmetic display data only; null when no
+        /// wallet snapshot was available or the plan needed no currency.
+        /// </summary>
+        public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
+
+        /// <summary>
+        /// NodeIds gw2e's "Value Own Materials" force-buy pre-pass excluded
+        /// from crafting at GENERATION time (M34-B2a #3 - see
+        /// OwnedMaterialsForceBuyPrePass), snapshotted here so
+        /// ResolveWithOverrides' local re-solve keeps applying it to every
+        /// node the user hasn't manually overridden, rather than forgetting
+        /// it the moment any single pill is clicked. Null in
+        /// OwnMaterialsMode.Free (the pre-pass never ran).
+        /// </summary>
+        public ISet<int> ForceBuyOnlyNodeIds { get; set; }
     }
 }

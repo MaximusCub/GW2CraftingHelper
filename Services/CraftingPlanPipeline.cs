@@ -281,11 +281,35 @@ namespace GW2CraftingHelper.Services
             // unpriceable, so fetch the missing cost-item prices and merge.
             prices = await AugmentWithVendorCostPricesAsync(prices, vendorOffers, ct);
 
+            // M34-B2a #3: gw2e's "Value Own Materials" force-buy pre-pass -
+            // only runs when the setting is Valued AND a snapshot actually
+            // drives reduction (see OwnedMaterialsForceBuyPrePass's and
+            // ModuleSettings.ValueOwnMaterials's doc comments for why this
+            // is deliberately narrower than gw2e's own unconditional
+            // `if (valueOwnItems)` gate).
+            bool useForceBuyPrePass = ownMaterialsMode == OwnMaterialsMode.Valued &&
+                snapshot != null && _reducer != null;
+
+            if (useForceBuyPrePass)
+            {
+                // Pre-assign stable NodeIds to the UNREDUCED tree BEFORE
+                // Step 6 clones/prunes it below - see RecipeNodeIds' doc
+                // comment: InventoryReducer.CloneNode preserves whatever
+                // NodeId a node already has, so these ids survive onto the
+                // corresponding surviving nodes of the reduced tree Step 7
+                // solves, letting the pre-pass below (computed against a
+                // genuine zero-owned baseline - this same, still-unreduced
+                // `tree`) key its forceBuyOnlyNodeIds set against exactly
+                // the ids that real solve will use.
+                RecipeNodeIds.Assign(tree);
+            }
+
             // Step 6: Inventory reduction
             progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
             sw.Restart();
             RecipeNode treeUsedForSolve = tree;
             List<UsedMaterial> usedMaterials = null;
+            Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null;
 
             if (snapshot != null && _reducer != null)
             {
@@ -293,19 +317,50 @@ namespace GW2CraftingHelper.Services
                 var reduced = _reducer.Reduce(tree, index, activeCharacterName);
                 treeUsedForSolve = reduced.ReducedTree;
                 usedMaterials = reduced.UsedMaterials;
+                ownedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
             }
             sw.Stop();
             timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
 
-            // Step 7: Solve
+            // Step 6.5 (M34-B2a #3): computed against `tree` - the ORIGINAL,
+            // UNREDUCED tree (Reduce above only ever mutates its CLONE, so
+            // `tree` still holds the full pre-ownership demand here) -
+            // matching gw2e's own zero-owned-baseline mechanics exactly
+            // (Section 2.2 of the R2 report): otherwise, evaluating this
+            // rule on the ALREADY-reduced tree would make it a near no-op
+            // in precisely the scenario it exists for, since owning a pile
+            // of components already makes their post-reduction craft cost
+            // look cheap regardless of what a FRESH purchase would cost.
+            ISet<int> forceBuyOnlyNodeIds = null;
+            if (useForceBuyPrePass)
+            {
+                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
+            }
+
+            // Step 7: Solve. assignNodeIds:false only when the pre-pass
+            // above pre-assigned ids to `tree` (and therefore, via cloning,
+            // to treeUsedForSolve's surviving nodes) - reusing those ids
+            // here instead of renumbering from scratch is what lets
+            // forceBuyOnlyNodeIds' keys actually match (see RecipeNodeIds).
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
             var solveResult = _solver.Solve(
                 treeUsedForSolve, prices, vendorOffers, priceBasis,
-                currencyValuation: valuation);
+                overrides: null, currencyValuation: valuation,
+                forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                assignNodeIds: !useForceBuyPrePass);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
+
+            // Step 7b (M34-B2a #1): convert the per-node owned-usage side
+            // channel (keyed by node object reference at reduction time,
+            // when NodeId did not exist yet) into a NodeId-keyed lookup now
+            // that Solve() above has assigned this tree's real, stable
+            // NodeIds to these same node objects.
+            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId =
+                BuildOwnedQuantityUsedByNodeId(ownedQuantityUsedByNode);
 
             // Step 8: Fetch item metadata for all step items + target + used materials + tree items
             // Fetch metadata for EVERY tree item (not just chosen-path ones):
@@ -389,10 +444,19 @@ namespace GW2CraftingHelper.Services
             result.CurrencyMetadata = currencyMetadata;
             result.AcquisitionHints = _acquisitionHints;
 
+            // M34-B2a #4: owned-currency annotation, cosmetic only (see
+            // AccountCurrencyIndex's doc comment) - built from the plan's
+            // final currency totals and the wallet snapshot, never fed back
+            // into any decision/total above.
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
+                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
+            result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
+
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(
-                treeUsedForSolve, solveResult.Decisions, metadata, _acquisitionHints);
+                treeUsedForSolve, solveResult.Decisions, metadata, _acquisitionHints,
+                ownedQuantityUsedByNodeId);
 
             ApplySellSideEconomics(
                 result, treeUsedForSolve, solveResult, prices,
@@ -414,7 +478,10 @@ namespace GW2CraftingHelper.Services
                 CurrencyValuation = valuation,
                 OwnMaterialsMode = ownMaterialsMode,
                 CurrencyMetadata = currencyMetadata,
-                AcquisitionHints = _acquisitionHints
+                AcquisitionHints = _acquisitionHints,
+                OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
+                OwnedCurrencyAmounts = ownedCurrencyAmounts,
+                ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -440,9 +507,23 @@ namespace GW2CraftingHelper.Services
             PlanSolveContext context,
             IReadOnlyDictionary<int, AcquisitionSource> overrides)
         {
+            // M34-B2a #3: reapply the SAME force-buy pre-pass result the
+            // original generation computed, so a local per-node override
+            // re-solve doesn't silently forget it for every other node - a
+            // manual override in `overrides` still always wins (see
+            // PlanSolver.Evaluate). assignNodeIds:false: context.Tree's
+            // nodes already carry stable ids from the original generation's
+            // own Solve() call (whether freshly assigned there, or
+            // pre-assigned/preserved for the force-buy pre-pass - see
+            // RecipeNodeIds) - reassigning again here would either be a
+            // harmless no-op (the common case) or, when the pre-pass ran,
+            // would renumber the tree's already-pruned/non-contiguous ids
+            // from scratch and desync them from forceBuyOnlyNodeIds' keys.
             var solveResult = _solver.Solve(
                 context.Tree, context.Prices, context.VendorOffers,
-                context.PriceBasis, overrides, context.CurrencyValuation);
+                context.PriceBasis, overrides, context.CurrencyValuation,
+                forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
+                assignNodeIds: false);
 
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(
@@ -450,10 +531,12 @@ namespace GW2CraftingHelper.Services
                 context.UsedMaterials, context.LearnedRecipeIds);
             result.CurrencyMetadata = context.CurrencyMetadata;
             result.AcquisitionHints = context.AcquisitionHints;
+            result.OwnedCurrencyAmounts = context.OwnedCurrencyAmounts;
 
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(
-                context.Tree, solveResult.Decisions, context.Metadata, context.AcquisitionHints);
+                context.Tree, solveResult.Decisions, context.Metadata, context.AcquisitionHints,
+                context.OwnedQuantityUsedByNodeId);
 
             ApplySellSideEconomics(
                 result, context.Tree, solveResult, context.Prices,
@@ -639,6 +722,54 @@ namespace GW2CraftingHelper.Services
                 }
                 result.CraftingProfit = profit;
             }
+        }
+
+        /// <summary>
+        /// M34-B2a #1: converts the reference-keyed per-node owned-usage
+        /// side channel (see ReducedTreeResult.OwnedQuantityUsedByNode) into
+        /// a NodeId-keyed lookup, once the tree's real NodeIds have been
+        /// assigned by the Solve() call that just ran on these same node
+        /// objects. Null input (no reduction happened) yields an empty,
+        /// non-null dictionary so callers never need a null check.
+        /// </summary>
+        private static IReadOnlyDictionary<int, int> BuildOwnedQuantityUsedByNodeId(
+            Dictionary<RecipeNode, int> ownedQuantityUsedByNode)
+        {
+            var result = new Dictionary<int, int>(ownedQuantityUsedByNode?.Count ?? 0);
+            if (ownedQuantityUsedByNode == null)
+            {
+                return result;
+            }
+            foreach (var kvp in ownedQuantityUsedByNode)
+            {
+                result[kvp.Key.NodeId] = kvp.Value;
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// M34-B2a #4: owned-currency annotation for the plan's final
+        /// currency totals (see AccountCurrencyIndex's doc comment) -
+        /// cosmetic only, computed strictly AFTER the plan/solve already
+        /// exist, never fed back into them. Null when there is no wallet
+        /// snapshot or the plan needs no currency at all, so callers can
+        /// treat null as "no data" distinctly from "0 owned".
+        /// </summary>
+        private static IReadOnlyDictionary<int, int> BuildOwnedCurrencyAmounts(
+            AccountSnapshot snapshot, List<CurrencyCost> currencyCosts)
+        {
+            if (snapshot == null || currencyCosts == null || currencyCosts.Count == 0)
+            {
+                return null;
+            }
+
+            var currencyIndex = new AccountCurrencyIndex(snapshot.Wallet);
+            var result = new Dictionary<int, int>(currencyCosts.Count);
+            foreach (var cc in currencyCosts)
+            {
+                result[cc.CurrencyId] = currencyIndex.GetQuantity(cc.CurrencyId);
+            }
+            return result;
         }
 
         /// <summary>

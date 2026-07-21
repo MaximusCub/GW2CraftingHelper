@@ -152,12 +152,24 @@ namespace GW2CraftingHelper.Services
                 {
                     string currencyName = CurrencyDisplayResolver.ResolveName(cc.CurrencyId, result.CurrencyMetadata);
                     string iconUrl = CurrencyDisplayResolver.ResolveIconUrl(cc.CurrencyId, result.CurrencyMetadata);
+
+                    // M34-B2a #4: owned/needed split, cosmetic only - null
+                    // when no wallet snapshot was available (distinct from
+                    // "0 owned").
+                    int? ownedQuantity = null;
+                    if (result.OwnedCurrencyAmounts != null &&
+                        result.OwnedCurrencyAmounts.TryGetValue(cc.CurrencyId, out int owned))
+                    {
+                        ownedQuantity = Math.Min(owned, (int)cc.Amount);
+                    }
+
                     section.Rows.Add(new PlanRowViewModel
                     {
                         RowType = PlanRowType.CurrencyCost,
                         Label = $"{cc.Amount}x {currencyName}",
                         Quantity = (int)cc.Amount,
-                        IconUrl = iconUrl
+                        IconUrl = iconUrl,
+                        CurrencyOwnedQuantity = ownedQuantity
                     });
                 }
             }

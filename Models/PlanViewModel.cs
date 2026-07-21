@@ -130,5 +130,13 @@ namespace GW2CraftingHelper.Models
         // divided by Quantity the same way UnitCoinValue divides CoinValue.
         // Null/empty under the same condition as CurrencyCosts.
         public List<CurrencyAmountViewModel> UnitCurrencyCosts { get; set; }
+
+        // Owned/needed split for a CurrencyCost row (M34-B2a #4, gw2e
+        // parity - see AccountCurrencyIndex): min(Quantity, wallet amount)
+        // of this currency the account already holds; the renderer derives
+        // "still needed" as Quantity - CurrencyOwnedQuantity. Null (not 0)
+        // when no wallet snapshot was available at all, distinct from "0
+        // owned" - only ever set on CurrencyCost rows.
+        public int? CurrencyOwnedQuantity { get; set; }
     }
 }
