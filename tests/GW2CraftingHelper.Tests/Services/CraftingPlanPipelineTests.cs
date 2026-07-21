@@ -1428,48 +1428,26 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- M34-B2a #3: force-buy pre-pass (zero-owned baseline) ---
 
+        /// <summary>
+        /// Reuses BuildOwnMaterialsPipeline's identical tree shape (item 1
+        /// &lt;- recipe 10 &lt;- 5x item 2), then sets prices for the
+        /// force-buy scenario: NOTE InMemoryPriceApiClient's
+        /// (buyUnitPrice, sellUnitPrice) map to raw GW2-API
+        /// buys/sells.unit_price - TradingPostService then maps BuyInstant
+        /// (cost to instant-BUY) from the RAW sellUnitPrice param, and
+        /// SellInstant from the raw buyUnitPrice param (see
+        /// TradingPostService.cs) - so the SECOND argument here is the one
+        /// that drives GetUnitPrice at PriceBasis.InstantBuy.
+        ///
+        /// Fresh (zero-owned) check: buy(100) &lt; craft(5x30=150)*0.85=127.5
+        /// -&gt; item 1 is force-buy-flagged on a truly zero-owned baseline.
+        /// </summary>
         private static CraftingPlanPipeline BuildForceBuyPipeline(out InMemoryPriceApiClient priceApi)
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 5 }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
-            });
-
-            priceApi = new InMemoryPriceApiClient();
-            // NOTE: InMemoryPriceApiClient's (buyUnitPrice, sellUnitPrice)
-            // map to raw GW2-API buys/sells.unit_price - TradingPostService
-            // then maps BuyInstant (cost to instant-BUY) from the RAW
-            // sellUnitPrice param, and SellInstant from the raw
-            // buyUnitPrice param (see TradingPostService.cs) - so the
-            // SECOND argument here is the one that drives GetUnitPrice at
-            // PriceBasis.InstantBuy.
-            //
-            // Fresh (zero-owned) check: buy(100) < craft(5x30=150)*0.85=127.5
-            // -> item 1 is force-buy-flagged on a truly zero-owned baseline.
+            var pipeline = BuildOwnMaterialsPipeline(out priceApi);
             priceApi.AddPrice(1, buyUnitPrice: 1000, sellUnitPrice: 100);
             priceApi.AddPrice(2, buyUnitPrice: 300, sellUnitPrice: 30);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient", "i.png");
-
-            return new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                reducer: new InventoryReducer());
+            return pipeline;
         }
 
         private static AccountSnapshot OwnFourOfIngredient()
