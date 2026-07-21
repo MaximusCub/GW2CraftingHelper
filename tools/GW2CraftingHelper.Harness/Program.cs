@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Services.Diagnostics;
@@ -75,6 +76,7 @@ namespace GW2CraftingHelper.Harness
             bool raw = false;
             bool printCacheStats = false;
             bool clearOverlayCache = false;
+            bool dumpTree = false;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -104,6 +106,9 @@ namespace GW2CraftingHelper.Harness
                     case "--clear-overlay-cache":
                         clearOverlayCache = true;
                         break;
+                    case "--dump-tree":
+                        dumpTree = true;
+                        break;
                 }
             }
 
@@ -112,7 +117,7 @@ namespace GW2CraftingHelper.Harness
                 Console.Error.WriteLine(
                     "Usage: GW2CraftingHelper.Harness --profile <n> " +
                     "[--iterations <n>] [--live] [--raw] " +
-                    "[--print-cache-stats] [--clear-overlay-cache]");
+                    "[--print-cache-stats] [--clear-overlay-cache] [--dump-tree]");
                 return 1;
             }
 
@@ -224,22 +229,58 @@ namespace GW2CraftingHelper.Harness
                     }
                 }
 
+                // Item name seed: reused as the ItemMetadataService fallback
+                // (mirrors Module.cs) so offline/live runs resolve real
+                // names instead of "Unknown Item" for every node - matches
+                // what the live module always has wired.
+                ItemNameSeedData itemNameSeed = null;
+                string itemNameSeedPath = Path.Combine(baseDir, "ref", "item_name_seed.json");
+                if (File.Exists(itemNameSeedPath))
+                {
+                    using (var nameStream = File.OpenRead(itemNameSeedPath))
+                    {
+                        ItemSearchProviderFactory.Create(nameStream, out _, out itemNameSeed);
+                    }
+                }
+
+                // Acquisition hints seed (docs/KNOWN-ISSUES.md item 8/17),
+                // mirroring Module.cs so Unknown-decision nodes carry the
+                // same tooltip/badge data the live module would show.
+                IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null;
+                string hintsSeedPath = Path.Combine(baseDir, "ref", "acquisition_hints_seed.json");
+                if (File.Exists(hintsSeedPath))
+                {
+                    using (var hintsStream = File.OpenRead(hintsSeedPath))
+                    {
+                        acquisitionHints = AcquisitionHintService.Load(hintsStream);
+                    }
+                }
+
                 var recipeCacheStore = new CompositeRecipeCacheStore(recipeSeed, recipeOverlay);
 
                 var pipeline = new CraftingPlanPipeline(
                     new RecipeService(recipeApi, cacheStore: recipeCacheStore),
                     new TradingPostService(priceApi),
                     new PlanSolver(),
-                    new ItemMetadataService(itemApi),
+                    new ItemMetadataService(itemApi, itemNameSeed),
                     vendorStore,
                     resolver: null,
                     reducer: new InventoryReducer(),
-                    accountRecipeClient: null);
+                    accountRecipeClient: null,
+                    currencyMetadataService: null,
+                    acquisitionHints: acquisitionHints);
 
                 // Run each profile item
                 foreach (var item in items)
                 {
-                    await RunItemProfile(pipeline, item, iterations, raw, mode);
+                    if (dumpTree)
+                    {
+                        await DumpItemTree(pipeline, item, mode);
+                    }
+                    else
+                    {
+                        await RunItemProfile(pipeline, item, iterations, raw, mode);
+                    }
                     Console.WriteLine();
                 }
 
@@ -287,9 +328,143 @@ namespace GW2CraftingHelper.Harness
                         });
                     }
                     return items;
+                case 2:
+                    return new List<ProfileItem>
+                    {
+                        new ProfileItem
+                        {
+                            Name = "Exordium",
+                            ItemId = 90551,
+                            Quantity = 1,
+                            RequiresLive = false
+                        }
+                    };
                 default:
                     return null;
             }
+        }
+
+        /// <summary>
+        /// Runs a single generation and prints the raw pre-solve RecipeNode
+        /// tree (recipe availability, independent of pricing) next to the
+        /// solved CraftingTreeNode tree (the decision/pricing the live
+        /// module would render), for M33-style item-by-item parity
+        /// research. Ids are printed freely here - this is a dev-only tool,
+        /// not the module's UI (see docs/KNOWN-ISSUES.md no-displayed-ids
+        /// invariant, which only governs runtime UI surfaces).
+        /// </summary>
+        private static async Task DumpItemTree(
+            CraftingPlanPipeline pipeline, ProfileItem item, string mode)
+        {
+            Console.WriteLine($"=== {item.Name} ({item.ItemId}) x{item.Quantity} -- tree dump [{mode}] ===");
+            Console.WriteLine();
+
+            var result = await pipeline.GenerateStructuredAsync(
+                item.ItemId, item.Quantity, null, CancellationToken.None);
+
+            Console.WriteLine("--- Raw pre-solve recipe tree (node.Recipes.Count = seed coverage) ---");
+            if (result.SolveContext != null && result.SolveContext.Tree != null)
+            {
+                DumpRawNode(result.SolveContext.Tree, 0);
+            }
+            else
+            {
+                Console.WriteLine("(no raw tree available)");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("--- Solved crafting tree (decision the live module would render) ---");
+            if (result.CraftingTree != null)
+            {
+                DumpSolvedNode(result.CraftingTree, 0);
+            }
+            else
+            {
+                Console.WriteLine("(no solved tree available)");
+            }
+        }
+
+        private const int MaxDumpDepth = 100;
+
+        private static void DumpRawNode(RecipeNode node, int depth)
+        {
+            if (depth > MaxDumpDepth)
+            {
+                Console.WriteLine($"{Indent(depth)}... (max depth {MaxDumpDepth} reached, truncated)");
+                return;
+            }
+
+            Console.WriteLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "{0}[{1}] id={2} qty={3} recipeCount={4}",
+                Indent(depth), node.IngredientType, node.Id, node.Quantity, node.Recipes.Count));
+
+            foreach (var recipe in node.Recipes)
+            {
+                string evSuffix = recipe.ExpectedOutputCount != recipe.OutputCount
+                    ? string.Format(CultureInfo.InvariantCulture, " ev={0}", recipe.ExpectedOutputCount)
+                    : string.Empty;
+                Console.WriteLine(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0}  recipe={1} output={2}{3} craftsNeeded={4}",
+                    Indent(depth), recipe.RecipeId, recipe.OutputCount, evSuffix, recipe.CraftsNeeded));
+
+                foreach (var ingredient in recipe.Ingredients)
+                {
+                    DumpRawNode(ingredient, depth + 2);
+                }
+            }
+        }
+
+        private static void DumpSolvedNode(CraftingTreeNode node, int depth)
+        {
+            if (depth > MaxDumpDepth)
+            {
+                Console.WriteLine($"{Indent(depth)}... (max depth {MaxDumpDepth} reached, truncated)");
+                return;
+            }
+
+            string flags = string.Format(
+                CultureInfo.InvariantCulture,
+                "craft={0} tp={1} vendor={2}",
+                node.CanCraft, node.CanBuyTp, node.CanBuyVendor);
+            string unitCost = node.UnitCost.HasValue
+                ? node.UnitCost.Value.ToString(CultureInfo.InvariantCulture)
+                : "-";
+            string subtreeCost = node.SubtreeCost.HasValue
+                ? node.SubtreeCost.Value.ToString(CultureInfo.InvariantCulture)
+                : "-";
+            string badge = !string.IsNullOrEmpty(node.AcquisitionBadge)
+                ? string.Format(CultureInfo.InvariantCulture, " badge={0}", node.AcquisitionBadge)
+                : string.Empty;
+            string reference = node.IsReferenceBranch ? " [reference]" : string.Empty;
+
+            Console.WriteLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "{0}id={1} name=\"{2}\" qty={3} decision={4} ({5}) unit={6}c subtree={7}c{8}{9}",
+                Indent(depth), node.ItemId, node.Name, node.Quantity, node.Decision,
+                flags, unitCost, subtreeCost, badge, reference));
+
+            if (node.VendorCurrencyCosts != null && node.VendorCurrencyCosts.Count > 0)
+            {
+                foreach (var cost in node.VendorCurrencyCosts)
+                {
+                    Console.WriteLine(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0}  currency type={1} id={2} count={3}",
+                        Indent(depth), cost.Type, cost.Id, cost.Count));
+                }
+            }
+
+            foreach (var child in node.Children)
+            {
+                DumpSolvedNode(child, depth + 1);
+            }
+        }
+
+        private static string Indent(int depth)
+        {
+            return new string(' ', depth * 2);
         }
 
         private static async Task RunItemProfile(
