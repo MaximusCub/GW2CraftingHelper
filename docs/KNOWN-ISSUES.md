@@ -108,9 +108,11 @@ Fixed in M30: pill labels now render in white.
 ## Carried follow-ups (from M24-M29 PRs)
 - Caret glyphs: settle ASCII v/> headers vs unicode tree triangles after
   an in-game check of which renders reliably
-- Remaining parity pillars: multi-item plans, Mystic Clover EV (blocked
-  on probability data - seeder first), vendor cap data scraping,
-  phase-2 owned-materials-as-competing-source, localization
+- Remaining parity pillars: Mystic Clover EV (blocked on probability
+  data - seeder first), vendor cap data scraping, phase-2
+  owned-materials-as-competing-source, localization. Multi-item plans
+  landed in M35 (see that section below) - last item removed from this
+  line.
 - Blish HUD has no SynchronizationContext: async continuations in
   TriggerGenerate resume off the main thread and mutate UI controls -
   latent cross-thread hazard, audit all await points that touch controls.
@@ -645,6 +647,151 @@ unverified overflow risk on a deeply-nested, narrow-panel tree row (the
 M33 m1 map's own "up to six pills" ceiling note) - treat a fresh
 pill-overflow or clipped-pill report as expected-until-checked rather than
 a regression.
+
+## 21. M35: gw2efficiency parity - multi-item plans
+
+Final major gw2efficiency parity pillar (see the "Remaining parity
+pillars" line above). Preceded by a research report
+(`m34-r1-gw2e-multiitem.md`) documenting gw2e's exact mechanism: the
+Calculator's `e.recipes` array (N `{id, amount}` rows, add/remove/reorder,
+one shared settings panel for the whole batch) is wrapped, at Generate
+time, under a single synthetic fake parent node (`id: false`, name
+`"Multiple recipes"`, `multipleRecipeTree: true`, `quantity: 1`,
+`output: 1`, `components` = the N real item trees each carrying its own
+requested amount as its own `quantity`) and fed through the SAME
+single-root `cheapestTree` solver unmodified; the fake node is never
+rendered (`componentTree.html`'s own `ng-if`), so the Recipe Tree section
+shows what looks like N independent top-level trees; Shopping List/
+Crafting Steps/Required Disciplines/Required Recipes are generic per-id
+tree walkers with no multi-item-specific code at all, so they merge
+automatically; Cost Breakdown drops its per-item "(per item)" sub-lines
+and adds a "Profit numbers are the sum of all crafted recipes" banner.
+
+### 21.1 B1: synthetic wrapper pipeline (Services layer)
+
+`RecipeService.BuildMultiItemTreeAsync` builds each requested item's own
+tree via the existing single-item `BuildTreeAsync` path, then wraps 2+ of
+them under a synthetic root `RecipeNode` using new
+`Gw2Constants.MultiItemWrapperItemId`/`MultiItemWrapperRecipeId` sentinels
+(`int.MinValue` - real GW2 ids are always positive, so these can never
+collide with a genuine tree item/recipe). A single-entry request returns
+that item's own tree UNWRAPPED - gw2e's own `if (r.length===1) return
+r[0]` short-circuit, verbatim. `PlanSolver.Collect`/`CraftingTreeBuilder`
+hide the wrapper's own throwaway "craft" decision and sentinel id
+everywhere (no step, no craft-order entry, no vendor-batch entry, no
+metadata fetch ever targets it) - mirrors `componentTree.html`'s own
+`ng-if="!component.multipleRecipeTree"`. `CraftingPlanPipeline` gains a
+`GenerateStructuredAsync(IReadOnlyList<PlanRequestItem>, ...)` overload
+that delegates straight to the existing single-item method for exactly one
+item (byte-identical output, confirmed by a regression test asserting the
+two paths produce identical `CraftingTree`/steps/disciplines/recipes down
+to every field), and to a new `GenerateStructuredMultiAsync` for 2+ -
+which mirrors the single-item pipeline step for step (force-buy pre-pass,
+inventory reduction, solve, vendor-batch finalization) with the wrapper
+tree standing in for a single item's tree throughout, so M34's merge-then-
+ceil correctness fix (`FinalizeVendorBatches`) and the force-buy pre-pass/
+Ignore-pill overrides apply across ALL requested items' shared materials
+for free, not just within one item's own tree (regression-tested: two
+items each needing 2 of a bulk-vendor-only shared material, `ceil(2/5)+
+ceil(2/5) = 2` purchases solved independently vs. `ceil(4/5) = 1` purchase
+solved as a merged batch - the merged answer is what the pipeline
+produces). Sell-side economics (profit/net-sale-value) are deliberately
+left unset for a multi-item batch - see 21.3's divergence note.
+
+### 21.2 B2: multi-row UI (Views layer)
+
+- **Input strip**: the single search-box+qty strip becomes a vertical list
+  of item rows (`CraftingPlanView._itemRows`, one `ItemRowState` per row -
+  search box, qty box, Remove button), echoing gw2e's own `e.recipes`
+  ng-repeat. A Remove button only renders once 2+ rows exist
+  (`ItemRowRequestBuilder.CanRemoveRow` - gw2e's own
+  `ng-if="recipes.length > 1"`), and an Add button sits on the trailing
+  edge of the LAST row only (rather than gw2e's own separate "Add another
+  item" link row) - a deliberate simplification that keeps the single-row
+  case's row height/position byte-identical to pre-M35
+  (`ComputeTopRegionLayout`'s own doc comment proves the N==1 formula
+  reproduces the old fixed Y-offset constants exactly). Reordering rows
+  (gw2e's `moveRecipe` up/down arrows) is NOT implemented - out of scope
+  for this milestone (see the divergences below).
+- **Tree render**: N top-level trees stacked in the Recipe Tree section's
+  single shared content FlowPanel, wrapper hidden - falls out almost for
+  free, since each requested item's own root `CraftingTreeNode` already
+  IS a full icon/name/quantity/pill/cost row (the same shape a single-item
+  plan's tree root always was), so `CreateTreeSection` simply loops
+  `RenderTreeNode` once per root instead of once total, with a thin visual
+  divider (`PlanContentHeightMath.MultiRootDividerHeight`) between
+  consecutive roots only (never for a single root). Total Cost/Cost
+  Breakdown adds a plain-text "Totals above are the sum of all crafted
+  recipes in this batch." row (`PlanRowType.MultiItemNote`) only in multi
+  mode - reworded from gw2e's own "Profit numbers are..." banner since this
+  module does not yet compute multi-item sell-side profit at all (see
+  21.3). Section machinery itself (Total Cost, Shopping List, Crafting
+  Steps, Required Disciplines/Recipes) needed ZERO section-builder changes
+  beyond the note row - they already operate on `CraftingPlanResult`'s
+  already-merged `Plan.Steps`/`UsedMaterials`/`RequiredDisciplines`/
+  `RequiredRecipes`, which the B1 pipeline populates correctly for a batch
+  the same way it always has for one item.
+- **M33/M34 contracts preserved**: `PlanContentHeightMath` gained
+  `MultiRootTreeFlowHeight`/`MultiRootDividerHeight` (a one-root list is
+  proven byte-identical to the pre-M35 single-tree height via a dedicated
+  test) and a `MultiItemNote` branch in `SummaryBodyHeight`; the new
+  divider Panel registers a width-only relayout closure like every other
+  chrome element in the file; `DecisionPillPlanner`/pill click handling is
+  completely untouched (each root node is walked by the same
+  `RenderTreeNode` recursion as before, so USING N OWNED/IGNORE keep
+  working per-node exactly as before); `PreserveScrollAcross`/
+  `PreserveScrollAcrossResize` wrap the batch render and the row Add/Remove
+  reflow respectively (the latter also arms the settle-time scroll-verify
+  directly, since a discrete one-shot row-count change - unlike a
+  continuous resize drag - never generates the further ticks
+  `ResizeSettleStep`'s own debounce relies on); the status pipeline is
+  unchanged (`TriggerGenerate`'s existing per-generation `myGen`/
+  `_statusClosedForCurrentGeneration` guard already covers a batch
+  generation the same way it covered one item, since nothing about the
+  guard is item-count-specific).
+
+### 21.3 Known divergences from gw2e's own multi-item UX
+
+- **No row reordering** (gw2e's `moveRecipe` up/down arrows): not
+  implemented. B2's own task scope named only "search box, qty, remove
+  button" for each row; reordering was judged non-essential polish and
+  left out to keep the milestone bounded.
+- **No URL/file persistence of the row list**: gw2e's own multi-item state
+  lives entirely in a shareable URL (`?item=...` / `/crafting/calculator/
+  <encoded>`), which has no analog in a Blish HUD module (no address bar).
+  The row list instead persists as in-memory session state
+  (`CraftingPlanView._itemRows`) across tab switches within the same
+  Blish HUD session, exactly like `_nodeOverrides`/`_ignoredItemIds`
+  already did - lost on module reload/game restart, matching how every
+  other piece of this view's session state already behaves.
+- **No multi-item sell-side economics**: gw2e's own multi-item Cost
+  Breakdown drops the per-item view and sums profit across every selected
+  item, plus exposes a multi-item-only "sell excess crafted components for
+  profit" rollup. Neither is implemented - `CraftingPlanResult.
+  SellableQuantity`/`NetSaleValue`/`CraftingProfit`/
+  `MaterialOpportunityCost` stay at their type defaults for a multi-item
+  result (`GenerateStructuredMultiAsync`'s own doc comment), since "what
+  would selling N independently-selected items net" has no obvious
+  single-number generalization the way it does for one target item. The
+  new Cost Breakdown note is worded around this (see 21.2) rather than
+  echoing gw2e's "Profit numbers..." text verbatim, since this module
+  currently shows no profit figure at all in multi mode to be "the sum
+  of." A future milestone could add a batch-level profit rollup.
+
+**VERIFICATION STATE**: build green, full test suite green (Blish-free
+production-path tests: `ItemRowRequestBuilderTests` for the row-list pure
+logic, `PlanViewModelBuilderTests` for the per-root viewmodel mapping/
+title/note-row gating, `PlanContentHeightMathTests` for the multi-root
+height arithmetic including the byte-identical-at-N==1 proof, plus the
+existing B1 `MultiItemPlanTests`/`PlanSolverTests`/`RecipeServiceTests`
+coverage of the wrapper pipeline itself). **Not yet verified by a live
+in-game desktop check** (screenshot loop) - the multi-row input strip's
+visual layout (row spacing, Add/Remove button placement, the tree
+section's inter-root divider) and the dynamic top-strip reflow when adding
+a second/third row are reasoned from the same explicit-height math this
+file already relies on elsewhere, but have not been visually confirmed
+against a running Blish HUD instance. Treat a fresh multi-row layout
+report as expected-until-checked rather than an automatic regression.
 
 ## Handoff notes for the implementing session
 - Project memory holds the environment + working rules: the
