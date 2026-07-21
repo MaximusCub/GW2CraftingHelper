@@ -1121,3 +1121,150 @@ Settled: keep ASCII carets.
 - Every runtime change: adversarial review gate, then PR -> CI ->
   self-merge. Visual fixes verified in the screenshot loop.
 - Tests: 512 green on master (799a4c5). Build/test commands in CLAUDE.md.
+
+---
+
+# M37 Backlog: Post-Parity Wave (logged 2026-07-21, user directives after M33-M36)
+
+User directives from the 2026-07-21 session, issued after full Exordium
+behavioral parity (M33-M36, master 812d0f0, 812 tests, PRs #44-#51).
+Localization is explicitly DEFERRED to the long-term backlog (user: "not
+core functionality"); upstream Blish HUD issue posts are explicitly
+SKIPPED (the v1.3.0 wheel-delta bug is already fixed on their unreleased
+dev branch; our module-side sanitizer stays until a fixed release ships,
+then can be retired at leisure).
+
+## THE METHOD (still governs items 24-26)
+Research how gw2efficiency handles each behavior FIRST (dev-time only -
+the module never calls gw2e or the wiki at runtime), document it, then
+echo it. NOTE FOR THE IMPLEMENTING SESSION: the prior session's research
+reports lived in a transient scratchpad and are GONE. Committed
+references that survive: docs/gw2e-parity-spec.md (normative algorithm
+spec), the resolution records in items 12-23 above, and project memory.
+gw2e sources remain publicly fetchable (recipe-calculation/recipe-nesting
+on GitHub; the live app bundle at gw2efficiency.com; the custom-recipes
+repo is GONE from GitHub - recover via Wayback Machine if needed).
+
+## 24. Homestead refinement handling (parity gap)
+gw2e's solver models Janthir Wilds homestead refinements - its
+cheapestTree has homestead-refinement merchant-name matching (observed
+in the M34 research of cheapestTree.ts). We model nothing. Refinement
+tiers are NOT in the official API, so a manual user setting is required
+(old critique item, pre-M18). Research first: exact gw2e mechanism
+(how refinement conversions are modeled as merchant recipes, the user
+toggle and its default, daily caps, which material families) plus wiki
+ground truth for the conversions (rates, daily limits, unlock state).
+Then: wiki-verified static seed for the conversions, a Settings toggle,
+solver participation mirroring gw2e, display. No invented data.
+
+## 25. Multi-item sell-side economics (parity gap, deliberate M35 gap)
+M35 left SellableQuantity/NetSaleValue/CraftingProfit unset for batches
+(documented in GenerateStructuredMultiAsync). gw2e's multi mode shows a
+Cost Breakdown that sums Cost/Savings/Profit across items, a "Profit
+numbers are the sum of all crafted recipes" banner, and a
+sell-excess-crafted-components-for-profit rollup exposed ONLY when
+multipleRecipeTree is true (observed in the M34 research of the app
+bundle). Research the exact semantics from the live bundle (what counts
+as excess, the 0.85 fee basis, tradability gating per item, display
+layout), then implement for MultiItemRoots batches. Single-item
+economics (M20) must be byte-identical after.
+
+## 26. Achievement-bit ingredient dedup (parity micro-gap)
+gw2e ships ~274 achievement-discipline custom recipes (achievement_id,
+ingredients mirroring collection requirements) and de-duplicates
+achievement-bit ingredients across the tree (flagged in M34 research as
+a known absent behavior in our module; zero Exordium impact - pick a
+real affected item for verification, e.g. a legendary with an
+achievement-gated collection component). Research exact dedup semantics
+from gw2e sources first; echo. Small.
+
+## 27. Ignore-pill click status label (open defect, see #22)
+Item #22 above: clicking IGNORE/IGNORED re-solves correctly but writes
+"Best path restored" - a preset label, not an ignore label. Use the
+neutral "Decisions updated" status family. Trivial; close #22 when done.
+
+## 28. Vendor cap data seeding + stale-offer sweep (data)
+M34 shipped gw2e-parity warn-only cap machinery (TimegatedItems +
+Crafting Steps notice) but 0 of ~53,530 seeded offers carry
+DailyCap/WeeklyCap values, so it is inert. Extend tools/VendorOfferUpdater
+to fetch purchase-cap data from the wiki (research whether SMW exposes
+caps as queryable properties; else targeted parsing), seed caps
+(mind VendorOfferHasher: content-derived offerIds change when the offer
+payload changes - check hasher scope + tests), and run a stale-offer
+detection pass (wiki-verify current availability; precedent: the Gift
+of Battle offer removed in M33 Wave B was wiki-confirmed discontinued
+in 2016). Scope guard: prioritize offers actually reachable from seeded
+recipe trees before attempting all 53k. Known concrete case to verify:
+the "Candy Corn Vendor (Weekly)" Ecto offers carry no caps despite the
+name (M34 research).
+
+## 29. Owned-materials UI live verification (verification debt)
+USING-N-OWNED pills, owned-currency annotations, and the owned/needed
+shopping splits (M34 B2b) are unit-tested but have never been SEEN
+rendering. Method (no real API key needed): write a synthetic
+AccountSnapshot into the ISOLATED preflight settings data dir
+(C:\Dev\Blish\blish-preflight-settings\data - real SnapshotStore
+format; never touch the user's real Blish config) with Exordium-relevant
+stock (e.g. Mystic Coins, Elder Wood Logs, T6 mats, wallet Spirit
+Shards), enable Use Own Materials, generate Exordium, verify via the
+screenshot loop: partial-owned pills, full-owned HAVE, currency
+owned/needed annotations, and that totals shrink accordingly.
+
+## 30. Required Disciplines divider pixel-scan (verification debt)
+The M36b clearance fix covered 32px discipline rows via the shared
+helper (simulation-proven) but that section was never individually
+pixel-scanned - it is short and sits somewhere above Required Recipes
+(the M36b session never located it on screen). Locate it, scan at 2+
+scroll offsets with the committed scanner
+(C:\Dev\Blish\preflight\scan_dividers.py - methodology and verdict
+reading documented in the script header; environment UI scale is 0.81
+so 32px rows pitch at ~25.9px).
+
+## 31. Concurrency and degradation audits (verification debt)
+Three never-formally-swept reviews, each producing classified findings
+(fix Critical/MustFix per the repo review loop):
+(a) Cross-thread await audit: every await continuation that touches
+Blish controls must marshal via the M31 primitives
+(MainThreadMarshal/generation guards). New async paths were added in
+M33-M36 (currency icon arrival, wheel correction, resize preserve,
+multi-item generate) - audit ALL await points in Views/ + Module.cs +
+pipeline callbacks that mutate controls.
+(b) Offline/API-down degradation: behavior when each /v2 endpoint
+(prices, items, currencies, recipes, account) fails or times out -
+status surfacing, partial renders, retry paths, no crashes/hangs.
+(c) Price-cache thread-safety: the M26 TTL cache + locks under
+concurrent generate/re-solve/refresh.
+
+## DEFERRED (recorded, not M37 scope)
+- Localization (en/de/fr/es via API lang param): user-deferred backlog,
+  "not core functionality". Full-milestone scale when picked up.
+- Upstream Blish HUD issue/PR for the wheel-delta wrap: skipped by user
+  decision; fix already exists on Blish dev; our sanitizer is
+  forward-compatible and retirable after their next release.
+- Ignore-pill cascade semantics + own-materials gating divergences
+  (#20.4): revisit only on user feedback.
+- Multi-item row reordering (gw2e moveRecipe): out of scope per M35.
+
+## Handoff notes for the implementing session
+- Project memory holds everything: parity goal + full M33-M36 record
+  (root causes, primitives: FrameTicker, MainThreadMarshal,
+  PlanContentHeightMath, PlanRelayoutMath, DecisionPillPlanner,
+  WheelDeltaSanitizer), the Blish-over-Paint automation protocol
+  (input routing: Paint focused for wheel/drag, Blish for typing;
+  corner icon +320,0 offset with window at 8,120; idle gate >=120s +
+  activate-verify; launch from a COPY of the .bhm so builds stay
+  unlocked; settings-injection for module settings; input-death
+  diagnosis via silent [scrolldiag]; window position PERSISTS across
+  sessions - re-derive click coords from fresh captures every time;
+  environment UI scale 0.81), and orchestrate-dont-implement (sonnet
+  subagents; opus only for hardest verify; desktop automation is
+  main-thread-only - subagents decline it).
+- Helper scripts: C:\Dev\Blish\preflight\ (wins/shot/click/activate/fg/
+  type/scroll/drag/wheelburst/repro_b/scan_dividers.py/start_paint/
+  start_blish - note start_blish.ps1 hardcodes the repo bin .bhm path;
+  use an inline Start-Process with the copy path instead).
+- Every runtime change: adversarial review gate, then PR -> CI ->
+  self-merge (git and gh allowlisted; git push prompts once per branch
+  due to a global ask rule - expected).
+- Tests: 812 green on master (812d0f0). Build/test commands in CLAUDE.md.
+- ScrollDiagnosticsEnabled=true persists in the preflight settings.json.
