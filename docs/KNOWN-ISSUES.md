@@ -127,3 +127,91 @@ Fixed in M30: pill labels now render in white.
 - Currency rows now use API names from /v2/currencies (may differ
   slightly from the old hardcoded fallbacks, e.g. singular forms);
   Gw2Constants remains the offline fallback.
+
+---
+
+# M33 Backlog: Exordium Full-Parity Wave (logged 2026-07-20, post-M32 hands-on)
+
+User-reported issues from live testing of the merged M30-M32 build, plus a
+milestone directive. GOAL: full behavioral parity with the gw2efficiency
+crafting calculator for an Exordium plan, every node. Hypotheses below are
+from the orchestrating session - instrument/verify before trusting.
+
+## THE METHOD (user directive - governs all items below)
+Research how gw2efficiency.com/crafting/calculator handles Exordium
+ITEM BY ITEM (research-only at dev time; the module must NEVER call
+gw2efficiency at runtime). For each node document: which sources gw2e
+shows, which price basis it uses, craft/buy defaults, how it displays
+vendor/currency costs, and how it handles unpriceable items. Make the
+module ECHO that behavior rather than inventing an approach. New
+dev-time seeders (vendor pricing, Mystic Forge recipes) are welcome;
+they must write static seed JSON, never scrape at runtime.
+
+## 12. Fast wheel-up scroll: net-downward stutter
+Rapid successive wheel-up events make the viewport scroll up then jump
+back down further than it went up - net downward movement with an
+upward stutter. Hypothesis: scroll guard/restore machinery (or some
+per-frame interaction with Blish's Panel wheel handling) contesting
+rapid user input. Reproduce with the proven instrument-first loop
+(synthetic rapid wheel-up while a guard window could be live and while
+idle) before designing a fix.
+
+## 13. Resize UX rework: live reflow, no settle stutter
+The 150ms debounce-only approach is REJECTED by user feedback: content
+must reflow smoothly WHILE dragging, not lag until the mouse holds
+still. Additionally the settle rebuild itself is visibly ugly: stray
+horizontal divider lines flash and the view visibly reconstructs from a
+collapsed state (nested AutoSize convergence made visible). Direction:
+in-place width relayout of EXISTING controls during drag (update
+widths/x-positions; no dispose+rebuild), making the settle rebuild
+unnecessary or invisible. This is the previously-rejected "option b" -
+now required; design it to avoid drift between build and relayout paths.
+
+## 14. Pill-click viewport flash (jump to top and back)
+Clicking a TP/VENDOR override pill visibly flashes the view to the top
+for an instant before the scroll restore re-asserts. The restore
+converges but applies a frame+ late. Direction: apply the saved scroll
+ratio synchronously inside PreserveScrollAcross immediately after the
+rebuild (before first paint), with the FrameTicker loop only defending
+convergence afterward - target: zero visible movement.
+
+## 15. Shopping tag text contrast (VENDOR / SALVAGE / UNKNOWN)
+The grey shopping-list source tags have poor text-vs-fill contrast.
+Tag text should be near-white / light grey (match the M30 #11 pill-label
+fix, which only covered tree pills, not shopping tags).
+
+## 16. Vendor-source items show no price
+Vendor-decision rows (e.g. Vision Crystal, Philosopher's Stone, Mystic
+Clover) render empty Each/Total cells. Show the actual vendor cost,
+including non-coin currency costs with currency icons (pipeline for
+icons exists since M30 #3). Echo gw2e's display for the same nodes.
+
+## 17. Seed data gaps: false UNKNOWNs in the Exordium tree
+- Gift of Exordium, Gift of Metal, Gift of the Mists: believed Mystic
+  Forge recipes - missing from the recipe seed, so they render UNKNOWN.
+- Mystic Runestone: vendor-purchased (Miyani, spirit shards) - missing
+  vendor offer.
+- Sweep EVERY node of a live Exordium plan that renders UNKNOWN against
+  the wiki; classify each as (a) genuinely no-source (seed an
+  acquisition hint + badge), or (b) missing recipe/vendor seed data
+  (extend the MF recipe seeder / vendor offers seed).
+- Known related data bug: ref/recipes_seed.json has a self-referential
+  recipe for Obsidian Shard (19925) - likely MF seeder scrape artifact.
+
+## 18. Multi-source decision display is inconsistent
+Glob of Ectoplasm shows a VENDOR pill while its pricing uses TP. Items
+available from multiple sources should expose all sources with the
+selected one highlighted (gw2e-style), and the displayed decision MUST
+match the price basis actually used by the solver. Audit the
+decision-to-pill mapping for every source combination.
+
+## Handoff notes for the implementing session
+- Project memory holds the environment + working rules: the
+  Blish-over-Paint screenshot loop (input routing: Paint focused for
+  wheel/drag, Blish focused for typing; corner icon at +320,0; idle
+  gate + activate-verify + cursor-drift protocol), orchestrate-dont-
+  implement (sonnet subagents), and the QueueMainThreadUpdate same-frame
+  drain / FrameTicker / MainThreadMarshal primitives.
+- Every runtime change: adversarial review gate, then PR -> CI ->
+  self-merge. Visual fixes verified in the screenshot loop.
+- Tests: 512 green on master (799a4c5). Build/test commands in CLAUDE.md.
