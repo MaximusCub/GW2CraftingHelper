@@ -953,7 +953,7 @@ correctly but writes the status line "Best path restored" - the label
 belongs to the Best Path preset, not the ignore toggle. Pick a neutral
 re-solve status ("Decisions updated" family) for ignore clicks.
 
-## 23. Horizontal dividers appear/disappear with scroll position (FIXED in M36, live-verified)
+## 23. Horizontal dividers appear/disappear with scroll position (FIXED in M36; see M36b follow-up below for 44px/32px rows)
 User report: the same rows' divider lines are present at one scroll
 offset and gone at another - not a contrast problem (that was #7, fixed
 in M30), a presence/absence flicker as the list scrolls.
@@ -1035,6 +1035,70 @@ same rows that previously lost their divider at unlucky positions keep
 it across all sampled offsets. Header divider and section-title glyph
 clearance looked normal in the same captures (no crowding observed),
 though no glyph-metric measurement was taken.
+**CORRECTION (M36b, see follow-up below):** the "LIVE-VERIFIED" claim
+above is downgraded from unqualified to **36px sections verified;
+44px/32px rows were still vulnerable** - the capture above only ever
+sampled the Shopping List, whose rowHeight (36) is mathematically
+immune to the defect regardless of this fix. It never exercised the
+Required Recipes/Disciplines/Crafting Steps row heights (44px/32px),
+which a follow-up investigation proved were still broken. Recorded
+here as an honest correction rather than silently edited away.
+
+## Follow-up to #23 (M36b): 44px/32px rows still vulnerable after M36
+User re-reported divider misses in Required Recipes on the merged M36
+build. Live pixel-scans (idle desktop, two successive scroll captures
+one wheel notch apart) proved the misses are position-dependent
+single-boundary vanishes that move with scroll phase, not a fixed
+row/content correlation: one capture showed exactly one missing
+divider boundary; the next capture (content shifted ~1 logical pixel)
+showed that boundary restored but two DIFFERENT boundaries missing.
+Measured environment UI scale for this test setup was 0.81 (Small),
+correcting the earlier 0.897 (Normal) assumption used throughout #23's
+original analysis and fix.
+ROOT CAUSE: a second, independent scissor round trip that #23's M36
+analysis did not model. `rowPanel` is itself a Blish `Container`, and
+every `Container.Paint()` unscales the physical scissor it was just
+given back to logical space before re-intersecting and re-scaling it
+for its own children (`Container.cs:377-381`, `Control.cs:1176-1177`
+in the decompiled Blish HUD v1.3.0 binary) - a SECOND floor/ceil step
+on top of the one #23 modeled for the divider's own quad-vs-scissor
+math. This second round trip can shrink the clip rectangle reaching
+the divider by exactly 1 logical pixel, always at the row's bottom
+edge, which for `rowHeight` = 44 (Crafting Steps, Recipe rows with a
+sublabel) and 32 (Required Disciplines) reliably deletes the divider
+entirely (0 physical scanlines) at ~10.2% of scroll phases at the
+default scale - matching the "one boundary here, different boundaries
+there, one notch later" live evidence exactly. `rowHeight` = 36 (Used
+Materials, Shopping List, Recipe rows with no sublabel) is immune by
+construction at every GW2 UI Size scale tested, which is why M36's own
+Shopping List verification pass came back clean - it happened to
+sample the one row height that was never broken.
+FIX (M36b): `CreateRowDivider` gained a `bottomClearance` parameter -
+1 extra logical pixel of gap between the divider and `rowHeight` for
+the vulnerable 44px/32px row types (`CreateCraftStepRow`,
+`CreateRecipeRow`'s sublabel branch, `CreateDisciplineRow`), 0
+(unchanged) for the immune 36px row types. Proven immune by
+simulation across every `rowHeight` value in the file and all four GW2
+UI Size scale factors (0.81/0.897/1.0/1.103), not just the default -
+see `CreateRowDivider`'s doc comment in Views/CraftingPlanView.cs for
+the full derivation. Required Disciplines was not part of the user's
+report but was confirmed mathematically identical exposure (~10.2%
+vanish rate) and free of any icon-clearance side effect (that row has
+no icon, just two `DefaultFont14` labels well clear of the new divider
+position) - fixed proactively rather than left latent.
+Also newly noted (unfixed, out of scope for M36b): the section
+headerDivider (H=30, built inline in CreateSectionHeader, not via
+CreateRowDivider) is built the same bottom-anchored way and shares the
+same Container.Paint exposure - simulation shows it is immune at the
+default 0.897 scale but becomes vulnerable (~16-17%) at the "Small"
+0.81 scale, which is the scale actually measured in this session's
+live pixel-scan. Left unfixed pending an explicit follow-up request.
+VERIFICATION STATE: code-verified (build/tests) and simulation-proven
+across all four UI scale factors, per the M36b investigation and
+divider-position pixel scans referenced above. Live re-verification of
+THIS fix (a fresh desktop pixel-scan of Required Recipes/Crafting
+Steps/Required Disciplines across multiple scroll phases) is still
+pending.
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every

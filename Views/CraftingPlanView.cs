@@ -2357,6 +2357,17 @@ namespace GW2CraftingHelper.Views
             // (Location.Y = 28, i.e. headerPanel.Height - 2) - see
             // CreateRowDivider's doc comment for why 1px is unsafe under
             // Blish's non-integer UI-scale GPU transform (KNOWN-ISSUES #23).
+            // NOT built via CreateRowDivider (headerPanel is not a row of a
+            // list, it has its own fixed 30px height) so it is out of scope
+            // for the M36b bottomClearance fix below - but it is built the
+            // SAME way (a Panel child bottom-anchored 2px from its parent's
+            // bottom edge) and is therefore subject to the identical
+            // Container.Paint round-trip defect. Simulation (M36b
+            // investigation) shows H=30 is immune at the default 0.897
+            // scale but becomes vulnerable (~16-17%) at the "Small" 0.81
+            // scale - unconfirmed live and left unfixed here since it was
+            // outside this fix's requested scope; flagged as a follow-up
+            // concern, not a known-safe case.
             var headerDivider = new Panel()
             {
                 Size = new Point(panelWidth, 2),
@@ -2495,22 +2506,49 @@ namespace GW2CraftingHelper.Views
         /// coverage is floor(0.897) = 0, i.e. it can disappear entirely
         /// depending on scroll-offset sub-pixel alignment (KNOWN-ISSUES
         /// #23). At 2px, floor(2 * 0.897) = floor(1.794) = 1 guarantees at
-        /// least one covered physical scanline at any offset. Bottom-
-        /// anchored (rowHeight - 2, not rowHeight - 1) so the divider grows
-        /// into the row's own bounds rather than past them - the row's
-        /// total height (PlanContentHeightMath) already accounts for the
-        /// divider living inside rowHeight, so this needed no height-math
-        /// change, only the two row types whose icon frame filled rowHeight
-        /// to within 1px (CreateUsedMaterialRow, CreateShoppingRow) needed
-        /// their icon's y nudged up by 1 to keep clear of the taller
-        /// divider - see the comment at each of those call sites.
+        /// least one covered physical scanline for the divider's OWN
+        /// quad-vs-scissor math analyzed in isolation.
+        ///
+        /// M36b (KNOWN-ISSUES #23 follow-up): that isolated argument is
+        /// necessary but not sufficient. rowPanel is itself a Container, and
+        /// every Container.Paint() performs a SECOND, independent
+        /// floor/ceil round trip - it unscales the physical scissor it was
+        /// just given back to logical space (ScaleBy(1/UIScaleMultiplier))
+        /// before re-intersecting and re-scaling it for its own children
+        /// (Container.cs:377-381, Control.cs:1176-1177 in the decompiled
+        /// Blish HUD binary). That round trip can shrink the clip rectangle
+        /// propagated to the divider by exactly 1 logical pixel, but
+        /// provably only at the row's BOTTOM edge (the reconstructed START
+        /// never exceeds the true start - floor(floor(Y*s)/s) &lt;= Y for any
+        /// positive scale s). Whether that 1px shrink actually deletes the
+        /// divider depends on rowHeight: simulation across every rowHeight
+        /// in this file and all four GW2 UI Size scale factors (0.81 /
+        /// 0.897 / 1.0 / 1.103) shows 44px rows (CraftStepRowHeight,
+        /// RecipeRowHeightWithSublabel) and 32px rows (DisciplineRowHeight)
+        /// vanish completely (0 physical scanlines) at ~10.2% of scroll
+        /// phases at the default scale; 36px rows (UsedMaterialRowHeight,
+        /// ShoppingRowHeight, RecipeRowHeightNoSublabel) are immune at every
+        /// tested scale.
+        ///
+        /// Fix: bottomClearance - an extra logical pixel of gap between the
+        /// divider and rowHeight, i.e. Location.Y = rowHeight - 2 -
+        /// bottomClearance. This moves the divider's own interval entirely
+        /// inside the worst-case-shrunk clip window, which simulation
+        /// confirms is immune (0/5000 vanishes) for every (rowHeight, scale)
+        /// pair tested - proven, not just observed clean at one scale.
+        /// Callers pass 1 for the vulnerable 44px/32px row types above and 0
+        /// for the immune 36px row types (CreateUsedMaterialRow,
+        /// CreateShoppingRow, CreateRecipeRow's no-sublabel branch) - those
+        /// three were tuned in M36 to a flush icon(0..34) + divider(34..36)
+        /// fit with zero slack, and giving them clearance they don't need
+        /// would reintroduce the icon/divider overlap M36 fixed.
         /// </summary>
-        private static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight)
+        private static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight, int bottomClearance)
         {
             return new Panel()
             {
                 Size = new Point(panelWidth, 2),
-                Location = new Point(0, rowHeight - 2),
+                Location = new Point(0, rowHeight - 2 - bottomClearance),
                 BackgroundColor = RowDividerColor,
                 Parent = rowPanel
             };
@@ -2637,7 +2675,12 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
-            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            // M36b: bottomClearance 0 - UsedMaterialRowHeight (36) is
+            // immune to the Container.Paint round-trip defect (see
+            // CreateRowDivider's doc comment) and its icon frame is
+            // flush-fit with zero slack; giving it clearance it doesn't
+            // need would reintroduce the icon/divider overlap M36 fixed.
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight, 0);
 
             // M33 C2b: qty label position is a pure reposition (qtyWidth is
             // font-only); the name is left untouched during drag ticks and
@@ -2849,7 +2892,11 @@ namespace GW2CraftingHelper.Views
             var eachCell = RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
             var totalCell = RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
 
-            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            // M36b: bottomClearance 0 - ShoppingRowHeight (36) is immune to
+            // the Container.Paint round-trip defect (see CreateRowDivider's
+            // doc comment) and its icon frame is flush-fit with zero
+            // slack; see the identical note in CreateUsedMaterialRow.
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight, 0);
 
             // M33 C2b: qty + Each/Total cells reposition every drag tick
             // (no MeasureString - RepositionValueCellRightAligned uses only
@@ -2983,7 +3030,13 @@ namespace GW2CraftingHelper.Views
                     new Color(153, 153, 153), panelWidth - 8, 16);
             }
 
-            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            // M36b: bottomClearance 1 - CraftStepRowHeight (44) is
+            // VULNERABLE to the Container.Paint round-trip defect (see
+            // CreateRowDivider's doc comment): its icon frame bottom
+            // (iconY 5 + 34 = 39) sits 2px clear of the new divider top
+            // (rowHeight-3 = 41), so the 1px shift is free of
+            // icon-clearance side effects.
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
 
             // M33 C2b: name/qty labels sit at a fixed x (font-only, not
             // width-dependent - textX never depended on panelWidth); only
@@ -3050,7 +3103,16 @@ namespace GW2CraftingHelper.Views
             };
             var levelLabel = CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
 
-            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            // M36b: bottomClearance 1 - DisciplineRowHeight (32) is
+            // VULNERABLE to the Container.Paint round-trip defect (see
+            // CreateRowDivider's doc comment), same ~10.2% vanish rate as
+            // the 44px rows; the M36b investigation confirmed this via
+            // simulation but omitted it from its fix list by oversight.
+            // No icon in this row (two DefaultFont14 labels at y=7 only),
+            // so there is no icon-clearance side effect to worry about -
+            // the new divider top (rowHeight - 3 = 29) sits well clear of
+            // the text baseline.
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
 
             _relayoutActions.Add(w =>
             {
@@ -3138,7 +3200,15 @@ namespace GW2CraftingHelper.Views
                 statusLabel = CreateRightAlignedLabel(rowPanel, row.StatusTag, font, statusColor, panelWidth - 8, hasSublabel ? 10 : 8);
             }
 
-            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            // M36b: bottomClearance depends on which rowHeight this branch
+            // used. hasSublabel (44px, RecipeRowHeightWithSublabel) is
+            // VULNERABLE to the Container.Paint round-trip defect (see
+            // CreateRowDivider's doc comment) - icon frame bottom (1 + 34 =
+            // 35) leaves ample headroom below rowHeight-3 (41). The
+            // no-sublabel branch (36px, RecipeRowHeightNoSublabel) is
+            // immune and flush-fit with zero slack (M36); giving it
+            // clearance it doesn't need would reintroduce that overlap.
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight, hasSublabel ? 1 : 0);
 
             _relayoutActions.Add(w =>
             {
