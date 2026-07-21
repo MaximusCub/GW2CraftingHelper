@@ -76,8 +76,10 @@ namespace GW2CraftingHelper.Services
                 vm.Sections.Add(BuildRecipesSection(result));
             }
 
-            // 6. Crafting Steps section (only if non-empty) - last, per gw2e order
-            if (craftSteps.Count > 0)
+            // 6. Crafting Steps section (only if non-empty, OR there is a
+            // timegated notice to show - M34-B1 #3) - last, per gw2e order
+            bool hasTimegatedItems = result.Plan.TimegatedItems != null && result.Plan.TimegatedItems.Count > 0;
+            if (craftSteps.Count > 0 || hasTimegatedItems)
             {
                 vm.Sections.Add(BuildCraftingStepsSection(craftSteps, result));
             }
@@ -315,6 +317,25 @@ namespace GW2CraftingHelper.Services
                     Rarity = rarity,
                     Quantity = step.Quantity
                 });
+            }
+
+            // Timegated (vendor purchase cap) notices (M34-B1 #3) - a plain
+            // informational line per item, gw2efficiency parity: caps are
+            // surfaced, never solved around. Appended after the real craft
+            // steps so a section made up ENTIRELY of notices (no craft
+            // steps at all) still renders correctly.
+            if (result.Plan.TimegatedItems != null)
+            {
+                foreach (var timegated in result.Plan.TimegatedItems)
+                {
+                    string itemName = ResolveName(timegated.ItemId, result.ItemMetadata);
+                    string capLabel = timegated.CapType == TimegatedCapType.Daily ? "Daily" : "Weekly";
+                    section.Rows.Add(new PlanRowViewModel
+                    {
+                        RowType = PlanRowType.TimegatedNotice,
+                        Label = $"{itemName} is timegated - {capLabel} limit: {timegated.CapValue} (plan needs {timegated.NeededCount})"
+                    });
+                }
             }
 
             return section;

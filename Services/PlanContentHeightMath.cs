@@ -63,7 +63,7 @@ namespace GW2CraftingHelper.Services
                 case PlanSectionType.ShoppingList:
                     return ShoppingHeaderRowHeight + rows.Count * ShoppingRowHeight;
                 case PlanSectionType.CraftingSteps:
-                    return rows.Count * CraftStepRowHeight;
+                    return CraftingStepsBodyHeight(rows);
                 case PlanSectionType.RequiredDisciplines:
                     return CTableHeaderRowHeight + rows.Count * DisciplineRowHeight;
                 case PlanSectionType.RequiredRecipes:
@@ -74,6 +74,26 @@ namespace GW2CraftingHelper.Services
                     // PlanRowViewModel).
                     return rows.Count * FallbackTextRowHeight;
             }
+        }
+
+        /// <summary>
+        /// M34-B1 #3: a Crafting Steps section can now mix numbered
+        /// CraftStep rows (CraftStepRowHeight, via CreateCraftStepRow) with
+        /// plain TimegatedNotice info rows (FallbackTextRowHeight, via the
+        /// shared CreateTextRow helper - see CraftingPlanView.
+        /// CreateCraftingStepsBody), so height is summed per-row rather than
+        /// assumed uniform.
+        /// </summary>
+        private static int CraftingStepsBodyHeight(IReadOnlyList<PlanRowViewModel> rows)
+        {
+            int height = 0;
+            foreach (var row in rows)
+            {
+                height += row.RowType == PlanRowType.TimegatedNotice
+                    ? FallbackTextRowHeight
+                    : CraftStepRowHeight;
+            }
+            return height;
         }
 
         private static int SummaryBodyHeight(IReadOnlyList<PlanRowViewModel> rows)

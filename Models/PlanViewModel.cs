@@ -30,7 +30,14 @@ namespace GW2CraftingHelper.Models
         ShoppingUnknown,
         CraftStep,
         DisciplineRow,
-        RecipeRow
+        RecipeRow,
+
+        // Plain informational line in the Crafting Steps section (M34-B1
+        // #3) - a vendor-capped item whose merged demand exceeds its
+        // offer's daily/weekly purchase cap. Never numbered/badged like a
+        // CraftStep row; rendered via the same plain-text row pattern as
+        // any other fallback text row.
+        TimegatedNotice
     }
 
     public class PlanViewModel

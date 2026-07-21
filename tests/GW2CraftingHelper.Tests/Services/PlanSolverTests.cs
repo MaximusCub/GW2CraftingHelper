@@ -1279,21 +1279,141 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(plan.CurrencyCosts);
         }
 
-        // --- Vendor purchase-cap tests ---
-        // V1 semantics: an offer whose DailyCap (or WeeklyCap when DailyCap is
-        // absent/zero) cannot cover the node's needed purchases in a single
-        // cap period is excluded entirely - it never competes in the
-        // comparable tier or the fallback tier. Partial cap-split sourcing
-        // (buy up to the cap, then take the rest from a second source) is a
-        // deliberate non-goal; a node is still sourced from exactly one
-        // acquisition.
+        // --- Aggregate-before-ceil tests (M34-B1 #1) ---
+        // gw2efficiency merges same-id demand across the WHOLE tree first,
+        // then ceils the purchase count exactly once (docs/gw2e-parity-spec.md
+        // Section 6.5). Evaluating/ceiling per tree occurrence and only
+        // summing afterward (the pre-fix shape) overstates the true cost for
+        // any item needed via 2+ occurrences and bought via a bulk
+        // (OutputCount > 1) offer.
 
         [Fact]
-        public void CappedOffer_NeededExceedsCap_ExcludedFallsBackToTp()
+        public void MultiOccurrenceBulkVendorOffer_CurrencyCost_AggregatesBeforeCeiling()
         {
-            // Vendor sells for 1 coin each but only 25/day; node needs 50, so
-            // one day's cap cannot cover it and the offer must be excluded,
-            // leaving the (much pricier) TP buy as the only option.
+            // Live repro (m34-m2-live-oddities.md): item 99 needed via 5
+            // separate tree occurrences (qty 4, 4, 4, 83, 84 = 179 total),
+            // all resolving to the same fallback-tier "3 units of item 99
+            // for 3 units of currency 5" offer (no TP price, no recipe,
+            // unvalued currency - exactly Obsidian Shard's real
+            // 3-for-3-Laurels shape). Per-occurrence ceiling would charge
+            // ceil(4/3)*3 x3 + ceil(83/3)*3 + ceil(84/3)*3 = 6+6+6+84+84 =
+            // 186; merging demand first and ceiling once gives
+            // ceil(179/3)*3 = 180 - not 186.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(99, 4),
+                    Leaf(99, 4),
+                    Leaf(99, 4),
+                    Leaf(99, 83),
+                    Leaf(99, 84)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { MixedVendorOffer(99, 0, 5, 3, outputCount: 3) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, vendorStep.Source);
+            Assert.Equal(179, vendorStep.Quantity);
+            Assert.Equal(0, vendorStep.TotalCost);
+
+            var currencyCost = Assert.Single(plan.CurrencyCosts, c => c.CurrencyId == 5);
+            Assert.Equal(180, currencyCost.Amount);
+        }
+
+        [Fact]
+        public void MultiOccurrenceBulkVendorOffer_CoinCost_AggregatesBeforeCeiling()
+        {
+            // Sibling to the currency case above (M34-B1 #1's class-level
+            // scope note): the identical bug shape applies to a bulk offer
+            // priced in COIN, not just non-coin currency. Same 179-unit
+            // demand, same 3-for-3 batch shape, coin instead of currency:
+            // ceil(179/3)*3 = 180, not the per-occurrence sum of 186.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(99, 4),
+                    Leaf(99, 4),
+                    Leaf(99, 4),
+                    Leaf(99, 83),
+                    Leaf(99, 84)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, vendorStep.Source);
+            Assert.Equal(179, vendorStep.Quantity);
+            Assert.Equal(180, vendorStep.TotalCost);
+            Assert.Equal(180, plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void MultiOccurrenceDifferentWinningOffers_LeavesPerOccurrenceSumUnmerged()
+        {
+            // Two tree occurrences of the same item can, at their own local
+            // quantity, legitimately prefer DIFFERENT vendor offers (a bulk
+            // discount threshold effect: a small purchase favors a 1-for-2
+            // offer, a large one favors a 100-for-150 offer). There is no
+            // single "true" offer to merge these under, so the per-occurrence
+            // sum (each individually correct) must be left alone rather than
+            // forced through a single ceil - the Conflict ratchet in
+            // PlanSolver.AggregateStep/FinalizeVendorBatches exists for
+            // exactly this case.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(99, 1),
+                    Leaf(99, 100)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    99, new List<VendorOffer>
+                    {
+                        CoinVendorOffer(99, 2, outputCount: 1),
+                        CoinVendorOffer(99, 150, outputCount: 100)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, vendorStep.Source);
+            Assert.Equal(101, vendorStep.Quantity);
+            // qty=1 picks the 1-for-2 offer (2 coin); qty=100 picks the
+            // 100-for-150 offer (150 coin) - two genuinely different real
+            // purchases, correctly left summed (2 + 150 = 152) rather than
+            // merged under either offer's own batch shape.
+            Assert.Equal(152, vendorStep.TotalCost);
+            Assert.Equal(152, plan.TotalCoinCost);
+            Assert.Equal(0, vendorStep.VendorOfferOutputCount);
+        }
+
+        // --- Vendor purchase-cap tests ---
+        // V2 semantics (M34-B1 #3, gw2efficiency parity): a DailyCap/WeeklyCap
+        // NEVER excludes an offer or re-routes the solver to a different
+        // source - gw2efficiency itself only ever surfaces a cap as a
+        // post-solve "this is timegated" notice, never a tree change. A
+        // cap-exceeding offer is still used exactly like an uncapped one;
+        // the only observable effect is a CraftingPlan.TimegatedItems entry.
+
+        [Fact]
+        public void CappedOffer_NeededExceedsCap_StillUsedAsVendor_SurfacesTimegatedNotice()
+        {
+            // Vendor sells for 1 coin each but only 25/day; node needs 50,
+            // exceeding one day's cap. The far cheaper vendor offer (50
+            // coin) is still used over the expensive TP price (500 coin) -
+            // caps never re-route the solver - and the plan surfaces a
+            // timegated notice instead of silently falling back.
             var tree = Leaf(1, 50);
             var prices = new Dictionary<int, ItemPrice>
             {
@@ -1308,15 +1428,22 @@ namespace GW2CraftingHelper.Tests.Services
             var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Single(plan.Steps);
-            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
-            Assert.Equal(500, plan.TotalCoinCost);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(50, plan.TotalCoinCost);
+
+            var notice = Assert.Single(plan.TimegatedItems);
+            Assert.Equal(1, notice.ItemId);
+            Assert.Equal(TimegatedCapType.Daily, notice.CapType);
+            Assert.Equal(25, notice.CapValue);
+            Assert.Equal(50, notice.NeededCount);
         }
 
         [Fact]
         public void CappedOffer_NeededWithinCap_StillUsedAsVendor()
         {
             // Needed (20) is within the cap (25); the far cheaper vendor
-            // offer must still be picked over the expensive TP price.
+            // offer must still be picked over the expensive TP price, and
+            // no timegated notice is raised since the cap is not exceeded.
             var tree = Leaf(1, 20);
             var prices = new Dictionary<int, ItemPrice>
             {
@@ -1333,6 +1460,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
             Assert.Equal(100, plan.TotalCoinCost);
+            Assert.Empty(plan.TimegatedItems);
         }
 
         [Fact]
@@ -1342,8 +1470,8 @@ namespace GW2CraftingHelper.Tests.Services
             // 30 units/day). Needing 25 units requires only 3 purchases
             // (ceil(25/10)), which fits the cap even though 25 itself is far
             // greater than the raw DailyCap of 3 - proving OutputCount is
-            // correctly folded into the cap check rather than comparing the
-            // node's raw quantity against the cap.
+            // correctly folded into the cap check (no timegated notice)
+            // rather than comparing the node's raw quantity against the cap.
             var tree = Leaf(1, 25);
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
@@ -1357,15 +1485,17 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
             Assert.Equal(15, plan.TotalCoinCost);
+            Assert.Empty(plan.TimegatedItems);
         }
 
         [Fact]
-        public void CappedBatchOffer_OneMoreUnitPushesPastCap_Excluded()
+        public void CappedBatchOffer_OneMoreUnitPushesPastCap_StillUsedAsVendor_SurfacesTimegatedNotice()
         {
             // Same batch/cap shape as above (10/batch, cap 3 => 30/day), but
-            // needing 31 units requires 4 purchases (ceil(31/10)), which
-            // exceeds the cap even though the cap*OutputCount ceiling (30) is
-            // barely below 31.
+            // needing 31 units requires 4 purchases (ceil(31/10)), exceeding
+            // the cap. With no TP price and no recipe, the offer is still
+            // the only (and therefore chosen) source - caps never exclude -
+            // and the plan surfaces a timegated notice for it.
             var tree = Leaf(1, 31);
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
@@ -1377,15 +1507,21 @@ namespace GW2CraftingHelper.Tests.Services
             var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Single(plan.Steps);
-            Assert.Equal(AcquisitionSource.UnknownSource, plan.Steps[0].Source);
-            Assert.Equal(0, plan.TotalCoinCost);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(20, plan.TotalCoinCost);
+
+            var notice = Assert.Single(plan.TimegatedItems);
+            Assert.Equal(1, notice.ItemId);
+            Assert.Equal(TimegatedCapType.Daily, notice.CapType);
+            Assert.Equal(3, notice.CapValue);
+            Assert.Equal(4, notice.NeededCount);
         }
 
         [Fact]
         public void ZeroCap_TreatedAsUncapped()
         {
             // An explicit DailyCap of 0 (not merely absent) must still mean
-            // uncapped per the V1 decision, not "zero purchases allowed".
+            // uncapped, not "zero purchases allowed" - no timegated notice.
             var tree = Leaf(1, 500);
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
@@ -1399,13 +1535,15 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
             Assert.Equal(500, plan.TotalCoinCost);
+            Assert.Empty(plan.TimegatedItems);
         }
 
         [Fact]
         public void WeeklyCapUsed_WhenDailyCapAbsent()
         {
-            // No DailyCap set; WeeklyCap of 25 cannot cover the 50 needed, so
-            // the offer is excluded and TP is used instead.
+            // No DailyCap set; WeeklyCap of 25 cannot cover the 50 needed.
+            // The offer is still used (far cheaper than TP) and surfaces a
+            // Weekly-typed timegated notice.
             var tree = Leaf(1, 50);
             var prices = new Dictionary<int, ItemPrice>
             {
@@ -1420,16 +1558,21 @@ namespace GW2CraftingHelper.Tests.Services
             var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Single(plan.Steps);
-            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
-            Assert.Equal(500, plan.TotalCoinCost);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(50, plan.TotalCoinCost);
+
+            var notice = Assert.Single(plan.TimegatedItems);
+            Assert.Equal(TimegatedCapType.Weekly, notice.CapType);
+            Assert.Equal(25, notice.CapValue);
+            Assert.Equal(50, notice.NeededCount);
         }
 
         [Fact]
         public void DailyCapTakesPrecedenceOverWeeklyCap()
         {
-            // DailyCap (100) alone covers the 50 needed, so the offer is used
-            // even though its WeeklyCap (1) alone would have excluded it -
-            // DailyCap wins whenever it is positive.
+            // DailyCap (100) alone covers the 50 needed, so no notice is
+            // raised even though the WeeklyCap (1) alone would have been
+            // exceeded - DailyCap wins whenever it is positive.
             var tree = Leaf(1, 50);
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
@@ -1443,15 +1586,17 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
             Assert.Equal(50, plan.TotalCoinCost);
+            Assert.Empty(plan.TimegatedItems);
         }
 
         [Fact]
-        public void CappedMixedCurrencyOffer_NeededExceedsCap_ExcludedFromFallbackTier()
+        public void CappedMixedCurrencyOffer_NeededExceedsCap_StillUsedAsFallback_SurfacesTimegatedNotice()
         {
             // A mixed-currency offer only ever competes in the fallback
-            // tier (its non-coin currency line is unvalued). The cap check
-            // must still apply there: needing 50 against a cap of 10 excludes
-            // it, leaving no acquisition at all (no TP price, no recipe).
+            // tier (its non-coin currency line is unvalued). With no TP
+            // price and no recipe, it remains the only source even though
+            // needing 50 exceeds the cap of 10 - caps never exclude - and a
+            // timegated notice is raised for it.
             var tree = Leaf(1, 50);
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
@@ -1463,16 +1608,25 @@ namespace GW2CraftingHelper.Tests.Services
             var plan = solver.Solve(tree, prices, vendorOffers).Plan;
 
             Assert.Single(plan.Steps);
-            Assert.Equal(AcquisitionSource.UnknownSource, plan.Steps[0].Source);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
             Assert.Equal(0, plan.TotalCoinCost);
-            Assert.Empty(plan.CurrencyCosts);
+            Assert.Single(plan.CurrencyCosts);
+            Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
+            Assert.Equal(2500, plan.CurrencyCosts[0].Amount);
+
+            var notice = Assert.Single(plan.TimegatedItems);
+            Assert.Equal(1, notice.ItemId);
+            Assert.Equal(TimegatedCapType.Daily, notice.CapType);
+            Assert.Equal(10, notice.CapValue);
+            Assert.Equal(50, notice.NeededCount);
         }
 
         [Fact]
         public void CappedMixedCurrencyOffer_NeededWithinCap_StillUsedAsFallback()
         {
             // Needed (5) is within the cap (10); the mixed-currency offer
-            // remains the fallback acquisition (no TP price, no recipe).
+            // remains the fallback acquisition (no TP price, no recipe), and
+            // no timegated notice is raised.
             var tree = Leaf(1, 5);
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
@@ -1489,6 +1643,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(plan.CurrencyCosts);
             Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
             Assert.Equal(250, plan.CurrencyCosts[0].Amount);
+            Assert.Empty(plan.TimegatedItems);
         }
 
         // --- Price basis tests ---

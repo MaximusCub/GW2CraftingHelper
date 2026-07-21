@@ -76,6 +76,7 @@
     <Compile Include="Models\CurrencyCost.cs" />
     <Compile Include="Models\CurrencyValuation.cs" />
     <Compile Include="Models\CraftingPlan.cs" />
+    <Compile Include="Models\TimegatedItem.cs" />
     <Compile Include="Services\PlanSolver.cs" />
     <Compile Include="Services\SolverDecision.cs" />
     <Compile Include="Services\SolveResult.cs" />

@@ -34,6 +34,42 @@ namespace GW2CraftingHelper.Services
             public bool CanCraft;
             public bool CanBuyTp;
             public bool CanBuyVendor;
+
+            // Winning vendor offer's batch shape (Source == BuyFromVendor
+            // only, null otherwise): the offer's own OutputCount and its
+            // UNSCALED per-batch coin/currency cost (one purchase, before
+            // this node's own occurrence-local unitsNeeded scaling). Carried
+            // so Collect/AggregateStep/FinalizeVendorBatches can re-derive a
+            // merged step's true cost from AGGREGATE demand and ceil once
+            // (M34-B1 #1 - gw2e parity), instead of trusting the sum of
+            // several already-independently-ceil'd per-occurrence costs.
+            public VendorOfferBatch? VendorBatch;
+        }
+
+        // See Decision.VendorBatch's doc comment.
+        private struct VendorOfferBatch
+        {
+            public int OutputCount;
+            public long CoinCostPerBatch;
+            public List<CostLine> CurrencyCostLinesPerBatch;
+            public int? DailyCap;
+            public int? WeeklyCap;
+        }
+
+        // Per-item-id (BuyFromVendor stepKey) bookkeeping built up across
+        // every tree occurrence during Collect/AggregateStep: which offer
+        // batch shape was seen, and whether every occurrence agreed (a
+        // node's own per-occurrence ceil can, in principle, pick a
+        // different offer at a different local quantity - see
+        // AggregateStep). Conflict is a one-way ratchet: once true, it
+        // never resets, and FinalizeVendorBatches leaves that step's
+        // already-per-occurrence-summed cost alone rather than guessing
+        // which of several genuinely different offers should apply to the
+        // merged total.
+        private sealed class VendorBatchState
+        {
+            public VendorOfferBatch Batch;
+            public bool Conflict;
         }
 
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
@@ -66,9 +102,18 @@ namespace GW2CraftingHelper.Services
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
             var currencyMap = new Dictionary<int, long>();
             var craftOrder = new Dictionary<(int, int), int>();
+            var vendorBatchTracking = new Dictionary<(int, AcquisitionSource, int), VendorBatchState>();
             int craftCounter = 0;
 
-            Collect(tree, memo, stepMap, currencyMap, craftOrder, ref craftCounter);
+            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, ref craftCounter);
+
+            // Pass 2b (M34-B1 #1/#3): re-derive each merged vendor step's
+            // true cost from its AGGREGATE Quantity and the winning offer's
+            // batch shape, ceiling once instead of trusting the sum of
+            // several already-per-occurrence-ceil'd costs; also folds the
+            // (now-correct) vendor currency costs into currencyMap and
+            // collects any post-solve "timegated" (cap-exceeded) notices.
+            var timegatedItems = FinalizeVendorBatches(stepMap, vendorBatchTracking, currencyMap);
 
             // Build ordered step list: buys/unknowns first, then crafts in bottom-up order
             var buysAndUnknowns = new List<PlanStep>();
@@ -115,7 +160,8 @@ namespace GW2CraftingHelper.Services
                 TargetQuantity = tree.Quantity,
                 Steps = steps,
                 TotalCoinCost = totalCoinCost,
-                CurrencyCosts = currencyCosts
+                CurrencyCosts = currencyCosts,
+                TimegatedItems = timegatedItems
             };
 
             // Convert internal memo to public decisions dict
@@ -189,8 +235,10 @@ namespace GW2CraftingHelper.Services
                 out long? comparableVendorValue,
                 out long? comparableVendorCoinCost,
                 out List<CostLine> comparableVendorCurrencyCosts,
+                out VendorOfferBatch? comparableVendorBatch,
                 out long? fallbackVendorCoinCost,
-                out List<CostLine> fallbackVendorCurrencyCosts);
+                out List<CostLine> fallbackVendorCurrencyCosts,
+                out VendorOfferBatch? fallbackVendorBatch);
 
             // Evaluate recipe options. EVERY non-currency ingredient of
             // EVERY recipe is always evaluated (M33 Finding 1 fix) - no
@@ -306,7 +354,8 @@ namespace GW2CraftingHelper.Services
             // Evaluate summary doc for why the two must stay separate.
             long? Commit(
                 AcquisitionSource src, long? cost, long? comparisonValue,
-                int recipeId, List<CostLine> vendorCurrencyCosts)
+                int recipeId, List<CostLine> vendorCurrencyCosts,
+                VendorOfferBatch? vendorBatch = null)
             {
                 memo[node.NodeId] = new Decision
                 {
@@ -317,7 +366,8 @@ namespace GW2CraftingHelper.Services
                     VendorCurrencyCosts = vendorCurrencyCosts,
                     CanCraft = canCraft,
                     CanBuyTp = canBuyTp,
-                    CanBuyVendor = canBuyVendor
+                    CanBuyVendor = canBuyVendor,
+                    VendorBatch = vendorBatch
                 };
                 return comparisonValue;
             }
@@ -338,8 +388,8 @@ namespace GW2CraftingHelper.Services
                 if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
                 {
                     return comparableVendorValue.HasValue
-                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts)
-                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
+                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch)
+                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch);
                 }
             }
 
@@ -349,7 +399,7 @@ namespace GW2CraftingHelper.Services
 
             if (source == AcquisitionSource.BuyFromVendor)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts);
+                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch);
             }
 
             if (source == AcquisitionSource.BuyFromTp)
@@ -373,7 +423,7 @@ namespace GW2CraftingHelper.Services
             // crafted" - no recipe, no price, genuinely no known source.
             if (fallbackVendorCoinCost.HasValue)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts);
+                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch);
             }
 
             return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);
@@ -400,16 +450,15 @@ namespace GW2CraftingHelper.Services
         /// no exchange rate and unit counts of different currencies must never
         /// be compared.
         ///
-        /// V1 purchase-cap semantics: an offer with a positive DailyCap (or a
-        /// positive WeeklyCap when DailyCap is absent/zero) that cannot supply
-        /// the node's needed quantity within a single cap period - i.e. the
-        /// node needs more purchases than the cap allows - is excluded from
-        /// this node's evaluation entirely, from both the comparable and the
-        /// fallback tier. Zero or absent caps mean uncapped, matching most
-        /// offers. Non-goal: this does not split a node's need across a capped
-        /// offer plus a second source once the cap is exhausted - a node is
-        /// still sourced from exactly one acquisition (partial cap-split
-        /// sourcing is left for a future milestone).
+        /// V2 purchase-cap semantics (M34-B1 #3, gw2efficiency parity): a
+        /// DailyCap/WeeklyCap NEVER excludes an offer or affects which tier
+        /// it lands in - gw2efficiency itself only ever surfaces a cap as a
+        /// post-solve "this is timegated" notice (dailyCooldowns.ts), it
+        /// never re-routes the tree. Both tiers below carry the offer's raw
+        /// DailyCap/WeeklyCap through via <see cref="VendorOfferBatch"/> so
+        /// PlanSolver.FinalizeVendorBatches can produce that notice once,
+        /// against the item's AGGREGATE (post-merge) demand rather than any
+        /// single tree occurrence's local quantity.
         /// </summary>
         private static void EvaluateVendorOffers(
             RecipeNode node,
@@ -420,14 +469,18 @@ namespace GW2CraftingHelper.Services
             out long? bestComparableValue,
             out long? bestComparableCoinCost,
             out List<CostLine> bestComparableCurrencyCosts,
+            out VendorOfferBatch? bestComparableBatch,
             out long? fallbackCoinCost,
-            out List<CostLine> fallbackCurrencyCosts)
+            out List<CostLine> fallbackCurrencyCosts,
+            out VendorOfferBatch? fallbackBatch)
         {
             bestComparableValue = null;
             bestComparableCoinCost = null;
             bestComparableCurrencyCosts = null;
+            bestComparableBatch = null;
             fallbackCoinCost = null;
             fallbackCurrencyCosts = null;
+            fallbackBatch = null;
             long fallbackCurrencyUnits = 0;
             int fallbackSingleCurrencyId = -1;
 
@@ -484,19 +537,6 @@ namespace GW2CraftingHelper.Services
                 }
 
                 int unitsNeeded = (int)Math.Ceiling((double)node.Quantity / offer.OutputCount);
-
-                // Purchase cap (see V1 semantics above): DailyCap wins when
-                // positive, else WeeklyCap when positive, else the offer is
-                // uncapped. If the node needs more purchases than fit in one
-                // cap period, the offer cannot fully supply this node and is
-                // excluded from both tiers below.
-                int? purchaseCap = offer.DailyCap.HasValue && offer.DailyCap.Value > 0
-                    ? offer.DailyCap
-                    : (offer.WeeklyCap.HasValue && offer.WeeklyCap.Value > 0 ? offer.WeeklyCap : null);
-                if (purchaseCap.HasValue && unitsNeeded > purchaseCap.Value)
-                {
-                    continue;
-                }
 
                 long totalCoinCost = coinCost * unitsNeeded;
 
@@ -579,6 +619,14 @@ namespace GW2CraftingHelper.Services
                         bestComparableValue = comparisonValue;
                         bestComparableCoinCost = totalCoinCost;
                         bestComparableCurrencyCosts = scaledCurrencyCosts;
+                        bestComparableBatch = new VendorOfferBatch
+                        {
+                            OutputCount = offer.OutputCount,
+                            CoinCostPerBatch = coinCost,
+                            CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
+                            DailyCap = offer.DailyCap,
+                            WeeklyCap = offer.WeeklyCap
+                        };
                     }
                     continue;
                 }
@@ -601,6 +649,14 @@ namespace GW2CraftingHelper.Services
                     fallbackCurrencyCosts = scaledCurrencyCosts;
                     fallbackCurrencyUnits = totalCurrencyUnits;
                     fallbackSingleCurrencyId = singleCurrencyId;
+                    fallbackBatch = new VendorOfferBatch
+                    {
+                        OutputCount = offer.OutputCount,
+                        CoinCostPerBatch = coinCost,
+                        CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
+                        DailyCap = offer.DailyCap,
+                        WeeklyCap = offer.WeeklyCap
+                    };
                 }
             }
         }
@@ -660,6 +716,7 @@ namespace GW2CraftingHelper.Services
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
             Dictionary<int, long> currencyMap,
             Dictionary<(int, int), int> craftOrder,
+            Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
             ref int craftCounter)
         {
             if (node.IngredientType == "Currency")
@@ -688,7 +745,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var ingredient in chosenRecipe.Ingredients)
                     {
-                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, ref craftCounter);
+                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, ref craftCounter);
                     }
                 }
 
@@ -700,33 +757,24 @@ namespace GW2CraftingHelper.Services
                 }
 
                 var stepKey = (node.Id, AcquisitionSource.Craft, decision.RecipeId);
-                AggregateStep(stepMap, stepKey, node, decision);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking);
             }
             else if (decision.Source == AcquisitionSource.BuyFromVendor)
             {
-                // Add vendor currency costs to the currency map
-                if (decision.VendorCurrencyCosts != null)
-                {
-                    foreach (var cc in decision.VendorCurrencyCosts)
-                    {
-                        if (currencyMap.ContainsKey(cc.Id))
-                        {
-                            currencyMap[cc.Id] = checked(currencyMap[cc.Id] + cc.Count);
-                        }
-                        else
-                        {
-                            currencyMap[cc.Id] = cc.Count;
-                        }
-                    }
-                }
-
+                // Vendor currency costs are folded into currencyMap once,
+                // after the whole tree is collected and every merged vendor
+                // step's true (aggregate-then-ceil) cost is known - see
+                // PlanSolver.FinalizeVendorBatches. Folding the still-
+                // per-occurrence decision.VendorCurrencyCosts in here would
+                // re-introduce the exact per-occurrence-then-sum overcount
+                // FinalizeVendorBatches exists to fix (M34-B1 #1).
                 var stepKey = (node.Id, AcquisitionSource.BuyFromVendor, 0);
-                AggregateStep(stepMap, stepKey, node, decision);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking);
             }
             else
             {
                 var stepKey = (node.Id, decision.Source, 0);
-                AggregateStep(stepMap, stepKey, node, decision);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking);
             }
         }
 
@@ -734,8 +782,31 @@ namespace GW2CraftingHelper.Services
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
             (int, AcquisitionSource, int) stepKey,
             RecipeNode node,
-            Decision decision)
+            Decision decision,
+            Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking)
         {
+            if (decision.Source == AcquisitionSource.BuyFromVendor && decision.VendorBatch.HasValue)
+            {
+                if (vendorBatchTracking.TryGetValue(stepKey, out var trackedState))
+                {
+                    if (!trackedState.Conflict && !VendorBatchesEqual(trackedState.Batch, decision.VendorBatch.Value))
+                    {
+                        // Ratchet only: a later occurrence agreeing with the
+                        // tracked batch must not clear a conflict a prior
+                        // occurrence already raised.
+                        trackedState.Conflict = true;
+                    }
+                }
+                else
+                {
+                    vendorBatchTracking[stepKey] = new VendorBatchState
+                    {
+                        Batch = decision.VendorBatch.Value,
+                        Conflict = false
+                    };
+                }
+            }
+
             if (stepMap.TryGetValue(stepKey, out var existing))
             {
                 existing.Quantity += node.Quantity;
@@ -811,7 +882,7 @@ namespace GW2CraftingHelper.Services
                     {
                         Type = merged[idx].Type,
                         Id = merged[idx].Id,
-                        Count = summed > int.MaxValue ? int.MaxValue : (int)summed
+                        Count = ClampToInt(summed)
                     };
                 }
                 else
@@ -821,6 +892,178 @@ namespace GW2CraftingHelper.Services
             }
 
             return merged;
+        }
+
+        /// <summary>
+        /// M34-B1 #1/#3: re-derives every merged BuyFromVendor PlanStep's
+        /// true cost from its AGGREGATE Quantity (summed across every tree
+        /// occurrence by AggregateStep) and the winning offer's batch shape,
+        /// ceiling the purchase count exactly ONCE - matching gw2efficiency's
+        /// own documented convention for bulk-output steps (`docs/gw2e-parity-spec.md`
+        /// Section 6.5: quantities are merged across the whole tree before
+        /// `Math.ceil` ever runs). This replaces the sum of several
+        /// already-independently-ceil'd per-occurrence costs (AggregateStep's
+        /// running total), which overstates the true cost whenever the same
+        /// item is needed via 2+ tree occurrences and bought via a bulk
+        /// (OutputCount > 1) offer - see PlanSolverTests for the exact
+        /// 4/4/4/83/84 -&gt; 179 -&gt; 180 (not 186) live repro.
+        ///
+        /// Only applied when every occurrence of that item resolved to the
+        /// IDENTICAL winning offer (vendorBatchTracking's Conflict flag is
+        /// false) - a node's own per-occurrence ceil can, at a different
+        /// local quantity, legitimately prefer a different offer (bulk
+        /// discount thresholds), and re-deriving a single "true" cost across
+        /// genuinely different offers has no principled answer. When
+        /// occurrences disagree, this step is left exactly as AggregateStep
+        /// already computed it (sum of real, individually-correct
+        /// per-occurrence purchases) - a documented, intentionally
+        /// conservative fallback, not a regression.
+        ///
+        /// Also folds every vendor step's final (possibly just-recomputed)
+        /// VendorCurrencyCosts into currencyMap - the single place vendor
+        /// currency contributions reach the plan-wide currency total, now
+        /// that Collect no longer folds the still-per-occurrence amounts in
+        /// directly (see Collect's BuyFromVendor branch) - and collects a
+        /// post-solve "timegated" notice (gw2e parity, M34-B1 #3) for any
+        /// uniform step whose aggregate purchase count exceeds the winning
+        /// offer's daily (preferred) or weekly cap. Caps never exclude an
+        /// offer or change Source/TotalCost - purely informational.
+        /// </summary>
+        private static List<TimegatedItem> FinalizeVendorBatches(
+            Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
+            Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
+            Dictionary<int, long> currencyMap)
+        {
+            var timegatedItems = new List<TimegatedItem>();
+
+            foreach (var kvp in stepMap)
+            {
+                var step = kvp.Value;
+                if (step.Source != AcquisitionSource.BuyFromVendor)
+                {
+                    continue;
+                }
+
+                if (vendorBatchTracking.TryGetValue(kvp.Key, out var state) &&
+                    !state.Conflict && state.Batch.OutputCount > 0)
+                {
+                    var batch = state.Batch;
+                    int unitsNeeded = step.Quantity > 0
+                        ? (int)Math.Ceiling((double)step.Quantity / batch.OutputCount)
+                        : 0;
+
+                    step.TotalCost = batch.CoinCostPerBatch * unitsNeeded;
+                    step.UnitCost = step.Quantity > 0 ? step.TotalCost / step.Quantity : 0;
+                    step.VendorCurrencyCosts = ScaleCostLines(batch.CurrencyCostLinesPerBatch, unitsNeeded);
+                    step.VendorOfferOutputCount = batch.OutputCount;
+                    step.VendorOfferCurrencyCostLinesPerBatch = batch.CurrencyCostLinesPerBatch;
+
+                    int? cap = batch.DailyCap.HasValue && batch.DailyCap.Value > 0
+                        ? batch.DailyCap
+                        : (batch.WeeklyCap.HasValue && batch.WeeklyCap.Value > 0 ? batch.WeeklyCap : (int?)null);
+                    if (cap.HasValue && unitsNeeded > cap.Value)
+                    {
+                        timegatedItems.Add(new TimegatedItem
+                        {
+                            ItemId = step.ItemId,
+                            CapType = (batch.DailyCap.HasValue && batch.DailyCap.Value > 0)
+                                ? TimegatedCapType.Daily
+                                : TimegatedCapType.Weekly,
+                            CapValue = cap.Value,
+                            NeededCount = unitsNeeded
+                        });
+                    }
+                }
+
+                if (step.VendorCurrencyCosts != null)
+                {
+                    foreach (var cc in step.VendorCurrencyCosts)
+                    {
+                        currencyMap[cc.Id] = currencyMap.TryGetValue(cc.Id, out var existing)
+                            ? checked(existing + cc.Count)
+                            : cc.Count;
+                    }
+                }
+            }
+
+            return timegatedItems;
+        }
+
+        /// <summary>
+        /// Structural equality for the fields that determine whether two
+        /// tree occurrences of the same item genuinely used the same
+        /// vendor offer (see FinalizeVendorBatches). CurrencyCostLinesPerBatch
+        /// is compared by content/order, not reference - both occurrences'
+        /// lists ultimately come from the same offer's own CostLines, built
+        /// independently but identically each time EvaluateVendorOffers
+        /// scans that item's offer list.
+        /// </summary>
+        private static bool VendorBatchesEqual(VendorOfferBatch a, VendorOfferBatch b)
+        {
+            if (a.OutputCount != b.OutputCount || a.CoinCostPerBatch != b.CoinCostPerBatch)
+            {
+                return false;
+            }
+
+            var linesA = a.CurrencyCostLinesPerBatch;
+            var linesB = b.CurrencyCostLinesPerBatch;
+            if (linesA == null || linesB == null)
+            {
+                return linesA == null && linesB == null;
+            }
+            if (linesA.Count != linesB.Count)
+            {
+                return false;
+            }
+            for (int i = 0; i < linesA.Count; i++)
+            {
+                if (linesA[i].Id != linesB[i].Id ||
+                    linesA[i].Count != linesB[i].Count ||
+                    !string.Equals(linesA[i].Type, linesB[i].Type, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Scales a per-batch (one purchase's worth) currency cost-line list
+        /// by the number of purchases, clamping to int.MaxValue rather than
+        /// overflowing a CostLine's int Count (mirrors the identical clamp
+        /// in MergeVendorCurrencyCosts).
+        /// </summary>
+        private static List<CostLine> ScaleCostLines(List<CostLine> perBatch, int unitsNeeded)
+        {
+            if (perBatch == null || perBatch.Count == 0)
+            {
+                return null;
+            }
+
+            var scaled = new List<CostLine>(perBatch.Count);
+            foreach (var line in perBatch)
+            {
+                long count = (long)line.Count * unitsNeeded;
+                scaled.Add(new CostLine
+                {
+                    Type = line.Type,
+                    Id = line.Id,
+                    Count = ClampToInt(count)
+                });
+            }
+            return scaled;
+        }
+
+        /// <summary>
+        /// Clamps a long to int.MaxValue rather than overflowing a
+        /// CostLine's int Count - shared by MergeVendorCurrencyCosts and
+        /// ScaleCostLines, the two places a currency amount can grow beyond
+        /// int range (summing across occurrences, or scaling by a purchase
+        /// count).
+        /// </summary>
+        private static int ClampToInt(long value)
+        {
+            return value > int.MaxValue ? int.MaxValue : (int)value;
         }
 
         private static void AssignNodeIds(RecipeNode node, ref int nextNodeId)

@@ -2218,9 +2218,24 @@ namespace GW2CraftingHelper.Views
 
         private void CreateCraftingStepsBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
+            // M34-B1 #3: a TimegatedNotice row (vendor-cap informational
+            // line) is a plain text row, not a numbered craft step - render
+            // it via the same generic CreateTextRow pattern every other
+            // section's fallback rows use, and don't consume a step number
+            // for it (stepNumber only advances for real CraftStep rows).
+            int stepNumber = 1;
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateCraftStepRow(section.Rows[i], i + 1, contentFlow, panelWidth, i == section.Rows.Count - 1);
+                var row = section.Rows[i];
+                bool isLast = i == section.Rows.Count - 1;
+                if (row.RowType == PlanRowType.TimegatedNotice)
+                {
+                    CreateTextRow(row.Label, contentFlow, panelWidth);
+                }
+                else
+                {
+                    CreateCraftStepRow(row, stepNumber++, contentFlow, panelWidth, isLast);
+                }
             }
         }
 

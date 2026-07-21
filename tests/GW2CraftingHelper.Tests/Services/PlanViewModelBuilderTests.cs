@@ -21,7 +21,8 @@ namespace GW2CraftingHelper.Tests.Services
             List<RequiredDiscipline> requiredDisciplines = null,
             List<RequiredRecipe> requiredRecipes = null,
             Dictionary<int, CurrencyMetadata> currencyMetadata = null,
-            Dictionary<int, AcquisitionHint> acquisitionHints = null)
+            Dictionary<int, AcquisitionHint> acquisitionHints = null,
+            List<TimegatedItem> timegatedItems = null)
         {
             return new CraftingPlanResult
             {
@@ -31,7 +32,8 @@ namespace GW2CraftingHelper.Tests.Services
                     TargetQuantity = targetQuantity,
                     TotalCoinCost = totalCoinCost,
                     Steps = steps ?? new List<PlanStep>(),
-                    CurrencyCosts = currencyCosts ?? new List<CurrencyCost>()
+                    CurrencyCosts = currencyCosts ?? new List<CurrencyCost>(),
+                    TimegatedItems = timegatedItems ?? new List<TimegatedItem>()
                 },
                 ItemMetadata = metadata != null
                     ? metadata
@@ -756,6 +758,57 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             Assert.DoesNotContain(vm.Sections, s => s.SectionType == PlanSectionType.CraftingSteps);
+        }
+
+        [Fact]
+        public void TimegatedItems_AppendedAsNoticeRowsInCraftingSteps()
+        {
+            // M34-B1 #3: a timegated (vendor purchase cap) notice renders as
+            // a plain informational row alongside real craft steps, never
+            // altering the numbered CraftStep rows themselves.
+            var meta = MetaFor((2, "Blade", "blade.png"), (9, "Obsidian Shard", "shard.png"));
+            var result = MakeResult(
+                metadata: meta,
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                },
+                timegatedItems: new List<TimegatedItem>
+                {
+                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Daily, CapValue = 3, NeededCount = 4 }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            Assert.Equal(2, section.Rows.Count);
+            Assert.Equal(PlanRowType.CraftStep, section.Rows[0].RowType);
+            Assert.Equal(PlanRowType.TimegatedNotice, section.Rows[1].RowType);
+            Assert.Contains("Obsidian Shard", section.Rows[1].Label);
+            Assert.Contains("Daily", section.Rows[1].Label);
+            Assert.Contains("3", section.Rows[1].Label);
+            Assert.Contains("4", section.Rows[1].Label);
+        }
+
+        [Fact]
+        public void TimegatedItems_NoCraftSteps_StillCreatesCraftingSection()
+        {
+            // A plan with zero real craft steps but a timegated vendor buy
+            // must still surface the notice - the section is no longer
+            // gated purely on craftSteps.Count.
+            var result = MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 9, Quantity = 4, Source = AcquisitionSource.BuyFromVendor }
+                },
+                timegatedItems: new List<TimegatedItem>
+                {
+                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Weekly, CapValue = 3, NeededCount = 4 }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            Assert.Single(section.Rows);
+            Assert.Equal(PlanRowType.TimegatedNotice, section.Rows[0].RowType);
         }
 
         // --- Required Disciplines ---
