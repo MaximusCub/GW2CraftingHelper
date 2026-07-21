@@ -83,7 +83,36 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             PriceBasis priceBasis = PriceBasis.InstantBuy,
             IReadOnlyDictionary<int, AcquisitionSource> overrides = null,
-            CurrencyValuation currencyValuation = null)
+            CurrencyValuation currencyValuation = null,
+            // M34-B2a #3 (gw2e "Value Own Materials" force-buy pre-pass):
+            // nodes in this set have craft excluded from the AUTOMATIC
+            // buy-vs-craft-vs-vendor comparison for this solve (buying
+            // outright beats crafting fresh components by gw2e's 15%
+            // margin - see OwnedMaterialsForceBuyPrePass). A manual
+            // per-node override in `overrides` still wins over this set,
+            // same as gw2e's own manual craft/buy pill always overriding
+            // its automatic pre-pass (docs/gw2e-parity-spec.md /
+            // m34-r2-gw2e-owned-materials.md Section 3.2).
+            ISet<int> forceBuyOnlyNodeIds = null,
+            // M34-B2a #3: when non-null, populated with this node's raw
+            // (buyCost, craftCost) - the SAME numbers Evaluate already
+            // computes for every "Item" node regardless of decision - so a
+            // caller (OwnedMaterialsForceBuyPrePass) can apply gw2e's exact
+            // buyPrice &lt; craftDecisionPrice * 0.85 rule without
+            // duplicating this method's cost-aggregation logic. Never
+            // affects this solve's own Decisions/Plan.
+            Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
+            // M34-B2a #3: when false, this tree's existing node.NodeId
+            // values are trusted as-is instead of being reassigned from
+            // scratch - see RecipeNodeIds' doc comment for why a caller
+            // (CraftingPlanPipeline, when the force-buy pre-pass is active)
+            // needs this: the tree's ids were pre-assigned, and survived
+            // pruning via InventoryReducer.CloneNode's NodeId preservation,
+            // BEFORE this Solve() call, and must not be renumbered out from
+            // under the pre-pass's own already-computed forceBuyOnlyNodeIds
+            // set. Every other caller keeps the default (true), unchanged
+            // from this method's original always-reassign behavior.
+            bool assignNodeIds = true)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
             var memo = new Dictionary<int, Decision>();
@@ -92,11 +121,13 @@ namespace GW2CraftingHelper.Services
             // Assignment is deterministic (DFS order), so NodeIds - and any
             // overrides keyed on them - are stable across re-solves of the
             // same tree.
-            int nextNodeId = 0;
-            AssignNodeIds(tree, ref nextNodeId);
+            if (assignNodeIds)
+            {
+                RecipeNodeIds.Assign(tree);
+            }
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation);
+            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -206,7 +237,9 @@ namespace GW2CraftingHelper.Services
             Dictionary<int, Decision> memo,
             PriceBasis priceBasis,
             IReadOnlyDictionary<int, AcquisitionSource> overrides,
-            CurrencyValuation currencyValuation)
+            CurrencyValuation currencyValuation,
+            ISet<int> forceBuyOnlyNodeIds = null,
+            Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null)
         {
             if (node.IngredientType == "Currency")
             {
@@ -320,7 +353,8 @@ namespace GW2CraftingHelper.Services
                     }
 
                     long? ingredientCost = Evaluate(
-                        ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation);
+                        ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation,
+                        forceBuyOnlyNodeIds, costDiagnostics);
                     craftCost += ingredientCost ?? 0L;
                     craftRealCost += memo[ingredient.NodeId].TotalCost ?? 0L;
                 }
@@ -347,6 +381,23 @@ namespace GW2CraftingHelper.Services
             bool canBuyTp = buyTotalCost.HasValue;
             bool canBuyVendor = comparableVendorValue.HasValue ||
                                 fallbackVendorCoinCost.HasValue;
+
+            // M34-B2a #3: raw diagnostics for OwnedMaterialsForceBuyPrePass -
+            // recorded regardless of forceBuyOnlyNodeIds/decision, so the
+            // pre-pass (a throwaway solve with neither set) can read the
+            // same numbers the real solve would have used.
+            if (costDiagnostics != null)
+            {
+                costDiagnostics[node.NodeId] = (buyTotalCost, bestCraftCost);
+            }
+
+            // M34-B2a #3: gw2e's "Value Own Materials" force-buy pre-pass
+            // marks this node craft:false BEFORE the automatic comparison
+            // below - a manual override (checked next, using the
+            // unmodified canCraft flag above) still always wins, matching
+            // gw2e's own manual pill always beating its automatic pre-pass.
+            bool craftExcludedFromAutoPick = forceBuyOnlyNodeIds != null &&
+                forceBuyOnlyNodeIds.Contains(node.NodeId);
 
             // cost = real coin (Decision.TotalCost / display); comparisonValue
             // = parent-comparison value (Decision.ComparisonValue). Commit
@@ -395,7 +446,10 @@ namespace GW2CraftingHelper.Services
 
             // Three-way comparison: vendor (coin part + any valued currency
             // lines) vs TP buy vs craft
-            var source = PickCheapest(buyTotalCost, bestCraftCost, comparableVendorValue);
+            var source = PickCheapest(
+                buyTotalCost,
+                craftExcludedFromAutoPick ? null : bestCraftCost,
+                comparableVendorValue);
 
             if (source == AcquisitionSource.BuyFromVendor)
             {
@@ -1064,18 +1118,6 @@ namespace GW2CraftingHelper.Services
         private static int ClampToInt(long value)
         {
             return value > int.MaxValue ? int.MaxValue : (int)value;
-        }
-
-        private static void AssignNodeIds(RecipeNode node, ref int nextNodeId)
-        {
-            node.NodeId = nextNodeId++;
-            foreach (var recipe in node.Recipes)
-            {
-                foreach (var ingredient in recipe.Ingredients)
-                {
-                    AssignNodeIds(ingredient, ref nextNodeId);
-                }
-            }
         }
 
         private long? GetBuyCost(

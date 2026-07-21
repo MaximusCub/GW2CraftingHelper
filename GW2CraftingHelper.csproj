@@ -125,6 +125,8 @@
     <Compile Include="Models\ReducedTreeResult.cs" />
     <Compile Include="Services\AccountItemIndex.cs" />
     <Compile Include="Services\InventoryReducer.cs" />
+    <Compile Include="Services\OwnedMaterialsForceBuyPrePass.cs" />
+    <Compile Include="Services\RecipeNodeIds.cs" />
     <Compile Include="Models\RequiredDiscipline.cs" />
     <Compile Include="Models\RequiredRecipe.cs" />
     <Compile Include="Services\PlanResultBuilder.cs" />

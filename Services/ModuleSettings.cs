@@ -15,19 +15,34 @@ namespace GW2CraftingHelper.Services
         // (Blish-free) does the actual conversion so that logic is unit-testable.
         public SettingEntry<string> CurrencyValuationsJson { get; private set; }
 
-        // gw2efficiency-style "value own materials" (M28): when enabled,
-        // materials the account already owns are valued at their sell
-        // opportunity cost instead of treated as free. Reduction itself is
-        // unaffected - this only feeds OwnMaterialsMode for the pipeline's
-        // profit calculation.
+        // gw2efficiency-style "value own materials" (M28; M34-B2a #3
+        // upgraded this from a display-only opportunity-cost tweak into a
+        // real force-buy pre-pass - see OwnedMaterialsForceBuyPrePass):
+        // when enabled, a node is force-excluded from crafting whenever
+        // buying it outright costs less than 85% of its own components'
+        // fresh buy cost (gw2efficiency's getCheaperToBuyItemIds), and the
+        // plan's profit figure is reduced by owned materials' sell
+        // opportunity cost. Default TRUE to match gw2efficiency's own
+        // "valueOwnItems" default (m34-r2-gw2e-owned-materials.md Section
+        // 3.1: valueOwnItems defaults true whenever the separate "use own
+        // materials" master toggle - CraftingPlanView's own checkbox,
+        // default off - is on). This setting's force-buy effect only
+        // applies when an account snapshot is actually driving reduction
+        // (CraftingPlanPipeline's own, deliberately narrower gate - see its
+        // Step 6.5 comment) - with no snapshot it stays fully inert, same
+        // as the profit-display opportunity-cost figure it also drives.
+        // Now surfaced as a checkbox in the Settings tab (see
+        // SettingsTabContent) - previously flip-only-via-JSON like
+        // ScrollDiagnosticsEnabled below.
         public SettingEntry<bool> ValueOwnMaterials { get; private set; }
 
         // M33 C1 (#12 diagnostics): gates the scroll-machinery diagnostic
         // logging in CraftingPlanView (wheel events, restore/guard writes
         // and state transitions). Default false; instrumentation only -
-        // never changes scroll/guard/restore behavior. Like ValueOwnMaterials,
-        // this has no checkbox in the Settings tab (see SettingsTabContent);
-        // it is flipped via the persisted settings JSON for diagnosis.
+        // never changes scroll/guard/restore behavior. Unlike
+        // ValueOwnMaterials (see above), this has no checkbox in the
+        // Settings tab; it is flipped via the persisted settings JSON for
+        // diagnosis.
         public SettingEntry<bool> ScrollDiagnosticsEnabled { get; private set; }
 
         public ModuleSettings(SettingCollection settings)
@@ -48,9 +63,9 @@ namespace GW2CraftingHelper.Services
                 () => "User-provided coin values for non-coin currencies (JSON)");
 
             ValueOwnMaterials = settings.DefineSetting(
-                "ValueOwnMaterials", false,
+                "ValueOwnMaterials", true,
                 () => "Value own materials",
-                () => "Value owned materials at their sell opportunity cost instead of treating them as free");
+                () => "Force-buy items where buying beats crafting from fresh components by more than 15%, and value owned materials at their sell opportunity cost instead of treating them as free");
 
             ScrollDiagnosticsEnabled = settings.DefineSetting(
                 "ScrollDiagnosticsEnabled", false,
@@ -78,7 +93,8 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Maps the ValueOwnMaterials toggle onto the pipeline's
-        /// OwnMaterialsMode enum. Defaults to Free.
+        /// OwnMaterialsMode enum. Defaults to Valued (see ValueOwnMaterials'
+        /// own doc comment for why).
         /// </summary>
         public OwnMaterialsMode GetOwnMaterialsMode()
         {
@@ -90,7 +106,7 @@ namespace GW2CraftingHelper.Services
             ModalDialogX.Value = -1;
             ModalDialogY.Value = -1;
             CurrencyValuationsJson.Value = string.Empty;
-            ValueOwnMaterials.Value = false;
+            ValueOwnMaterials.Value = true;
             ScrollDiagnosticsEnabled.Value = false;
         }
     }
