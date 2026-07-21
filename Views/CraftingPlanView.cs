@@ -97,17 +97,37 @@ namespace GW2CraftingHelper.Views
         // Resize tracking
         private int _lastRenderedWidth;
 
-        // Trailing debounce for resize-triggered re-renders. A re-render is a
-        // full dispose+rebuild of the plan tree, which restarts nested
-        // AutoSize height convergence; firing it on every >=1px resize tick
-        // during a window drag flickers and transiently squashes deep tree
-        // nodes. _resizeRenderPending gates a single in-flight debounce
-        // ticker; each real frame it checks whether ResizeDebounceMs has
-        // elapsed since the last resize tick, then fires one render once it
-        // has - see ResizeDebounceStep and FrameTicker.
+        // M33 C2b: per-render relayout registry, lifecycle mirrors
+        // _treeNodeStates (cleared and repopulated by every full RenderPlan
+        // rebuild; appended to by lazy tree-node expansion afterwards).
+        // _relayoutActions holds cheap, position/width-only closures (no
+        // MeasureString) replayed on EVERY resize tick via OnPanelResized -
+        // see ReplayRelayout. _reellipsisActions holds the small subset of
+        // sections that truncate text (Used Materials name, Shopping row
+        // name, Tree row name - the 3 EllipsizeToWidth call sites m2's
+        // research inventoried); these are text-only (Label.Text/tooltip)
+        // updates on already-existing controls, replayed only once at drag
+        // settle - see RunReellipsis. Neither list ever changes a control's
+        // Height, so neither can perturb AutoSize/scroll state (M33 C2a
+        // made every row height explicit; a pure width/text write on a
+        // fixed-height row cannot re-trigger convergence).
+        private readonly List<Action<int>> _relayoutActions = new List<Action<int>>();
+        private readonly List<Action<int>> _reellipsisActions = new List<Action<int>>();
+
+        // Trailing debounce for the resize-settle re-ellipsis pass. Every
+        // relayout tick already runs synchronously in OnPanelResized (no
+        // debounce needed for pure width/position writes - see
+        // ReplayRelayout); this debounce exists ONLY to bound how often the
+        // 3 EllipsizeToWidth call sites re-measure text, which is
+        // comparatively expensive over a long shopping list or deep tree.
+        // _resizeSettlePending gates a single in-flight settle ticker; each
+        // real frame it checks whether ResizeDebounceMs has elapsed since
+        // the last resize tick, then runs the re-ellipsis pass (plus one
+        // best-effort full relayout replay, as a defensive correctness net)
+        // once it has - see ResizeSettleStep and FrameTicker.
         private const int ResizeDebounceMs = 150;
         private DateTime _lastResizeEventUtc;
-        private bool _resizeRenderPending;
+        private bool _resizeSettlePending;
 
         // Bumped by every PreserveScrollAcross call; an in-flight
         // StartScrollVerify loop compares its captured value against the
@@ -664,7 +684,7 @@ namespace GW2CraftingHelper.Views
 
             // Same cleanup for any leftover scroll-verify/resize-debounce
             // tickers from the previous build cycle - see the field
-            // comments above. Reset _resizeRenderPending too, or a ticker
+            // comments above. Reset _resizeSettlePending too, or a ticker
             // canceled mid-debounce here would leave it stuck true and
             // silently disable all future resize debouncing. Also drop any
             // wheel-recency state from the previous render's tab so it
@@ -673,7 +693,7 @@ namespace GW2CraftingHelper.Views
             _scrollVerifyTicker = null;
             _resizeDebounceTicker?.Cancel();
             _resizeDebounceTicker = null;
-            _resizeRenderPending = false;
+            _resizeSettlePending = false;
             _lastWheelEventUtc = null;
 
             int w = buildPanel.ContentRegion.Width;
@@ -826,44 +846,138 @@ namespace GW2CraftingHelper.Views
             int w = container.ContentRegion.Width;
             int h = container.ContentRegion.Height;
 
-            // Update widths of layout panels
+            // Update widths of layout panels. Top-strip controls keep their
+            // pre-existing direct updates (M33 C2b directive 1) - these were
+            // never part of the dispose+rebuild problem the relayout
+            // registry below replaces.
             _inputPanel.Size = new Point(w, RowHeight);
             _controlsPanel.Size = new Point(w, RowHeight);
             _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
             _separator.Size = new Point(w - RightEdgePadding, 2);
             _contentPanel.Size = new Point(w, h - TopRegionHeight);
 
-            // Re-render plan content when width changes (centered title, right-aligned
-            // timestamps). Debounced to a single trailing render fired once the
-            // resize drag settles - see ResizeDebounceStep and the _resize*
-            // fields for why.
+            // M33 C2b: live in-place relayout, every real drag tick - no
+            // dispose+rebuild, no debounce wait. Perf guard: skip entirely
+            // when the width genuinely did not change (e.g. a height-only
+            // resize, or a duplicate event) so an idle window never pays
+            // for a registry walk.
             if (_currentPlan != null && w != _lastRenderedWidth)
             {
+                _lastRenderedWidth = w;
                 _lastResizeEventUtc = DateTime.UtcNow;
-                if (!_resizeRenderPending)
+
+                int panelWidth = w - RightEdgePadding;
+                ReplayRelayout(panelWidth);
+
+                // Trailing settle pass: bounded to a single in-flight
+                // ticker (_resizeSettlePending) so repeated ticks during a
+                // drag just extend _lastResizeEventUtc rather than spawning
+                // parallel tickers - see ResizeSettleStep.
+                if (!_resizeSettlePending)
                 {
-                    _resizeRenderPending = true;
+                    _resizeSettlePending = true;
                     _resizeDebounceTicker?.Cancel();
-                    _resizeDebounceTicker = new FrameTicker(ResizeDebounceStep);
+                    _resizeDebounceTicker = new FrameTicker(ResizeSettleStep);
                 }
             }
         }
 
         /// <summary>
-        /// Trailing edge of the resize debounce. Ticks once per real frame
-        /// while resize events keep landing within ResizeDebounceMs of one
-        /// another, then fires a single re-render once the drag settles.
-        /// _resizeRenderPending guarantees only one of these tickers is ever
-        /// running, so repeated resize ticks just extend _lastResizeEventUtc
-        /// rather than spawning parallel tickers.
+        /// M33 C2b: replays every registered relayout closure at the given
+        /// panelWidth - position/width writes on already-existing controls
+        /// only, never a MeasureString call, never a Height change (see the
+        /// _relayoutActions field comment). Wrapped in the vendor
+        /// SuspendLayout/ResumeLayout pair (m2 risk 2): resizing a row
+        /// Panel's Width fires its own Resized event, which FlowPanel wires
+        /// to a full sibling reflow of its parent on every single write:
+        /// for a long shopping list or deep tree, replaying dozens of
+        /// per-row closures in a single tick would otherwise trigger that
+        /// many redundant reflow passes in the same frame (m2's O(rows^2)
+        /// comparison-cost risk). SuspendLayout on _contentPanel propagates
+        /// down (Blish's own IsLayoutSuspended check walks the parent
+        /// chain), so every nested FlowPanel's reflow this tick is
+        /// deferred; ResumeLayout(false) does not force it back
+        /// synchronously - Blish's own per-frame Control.Update ->
+        /// UpdateLayout call resolves any still-Invalidated FlowPanel
+        /// automatically on the very next real frame, so nothing is lost,
+        /// only coalesced. Since these writes only ever touch Width/X (row
+        /// heights stay fixed per M33 C2a), the coalesced reflow is a no-op
+        /// for vertical position anyway - SingleTopToBottom flow positions
+        /// children from cumulative Height, not Width.
         /// </summary>
-        private bool ResizeDebounceStep(GameTime gameTime)
+        private void ReplayRelayout(int panelWidth)
+        {
+            if (_contentPanel == null || _relayoutActions.Count == 0) return;
+
+#if DEBUG
+            // M33 C2b invariant (task directive 6): a pure width/text
+            // relayout must never touch scroll position. DEBUG-only (reuses
+            // the same cached PanelScrollbarField reflection handle the
+            // scroll-restore machinery already resolved once) so this costs
+            // nothing in Release builds; a violation here would mean some
+            // relayout closure reached into the scrollbar, which no closure
+            // in this file is supposed to do.
+            var debugScrollbar = PanelScrollbarField?.GetValue(_contentPanel) as Scrollbar;
+            float debugScrollBefore = debugScrollbar?.ScrollDistance ?? -1f;
+#endif
+
+            _contentPanel.SuspendLayout();
+            try
+            {
+                foreach (var relayout in _relayoutActions)
+                {
+                    relayout(panelWidth);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Unlike the settle pass (already inside a try/catch-guarded
+                // FrameTicker step), this runs synchronously and directly
+                // off Blish's own Resized event - an uncaught exception here
+                // would propagate into the library's event dispatch on
+                // every remaining drag tick, not just degrade this one
+                // resize. A stale-control edge case (e.g. Build() ran again
+                // mid-drag, disposing the very controls a closure captured)
+                // must degrade to "this tick's relayout is incomplete", not
+                // take down the resize interaction.
+                Logger.Warn(ex, "Relayout tick failed partway through; some controls may be stale until the next resize or rebuild");
+            }
+            finally
+            {
+                _contentPanel.ResumeLayout(false);
+            }
+
+#if DEBUG
+            if (debugScrollbar != null && debugScrollbar.ScrollDistance != debugScrollBefore)
+            {
+                Logger.Warn(
+                    "M33 C2b invariant violated: a relayout closure changed the scrollbar position (before={0:0.0000} after={1:0.0000}) - relayout must be scroll-neutral.",
+                    debugScrollBefore, debugScrollbar.ScrollDistance);
+            }
+#endif
+        }
+
+        /// <summary>
+        /// M33 C2b: the settle-only text-measurement pass. Every relayout
+        /// closure already ran (and re-ran) synchronously on every drag
+        /// tick via ReplayRelayout; this only re-runs the 3 EllipsizeToWidth
+        /// call sites' MEASURE work (Used Materials, Shopping List, Tree row
+        /// names), since MeasureString is comparatively expensive to run on
+        /// every tick across a long list/deep tree and the visible cost of
+        /// deferring it (truncated text unchanged mid-drag, corrected once
+        /// the drag settles) is small - per M33 C2b directive 2. Neither
+        /// this pass nor the defensive ReplayRelayout repeat below ever
+        /// changes a row's Height, so - unlike the pre-C2a settle rebuild
+        /// this replaces - nothing here can perturb scroll position; no
+        /// PreserveScrollAcross wrapper is needed or used.
+        /// </summary>
+        private bool ResizeSettleStep(GameTime gameTime)
         {
             // The view may have been unloaded (tab switched away, module
             // disabled) while this was pending - nothing to render into.
             if (_contentPanel == null || _contentPanel.Parent == null)
             {
-                _resizeRenderPending = false;
+                _resizeSettlePending = false;
                 return false;
             }
 
@@ -872,7 +986,7 @@ namespace GW2CraftingHelper.Views
                 return true;
             }
 
-            _resizeRenderPending = false;
+            _resizeSettlePending = false;
 
             try
             {
@@ -880,12 +994,13 @@ namespace GW2CraftingHelper.Views
                 // was captured by the resize tick that started this ticker -
                 // only the width at the moment the drag actually settled
                 // matters.
-                int currentWidth = _contentPanel.Width;
-                if (_currentPlan != null && currentWidth != _lastRenderedWidth)
-                {
-                    _lastRenderedWidth = currentWidth;
-                    PreserveScrollAcross(() => RenderPlan(_currentPlan));
-                }
+                int panelWidth = _contentPanel.Width - RightEdgePadding;
+                RunReellipsis(panelWidth);
+                // Defensive correctness net (m2 4.2): a single extra
+                // position-only replay at the final settled width, in case
+                // any per-tick relayout closure was ever skipped or landed
+                // on a stale intermediate width. Cheap - no MeasureString.
+                ReplayRelayout(panelWidth);
             }
             catch (Exception ex)
             {
@@ -893,10 +1008,22 @@ namespace GW2CraftingHelper.Views
                 // and the debounce firing (e.g. Build() ran again for a tab
                 // reload mid-drag). Degrade silently: whichever Build() call
                 // is current already rendered fresh content at its own width.
-                Logger.Warn(ex, "Resize debounce render skipped; content panel unavailable");
+                Logger.Warn(ex, "Resize settle pass skipped; content panel unavailable");
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// M33 C2b: replays every registered re-ellipsis closure - see
+        /// ResizeSettleStep and the _reellipsisActions field comment.
+        /// </summary>
+        private void RunReellipsis(int panelWidth)
+        {
+            foreach (var reellipsis in _reellipsisActions)
+            {
+                reellipsis(panelWidth);
+            }
         }
 
         private void OnOwnMaterialsToggled(object sender, CheckChangedEvent e)
@@ -1062,6 +1189,23 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        /// <summary>
+        /// The content panel's LIVE usable width (RightEdgePadding already
+        /// subtracted). M33 C2b: OnPanelResized updates _contentPanel's own
+        /// Width synchronously on every drag tick (no rebuild, no debounce),
+        /// so this is always current - unlike a panelWidth value captured
+        /// once at a control's build time (e.g. a TreeNodeState created
+        /// before a since-completed resize), which the removal of the
+        /// settle rebuild would otherwise leave stale indefinitely. Callers
+        /// that need "the width this plan was last rendered at" (tree
+        /// height/width bookkeeping, lazy child construction) read this
+        /// instead of a stored field.
+        /// </summary>
+        private int GetCurrentPanelWidth()
+        {
+            return _contentPanel != null ? _contentPanel.Width - RightEdgePadding : 0;
+        }
+
         private void RenderPlan(PlanViewModel vm)
         {
             if (_contentPanel == null) return;
@@ -1071,6 +1215,14 @@ namespace GW2CraftingHelper.Views
             _treeNodeStates.Clear();
             _treeRoot = null;
             _treeFlow = null;
+
+            // M33 C2b: the relayout/re-ellipsis registries are rebuilt from
+            // scratch alongside every other per-render state above - same
+            // lifecycle as _treeNodeStates. Every closure captures controls
+            // from the render about to happen below; nothing here can
+            // outlive the dispose loop that follows.
+            _relayoutActions.Clear();
+            _reellipsisActions.Clear();
 
             foreach (var child in _contentPanel.Children.ToArray())
             {
@@ -1082,12 +1234,13 @@ namespace GW2CraftingHelper.Views
             CreatePlanHeader(vm, panelWidth);
 
             // Separator under header
-            new Panel()
+            var headerSeparator = new Panel()
             {
                 Size = new Point(panelWidth, 2),
                 BackgroundColor = new Color(180, 180, 180),
                 Parent = _contentPanel
             };
+            _relayoutActions.Add(w => headerSeparator.Size = new Point(w, 2));
 
             // Section order mirrors gw2efficiency's calculator page: total
             // cost breakdown, then the recipe tree, then everything else in
@@ -1158,7 +1311,7 @@ namespace GW2CraftingHelper.Views
             }
 
             int totalTitleWidth = frameSize + iconPad + prefixWidth + nameWidth + qtyWidth;
-            int startX = System.Math.Max(0, (panelWidth - totalTitleWidth) / 2);
+            int startX = PlanRelayoutMath.CenterX(panelWidth, totalTitleWidth);
             int centerRegion = headerHeight - headerTopPad - headerBottomPad;
             int iconY = headerTopPad + (centerRegion - frameSize) / 2;
             // Anchor text to icon's visual center with -2px optical nudge for descenders
@@ -1170,12 +1323,12 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            CreateRarityFramedIcon(
+            var iconFrame = CreateRarityFramedIcon(
                 titlePanel, vm.TargetIconUrl, vm.TargetRarity, startX, iconY,
                 iconSize: iconSize, borderThickness: iconBorder);
 
             int textX = startX + frameSize + iconPad;
-            new Label()
+            var prefixLabel = new Label()
             {
                 Text = prefixText,
                 Font = titleFont,
@@ -1186,7 +1339,7 @@ namespace GW2CraftingHelper.Views
             };
             textX += prefixWidth;
 
-            new Label()
+            var nameLabel = new Label()
             {
                 Text = nameText,
                 Font = titleFont,
@@ -1200,12 +1353,13 @@ namespace GW2CraftingHelper.Views
             };
             textX += nameWidth;
 
+            Label qtyLabel = null;
             if (qtyText.Length > 0)
             {
                 // DefaultFont16 sits a little taller than Font18's cap
                 // height at this weight; +3 keeps its baseline visually
                 // aligned with the name label instead of reading "raised".
-                new Label()
+                qtyLabel = new Label()
                 {
                     Text = qtyText,
                     Font = qtyFont,
@@ -1229,15 +1383,39 @@ namespace GW2CraftingHelper.Views
             var tsMeasured = tsFont.MeasureString(tsText);
             int tsWidth = (int)System.Math.Ceiling(tsMeasured.Width);
 
-            new Label()
+            var tsLabel = new Label()
             {
                 Text = tsText,
                 Font = tsFont,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(System.Math.Max(0, panelWidth - tsWidth - 8), 2),
+                Location = new Point(PlanRelayoutMath.RightAlignedX(panelWidth - 8, tsWidth), 2),
                 Parent = tsPanel
             };
+
+            // M33 C2b: every measured width here (prefixWidth, nameWidth,
+            // qtyWidth, tsWidth) is font-only and invariant to panelWidth -
+            // only the centering/right-alignment anchors shift, so this is a
+            // pure reposition, no re-measure, on every drag tick.
+            _relayoutActions.Add(w =>
+            {
+                int newStartX = PlanRelayoutMath.CenterX(w, totalTitleWidth);
+                titlePanel.Size = new Point(w, headerHeight);
+                iconFrame.Location = new Point(newStartX, iconY);
+
+                int x = newStartX + frameSize + iconPad;
+                prefixLabel.Location = new Point(x, textY);
+                x += prefixWidth;
+                nameLabel.Location = new Point(x, textY);
+                x += nameWidth;
+                if (qtyLabel != null)
+                {
+                    qtyLabel.Location = new Point(x, textY + 3);
+                }
+
+                tsPanel.Size = new Point(w, 22);
+                tsLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, tsWidth), 2);
+            });
         }
 
         /// <summary>
@@ -1268,7 +1446,7 @@ namespace GW2CraftingHelper.Views
         {
             // Consistent top gap before every section (including the tree),
             // so sections do not sit flush against whatever preceded them.
-            new Panel()
+            var topGap = new Panel()
             {
                 Size = new Point(panelWidth, SectionSpacing),
                 Parent = _contentPanel
@@ -1318,7 +1496,7 @@ namespace GW2CraftingHelper.Views
             };
 
             // Divider under the header - identical chrome for every section.
-            new Panel()
+            var headerDivider = new Panel()
             {
                 Size = new Point(panelWidth, 1),
                 Location = new Point(0, 29),
@@ -1359,6 +1537,19 @@ namespace GW2CraftingHelper.Views
                 });
             };
 
+            // M33 C2b: shared chrome relayout for every section (and the
+            // tree) - width-only writes, contentFlow's Height is preserved
+            // exactly (whatever it was most recently finalized to by
+            // PlanContentHeightMath) so this can never disturb scroll
+            // state.
+            _relayoutActions.Add(w =>
+            {
+                topGap.Size = new Point(w, SectionSpacing);
+                headerPanel.Size = new Point(w, 30);
+                headerDivider.Size = new Point(w, 1);
+                contentFlow.Size = new Point(w, contentFlow.Height);
+            });
+
             return new SectionHeaderHandle
             {
                 HeaderPanel = headerPanel,
@@ -1371,6 +1562,15 @@ namespace GW2CraftingHelper.Views
         {
             var header = CreateSectionHeader(section.Title, section.SectionType, panelWidth, section.IsDefaultExpanded);
             var contentFlow = header.ContentFlow;
+
+#if DEBUG
+            // M33 C2b (m2 risk 3): a section type added later without
+            // registering its own width relayout would silently freeze at
+            // build-time width on every future resize - labels just stop
+            // moving, easy to miss in review. Fail loud in DEBUG builds
+            // instead of relying on call-site discipline alone.
+            int relayoutCountBeforeBody = _relayoutActions.Count;
+#endif
 
             // Every section gets its own table-column layout (spec: aligned
             // columns everywhere, not free-flowing text rows), so each has a
@@ -1406,6 +1606,15 @@ namespace GW2CraftingHelper.Views
                     break;
             }
 
+#if DEBUG
+            if (section.Rows.Count > 0 && _relayoutActions.Count == relayoutCountBeforeBody)
+            {
+                Logger.Warn(
+                    "M33 C2b: section {0} rendered {1} row(s) but its body registered no relayout closures - it will not track live window resize. See CreateCollapsibleSection.",
+                    section.SectionType, section.Rows.Count);
+            }
+#endif
+
             // M33 C2a (directive A): finalize contentFlow's real height
             // synchronously now that every row is populated, instead of
             // leaving it to Blish's per-frame AutoSize convergence. Pure
@@ -1419,9 +1628,9 @@ namespace GW2CraftingHelper.Views
         /// row" chrome used by every table-style section except the tree
         /// (which uses indent guidelines instead, per gw2e's own convention).
         /// </summary>
-        private static void CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight)
+        private static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight)
         {
-            new Panel()
+            return new Panel()
             {
                 Size = new Point(panelWidth, 1),
                 Location = new Point(0, rowHeight - 1),
@@ -1451,7 +1660,7 @@ namespace GW2CraftingHelper.Views
         /// styling) - used for the shopping list's source tag and anywhere
         /// else a short non-interactive label needs pill chrome.
         /// </summary>
-        private static void CreateSmallTag(Panel parent, string text, int x, int y)
+        private static Panel CreateSmallTag(Panel parent, string text, int x, int y)
         {
             var font = GameService.Content.DefaultFont12;
             int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
@@ -1486,6 +1695,8 @@ namespace GW2CraftingHelper.Views
                 Location = new Point((width - 2 - textWidth) / 2, 1),
                 Parent = inner
             };
+
+            return outer;
         }
 
         // --- Used Materials section ---
@@ -1498,7 +1709,7 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateUsedMaterialRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        private void CreateUsedMaterialRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
@@ -1511,11 +1722,11 @@ namespace GW2CraftingHelper.Views
 
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
-            int nameMaxWidth = System.Math.Max(20, qtyRightEdge - qtyWidth - 12 - nameX);
+            int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(qtyRightEdge, qtyWidth, 12, nameX);
 
             string fullName = row.Label ?? "";
             string displayName = EllipsizeToWidth(font, fullName, nameMaxWidth);
-            new Label()
+            var nameLabel = new Label()
             {
                 Text = displayName,
                 Font = font,
@@ -1532,7 +1743,7 @@ namespace GW2CraftingHelper.Views
                 rowPanel.BasicTooltipText = fullName;
             }
 
-            new Label()
+            var qtyLabel = new Label()
             {
                 Text = qtyText,
                 Font = font,
@@ -1543,7 +1754,28 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
-            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+
+            // M33 C2b: qty label position is a pure reposition (qtyWidth is
+            // font-only); the name is left untouched during drag ticks and
+            // only re-ellipsized at settle (RunReellipsis) to avoid a
+            // MeasureString call per row per tick.
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, rowHeight);
+                qtyLabel.Location = new Point(w - 8 - qtyWidth, 9);
+                if (divider != null) divider.Size = new Point(w, 1);
+            });
+            _reellipsisActions.Add(w =>
+            {
+                int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(w - 8, qtyWidth, 12, nameX);
+                string newDisplayName = EllipsizeToWidth(font, fullName, newMaxWidth);
+                if (nameLabel.Text != newDisplayName)
+                {
+                    nameLabel.Text = newDisplayName;
+                    rowPanel.BasicTooltipText = newDisplayName != fullName ? fullName : null;
+                }
+            });
         }
 
         // --- Shopping List section ---
@@ -1583,17 +1815,21 @@ namespace GW2CraftingHelper.Views
             var edges = ShoppingColumnMath.ComputeEdges(totalRightEdge, maxEachWidth, maxTotalWidth);
 
             // Both the header and every data row are handed this SAME
-            // ColumnEdges instance, so they cannot drift apart for this
-            // render.
-            CreateShoppingListHeaderRow(contentFlow, panelWidth, edges);
+            // ColumnEdges instance (for the build), and the same cached
+            // maxEachWidth/maxTotalWidth (for their relayout closures) - a
+            // relayout tick re-invokes ShoppingColumnMath.ComputeEdges with
+            // the new panelWidth but these SAME data-derived maxima (M33
+            // C2b: the pre-scan above depends only on row data, never on
+            // panelWidth, so it does not need to re-run on resize at all).
+            CreateShoppingListHeaderRow(contentFlow, panelWidth, edges, maxEachWidth, maxTotalWidth);
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, edges, i == section.Rows.Count - 1);
+                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, edges, maxEachWidth, maxTotalWidth, i == section.Rows.Count - 1);
             }
         }
 
-        private static void CreateShoppingListHeaderRow(
-            FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges)
+        private void CreateShoppingListHeaderRow(
+            FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges, int maxEachWidth, int maxTotalWidth)
         {
             var rowPanel = new Panel()
             {
@@ -1609,9 +1845,23 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(50, 4), Parent = rowPanel
             };
-            CreateRightAlignedLabel(rowPanel, "Amount", font, color, edges.QtyRightEdge, 4);
-            CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
-            CreateRightAlignedLabel(rowPanel, "Total", font, color, edges.TotalRightEdge, 4);
+            var amountLabel = CreateRightAlignedLabel(rowPanel, "Amount", font, color, edges.QtyRightEdge, 4);
+            var eachLabel = CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
+            var totalLabel = CreateRightAlignedLabel(rowPanel, "Total", font, color, edges.TotalRightEdge, 4);
+
+            // M33 C2b: header column labels are font-only (fixed text) -
+            // pure reposition on every drag tick, recomputing edges from
+            // the SAME cached maxEachWidth/maxTotalWidth ComputeEdges was
+            // built with (ShoppingColumnMath is the single source of truth
+            // both paths call).
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, PlanContentHeightMath.ShoppingHeaderRowHeight);
+                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
+                amountLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), 4);
+                eachLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), 4);
+                totalLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), 4);
+            });
         }
 
         private static string ShoppingSourceTag(PlanRowViewModel row)
@@ -1629,8 +1879,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateShoppingRow(
-            PlanRowViewModel row, FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges, bool isLast)
+        private void CreateShoppingRow(
+            PlanRowViewModel row, FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges,
+            int maxEachWidth, int maxTotalWidth, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.ShoppingRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
@@ -1642,9 +1893,10 @@ namespace GW2CraftingHelper.Views
 
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
-            int nameMaxWidth = System.Math.Max(20, edges.QtyRightEdge - qtyWidth - 12 - nameX);
+            int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(edges.QtyRightEdge, qtyWidth, 12, nameX);
 
             string fullName = row.Label ?? "";
+            string hintText = row.HintText;
             string displayName = EllipsizeToWidth(font, fullName, nameMaxWidth);
             var nameLabel = new Label()
             {
@@ -1663,9 +1915,9 @@ namespace GW2CraftingHelper.Views
             {
                 tooltipParts.Add(fullName);
             }
-            if (!string.IsNullOrEmpty(row.HintText))
+            if (!string.IsNullOrEmpty(hintText))
             {
-                tooltipParts.Add(row.HintText);
+                tooltipParts.Add(hintText);
             }
             if (tooltipParts.Count > 0)
             {
@@ -1673,12 +1925,11 @@ namespace GW2CraftingHelper.Views
             }
 
             string sourceTag = ShoppingSourceTag(row);
-            if (!string.IsNullOrEmpty(sourceTag))
-            {
-                CreateSmallTag(rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9);
-            }
+            Panel tagPanel = !string.IsNullOrEmpty(sourceTag)
+                ? CreateSmallTag(rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9)
+                : null;
 
-            new Label()
+            var qtyLabel = new Label()
             {
                 Text = qtyText,
                 Font = font,
@@ -1695,10 +1946,43 @@ namespace GW2CraftingHelper.Views
             // alongside/instead of coin; a row with neither (genuinely
             // unpriceable - gw2e: "Not sold or crafted") renders a dash,
             // never a blank cell (KNOWN-ISSUES #16).
-            RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
-            RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
+            var eachCell = RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
+            var totalCell = RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
 
-            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+
+            // M33 C2b: qty + Each/Total cells reposition every drag tick
+            // (no MeasureString - RepositionValueCellRightAligned uses only
+            // cached segment text widths). The name label and its source
+            // tag are untouched here; both depend on ellipsis truncation
+            // and only update at settle (RunReellipsis) below.
+            _relayoutActions.Add(w =>
+            {
+                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
+                rowPanel.Size = new Point(w, rowHeight);
+                qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
+                RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
+                RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
+                if (divider != null) divider.Size = new Point(w, 1);
+            });
+            _reellipsisActions.Add(w =>
+            {
+                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
+                int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(e.QtyRightEdge, qtyWidth, 12, nameX);
+                string newDisplayName = EllipsizeToWidth(font, fullName, newMaxWidth);
+                if (nameLabel.Text != newDisplayName)
+                {
+                    nameLabel.Text = newDisplayName;
+                    var parts = new List<string>();
+                    if (newDisplayName != fullName) parts.Add(fullName);
+                    if (!string.IsNullOrEmpty(hintText)) parts.Add(hintText);
+                    rowPanel.BasicTooltipText = parts.Count > 0 ? string.Join("\n", parts) : null;
+                }
+                if (tagPanel != null)
+                {
+                    tagPanel.Location = new Point(nameX + nameLabel.Width + 8, 9);
+                }
+            });
         }
 
         // --- Crafting Steps section ---
@@ -1711,7 +1995,7 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateCraftStepRow(
+        private void CreateCraftStepRow(
             PlanRowViewModel row, int stepNumber, FlowPanel parent, int panelWidth, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.CraftStepRowHeight;
@@ -1776,19 +2060,34 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(x, 13), Parent = rowPanel
             };
 
+            Label sublabelLabel = null;
             if (!string.IsNullOrEmpty(row.Sublabel))
             {
-                CreateRightAlignedLabel(
+                sublabelLabel = CreateRightAlignedLabel(
                     rowPanel, row.Sublabel, GameService.Content.DefaultFont12,
                     new Color(153, 153, 153), panelWidth - 8, 16);
             }
 
-            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+
+            // M33 C2b: name/qty labels sit at a fixed x (font-only, not
+            // width-dependent - textX never depended on panelWidth); only
+            // the row width, its divider, and the right-aligned sublabel
+            // need to move.
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, rowHeight);
+                if (sublabelLabel != null)
+                {
+                    sublabelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, sublabelLabel.Width), 16);
+                }
+                if (divider != null) divider.Size = new Point(w, 1);
+            });
         }
 
         // --- Required Disciplines / Required Recipes sections (c-table) ---
 
-        private static void CreateCTableHeaderRow(
+        private void CreateCTableHeaderRow(
             FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel)
         {
             var rowPanel = new Panel()
@@ -1804,7 +2103,13 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(leftX, 5), Parent = rowPanel
             };
-            CreateRightAlignedLabel(rowPanel, rightLabel, font, Color.White, panelWidth - 8, 5);
+            var rightLabelControl = CreateRightAlignedLabel(rowPanel, rightLabel, font, Color.White, panelWidth - 8, 5);
+
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, PlanContentHeightMath.CTableHeaderRowHeight);
+                rightLabelControl.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, rightLabelControl.Width), 5);
+            });
         }
 
         private void CreateDisciplinesBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
@@ -1816,7 +2121,7 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateDisciplineRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        private void CreateDisciplineRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.DisciplineRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
@@ -1828,9 +2133,16 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(8, 7), Parent = rowPanel
             };
-            CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
+            var levelLabel = CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
 
-            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, rowHeight);
+                levelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, levelLabel.Width), 7);
+                if (divider != null) divider.Size = new Point(w, 1);
+            });
         }
 
         private void CreateRecipesBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
@@ -1842,7 +2154,7 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private static void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        private void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
         {
             bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
             int rowHeight = hasSublabel
@@ -1882,6 +2194,7 @@ namespace GW2CraftingHelper.Views
                 };
             }
 
+            Label statusLabel = null;
             if (!string.IsNullOrEmpty(row.StatusTag))
             {
                 Color statusColor = Color.White;
@@ -1893,10 +2206,20 @@ namespace GW2CraftingHelper.Views
                 {
                     statusColor = new Color(150, 200, 150);
                 }
-                CreateRightAlignedLabel(rowPanel, row.StatusTag, font, statusColor, panelWidth - 8, hasSublabel ? 10 : 8);
+                statusLabel = CreateRightAlignedLabel(rowPanel, row.StatusTag, font, statusColor, panelWidth - 8, hasSublabel ? 10 : 8);
             }
 
-            if (!isLast) CreateRowDivider(rowPanel, panelWidth, rowHeight);
+            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight);
+
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, rowHeight);
+                if (statusLabel != null)
+                {
+                    statusLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, statusLabel.Width), hasSublabel ? 10 : 8);
+                }
+                if (divider != null) divider.Size = new Point(w, 1);
+            });
         }
 
         /// <summary>
@@ -1905,7 +2228,19 @@ namespace GW2CraftingHelper.Views
         /// spec's 5 when all are applicable). Non-coin rows (currency costs)
         /// are handled separately as full-width rows underneath.
         /// </summary>
-        private static void CreateCostTileRow(List<PlanRowViewModel> coinRows, FlowPanel parent, int panelWidth)
+        /// <summary>
+        /// One tile's already-created controls, cached for relayout - m2
+        /// 3.5's [FANOUT] case: unlike a single-anchor row, every tile's
+        /// caption AND coin segments are independently re-centered inside
+        /// their own tileWidth-wide slice on every drag tick.
+        /// </summary>
+        private sealed class CostTileHandle
+        {
+            public Label CaptionLabel;
+            public SegmentLayoutHandle Segments;
+        }
+
+        private void CreateCostTileRow(List<PlanRowViewModel> coinRows, FlowPanel parent, int panelWidth)
         {
             int tileCount = coinRows.Count;
             if (tileCount == 0) return;
@@ -1913,9 +2248,7 @@ namespace GW2CraftingHelper.Views
             const int rowHeight = PlanContentHeightMath.CostTileRowHeight;
             const int totalMargin = 40;
             const int minTileWidth = 80;
-            int tileWidth = System.Math.Max(minTileWidth, (panelWidth - totalMargin) / tileCount);
-            int rowContentWidth = tileWidth * tileCount;
-            int startX = System.Math.Max(0, (panelWidth - rowContentWidth) / 2);
+            var geometry = PlanRelayoutMath.ComputeCostTileGeometry(panelWidth, tileCount, totalMargin, minTileWidth);
 
             var rowPanel = new Panel()
             {
@@ -1927,29 +2260,52 @@ namespace GW2CraftingHelper.Views
             var amountFont = GameService.Content.DefaultFont16;
             var captionColor = new Color(153, 153, 153);
 
+            var tiles = new List<CostTileHandle>(tileCount);
             for (int i = 0; i < tileCount; i++)
             {
-                int tileX = startX + i * tileWidth;
+                int tileX = geometry.StartX + i * geometry.TileWidth;
                 var row = coinRows[i];
 
                 string caption = TileCaptionFor(row.Label);
                 int captionWidth = (int)System.Math.Ceiling(captionFont.MeasureString(caption).Width);
-                new Label()
+                var captionLabel = new Label()
                 {
                     Text = caption,
                     Font = captionFont,
                     TextColor = captionColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(tileX + System.Math.Max(0, (tileWidth - captionWidth) / 2), 6),
+                    Location = new Point(tileX + PlanRelayoutMath.CenterX(geometry.TileWidth, captionWidth), 6),
                     Parent = rowPanel
                 };
 
                 var segments = BuildCoinSegments(row.CoinValue, amountFont);
                 int segmentsWidth = TotalCoinSegmentsWidth(segments);
-                int coinStartX = tileX + System.Math.Max(0, (tileWidth - segmentsWidth) / 2);
-                LayoutCoinSegments(rowPanel, segments, coinStartX, 30, amountFont);
+                int coinStartX = tileX + PlanRelayoutMath.CenterX(geometry.TileWidth, segmentsWidth);
+                var segmentHandle = LayoutCoinSegments(rowPanel, segments, coinStartX, 30, amountFont);
+
+                tiles.Add(new CostTileHandle { CaptionLabel = captionLabel, Segments = segmentHandle });
             }
+
+            // M33 C2b [FANOUT]: every tile's caption + coin segments are
+            // font-only (invariant to panelWidth) - only tileWidth/startX
+            // and each tile's own centering offset move. No MeasureString.
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, rowHeight);
+                var g = PlanRelayoutMath.ComputeCostTileGeometry(w, tileCount, totalMargin, minTileWidth);
+                for (int i = 0; i < tiles.Count; i++)
+                {
+                    int tileX = g.StartX + i * g.TileWidth;
+                    var tile = tiles[i];
+
+                    tile.CaptionLabel.Location = new Point(tileX + PlanRelayoutMath.CenterX(g.TileWidth, tile.CaptionLabel.Width), 6);
+
+                    int segmentsWidth = ShoppingColumnMath.SegmentRunWidth(tile.Segments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
+                    int coinStartX = tileX + PlanRelayoutMath.CenterX(g.TileWidth, segmentsWidth);
+                    RepositionSegments(tile.Segments, coinStartX, 30);
+                }
+            });
         }
 
         /// <summary>
@@ -2001,6 +2357,10 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(8, 4),
                 Parent = rowPanel
             };
+
+            // Not width-dependent beyond the row's own cosmetic width (fixed
+            // left-anchored text, m2 3.6's "no relayout needed" case).
+            _relayoutActions.Add(w => rowPanel.Size = new Point(w, PlanContentHeightMath.FallbackTextRowHeight));
         }
 
         // Sized between the tree/row item-icon (32px) and the coin-segment
@@ -2041,6 +2401,11 @@ namespace GW2CraftingHelper.Views
                 int iconY = (CurrencyRowHeight - CurrencyIconSize) / 2;
                 CreateItemIcon(rowPanel, row.IconUrl, iconX, iconY, CurrencyIconSize);
             }
+
+            // Not width-dependent beyond the row's own cosmetic width (m2
+            // 3.6): label/icon sit at a fixed left-anchored x regardless of
+            // panelWidth.
+            _relayoutActions.Add(w => rowPanel.Size = new Point(w, CurrencyRowHeight));
         }
 
         // --- Recipe tree section ---
@@ -2053,7 +2418,11 @@ namespace GW2CraftingHelper.Views
             public Label ArrowLabel;
             public CraftingTreeNode Node;
             public int Depth;
-            public int PanelWidth;
+
+            // M33 C2b: PanelWidth removed - a captured build-time width
+            // would go stale once resize no longer triggers a full rebuild
+            // (see GetCurrentPanelWidth, which every remaining reader of
+            // "current tree width" uses instead).
 
             // Whether lazily-built children (built on first expand) should
             // render dimmed - computed once from this node's own dimmed
@@ -2106,6 +2475,7 @@ namespace GW2CraftingHelper.Views
             // the presets (Buy All / Craft All / Best Path) continuing
             // leftward with 4px gaps so they never collide with the title.
             int cursorX = panelWidth;
+            var headerButtons = new List<(StandardButton Button, int Width)>(5);
             StandardButton PlaceButtonRight(string text, int width)
             {
                 cursorX -= width;
@@ -2116,6 +2486,7 @@ namespace GW2CraftingHelper.Views
                     Location = new Point(cursorX, 3),
                     Parent = headerPanel
                 };
+                headerButtons.Add((button, width));
                 cursorX -= 4;
                 return button;
             }
@@ -2126,7 +2497,36 @@ namespace GW2CraftingHelper.Views
             craftAllButton = PlaceButtonRight("Craft All", 76);
             bestPathButton = PlaceButtonRight("Best Path", 80);
 
+            // M33 C2b: right-to-left button placement is font-only (fixed
+            // widths) - pure reposition on every drag tick, same order as
+            // PlaceButtonRight built them so the right-to-left offsets
+            // reproduce identically.
+            _relayoutActions.Add(w =>
+            {
+                int x = w;
+                foreach (var (button, width) in headerButtons)
+                {
+                    x -= width;
+                    button.Location = new Point(x, 3);
+                    x -= 4;
+                }
+            });
+
+#if DEBUG
+            int relayoutCountBeforeTree = _relayoutActions.Count;
+#endif
             RenderTreeNode(treeRoot, treeFlow, panelWidth, 0, dimmed: false);
+#if DEBUG
+            // M33 C2b (m2 risk 3): every RenderTreeNode call registers its
+            // own relayout closure (see the field comment on
+            // _relayoutActions) - a single root node still yields at least
+            // one. Zero growth here would mean that mechanism itself
+            // silently broke.
+            if (_relayoutActions.Count == relayoutCountBeforeTree)
+            {
+                Logger.Warn("M33 C2b: Recipe Tree root rendered but registered no relayout closures - it will not track live window resize.");
+            }
+#endif
 
             // M33 C2a (directive A): every container this initial build
             // populated (treeFlow plus every childFlow created for a
@@ -2135,7 +2535,7 @@ namespace GW2CraftingHelper.Views
             // every one of them from the same PlanContentHeightMath
             // arithmetic the rows above were just laid out with, before
             // this method returns to RenderPlan/PreserveScrollAcross.
-            RefreshTreeContainerHeights(panelWidth);
+            RefreshTreeContainerHeights();
 
             // Decision presets: clear overrides / force craft-everywhere /
             // force buy-everywhere (feasibility respected by the solver).
@@ -2159,7 +2559,7 @@ namespace GW2CraftingHelper.Views
                     {
                         foreach (var child in s.Node.Children)
                         {
-                            RenderTreeNode(child, s.ChildContainer, s.PanelWidth, s.Depth + 1, s.ChildDimmed);
+                            RenderTreeNode(child, s.ChildContainer, GetCurrentPanelWidth(), s.Depth + 1, s.ChildDimmed);
                         }
                         s.ChildrenBuilt = true;
                     }
@@ -2168,7 +2568,7 @@ namespace GW2CraftingHelper.Views
                     s.ChildContainer.Visible = true;
                     s.ArrowLabel.Text = "\u25BC";
                 }
-                RefreshTreeContainerHeights(panelWidth);
+                RefreshTreeContainerHeights();
             });
 
             collapseAllButton.Click += (_, __) => PreserveScrollAcross(() =>
@@ -2180,7 +2580,7 @@ namespace GW2CraftingHelper.Views
                     s.ChildContainer.Visible = false;
                     s.ArrowLabel.Text = "\u25B6";
                 }
-                RefreshTreeContainerHeights(panelWidth);
+                RefreshTreeContainerHeights();
             });
 
             headerPanel.LeftMouseButtonPressed += (_, __) =>
@@ -2271,8 +2671,9 @@ namespace GW2CraftingHelper.Views
         /// toggle, never per frame, so the extra work is not a hot-path
         /// concern.
         /// </summary>
-        private void RefreshTreeContainerHeights(int panelWidth)
+        private void RefreshTreeContainerHeights()
         {
+            int panelWidth = GetCurrentPanelWidth();
             foreach (var state in _treeNodeStates)
             {
                 state.ChildContainer.Size = new Point(
@@ -2360,19 +2761,26 @@ namespace GW2CraftingHelper.Views
             // Name column: fixed x regardless of depth's remaining width;
             // clipped with an ellipsis against the pill column so long names
             // never collide with the fixed-position columns to its right.
+            // M33 C2b: pillColX/costRightEdge/nameMaxWidth now come from
+            // PlanRelayoutMath.ComputeTreeColumnEdges - the SAME pure
+            // function the relayout/re-ellipsis closures below call, so the
+            // build and every later resize tick can never disagree about
+            // these columns.
             int nameX = indent + TreeCaretColWidth + TreeIconFrameSize + TreeNameGap;
-            int pillColX = panelWidth - (TreeRightMargin + TreeCostColumnWidth) - TreePillColumnWidth;
-            int costRightEdge = panelWidth - TreeRightMargin;
-            int nameMaxWidth = System.Math.Max(20, pillColX - nameX - 8);
 
             var nameFont = GameService.Content.DefaultFont14;
             string qtyPrefix = node.Quantity > 0 ? $"{node.Quantity}x " : "";
             int qtyWidth = qtyPrefix.Length > 0
                 ? (int)System.Math.Ceiling(nameFont.MeasureString(qtyPrefix).Width)
                 : 0;
-            int nameAvailWidth = System.Math.Max(10, nameMaxWidth - qtyWidth);
+
+            var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+            int pillColX = edges.PillColX;
+            int costRightEdge = edges.CostRightEdge;
+
             string fullName = node.Name ?? "";
-            string displayName = EllipsizeToWidth(nameFont, fullName, nameAvailWidth);
+            string displayName = EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
 
             Color qtyColor = new Color(170, 170, 170);
             Color nameColor = GetRarityNameColor(node.Rarity);
@@ -2397,7 +2805,7 @@ namespace GW2CraftingHelper.Views
                     Parent = rowPanel
                 };
             }
-            new Label()
+            var nameLabel = new Label()
             {
                 Text = displayName,
                 Font = nameFont,
@@ -2410,25 +2818,23 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
-            var tooltipParts = new List<string>();
-            if (displayName != fullName)
-            {
-                tooltipParts.Add(fullName);
-            }
+            // M33 C2b: extraTooltipLines never depends on panelWidth (unit
+            // price / acquisition hint text is fixed), so it is computed
+            // once and reused verbatim by the settle re-ellipsis pass -
+            // only the "is the name actually truncated" line needs to be
+            // reconsidered when nameMaxWidth changes.
+            var extraTooltipLines = new List<string>();
             if (node.UnitCost.HasValue && node.Quantity > 1 &&
                 (node.Decision == CraftingDecision.BuyFromTp ||
                  node.Decision == CraftingDecision.BuyFromVendor))
             {
-                tooltipParts.Add("Unit price: " + FormatCoinText(node.UnitCost.Value));
+                extraTooltipLines.Add("Unit price: " + FormatCoinText(node.UnitCost.Value));
             }
             if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
             {
-                tooltipParts.Add(node.AcquisitionHint);
+                extraTooltipLines.Add(node.AcquisitionHint);
             }
-            if (tooltipParts.Count > 0)
-            {
-                rowPanel.BasicTooltipText = string.Join("\n", tooltipParts);
-            }
+            UpdateTreeRowTooltip(rowPanel, displayName, fullName, extraTooltipLines);
 
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
@@ -2447,12 +2853,13 @@ namespace GW2CraftingHelper.Views
             // fix, same RenderValueCellRightAligned entry point); a
             // decision whose real cost is genuinely zero-and-uncosted
             // renders a dash instead of an invented "0".
+            ValueCellHandle costCell = null;
             if (node.SubtreeCost.HasValue)
             {
                 var costFont = GameService.Content.DefaultFont14;
                 var currencyAmounts = CurrencyDisplayResolver.ResolveAmounts(
                     node.VendorCurrencyCosts, _currentPlan?.CurrencyMetadata);
-                RenderValueCellRightAligned(
+                costCell = RenderValueCellRightAligned(
                     rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
             }
 
@@ -2460,6 +2867,7 @@ namespace GW2CraftingHelper.Views
             // ".not-crafted" informational reference branch (what it would
             // cost to craft instead) - dimmed, and the flag does not stack
             // on already-dimmed branches.
+            FlowPanel childFlow = null;
             if (hasChildren)
             {
                 bool childDimmed = dimmed || node.Decision != CraftingDecision.Craft;
@@ -2471,7 +2879,7 @@ namespace GW2CraftingHelper.Views
                 // initial call, or a toggle handler below) finalizes the
                 // real height via RefreshTreeContainerHeights before
                 // control returns to PreserveScrollAcross's caller.
-                var childFlow = new FlowPanel()
+                childFlow = new FlowPanel()
                 {
                     Size = new Point(panelWidth, 0),
                     FlowDirection = ControlFlowDirection.SingleTopToBottom,
@@ -2484,7 +2892,6 @@ namespace GW2CraftingHelper.Views
                     Depth = depth,
                     ChildContainer = childFlow,
                     ArrowLabel = arrowLabel,
-                    PanelWidth = panelWidth,
                     ChildDimmed = childDimmed
                 };
                 _treeNodeStates.Add(state);
@@ -2519,10 +2926,15 @@ namespace GW2CraftingHelper.Views
                     {
                         if (!state.ChildrenBuilt)
                         {
+                            // M33 C2b: read the LIVE width rather than the
+                            // (possibly long-stale, since resize no longer
+                            // triggers a rebuild) width this node itself was
+                            // built at - see GetCurrentPanelWidth.
+                            int currentWidth = GetCurrentPanelWidth();
                             foreach (var child in state.Node.Children)
                             {
                                 RenderTreeNode(
-                                    child, state.ChildContainer, state.PanelWidth, state.Depth + 1, state.ChildDimmed);
+                                    child, state.ChildContainer, currentWidth, state.Depth + 1, state.ChildDimmed);
                             }
                             state.ChildrenBuilt = true;
                         }
@@ -2530,11 +2942,72 @@ namespace GW2CraftingHelper.Views
                         _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
                         state.ChildContainer.Visible = state.IsExpanded;
                         state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
-                        RefreshTreeContainerHeights(state.PanelWidth);
+                        RefreshTreeContainerHeights();
                     });
                 };
                 rowPanel.Click += toggleHandler;
             }
+
+            // M33 C2b: pills/cost cell reposition every drag tick (no
+            // MeasureString - pill widths are already-known control Width,
+            // RepositionValueCellRightAligned uses only cached segment text
+            // widths); childFlow's width tracks panelWidth with its Height
+            // preserved exactly (never perturbs scroll - M33 C2a already
+            // made every row/container height explicit). The name label is
+            // untouched here; it only re-ellipsizes at settle below.
+            _relayoutActions.Add(w =>
+            {
+                rowPanel.Size = new Point(w, TreeRowHeight);
+                var e = PlanRelayoutMath.ComputeTreeColumnEdges(
+                    w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+
+                if (pillPanels.Count > 0)
+                {
+                    int x = e.PillColX;
+                    foreach (var pill in pillPanels)
+                    {
+                        pill.Location = new Point(x, 10);
+                        x += pill.Width + 6;
+                    }
+                }
+                if (costCell != null)
+                {
+                    RepositionValueCellRightAligned(costCell, e.CostRightEdge, 12);
+                }
+                if (childFlow != null)
+                {
+                    childFlow.Size = new Point(w, childFlow.Height);
+                }
+            });
+            _reellipsisActions.Add(w =>
+            {
+                var e = PlanRelayoutMath.ComputeTreeColumnEdges(
+                    w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+                string newDisplayName = EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
+                if (nameLabel.Text != newDisplayName)
+                {
+                    nameLabel.Text = newDisplayName;
+                    UpdateTreeRowTooltip(rowPanel, newDisplayName, fullName, extraTooltipLines);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Rebuilds a tree row's tooltip from its (possibly re-ellipsized)
+        /// display name plus its width-invariant extra lines - shared by
+        /// RenderTreeNode's initial build and its settle re-ellipsis
+        /// closure so the two can never disagree about tooltip content.
+        /// </summary>
+        private static void UpdateTreeRowTooltip(
+            Panel rowPanel, string displayName, string fullName, List<string> extraLines)
+        {
+            var parts = new List<string>();
+            if (displayName != fullName)
+            {
+                parts.Add(fullName);
+            }
+            parts.AddRange(extraLines);
+            rowPanel.BasicTooltipText = parts.Count > 0 ? string.Join("\n", parts) : null;
         }
 
         // --- Decision pills ---
@@ -2823,20 +3296,40 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
+        /// M33 C2b: a coin/currency segment run's already-created controls
+        /// plus each segment's cached (font-only, panelWidth-invariant)
+        /// text width, so a relayout closure can reposition the whole run
+        /// at a new x without ever calling MeasureString again - see
+        /// RepositionSegments. Controls/TextWidths are always the same
+        /// length and share indices.
+        /// </summary>
+        private struct SegmentLayoutHandle
+        {
+            public (Label Label, Panel Icon)[] Controls;
+            public int[] TextWidths;
+
+            public static readonly SegmentLayoutHandle Empty =
+                new SegmentLayoutHandle { Controls = System.Array.Empty<(Label, Panel)>(), TextWidths = System.Array.Empty<int>() };
+        }
+
+        /// <summary>
         /// Lays out coin segments left-to-right starting at x. alphaScale
         /// dims the number labels (not the icons - Panel has no tint
         /// property) for dimmed not-crafted subtree rows.
         /// </summary>
-        private static void LayoutCoinSegments(
+        private static SegmentLayoutHandle LayoutCoinSegments(
             Panel parent, List<CoinSegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
         {
+            var controls = new (Label, Panel)[segments.Count];
+            var widths = new int[segments.Count];
             int x = startX;
-            foreach (var seg in segments)
+            for (int i = 0; i < segments.Count; i++)
             {
+                var seg = segments[i];
                 Color textColor = GetCoinColor(seg.AssetId);
                 if (alphaScale < 1f) textColor *= alphaScale;
 
-                new Label()
+                var label = new Label()
                 {
                     Text = seg.Text,
                     Font = font,
@@ -2847,7 +3340,7 @@ namespace GW2CraftingHelper.Views
                     Parent = parent
                 };
 
-                new Panel()
+                var icon = new Panel()
                 {
                     Size = new Point(CoinIconSize, CoinIconSize),
                     Location = new Point(x + seg.TextWidth + CoinLabelIconGap, y),
@@ -2855,7 +3348,33 @@ namespace GW2CraftingHelper.Views
                     Parent = parent
                 };
 
+                controls[i] = (label, icon);
+                widths[i] = seg.TextWidth;
                 x += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
+            }
+
+            return new SegmentLayoutHandle { Controls = controls, TextWidths = widths };
+        }
+
+        /// <summary>
+        /// M33 C2b: non-allocating reposition twin to LayoutCoinSegments/
+        /// LayoutCurrencySegments (m2 3.7/4) - moves EXISTING segment
+        /// controls to new x-positions using the cached TextWidths, never
+        /// creating a control or calling MeasureString. Shared by both coin
+        /// and currency segment runs since they follow the identical
+        /// "label, gap, icon, gap" geometry (same CoinIconSize/
+        /// CoinLabelIconGap/CoinSegmentGap constants).
+        /// </summary>
+        private static void RepositionSegments(SegmentLayoutHandle handle, int startX, int y)
+        {
+            int x = startX;
+            for (int i = 0; i < handle.Controls.Length; i++)
+            {
+                var (label, icon) = handle.Controls[i];
+                int textWidth = handle.TextWidths[i];
+                label.Location = new Point(x, y);
+                icon.Location = new Point(x + textWidth + CoinLabelIconGap, y);
+                x += textWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
             }
         }
 
@@ -2928,16 +3447,19 @@ namespace GW2CraftingHelper.Views
             return ShoppingColumnMath.SegmentRunWidth(widths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
         }
 
-        private static void LayoutCurrencySegments(
+        private static SegmentLayoutHandle LayoutCurrencySegments(
             Panel parent, List<CurrencySegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
         {
+            var controls = new (Label, Panel)[segments.Count];
+            var widths = new int[segments.Count];
             int x = startX;
             Color textColor = new Color(220, 220, 220);
             if (alphaScale < 1f) textColor *= alphaScale;
 
-            foreach (var seg in segments)
+            for (int i = 0; i < segments.Count; i++)
             {
-                new Label()
+                var seg = segments[i];
+                var label = new Label()
                 {
                     Text = seg.Text,
                     Font = font,
@@ -2948,10 +3470,14 @@ namespace GW2CraftingHelper.Views
                     Parent = parent
                 };
 
-                CreateItemIcon(parent, seg.IconUrl, x + seg.TextWidth + CoinLabelIconGap, y, CoinIconSize);
+                var icon = CreateItemIcon(parent, seg.IconUrl, x + seg.TextWidth + CoinLabelIconGap, y, CoinIconSize);
 
+                controls[i] = (label, icon);
+                widths[i] = seg.TextWidth;
                 x += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
             }
+
+            return new SegmentLayoutHandle { Controls = controls, TextWidths = widths };
         }
 
         /// <summary>
@@ -2972,13 +3498,29 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
+        /// M33 C2b: everything a relayout closure needs to reposition an
+        /// already-rendered value cell (RenderValueCellRightAligned's
+        /// result) at a new rightEdgeX without any MeasureString call -
+        /// either DashLabel is set (genuinely unpriceable row) or the two
+        /// SegmentLayoutHandles are (each individually empty when that half
+        /// of the mix is absent - e.g. CoinSegments.Controls.Length == 0
+        /// for a currency-only row).
+        /// </summary>
+        private sealed class ValueCellHandle
+        {
+            public SegmentLayoutHandle CoinSegments;
+            public SegmentLayoutHandle CurrencySegments;
+            public Label DashLabel;
+        }
+
+        /// <summary>
         /// Right-aligns coin segments (if copper &gt; 0) followed by
         /// currency segments (if any) to rightEdgeX - the "mixed
         /// coin+currency renders coin segments then currency segments"
         /// rule. Callers must not invoke this for a value with neither
         /// (RenderValueCellRightAligned handles that dash case instead).
         /// </summary>
-        private static void LayoutValueSegmentsRightAligned(
+        private static ValueCellHandle LayoutValueSegmentsRightAligned(
             Panel parent, long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts,
             int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
         {
@@ -2989,8 +3531,10 @@ namespace GW2CraftingHelper.Views
             int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentGap : 0;
 
             int startX = rightEdgeX - (coinWidth + gap + currencyWidth);
-            LayoutCoinSegments(parent, coinSegments, startX, y, font, alphaScale);
-            LayoutCurrencySegments(parent, currencySegments, startX + coinWidth + gap, y, font, alphaScale);
+            var coinHandle = LayoutCoinSegments(parent, coinSegments, startX, y, font, alphaScale);
+            var currencyHandle = LayoutCurrencySegments(parent, currencySegments, startX + coinWidth + gap, y, font, alphaScale);
+
+            return new ValueCellHandle { CoinSegments = coinHandle, CurrencySegments = currencyHandle };
         }
 
         /// <summary>
@@ -3000,8 +3544,10 @@ namespace GW2CraftingHelper.Views
         /// currency/mixed, newly matching) the coin invariant; a value with
         /// neither a coin price nor a currency cost renders a plain dash
         /// instead of a blank cell or an invented "0" (KNOWN-ISSUES #16b).
+        /// Returns a handle so a relayout closure can reposition the cell
+        /// at a new rightEdgeX later - see RepositionValueCellRightAligned.
         /// </summary>
-        private static void RenderValueCellRightAligned(
+        private static ValueCellHandle RenderValueCellRightAligned(
             Panel parent, long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts,
             int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
         {
@@ -3011,11 +3557,42 @@ namespace GW2CraftingHelper.Views
             if (!hasCoin && !hasCurrency)
             {
                 Color dashColor = alphaScale < 1f ? UnpricedDashColor * alphaScale : UnpricedDashColor;
-                CreateRightAlignedLabel(parent, UnpricedDashText, font, dashColor, rightEdgeX, y);
+                var dashLabel = CreateRightAlignedLabel(parent, UnpricedDashText, font, dashColor, rightEdgeX, y);
+                return new ValueCellHandle
+                {
+                    CoinSegments = SegmentLayoutHandle.Empty,
+                    CurrencySegments = SegmentLayoutHandle.Empty,
+                    DashLabel = dashLabel
+                };
+            }
+
+            return LayoutValueSegmentsRightAligned(parent, copper, currencyAmounts, rightEdgeX, y, font, alphaScale);
+        }
+
+        /// <summary>
+        /// M33 C2b: non-allocating reposition twin to
+        /// RenderValueCellRightAligned - moves an EXISTING value cell's
+        /// controls to a new rightEdgeX, using only the cached per-segment
+        /// TextWidths (ShoppingColumnMath.SegmentRunWidth, the same pure
+        /// function the shopping column pre-scan uses, so the width this
+        /// computes can never drift from what LayoutValueSegmentsRightAligned
+        /// actually laid out). No MeasureString, no new controls.
+        /// </summary>
+        private static void RepositionValueCellRightAligned(ValueCellHandle handle, int rightEdgeX, int y)
+        {
+            if (handle.DashLabel != null)
+            {
+                handle.DashLabel.Location = new Point(rightEdgeX - handle.DashLabel.Width, y);
                 return;
             }
 
-            LayoutValueSegmentsRightAligned(parent, copper, currencyAmounts, rightEdgeX, y, font, alphaScale);
+            int coinWidth = ShoppingColumnMath.SegmentRunWidth(handle.CoinSegments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
+            int currencyWidth = ShoppingColumnMath.SegmentRunWidth(handle.CurrencySegments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
+            int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentGap : 0;
+
+            int startX = rightEdgeX - (coinWidth + gap + currencyWidth);
+            RepositionSegments(handle.CoinSegments, startX, y);
+            RepositionSegments(handle.CurrencySegments, startX + coinWidth + gap, y);
         }
 
         // --- Icon helper ---
@@ -3025,19 +3602,22 @@ namespace GW2CraftingHelper.Views
         /// size (32px icon, 1px border = 34px overall); the plan header uses
         /// a larger 40px/2px variant (44px overall, gw2e's .tooltip-item).
         /// </summary>
-        private static void CreateRarityFramedIcon(
+        private static Panel CreateRarityFramedIcon(
             Panel parent, string iconUrl, string rarity, int x, int y,
             int iconSize = 32, int borderThickness = 1)
         {
-            CreateRarityFramedIcon(
+            return CreateRarityFramedIcon(
                 parent, iconUrl, GetRarityBorderColor(rarity), x, y, iconSize, borderThickness);
         }
 
         /// <summary>
         /// Same as above with an explicit frame color, for dimmed
         /// not-crafted subtree rows (neutral grey frame instead of rarity).
+        /// Returns the outer frame Panel so a caller whose icon position
+        /// depends on panelWidth (currently only the plan header's centered
+        /// title) can reposition it on relayout without recreating it.
         /// </summary>
-        private static void CreateRarityFramedIcon(
+        private static Panel CreateRarityFramedIcon(
             Panel parent, string iconUrl, Color frameColor, int x, int y,
             int iconSize = 32, int borderThickness = 1)
         {
@@ -3050,25 +3630,25 @@ namespace GW2CraftingHelper.Views
                 Parent = parent
             };
             CreateItemIcon(frame, iconUrl, borderThickness, borderThickness, iconSize);
+            return frame;
         }
 
-        private static void CreateItemIcon(Panel parent, string iconUrl, int x, int y, int size = 32)
+        private static Panel CreateItemIcon(Panel parent, string iconUrl, int x, int y, int size = 32)
         {
             // Missing icon: render a neutral empty-slot square, not the
             // alarming red error texture - a data gap is not a failure.
             if (string.IsNullOrEmpty(iconUrl))
             {
-                new Panel()
+                return new Panel()
                 {
                     Size = new Point(size, size),
                     Location = new Point(x, y),
                     BackgroundColor = new Color(45, 45, 45),
                     Parent = parent
                 };
-                return;
             }
 
-            new Panel()
+            return new Panel()
             {
                 Size = new Point(size, size),
                 Location = new Point(x, y),
