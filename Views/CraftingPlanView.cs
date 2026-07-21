@@ -135,6 +135,25 @@ namespace GW2CraftingHelper.Views
         // superseded it.
         private int _scrollRestoreGeneration;
 
+        // M33 C2c (resize-scroll-preserve regression fix): set by
+        // PreserveScrollAcrossResize whenever a height-changing resize tick
+        // (dragging the window's bottom edge or a corner) wrote a per-tick
+        // scroll-preserve during the current drag. ResizeSettleStep arms a
+        // single bounded verify window for it at drag settle (not per
+        // tick) via StartResizeScrollVerify, then clears the flag.
+        // _resizeScrollSavedOffset holds the last known-good pre-tick
+        // pixel offset to verify against - PreserveScrollAcrossResize only
+        // updates it when a tick's freshly captured offset is > 0, so an
+        // uncontested reset that lands on some frame between two ticks
+        // (and would otherwise corrupt the NEXT tick's own capture to 0)
+        // cannot erase the real target. PreserveScrollAcross (the rebuild
+        // path) clears _resizeScrollRestorePending up front, since a
+        // rebuild disposes and recreates the content panel's children -
+        // any resize-drag offset captured against the old content is
+        // meaningless once that happens.
+        private bool _resizeScrollRestorePending;
+        private int _resizeScrollSavedOffset;
+
         // Live FrameTicker instances (null when idle). Tracked so Build()
         // can cancel a leftover ticker from the previous build cycle before
         // starting a new one, using the same SpriteScreen-parented cleanup
@@ -267,6 +286,17 @@ namespace GW2CraftingHelper.Views
         {
             int saved = _contentPanel?.VerticalScrollOffset ?? 0;
             int capturedGeneration = ++_scrollRestoreGeneration;
+
+            // M33 C2c: a rebuild is about to dispose and recreate every
+            // content-panel child, so any resize-drag scroll-preserve still
+            // pending from before it (see _resizeScrollRestorePending) is
+            // now meaningless - clear it so a later ResizeSettleStep tick
+            // never arms a stale-offset verify (StartResizeScrollVerify)
+            // against the new content using the old content's dimensions,
+            // which could otherwise cancel and replace this rebuild's own
+            // in-flight verify with wrong math.
+            _resizeScrollRestorePending = false;
+
             mutate();
             if (saved > 0)
             {
@@ -698,6 +728,8 @@ namespace GW2CraftingHelper.Views
             _resizeDebounceTicker?.Cancel();
             _resizeDebounceTicker = null;
             _resizeSettlePending = false;
+            _resizeScrollRestorePending = false;
+            _resizeScrollSavedOffset = 0;
             _lastWheelEventUtc = null;
 
             int w = buildPanel.ContentRegion.Width;
@@ -850,6 +882,13 @@ namespace GW2CraftingHelper.Views
             int w = container.ContentRegion.Width;
             int h = container.ContentRegion.Height;
 
+            // M33 C2c: capture the content panel's absolute scroll offset
+            // (pixels) and height BEFORE either changes below - see
+            // PreserveScrollAcrossResize's doc comment for why this must
+            // happen pre-mutation.
+            int savedScrollOffset = _contentPanel?.VerticalScrollOffset ?? 0;
+            int previousContentHeight = _contentPanel?.Height ?? 0;
+
             // Update widths of layout panels. Top-strip controls keep their
             // pre-existing direct updates (M33 C2b directive 1) - these were
             // never part of the dispose+rebuild problem the relayout
@@ -860,23 +899,50 @@ namespace GW2CraftingHelper.Views
             _separator.Size = new Point(w - RightEdgePadding, 2);
             _contentPanel.Size = new Point(w, h - TopRegionHeight);
 
+            bool widthChanged = w != _lastRenderedWidth;
+            bool heightChanged = _contentPanel.Height != previousContentHeight;
+
+            // M33 C2c (KNOWN-ISSUES resize-scroll regression): a
+            // height-changing drag tick (dragging the window's bottom edge
+            // or a corner) resets Blish's own scrollbar to top one real
+            // frame later - see PreserveScrollAcrossResize's doc comment
+            // for the vendor-source-grounded mechanism. Gated on
+            // _currentPlan so an empty content panel never does this work;
+            // the offset/height capture above stays unconditional since it
+            // is two cheap property reads either way.
+            if (_currentPlan != null && heightChanged)
+            {
+                PreserveScrollAcrossResize(savedScrollOffset, _contentPanel.Height);
+            }
+
             // M33 C2b: live in-place relayout, every real drag tick - no
             // dispose+rebuild, no debounce wait. Perf guard: skip entirely
             // when the width genuinely did not change (e.g. a height-only
             // resize, or a duplicate event) so an idle window never pays
             // for a registry walk.
-            if (_currentPlan != null && w != _lastRenderedWidth)
+            if (_currentPlan != null && widthChanged)
             {
                 _lastRenderedWidth = w;
-                _lastResizeEventUtc = DateTime.UtcNow;
 
                 int panelWidth = w - RightEdgePadding;
                 ReplayRelayout(panelWidth);
+            }
 
-                // Trailing settle pass: bounded to a single in-flight
-                // ticker (_resizeSettlePending) so repeated ticks during a
-                // drag just extend _lastResizeEventUtc rather than spawning
-                // parallel tickers - see ResizeSettleStep.
+            // M33 C2c: the trailing settle pass (re-ellipsis, a defensive
+            // relayout replay, and now the resize-scroll verify armed by
+            // PreserveScrollAcrossResize above) must be scheduled whenever
+            // EITHER dimension changed. Previously this ticker was
+            // scheduled only on a width change, which silently starved a
+            // pure height-only drag (e.g. dragging just the bottom edge) of
+            // any settle handling at all - exactly the drag shape the live
+            // regression was found under. Bounded to a single in-flight
+            // ticker (_resizeSettlePending) so repeated ticks during a drag
+            // just extend _lastResizeEventUtc rather than spawning parallel
+            // tickers - see ResizeSettleStep.
+            if (_currentPlan != null && (widthChanged || heightChanged))
+            {
+                _lastResizeEventUtc = DateTime.UtcNow;
+
                 if (!_resizeSettlePending)
                 {
                     _resizeSettlePending = true;
@@ -884,6 +950,141 @@ namespace GW2CraftingHelper.Views
                     _resizeDebounceTicker = new FrameTicker(ResizeSettleStep);
                 }
             }
+        }
+
+        /// <summary>
+        /// M33 C2c: per-tick counterpart to ApplySavedScrollSynchronously
+        /// for a resize drag that changes the content panel's viewport
+        /// HEIGHT, as opposed to a content rebuild (PreserveScrollAcross's
+        /// case). Root cause, confirmed by decompiling the vendor assembly
+        /// (packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe,
+        /// Blish_HUD.Controls.Scrollbar and Panel):
+        ///
+        /// Scrollbar.RecalculateLayout caches
+        /// _scrollbarPercent = ContentRegion.Height / containerLowestContent
+        /// and zeroes ScrollDistance (and, via UpdateAssocContainer,
+        /// VerticalScrollOffset) whenever that ratio differs from the
+        /// previously cached value. RecalculateLayout runs from two places:
+        /// (1) synchronously, nested inside Panel's own "Height"
+        /// PropertyChanged handler (UpdatePanelScrollbarOnOwnPropertyChanged
+        /// sets _panelScrollbar.Height, itself a Control.Height write that
+        /// invalidates/recalculates the scrollbar) - but .NET's
+        /// PropertyChanged event fires BEFORE Control.Size's own
+        /// OnPropertyChanged("Height", invalidateLayout: true) call to
+        /// Invalidate(), so this nested call runs before Panel's own
+        /// RecalculateLayout has refreshed ContentRegion for the new size
+        /// and reads the STALE (pre-resize) ContentRegion.Height, seeing no
+        /// change; and (2) once every real engine frame, unconditionally,
+        /// from Scrollbar.DoUpdate's own Invalidate() call - by the time
+        /// THAT runs, ContentRegion.Height has already been refreshed (the
+        /// panel's own RecalculateLayout already ran synchronously earlier
+        /// in the same Height-setter chain), so it now sees a genuine
+        /// change and resets. Net effect: the reset lands on a later real
+        /// frame - typically the next one - not synchronously inside this
+        /// tick's Size write. This is the same delayed-reset window
+        /// ApplySavedScrollSynchronously's class doc already describes for
+        /// rebuilds (StartScrollVerify exists there for exactly this
+        /// reason).
+        ///
+        /// A write here keeps the visible position correct for the
+        /// remainder of THIS tick (no flash mid-drag, matching directive
+        /// B's zero-flash goal); OnPanelResized separately arms a bounded
+        /// verify window at drag SETTLE (ResizeSettleStep), not per tick,
+        /// to contest that trailing later-frame reset once the drag stops
+        /// producing new ticks - see StartResizeScrollVerify. A per-tick
+        /// verify window was deliberately not used: it would spawn (or
+        /// cancel-and-replace) a FrameTicker on every single drag frame,
+        /// which is the "spam" the task explicitly ruled out, and the
+        /// per-tick synchronous write already keeps each tick visually
+        /// correct without one.
+        /// </summary>
+        private void PreserveScrollAcrossResize(int savedOffsetPx, int newContentPanelHeight)
+        {
+            if (_contentPanel == null || PanelScrollbarField == null || savedOffsetPx <= 0)
+            {
+                return;
+            }
+
+            var scrollbar = PanelScrollbarField.GetValue(_contentPanel) as Scrollbar;
+            if (scrollbar == null)
+            {
+                return;
+            }
+
+            // Force the scrollbar to resolve its own cached _scrollbarPercent
+            // (ContentRegion.Height / containerLowestContent) against the
+            // ALREADY-fresh ContentRegion.Height _contentPanel.Size just set,
+            // BEFORE writing our restore ratio below. Skipping this call
+            // would make our own write below self-defeating: Scrollbar.
+            // ScrollDistance's setter always calls Invalidate(), and on a
+            // pure height-only tick nothing else has touched the scrollbar
+            // yet this tick, so _scrollbarPercent is still stale (last
+            // refreshed against the OLD height); OUR write would then be the
+            // first thing to trigger Scrollbar.RecalculateLayout against the
+            // new ratio, which would detect the just-changed percent and
+            // reset ScrollDistance back to 0 synchronously, inside the same
+            // statement, undoing our own write before this method even
+            // returns. Calling RecalculateLayout directly (bypassing
+            // Control.UpdateLayout's once-per-LayoutState guard - see that
+            // guard's own doc comment) lets this expected reset happen NOW,
+            // harmlessly (nothing paints between these two statements), so
+            // the restore write immediately below is the one that actually
+            // sticks: _scrollbarPercent is stable by then, so ScrollDistance's
+            // own cascading RecalculateLayout finds no further change to
+            // react to. (A rebuild does not need this: PreserveScrollAcross's
+            // mutate() churns through many of _contentPanel's own direct
+            // children - each write reaching Panel.UpdateContentRegionBounds
+            // - which already forces this same stale-to-fresh transition
+            // organically before ApplySavedScrollSynchronously's write runs.
+            // A pure height-only resize tick has no such churn: ReplayRelayout
+            // does not even run when only height changed, since it is gated
+            // on widthChanged.)
+            scrollbar.RecalculateLayout();
+
+            int contentHeight = MeasureContentHeight(_contentPanel);
+            float ratio = ScrollMath.RatioForOffset(savedOffsetPx, contentHeight, newContentPanelHeight);
+            float before = scrollbar.ScrollDistance;
+            scrollbar.ScrollDistance = ratio;
+
+            // Remember the last known-good pre-tick offset so the
+            // settle-time verify (StartResizeScrollVerify) restores the
+            // user's real position even if this was not the final tick of
+            // the drag - see the field comment on _resizeScrollSavedOffset.
+            _resizeScrollRestorePending = true;
+            _resizeScrollSavedOffset = savedOffsetPx;
+
+            if (_settings != null && _settings.ScrollDiagnosticsEnabled.Value)
+            {
+                Logger.Debug("{0} write writer=ResizePreserve frame={1} before={2:0.0000} after={3:0.0000} contentHeight={4} savedOffset={5} newHeight={6}",
+                    ScrollDiagTag, ScrollDiagFrame(), before, ratio, contentHeight, savedOffsetPx, newContentPanelHeight);
+            }
+        }
+
+        /// <summary>
+        /// M33 C2c: arms StartScrollVerify's existing bounded window once,
+        /// at resize-drag settle, using the last known-good offset a
+        /// resize tick captured via PreserveScrollAcrossResize. Reuses
+        /// StartScrollVerify unmodified, so the existing wheel-yield,
+        /// zero-reassert-cap, and generation-staleness semantics all apply
+        /// unchanged - see that method's doc comment. Deliberately called
+        /// only from ResizeSettleStep (once per settled drag), never per
+        /// tick.
+        /// </summary>
+        private void StartResizeScrollVerify()
+        {
+            if (_contentPanel == null || PanelScrollbarField == null || _resizeScrollSavedOffset <= 0)
+            {
+                return;
+            }
+
+            var scrollbar = PanelScrollbarField.GetValue(_contentPanel) as Scrollbar;
+            if (scrollbar == null)
+            {
+                return;
+            }
+
+            int capturedGeneration = ++_scrollRestoreGeneration;
+            StartScrollVerify(_contentPanel, capturedGeneration, _resizeScrollSavedOffset, scrollbar);
         }
 
         /// <summary>
@@ -981,8 +1182,12 @@ namespace GW2CraftingHelper.Views
         /// the drag settles) is small - per M33 C2b directive 2. Neither
         /// this pass nor the defensive ReplayRelayout repeat below ever
         /// changes a row's Height, so - unlike the pre-C2a settle rebuild
-        /// this replaces - nothing here can perturb scroll position; no
-        /// PreserveScrollAcross wrapper is needed or used.
+        /// this replaces - nothing in RunReellipsis/ReplayRelayout can
+        /// perturb scroll position; no PreserveScrollAcross wrapper is
+        /// needed around them. M33 C2c: this method also arms the resize
+        /// drag's single settle-time scroll-verify window, if a
+        /// height-changing tick during the drag needs one - see
+        /// StartResizeScrollVerify and _resizeScrollRestorePending.
         /// </summary>
         private bool ResizeSettleStep(GameTime gameTime)
         {
@@ -991,6 +1196,7 @@ namespace GW2CraftingHelper.Views
             if (_contentPanel == null || _contentPanel.Parent == null)
             {
                 _resizeSettlePending = false;
+                _resizeScrollRestorePending = false;
                 return false;
             }
 
@@ -1022,6 +1228,16 @@ namespace GW2CraftingHelper.Views
                 // reload mid-drag). Degrade silently: whichever Build() call
                 // is current already rendered fresh content at its own width.
                 Logger.Warn(ex, "Resize settle pass skipped; content panel unavailable");
+            }
+
+            // M33 C2c: bounded to a single window per settled drag (not per
+            // tick) - see PreserveScrollAcrossResize's doc comment for why
+            // one settle-time window is sufficient to contest the trailing
+            // Blish-internal reset.
+            if (_resizeScrollRestorePending)
+            {
+                _resizeScrollRestorePending = false;
+                StartResizeScrollVerify();
             }
 
             return false;

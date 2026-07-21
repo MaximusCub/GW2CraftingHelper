@@ -346,6 +346,71 @@ selected one highlighted (gw2e-style), and the displayed decision MUST
 match the price basis actually used by the solver. Audit the
 decision-to-pill mapping for every source combination.
 
+## 19. Resize-drag scroll reset on height change (FIXED in M33 C2c)
+Live-verified regression from M33 C2b's live in-place relayout: any window
+resize drag that changes the content panel's VIEWPORT HEIGHT (dragging the
+bottom edge or a corner) reset scroll to the top, with no [scrolldiag]
+writes during the drag at all. Mechanism: the settle rebuild C2b removed
+used to run inside PreserveScrollAcross, so scroll was restored as a side
+effect of that wrapper; the new live-reflow path never rebuilds, so
+nothing contested Blish's own Scrollbar.RecalculateLayout, which zeroes
+ScrollDistance whenever _scrollbarPercent (viewportHeight/contentHeight)
+changes - which a height-changing drag does on every tick. Width-only
+reflow was and remains unaffected (verified live: no scroll disturbance).
+Confirmed by decompiling packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe
+(Blish_HUD.Controls.Scrollbar/Panel): the reset is NOT synchronous inside
+the Height setter - the nested scrollbar Height write that Panel's own
+"Height" PropertyChanged handler triggers runs before Panel.RecalculateLayout
+has refreshed ContentRegion, so it reads a still-stale ratio and sees no
+change; the real reset comes from Scrollbar.DoUpdate's unconditional
+per-frame Invalidate(), which by then sees the refreshed ContentRegion and
+lands the reset a real frame (or two) after the resize tick - the same
+delayed-reset window StartScrollVerify already exists to contest for
+rebuilds (item #14).
+Fixed in M33 (C2c): OnPanelResized now captures the content panel's
+absolute scroll offset in pixels before its Height changes on every
+resize tick, and - only when the tick actually changed content-panel
+height - re-applies it synchronously afterward via the new
+PreserveScrollAcrossResize (same ScrollMath.RatioForOffset conversion
+ApplySavedScrollSynchronously already uses for rebuilds), logged as
+[scrolldiag] writer=ResizePreserve. A second, less obvious fix was needed
+for the write itself to actually stick: on a pure height-only tick
+(dragging just the bottom edge, no width change) nothing else touches the
+scrollbar first, so Scrollbar's own cached percent is still stale when
+PreserveScrollAcrossResize runs; writing ScrollDistance directly would
+itself trigger the vendor's RecalculateLayout for the first time against
+the now-fresh ContentRegion, which would detect the change and reset back
+to 0 synchronously, undoing the write within the same statement. The fix
+calls scrollbar.RecalculateLayout() directly first (bypassing Control's
+once-per-LayoutState UpdateLayout guard) to force that stale-to-fresh
+transition - and its harmless, invisible-since-synchronous reset - to
+happen under this method's control, so the restore write immediately
+after is the one that lands. A rebuild does not need this extra step:
+PreserveScrollAcross's mutate() already churns through many of the
+content panel's own direct children, each reaching
+Panel.UpdateContentRegionBounds and forcing the same transition
+organically before ApplySavedScrollSynchronously ever writes.
+This keeps every tick visually correct without a per-tick verify ticker
+(which would spam a new FrameTicker on every drag frame); a single
+bounded verify window is
+instead armed once, at drag settle (reusing the existing
+ResizeDebounceStep/StartScrollVerify machinery unmodified), to contest
+the one trailing later-frame reset the vendor source shows can still land
+after the drag's last tick. The settle ticker itself - previously
+scheduled only when width changed - is now also scheduled on a
+height-only change (e.g. dragging just the bottom edge): that drag shape
+previously got no settle handling of any kind, which would have starved
+even the per-tick write of its trailing verify. A rebuild
+(PreserveScrollAcross) clears any pending resize-verify up front, since
+it disposes and recreates the very content the pending verify would
+otherwise be measured against.
+VERIFICATION STATE: confirmed by construction against the decompiled
+vendor Scrollbar/Panel source and the existing ScrollMath unit coverage,
+plus a green build and full test suite. Not re-confirmed by a live
+in-game drag-resize check (screenshot loop) after this specific fix -
+treat a fresh scroll-reset-on-height-drag report as reopening this item
+rather than assuming it is the same M33 C2b regression recurring.
+
 ## Handoff notes for the implementing session
 - Project memory holds the environment + working rules: the
   Blish-over-Paint screenshot loop (input routing: Paint focused for
