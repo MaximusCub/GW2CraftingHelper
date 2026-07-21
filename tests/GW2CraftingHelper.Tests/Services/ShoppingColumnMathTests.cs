@@ -117,5 +117,45 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(10 + 5 + 100, width);
         }
+
+        // --- SegmentRunWidth(int[], ...) overload (M33 UX-wave fix-pass:
+        // the per-frame resize hot path passes SegmentLayoutHandle.TextWidths,
+        // a concrete int[], to a non-allocating overload rather than the
+        // IReadOnlyList<int> one above; both must agree on every result) ---
+
+        [Fact]
+        public void SegmentRunWidthArrayOverload_Null_ReturnsZero()
+        {
+            Assert.Equal(0, ShoppingColumnMath.SegmentRunWidth((int[])null, 20, 2, 6));
+        }
+
+        [Fact]
+        public void SegmentRunWidthArrayOverload_Empty_ReturnsZero()
+        {
+            Assert.Equal(0, ShoppingColumnMath.SegmentRunWidth(new int[0], 20, 2, 6));
+        }
+
+        [Fact]
+        public void SegmentRunWidthArrayOverload_SingleSegment_NoTrailingGap()
+        {
+            var width = ShoppingColumnMath.SegmentRunWidth(new int[] { 30 }, 20, 2, 6);
+
+            Assert.Equal(52, width);
+        }
+
+        [Fact]
+        public void SegmentRunWidthArrayOverload_MatchesListOverload_ForSameInput()
+        {
+            // Both overloads implement the same formula; a resize-tick call
+            // through the int[] overload must never drift from a
+            // build-time call through the IReadOnlyList<int> overload for
+            // the same segment widths.
+            var widths = new int[] { 30, 15, 42 };
+
+            int arrayResult = ShoppingColumnMath.SegmentRunWidth(widths, 20, 2, 6);
+            int listResult = ShoppingColumnMath.SegmentRunWidth(new List<int>(widths), 20, 2, 6);
+
+            Assert.Equal(listResult, arrayResult);
+        }
     }
 }

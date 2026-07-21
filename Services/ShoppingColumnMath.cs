@@ -74,5 +74,32 @@ namespace GW2CraftingHelper.Services
             }
             return width - segmentGap;
         }
+
+        /// <summary>
+        /// int[] twin of the IReadOnlyList&lt;int&gt; overload above, same
+        /// formula. Every M33 C2b per-frame relayout closure (replayed on
+        /// every OnPanelResized drag tick) calls this with
+        /// SegmentLayoutHandle.TextWidths, which is always a concrete
+        /// int[]; without this overload the compiler binds those hot-path
+        /// calls to the IReadOnlyList&lt;int&gt; overload instead, and on
+        /// .NET Framework foreaching an array through IEnumerable&lt;T&gt;/
+        /// IReadOnlyList&lt;T&gt; allocates a heap enumerator per call. This
+        /// overload lets the compiler lower the foreach to a plain indexed
+        /// loop, so the resize hot path stays allocation-free as documented
+        /// on its callers (RepositionValueCellRightAligned, the cost-tile
+        /// relayout closure).
+        /// </summary>
+        public static int SegmentRunWidth(
+            int[] segmentTextWidths, int iconSize, int labelIconGap, int segmentGap)
+        {
+            if (segmentTextWidths == null || segmentTextWidths.Length == 0) return 0;
+
+            int width = 0;
+            for (int i = 0; i < segmentTextWidths.Length; i++)
+            {
+                width += segmentTextWidths[i] + labelIconGap + iconSize + segmentGap;
+            }
+            return width - segmentGap;
+        }
     }
 }
