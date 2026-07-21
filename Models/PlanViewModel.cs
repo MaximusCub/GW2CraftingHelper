@@ -80,6 +80,15 @@ namespace GW2CraftingHelper.Models
         // number. Null for every whole-number amount and for every Total
         // (non-"Each") amount - see CurrencyDisplayResolver.ResolveUnitAmounts.
         public string BundleLabel { get; set; }
+
+        // Owned/needed split for a shopping-row currency Total amount
+        // (M34-B2b, gw2e parity - mirrors PlanRowViewModel.
+        // CurrencyOwnedQuantity's doc comment): min(Amount, wallet amount)
+        // of this currency the account already holds. Null (not 0) when no
+        // wallet snapshot was available, or this amount is a per-unit
+        // "Each" figure (ownership is a total-quantity concept - see
+        // CurrencyDisplayResolver.ResolveAmounts/ResolveUnitAmounts).
+        public int? OwnedQuantity { get; set; }
     }
 
     public class PlanSectionViewModel

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using GW2CraftingHelper.Models;
 
@@ -59,10 +60,20 @@ namespace GW2CraftingHelper.Services
         /// amounts. Null/empty input yields null (never an empty-but-
         /// non-null list), so callers can use a simple null/Count==0 check
         /// for "does this row/node have a currency cost at all".
+        ///
+        /// ownedCurrencyAmounts (M34-B2b, gw2e's ownedCurrencies split -
+        /// optional, cosmetic only) sets each line's OwnedQuantity to
+        /// min(line.Count, wallet amount) when the wallet holds any of that
+        /// currency; null (not 0) when the caller has no wallet data at all
+        /// or omits it, or the currency simply isn't in the wallet snapshot.
+        /// Callers resolving a per-unit "Each" amount should not pass this
+        /// (ownership is a total-quantity concept - see ResolveUnitAmounts,
+        /// which never accepts it).
         /// </summary>
         public static List<CurrencyAmountViewModel> ResolveAmounts(
             IReadOnlyList<CostLine> costLines,
-            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts = null)
         {
             if (costLines == null || costLines.Count == 0)
             {
@@ -72,11 +83,19 @@ namespace GW2CraftingHelper.Services
             var result = new List<CurrencyAmountViewModel>(costLines.Count);
             foreach (var line in costLines)
             {
+                int? owned = null;
+                if (ownedCurrencyAmounts != null &&
+                    ownedCurrencyAmounts.TryGetValue(line.Id, out int ownedRaw))
+                {
+                    owned = Math.Min(ownedRaw, line.Count);
+                }
+
                 result.Add(new CurrencyAmountViewModel
                 {
                     Amount = line.Count,
                     Name = ResolveName(line.Id, currencyMetadata),
-                    IconUrl = ResolveIconUrl(line.Id, currencyMetadata)
+                    IconUrl = ResolveIconUrl(line.Id, currencyMetadata),
+                    OwnedQuantity = owned
                 });
             }
             return result;

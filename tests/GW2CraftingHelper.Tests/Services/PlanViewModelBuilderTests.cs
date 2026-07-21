@@ -140,6 +140,76 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("100x Volatile Magic", ccRows[1].Label);
         }
 
+        // --- M34-B2b (view-model wiring dates to M34-B2a #4): owned/needed
+        // split on Total Cost currency rows ---
+
+        [Fact]
+        public void SummarySection_CurrencyCost_OwnedAmountPresent_SetsCurrencyOwnedQuantity()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+            });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 200 } };
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections
+                .First(s => s.SectionType == PlanSectionType.Summary)
+                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal(200, ccRow.CurrencyOwnedQuantity);
+        }
+
+        [Fact]
+        public void SummarySection_CurrencyCost_OwnedExceedsNeeded_ClampedToAmount()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+            });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 999999 } };
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections
+                .First(s => s.SectionType == PlanSectionType.Summary)
+                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal(500, ccRow.CurrencyOwnedQuantity);
+        }
+
+        [Fact]
+        public void SummarySection_CurrencyCost_NoOwnedCurrencyAmounts_CurrencyOwnedQuantityNull()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+            });
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections
+                .First(s => s.SectionType == PlanSectionType.Summary)
+                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Null(ccRow.CurrencyOwnedQuantity);
+        }
+
+        [Fact]
+        public void SummarySection_CurrencyCost_OwnedAmountsMissingThisId_CurrencyOwnedQuantityNull()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+            });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 2, 100 } }; // different currency id
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections
+                .First(s => s.SectionType == PlanSectionType.Summary)
+                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Null(ccRow.CurrencyOwnedQuantity);
+        }
+
         [Fact]
         public void SummarySection_AstralAcclaim_CorrectName()
         {
@@ -469,6 +539,73 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(100, row.CurrencyCosts[0].Amount);
             Assert.Equal("Spirit Shards", row.CurrencyCosts[0].Name);
             Assert.Equal("s.png", row.CurrencyCosts[0].IconUrl);
+        }
+
+        // --- M34-B2b: owned/needed split on shopping-row currency Total cells ---
+
+        [Fact]
+        public void ShoppingList_VendorRow_OwnedCurrencyAmountsPresent_SetsOwnedQuantityOnCurrencyCosts()
+        {
+            var result = MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep
+                    {
+                        ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromVendor,
+                        TotalCost = 0, UnitCost = 0,
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } }
+                    }
+                });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 40 } };
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Equal(40, row.CurrencyCosts[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ShoppingList_VendorRow_NoOwnedCurrencyAmounts_OwnedQuantityStaysNull()
+        {
+            var result = MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep
+                    {
+                        ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromVendor,
+                        TotalCost = 0, UnitCost = 0,
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } }
+                    }
+                });
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Null(row.CurrencyCosts[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ShoppingList_VendorRow_UnitCurrencyCosts_NeverGetsOwnedQuantity()
+        {
+            // Ownership is a total-quantity concept - the Each column's
+            // per-unit rate must never carry an owned/needed split even
+            // when wallet data is present.
+            var result = MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep
+                    {
+                        ItemId = 1, Quantity = 100, Source = AcquisitionSource.BuyFromVendor,
+                        TotalCost = 0, UnitCost = 0,
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 400 } },
+                        VendorOfferOutputCount = 1,
+                        VendorOfferCurrencyCostLinesPerBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 4 } }
+                    }
+                });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 40 } };
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Null(row.UnitCurrencyCosts[0].OwnedQuantity);
+            Assert.Equal(40, row.CurrencyCosts[0].OwnedQuantity);
         }
 
         [Fact]

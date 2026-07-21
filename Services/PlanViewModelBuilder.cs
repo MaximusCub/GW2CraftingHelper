@@ -233,8 +233,12 @@ namespace GW2CraftingHelper.Services
                     UnitCoinValue = step.UnitCost,
                     HintText = ResolveHintText(rowType, step.ItemId, result.AcquisitionHints),
                     BadgeText = ResolveBadgeText(rowType, step.ItemId, result.AcquisitionHints),
+                    // M34-B2b: owned/needed split, cosmetic only (mirrors
+                    // BuildSummarySection's CurrencyCost rows) - only the
+                    // Total column, never Each (a per-unit rate has no
+                    // ownership concept - see ResolveAmounts' doc comment).
                     CurrencyCosts = CurrencyDisplayResolver.ResolveAmounts(
-                        step.VendorCurrencyCosts, result.CurrencyMetadata),
+                        step.VendorCurrencyCosts, result.CurrencyMetadata, result.OwnedCurrencyAmounts),
                     UnitCurrencyCosts = CurrencyDisplayResolver.ResolveUnitAmounts(
                         step.VendorOfferOutputCount, step.VendorOfferCurrencyCostLinesPerBatch, result.CurrencyMetadata)
                 });

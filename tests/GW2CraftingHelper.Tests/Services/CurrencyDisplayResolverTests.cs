@@ -152,6 +152,69 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(result[1].IconUrl);
         }
 
+        // --- ResolveAmounts ownedCurrencyAmounts (M34-B2b) ---
+
+        [Fact]
+        public void ResolveAmounts_OwnedAmountsNull_OwnedQuantityStaysNull()
+        {
+            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+
+            var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, null);
+
+            Assert.Null(result[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ResolveAmounts_OwnedLessThanNeeded_OwnedQuantityIsRawWalletAmount()
+        {
+            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+            var owned = new Dictionary<int, int> { { 23, 200 } };
+
+            var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
+
+            Assert.Equal(200, result[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ResolveAmounts_OwnedExceedsNeeded_OwnedQuantityClampedToAmount()
+        {
+            // Owning MORE than this cost line needs must never surface an
+            // "owned" figure bigger than the line's own Amount.
+            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+            var owned = new Dictionary<int, int> { { 23, 999999 } };
+
+            var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
+
+            Assert.Equal(500, result[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ResolveAmounts_OwnedAmountsMissingThisCurrencyId_OwnedQuantityStaysNull()
+        {
+            var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
+            var owned = new Dictionary<int, int> { { 2, 100 } }; // different currency id
+
+            var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
+
+            Assert.Null(result[0].OwnedQuantity);
+        }
+
+        [Fact]
+        public void ResolveAmounts_MultipleLines_OwnedQuantityResolvedPerLine()
+        {
+            var costLines = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = 23, Count = 500 },
+                new CostLine { Type = "Currency", Id = 2, Count = 1000 }
+            };
+            var owned = new Dictionary<int, int> { { 23, 100 } }; // only the first line has wallet data
+
+            var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
+
+            Assert.Equal(100, result[0].OwnedQuantity);
+            Assert.Null(result[1].OwnedQuantity);
+        }
+
         [Fact]
         public void ResolveAmounts_NeverExposesRawCurrencyId()
         {
