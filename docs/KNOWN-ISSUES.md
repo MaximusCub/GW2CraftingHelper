@@ -1086,19 +1086,24 @@ report but was confirmed mathematically identical exposure (~10.2%
 vanish rate) and free of any icon-clearance side effect (that row has
 no icon, just two `DefaultFont14` labels well clear of the new divider
 position) - fixed proactively rather than left latent.
-Also newly noted (unfixed, out of scope for M36b): the section
-headerDivider (H=30, built inline in CreateSectionHeader, not via
-CreateRowDivider) is built the same bottom-anchored way and shares the
-same Container.Paint exposure - simulation shows it is immune at the
-default 0.897 scale but becomes vulnerable (~16-17%) at the "Small"
-0.81 scale, which is the scale actually measured in this session's
-live pixel-scan. Left unfixed pending an explicit follow-up request.
-VERIFICATION STATE: code-verified (build/tests) and simulation-proven
-across all four UI scale factors, per the M36b investigation and
-divider-position pixel scans referenced above. Live re-verification of
-THIS fix (a fresh desktop pixel-scan of Required Recipes/Crafting
-Steps/Required Disciplines across multiple scroll phases) is still
-pending.
+The section headerDivider (H=30, built inline in CreateSectionHeader,
+not via CreateRowDivider) shares the same Container.Paint exposure -
+simulation shows it is immune at the default 0.897 scale but vulnerable
+(~16-17%) at the "Small" 0.81 scale, which is the scale actually
+measured in this session's live pixel-scans - so it received the same
+1px bottom clearance (y 28 -> 27) in the same wave.
+VERIFICATION STATE: LIVE-VERIFIED 2026-07-21 (post-fix desktop
+pixel-scans on the m36b build, automated scanner measuring divider
+scanline positions against expected row boundaries): Required Recipes
+scanned at FIVE distinct scroll offsets - including the exact viewport
+from the user's bug report (the Gift of Dust/Claws/Scales/Bones/Fangs
+block) - with uniform 35-36px physical pitches and ZERO missing
+boundaries (pre-fix scans of the same section showed 1-2 missing
+boundaries per viewport that moved with scroll phase); Crafting Steps
+scanned clean at two offsets; Shopping List (immune 36px class)
+previously verified at three offsets. Required Disciplines (32px,
+3 text-only rows, same shared-helper fix, simulation-proven) was not
+individually pixel-scanned.
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
