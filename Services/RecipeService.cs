@@ -198,18 +198,48 @@ namespace GW2CraftingHelper.Services
                 foreach (var recipeId in recipeIds)
                 {
                     var raw = await GetRecipeCachedAsync(recipeId, ct);
-                    int craftsNeeded = (int)Math.Ceiling((double)quantity / raw.OutputItemCount);
+
+                    // Defaults to the nominal OutputItemCount (a no-op)
+                    // whenever the source recipe has no fractional EV; only
+                    // Mystic Clover-style Mystic Forge recipes set this
+                    // below OutputItemCount.
+                    double expectedOutputCount = raw.ExpectedOutputCount.HasValue && raw.ExpectedOutputCount.Value > 0
+                        ? raw.ExpectedOutputCount.Value
+                        : raw.OutputItemCount;
+
+                    // M33 Critical fix: craftsNeeded (and therefore every
+                    // ingredient quantity scaled by it below) is computed
+                    // from the EXPECTED output, not the nominal integer
+                    // output - echoing gw2e's single-field output_item_count
+                    // model (r1/r2), where quantity propagation and pricing
+                    // both derive from the same fractional value. For a
+                    // Mystic Clover-style recipe (EV 0.31) this means the
+                    // number of Mystic Forge attempts - and thus the raw
+                    // ingredients consumed - already reflects the expected
+                    // failure rate, so the shopping list is never
+                    // under-provisioned relative to what the craft step
+                    // actually costs (see PlanSolver, which no longer
+                    // re-amortizes cost on top of this).
+                    int craftsNeeded;
+                    try
+                    {
+                        craftsNeeded = checked((int)Math.Ceiling((double)quantity / expectedOutputCount));
+                    }
+                    catch (OverflowException)
+                    {
+                        // Malformed seed data (an absurdly tiny
+                        // ExpectedOutputCount) - fall back to the nominal
+                        // integer output rather than crash the whole tree
+                        // build.
+                        craftsNeeded = (int)Math.Ceiling((double)quantity / raw.OutputItemCount);
+                    }
 
                     var option = new RecipeOption
                     {
                         RecipeId = raw.Id,
                         OutputCount = raw.OutputItemCount,
                         CraftsNeeded = craftsNeeded,
-                        // Defaults to the nominal OutputItemCount (a no-op)
-                        // whenever the source recipe has no fractional EV.
-                        ExpectedOutputCount = raw.ExpectedOutputCount.HasValue && raw.ExpectedOutputCount.Value > 0
-                            ? raw.ExpectedOutputCount.Value
-                            : raw.OutputItemCount,
+                        ExpectedOutputCount = expectedOutputCount,
                         Disciplines = new List<string>(raw.Disciplines),
                         MinRating = raw.MinRating,
                         Flags = new List<string>(raw.Flags)

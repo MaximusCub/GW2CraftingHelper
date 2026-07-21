@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
@@ -372,6 +373,83 @@ namespace GW2CraftingHelper.Tests.Services
             var node = await svc.BuildTreeAsync(19675, 1, CancellationToken.None);
 
             Assert.Equal(0.31, node.Recipes[0].ExpectedOutputCount);
+        }
+
+        [Fact]
+        public async Task FractionalExpectedOutputCount_CraftsNeededAndIngredientQuantity_UseExpectedOutputCount()
+        {
+            // M33 fix-pass Critical finding: craftsNeeded (and therefore
+            // every ingredient quantity scaled by it) must derive from the
+            // EXPECTED output, not the nominal integer output, exactly
+            // mirroring the real Mystic Clover shape (recipe -1591,
+            // ExpectedOutputCount 0.31) needed 77x by Mystic Tribute.
+            // ceil(77 / 0.31) = 249 forge attempts - NOT ceil(77/1)=77,
+            // which would silently under-provision every raw ingredient by
+            // ~1/0.31 (the exact bug this fix closes).
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(19675, -1591);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = -1591,
+                OutputItemId = 19675,
+                OutputItemCount = 1,
+                ExpectedOutputCount = 0.31,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 19925, Count = 1 }, // Obsidian Shard
+                    new RawIngredient { Type = "Item", Id = 19976, Count = 1 }, // Mystic Coin
+                    new RawIngredient { Type = "Item", Id = 19721, Count = 1 }, // Glob of Ectoplasm
+                    new RawIngredient { Type = "Item", Id = 20796, Count = 6 }  // Philosopher's Stone
+                }
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(19675, 77, CancellationToken.None);
+
+            var option = node.Recipes[0];
+            Assert.Equal(1, option.OutputCount);
+            Assert.Equal(0.31, option.ExpectedOutputCount);
+            Assert.Equal(249, option.CraftsNeeded); // ceil(77/0.31) = 249
+
+            Assert.Equal(249, option.Ingredients.Single(i => i.Id == 19925).Quantity);
+            Assert.Equal(249, option.Ingredients.Single(i => i.Id == 19976).Quantity);
+            Assert.Equal(249, option.Ingredients.Single(i => i.Id == 19721).Quantity);
+            Assert.Equal(249 * 6, option.Ingredients.Single(i => i.Id == 20796).Quantity);
+        }
+
+        [Fact]
+        public async Task FractionalExpectedOutputCount_AbsurdlyTinyValue_OverflowFallsBackToNominal()
+        {
+            // A corrupt/malicious seed could set an ExpectedOutputCount so
+            // small that ceil(quantity/ExpectedOutputCount) overflows int -
+            // must fall back to the nominal integer-output calculation
+            // rather than crash the whole tree build.
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(1, 10);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                ExpectedOutputCount = 1e-15,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                }
+            });
+
+            var svc = new RecipeService(api);
+
+            RecipeNode node = null;
+            var exception = await Record.ExceptionAsync(async () =>
+            {
+                node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);
+            });
+
+            Assert.Null(exception);
+            // Falls back to ceil(1/1)=1, exactly the nominal-output result.
+            Assert.Equal(1, node.Recipes[0].CraftsNeeded);
+            Assert.Equal(1, node.Recipes[0].Ingredients[0].Quantity);
         }
 
         [Fact]
