@@ -27,7 +27,13 @@ namespace VendorOfferUpdater
             // rows only stay stable because callers like --merge-into copy
             // untouched baseline objects through rather than recomputing
             // them. Mirrors Services/VendorOfferHasher.cs exactly.
-            int? homesteadTier = null)
+            int? homesteadTier = null,
+            // Astral Acclaim package (KNOWN-ISSUES #28): same non-backward-
+            // compatible-hash caveat as homesteadTier above, appended last
+            // so existing positional callers that already pass homesteadTier
+            // keep meaning exactly what they meant before this parameter
+            // existed. Mirrors Services/VendorOfferHasher.cs exactly.
+            int? seasonalCap = null)
         {
             var sb = new StringBuilder();
 
@@ -78,6 +84,11 @@ namespace VendorOfferUpdater
             sb.Append(";homesteadTier=");
             sb.Append(homesteadTier.HasValue
                 ? homesteadTier.Value.ToString(CultureInfo.InvariantCulture)
+                : "null");
+
+            sb.Append(";seasonalCap=");
+            sb.Append(seasonalCap.HasValue
+                ? seasonalCap.Value.ToString(CultureInfo.InvariantCulture)
                 : "null");
 
             byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()));

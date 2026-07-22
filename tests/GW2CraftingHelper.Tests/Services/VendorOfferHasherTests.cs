@@ -237,5 +237,69 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(hash1, hash2);
         }
+
+        // Astral Acclaim package (KNOWN-ISSUES #28): seasonalCap is appended
+        // AFTER homesteadTier (not between it and weeklyCap) specifically so
+        // every existing positional call above - including the ones that
+        // already pass homesteadTier - keeps meaning exactly what it meant
+        // before this parameter existed.
+
+        [Fact]
+        public void OmittedSeasonalCap_MatchesExplicitNull()
+        {
+            var costs = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+            };
+
+            string hashOmitted = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), null, null);
+            string hashExplicitNull = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), null, null, null, null);
+
+            Assert.Equal(hashOmitted, hashExplicitNull);
+        }
+
+        [Fact]
+        public void DifferentSeasonalCaps_ProduceDifferentHashes()
+        {
+            var costs = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = 63, Count = 60 }
+            };
+
+            string hashNoCap = VendorOfferHasher.ComputeOfferId(
+                19675, 1, costs, "Wizard's Vault", new List<string>(), null, null);
+            string hashSeasonal20 = VendorOfferHasher.ComputeOfferId(
+                19675, 1, costs, "Wizard's Vault", new List<string>(), null, null, null, 20);
+            string hashSeasonal60 = VendorOfferHasher.ComputeOfferId(
+                19675, 1, costs, "Wizard's Vault", new List<string>(), null, null, null, 60);
+
+            Assert.NotEqual(hashNoCap, hashSeasonal20);
+            Assert.NotEqual(hashNoCap, hashSeasonal60);
+            Assert.NotEqual(hashSeasonal20, hashSeasonal60);
+        }
+
+        [Fact]
+        public void SeasonalCap_IsIndependentOfDailyAndWeeklyCap()
+        {
+            var costs = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+            };
+
+            // Same numeric value (5), but in different cap slots - must not
+            // collide, since dailyCap/weeklyCap/seasonalCap are semantically
+            // distinct even when their magnitude happens to match.
+            string hashDaily5 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), 5, null);
+            string hashWeekly5 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), null, 5);
+            string hashSeasonal5 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), null, null, null, 5);
+
+            Assert.NotEqual(hashDaily5, hashSeasonal5);
+            Assert.NotEqual(hashWeekly5, hashSeasonal5);
+        }
     }
 }

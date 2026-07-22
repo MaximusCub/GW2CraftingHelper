@@ -21,7 +21,8 @@ namespace VendorOfferUpdater.Tests.Helpers
             string vendor = null,
             List<string> locations = null,
             int? dailyCap = null,
-            int? weeklyCap = null)
+            int? weeklyCap = null,
+            int? seasonalCap = null)
         {
             _results.Add(new ResultEntry
             {
@@ -33,7 +34,8 @@ namespace VendorOfferUpdater.Tests.Helpers
                 Vendor = vendor,
                 Locations = locations,
                 DailyCap = dailyCap,
-                WeeklyCap = weeklyCap
+                WeeklyCap = weeklyCap,
+                SeasonalCap = seasonalCap
             });
             return this;
         }
@@ -150,6 +152,14 @@ namespace VendorOfferUpdater.Tests.Helpers
                 }
                 writer.WriteEndArray();
 
+                // Has seasonal purchase cap - same empty-array-means-uncapped shape.
+                writer.WriteStartArray("Has seasonal purchase cap");
+                if (entry.SeasonalCap.HasValue)
+                {
+                    writer.WriteNumberValue(entry.SeasonalCap.Value);
+                }
+                writer.WriteEndArray();
+
                 writer.WriteEndObject(); // printouts
                 writer.WriteEndObject(); // pageName
             }
@@ -187,6 +197,7 @@ namespace VendorOfferUpdater.Tests.Helpers
             public List<string> Locations { get; set; }
             public int? DailyCap { get; set; }
             public int? WeeklyCap { get; set; }
+            public int? SeasonalCap { get; set; }
         }
     }
 }
