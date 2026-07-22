@@ -343,8 +343,9 @@ namespace GW2CraftingHelper.Tests.Services
         // VendorOfferLoader by the Homestead test above, but only for a
         // 237-row subset - this pins the loader's parse of the *entire*
         // file, guarding the WP-08 ReadToEnd->DeserializeAsync(Stream)
-        // switch (and the leading-BOM handling it depends on) against
-        // silent drift.
+        // switch against silent drift (this file has no leading BOM;
+        // the switch here is purely the perf P2a change, see
+        // VendorOfferLoader.Load).
         [Fact]
         public void ShippedSeedFile_VendorOfferLoader_ParsesAllOffers()
         {

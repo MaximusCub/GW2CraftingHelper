@@ -542,6 +542,7 @@ namespace GW2CraftingHelper.Tests.Services
                 var data = MysticForgeRecipeData.Load(stream);
 
                 Assert.Empty(data.LoadWarnings);
+                Assert.Equal(1591, data.RecipeCount);
 
                 // Recipe: Tray of Banana Cream Pies (from wiki).
                 var recipe = data.GetRecipe(-1);

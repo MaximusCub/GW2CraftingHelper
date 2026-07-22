@@ -61,9 +61,12 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
         // never exercised through the production ItemNameSeedData.Load by
         // a committed test - mirrors the FindRepoFile shipped-file pattern
         // established in AcquisitionHintServiceTests /
-        // RecipeCacheSerializerTests. This file also ships with a leading
-        // UTF-8 BOM, so it guards the WP-08 ReadToEnd->DeserializeAsync
-        // switch against a BOM regression specifically.
+        // RecipeCacheSerializerTests. Pins the real loader's parsed shape
+        // (exact count + a known row) through the actual shipped file.
+        // This file also happens to ship with a leading UTF-8 BOM, so it
+        // incidentally exercises that path too, though the WP-08
+        // ReadToEnd->DeserializeAsync switch was never at risk of a BOM
+        // regression (both paths handle this file's BOM correctly).
         [Fact]
         public void Load_ShippedSeedFile_ParsesAllItemsIncludingLeadingBom()
         {
