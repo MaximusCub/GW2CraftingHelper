@@ -1232,7 +1232,7 @@ Normalize, used by MainView); StatusText.ForOverrideResolve extends
 that existing seam rather than inventing a new one, and is covered by
 StatusTextTests (Blish-free, per repo invariants).
 
-## 28. Vendor cap data seeding + stale-offer sweep (FIXED in M37)
+## 28. Vendor cap data seeding + stale-offer sweep (PARTIAL - core FIXED in M37; gaps deferred, see DEFERRED below)
 M34 shipped gw2e-parity warn-only cap machinery (TimegatedItems +
 Crafting Steps notice) but 0 of ~53,530 seeded offers carry
 DailyCap/WeeklyCap values, so it is inert. Extend tools/VendorOfferUpdater
@@ -1389,6 +1389,30 @@ concurrent generate/re-solve/refresh.
 - Ignore-pill cascade semantics + own-materials gating divergences
   (#20.4): revisit only on user feedback.
 - Multi-item row reordering (gw2e moveRecipe): out of scope per M35.
+- Skirmish Merchant-family wiki page split (#28, 18 offers): Skirmish
+  Supervisor / Lionguard (Skirmish Merchant) / Mercenary (Skirmish
+  Merchant) wiki pages were restructured into /Armor, /Weapons, /Others
+  subpages; the items are still sold in-game under the split pages, but
+  the seed's merchant-page linkage is now stale-shaped. Missing-offer/
+  rename gap for a future re-scrape to follow up; not removed.
+- "Merchant (Untamed Crags)" vendor-page-name mismatch (#28, 1 offer):
+  the Hydrocatalytic Reagent / 50 Research Note offer's exact vendor
+  page no longer resolves on the wiki (no page, no redirect), while the
+  item and cost remain valid via other crafting-material vendors.
+  Deferred pending research into whether the page was renamed or the
+  original scrape mislabeled the vendor.
+- Wiki-drift missing-offers superset (#28, ~5,400 offers): M37's full
+  from-scratch re-scrape (for cap seeding) incidentally picked up new
+  Homestead recipes and unrelated vendor page changes beyond the
+  stale-offer-sweep scope. Discarded uncommitted; recorded here as a
+  candidate for a future dedicated "missing offers" pass.
+- Character/total/seasonal purchase caps (#28): the wiki's "Has
+  character purchase cap", "Has total purchase cap", and "Has seasonal
+  purchase cap" SMW properties are real and populated (confirmed in
+  M37) but were deliberately not seeded - the module has no model field
+  or consuming logic for them (TimegatedCapType is Daily/Weekly only)
+  and no account/character concept at all. Left for a future
+  milestone's own design pass.
 
 ## Handoff notes for the implementing session
 - Project memory holds everything: parity goal + full M33-M36 record

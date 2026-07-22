@@ -139,7 +139,12 @@ Offers are deduplicated by `offerId` and sorted alphabetically. Null fields are 
 - **Wiki updates** when the community documents new or corrected vendor data
 - **Periodically** (e.g. quarterly) to pick up gradual wiki improvements
 - After modifying the VendorOfferUpdater tool itself, to verify output correctness
-- **After adding new printouts/fields to `WikiSmwClient`** - `ref/wiki_vendor_cache.json`
-  is keyed by the old `WikiVendorResult` shape and does not retroactively backfill new
-  fields. Re-running Pass 2 alone (`--resolve-item-currencies-only`) against a stale
-  cache will silently omit the new data forever; a full Pass 1 re-scrape is required.
+- **After adding new printouts/fields to `WikiSmwClient`** - Re-running Pass 2 alone
+  (`--resolve-item-currencies-only`) against `ref/wiki_vendor_cache.json` reuses the
+  old cached `WikiVendorResult` shape and will silently omit the new fields forever;
+  a full Pass 1 re-scrape is required to fetch them. Pass 1's cache merge overwrites
+  any existing entry for a re-queried `PageName` with the freshly-fetched result (see
+  `Program.cs`), so a normal full re-scrape backfills new fields for every page without
+  needing to delete `ref/wiki_vendor_cache.json` first. Deleting the cache first is only
+  needed if a page must be dropped from the cache entirely (e.g. it no longer resolves
+  on the wiki) rather than refreshed.

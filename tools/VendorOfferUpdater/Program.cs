@@ -185,26 +185,42 @@ namespace VendorOfferUpdater
                     }
 
                     // Save wiki results cache for --resolve-item-currencies-only
-                    // Merge with existing cache if present (supports multi-pass querying)
+                    // Merge with existing cache if present (supports multi-pass querying).
+                    // Freshly-queried pages always overwrite any existing cache entry for
+                    // the same PageName, so a full Pass 1 re-scrape after a WikiVendorResult
+                    // schema change (e.g. new printouts/fields) is not silently discarded by
+                    // stale cache data. Pages not touched by this pass keep their cached copy.
                     if (File.Exists(wikiCachePath))
                     {
                         string existingCacheJson = await File.ReadAllTextAsync(wikiCachePath);
                         var existing = JsonSerializer.Deserialize<List<WikiVendorResult>>(
                             existingCacheJson) ?? new List<WikiVendorResult>();
-                        var existingPages = new HashSet<string>(
-                            existing.Select(r => r.PageName), StringComparer.Ordinal);
+                        var merged = new Dictionary<string, WikiVendorResult>(
+                            StringComparer.Ordinal);
+                        foreach (var r in existing)
+                        {
+                            merged[r.PageName ?? string.Empty] = r;
+                        }
                         int added = 0;
+                        int refreshed = 0;
                         foreach (var r in wikiResults)
                         {
-                            if (!existingPages.Contains(r.PageName))
+                            string key = r.PageName ?? string.Empty;
+                            if (merged.ContainsKey(key))
                             {
-                                existing.Add(r);
+                                refreshed++;
+                            }
+                            else
+                            {
                                 added++;
                             }
+                            merged[key] = r;
                         }
+                        int unchanged = existing.Count - refreshed;
                         Console.WriteLine(
-                            $"Merged wiki cache: {added} new + {existing.Count - added} existing = {existing.Count} total");
-                        wikiResults = existing;
+                            $"Merged wiki cache: {added} new + {refreshed} refreshed + " +
+                            $"{unchanged} unchanged = {merged.Count} total");
+                        wikiResults = merged.Values.ToList();
                     }
                     string cacheJson = JsonSerializer.Serialize(wikiResults);
                     await File.WriteAllTextAsync(wikiCachePath, cacheJson);
