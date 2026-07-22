@@ -2177,5 +2177,160 @@ namespace GW2CraftingHelper.Tests.Services
             await Assert.ThrowsAsync<OperationCanceledException>(() => planTask);
             Assert.True(planTask.IsCanceled);
         }
+
+        // Builds a pipeline whose target item (id 1) crafts from
+        // `ingredientCount` distinct, individually-priced/metadata'd leaf
+        // ingredient items - large enough to exceed TradingPostService's and
+        // ItemMetadataService's shared BatchSize (200), so a single bad
+        // batch's documented degrade-vs-abort boundary (KNOWN-ISSUES
+        // api-degradation F2/F3) is observable end to end through the real
+        // pipeline, not just at TradingPostServiceTests'/
+        // ItemMetadataServiceTests' own service-level unit tests.
+        private static CraftingPlanPipeline BuildManyLeafIngredientsPipeline(
+            int ingredientCount,
+            out InMemoryPriceApiClient priceApi,
+            out InMemoryItemApiClient itemApi)
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+
+            priceApi = new InMemoryPriceApiClient();
+            itemApi = new InMemoryItemApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 1, sellUnitPrice: 2);
+            itemApi.AddItem(1, "Target", "t.png");
+
+            var ingredients = new List<RawIngredient>(ingredientCount);
+            for (int i = 0; i < ingredientCount; i++)
+            {
+                int id = 1000 + i;
+                ingredients.Add(new RawIngredient { Type = "Item", Id = id, Count = 1 });
+                priceApi.AddPrice(id, buyUnitPrice: 1, sellUnitPrice: 2);
+                itemApi.AddItem(id, "Ingredient " + id, "i.png");
+            }
+
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = ingredients,
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400
+            });
+
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+        }
+
+        // KNOWN-ISSUES api-degradation F2: TradingPostService degrades a
+        // single failing batch to missing prices instead of aborting the
+        // whole GetPricesAsync call. This proves that degrade behavior
+        // survives being called THROUGH the pipeline, not just at
+        // TradingPostServiceTests.OneBatchFails_DegradesToHolesInsteadOfAbortingWholeCall's
+        // own service-level test.
+        [Fact]
+        public async Task GenerateStructuredAsync_OneOfManyPriceBatchesFails_DegradesInsteadOfAborting()
+        {
+            var pipeline = BuildManyLeafIngredientsPipeline(210, out var priceApi, out _);
+            priceApi.ThrowOnCallNumber = 2; // second of two sequential batches fails
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            // Proves the multi-batch scenario was genuinely exercised (not a
+            // vacuous pass that would also hold if BatchSize ever changed to
+            // no longer split 211 ids into two calls) - the second batch's
+            // failure must not have short-circuited the fetch into only
+            // attempting one batch.
+            Assert.Equal(2, priceApi.Calls.Count);
+            // The actual "degrades, does not abort" claim: the pipeline
+            // still completed and produced a usable plan despite the second
+            // batch's failure, rather than propagating it as a thrown
+            // exception (see the AllPriceBatchesFail sibling test below for
+            // the total-outage case, which DOES throw).
+            Assert.NotNull(result.Plan);
+            Assert.True(result.Plan.Steps.Count > 0);
+        }
+
+        // KNOWN-ISSUES api-degradation F2's other half: a genuine total
+        // price-API outage (every batch fails) must still surface as a
+        // thrown exception through the pipeline, not silently degrade to an
+        // all-unpriceable "success".
+        [Fact]
+        public async Task GenerateStructuredAsync_AllPriceBatchesFail_AbortsInsteadOfSilentlyDegrading()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1 - simplest leaf-buy tree.
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
+            priceApi.ThrowAlways = true;
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Copper Ore", "copper.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            await Assert.ThrowsAsync<HttpRequestException>(() =>
+                pipeline.GenerateStructuredAsync(
+                    1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy));
+        }
+
+        // KNOWN-ISSUES api-degradation F3: ItemMetadataService degrades a
+        // single failing first-wave batch (retry wave/seed fallback/
+        // omission) instead of aborting GetMetadataAsync entirely. Same
+        // large-fixture shape as the price-side degrade test above, proven
+        // through the real pipeline.
+        [Fact]
+        public async Task GenerateStructuredAsync_OneOfManyMetadataBatchesFails_DegradesInsteadOfAborting()
+        {
+            var pipeline = BuildManyLeafIngredientsPipeline(210, out _, out var itemApi);
+            itemApi.ThrowOnCallNumber = 2; // second of two sequential first-wave batches fails
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            // Proves the multi-batch scenario was genuinely exercised (at
+            // least the 2 first-wave batches; a 3rd retry-wave call is
+            // possible per ItemMetadataService's own degrade behavior).
+            Assert.True(itemApi.Calls.Count >= 2);
+            Assert.NotNull(result.Plan);
+            Assert.True(result.Plan.Steps.Count > 0);
+        }
+
+        // KNOWN-ISSUES api-degradation F3's other half: a genuine total item
+        // API outage (the only first-wave batch fails) must still surface
+        // as a thrown exception through the pipeline.
+        [Fact]
+        public async Task GenerateStructuredAsync_AllMetadataBatchesFail_AbortsInsteadOfSilentlyDegrading()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1 - simplest leaf-buy tree, single item
+            // metadata batch.
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Copper Ore", "copper.png");
+            itemApi.ThrowOnCallNumber = 1; // the sole first-wave batch fails
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                pipeline.GenerateStructuredAsync(
+                    1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy));
+        }
     }
 }
