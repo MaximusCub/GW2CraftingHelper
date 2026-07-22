@@ -278,7 +278,7 @@ namespace VendorOfferUpdater.Tests
         {
             var (helper, httpClient) = await CreateLoadedHelper();
             using var _ = httpClient;
-            var result = MakeResult(gameId: 102205, merchantName: "Homestead Refinement—Metal Forge");
+            var result = MakeResult(gameId: 102205, merchantName: "Homestead Refinement\u2014Metal Forge");
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
 
@@ -293,7 +293,7 @@ namespace VendorOfferUpdater.Tests
             using var _ = httpClient;
             var result = MakeResult(
                 gameId: 102205,
-                merchantName: "Homestead Refinement—Metal Forge",
+                merchantName: "Homestead Refinement\u2014Metal Forge",
                 requirement: "one [[Homestead Upgrade: Ore Trade Efficiency]]");
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -309,7 +309,7 @@ namespace VendorOfferUpdater.Tests
             using var _ = httpClient;
             var result = MakeResult(
                 gameId: 102205,
-                merchantName: "Homestead Refinement—Metal Forge",
+                merchantName: "Homestead Refinement\u2014Metal Forge",
                 requirement: "two [[Homestead Upgrade: Ore Trade Efficiency]]");
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -324,12 +324,12 @@ namespace VendorOfferUpdater.Tests
             var (helper, httpClient) = await CreateLoadedHelper();
             using var _ = httpClient;
             var tier0 = Program.ConvertToOffer(
-                MakeResult(gameId: 102205, merchantName: "Homestead Refinement—Metal Forge"),
+                MakeResult(gameId: 102205, merchantName: "Homestead Refinement\u2014Metal Forge"),
                 helper, new Dictionary<string, int>());
             var tier1 = Program.ConvertToOffer(
                 MakeResult(
                     gameId: 102205,
-                    merchantName: "Homestead Refinement—Metal Forge",
+                    merchantName: "Homestead Refinement\u2014Metal Forge",
                     requirement: "one [[Homestead Upgrade: Ore Trade Efficiency]]"),
                 helper, new Dictionary<string, int>());
 
@@ -349,7 +349,7 @@ namespace VendorOfferUpdater.Tests
             using var _ = httpClient;
             var result = MakeResult(
                 gameId: 102306,
-                merchantName: "Homestead Refinement—Farm",
+                merchantName: "Homestead Refinement\u2014Farm",
                 requirement: "[[Some Unrelated Achievement]]");
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -372,7 +372,7 @@ namespace VendorOfferUpdater.Tests
             using var _ = httpClient;
             var result = MakeResult(
                 gameId: 102415, // Homestead Upgrade: Ore Trade Efficiency
-                merchantName: "Homestead Refinement—Metal Forge");
+                merchantName: "Homestead Refinement\u2014Metal Forge");
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
 

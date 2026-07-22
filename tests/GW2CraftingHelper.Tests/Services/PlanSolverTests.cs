@@ -2645,7 +2645,7 @@ namespace GW2CraftingHelper.Tests.Services
 
         private static VendorOffer HomesteadOffer(
             int outputItemId, int inputCount, int outputCount, int homesteadTier,
-            int? weeklyCap = null, string merchantName = "Homestead Refinement—Metal Forge")
+            int? weeklyCap = null, string merchantName = "Homestead Refinement\u2014Metal Forge")
         {
             return new VendorOffer
             {

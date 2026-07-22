@@ -205,13 +205,13 @@ namespace GW2CraftingHelper.Tests.Services
             };
 
             string hashNoTier = VendorOfferHasher.ComputeOfferId(
-                102205, 1, costs, "Homestead Refinement—Metal Forge", new List<string>(), null, null, null);
+                102205, 1, costs, "Homestead Refinement\u2014Metal Forge", new List<string>(), null, null, null);
             string hashTier0 = VendorOfferHasher.ComputeOfferId(
-                102205, 1, costs, "Homestead Refinement—Metal Forge", new List<string>(), null, null, 0);
+                102205, 1, costs, "Homestead Refinement\u2014Metal Forge", new List<string>(), null, null, 0);
             string hashTier1 = VendorOfferHasher.ComputeOfferId(
-                102205, 1, costs, "Homestead Refinement—Metal Forge", new List<string>(), null, null, 1);
+                102205, 1, costs, "Homestead Refinement\u2014Metal Forge", new List<string>(), null, null, 1);
             string hashTier2 = VendorOfferHasher.ComputeOfferId(
-                102205, 1, costs, "Homestead Refinement—Metal Forge", new List<string>(), null, null, 2);
+                102205, 1, costs, "Homestead Refinement\u2014Metal Forge", new List<string>(), null, null, 2);
 
             Assert.NotEqual(hashNoTier, hashTier0);
             Assert.NotEqual(hashTier0, hashTier1);
@@ -228,9 +228,9 @@ namespace GW2CraftingHelper.Tests.Services
             };
 
             string hash1 = VendorOfferHasher.ComputeOfferId(
-                102205, 1, costs, "Homestead Refinement—Metal Forge", new List<string>(), null, null, 1);
+                102205, 1, costs, "Homestead Refinement\u2014Metal Forge", new List<string>(), null, null, 1);
             string hash2 = VendorOfferHasher.ComputeOfferId(
-                102205, 1, costs, "Homestead Refinement—Metal Forge", new List<string>(), null, null, 1);
+                102205, 1, costs, "Homestead Refinement\u2014Metal Forge", new List<string>(), null, null, 1);
 
             Assert.Equal(hash1, hash2);
         }

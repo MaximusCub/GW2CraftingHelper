@@ -72,12 +72,12 @@ namespace VendorOfferUpdater
         /// and query statistics.
         ///
         /// Vendor data lives on subobject pages (e.g. "NPC#vendor1") with properties:
-        ///   Sells item          – the item page
-        ///   Sells item.Has game id – item's GW2 game ID (property chain)
-        ///   Has item quantity    – output count
-        ///   Has item cost        – record: { Has item value, Has item currency }
-        ///   Has vendor           – NPC page
-        ///   Located in           – location pages
+        ///   Sells item          - the item page
+        ///   Sells item.Has game id - item's GW2 game ID (property chain)
+        ///   Has item quantity    - output count
+        ///   Has item cost        - record: { Has item value, Has item currency }
+        ///   Has vendor           - NPC page
+        ///   Located in           - location pages
         ///   Has daily purchase cap  - daily purchase limit (absent = uncapped)
         ///   Has weekly purchase cap - weekly purchase limit (absent = uncapped)
         ///
@@ -246,7 +246,7 @@ namespace VendorOfferUpdater
                 return;
             }
 
-            // OVERFLOW — check depth limit
+            // OVERFLOW - check depth limit
             if (depth >= _options.MaxPrefixDepth)
             {
                 Console.WriteLine(
@@ -355,7 +355,7 @@ namespace VendorOfferUpdater
             }
             Console.WriteLine();
             Console.WriteLine(
-                "Actual request count is unknown without probing — " +
+                "Actual request count is unknown without probing - " +
                 "depends on data distribution.");
         }
 
@@ -409,7 +409,7 @@ namespace VendorOfferUpdater
                         {
                             cooldownMs = Math.Max(cooldownMs, (int)delta403.TotalMilliseconds);
                         }
-                        // Add jitter: ±10%
+                        // Add jitter: +/-10%
                         int jitter = (int)(cooldownMs * 0.1);
                         cooldownMs += Random.Shared.Next(-jitter, jitter + 1);
                         cooldownMs = Math.Max(cooldownMs, 0);
@@ -519,7 +519,7 @@ namespace VendorOfferUpdater
                 result.Requirement = requirement[0].GetString();
             }
 
-            // Has item cost — record type containing nested fields
+            // Has item cost - record type containing nested fields
             if (printouts.TryGetProperty("Has item cost", out var costArray))
             {
                 foreach (var costRecord in costArray.EnumerateArray())
@@ -592,7 +592,7 @@ namespace VendorOfferUpdater
 
             int delay = _effectiveDelay;
 
-            // Batch into groups — wiki SMW limits query complexity (OR conditions).
+            // Batch into groups - wiki SMW limits query complexity (OR conditions).
             // 50 items per batch exceeds the wiki's depth limit; 10 is safe.
             const int batchSize = 10;
 

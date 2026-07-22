@@ -13,12 +13,12 @@ namespace VendorOfferUpdater
     /// research/m37-r1-homestead.md Section 1.2): a row only participates
     /// in tier gating when its merchant name contains the literal substring
     /// "Homestead Refinement" (gw2e: tree.merchant.name.includes('Homestead
-    /// Refinement')) - matching all three station pages ("...—Farm",
-    /// "...—Lumber Mill", "...—Metal Forge") the same way a plain
+    /// Refinement')) - matching all three station pages ("...-Farm",
+    /// "...-Lumber Mill", "...-Metal Forge") the same way a plain
     /// `.includes()` substring test would.
     ///
     /// Confirmed live (direct SMW ask probe against Homestead
-    /// Refinement—Metal Forge, 2026-07-21): a tier-0 row's "Has requirement"
+    /// Refinement-Metal Forge, 2026-07-21): a tier-0 row's "Has requirement"
     /// printout returns an empty array; a tier-1/tier-2 row returns exactly
     /// one _txt value, "one [[Homestead Upgrade: ...]]" or "two [[Homestead
     /// Upgrade: ...]]" respectively - the wiki's {{vendor table row}}

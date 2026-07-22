@@ -398,7 +398,7 @@ namespace VendorOfferUpdater
                 // HTML-safety escaping (while still escaping the JSON-
                 // mandatory '"'/'\\'/control characters) but ALSO stops
                 // escaping non-ASCII text, which the existing file DOES do
-                // (e.g. "Homestead Refinement—Farm"). EscapeNonAscii
+                // (e.g. "Homestead Refinement-Farm"). EscapeNonAscii
                 // below restores exactly that: non-ASCII escaped, everything
                 // else literal - matching the existing file's convention so
                 // a scoped --merge-into run's diff stays confined to the
@@ -462,7 +462,7 @@ namespace VendorOfferUpdater
             {
                 Console.WriteLine();
                 Console.WriteLine(
-                    $"  WARNING: Coverage may be incomplete — " +
+                    $"  WARNING: Coverage may be incomplete - " +
                     $"{stats.TruncatedPartitions} partition(s) were truncated at max depth.");
             }
 
@@ -630,7 +630,7 @@ namespace VendorOfferUpdater
                 }
                 else if (!string.IsNullOrEmpty(cost.Currency))
                 {
-                    // Unresolved currency/item name — skip this offer
+                    // Unresolved currency/item name - skip this offer
                     return null;
                 }
                 else
@@ -654,7 +654,7 @@ namespace VendorOfferUpdater
             // M37 (KNOWN-ISSUES #24): null for every non-Homestead-
             // Refinement offer. Also gated on the OUTPUT being one of the
             // three known refined materials - the same three "Homestead
-            // Refinement—X" merchant pages also sell unrelated rows under
+            // Refinement-X" merchant pages also sell unrelated rows under
             // the identical merchant name (the station's own one-time
             // efficiency/capacity Upgrade purchase items, "Has vendor" is
             // hardcoded to the page name for every row on the page

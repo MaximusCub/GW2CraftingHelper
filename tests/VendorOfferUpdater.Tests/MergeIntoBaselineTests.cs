@@ -31,13 +31,13 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("a", "Homestead Refinement—Farm"),
-                MakeOffer("b", "Homestead Refinement—Farm"),
+                MakeOffer("a", "Homestead Refinement\u2014Farm"),
+                MakeOffer("b", "Homestead Refinement\u2014Farm"),
                 MakeOffer("c", "Miyani")
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("d", "Homestead Refinement—Farm")
+                MakeOffer("d", "Homestead Refinement\u2014Farm")
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -54,13 +54,13 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("a", "Homestead Refinement—Farm"),
+                MakeOffer("a", "Homestead Refinement\u2014Farm"),
                 MakeOffer("c", "Miyani"),
                 MakeOffer("d", "Battle Master")
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("e", "Homestead Refinement—Farm")
+                MakeOffer("e", "Homestead Refinement\u2014Farm")
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -78,12 +78,12 @@ namespace VendorOfferUpdater.Tests
             // alongside the fresh row.
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("stale1", "Homestead Refinement—Metal Forge"),
-                MakeOffer("stale2", "Homestead Refinement—Metal Forge")
+                MakeOffer("stale1", "Homestead Refinement\u2014Metal Forge"),
+                MakeOffer("stale2", "Homestead Refinement\u2014Metal Forge")
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("fresh1", "Homestead Refinement—Metal Forge")
+                MakeOffer("fresh1", "Homestead Refinement\u2014Metal Forge")
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -98,14 +98,14 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("a", "Homestead Refinement—Farm"),
-                MakeOffer("b", "Homestead Refinement—Lumber Mill"),
+                MakeOffer("a", "Homestead Refinement\u2014Farm"),
+                MakeOffer("b", "Homestead Refinement\u2014Lumber Mill"),
                 MakeOffer("c", "Miyani")
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("d", "Homestead Refinement—Farm"),
-                MakeOffer("e", "Homestead Refinement—Lumber Mill")
+                MakeOffer("d", "Homestead Refinement\u2014Farm"),
+                MakeOffer("e", "Homestead Refinement\u2014Lumber Mill")
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -120,7 +120,7 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("a", "Homestead Refinement—Farm"),
+                MakeOffer("a", "Homestead Refinement\u2014Farm"),
                 MakeOffer("b", "Miyani")
             };
 
@@ -135,7 +135,7 @@ namespace VendorOfferUpdater.Tests
         {
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("a", "Homestead Refinement—Farm")
+                MakeOffer("a", "Homestead Refinement\u2014Farm")
             };
 
             var result = Program.MergeIntoBaseline(new List<VendorOffer>(), fresh);
@@ -153,8 +153,8 @@ namespace VendorOfferUpdater.Tests
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("bbb", "Homestead Refinement—Farm"),
-                MakeOffer("aaa", "Homestead Refinement—Farm")
+                MakeOffer("bbb", "Homestead Refinement\u2014Farm"),
+                MakeOffer("aaa", "Homestead Refinement\u2014Farm")
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);

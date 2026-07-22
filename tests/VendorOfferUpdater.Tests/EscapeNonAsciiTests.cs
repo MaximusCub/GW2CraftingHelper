@@ -29,7 +29,11 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void EmDash_EscapedAsLowercaseUnicode()
         {
-            string result = Program.EscapeNonAscii("\"Homestead Refinement—Farm\"");
+            // Source stays ASCII-only (repo invariant): the U+2014 em
+            // dash below is written as a \u2014 escape sequence, which
+            // the C# compiler resolves to the identical runtime
+            // character a pasted literal would be.
+            string result = Program.EscapeNonAscii("\"Homestead Refinement\u2014Farm\"");
 
             Assert.Equal("\"Homestead Refinement\\u2014Farm\"", result);
         }
@@ -37,7 +41,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void AccentedLatin_EscapedAsLowercaseUnicode()
         {
-            string result = Program.EscapeNonAscii("\"café\"");
+            string result = Program.EscapeNonAscii("\"caf\u00e9\"");
 
             Assert.Equal("\"caf\\u00e9\"", result);
         }
