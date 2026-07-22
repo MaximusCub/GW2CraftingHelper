@@ -274,16 +274,19 @@ namespace GW2CraftingHelper
 
                     var currencyValuation = _settings.GetCurrencyValuation();
                     var ownMaterialsMode = _settings.GetOwnMaterialsMode();
+                    var homesteadTiers = _settings.GetHomesteadEfficiencyTiers();
 
                     if (useOwn)
                     {
                         return _craftingPipeline.GenerateStructuredAsync(
                             items, _currentSnapshot, ct, progress,
-                            activeChar, priceBasis, currencyValuation, ownMaterialsMode);
+                            activeChar, priceBasis, currencyValuation, ownMaterialsMode,
+                            homesteadTiers);
                     }
                     return _craftingPipeline.GenerateStructuredAsync(
                         items, null, ct, progress,
-                        null, priceBasis, currencyValuation, ownMaterialsMode);
+                        null, priceBasis, currencyValuation, ownMaterialsMode,
+                        homesteadTiers);
                 },
                 _modalDialog,
                 _itemSearchProvider,

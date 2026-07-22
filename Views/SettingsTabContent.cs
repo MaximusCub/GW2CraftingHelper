@@ -56,11 +56,25 @@ namespace GW2CraftingHelper.Views
             public Label ErrorLabel;
         }
 
+        // M37 (KNOWN-ISSUES #24): one row per Homestead Refinement material
+        // family. MaterialItemId is internal-only bookkeeping (never
+        // displayed - see MaterialLabel) used solely to route the parsed
+        // tier back to the right ModuleSettings entry.
+        private class HomesteadTierRow
+        {
+            public int MaterialItemId;
+            public string MaterialLabel;
+            public TextBox Input;
+            public Label ErrorLabel;
+        }
+
         private readonly ModuleSettings _settings;
         private readonly List<CurrencyRow> _rows = new List<CurrencyRow>();
+        private readonly List<HomesteadTierRow> _homesteadRows = new List<HomesteadTierRow>();
 
         private FlowPanel _rootPanel;
         private Label _statusLabel;
+        private Label _homesteadStatusLabel;
         private Checkbox _valueOwnMaterialsCheckbox;
 
         public SettingsTabContent(ModuleSettings settings)
@@ -91,8 +105,10 @@ namespace GW2CraftingHelper.Views
 
             BuildCurrencyValuationsSection(panelWidth);
             BuildPlanDefaultsSection(panelWidth);
+            BuildHomesteadRefinementSection(panelWidth);
 
             LoadCurrentValuations();
+            LoadCurrentHomesteadTiers();
         }
 
         private void BuildCurrencyValuationsSection(int panelWidth)
@@ -155,6 +171,173 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(NameColumnX + 170, 7),
                 Parent = rowPanel
             };
+        }
+
+        /// <summary>
+        /// M37 (KNOWN-ISSUES #24, gw2e parity): three per-material efficiency
+        /// tier rows (Fiber/Metal/Wood), each an integer 0/1/2 entered as
+        /// text and validated on Save - same TextBox+Save shape as the
+        /// Currency Valuations section above (a plain Checkbox's immediate-
+        /// apply pattern doesn't fit a 3-valued integer, and no Dropdown/
+        /// stepper control is otherwise used in this codebase's Views).
+        /// Labels name the material family only - no raw item/vendor ids
+        /// are ever displayed (repo invariant).
+        /// </summary>
+        private void BuildHomesteadRefinementSection(int panelWidth)
+        {
+            AddSectionHeader("Homestead Refinement", panelWidth);
+            AddInfoLine("Efficiency upgrades owned per material (0 = none, 1 = one upgrade, 2 = both).", panelWidth);
+            AddInfoLine("Raises how much Refined Homestead material each trade produces.", panelWidth);
+
+            AddHomesteadTierRow(Gw2Constants.RefinedHomesteadFiberItemId, "Fiber (Farm)", panelWidth);
+            AddHomesteadTierRow(Gw2Constants.RefinedHomesteadMetalItemId, "Metal (Metal Forge)", panelWidth);
+            AddHomesteadTierRow(Gw2Constants.RefinedHomesteadWoodItemId, "Wood (Lumber Mill)", panelWidth);
+
+            AddHomesteadSaveRow(panelWidth);
+        }
+
+        private void AddHomesteadTierRow(int materialItemId, string materialLabel, int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, RowHeight),
+                Parent = _rootPanel
+            };
+
+            new Label()
+            {
+                Text = materialLabel,
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = NameColumnWidth,
+                Location = new Point(NameColumnX, 7),
+                Parent = rowPanel
+            };
+
+            var input = new TextBox()
+            {
+                Size = new Point(InputWidth, 26),
+                Location = new Point(NameColumnX + NameColumnWidth, 3),
+                Parent = rowPanel
+            };
+
+            new Label()
+            {
+                Text = "tier (0-2)",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = InfoTextColor,
+                Location = new Point(HintX, 7),
+                Parent = rowPanel
+            };
+
+            var errorLabel = new Label()
+            {
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = ErrorTextColor,
+                Location = new Point(ErrorX, 7),
+                Parent = rowPanel
+            };
+
+            _homesteadRows.Add(new HomesteadTierRow
+            {
+                MaterialItemId = materialItemId,
+                MaterialLabel = materialLabel,
+                Input = input,
+                ErrorLabel = errorLabel
+            });
+        }
+
+        private void AddHomesteadSaveRow(int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, 40),
+                Parent = _rootPanel
+            };
+
+            var saveButton = new StandardButton()
+            {
+                Text = "Save",
+                Size = new Point(80, 28),
+                Location = new Point(NameColumnX, 6),
+                Parent = rowPanel
+            };
+            saveButton.Click += (_, __) => SaveHomesteadTiers();
+
+            _homesteadStatusLabel = new Label()
+            {
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(NameColumnX + 80 + 12, 12),
+                Parent = rowPanel
+            };
+        }
+
+        private void LoadCurrentHomesteadTiers()
+        {
+            var tiers = _settings.GetHomesteadEfficiencyTiers();
+
+            foreach (var row in _homesteadRows)
+            {
+                row.Input.Text = tiers.GetTier(row.MaterialItemId).ToString(CultureInfo.InvariantCulture);
+                row.ErrorLabel.Text = "";
+            }
+        }
+
+        private void SaveHomesteadTiers()
+        {
+            int invalidCount = 0;
+            var parsedTiers = new Dictionary<int, int>();
+
+            foreach (var row in _homesteadRows)
+            {
+                row.ErrorLabel.Text = "";
+
+                if (SettingsInputParser.TryParseTier(row.Input.Text, out int tier))
+                {
+                    parsedTiers[row.MaterialItemId] = tier;
+                }
+                else
+                {
+                    // Left out of this save entirely - whatever was
+                    // previously persisted for this material is preserved,
+                    // matching the currency valuation Save button's
+                    // "invalid rows are not saved" contract.
+                    row.ErrorLabel.Text = "Must be 0, 1, or 2";
+                    invalidCount++;
+                }
+            }
+
+            if (parsedTiers.TryGetValue(Gw2Constants.RefinedHomesteadFiberItemId, out int fiberTier))
+            {
+                _settings.HomesteadFiberTier.Value = fiberTier;
+            }
+            if (parsedTiers.TryGetValue(Gw2Constants.RefinedHomesteadMetalItemId, out int metalTier))
+            {
+                _settings.HomesteadMetalTier.Value = metalTier;
+            }
+            if (parsedTiers.TryGetValue(Gw2Constants.RefinedHomesteadWoodItemId, out int woodTier))
+            {
+                _settings.HomesteadWoodTier.Value = woodTier;
+            }
+
+            if (_homesteadStatusLabel == null) return;
+
+            if (invalidCount == 0)
+            {
+                _homesteadStatusLabel.Text = $"Saved - {DateTime.Now:t}";
+                _homesteadStatusLabel.TextColor = SuccessTextColor;
+            }
+            else
+            {
+                string entryWord = invalidCount == 1 ? "entry" : "entries";
+                _homesteadStatusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
+                _homesteadStatusLabel.TextColor = WarningTextColor;
+            }
         }
 
         private void AddSectionHeader(string title, int panelWidth)

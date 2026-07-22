@@ -210,9 +210,13 @@ namespace GW2CraftingHelper.Services
             // Views/CraftingPlanView.cs's matching field default.
             PriceBasis priceBasis = PriceBasis.BuyOrder,
             CurrencyValuation currencyValuation = null,
-            OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free)
+            OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free,
+            // M37 (KNOWN-ISSUES #24, gw2e parity): see ModuleSettings.
+            // GetHomesteadEfficiencyTiers/PlanSolveContext.HomesteadTiers.
+            HomesteadEfficiencyTiers homesteadTiers = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
+            var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
             var sw = new Stopwatch();
             var timingLog = new List<string>();
 
@@ -350,7 +354,8 @@ namespace GW2CraftingHelper.Services
                 treeUsedForSolve, prices, vendorOffers, priceBasis,
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
-                assignNodeIds: !useForceBuyPrePass);
+                assignNodeIds: !useForceBuyPrePass,
+                homesteadTiers: tiers);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -482,7 +487,8 @@ namespace GW2CraftingHelper.Services
                 AcquisitionHints = _acquisitionHints,
                 OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
-                ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds
+                ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
+                HomesteadTiers = tiers
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -523,7 +529,8 @@ namespace GW2CraftingHelper.Services
             string activeCharacterName = null,
             PriceBasis priceBasis = PriceBasis.BuyOrder,
             CurrencyValuation currencyValuation = null,
-            OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free)
+            OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free,
+            HomesteadEfficiencyTiers homesteadTiers = null)
         {
             // Marked async (rather than returning the branch Tasks directly)
             // so this validation throws INSIDE the returned Task, exactly
@@ -539,12 +546,13 @@ namespace GW2CraftingHelper.Services
             {
                 return await GenerateStructuredAsync(
                     items[0].ItemId, items[0].Quantity, snapshot, ct, progress,
-                    activeCharacterName, priceBasis, currencyValuation, ownMaterialsMode);
+                    activeCharacterName, priceBasis, currencyValuation, ownMaterialsMode,
+                    homesteadTiers);
             }
 
             return await GenerateStructuredMultiAsync(
                 items, snapshot, ct, progress, activeCharacterName,
-                priceBasis, currencyValuation, ownMaterialsMode);
+                priceBasis, currencyValuation, ownMaterialsMode, homesteadTiers);
         }
 
         /// <summary>
@@ -574,9 +582,11 @@ namespace GW2CraftingHelper.Services
             string activeCharacterName,
             PriceBasis priceBasis,
             CurrencyValuation currencyValuation,
-            OwnMaterialsMode ownMaterialsMode)
+            OwnMaterialsMode ownMaterialsMode,
+            HomesteadEfficiencyTiers homesteadTiers)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
+            var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
             var sw = new Stopwatch();
             var timingLog = new List<string>();
 
@@ -688,7 +698,8 @@ namespace GW2CraftingHelper.Services
                 treeUsedForSolve, prices, vendorOffers, priceBasis,
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
-                assignNodeIds: !useForceBuyPrePass);
+                assignNodeIds: !useForceBuyPrePass,
+                homesteadTiers: tiers);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -796,7 +807,8 @@ namespace GW2CraftingHelper.Services
                 OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
-                RequestedItems = items
+                RequestedItems = items,
+                HomesteadTiers = tiers
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -846,7 +858,8 @@ namespace GW2CraftingHelper.Services
                 context.PriceBasis, overrides, context.CurrencyValuation,
                 forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
                 assignNodeIds: false,
-                ignoredItemIds: ignoredItemIds);
+                ignoredItemIds: ignoredItemIds,
+                homesteadTiers: context.HomesteadTiers);
 
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(

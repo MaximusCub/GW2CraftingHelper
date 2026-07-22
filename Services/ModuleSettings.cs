@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Blish_HUD.Settings;
 using GW2CraftingHelper.Models;
 
@@ -36,6 +37,21 @@ namespace GW2CraftingHelper.Services
         // ScrollDiagnosticsEnabled below.
         public SettingEntry<bool> ValueOwnMaterials { get; private set; }
 
+        // M37 (KNOWN-ISSUES #24, gw2e parity): per-material Homestead
+        // Refinement efficiency tier (0/1/2), echoing gw2efficiency's own
+        // per-output-material userEfficiencyTiers setting exactly - three
+        // independent settings, not one combined toggle, matching gw2e's
+        // own three-material shape (docs/research/m37-r1-homestead.md
+        // Section 1.2). Default 0 for all three: gw2e's own hardcoded
+        // default AND its own no-API-key fallback, and matches this repo's
+        // "no invented data" posture better than assuming any upgrade
+        // level. Deliberately NO master "do you even own Homestead" gate -
+        // gw2e has none either; see KNOWN-ISSUES.md item 24 for that
+        // recorded, deferred divergence option.
+        public SettingEntry<int> HomesteadFiberTier { get; private set; }
+        public SettingEntry<int> HomesteadMetalTier { get; private set; }
+        public SettingEntry<int> HomesteadWoodTier { get; private set; }
+
         // M33 C1 (#12 diagnostics): gates the scroll-machinery diagnostic
         // logging in CraftingPlanView (wheel events, restore/guard writes
         // and state transitions). Default false; instrumentation only -
@@ -67,10 +83,53 @@ namespace GW2CraftingHelper.Services
                 () => "Value own materials",
                 () => "Force-buy items where buying beats crafting from fresh components by more than 15%, and value owned materials at their sell opportunity cost instead of treating them as free");
 
+            HomesteadFiberTier = settings.DefineSetting(
+                "HomesteadFiberTier", 0,
+                () => "Homestead Fiber efficiency tier",
+                () => "Farm refinement efficiency upgrades owned (0, 1, or 2)");
+
+            HomesteadMetalTier = settings.DefineSetting(
+                "HomesteadMetalTier", 0,
+                () => "Homestead Metal efficiency tier",
+                () => "Metal Forge refinement efficiency upgrades owned (0, 1, or 2)");
+
+            HomesteadWoodTier = settings.DefineSetting(
+                "HomesteadWoodTier", 0,
+                () => "Homestead Wood efficiency tier",
+                () => "Lumber Mill refinement efficiency upgrades owned (0, 1, or 2)");
+
             ScrollDiagnosticsEnabled = settings.DefineSetting(
                 "ScrollDiagnosticsEnabled", false,
                 () => "Scroll diagnostics",
                 () => "Log scroll machinery events for debugging");
+        }
+
+        /// <summary>
+        /// Reads the persisted Homestead Refinement efficiency tiers.
+        /// Values outside 0-2 (possible only via a hand-edited settings
+        /// file, since the Settings tab and SettingsInputParser reject
+        /// them) are clamped rather than thrown - a corrupt/out-of-range
+        /// persisted value must never crash plan generation. See
+        /// HomesteadEfficiencyTiers' own constructor for why clamping
+        /// happens here rather than there: that constructor fails loudly by
+        /// design for a directly-constructed caller.
+        /// </summary>
+        public HomesteadEfficiencyTiers GetHomesteadEfficiencyTiers()
+        {
+            var map = new Dictionary<int, int>
+            {
+                { Gw2Constants.RefinedHomesteadFiberItemId, ClampTier(HomesteadFiberTier.Value) },
+                { Gw2Constants.RefinedHomesteadMetalItemId, ClampTier(HomesteadMetalTier.Value) },
+                { Gw2Constants.RefinedHomesteadWoodItemId, ClampTier(HomesteadWoodTier.Value) }
+            };
+            return new HomesteadEfficiencyTiers(map);
+        }
+
+        private static int ClampTier(int tier)
+        {
+            if (tier < 0) return 0;
+            if (tier > 2) return 2;
+            return tier;
         }
 
         /// <summary>
@@ -107,6 +166,9 @@ namespace GW2CraftingHelper.Services
             ModalDialogY.Value = -1;
             CurrencyValuationsJson.Value = string.Empty;
             ValueOwnMaterials.Value = true;
+            HomesteadFiberTier.Value = 0;
+            HomesteadMetalTier.Value = 0;
+            HomesteadWoodTier.Value = 0;
             ScrollDiagnosticsEnabled.Value = false;
         }
     }

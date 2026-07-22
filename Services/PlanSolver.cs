@@ -70,6 +70,22 @@ namespace GW2CraftingHelper.Services
         {
             public VendorOfferBatch Batch;
             public bool Conflict;
+
+            // M37 (KNOWN-ISSUES #24/#25 3.3, gw2e parity - the Homestead
+            // Refinement cap-notice gap): tracks whether every occurrence's
+            // winning offer agreed on (DailyCap, WeeklyCap) ALONE,
+            // independent of full batch-shape agreement (Conflict above).
+            // Homestead Refinement is the prototypical case this exists
+            // for: every offer for a given output+station shares the
+            // identical weekly cap even when occurrences pick different
+            // specific input-material offers (Conflict is true there), so
+            // a per-offer batch-shape disagreement should not by itself
+            // suppress the cap notice when the cap itself is not actually
+            // in dispute. Ratchet only, same discipline as Conflict - see
+            // FinalizeVendorBatches' mixed-offer cap-check branch.
+            public int? CapDailyCap;
+            public int? CapWeeklyCap;
+            public bool CapConflict;
         }
 
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
@@ -123,9 +139,18 @@ namespace GW2CraftingHelper.Services
             // choice), this is per-ItemId, matching gw2e's own "Ignore
             // marks every occurrence of that item id, tree-wide" semantics.
             // Null (the default) behaves exactly as before this feature.
-            ISet<int> ignoredItemIds = null)
+            ISet<int> ignoredItemIds = null,
+            // M37 (KNOWN-ISSUES #24, gw2e parity): per-material Homestead
+            // Refinement efficiency tier configuration. Null (the default)
+            // behaves as HomesteadEfficiencyTiers.Default - tier 0 for
+            // every material, gw2e's own default - so every existing
+            // caller that doesn't know about this setting keeps excluding
+            // every Homestead Refinement offer above tier 0, exactly
+            // matching the live-defect fix's intended default behavior.
+            HomesteadEfficiencyTiers homesteadTiers = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
+            var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
             var memo = new Dictionary<int, Decision>();
 
             // Pre-pass: assign unique NodeIds to every node in the tree.
@@ -138,7 +163,7 @@ namespace GW2CraftingHelper.Services
             }
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds);
+            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds, tiers);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -155,9 +180,17 @@ namespace GW2CraftingHelper.Services
             // (ItemId, RecipeId) craft, taken BEFORE the correction passes
             // below ever run (see RefreshCraftStepCosts's doc comment).
             var craftOccurrences = new Dictionary<(int, AcquisitionSource, int), List<int>>();
+            // M37 (KNOWN-ISSUES #24/#25 3.3): every tree occurrence's own
+            // Quantity and winning VendorOfferBatch for a merged
+            // BuyFromVendor stepKey, in first-seen (DFS) order - see
+            // VendorBatchState.CapConflict's doc comment and
+            // FinalizeVendorBatches' mixed-offer cap-check branch. Separate
+            // from vendorOccurrences (which tracks NodeId, not Batch) so
+            // AllocateVendorNodeCosts' existing tuple shape is untouched.
+            var vendorCapOccurrences = new Dictionary<(int, AcquisitionSource, int), List<(int Quantity, VendorOfferBatch Batch)>>();
             int craftCounter = 0;
 
-            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
 
             // Pass 2b (M34-B1 #1/#3): re-derive each merged vendor step's
             // true cost from its AGGREGATE Quantity and the winning offer's
@@ -165,7 +198,7 @@ namespace GW2CraftingHelper.Services
             // several already-per-occurrence-ceil'd costs; also folds the
             // (now-correct) vendor currency costs into currencyMap and
             // collects any post-solve "timegated" (cap-exceeded) notices.
-            var timegatedItems = FinalizeVendorBatches(stepMap, vendorBatchTracking, currencyMap);
+            var timegatedItems = FinalizeVendorBatches(stepMap, vendorBatchTracking, vendorCapOccurrences, currencyMap);
 
             // Pass 2c (M34 fix - Critical review finding): FinalizeVendorBatches
             // only corrects the MERGED PlanStep/currencyMap view; it never
@@ -299,12 +332,15 @@ namespace GW2CraftingHelper.Services
             CurrencyValuation currencyValuation,
             ISet<int> forceBuyOnlyNodeIds = null,
             Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
-            ISet<int> ignoredItemIds = null)
+            ISet<int> ignoredItemIds = null,
+            HomesteadEfficiencyTiers homesteadTiers = null)
         {
             if (node.IngredientType == "Currency")
             {
                 return null;
             }
+
+            var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
 
             // M34-B2b: an "Ignore"-d item id is treated as fully in-hand for
             // THIS node - zero cost, no recipe/vendor/TP evaluation, and (by
@@ -351,7 +387,7 @@ namespace GW2CraftingHelper.Services
             // reported on the plan (VendorCurrencyCosts) - valuation only
             // affects comparison, never the displayed currency cost.
             EvaluateVendorOffers(
-                node, prices, vendorOffers, priceBasis, currencyValuation,
+                node, prices, vendorOffers, priceBasis, currencyValuation, tiers,
                 out long? comparableVendorValue,
                 out long? comparableVendorCoinCost,
                 out List<CostLine> comparableVendorCurrencyCosts,
@@ -441,7 +477,7 @@ namespace GW2CraftingHelper.Services
 
                     long? ingredientCost = Evaluate(
                         ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation,
-                        forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds);
+                        forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds, tiers);
                     craftCost += ingredientCost ?? 0L;
                     craftRealCost += memo[ingredient.NodeId].TotalCost ?? 0L;
                 }
@@ -571,6 +607,16 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// M37 (KNOWN-ISSUES #24, gw2e parity): before any of the above, a
+        /// Homestead Refinement offer (VendorOffer.HomesteadTier.HasValue)
+        /// whose tagged tier exceeds <paramref name="homesteadTiers"/>'
+        /// configured tier for that output material is skipped entirely -
+        /// it never competes as comparable OR fallback. Fixes a live
+        /// defect (not merely a modeling gap): the baseline seed already
+        /// carries all 236 wiki-scraped Homestead Refinement rows
+        /// unconditionally, so before this gate the solver silently
+        /// behaved as if every account had every efficiency upgrade.
+        ///
         /// Splits vendor offers into two tiers. An offer is COMPARABLE (competes
         /// with TP/craft coin costs in PickCheapest) when it has no non-coin
         /// currency lines at all, OR every one of its non-coin currency lines
@@ -607,6 +653,7 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             PriceBasis priceBasis,
             CurrencyValuation currencyValuation,
+            HomesteadEfficiencyTiers homesteadTiers,
             out long? bestComparableValue,
             out long? bestComparableCoinCost,
             out List<CostLine> bestComparableCurrencyCosts,
@@ -634,6 +681,27 @@ namespace GW2CraftingHelper.Services
             foreach (var offer in offers)
             {
                 if (offer.OutputCount <= 0)
+                {
+                    continue;
+                }
+
+                // M37 (KNOWN-ISSUES #24, gw2e parity): a Homestead
+                // Refinement offer whose tagged tier exceeds the user's
+                // configured tier for that output material is excluded
+                // entirely - never comparable, never a fallback. Keyed on
+                // offer.OutputItemId (not a merchant-name string match at
+                // this hot-path call site) because HomesteadTier is only
+                // ever set on rows the seeding pass already confirmed carry
+                // a merchant name containing "Homestead Refinement" (see
+                // ConvertToOffer/HomesteadTierResolver) - the family
+                // mapping gw2e itself keys on (cheapestTree.ts's
+                // merchant.name.includes('Homestead Refinement') check) is
+                // therefore already baked into which rows have a non-null
+                // tag, so re-checking the merchant name string here on
+                // every offer/every solve would be redundant string work in
+                // a loop that already runs per vendor offer per tree node.
+                if (offer.HomesteadTier.HasValue &&
+                    offer.HomesteadTier.Value > homesteadTiers.GetTier(offer.OutputItemId))
                 {
                     continue;
                 }
@@ -859,6 +927,7 @@ namespace GW2CraftingHelper.Services
             Dictionary<(int, int), int> craftOrder,
             Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
             Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
+            Dictionary<(int, AcquisitionSource, int), List<(int Quantity, VendorOfferBatch Batch)>> vendorCapOccurrences,
             Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences,
             ref int craftCounter,
             ISet<int> ignoredItemIds = null)
@@ -915,7 +984,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var itemRoot in wrapperRecipe.Ingredients)
                     {
-                        Collect(itemRoot, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+                        Collect(itemRoot, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
                     }
                 }
                 return;
@@ -929,7 +998,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var ingredient in chosenRecipe.Ingredients)
                     {
-                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
                     }
                 }
 
@@ -941,7 +1010,7 @@ namespace GW2CraftingHelper.Services
                 }
 
                 var stepKey = (node.Id, AcquisitionSource.Craft, decision.RecipeId);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences);
             }
             else if (decision.Source == AcquisitionSource.BuyFromVendor)
             {
@@ -953,12 +1022,12 @@ namespace GW2CraftingHelper.Services
                 // re-introduce the exact per-occurrence-then-sum overcount
                 // FinalizeVendorBatches exists to fix (M34-B1 #1).
                 var stepKey = (node.Id, AcquisitionSource.BuyFromVendor, 0);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences);
             }
             else
             {
                 var stepKey = (node.Id, decision.Source, 0);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences);
             }
         }
 
@@ -969,6 +1038,7 @@ namespace GW2CraftingHelper.Services
             Decision decision,
             Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
             Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
+            Dictionary<(int, AcquisitionSource, int), List<(int Quantity, VendorOfferBatch Batch)>> vendorCapOccurrences,
             Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences)
         {
             if (decision.Source == AcquisitionSource.Craft)
@@ -990,22 +1060,40 @@ namespace GW2CraftingHelper.Services
 
             if (decision.Source == AcquisitionSource.BuyFromVendor && decision.VendorBatch.HasValue)
             {
+                var batch = decision.VendorBatch.Value;
+
                 if (vendorBatchTracking.TryGetValue(stepKey, out var trackedState))
                 {
-                    if (!trackedState.Conflict && !VendorBatchesEqual(trackedState.Batch, decision.VendorBatch.Value))
+                    if (!trackedState.Conflict && !VendorBatchesEqual(trackedState.Batch, batch))
                     {
                         // Ratchet only: a later occurrence agreeing with the
                         // tracked batch must not clear a conflict a prior
                         // occurrence already raised.
                         trackedState.Conflict = true;
                     }
+
+                    // M37 (KNOWN-ISSUES #24/#25 3.3): a separate, coarser
+                    // ratchet on the cap tuple ALONE - see
+                    // VendorBatchState.CapConflict's doc comment. Every
+                    // occurrence's (DailyCap, WeeklyCap) must agree for the
+                    // mixed-offer cap-check branch below to fire; disagreeing
+                    // batch shapes (Conflict above) are irrelevant to this.
+                    if (!trackedState.CapConflict &&
+                        (trackedState.CapDailyCap != batch.DailyCap ||
+                         trackedState.CapWeeklyCap != batch.WeeklyCap))
+                    {
+                        trackedState.CapConflict = true;
+                    }
                 }
                 else
                 {
                     vendorBatchTracking[stepKey] = new VendorBatchState
                     {
-                        Batch = decision.VendorBatch.Value,
-                        Conflict = false
+                        Batch = batch,
+                        Conflict = false,
+                        CapDailyCap = batch.DailyCap,
+                        CapWeeklyCap = batch.WeeklyCap,
+                        CapConflict = false
                     };
                 }
 
@@ -1023,6 +1111,19 @@ namespace GW2CraftingHelper.Services
                     vendorOccurrences[stepKey] = occurrenceList;
                 }
                 occurrenceList.Add((node.NodeId, node.Quantity));
+
+                // M37 (KNOWN-ISSUES #24/#25 3.3): the Batch-carrying twin of
+                // the list above, used only by FinalizeVendorBatches' new
+                // mixed-offer cap-check branch to sum true per-occurrence
+                // purchase counts (each occurrence's OWN offer shape) when
+                // occurrences disagreed on the winning offer but still
+                // agreed on the cap.
+                if (!vendorCapOccurrences.TryGetValue(stepKey, out var capOccurrenceList))
+                {
+                    capOccurrenceList = new List<(int Quantity, VendorOfferBatch Batch)>();
+                    vendorCapOccurrences[stepKey] = capOccurrenceList;
+                }
+                capOccurrenceList.Add((node.Quantity, batch));
             }
 
             if (stepMap.TryGetValue(stepKey, out var existing))
@@ -1159,10 +1260,23 @@ namespace GW2CraftingHelper.Services
         /// still truncates here rather than gaining new model/UI surface for
         /// a MustFix-level display nuance - a deliberate, narrower scope
         /// than the currency fix, not an oversight.
+        ///
+        /// M37 addendum (KNOWN-ISSUES #24/#25 3.3): when occurrences
+        /// disagree on the winning offer (Conflict true, so cost recompute
+        /// above is skipped as documented) but still agree on the raw
+        /// (DailyCap, WeeklyCap) tuple, a SEPARATE branch below still
+        /// produces a cap notice - summing each occurrence's own true
+        /// purchase count rather than borrowing one occurrence's OutputCount
+        /// for all of them. This targets the Homestead Refinement case
+        /// directly: many distinct input-material offers for the same
+        /// output share one identical station-wide weekly cap, so a
+        /// per-offer batch-shape disagreement should not by itself suppress
+        /// a real, correctly-computable cap notice.
         /// </summary>
         private static List<TimegatedItem> FinalizeVendorBatches(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
             Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
+            Dictionary<(int, AcquisitionSource, int), List<(int Quantity, VendorOfferBatch Batch)>> vendorCapOccurrences,
             Dictionary<int, long> currencyMap)
         {
             var timegatedItems = new List<TimegatedItem>();
@@ -1216,6 +1330,53 @@ namespace GW2CraftingHelper.Services
                             CapValue = cap.Value,
                             NeededCount = unitsNeeded
                         });
+                    }
+                }
+                else if (state != null && state.Conflict && !state.CapConflict &&
+                         vendorCapOccurrences.TryGetValue(kvp.Key, out var capOccurrences))
+                {
+                    // M37 (KNOWN-ISSUES #24/#25 3.3, gw2e parity - the
+                    // Homestead Refinement cap-notice gap): occurrences
+                    // disagreed on the winning offer's exact batch shape
+                    // (Conflict is true, so cost/UnitCost/currency lines are
+                    // deliberately left as AggregateStep already computed
+                    // them - unchanged from the block above), but every
+                    // occurrence's own offer still carries the IDENTICAL
+                    // (DailyCap, WeeklyCap) tuple (CapConflict is false).
+                    // Homestead Refinement is the prototypical case: many
+                    // different input-material offers for the same output
+                    // share one station-wide weekly cap. Sum each
+                    // occurrence's OWN true purchase count (its own offer's
+                    // OutputCount, not a borrowed one) so the notice reflects
+                    // real trades, not a mixed-offer cost blend.
+                    int? cap = state.CapDailyCap.HasValue && state.CapDailyCap.Value > 0
+                        ? state.CapDailyCap
+                        : (state.CapWeeklyCap.HasValue && state.CapWeeklyCap.Value > 0 ? state.CapWeeklyCap : (int?)null);
+
+                    if (cap.HasValue)
+                    {
+                        int totalPurchases = 0;
+                        foreach (var occurrence in capOccurrences)
+                        {
+                            if (occurrence.Batch.OutputCount > 0 && occurrence.Quantity > 0)
+                            {
+                                totalPurchases += (int)Math.Ceiling(
+                                    (double)occurrence.Quantity / occurrence.Batch.OutputCount);
+                            }
+                        }
+
+                        if (totalPurchases > cap.Value)
+                        {
+                            timegatedItems.Add(new TimegatedItem
+                            {
+                                ItemId = step.ItemId,
+                                CapType = (state.CapDailyCap.HasValue && state.CapDailyCap.Value > 0)
+                                    ? TimegatedCapType.Daily
+                                    : TimegatedCapType.Weekly,
+                                CapValue = cap.Value,
+                                NeededCount = totalPurchases
+                            });
+                        }
                     }
                 }
 
