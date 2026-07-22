@@ -1,6 +1,5 @@
 using System.IO;
 using System.Text;
-using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Services;
 using Xunit;
 

@@ -978,7 +978,7 @@ namespace GW2CraftingHelper.Tests.Services
             // Context is carried forward for subsequent re-solves
             Assert.Same(initial.SolveContext, resolved.SolveContext);
             // Tree reflects the forced decision and availability
-            Assert.Equal(Contracts.CraftingDecision.BuyFromTp, resolved.CraftingTree.Decision);
+            Assert.Equal(CraftingDecision.BuyFromTp, resolved.CraftingTree.Decision);
             Assert.True(resolved.CraftingTree.CanCraft);
             Assert.True(resolved.CraftingTree.CanBuyTp);
         }
@@ -1532,7 +1532,7 @@ namespace GW2CraftingHelper.Tests.Services
             // item 1 (the root) still crafts, now at zero cost.
             Assert.DoesNotContain(resolved.Plan.Steps, s => s.ItemId == 2);
             Assert.Contains(resolved.Plan.Steps, s => s.ItemId == 1 && s.Source == AcquisitionSource.Craft && s.TotalCost == 0);
-            Assert.Equal(Contracts.CraftingDecision.Have, resolved.CraftingTree.Children[0].Decision);
+            Assert.Equal(CraftingDecision.Have, resolved.CraftingTree.Children[0].Decision);
             Assert.True(resolved.CraftingTree.Children[0].IsIgnored);
         }
 
@@ -1572,7 +1572,7 @@ namespace GW2CraftingHelper.Tests.Services
             var resolved = pipeline.ResolveWithOverrides(
                 initial.SolveContext, overrides, new HashSet<int> { 2 });
 
-            Assert.Equal(Contracts.CraftingDecision.BuyFromTp, resolved.CraftingTree.Decision);
+            Assert.Equal(CraftingDecision.BuyFromTp, resolved.CraftingTree.Decision);
             Assert.Equal(20000, resolved.Plan.TotalCoinCost); // manual override wins on the root regardless of the sibling Ignore
         }
 
@@ -1840,7 +1840,7 @@ namespace GW2CraftingHelper.Tests.Services
                 ownMaterialsMode: OwnMaterialsMode.Valued,
                 priceBasis: PriceBasis.InstantBuy);
 
-            Assert.Equal(Contracts.CraftingDecision.BuyFromTp, initial.CraftingTree.Decision);
+            Assert.Equal(CraftingDecision.BuyFromTp, initial.CraftingTree.Decision);
             Assert.True(initial.CraftingTree.CanCraft); // flag reflects true feasibility
 
             // Manually force craft on the root - must win over the
@@ -1852,7 +1852,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 
-            Assert.Equal(Contracts.CraftingDecision.Craft, resolved.CraftingTree.Decision);
+            Assert.Equal(CraftingDecision.Craft, resolved.CraftingTree.Decision);
             // Real (post-reduction) craft cost: only 1 remaining unit of
             // item 2 needs buying, at 30 each.
             Assert.Equal(30, resolved.Plan.TotalCoinCost);
