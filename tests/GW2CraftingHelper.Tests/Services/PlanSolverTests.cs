@@ -2534,33 +2534,19 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // M38 WP-18 (tests T6, KNOWN-ISSUES 20.4 "Conservative reading"):
-        // ownership (InventoryReducer) runs BEFORE Solve and already
-        // consumed the owned pool by the time a node reaches here - this
-        // node's Quantity=2 stands in for a real reduction's leftover-to-buy
-        // amount (as if 3 of an original 5 were already owned). The Ignore
-        // check keys off node.Id alone and fires before any Quantity-based
-        // cost math (see Evaluate/Collect), so it "skips" the node
-        // identically to the fully-unreduced case above
-        // (IgnoredItemIds_LeafBuyNode_ZeroCostNoStep) - the earlier pool
-        // consumption is not double-counted or treated any differently just
-        // because part of the demand was already satisfied by ownership.
-        [Fact]
-        public void IgnoredItemIds_NodeAlreadyReducedByPartialOwnership_StillZeroCostNoStep()
-        {
-            var tree = Leaf(1, 2);
-            var prices = new Dictionary<int, ItemPrice>
-            {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
-            };
-            var solver = new PlanSolver();
-
-            var result = solver.Solve(
-                tree, prices, null, PriceBasis.InstantBuy, null, null,
-                ignoredItemIds: new HashSet<int> { 1 });
-
-            Assert.Empty(result.Plan.Steps);
-            Assert.Equal(0, result.Plan.TotalCoinCost);
-        }
+        // the Ignore x owned-materials interaction is NOT pinned at this
+        // layer. RecipeNode (the type Solve consumes) has no ownership
+        // field at all - only Id/NodeId/Quantity/achievement fields - so
+        // "a node already reduced by partial ownership" cannot be
+        // represented here beyond just choosing a smaller Quantity, which
+        // collapses to the exact same Evaluate/Collect code path as
+        // IgnoredItemIds_LeafBuyNode_ZeroCostNoStep above and proves
+        // nothing extra about the interaction. Ownership only exists on the
+        // downstream CraftingTreeNode built after Solve returns, so the
+        // real pin lives one and two layers up:
+        // CraftingPlanPipelineTests (GenerateStructuredAsync Ignore x owned-
+        // materials coverage) and DecisionPillPlannerTests
+        // (Have_IgnoredAndPartiallyOwned_ShowsIgnoredNotOwnedInfo).
 
         // --- M35-B1: synthetic multi-item wrapper root (gw2e parity) ---
         // WrapperOf lives in Helpers/RecipeNodeBuilders.cs.
