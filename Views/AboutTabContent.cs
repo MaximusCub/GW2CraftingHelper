@@ -18,9 +18,10 @@ namespace GW2CraftingHelper.Views
     /// The About tab (M39, d1-snapshot-about-settings.md Feature 2): static,
     /// mostly-derived information about the module itself - name, version,
     /// author/contributors, source URL, the Blish HUD version it targets,
-    /// this repo's own license, and the module's data directory (useful
-    /// when a user needs to attach snapshot.json/status.json/etc. to a bug
-    /// report). Same shape as LogTabContent.cs: one FlowPanel(CanScroll),
+    /// this repo's own license, a Blish HUD MIT-license credit line, and
+    /// the module's data directory (useful when a user needs to attach
+    /// snapshot.json/status.json/etc. to a bug report). Same shape as
+    /// LogTabContent.cs: one FlowPanel(CanScroll),
     /// Build(Container) populates it once, no relayout registry, no M33
     /// involvement - nothing here is interactive beyond plain
     /// selectable/copyable text, so there is nothing to keep "sticky"
@@ -53,6 +54,16 @@ namespace GW2CraftingHelper.Views
         private const string ModuleDisplayName = "GW2 Crafting Helper";
         private const string UnknownText = "unknown";
         private const string BlishHudDependencyNamespace = "bh.blishhud";
+
+        // d1 Feature 2's "Licenses & Attributions" section: the Blish HUD
+        // MIT-license credit line. d1 flags this exact wording as MEASURED
+        // (verified via WebSearch against Blish HUD's own repo) and
+        // low-risk to ship, unlike the ArenaNet/GW2 disclaimer below, which
+        // stays out pending maintainer sign-off. Kept as its own constant
+        // (not folded into the "Built with:" row) because "Built with:"
+        // reports the live SemVer.Range this module targets - a distinct,
+        // manifest-derived value - while this is fixed attribution text.
+        private const string BlishHudCreditLine = "Built on Blish HUD (MIT License) - github.com/blish-hud/Blish-HUD";
 
         // Manual fallback for the "Built with Blish HUD" note, only ever
         // shown if BOTH the live Dependencies read (ReadBlishHudDependencyRange)
@@ -122,19 +133,32 @@ namespace GW2CraftingHelper.Views
             AddValueRow("Source:", string.IsNullOrWhiteSpace(info.Url) ? "Not set in manifest.json" : info.Url, panelWidth, copyable: true);
             AddValueRow("Author:", info.AuthorDisplay ?? "Not listed in manifest.json", panelWidth);
             AddValueRow("Built with:", $"Blish HUD {info.BlishVersionRange ?? FallbackBlishHudVersionRange}", panelWidth);
+
+            // "License:" (this project's own license) and "Credits:" (the
+            // Blish HUD attribution d1 Feature 2 asked for) are two
+            // separate, differently-sourced rows and are deliberately kept
+            // side by side rather than merged: "License:" is this repo's
+            // own MIT license (not present in d1's original wireframe -
+            // added here so a reader always sees which license applies to
+            // this module's own code), while "Credits:" is d1's
+            // already-verified Blish HUD MIT-license credit line, carried
+            // over unchanged. Do not collapse these into one row or drop
+            // either without updating this comment.
             AddValueRow("License:", "MIT (see LICENSE in the repo)", panelWidth);
+            AddValueRow("Credits:", BlishHudCreditLine, panelWidth, copyable: true);
             AddValueRow("Data directory:", string.IsNullOrWhiteSpace(_dataDirectoryPath) ? "Not available" : _dataDirectoryPath, panelWidth, copyable: true);
 
-            // d1 Feature 2's wireframe also proposed a "Licenses &
-            // Attributions" section with a GW2/ArenaNet fan-content
-            // disclaimer line - deliberately NOT included here. d1's own
-            // text flags that draft wording as an unverified, INFERRED
-            // paraphrase, explicitly "not something to ship as-is" (Open
-            // Question 3: get the exact required wording verified against
-            // ArenaNet's own legal pages first). Per the repo's "do not
-            // invent data" posture, this stays an open item for the
-            // maintainer rather than shipping unverified legal text - see
-            // this milestone's PR notes.
+            // d1 Feature 2's wireframe also proposed a GW2/ArenaNet
+            // fan-content disclaimer line in the same "Licenses &
+            // Attributions" section as the Blish HUD credit above -
+            // deliberately NOT included here. d1's own text flags that
+            // draft wording as an unverified, INFERRED paraphrase,
+            // explicitly "not something to ship as-is" (Open Question 3:
+            // get the exact required wording verified against ArenaNet's
+            // own legal pages first). Per the repo's "do not invent data"
+            // posture, this stays an open item for the maintainer rather
+            // than shipping unverified legal text - see this milestone's
+            // PR notes.
         }
 
         private void AddHeaderRow(AboutInfo info, int panelWidth)
