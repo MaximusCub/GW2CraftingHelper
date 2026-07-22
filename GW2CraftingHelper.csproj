@@ -83,6 +83,9 @@
     <Compile Include="Models\TimegatedItem.cs" />
     <Compile Include="Services\PlanSolver.cs" />
     <Compile Include="Services\StatusUpdateGuard.cs" />
+    <Compile Include="Services\SnapshotEpochGuard.cs" />
+    <Compile Include="Services\SnapshotCommitGate.cs" />
+    <Compile Include="Services\SnapshotFetchFailedException.cs" />
     <Compile Include="Services\SolverDecision.cs" />
     <Compile Include="Services\SolveResult.cs" />
     <Compile Include="Models\ItemMetadata.cs" />

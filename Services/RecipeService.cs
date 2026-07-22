@@ -309,6 +309,19 @@ namespace GW2CraftingHelper.Services
                 {
                     var raw = await GetRecipeCachedAsync(recipeId, ct);
 
+                    // KNOWN-ISSUES api-degradation F5: GetRecipeAsync now
+                    // returns null on a 404 instead of throwing (previously
+                    // unreachable here, since the search endpoint and the
+                    // detail endpoint are backed by the same data - but no
+                    // longer guaranteed given the new 404 handling). Skip
+                    // this recipe id rather than crash on a null
+                    // dereference below; mirrors PreWarmCacheAsync's own
+                    // existing null-recipe guard a few lines up.
+                    if (raw == null)
+                    {
+                        continue;
+                    }
+
                     // Defaults to the nominal OutputItemCount (a no-op)
                     // whenever the source recipe has no fractional EV; only
                     // Mystic Clover-style Mystic Forge recipes set this
@@ -447,7 +460,23 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            _cacheStore.PutRecipe(recipeId, result);
+            // KNOWN-ISSUES api-degradation F5: GetRecipeAsync can now
+            // return null (a 404), which the in-memory _recipeCache above
+            // tolerates fine (a session-lifetime negative cache, avoiding
+            // repeat round-trips for a genuinely-missing id) - but the
+            // persistent overlay store's own serializer
+            // (RecipeCacheSerializer.SerializeRecipes) does
+            // `recipes.Values.OrderBy(r => r.Id)`, which throws a
+            // NullReferenceException on any null entry. That exception is
+            // swallowed by OverlayRecipeCacheStore's own catch-all around
+            // Flush(), but _recipes never removes the poisoned null entry -
+            // so persisting the recipe overlay (and the manifest write that
+            // follows it in the same call) would silently stop working for
+            // the rest of the module session. Only persist a genuine hit.
+            if (result != null)
+            {
+                _cacheStore.PutRecipe(recipeId, result);
+            }
             return result;
         }
     }

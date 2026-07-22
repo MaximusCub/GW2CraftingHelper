@@ -741,5 +741,75 @@ namespace GW2CraftingHelper.Tests.Services
             await Assert.ThrowsAsync<System.ArgumentException>(
                 () => svc.BuildMultiItemTreeAsync(new List<PlanRequestItem>(), CancellationToken.None));
         }
+
+        // KNOWN-ISSUES api-degradation F5 (adversarial-review follow-up):
+        // Gw2RecipeApiClient.GetRecipeAsync can now return null on a 404
+        // instead of throwing. A recipe id a search result points to that
+        // then 404s on its own detail lookup must not crash the tree build
+        // (the option is simply skipped) and must not poison the
+        // persistent recipe overlay cache for every subsequent Flush -
+        // real OverlayRecipeCacheStore backed by a temp directory, per the
+        // repo's real-storage-testing convention, so this exercises the
+        // actual serializer, not a fake.
+        [Fact]
+        public async Task RecipeId_404sOnDetailLookup_SkipsOptionAndDoesNotPoisonPersistentCache()
+        {
+            string tempDir = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(), "gw2ch-test-" + System.Guid.NewGuid());
+            try
+            {
+                var cacheStore = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tempDir);
+                cacheStore.Load(currentGw2BuildId: null);
+
+                var api = new InMemoryRecipeApiClient();
+                // Item 1 has two candidate recipes: 10 (healthy) and 11
+                // (404s on detail lookup despite being a real search hit).
+                api.AddSearchResult(1, 10, 11);
+                api.AddRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    }
+                });
+                api.Return404For.Add(11);
+
+                var svc = new RecipeService(api, cacheStore: cacheStore);
+
+                var node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);
+
+                // Only the healthy recipe (10) became an option; the 404'd
+                // one (11) was skipped, not crashed on.
+                Assert.Single(node.Recipes);
+                Assert.Equal(10, node.Recipes[0].RecipeId);
+
+                // Persisting must still succeed (the null recipe is never
+                // written into the store) and other recipes remain
+                // retrievable - proving Flush() was not silently broken by
+                // RecipeCacheSerializer.SerializeRecipes throwing on a null
+                // entry in _recipes.
+                cacheStore.Flush(force: true);
+
+                var reloaded = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tempDir);
+                reloaded.Load(currentGw2BuildId: null);
+                var persistedRecipe = reloaded.TryGetRecipe(10);
+                Assert.NotNull(persistedRecipe);
+                Assert.Equal(1, persistedRecipe.OutputItemId);
+
+                // The 404'd id must not appear in the persisted store at
+                // all - a genuine cache miss, not a stored null.
+                Assert.Null(reloaded.TryGetRecipe(11));
+            }
+            finally
+            {
+                if (System.IO.Directory.Exists(tempDir))
+                {
+                    System.IO.Directory.Delete(tempDir, recursive: true);
+                }
+            }
+        }
     }
 }

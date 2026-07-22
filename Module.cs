@@ -41,6 +41,15 @@ namespace GW2CraftingHelper
         private static readonly Logger Logger = Logger.GetLogger<Module>();
         private static readonly TimeSpan StaleThreshold = TimeSpan.FromMinutes(10);
 
+        // Bounds the whole multi-step account-snapshot fetch (wallet, bank,
+        // shared inventory, materials, one call per character) so a full
+        // network outage fails fast instead of stacking several ~100s HTTP
+        // timeouts sequentially (KNOWN-ISSUES 31b/api-degradation F6) -
+        // mirrors CurrencyMetadataService's own internal-timeout pattern,
+        // just with a larger budget since this fetch does far more work on
+        // a genuine success than a single /v2/currencies call.
+        private static readonly TimeSpan SnapshotFetchTimeout = TimeSpan.FromSeconds(60);
+
         internal ContentsManager ContentsManager => this.ModuleParameters.ContentsManager;
         internal DirectoriesManager DirectoriesManager => this.ModuleParameters.DirectoriesManager;
         internal Gw2ApiManager Gw2ApiManager => this.ModuleParameters.Gw2ApiManager;
@@ -77,7 +86,48 @@ namespace GW2CraftingHelper
         private Texture2D _emblemTexture;
 
         private CancellationTokenSource _refreshCts;
-        private bool _refreshInProgress;
+
+        // KNOWN-ISSUES 31a-F3 (nice-to-have): written in the finally of
+        // RefreshSnapshotInBackgroundAsync/UserRefreshAsync, which may
+        // resume on a ThreadPool continuation (Blish's XNA host installs no
+        // SynchronizationContext), and read from Update() on the main
+        // thread as a mutual-exclusion gate - a genuine cross-thread field,
+        // so it needs the visibility guarantee volatile provides even
+        // though no torn read is possible for a bool.
+        private volatile bool _refreshInProgress;
+
+        // KNOWN-ISSUES 31a-F1 (audit-of-fix): bumped only by ClearCache; a
+        // fetch that captured an older epoch before starting must discard
+        // its result rather than commit over a cleared cache. A bare
+        // volatile counter (the original fix) left the check and the
+        // commit as separate unsynchronized steps, so the gate now owns
+        // both the epoch and the lock that makes ClearCache's bump/clear
+        // and FetchAndSaveSnapshotAsync's check/commit mutually exclusive
+        // - see SnapshotCommitGate's own doc comment for the full race.
+        private readonly SnapshotCommitGate _snapshotCommitGate = new SnapshotCommitGate();
+
+        // KNOWN-ISSUES 31c-audit (api-F1 follow-up): UTC ticks of the most
+        // recent FAILED background refresh, or 0 if none. api-F1 made a
+        // failed FetchSnapshotAsync throw instead of stamping
+        // _currentSnapshot.CapturedAt with a fresh timestamp - correct
+        // (no more silent data corruption), but that stamping used to be
+        // the only thing making Update()'s staleness gate wait before
+        // retrying. Without this, a persistent failure would re-arm the
+        // gate on every single Update() tick instead of waiting out
+        // RefreshFailureBackoff - see RefreshSnapshotInBackgroundAsync.
+        // long, not DateTime, because C# disallows `volatile` on 64-bit
+        // primitives; Interlocked.Read/Exchange give the same cross-thread
+        // visibility guarantee _refreshInProgress gets from volatile
+        // (_snapshotCommitGate below gets it from its own internal lock
+        // instead), without needing a lock of its own here.
+        private long _lastFailedRefreshAttemptTicks;
+
+        // KNOWN-ISSUES 31c-audit: minimum wait after a failed background
+        // refresh before RefreshSnapshotInBackgroundAsync is allowed to
+        // auto-retrigger again. Deliberately does NOT gate UserRefreshAsync
+        // (the explicit "Refresh Now" button) - a user-initiated retry
+        // should never be throttled by an earlier automatic failure.
+        private static readonly TimeSpan RefreshFailureBackoff = TimeSpan.FromSeconds(60);
 
         [ImportingConstructor]
         public Module([Import("ModuleParameters")] ModuleParameters moduleParameters) : base(moduleParameters) { }
@@ -457,13 +507,56 @@ namespace GW2CraftingHelper
         {
             Logger.Info("Refreshing account snapshot...");
 
-            var snapshot = await _snapshotService.FetchSnapshotAsync(ct);
+            // Captured before the fetch starts (main thread - see the
+            // field's own comment) so the post-await commit below can
+            // detect a Clear Cache that ran while this fetch was still in
+            // flight (KNOWN-ISSUES 31a-F1).
+            int myEpoch = _snapshotCommitGate.Epoch;
 
-            _currentSnapshot = snapshot;
-            _snapshotStore.Save(snapshot);
+            AccountSnapshot snapshot;
+            using (var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+            {
+                timeoutCts.CancelAfter(SnapshotFetchTimeout);
+                try
+                {
+                    snapshot = await _snapshotService.FetchSnapshotAsync(timeoutCts.Token);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    // The internal timeout fired, not the caller's own
+                    // token - a genuine fetch failure (KNOWN-ISSUES
+                    // api-degradation F6), not a cancellation. Re-thrown as
+                    // a plain Exception so callers' "cancelled" catch
+                    // (which must stay silent) does not swallow it.
+                    throw new TimeoutException(
+                        $"Account snapshot fetch exceeded {SnapshotFetchTimeout.TotalSeconds:0}s.");
+                }
+            }
 
-            _pendingSnapshot = snapshot;
-            _snapshotDirty = true;
+            // Re-check and commit run inside SnapshotCommitGate's lock -
+            // the same lock ClearCache's own bump+clear runs under below -
+            // so the two can never interleave (KNOWN-ISSUES 31a-F1
+            // audit-of-fix; see SnapshotCommitGate's doc comment).
+            bool committed = _snapshotCommitGate.TryCommit(myEpoch, () =>
+            {
+                _currentSnapshot = snapshot;
+                _snapshotStore.Save(snapshot);
+
+                _pendingSnapshot = snapshot;
+                _snapshotDirty = true;
+            });
+
+            if (!committed)
+            {
+                // Clear Cache ran (fully, atomically) either before or
+                // during this check; committing now would resurrect data
+                // the user explicitly cleared (KNOWN-ISSUES 31a-F1). Drop
+                // the result - _currentSnapshot, _pendingSnapshot,
+                // _snapshotDirty, and the on-disk file are all left
+                // untouched by this call.
+                Logger.Info("Discarding snapshot fetch superseded by Clear Cache (epoch {0})", myEpoch);
+                return null;
+            }
 
             Logger.Info("Fetched snapshot CapturedAt={0:o} items={1} wallet={2} coin={3}",
                 snapshot.CapturedAt, snapshot.Items.Count, snapshot.Wallet.Count, snapshot.CoinCopper);
@@ -474,6 +567,21 @@ namespace GW2CraftingHelper
         private async Task RefreshSnapshotInBackgroundAsync()
         {
             if (_refreshInProgress) return;
+
+            // KNOWN-ISSUES 31c-audit: refuse to auto-retrigger again so
+            // soon after a failed attempt - see _lastFailedRefreshAttemptTicks'
+            // own doc comment. Both callers of this method (Update()'s
+            // staleness tick and OnSubtokenUpdated) can otherwise re-fire
+            // far faster than any real transient failure needs to be
+            // retried at.
+            var lastFailedTicks = Interlocked.Read(ref _lastFailedRefreshAttemptTicks);
+            if (lastFailedTicks != 0 &&
+                DateTime.UtcNow - new DateTime(lastFailedTicks, DateTimeKind.Utc) < RefreshFailureBackoff)
+            {
+                Logger.Debug("Skipping snapshot refresh retry - within backoff window after a prior failure");
+                return;
+            }
+
             _refreshInProgress = true;
 
             _refreshCts?.Cancel();
@@ -483,8 +591,16 @@ namespace GW2CraftingHelper
             try
             {
                 var snapshot = await FetchAndSaveSnapshotAsync(_refreshCts.Token);
-                var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
-                SaveStatusThreadSafe(status);
+                Interlocked.Exchange(ref _lastFailedRefreshAttemptTicks, 0);
+                if (snapshot != null)
+                {
+                    var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
+                    SaveStatusThreadSafe(status);
+                }
+                // else: superseded by Clear Cache while this fetch was in
+                // flight (KNOWN-ISSUES 31a-F1, see SnapshotEpochGuard) -
+                // Clear Cache already wrote its own status; nothing further
+                // to report here.
             }
             catch (OperationCanceledException)
             {
@@ -493,6 +609,7 @@ namespace GW2CraftingHelper
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Failed to refresh account snapshot");
+                Interlocked.Exchange(ref _lastFailedRefreshAttemptTicks, DateTime.UtcNow.Ticks);
                 var status = $"Refresh failed \u2014 {DateTime.Now:t}";
                 SaveStatusThreadSafe(status);
             }
@@ -526,10 +643,21 @@ namespace GW2CraftingHelper
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
             _refreshCts = null;
-            _snapshotStore.Delete();
-            _currentSnapshot = null;
-            _pendingSnapshot = null;
-            _snapshotDirty = false;
+
+            // Epoch bump + on-disk delete + field resets all run inside
+            // SnapshotCommitGate's lock so a snapshot fetch already in
+            // flight (which captured an epoch before this call ran) either
+            // commits fully before this runs, or has its post-fetch commit
+            // check fail atomically against this bump - no interleaving,
+            // no torn field state (KNOWN-ISSUES 31a-F1 audit-of-fix; see
+            // SnapshotCommitGate's own doc comment).
+            _snapshotCommitGate.Clear(() =>
+            {
+                _snapshotStore.Delete();
+                _currentSnapshot = null;
+                _pendingSnapshot = null;
+                _snapshotDirty = false;
+            });
         }
 
         private void PersistStatus(string status)

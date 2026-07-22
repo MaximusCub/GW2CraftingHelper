@@ -447,13 +447,30 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
 
-            // Step 10: Fetch learned recipe IDs (if permission available)
+            // Step 10: Fetch learned recipe IDs (if permission available).
+            // KNOWN-ISSUES api-degradation F4: any non-cancellation failure
+            // degrades to null (the same as never having permission),
+            // mirroring the currencyTask try/catch above - PlanResultBuilder
+            // already treats null learnedRecipeIds as a supported degraded
+            // state, so a transient failure here must not discard an
+            // otherwise fully-successful, fully-priced plan.
             progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
             sw.Restart();
             ISet<int> learnedRecipeIds = null;
             if (_accountRecipeClient != null && _accountRecipeClient.HasRequiredPermission())
             {
-                learnedRecipeIds = await _accountRecipeClient.GetLearnedRecipeIdsAsync(ct);
+                try
+                {
+                    learnedRecipeIds = await _accountRecipeClient.GetLearnedRecipeIdsAsync(ct);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    learnedRecipeIds = null;
+                }
             }
             sw.Stop();
             timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");
@@ -782,13 +799,30 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
 
-            // Step 10: Fetch learned recipe IDs (if permission available)
+            // Step 10: Fetch learned recipe IDs (if permission available).
+            // KNOWN-ISSUES api-degradation F4: any non-cancellation failure
+            // degrades to null (the same as never having permission),
+            // mirroring the currencyTask try/catch above - PlanResultBuilder
+            // already treats null learnedRecipeIds as a supported degraded
+            // state, so a transient failure here must not discard an
+            // otherwise fully-successful, fully-priced plan.
             progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
             sw.Restart();
             ISet<int> learnedRecipeIds = null;
             if (_accountRecipeClient != null && _accountRecipeClient.HasRequiredPermission())
             {
-                learnedRecipeIds = await _accountRecipeClient.GetLearnedRecipeIdsAsync(ct);
+                try
+                {
+                    learnedRecipeIds = await _accountRecipeClient.GetLearnedRecipeIdsAsync(ct);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    learnedRecipeIds = null;
+                }
             }
             sw.Stop();
             timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");

@@ -50,11 +50,37 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
+            // KNOWN-ISSUES api-degradation F3: a single hard-failing batch
+            // must degrade to "treat this batch's ids as missing, fall
+            // through to the retry wave/seed fallback below" instead of
+            // aborting GetMetadataAsync entirely - mirroring the retry
+            // wave's own per-batch catch a few lines down. An exception is
+            // re-thrown below only if EVERY batch in this wave failed (a
+            // genuine total outage), so a real outage still surfaces as an
+            // error instead of silently rendering the whole plan with
+            // Unknown Item/seed-fallback metadata.
+            Exception firstWaveFailure = null;
+            int firstWaveBatchCount = 0;
+            int firstWaveSucceeded = 0;
             for (int i = 0; i < toFetch.Count; i += BatchSize)
             {
                 int count = Math.Min(BatchSize, toFetch.Count - i);
                 var batch = toFetch.GetRange(i, count);
-                await FetchBatchIntoCacheAsync(batch, ct);
+                firstWaveBatchCount++;
+                try
+                {
+                    await FetchBatchIntoCacheAsync(batch, ct);
+                    firstWaveSucceeded++;
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException))
+                {
+                    firstWaveFailure = ex;
+                }
+            }
+
+            if (firstWaveBatchCount > 0 && firstWaveSucceeded == 0)
+            {
+                throw firstWaveFailure;
             }
 
             // The items endpoint can return partial results (206) or drop

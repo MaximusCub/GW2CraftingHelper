@@ -39,9 +39,17 @@ namespace GW2CraftingHelper.Services
             return _apiManager.HasPermissions(RequiredPermissions);
         }
 
+        // The 5 independent top-level account-data sources tallied below for
+        // success/failure (KNOWN-ISSUES 31/api-degradation F1). Per-character
+        // inventory failures are NOT counted individually here - they are
+        // already tolerated as a partial-Characters-source degradation by
+        // the inner try/catch around each character's own inventory fetch.
+        private const int SourceCount = 5;
+
         public async Task<AccountSnapshot> FetchSnapshotAsync(CancellationToken ct)
         {
             var snapshot = new AccountSnapshot { CapturedAt = DateTime.UtcNow };
+            int failedSources = 0;
 
             // Wallet (also extracts coins as currency ID 1)
             try
@@ -67,6 +75,7 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to fetch wallet");
+                failedSources++;
             }
 
             ct.ThrowIfCancellationRequested();
@@ -89,6 +98,7 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to fetch bank");
+                failedSources++;
             }
 
             ct.ThrowIfCancellationRequested();
@@ -111,6 +121,7 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to fetch shared inventory");
+                failedSources++;
             }
 
             ct.ThrowIfCancellationRequested();
@@ -133,6 +144,7 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to fetch material storage");
+                failedSources++;
             }
 
             ct.ThrowIfCancellationRequested();
@@ -172,6 +184,18 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to fetch character list");
+                failedSources++;
+            }
+
+            // A partial or total failure must never silently masquerade as a
+            // full snapshot (KNOWN-ISSUES 31/api-degradation F1): throw
+            // instead of returning a snapshot with holes relative to what a
+            // prior good fetch may already have on disk/in memory. See
+            // SnapshotFetchFailedException's doc comment for the full
+            // conservative-persistence-rule rationale.
+            if (failedSources > 0)
+            {
+                throw new SnapshotFetchFailedException(failedSources, SourceCount);
             }
 
             // Resolve display names and icon URLs

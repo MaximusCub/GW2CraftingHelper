@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,15 +23,51 @@ namespace GW2CraftingHelper.Services
         public async Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct)
         {
             var url = $"{BaseUrl}/recipes/search?output={itemId}";
-            var json = await _http.GetStringAsync(url);
+            string json = await GetJsonAsync(url, ct);
+            if (json == null)
+            {
+                return new List<int>();
+            }
             return JsonConvert.DeserializeObject<List<int>>(json);
         }
 
         public async Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
         {
             var url = $"{BaseUrl}/recipes/{recipeId}";
-            var json = await _http.GetStringAsync(url);
+            string json = await GetJsonAsync(url, ct);
+            if (json == null)
+            {
+                return null;
+            }
             return ParseRecipe(json);
+        }
+
+        // KNOWN-ISSUES api-degradation F5: the previous implementation used
+        // HttpClient.GetStringAsync(url) - the classic overload with no
+        // CancellationToken parameter (net472 has no ct-accepting
+        // GetStringAsync overload) - so `ct` was silently a no-op for
+        // every recipe search/detail call. GetAsync(url, ct) threads
+        // cancellation through properly and matches
+        // Gw2PriceApiClient/Gw2ItemApiClient's own SendAsync(request, ct)
+        // pattern, including their 404-handling, which this class
+        // previously lacked entirely.
+        private async Task<string> GetJsonAsync(string url, CancellationToken ct)
+        {
+            using (var response = await _http.GetAsync(url, ct))
+            {
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        $"GW2 API error {(int)response.StatusCode} from {url}");
+                }
+
+                return await response.Content.ReadAsStringAsync();
+            }
         }
 
         internal static RawRecipe ParseRecipe(string json)

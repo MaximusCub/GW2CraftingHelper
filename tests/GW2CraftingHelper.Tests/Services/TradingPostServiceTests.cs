@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Services;
@@ -200,6 +201,190 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Single(api.Calls); // second call served from cache, well within the TTL
             Assert.Equal(200, result[1].BuyInstant);
+        }
+
+        // KNOWN-ISSUES 31c-1: two overlapping GetPricesAsync calls for the
+        // same not-yet-cached id must coalesce into a single upstream
+        // fetch instead of each starting its own. The Gate holds the fake
+        // API's response until BOTH calls have been started, so joining
+        // is exercised deterministically rather than relying on timing.
+        [Fact]
+        public async Task ConcurrentCalls_SameId_CoalesceIntoSingleUpstreamFetch()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            var gate = new TaskCompletionSource<bool>();
+            api.Gate = gate.Task;
+            var svc = new TradingPostService(api);
+
+            var task1 = svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+            var task2 = svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            gate.SetResult(true);
+            var result1 = await task1;
+            var result2 = await task2;
+
+            Assert.Single(api.Calls); // only one upstream fetch, shared by both callers
+            Assert.Equal(200, result1[1].BuyInstant);
+            Assert.Equal(200, result2[1].BuyInstant);
+        }
+
+        // Closer mirror of the real scenario (two overlapping plan
+        // generations with overlapping-but-not-identical item sets): the
+        // shared ids coalesce onto the first call's fetch, while the
+        // second call still fetches its own unique id itself.
+        [Fact]
+        public async Task ConcurrentCalls_OverlappingIds_SharedIdsCoalesce_UniqueIdFetchedSeparately()
+        {
+            var api = new InMemoryPriceApiClient();
+            for (int i = 1; i <= 4; i++)
+            {
+                api.AddPrice(i, buyUnitPrice: i, sellUnitPrice: i * 2);
+            }
+            var gate = new TaskCompletionSource<bool>();
+            api.Gate = gate.Task;
+            var svc = new TradingPostService(api);
+
+            var task1 = svc.GetPricesAsync(new[] { 1, 2, 3 }, CancellationToken.None);
+            var task2 = svc.GetPricesAsync(new[] { 2, 3, 4 }, CancellationToken.None);
+
+            gate.SetResult(true);
+            var result1 = await task1;
+            var result2 = await task2;
+
+            // task1's own batch covers {1,2,3}; task2 joins that for ids
+            // 2 and 3, and only fetches id 4 itself - two upstream calls
+            // total, not three.
+            Assert.Equal(2, api.Calls.Count);
+            Assert.Equal(3, result1.Count);
+            Assert.Equal(3, result2.Count);
+        }
+
+        // KNOWN-ISSUES 31c-audit: the owning caller's cancellation must
+        // never abandon the shared fetch a DIFFERENT, still-live caller is
+        // joined onto. Caller A (owner) is cancelled while the upstream
+        // fetch is still gated; caller B (joiner, never cancelled) must
+        // still see its own price once the gate releases, not inherit A's
+        // OperationCanceledException.
+        [Fact]
+        public async Task ConcurrentCalls_OwnerCancelled_JoinerWithLiveTokenStillSucceeds()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            var gate = new TaskCompletionSource<bool>();
+            api.Gate = gate.Task;
+            var svc = new TradingPostService(api);
+            var ownerCts = new CancellationTokenSource();
+
+            var ownerTask = svc.GetPricesAsync(new[] { 1 }, ownerCts.Token);
+            var joinerTask = svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            ownerCts.Cancel();
+            gate.SetResult(true);
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() => ownerTask);
+            var joinerResult = await joinerTask;
+
+            Assert.Equal(200, joinerResult[1].BuyInstant);
+            Assert.Single(api.Calls); // still just one shared upstream fetch
+        }
+
+        // KNOWN-ISSUES 31c-audit: a joining caller's own cancellation must
+        // be observed - it must not silently ride along on whatever the
+        // owning caller's fetch eventually does. Caller B (joiner) is
+        // cancelled while the upstream fetch is still gated (unreleased);
+        // B must throw promptly on its own token without waiting for the
+        // owner's fetch to finish, and the owner (never cancelled) must
+        // still succeed once the gate is released.
+        [Fact]
+        public async Task ConcurrentCalls_JoinerCancelled_ThrowsPromptlyWithoutAffectingOwner()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            var gate = new TaskCompletionSource<bool>();
+            api.Gate = gate.Task;
+            var svc = new TradingPostService(api);
+            var joinerCts = new CancellationTokenSource();
+
+            var ownerTask = svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+            var joinerTask = svc.GetPricesAsync(new[] { 1 }, joinerCts.Token);
+
+            joinerCts.Cancel();
+
+            // B's own cancellation must surface without the gate ever
+            // being released - proves it did not wait on the owner's task.
+            await Assert.ThrowsAsync<OperationCanceledException>(() => joinerTask);
+
+            gate.SetResult(true);
+            var ownerResult = await ownerTask;
+
+            Assert.Equal(200, ownerResult[1].BuyInstant);
+            Assert.Single(api.Calls); // still just one shared upstream fetch
+        }
+
+        // KNOWN-ISSUES api-degradation F2: one bad batch amid otherwise-
+        // healthy ones must degrade to missing ids (unpriceable holes
+        // downstream) instead of aborting the whole call.
+        [Fact]
+        public async Task OneBatchFails_DegradesToHolesInsteadOfAbortingWholeCall()
+        {
+            var api = new InMemoryPriceApiClient();
+            var ids = new List<int>();
+            for (int i = 1; i <= 250; i++)
+            {
+                api.AddPrice(i, buyUnitPrice: i, sellUnitPrice: i * 2);
+                ids.Add(i);
+            }
+            api.ThrowOnCallNumber = 2; // second batch (ids 201-250) fails
+
+            var svc = new TradingPostService(api);
+
+            var result = await svc.GetPricesAsync(ids, CancellationToken.None);
+
+            // Batch 1 (1-200) succeeded and is present; batch 2 (201-250)
+            // failed and is degraded to holes, not an aborted call.
+            Assert.Equal(200, result.Count);
+            Assert.True(result.ContainsKey(1));
+            Assert.False(result.ContainsKey(201));
+        }
+
+        // KNOWN-ISSUES api-degradation F2: a genuine total outage (every
+        // batch fails) must still surface as an error, not silently render
+        // an all-unpriceable plan.
+        [Fact]
+        public async Task AllBatchesFail_ThrowsInsteadOfSilentlyReturningEmpty()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 1, sellUnitPrice: 2);
+            api.ThrowAlways = true;
+            var svc = new TradingPostService(api);
+
+            await Assert.ThrowsAsync<HttpRequestException>(
+                () => svc.GetPricesAsync(new[] { 1 }, CancellationToken.None));
+        }
+
+        // Edge case of the 31c-1 fix: a caller whose entire request is
+        // satisfied purely by joining another overlapping call's in-flight
+        // fetch must still see the failure if that joined fetch fails
+        // totally - it must not silently return an empty result just
+        // because it started no batch of its own.
+        [Fact]
+        public async Task ConcurrentCalls_UpstreamFails_JoiningCallerAlsoThrows()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.ThrowAlways = true;
+            var gate = new TaskCompletionSource<bool>();
+            api.Gate = gate.Task;
+            var svc = new TradingPostService(api);
+
+            var task1 = svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+            var task2 = svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            gate.SetResult(true);
+
+            await Assert.ThrowsAsync<HttpRequestException>(() => task1);
+            await Assert.ThrowsAsync<HttpRequestException>(() => task2);
+            Assert.Single(api.Calls); // still just one shared upstream attempt
         }
     }
 }

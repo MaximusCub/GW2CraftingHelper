@@ -17,6 +17,15 @@ namespace GW2CraftingHelper.Tests.Helpers
         public int MaxObservedConcurrency => _maxObservedConcurrency;
         public int LatencyMs { get; set; }
 
+        /// <summary>
+        /// Recipe ids GetRecipeAsync should return null for, simulating a
+        /// 404 (KNOWN-ISSUES api-degradation F5's new null-on-404 contract)
+        /// instead of the indexer's default throw-on-missing-key behavior,
+        /// which every other existing test relies on to catch a genuinely
+        /// mismatched search/recipe setup.
+        /// </summary>
+        public HashSet<int> Return404For { get; } = new HashSet<int>();
+
         public void AddSearchResult(int itemId, params int[] recipeIds)
         {
             _searchResults[itemId] = new List<int>(recipeIds);
@@ -62,6 +71,11 @@ namespace GW2CraftingHelper.Tests.Helpers
                 if (LatencyMs > 0)
                 {
                     await Task.Delay(LatencyMs, ct);
+                }
+
+                if (Return404For.Contains(recipeId))
+                {
+                    return null;
                 }
 
                 return _recipes[recipeId];
