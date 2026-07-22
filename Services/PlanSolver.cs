@@ -876,6 +876,33 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
+            // M37 (KNOWN-ISSUES #26 fix-pass finding): a Quantity == 0
+            // "Item" node draws no demand of its own and must never
+            // generate a shopping/craft step - matches
+            // CraftingTreeBuilder.BuildNode's own Quantity == 0 early
+            // return (the "already owned" collapse, checked first there
+            // too) for the SAME reason, regardless of WHY it is zero
+            // (genuine full ownership via InventoryReducer, or a duplicate
+            // occurrence zeroed by AchievementBitDedupPrePass). Without
+            // this guard, a zeroed node whose "real" counterpart resolves
+            // to a DIFFERENT stepKey (e.g. Craft vs. Buy - so the two never
+            // merge via the ordinary per-stepKey aggregation below) leaves
+            // a standalone "buy/craft 0 units, 0 cost" ghost row in
+            // Plan.Steps: reproduced and confirmed via manual trace while
+            // verifying this exact claim for the M37 achievement-bit dedup
+            // feature (docs/research/m37-r3-achievement-dedup.md Section
+            // 4.2 flags this as needing verification, not assumption) - see
+            // PlanSolverTests' QuantityZeroNode_* cases for the covering
+            // scenario.
+            // This was already a latent gap for the pre-existing genuinely-
+            // owned case (the comment immediately below, predating this
+            // fix, already claimed a real Quantity == 0 node produces "no
+            // step" - this guard is what makes that claim actually true).
+            if (node.Quantity == 0)
+            {
+                return;
+            }
+
             // M34-B2b: an ignored item generates no crafting step and no
             // shopping row at all - it is fully in-hand, same as a real
             // Quantity == 0 node's "usedQuantity == 0 -> no step" gw2e
