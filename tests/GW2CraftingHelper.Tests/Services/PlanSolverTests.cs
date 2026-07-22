@@ -805,7 +805,8 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Vendor offer tests ---
 
         private static VendorOffer CoinVendorOffer(
-            int outputItemId, int coinCost, int outputCount = 1, int? dailyCap = null, int? weeklyCap = null)
+            int outputItemId, int coinCost, int outputCount = 1, int? dailyCap = null, int? weeklyCap = null,
+            int? seasonalCap = null)
         {
             return new VendorOffer
             {
@@ -819,7 +820,8 @@ namespace GW2CraftingHelper.Tests.Services
                 MerchantName = "TestMerchant",
                 Locations = new List<string> { "TestLoc" },
                 DailyCap = dailyCap,
-                WeeklyCap = weeklyCap
+                WeeklyCap = weeklyCap,
+                SeasonalCap = seasonalCap
             };
         }
 
@@ -1006,7 +1008,7 @@ namespace GW2CraftingHelper.Tests.Services
 
         private static VendorOffer MixedVendorOffer(
             int outputItemId, int coinCost, int currencyId, int currencyCount, int outputCount = 1,
-            int? dailyCap = null, int? weeklyCap = null)
+            int? dailyCap = null, int? weeklyCap = null, int? seasonalCap = null)
         {
             var costLines = new List<CostLine>();
             if (coinCost > 0)
@@ -1029,7 +1031,8 @@ namespace GW2CraftingHelper.Tests.Services
                 MerchantName = "Mixed Vendor",
                 Locations = new List<string>(),
                 DailyCap = dailyCap,
-                WeeklyCap = weeklyCap
+                WeeklyCap = weeklyCap,
+                SeasonalCap = seasonalCap
             };
         }
 
@@ -1778,6 +1781,200 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
             Assert.Equal(250, plan.CurrencyCosts[0].Amount);
             Assert.Empty(plan.TimegatedItems);
+        }
+
+        // --- Seasonal (Astral Acclaim package, KNOWN-ISSUES #33) vendor
+        // purchase-cap tests ---
+        // Same warn-only semantics as Daily/Weekly above (a cap never gates
+        // offer eligibility or re-routes the solver), but checked
+        // INDEPENDENTLY of Daily/Weekly rather than folded into the same
+        // "pick one" precedence - see the SeasonalAndWeeklyCap test below.
+
+        [Fact]
+        public void SeasonalCap_NeededExceedsCap_StillUsedAsVendor_SurfacesTimegatedNotice()
+        {
+            // Vendor sells for 1 coin each but only 20/season; node needs
+            // 25, exceeding the season's cap. The far cheaper vendor offer
+            // (25 coin) is still used over the expensive TP price (10000
+            // coin) - caps never re-route the solver - and the plan
+            // surfaces a Seasonal-typed timegated notice instead of
+            // silently falling back.
+            var tree = Leaf(1, 25);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 400 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, seasonalCap: 20) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(25, plan.TotalCoinCost);
+
+            var notice = Assert.Single(plan.TimegatedItems);
+            Assert.Equal(1, notice.ItemId);
+            Assert.Equal(TimegatedCapType.Seasonal, notice.CapType);
+            Assert.Equal(20, notice.CapValue);
+            Assert.Equal(25, notice.NeededCount);
+        }
+
+        [Fact]
+        public void SeasonalCap_NeededWithinCap_StillUsedAsVendor_NoNotice()
+        {
+            // Needed (10) is within the season cap (20); the far cheaper
+            // vendor offer must still be picked over the expensive TP
+            // price, and no timegated notice is raised since the cap is
+            // not exceeded.
+            var tree = Leaf(1, 10);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, seasonalCap: 20) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(50, plan.TotalCoinCost);
+            Assert.Empty(plan.TimegatedItems);
+        }
+
+        [Fact]
+        public void SeasonalCapZero_TreatedAsUncapped()
+        {
+            // An explicit SeasonalCap of 0 (not merely absent) must still
+            // mean uncapped, not "zero purchases allowed" - matching the
+            // DailyCap/WeeklyCap zero-cap convention exactly.
+            var tree = Leaf(1, 500);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, seasonalCap: 0) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(500, plan.TotalCoinCost);
+            Assert.Empty(plan.TimegatedItems);
+        }
+
+        [Fact]
+        public void SeasonalAndWeeklyCap_BothExceeded_BothNoticesReported()
+        {
+            // A single offer carrying BOTH a WeeklyCap and a SeasonalCap
+            // must surface BOTH notices when both are exceeded - Seasonal
+            // is checked independently of Daily/Weekly (a separate,
+            // unrelated real-world limit), unlike Daily's precedence over
+            // Weekly which suppresses one notice in favor of the other on
+            // that SAME axis (see DailyCapTakesPrecedenceOverWeeklyCap).
+            var tree = Leaf(1, 50);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, weeklyCap: 10, seasonalCap: 20) } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(50, plan.TotalCoinCost);
+
+            Assert.Equal(2, plan.TimegatedItems.Count);
+            var weeklyNotice = Assert.Single(plan.TimegatedItems, t => t.CapType == TimegatedCapType.Weekly);
+            Assert.Equal(1, weeklyNotice.ItemId);
+            Assert.Equal(10, weeklyNotice.CapValue);
+            Assert.Equal(50, weeklyNotice.NeededCount);
+            var seasonalNotice = Assert.Single(plan.TimegatedItems, t => t.CapType == TimegatedCapType.Seasonal);
+            Assert.Equal(1, seasonalNotice.ItemId);
+            Assert.Equal(20, seasonalNotice.CapValue);
+            Assert.Equal(50, seasonalNotice.NeededCount);
+        }
+
+        [Fact]
+        public void SeasonalCap_NeverChangesDecisionOrTotalCost_Regression()
+        {
+            // Regression guard (mirrors the existing Daily/Weekly cap-
+            // never-reroutes tests): an exceeded SeasonalCap must not alter
+            // the solver's Source choice, TotalCost, or the per-node
+            // Decision - purely an informational notice layered on top of
+            // an otherwise-unchanged solve.
+            var tree = Leaf(1, 30);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 2, seasonalCap: 5) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var plan = result.Plan;
+
+            // The vendor offer (2 coin each = 60 total) is still far
+            // cheaper than TP (1000 each) and remains the chosen source
+            // despite the exceeded SeasonalCap (need 30, cap 5).
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(60, plan.Steps[0].TotalCost);
+            Assert.Equal(60, plan.TotalCoinCost);
+            Assert.Equal(60, result.Decisions[tree.NodeId].TotalCost);
+            Assert.NotEmpty(plan.TimegatedItems);
+        }
+
+        [Fact]
+        public void SeasonalCappedCurrencyOffer_ValuedCurrency_BeatsExpensiveTp_SurfacesTimegatedNotice()
+        {
+            // HONESTY NOTE: in live data, Wizard's Vault offers are priced
+            // in unvalued Astral Acclaim, so the solver only ever selects
+            // one (and therefore only ever fires this notice) when the
+            // user has supplied a CurrencyValuation for that currency.
+            // This exercises that real path through the actual comparable-
+            // tier pipeline: a currency-priced (not coin-priced) offer,
+            // chosen over TP because the user values the currency, whose
+            // SeasonalCap the merged demand exceeds.
+            var tree = Leaf(1, 25);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 9, seasonalCap: 20) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
+            Assert.Equal(0, plan.TotalCoinCost);
+            Assert.Single(plan.CurrencyCosts);
+            Assert.Equal(2, plan.CurrencyCosts[0].CurrencyId);
+            Assert.Equal(225, plan.CurrencyCosts[0].Amount); // real currency amount: 9 * 25, unaffected by valuation
+
+            var notice = Assert.Single(plan.TimegatedItems);
+            Assert.Equal(1, notice.ItemId);
+            Assert.Equal(TimegatedCapType.Seasonal, notice.CapType);
+            Assert.Equal(20, notice.CapValue);
+            Assert.Equal(25, notice.NeededCount);
         }
 
         // --- Price basis tests ---
@@ -2987,6 +3184,95 @@ namespace GW2CraftingHelper.Tests.Services
             // Confirms Conflict actually ratcheted true here (matching the
             // pre-existing sibling test's own proof for this exact shape),
             // so the empty-notice assertion below is testing genuine
+            // Conflict suppression, not merely "no cap was ever exceeded".
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(0, vendorStep.VendorOfferOutputCount);
+
+            Assert.Empty(plan.TimegatedItems);
+        }
+
+        // --- Adversarial review of the M37 mixed-offer Weekly pair above
+        // found the Conflict-suppression parity claim for the KNOWN-ISSUES
+        // #33 SeasonalCap package unverified: FinalizeVendorBatches checks
+        // Seasonal inside the exact same "!state.Conflict" guard as Daily/
+        // Weekly (an implementation coincidence, not a pinned contract), so
+        // nothing failed if that guard were ever hoisted apart for Seasonal
+        // specifically. These two tests mirror the Weekly pair exactly,
+        // substituting seasonalCap for weeklyCap, to pin the same suppress-
+        // on-Conflict behavior for Seasonal. ---
+
+        [Fact]
+        public void MixedOfferSameSeasonalCap_NoticeStillSuppressed_DocumentedLimitation()
+        {
+            // Same bulk-discount-threshold shape as
+            // MixedOfferSameWeeklyCap_NoticeStillSuppressed_DocumentedLimitation
+            // (qty=1 deterministically favors the 1-for-2 offer, qty=100
+            // deterministically favors the 100-for-150 offer - genuine
+            // disagreement, not a tie). Both offers happen to share the
+            // identical SeasonalCap=1, but Conflict (the offer-shape
+            // ratchet) alone still suppresses the notice - same as Weekly.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, Leaf(99, 1), Leaf(99, 100)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    99, new List<VendorOffer>
+                    {
+                        CoinVendorOffer(99, 2, outputCount: 1, seasonalCap: 1),
+                        CoinVendorOffer(99, 150, outputCount: 100, seasonalCap: 1)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy);
+            var plan = result.Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            // Confirms Conflict actually ratcheted true here (matching the
+            // pre-existing Weekly sibling test's own proof for this exact
+            // shape), so the empty-notice assertion below is testing genuine
+            // Conflict suppression, not merely "no cap was ever exceeded".
+            Assert.Equal(0, vendorStep.VendorOfferOutputCount);
+            Assert.Equal(152, vendorStep.TotalCost);
+
+            Assert.Empty(plan.TimegatedItems);
+        }
+
+        [Fact]
+        public void MixedOfferDifferentSeasonalCap_NoticeStillSuppressed_DocumentedLimitation()
+        {
+            // Same bulk-discount-threshold shape as
+            // MixedOfferDifferentWeeklyCap_NoticeStillSuppressed_DocumentedLimitation
+            // (qty=1 favors the 1-for-2 offer, qty=100 favors the
+            // 100-for-150 offer - genuine, deterministic disagreement, not
+            // a tie), but this time the two offers ALSO carry different
+            // SeasonalCap values. Whether or not the raw cap number happens
+            // to match across occurrences, Conflict alone suppresses the
+            // notice - same as Weekly.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(99, 1),
+                    Leaf(99, 100)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    99, new List<VendorOffer>
+                    {
+                        CoinVendorOffer(99, 2, outputCount: 1, seasonalCap: 5),
+                        CoinVendorOffer(99, 150, outputCount: 100, seasonalCap: 999)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy).Plan;
+
+            // Confirms Conflict actually ratcheted true here (matching the
+            // pre-existing Weekly sibling test's own proof for this exact
+            // shape), so the empty-notice assertion below is testing genuine
             // Conflict suppression, not merely "no cap was ever exceeded".
             var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
             Assert.Equal(0, vendorStep.VendorOfferOutputCount);

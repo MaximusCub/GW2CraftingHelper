@@ -980,6 +980,35 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(PlanRowType.TimegatedNotice, section.Rows[0].RowType);
         }
 
+        [Fact]
+        public void TimegatedItems_SeasonalCapType_RendersSeasonWording()
+        {
+            // Astral Acclaim package (KNOWN-ISSUES #33): Seasonal renders
+            // with the noun "Season" (matching gw2e's own Wizard's Vault
+            // wording), keeping the same "{CapLabel} limit: N (plan needs
+            // M)" shape Daily/Weekly already use.
+            var meta = MetaFor((9, "Obsidian Shard", "shard.png"));
+            var result = MakeResult(
+                metadata: meta,
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 9, Quantity = 60, Source = AcquisitionSource.BuyFromVendor }
+                },
+                timegatedItems: new List<TimegatedItem>
+                {
+                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Seasonal, CapValue = 20, NeededCount = 60 }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            var notice = Assert.Single(section.Rows);
+            Assert.Equal(PlanRowType.TimegatedNotice, notice.RowType);
+            Assert.Contains("Obsidian Shard", notice.Label);
+            Assert.Contains("Season limit: 20", notice.Label);
+            Assert.Contains("plan needs 60", notice.Label);
+            Assert.DoesNotContain("Seasonal", notice.Label);
+        }
+
         // --- Required Disciplines ---
 
         [Fact]

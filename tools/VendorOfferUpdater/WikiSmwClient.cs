@@ -44,8 +44,7 @@ namespace VendorOfferUpdater
 
         // Note: the wiki also exposes "Has character purchase cap" and
         // "Has total purchase cap" on the same per-offer subobjects, but the
-        // module has no consuming model for either (Models/TimegatedItem.cs's
-        // TimegatedCapType is Daily/Weekly only, and the solver has no
+        // module has no consuming model for either (the solver has no
         // account/character concept at all) - deliberately not scraped here.
         // See KNOWN-ISSUES.md item 28.
         //
@@ -55,11 +54,10 @@ namespace VendorOfferUpdater
         // Rewards" subobjects (a wiki-wide `[[Has seasonal purchase cap::+]]`
         // probe returned 29 rows, all three under one of those page names -
         // no other vendor on the wiki uses this property). The parsed value
-        // is threaded into VendorOffer.SeasonalCap and the hasher, but the
-        // runtime solver (PlanSolver/TimegatedItem) deliberately does NOT
-        // consume it yet - TimegatedCapType has no Seasonal member. Wiring
-        // that in is a later package (see KNOWN-ISSUES.md item 28 DEFERRED
-        // note / M38 WP-15).
+        // is threaded into VendorOffer.SeasonalCap and the hasher, and is now
+        // also consumed by the runtime solver via
+        // TimegatedCapType.Seasonal (see KNOWN-ISSUES.md item 33 /
+        // VendorBatchSolver.FinalizeVendorBatches).
         //
         // M37 (KNOWN-ISSUES #24): "Has requirement" is populated by the
         // {{vendor table row|requirement=...}} parameter (confirmed live via
