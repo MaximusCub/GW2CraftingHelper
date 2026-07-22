@@ -1722,7 +1722,7 @@ scroll offsets with the committed scanner
 reading documented in the script header; environment UI scale is 0.81
 so 32px rows pitch at ~25.9px).
 
-## 31. Concurrency and degradation audits (verification debt)
+## 31. Concurrency and degradation audits (verification debt) (FIXED in M37)
 Three never-formally-swept reviews, each producing classified findings
 (fix Critical/MustFix per the repo review loop):
 (a) Cross-thread await audit: every await continuation that touches
@@ -1736,6 +1736,188 @@ pipeline callbacks that mutate controls.
 status surfacing, partial renders, retry paths, no crashes/hangs.
 (c) Price-cache thread-safety: the M26 TTL cache + locks under
 concurrent generate/re-solve/refresh.
+
+FIXED in M37 (audits: docs/research/m37-r5-audits.md, all three
+inventories + classified findings recorded verbatim, attributed).
+9 confirmed findings across the three audits (0 refuted - every
+blocking finding was independently adversarially re-walked against the
+real code before being fixed here), plus 2 nice-to-have findings (one
+fixed, one deferred to M38).
+
+Audit (a) cross-thread await - verdict: control/view-state marshaling is
+broadly correct and the M31/M34 primitives are applied consistently
+everywhere except two guard-shaped gaps.
+- 31a-F1 (MustFix): Module.FetchAndSaveSnapshotAsync's post-await commit
+  had no epoch/generation guard, so a Clear Cache click racing an
+  in-flight background refresh could resurrect the just-cleared snapshot
+  once the refresh's ThreadPool continuation landed after the clear
+  (token cancellation alone cannot close this - by the time Cancel()
+  fires the network response may already have landed, and there is no
+  cancellation checkpoint left on the way back to the commit). Fixed
+  with a new `Services/SnapshotEpochGuard.cs` (pure, StatusUpdateGuard-
+  shaped: `ShouldCommit(myEpoch, currentEpoch)`) plus a `volatile int
+  _snapshotEpoch` bumped only by ClearCache; the post-await commit
+  captures its epoch before the fetch starts and checks it after, and
+  discards (returns null, no-op) on a mismatch instead of touching
+  `_currentSnapshot`/`_pendingSnapshot`/`_snapshotDirty`/the on-disk
+  file.
+- 31a-F2 (MustFix): CraftingPlanView.TriggerGenerate bumped
+  `_generateSequence` before its empty-request early-return, so a no-op
+  validation failure could still invalidate a genuinely in-flight
+  generation's guarded button re-enable, permanently stuck-disabling
+  Generate. Fixed by moving the sequence bump (and the
+  `_statusClosedForCurrentGeneration` reset) to after the early-return;
+  button enable/disable semantics for real generations are unchanged.
+- 31a-F3 (NiceToHave, fixed): `_refreshInProgress` is written from a
+  ThreadPool continuation and read on the main thread with no memory
+  barrier. Marked `volatile` (cheapest correct primitive) - the same
+  treatment given to the new `_snapshotEpoch` field above, for the
+  identical cross-thread-visibility reason.
+
+Audit (b) offline/API-down degradation - verdict: one Critical (silent
+account-snapshot corruption on refresh failure) plus five MustFix
+findings; the currency-metadata path, the unused wiki/vendor-offer path,
+and the UI-thread status-surfacing primitives were already solid and
+needed no changes.
+- F1 (Critical): Gw2AccountSnapshotService.FetchSnapshotAsync
+  self-caught every independent Account.* sub-fetch and always returned
+  a fully-formed, freshly-timestamped AccountSnapshot even when every
+  fetch failed - silently overwriting a good cached snapshot with an
+  empty one and resetting the staleness clock, so "Use Owned Materials"
+  would silently price everything as unowned with zero error indication
+  anywhere in the module's UI. Fixed: FetchSnapshotAsync now tallies
+  failures across its 5 independent top-level sources (wallet, bank,
+  shared inventory, materials, character list) and throws a new
+  `SnapshotFetchFailedException` on ANY failure - partial or total -
+  instead of ever returning a snapshot with holes. Conservative
+  persistence rule, documented on the exception class itself: a partial
+  failure is treated exactly like a total one for persistence purposes
+  (never committed, not even with holes) so it can never silently
+  masquerade as a full snapshot; Module.cs's existing generic-Exception
+  catch already keeps the prior good snapshot in place and surfaces
+  "Refresh failed" (distinct from "Updated") with no new status plumbing
+  needed.
+- F2 (MustFix): TradingPostService.GetPricesAsync's batch loop had no
+  per-batch try/catch, so one bad batch (e.g. a 504 on an oversized
+  request) aborted the entire price fetch - and with it the whole plan
+  generation - discarding already-fetched batches, the recipe tree, and
+  vendor resolution. Fixed to degrade per-batch to missing ids
+  (unpriceable holes, an already-supported downstream state), re-thrown
+  only if EVERY batch failed - a genuine total outage still surfaces as
+  an error, preserving the existing "Generate retry succeeds after a
+  504" behavior this file already documents.
+- F3 (MustFix): ItemMetadataService.GetMetadataAsync's first-wave batch
+  loop was unguarded (unlike its own retry-wave loop directly below,
+  which already catches per-batch), so a hard-failing batch aborted the
+  whole call one loop iteration too early. Fixed with the identical
+  per-batch try/catch + total-failure-only-throw shape as F2, mirroring
+  the retry wave's own established pattern.
+- F4 (MustFix): CraftingPlanPipeline's two GetLearnedRecipeIdsAsync call
+  sites (single- and multi-item paths) were unguarded, unlike the
+  currencyTask fetch a few lines above in the same method, discarding an
+  otherwise fully-priced plan on any transient /v2/account/recipes
+  failure. Fixed with the same try/catch-degrades-to-null shape as the
+  currencyTask precedent; PlanResultBuilder already treats a null
+  learnedRecipeIds as a supported "unknown known-recipe status" state.
+- F5 (MustFix): Gw2RecipeApiClient used HttpClient.GetStringAsync(url) -
+  the classic overload with no CancellationToken parameter on this
+  project's net472 target - silently making its own `ct` parameter a
+  no-op for every recipe search/detail call, and never special-cased 404
+  the way its siblings do. Fixed to GetAsync(url, ct) + explicit status
+  handling (matching Gw2PriceApiClient/Gw2ItemApiClient's own pattern),
+  including 404 -> empty-list (search) / null (detail). Fix-pass finding
+  (adversarial review, addressed): the new null-on-404 return from
+  GetRecipeAsync was not yet safe to consume - RecipeService.BuildNodeAsync
+  would NRE dereferencing a null recipe, and persisting a null recipe
+  into the overlay cache store would crash its own serializer
+  (`RecipeCacheSerializer.SerializeRecipes` does
+  `recipes.Values.OrderBy(r => r.Id)`, which throws on any null entry),
+  silently breaking recipe-cache persistence for the rest of the module
+  session (the exception is swallowed by the store's own catch-all, but
+  the poisoned entry is never removed, so every later Flush fails the
+  same way). Both fixed: BuildNodeAsync now skips a null recipe option
+  instead of crafting an option from it, and GetRecipeCachedAsync no
+  longer persists a null result to the cache store (the in-memory
+  negative-cache for the session is unaffected, so a genuinely-missing
+  id still avoids repeat round-trips).
+- F6 (MustFix): RefreshSnapshotInBackgroundAsync/UserRefreshAsync gate on
+  one shared `_refreshInProgress` flag while
+  Gw2AccountSnapshotService.FetchSnapshotAsync performs 9+ independent
+  sequential network calls with no overall time budget - a full outage
+  could stack several ~100s per-call timeouts into many minutes with no
+  way for the user's own "Refresh Now" to cancel or accelerate it. Fixed
+  with a 60s overall timeout wrapping the whole fetch
+  (`Module.SnapshotFetchTimeout`, mirroring CurrencyMetadataService's own
+  internal-timeout pattern) - an internal timeout surfaces as "Refresh
+  failed" (not silently swallowed as a cancellation); genuine caller
+  cancellation is unaffected. The "manual refresh cancels background"
+  idea from the finding's own suggested fix was left out of scope this
+  milestone - it would need the same epoch-guard machinery as 31a-F1 to
+  be correct, adding real complexity for what the finding itself flagged
+  as optional.
+
+Audit (c) price-cache thread-safety - verdict: the M26 TTL cache's lock
+discipline around the dictionary itself was already sound (no tearing,
+no enumeration-during-mutation, no re-entrancy-while-locked, no
+mid-solve inconsistency, no disposal crash) - the one real gap was a
+stampede, not data corruption.
+- 31c-1 (MustFix): GetPricesAsync's check-then-act (TTL check, then an
+  unlocked network fetch, then an insert-under-lock) had no in-flight
+  tracking, so two overlapping GenerateStructuredAsync calls (e.g.
+  Generate + a same-plan "Use Own Materials" toggle-confirm, neither of
+  which mutually excludes the other) could each independently observe
+  the same stale/missing ids and issue duplicate /v2/commerce/prices
+  batches. Fixed: TradingPostService now tracks each call's own fetch in
+  a `Dictionary<int, Task> _inFlight` under the existing `_cacheLock`
+  (deciding which ids are fresh/in-flight/uncovered and registering this
+  call's own fetch happen in one atomic lock acquisition - splitting that
+  into two lock statements would reopen a duplicate-fetch window between
+  two overlapping callers' decide phases; the lock is never held across
+  an await). A second overlapping caller joins the first caller's fetch
+  instead of starting its own; a caller whose entire request is
+  satisfied purely by joining also correctly sees a thrown error if that
+  joined fetch fails totally (not just a caller with its own failed
+  batch). TTL semantics are byte-identical for the single-caller case
+  (same batch order/count/timing as before - batches are still fetched
+  strictly sequentially per call). Combined in the same method with F2's
+  per-batch degradation, since both touch GetPricesAsync's fetch loop.
+- 31c-2 (NiceToHave, DEFERRED to M38): `_cache` has no eviction policy -
+  every item id ever priced during the module's process lifetime stays
+  resident forever (refreshed in place on next access, never removed).
+  Bounded and unlikely to matter at current GW2 item-id cardinality;
+  accepted as an M38 candidate (a periodic sweep evicting entries older
+  than a multiple of CacheTtl, or a simple LRU/size cap) rather than
+  built speculatively this milestone.
+
+Tests: `SnapshotEpochGuardTests` (pure guard logic, mirroring
+`StatusUpdateGuardTests`), `TradingPostServiceTests` (+5: single-flight
+coalescing, overlapping-id coalescing, one-batch-fails degradation,
+all-batches-fail throw, a joining-only caller also seeing a total
+failure), `ItemMetadataServiceTests` (+2: first-wave batch failure
+healed by the retry wave, first-wave total failure throws),
+`CraftingPlanPipelineTests` (+1: a failed learned-recipe fetch degrades
+to null without aborting the plan), `Gw2RecipeApiClientHttpTests` (new
+file, 8 tests: 200/404/500 for both endpoints plus a genuine
+cancellation-propagation proof for each, mirroring the established
+`Gw2ApiClient404Tests`/`CurrencyMetadataServiceTests` StubHandler
+pattern), `SnapshotFetchFailedExceptionTests` (message construction -
+`Gw2AccountSnapshotService` itself is Blish/Gw2Sharp-coupled and cannot
+be exercised per the repo's tests-must-never-reference-Blish-HUD
+invariant; its non-persistence behavior is verified by construction
+instead, documented in that test file), `RecipeServiceTests` (+1,
+fix-pass finding: a 404'd recipe option is skipped and does not poison
+the persistent overlay cache, exercised against a real
+`OverlayRecipeCacheStore` backed by a temp directory per the repo's
+real-storage-testing convention). Module.cs/CraftingPlanView.cs's own
+fixes are Blish-coupled and verified by construction + code comments
+rather than a fake seam, per repo convention (no Module.cs/
+CraftingPlanView.cs unit tests exist or were added). 876 tests total (up
+from 854), 0 Blish HUD/Gw2Sharp references added to tests.
+
+Note: m37-homestead's diff (a separate in-flight worktree, out of scope
+for these three audits) gets its own small delta-audit before the
+desktop wave - the orchestrator handles scheduling that, not this
+session.
 
 ## DEFERRED (recorded, not M37 scope)
 - Localization (en/de/fr/es via API lang param): user-deferred backlog,
