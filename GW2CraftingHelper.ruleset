@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RuleSet Name="GW2CraftingHelper style rules" Description="Custom StyleCop.Analyzers severity overrides. Suppresses only the rules that actively fight this codebase's documented, deliberate house style (see CLAUDE.md); everything else stays at StyleCop's default (warning) severity so drift gets caught for free. See M38 WP-02." ToolsVersion="16.0">
+  <Rules AnalyzerId="StyleCop.Analyzers" RuleNamespace="StyleCop.Analyzers">
+    <!-- Doc-mandate rules: this codebase documents intent via prose "//" comments at
+         decision points, not <summary> on every member (CLAUDE.md style; a6-csharp.md
+         section 9). Forcing XML doc everywhere would produce thousands of new warnings
+         for zero value and encourage empty boilerplate doc comments. -->
+    <Rule Id="SA1600" Action="None" /> <!-- ElementsMustBeDocumented -->
+    <Rule Id="SA1602" Action="None" /> <!-- EnumerationItemsMustBeDocumented -->
+    <!-- Meta-warning that fires only because the doc-mandate rules above are off;
+         suppressing it is a direct consequence of the SA1600/SA1602 decision, not a
+         separate style choice. -->
+    <Rule Id="SA0001" Action="None" /> <!-- XmlCommentAnalysisDisabled -->
+
+    <!-- File-header rules assume a license banner on every file. This repo has never
+         used one; there is nothing to enforce here. -->
+    <Rule Id="SA1633" Action="None" /> <!-- FileMustHaveHeader -->
+    <Rule Id="SA1634" Action="None" /> <!-- FileHeaderMustShowCopyright -->
+    <Rule Id="SA1635" Action="None" /> <!-- FileHeaderMustHaveCopyrightText -->
+    <Rule Id="SA1636" Action="None" /> <!-- FileHeaderCopyrightTextMustMatch -->
+    <Rule Id="SA1637" Action="None" /> <!-- FileHeaderMustContainFileName -->
+    <Rule Id="SA1638" Action="None" /> <!-- FileHeaderFileNameDocumentationMustMatch -->
+    <Rule Id="SA1639" Action="None" /> <!-- FileHeaderMustHaveSummary -->
+    <Rule Id="SA1640" Action="None" /> <!-- FileHeaderMustHaveValidCompanyText -->
+    <Rule Id="SA1641" Action="None" /> <!-- FileHeaderCompanyNameTextMustMatch -->
+
+    <!-- Fields are private-field-camelCase-with-underscore-prefix (_camelCase) 100%
+         consistently across the whole repo (verified: a6-csharp.md section 9, and the
+         .editorconfig naming convention added alongside this ruleset codifies exactly
+         that). SA1309 demands the opposite (no leading underscore) on every one of
+         those same fields - leaving it on would contradict the naming convention this
+         same change encodes, not "catch drift" against it. -->
+    <Rule Id="SA1309" Action="None" /> <!-- FieldNamesMustNotBeginWithUnderscore -->
+  </Rules>
+  <Rules AnalyzerId="Microsoft.CodeAnalysis.CSharp.NetAnalyzers" RuleNamespace="Microsoft.CodeAnalysis.CSharp.NetAnalyzers">
+    <!-- Not currently produced (no NetAnalyzers package is referenced by this project),
+         but disabled defensively so a future generic-analyzer addition can't "fix" this:
+         Blish HUD's XNA host installs no SynchronizationContext (see
+         Views/MainThreadMarshal.cs's doc comment), so SynchronizationContext.Current is
+         already null on every await in this process - ConfigureAwait(false) would skip
+         a capture that never happens, adding visual noise for zero behavioral benefit. -->
+    <Rule Id="CA2007" Action="None" /> <!-- DoNotDirectlyAwaitATask (ConfigureAwait) -->
+  </Rules>
+</RuleSet>

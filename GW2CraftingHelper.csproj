@@ -21,6 +21,7 @@
          whatever "latest non-preview" the installed csc.exe on a given machine
          resolves to (M38 WP-02 / a6-csharp.md section 10). -->
     <LangVersion>7.3</LangVersion>
+    <CodeAnalysisRuleSet>GW2CraftingHelper.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
@@ -44,6 +45,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Analyzer Include="packages\StyleCop.Analyzers.1.1.118\analyzers\dotnet\cs\StyleCop.Analyzers.dll" />
+    <Analyzer Include="packages\StyleCop.Analyzers.1.1.118\analyzers\dotnet\cs\StyleCop.Analyzers.CodeFixes.dll" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Models\AccountSnapshot.cs" />
