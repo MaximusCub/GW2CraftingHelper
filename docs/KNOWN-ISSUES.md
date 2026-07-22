@@ -1471,7 +1471,8 @@ upstream unit test quoted in the report):
   ground-truth unit test scenarios 1:1 - bit-and-normal coexistence
   zeroing ALL bit occurrences, bit-only first-occurrence-keeps
   semantics, ordinary duplicates unaffected, Currency/multi-item-
-  wrapper exclusion, multi-recipe-option coverage), `CraftingTreeBuilderTests`/
+  wrapper exclusion, multi-recipe-option isolation - see "Fix-pass
+  update 3" below), `CraftingTreeBuilderTests`/
   `DecisionPillPlannerTests` (the new flag/pill), `RecipeServiceTests`/
   `InventoryReducerTests` (field propagation and clone preservation),
   `PlanSolverTests` (the ghost-row fix), and one full end-to-end
@@ -1481,34 +1482,75 @@ upstream unit test quoted in the report):
   shared item's cost is counted once (200 total), not twice (300, the
   pre-fix expectation).
 
-Known, accepted display nuance (not fixed - matches upstream's own
-convention, not a defect): since this module has no "Merchant"/
-"Achievement" discipline concept of its own (vendor purchases are
-modeled separately via `ref/vendor_offers.json`, a pre-existing
-architectural divergence documented in the M34 R2 report, unrelated to
-this fix), a plan whose solved path ends up choosing to "craft" the new
-Blueprint recipe or one of its Merchant sub-recipes (likely, since these
-WvW-only items have no live TP price) will show "Achievement" or
-"Merchant" in the Required Disciplines list - a literal echo of
-gw2efficiency's own custom-recipes data, which uses the identical tag
-for the identical purpose (Section 2.2 of the report). Not addressed
-here since inventing special-case discipline filtering is out of scope
-for a "Small" correctness fix and was not directed by the milestone
-brief.
+Fix-pass update (adversarial review finding, addressed): the paragraph
+above originally shipped as an accepted, unfixed display nuance -
+"Achievement"/"Merchant" leaking into the Required Disciplines list as
+if they were real, levelable GW2 crafting disciplines. Re-reviewed and
+fixed: `PlanResultBuilder` now filters "Achievement"/"Merchant" out of
+Required Disciplines specifically (`NonCraftingDisciplines`), so a
+solved plan that crafts the Blueprint or a Merchant sub-recipe no longer
+shows a misleading "Achievement (0)"/"Merchant (0)" entry there.
+`RequiredRecipes`' own per-recipe `Disciplines` field is left untouched
+(still shows "Achievement"/"Merchant" for that specific recipe row -
+accurate, informational metadata about its real source, matching
+gw2efficiency's own custom-recipes tagging convention). `MysticForge`
+intentionally stays visible in Required Disciplines - unrelated,
+pre-existing, out-of-scope behavior. Same fix-pass also replaced
+`PlanResultBuilder`'s `IsMissing` check (previously a bare
+`recipeId < 0` sign check, which the achievement/merchant recipes'
+adjacent negative id range made unsound - see the id-collision finding
+below) with a check on the recipe's own declared Disciplines
+(`InherentlyAvailableDisciplines`), so Mystic Forge/Achievement/Merchant
+recipes are all still correctly reported as never "missing" for the
+right reason instead of by sign-check coincidence.
 
-VERIFICATION STATE: confirmed by a green build and the full 848-test
-suite (real production-path tests throughout: `RecipeService`,
+Fix-pass update 2 (adversarial review finding, addressed): the new
+achievement/merchant recipe ids (-1592..-1595) share the same contiguous
+negative-id block `ref/mystic_forge_recipes.json` uses for real Mystic
+Forge recipes (up to -1591), adjacent rather than disjoint.
+`CompositeRecipeApiClient.GetRecipeAsync` previously routed ANY negative
+id straight to `MysticForgeRecipeData` and returned null without ever
+trying primary if unrecognized - on a cold seed-cache miss this would
+NRE inside `RecipeService.BuildNodeAsync` (`raw.ExpectedOutputCount`)
+for these recipes. Fixed to a real membership check (falls through to
+primary when `MysticForgeRecipeData.GetRecipe` returns null), same
+principle as the `PlanResultBuilder` fix above.
+
+Fix-pass update 3 (adversarial review finding, addressed):
+`AchievementBitDedupPrePass` previously walked EVERY `RecipeOption` on a
+node (not just the one `PlanSolver` would end up choosing) for both
+classification and zeroing. Since this module's `RecipeNode` can carry
+multiple mutually-exclusive alternate `RecipeOption`s for the same node
+(unlike gw2e's single-recipe-per-node tree), this could zero an
+achievement-bit occurrence living only in a never-chosen sibling option
+- or, worse, the only real occurrence on the actually-solved path -
+purely because that sibling was visited first, letting `PlanSolver`
+pick an artificially-cheapened, objectively worse option. Not reachable
+with the currently-shipped 7 real achievement-bit recipes (each is
+single-option) but latent for any future addition. Fixed to only
+descend through each node's primary option (`node.Recipes[0]`),
+mirroring `InventoryReducer.ReduceNode`'s own existing precedent for the
+identical ambiguity. Regression-tested in
+`AchievementBitDedupPrePassTests` (unit-level: the other option's
+occurrence is left untouched) and end-to-end (a `PlanSolver.Solve` case
+locking in that the honest, cheaper option is still chosen).
+
+VERIFICATION STATE: confirmed by a green build and the full test suite
+(real production-path tests throughout: `RecipeService`,
 `InventoryReducer`, `PlanSolver`, `CraftingTreeBuilder`,
-`DecisionPillPlanner`, `CraftingPlanPipeline`/`MultiItemPlanTests`), plus
-a temporary check (run then discarded, not committed) confirming the
-hand-edited seed JSON deserializes correctly through the real
-`RecipeCacheSerializer`/System.Text.Json loading path, not just via the
-Python tooling used to edit it. Not yet live-verified in-game (no
-in-game achievement-bit scenario was screenshot-loop checked this
-milestone) - a fresh capture of a WvW Infinite Trebuchet Blueprint plan
-alongside a direct Pile of Recycled Trebuchets request would be the
-natural follow-up, matching this file's existing convention for other
-M35/M37 UI changes.
+`DecisionPillPlanner`, `CraftingPlanPipeline`/`MultiItemPlanTests`,
+`PlanResultBuilder`, `CompositeRecipeApiClient`,
+`AchievementBitDedupPrePass`), plus a new `RecipeCacheSerializer`
+test (`RecipeCacheSerializerTests`, mirroring
+`AcquisitionHintServiceTests`' `FindRepoFile` pattern) that loads the
+real `ref/recipes_seed.json`/`ref/recipe_search_seed.json` from disk
+through the production deserialization path on every run, replacing the
+prior "run then discarded, not committed" manual check. Not yet
+live-verified in-game (no in-game achievement-bit scenario was
+screenshot-loop checked this milestone) - a fresh capture of a WvW
+Infinite Trebuchet Blueprint plan alongside a direct Pile of Recycled
+Trebuchets request would be the natural follow-up, matching this file's
+existing convention for other M35/M37 UI changes.
 
 ## 27. Ignore-pill click status label (FIXED in M37, closes #22)
 Item #22 above: clicking IGNORE/IGNORED re-solves correctly but writes
