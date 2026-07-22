@@ -2882,6 +2882,67 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        [Fact]
+        public void NullHomesteadTier_OnMaterialOutput_IsAdmittedRegardlessOfConfiguredTier()
+        {
+            // Documents CURRENT, by-design behavior (not a bug to fix
+            // here): EvaluateVendorOffers only gates on
+            // `offer.HomesteadTier.HasValue` - a null tier is NEVER
+            // excluded, even when OutputItemId is one of the three real
+            // Homestead Refinement materials and even at the most
+            // restrictive tier (0). Null is meant for the 21 one-time
+            // "Upgrade" purchase rows the same merchant pages also sell
+            // (tier-independent by design), NOT for a material-conversion
+            // row - if a future wiki re-scrape ever mistagged a material
+            // row with a null tier, this is exactly the runtime behavior
+            // that would silently readmit it at every tier, reintroducing
+            // the always-max-tier defect PR #57 fixed. The solver itself
+            // has no way to catch that mistake; the data-integrity test
+            // ShippedSeedFile_HomesteadRefinementMaterialRows_AllHaveNonNullTierInRange
+            // (VendorOfferStoreTests) exists precisely because of the
+            // runtime behavior pinned here.
+            var tree = Leaf(Gw2Constants.RefinedHomesteadMetalItemId, 2);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 900, new ItemPrice { ItemId = 900, BuyInstant = 1 } }
+            };
+            var untaggedMaterialOffer = new VendorOffer
+            {
+                OfferId = "untagged-material-offer",
+                OutputItemId = Gw2Constants.RefinedHomesteadMetalItemId,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Item", Id = 900, Count = 1 }
+                },
+                MerchantName = "Homestead Refinement\u2014Metal Forge",
+                Locations = new List<string> { "Hearth's Glow" },
+                HomesteadTier = null
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    Gw2Constants.RefinedHomesteadMetalItemId,
+                    new List<VendorOffer> { untaggedMaterialOffer }
+                }
+            };
+            // Tier 0 is the most restrictive setting - if the gate applied
+            // to this offer, it would still be excluded here.
+            var tierZero = new HomesteadEfficiencyTiers(new Dictionary<int, int>
+            {
+                { Gw2Constants.RefinedHomesteadMetalItemId, 0 }
+            });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(
+                tree, prices, vendorOffers, PriceBasis.InstantBuy,
+                homesteadTiers: tierZero).Plan;
+
+            var step = Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, step.Source);
+            Assert.Equal(2, step.TotalCost);
+        }
+
         // --- M37: Homestead mixed-offer cap-notice gap (KNOWN-ISSUES
         // #24/#25 Section 3.3) - a fix was attempted here (summing each
         // occurrence's own true purchase count when occurrences disagreed
