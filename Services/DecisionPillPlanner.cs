@@ -35,11 +35,18 @@ namespace GW2CraftingHelper.Services
         AchievementBitDeduped
     }
 
-    public struct PillSpec
+    public readonly struct PillSpec
     {
-        public string Text;
-        public AcquisitionSource? Source; // non-null => clickable
-        public PillKind Kind;
+        public readonly string Text;
+        public readonly AcquisitionSource? Source; // non-null => clickable
+        public readonly PillKind Kind;
+
+        public PillSpec(string text, AcquisitionSource? source, PillKind kind)
+        {
+            Text = text;
+            Source = source;
+            Kind = kind;
+        }
     }
 
     /// <summary>
@@ -83,10 +90,10 @@ namespace GW2CraftingHelper.Services
                 // (see PillKind.AchievementBitDeduped's own doc comment).
                 if (node.IsAchievementBitDeduped)
                 {
-                    specs.Add(new PillSpec { Text = "COUNTED ELSEWHERE", Source = null, Kind = PillKind.AchievementBitDeduped });
+                    specs.Add(new PillSpec("COUNTED ELSEWHERE", null, PillKind.AchievementBitDeduped));
                     return specs;
                 }
-                specs.Add(new PillSpec { Text = "HAVE", Source = null, Kind = PillKind.Have });
+                specs.Add(new PillSpec("HAVE", null, PillKind.Have));
                 // A node collapses to Have both for genuine full ownership
                 // (Quantity == 0 via real reduction) and for a manually
                 // "Ignore"-d item (M34-B2b) - only the latter gets the extra
@@ -95,13 +102,13 @@ namespace GW2CraftingHelper.Services
                 // the single plain HAVE pill unchanged.
                 if (node.IsIgnored)
                 {
-                    specs.Add(new PillSpec { Text = "IGNORED", Source = null, Kind = PillKind.Ignore });
+                    specs.Add(new PillSpec("IGNORED", null, PillKind.Ignore));
                 }
                 return specs;
             }
             if (node.Decision == CraftingDecision.Currency)
             {
-                specs.Add(new PillSpec { Text = "CURRENCY", Source = null, Kind = PillKind.Locked });
+                specs.Add(new PillSpec("CURRENCY", null, PillKind.Locked));
                 return specs;
             }
 
@@ -118,13 +125,13 @@ namespace GW2CraftingHelper.Services
                 string badgeText = !string.IsNullOrEmpty(node.AcquisitionBadge)
                     ? node.AcquisitionBadge
                     : "UNKNOWN";
-                specs.Add(new PillSpec { Text = badgeText, Source = null, Kind = PillKind.Locked });
+                specs.Add(new PillSpec(badgeText, null, PillKind.Locked));
                 AppendOwnershipPills(specs, node);
                 return specs;
             }
             if (options.Count == 1)
             {
-                specs.Add(new PillSpec { Text = options[0].text, Source = null, Kind = PillKind.Locked });
+                specs.Add(new PillSpec(options[0].text, null, PillKind.Locked));
                 AppendOwnershipPills(specs, node);
                 return specs;
             }
@@ -141,15 +148,13 @@ namespace GW2CraftingHelper.Services
             foreach (var opt in options)
             {
                 bool selected = opt.src == current;
-                specs.Add(new PillSpec
-                {
-                    Text = opt.text,
+                specs.Add(new PillSpec(
+                    opt.text,
                     // The selected pill is already the active choice -
                     // clicking it would be a no-op re-solve, so it is
                     // rendered non-interactive rather than wired up.
-                    Source = selected ? (AcquisitionSource?)null : opt.src,
-                    Kind = selected ? PillKind.Selected : PillKind.Available
-                });
+                    selected ? (AcquisitionSource?)null : opt.src,
+                    selected ? PillKind.Selected : PillKind.Available));
             }
             AppendOwnershipPills(specs, node);
             return specs;
@@ -172,14 +177,12 @@ namespace GW2CraftingHelper.Services
         {
             if (node.OwnedQuantityUsed > 0)
             {
-                specs.Add(new PillSpec
-                {
-                    Text = $"USING {node.OwnedQuantityUsed} OWNED",
-                    Source = null,
-                    Kind = PillKind.OwnedInfo
-                });
+                specs.Add(new PillSpec(
+                    $"USING {node.OwnedQuantityUsed} OWNED",
+                    null,
+                    PillKind.OwnedInfo));
             }
-            specs.Add(new PillSpec { Text = "IGNORE", Source = null, Kind = PillKind.Ignore });
+            specs.Add(new PillSpec("IGNORE", null, PillKind.Ignore));
         }
     }
 }

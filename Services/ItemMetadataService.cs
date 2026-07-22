@@ -13,6 +13,15 @@ namespace GW2CraftingHelper.Services
         private const int BatchSize = 200;
 
         private readonly IItemApiClient _api;
+
+        // Deliberately unbounded/TTL-less, unlike TradingPostService's
+        // 15-minute price cache: item metadata (name/icon/rarity) does not
+        // go stale the way a market price does, so there is no correctness
+        // reason to ever evict or re-fetch an entry within a module session.
+        // Growth is naturally rate-limited by how many distinct item ids a
+        // player can look up by hand in one session (a few MB even at
+        // 10,000 distinct items), so this mirrors CurrencyMetadataService's
+        // own unbounded cache rather than TradingPostService's TTL pattern.
         private readonly Dictionary<int, ItemMetadata> _cache = new Dictionary<int, ItemMetadata>();
         private readonly Dictionary<int, ItemNameEntry> _seedById;
 

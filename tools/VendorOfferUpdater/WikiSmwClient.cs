@@ -22,10 +22,13 @@ namespace VendorOfferUpdater
 
         private readonly HttpClient _httpClient;
 
-        // Per-query state (set at the start of each QueryVendorItemsAsync call)
-        private QueryOptions _options;
-        private QueryStats _stats;
-        private Stopwatch _stopwatch;
+        // Per-query state (set at the start of each QueryVendorItemsAsync
+        // call; null-forgiven here rather than made nullable since every
+        // other method that reads them is only ever called from within a
+        // QueryVendorItemsAsync call, after this initial assignment).
+        private QueryOptions _options = null!;
+        private QueryStats _stats = null!;
+        private Stopwatch _stopwatch = null!;
         private int _effectiveDelay;
 
         public WikiSmwClient(HttpClient httpClient)
@@ -87,7 +90,7 @@ namespace VendorOfferUpdater
         /// skipped. Safety limits prevent runaway execution.
         /// </summary>
         public async Task<(List<WikiVendorResult> Results, QueryStats Stats)> QueryVendorItemsAsync(
-            string queryCondition = null, QueryOptions options = null, CancellationToken ct = default)
+            string? queryCondition = null, QueryOptions? options = null, CancellationToken ct = default)
         {
             _options = options ?? new QueryOptions();
             _effectiveDelay = _options.DelayBetweenRequestsMs;
@@ -140,7 +143,7 @@ namespace VendorOfferUpdater
 
         private async Task PaginateConditionAsync(
             string baseCondition,
-            string vendorPrefix,
+            string? vendorPrefix,
             int depth,
             List<WikiVendorResult> allResults,
             HashSet<string> seenKeys,
@@ -458,7 +461,7 @@ namespace VendorOfferUpdater
             throw new HttpRequestException($"Failed after {MaxRetries + 1} attempts: {url}");
         }
 
-        private static WikiVendorResult ParseResult(string pageName, JsonElement element)
+        private static WikiVendorResult? ParseResult(string pageName, JsonElement element)
         {
             if (!element.TryGetProperty("printouts", out var printouts))
             {
@@ -569,7 +572,9 @@ namespace VendorOfferUpdater
                 {
                     if (loc.TryGetProperty("fulltext", out var locName))
                     {
-                        result.Locations.Add(locName.GetString());
+                        // "fulltext" is always a JSON string on a page-link
+                        // object, never JSON null.
+                        result.Locations.Add(locName.GetString()!);
                     }
                 }
             }
@@ -658,23 +663,38 @@ namespace VendorOfferUpdater
     public class WikiCostEntry
     {
         public int Value { get; set; }
-        public string Currency { get; set; }
+
+        // Set only when "Has item cost"'s nested "Has item currency"
+        // record is present - absent for some rows (see ConvertToOffer's
+        // no-currency-specified/coins fallback).
+        public string? Currency { get; set; }
     }
 
     public class WikiVendorResult
     {
-        public string PageName { get; set; }
+        // Always set at construction (ParseResult's one object
+        // initializer), but nullable rather than defaulted to "": this
+        // type round-trips through the wiki_vendor_cache.json cache
+        // (JsonSerializer.Serialize/Deserialize with default options, which
+        // write/read an explicit null verbatim), and MergeWikiCache's own
+        // "?? string.Empty" coalescing below already treats a deserialized
+        // PageName as possibly null.
+        public string? PageName { get; set; }
         public int GameId { get; set; }
-        public string ItemName { get; set; }
+
+        // The following are all set conditionally, after construction,
+        // only when their SMW printout is present on the page - each stays
+        // null when the wiki row has no data for that property.
+        public string? ItemName { get; set; }
         public int? OutputQuantity { get; set; }
         public List<WikiCostEntry> CostEntries { get; set; } = new List<WikiCostEntry>();
-        public string MerchantName { get; set; }
+        public string? MerchantName { get; set; }
         public List<string> Locations { get; set; } = new List<string>();
         public int? DailyCap { get; set; }
         public int? WeeklyCap { get; set; }
 
         // M37 (KNOWN-ISSUES #24): raw "Has requirement" text, or null if
         // the row has none. See HomesteadTierResolver.
-        public string Requirement { get; set; }
+        public string? Requirement { get; set; }
     }
 }

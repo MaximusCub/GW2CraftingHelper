@@ -53,11 +53,18 @@ namespace GW2CraftingHelper.Services
             return width > 20 ? width : 20;
         }
 
-        public struct TreeColumnEdges
+        public readonly struct TreeColumnEdges
         {
-            public int PillColX;
-            public int CostRightEdge;
-            public int NameMaxWidth;
+            public readonly int PillColX;
+            public readonly int CostRightEdge;
+            public readonly int NameMaxWidth;
+
+            public TreeColumnEdges(int pillColX, int costRightEdge, int nameMaxWidth)
+            {
+                PillColX = pillColX;
+                CostRightEdge = costRightEdge;
+                NameMaxWidth = nameMaxWidth;
+            }
         }
 
         /// <summary>
@@ -84,12 +91,7 @@ namespace GW2CraftingHelper.Services
             int nameAvailWidth = nameMaxWidth - qtyPrefixWidth;
             if (nameAvailWidth < 10) nameAvailWidth = 10;
 
-            return new TreeColumnEdges
-            {
-                PillColX = pillColX,
-                CostRightEdge = costRightEdge,
-                NameMaxWidth = nameAvailWidth
-            };
+            return new TreeColumnEdges(pillColX, costRightEdge, nameAvailWidth);
         }
 
         /// <summary>
@@ -136,10 +138,16 @@ namespace GW2CraftingHelper.Services
             return count;
         }
 
-        public struct CostTileGeometry
+        public readonly struct CostTileGeometry
         {
-            public int TileWidth;
-            public int StartX;
+            public readonly int TileWidth;
+            public readonly int StartX;
+
+            public CostTileGeometry(int tileWidth, int startX)
+            {
+                TileWidth = tileWidth;
+                StartX = startX;
+            }
         }
 
         /// <summary>
@@ -155,18 +163,14 @@ namespace GW2CraftingHelper.Services
         {
             if (tileCount <= 0)
             {
-                return new CostTileGeometry { TileWidth = 0, StartX = 0 };
+                return new CostTileGeometry(0, 0);
             }
 
             int tileWidth = (panelWidth - totalMargin) / tileCount;
             if (tileWidth < minTileWidth) tileWidth = minTileWidth;
             int rowContentWidth = tileWidth * tileCount;
 
-            return new CostTileGeometry
-            {
-                TileWidth = tileWidth,
-                StartX = CenterX(panelWidth, rowContentWidth)
-            };
+            return new CostTileGeometry(tileWidth, CenterX(panelWidth, rowContentWidth));
         }
     }
 }
