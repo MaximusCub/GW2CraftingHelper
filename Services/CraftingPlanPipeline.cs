@@ -99,22 +99,11 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
-            // Step 4: Query vendor offers
-            progress?.Report(new PlanStatus { Message = "Looking up vendor offers..." });
-            sw.Restart();
-            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
-            if (_vendorOfferStore != null)
-            {
-                vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
-            }
-            sw.Stop();
-            timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
-
-            // Vendor offers can charge ITEMS that appear nowhere in the
-            // recipe tree (e.g. Gift of Glory costs 250x Shard of Glory).
-            // Without their prices the solver silently skips the offer as
-            // unpriceable, so fetch the missing cost-item prices and merge.
-            prices = await AugmentWithVendorCostPricesAsync(prices, vendorOffers, ct);
+            // Step 4: Query vendor offers, then price any vendor-only cost items
+            var vendorContext = await FetchPricedVendorContextAsync(
+                allItemIds, prices, progress, sw, timingLog, ct);
+            var vendorOffers = vendorContext.VendorOffers;
+            prices = vendorContext.Prices;
 
             // Step 6: Solve
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
@@ -150,32 +139,9 @@ namespace GW2CraftingHelper.Services
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
             // Step 8: Await the currency name/icon metadata fetch started
-            // above. Optional dependency: null when not wired up (e.g. the
-            // CLI harness), in which case CurrencyCost rows stay text-only
-            // via the offline Gw2Constants fallback (see
-            // PlanViewModelBuilder). Any failure besides genuine caller
-            // cancellation is swallowed here too, consistent with the
-            // service's own contract of returning an empty result.
-            progress?.Report(new PlanStatus { Message = "Fetching currency details..." });
-            sw.Restart();
-            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null;
-            if (currencyTask != null)
-            {
-                try
-                {
-                    currencyMetadata = await currencyTask;
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception)
-                {
-                    currencyMetadata = null;
-                }
-            }
-            sw.Stop();
-            timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
+            // above - see AwaitCurrencyMetadataOrNullAsync's own doc comment.
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata =
+                await AwaitCurrencyMetadataOrNullAsync(currencyTask, progress, sw, timingLog, ct);
 
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
@@ -261,22 +227,11 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
-            // Step 4: Query vendor offers
-            progress?.Report(new PlanStatus { Message = "Looking up vendor offers..." });
-            sw.Restart();
-            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
-            if (_vendorOfferStore != null)
-            {
-                vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
-            }
-            sw.Stop();
-            timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
-
-            // Vendor offers can charge ITEMS that appear nowhere in the
-            // recipe tree (e.g. Gift of Glory costs 250x Shard of Glory).
-            // Without their prices the solver silently skips the offer as
-            // unpriceable, so fetch the missing cost-item prices and merge.
-            prices = await AugmentWithVendorCostPricesAsync(prices, vendorOffers, ct);
+            // Step 4: Query vendor offers, then price any vendor-only cost items
+            var vendorContext = await FetchPricedVendorContextAsync(
+                allItemIds, prices, progress, sw, timingLog, ct);
+            var vendorOffers = vendorContext.VendorOffers;
+            prices = vendorContext.Prices;
 
             // M34-B2a #3: gw2e's "Value Own Materials" force-buy pre-pass -
             // only runs when the setting is Valued AND a snapshot actually
@@ -396,60 +351,14 @@ namespace GW2CraftingHelper.Services
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
             // Step 9: Await the currency name/icon metadata fetch started
-            // above. Optional dependency: null when not wired up (e.g. the
-            // CLI harness), in which case CurrencyCost rows stay text-only
-            // via the offline Gw2Constants fallback (see
-            // PlanViewModelBuilder). Any failure besides genuine caller
-            // cancellation is swallowed here too, consistent with the
-            // service's own contract of returning an empty result.
-            progress?.Report(new PlanStatus { Message = "Fetching currency details..." });
-            sw.Restart();
-            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null;
-            if (currencyTask != null)
-            {
-                try
-                {
-                    currencyMetadata = await currencyTask;
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception)
-                {
-                    currencyMetadata = null;
-                }
-            }
-            sw.Stop();
-            timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
+            // above - see AwaitCurrencyMetadataOrNullAsync's own doc comment.
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata =
+                await AwaitCurrencyMetadataOrNullAsync(currencyTask, progress, sw, timingLog, ct);
 
-            // Step 10: Fetch learned recipe IDs (if permission available).
-            // KNOWN-ISSUES api-degradation F4: any non-cancellation failure
-            // degrades to null (the same as never having permission),
-            // mirroring the currencyTask try/catch above - PlanResultBuilder
-            // already treats null learnedRecipeIds as a supported degraded
-            // state, so a transient failure here must not discard an
-            // otherwise fully-successful, fully-priced plan.
-            progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
-            sw.Restart();
-            ISet<int> learnedRecipeIds = null;
-            if (_accountRecipeClient != null && _accountRecipeClient.HasRequiredPermission())
-            {
-                try
-                {
-                    learnedRecipeIds = await _accountRecipeClient.GetLearnedRecipeIdsAsync(ct);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception)
-                {
-                    learnedRecipeIds = null;
-                }
-            }
-            sw.Stop();
-            timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");
+            // Step 10: Fetch learned recipe IDs (if permission available) -
+            // see FetchLearnedRecipeIdsAsync's own doc comment.
+            ISet<int> learnedRecipeIds =
+                await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, ct);
 
             // Step 11: Build structured result
             progress?.Report(new PlanStatus { Message = "Building final result..." });
@@ -502,14 +411,9 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
 
-            // Prepend timing log to debug entries from PlanResultBuilder
-            if (result.DebugLog == null)
-            {
-                result.DebugLog = new List<string>();
-            }
-            result.DebugLog.InsertRange(0, timingLog);
-            var summary = PlanTimingAnalyzer.Summarize(timingLog);
-            result.DebugLog.InsertRange(timingLog.Count, summary);
+            // Prepend timing log to debug entries from PlanResultBuilder -
+            // see FinishTimingLog's own doc comment.
+            FinishTimingLog(result, timingLog);
 
             return result;
         }
@@ -650,18 +554,11 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
-            // Step 4: Query vendor offers
-            progress?.Report(new PlanStatus { Message = "Looking up vendor offers..." });
-            sw.Restart();
-            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
-            if (_vendorOfferStore != null)
-            {
-                vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
-            }
-            sw.Stop();
-            timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
-
-            prices = await AugmentWithVendorCostPricesAsync(prices, vendorOffers, ct);
+            // Step 4: Query vendor offers, then price any vendor-only cost items
+            var vendorContext = await FetchPricedVendorContextAsync(
+                allItemIds, prices, progress, sw, timingLog, ct);
+            var vendorOffers = vendorContext.VendorOffers;
+            prices = vendorContext.Prices;
 
             // M34-B2a #3: same force-buy pre-pass as the single-item path,
             // applied to the WHOLE wrapper batch at once.
@@ -753,54 +650,15 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
-            progress?.Report(new PlanStatus { Message = "Fetching currency details..." });
-            sw.Restart();
-            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null;
-            if (currencyTask != null)
-            {
-                try
-                {
-                    currencyMetadata = await currencyTask;
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception)
-                {
-                    currencyMetadata = null;
-                }
-            }
-            sw.Stop();
-            timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
+            // Await the currency name/icon metadata fetch started above -
+            // see AwaitCurrencyMetadataOrNullAsync's own doc comment.
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata =
+                await AwaitCurrencyMetadataOrNullAsync(currencyTask, progress, sw, timingLog, ct);
 
-            // Step 10: Fetch learned recipe IDs (if permission available).
-            // KNOWN-ISSUES api-degradation F4: any non-cancellation failure
-            // degrades to null (the same as never having permission),
-            // mirroring the currencyTask try/catch above - PlanResultBuilder
-            // already treats null learnedRecipeIds as a supported degraded
-            // state, so a transient failure here must not discard an
-            // otherwise fully-successful, fully-priced plan.
-            progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
-            sw.Restart();
-            ISet<int> learnedRecipeIds = null;
-            if (_accountRecipeClient != null && _accountRecipeClient.HasRequiredPermission())
-            {
-                try
-                {
-                    learnedRecipeIds = await _accountRecipeClient.GetLearnedRecipeIdsAsync(ct);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception)
-                {
-                    learnedRecipeIds = null;
-                }
-            }
-            sw.Stop();
-            timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");
+            // Step 10: Fetch learned recipe IDs (if permission available) -
+            // see FetchLearnedRecipeIdsAsync's own doc comment.
+            ISet<int> learnedRecipeIds =
+                await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, ct);
 
             // Step 11: Build structured result
             progress?.Report(new PlanStatus { Message = "Building final result..." });
@@ -847,13 +705,8 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
 
-            if (result.DebugLog == null)
-            {
-                result.DebugLog = new List<string>();
-            }
-            result.DebugLog.InsertRange(0, timingLog);
-            var summary = PlanTimingAnalyzer.Summarize(timingLog);
-            result.DebugLog.InsertRange(timingLog.Count, summary);
+            // See FinishTimingLog's own doc comment.
+            FinishTimingLog(result, timingLog);
 
             return result;
         }
@@ -939,6 +792,159 @@ namespace GW2CraftingHelper.Services
                 $"Local re-solve with {overrides?.Count ?? 0} override(s), {ignoredItemIds?.Count ?? 0} ignored item(s)");
 
             return result;
+        }
+
+        /// <summary>
+        /// Return shape for FetchPricedVendorContextAsync - the vendor
+        /// offers queried for a request's item ids, paired with the price
+        /// dictionary after merging in any vendor-only cost-item prices.
+        /// </summary>
+        private readonly struct PricedVendorContext
+        {
+            public PricedVendorContext(
+                IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
+                IReadOnlyDictionary<int, ItemPrice> prices)
+            {
+                VendorOffers = vendorOffers;
+                Prices = prices;
+            }
+
+            public IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> VendorOffers { get; }
+
+            public IReadOnlyDictionary<int, ItemPrice> Prices { get; }
+        }
+
+        /// <summary>
+        /// Queries vendor offers for the given item ids (Step 4 of every
+        /// Generate*Async overload) and folds in TP prices for any vendor
+        /// cost-line items not already covered by <paramref name="prices"/>
+        /// - see AugmentWithVendorCostPricesAsync's own doc comment for why
+        /// that augmentation is needed. Vendor offers can charge ITEMS that
+        /// appear nowhere in the recipe tree (e.g. Gift of Glory costs 250x
+        /// Shard of Glory); without their prices the solver silently skips
+        /// the offer as unpriceable. Shared verbatim by GenerateAsync,
+        /// GenerateStructuredAsync, and GenerateStructuredMultiAsync.
+        /// </summary>
+        private async Task<PricedVendorContext> FetchPricedVendorContextAsync(
+            HashSet<int> allItemIds,
+            IReadOnlyDictionary<int, ItemPrice> prices,
+            IProgress<PlanStatus> progress,
+            Stopwatch sw,
+            List<string> timingLog,
+            CancellationToken ct)
+        {
+            progress?.Report(new PlanStatus { Message = "Looking up vendor offers..." });
+            sw.Restart();
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
+            if (_vendorOfferStore != null)
+            {
+                vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
+            }
+            sw.Stop();
+            timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
+
+            var mergedPrices = await AugmentWithVendorCostPricesAsync(prices, vendorOffers, ct);
+            return new PricedVendorContext(vendorOffers, mergedPrices);
+        }
+
+        /// <summary>
+        /// Awaits the decorative currency-metadata fetch kicked off earlier
+        /// (in parallel with item metadata), reporting progress and timing
+        /// exactly like every other pipeline step. Optional dependency: null
+        /// currencyTask (not wired up, e.g. the CLI harness) short-circuits
+        /// to a null result, in which case CurrencyCost rows stay text-only
+        /// via the offline Gw2Constants fallback (see PlanViewModelBuilder).
+        /// Any failure besides genuine caller cancellation is swallowed here
+        /// too, consistent with the service's own contract of returning an
+        /// empty result. Shared verbatim by GenerateAsync,
+        /// GenerateStructuredAsync, and GenerateStructuredMultiAsync.
+        /// </summary>
+        private static async Task<IReadOnlyDictionary<int, CurrencyMetadata>> AwaitCurrencyMetadataOrNullAsync(
+            Task<IReadOnlyDictionary<int, CurrencyMetadata>> currencyTask,
+            IProgress<PlanStatus> progress,
+            Stopwatch sw,
+            List<string> timingLog,
+            CancellationToken ct)
+        {
+            progress?.Report(new PlanStatus { Message = "Fetching currency details..." });
+            sw.Restart();
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null;
+            if (currencyTask != null)
+            {
+                try
+                {
+                    currencyMetadata = await currencyTask;
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    currencyMetadata = null;
+                }
+            }
+            sw.Stop();
+            timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
+            return currencyMetadata;
+        }
+
+        /// <summary>
+        /// Fetches learned recipe ids (if the account client is wired up and
+        /// has permission), reporting progress and timing exactly like every
+        /// other pipeline step. KNOWN-ISSUES api-degradation F4: any
+        /// non-cancellation failure degrades to null (the same as never
+        /// having permission), mirroring AwaitCurrencyMetadataOrNullAsync's
+        /// own try/catch shape - PlanResultBuilder already treats null
+        /// learnedRecipeIds as a supported degraded state, so a transient
+        /// failure here must not discard an otherwise fully-successful,
+        /// fully-priced plan. Shared verbatim by GenerateStructuredAsync and
+        /// GenerateStructuredMultiAsync.
+        /// </summary>
+        private async Task<ISet<int>> FetchLearnedRecipeIdsAsync(
+            IProgress<PlanStatus> progress,
+            Stopwatch sw,
+            List<string> timingLog,
+            CancellationToken ct)
+        {
+            progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
+            sw.Restart();
+            ISet<int> learnedRecipeIds = null;
+            if (_accountRecipeClient != null && _accountRecipeClient.HasRequiredPermission())
+            {
+                try
+                {
+                    learnedRecipeIds = await _accountRecipeClient.GetLearnedRecipeIdsAsync(ct);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    learnedRecipeIds = null;
+                }
+            }
+            sw.Stop();
+            timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");
+            return learnedRecipeIds;
+        }
+
+        /// <summary>
+        /// Prepends the timing log (plus its PlanTimingAnalyzer summary) to
+        /// <paramref name="result"/>.DebugLog, initializing the list if
+        /// PlanResultBuilder left it null. Shared verbatim by
+        /// GenerateStructuredAsync and GenerateStructuredMultiAsync.
+        /// </summary>
+        private static void FinishTimingLog(CraftingPlanResult result, List<string> timingLog)
+        {
+            if (result.DebugLog == null)
+            {
+                result.DebugLog = new List<string>();
+            }
+            result.DebugLog.InsertRange(0, timingLog);
+            var summary = PlanTimingAnalyzer.Summarize(timingLog);
+            result.DebugLog.InsertRange(timingLog.Count, summary);
         }
 
         /// <summary>
