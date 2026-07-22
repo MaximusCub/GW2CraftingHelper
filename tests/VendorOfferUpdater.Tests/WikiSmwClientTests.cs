@@ -153,7 +153,7 @@ namespace VendorOfferUpdater.Tests
                 "[[Sells item::+]]", FastOptions());
 
             Assert.Single(results);
-            // Must be null (uncapped), never 0 - PlanSolver.FinalizeVendorBatches
+            // Must be null (uncapped), never 0 - VendorBatchSolver.FinalizeVendorBatches
             // treats HasValue && Value > 0 as "has a real cap", so a wrongly-mapped
             // 0 would be silently ignored, while a wrongly-mapped null-that-should-
             // be-a-real-value would silently mask a real cap.

@@ -115,7 +115,7 @@ namespace GW2CraftingHelper.Services
         /// VendorOfferCurrencyCostLinesPerBatch/VendorOfferOutputCount,
         /// which are only populated when every tree occurrence merged into
         /// that step used the identical winning offer (see
-        /// PlanSolver.FinalizeVendorBatches) - null/0 otherwise (mixed
+        /// VendorBatchSolver.FinalizeVendorBatches) - null/0 otherwise (mixed
         /// offers, or a non-vendor row), in which case this returns null
         /// rather than reviving the old misleading average: gw2efficiency
         /// itself never shows a per-unit currency price at all (docs/

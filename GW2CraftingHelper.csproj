@@ -88,6 +88,7 @@
     <Compile Include="Models\CraftingPlan.cs" />
     <Compile Include="Models\TimegatedItem.cs" />
     <Compile Include="Services\PlanSolver.cs" />
+    <Compile Include="Services\VendorBatchSolver.cs" />
     <Compile Include="Services\StatusUpdateGuard.cs" />
     <Compile Include="Services\SnapshotEpochGuard.cs" />
     <Compile Include="Services\SnapshotCommitGate.cs" />
