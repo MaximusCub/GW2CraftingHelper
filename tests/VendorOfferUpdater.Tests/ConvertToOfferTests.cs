@@ -34,6 +34,7 @@ namespace VendorOfferUpdater.Tests
             List<string> locations = null,
             int? dailyCap = null,
             int? weeklyCap = null,
+            int? seasonalCap = null,
             string requirement = null)
         {
             return new WikiVendorResult
@@ -45,6 +46,7 @@ namespace VendorOfferUpdater.Tests
                 Locations = locations ?? new List<string>(),
                 DailyCap = dailyCap,
                 WeeklyCap = weeklyCap,
+                SeasonalCap = seasonalCap,
                 Requirement = requirement
             };
         }
@@ -223,6 +225,7 @@ namespace VendorOfferUpdater.Tests
             Assert.NotNull(offer);
             Assert.Null(offer.DailyCap);
             Assert.Null(offer.WeeklyCap);
+            Assert.Null(offer.SeasonalCap);
         }
 
         [Fact]
@@ -255,6 +258,62 @@ namespace VendorOfferUpdater.Tests
             // offer that gains a real WeeklyCap must change OfferId, since the
             // hasher folds dailyCap/weeklyCap into the hashed string.
             Assert.NotEqual(uncapped.OfferId, capped.OfferId);
+        }
+
+        // Astral Acclaim package (KNOWN-ISSUES #28): SeasonalCap threading,
+        // mirroring the daily/weekly cases above.
+
+        [Fact]
+        public async Task SeasonalCapData_ThreadedIntoOffer()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(gameId: 19675, merchantName: "Wizard's Vault", seasonalCap: 20);
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Equal(20, offer.SeasonalCap);
+            // Daily/weekly must stay null - this offer has no such cap.
+            Assert.Null(offer.DailyCap);
+            Assert.Null(offer.WeeklyCap);
+        }
+
+        [Fact]
+        public async Task SeasonalCapData_ChangesOfferIdVersusNoCap()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var uncapped = Program.ConvertToOffer(
+                MakeResult(gameId: 19675, merchantName: "Wizard's Vault"),
+                helper, new Dictionary<string, int>());
+            var capped = Program.ConvertToOffer(
+                MakeResult(gameId: 19675, merchantName: "Wizard's Vault", seasonalCap: 20),
+                helper, new Dictionary<string, int>());
+
+            Assert.NotNull(uncapped);
+            Assert.NotNull(capped);
+            // This is the exact task-named case: the Wizard's Vault Mystic
+            // Clover row gaining a real SeasonalCap must change OfferId, since
+            // the hasher folds seasonalCap into the hashed string.
+            Assert.NotEqual(uncapped.OfferId, capped.OfferId);
+        }
+
+        [Fact]
+        public async Task SeasonalCapData_DoesNotChangeOfferIdWhenDailyWeeklyAlsoDiffer()
+        {
+            // Sanity check that SeasonalCap and DailyCap/WeeklyCap are
+            // independent hash inputs, not aliases of one another.
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var withDailyOnly = Program.ConvertToOffer(
+                MakeResult(dailyCap: 5), helper, new Dictionary<string, int>());
+            var withSeasonalOnly = Program.ConvertToOffer(
+                MakeResult(seasonalCap: 5), helper, new Dictionary<string, int>());
+
+            Assert.NotNull(withDailyOnly);
+            Assert.NotNull(withSeasonalOnly);
+            Assert.NotEqual(withDailyOnly.OfferId, withSeasonalOnly.OfferId);
         }
 
         // M37 (KNOWN-ISSUES #24): HomesteadTier wiring end-to-end through

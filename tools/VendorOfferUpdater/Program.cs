@@ -692,7 +692,8 @@ namespace VendorOfferUpdater
                 offerLocations,
                 result.DailyCap,
                 result.WeeklyCap,
-                homesteadTier);
+                homesteadTier,
+                result.SeasonalCap);
 
             return new VendorOffer
             {
@@ -704,7 +705,8 @@ namespace VendorOfferUpdater
                 Locations = offerLocations,
                 DailyCap = result.DailyCap,
                 WeeklyCap = result.WeeklyCap,
-                HomesteadTier = homesteadTier
+                HomesteadTier = homesteadTier,
+                SeasonalCap = result.SeasonalCap
             };
         }
 

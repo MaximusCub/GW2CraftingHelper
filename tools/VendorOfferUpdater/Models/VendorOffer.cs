@@ -28,6 +28,13 @@ namespace VendorOfferUpdater.Models
         public int? DailyCap { get; set; }
         public int? WeeklyCap { get; set; }
 
+        // Astral Acclaim package: Wizard's Vault seasonal purchase cap
+        // (resets each Vault season), or null for every non-Vault offer.
+        // See Models/VendorOffer.cs (the runtime copy) for the full
+        // deferred-consumption note - this field is additive/seed-only in
+        // this tool; nothing here interprets it.
+        public int? SeasonalCap { get; set; }
+
         // M37 (KNOWN-ISSUES #24): Homestead Refinement efficiency tier
         // (0/1/2) this offer row corresponds to, or null for a non-
         // Homestead-Refinement offer. See ConvertToOffer/HomesteadTierResolver.

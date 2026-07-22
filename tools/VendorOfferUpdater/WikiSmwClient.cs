@@ -42,11 +42,24 @@ namespace VendorOfferUpdater
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
                 .Select(c => c.ToString()).ToArray();
 
-        // Note: the wiki also exposes "Has character purchase cap",
-        // "Has total purchase cap", and "Has seasonal purchase cap" on the same
-        // per-offer subobjects, but the module has no consuming model for those
-        // (Models/TimegatedItem.cs's TimegatedCapType is Daily/Weekly only) -
-        // deliberately not scraped here. See KNOWN-ISSUES.md item 28.
+        // Note: the wiki also exposes "Has character purchase cap" and
+        // "Has total purchase cap" on the same per-offer subobjects, but the
+        // module has no consuming model for either (Models/TimegatedItem.cs's
+        // TimegatedCapType is Daily/Weekly only, and the solver has no
+        // account/character concept at all) - deliberately not scraped here.
+        // See KNOWN-ISSUES.md item 28.
+        //
+        // "Has seasonal purchase cap" (Astral Acclaim package): IS scraped
+        // below - live-confirmed exclusively on the "Wizard's Vault" /
+        // "Wizard's Vault/Historical Astral Rewards" / "Wizard's Vault/Legacy
+        // Rewards" subobjects (a wiki-wide `[[Has seasonal purchase cap::+]]`
+        // probe returned 29 rows, all three under one of those page names -
+        // no other vendor on the wiki uses this property). The parsed value
+        // is threaded into VendorOffer.SeasonalCap and the hasher, but the
+        // runtime solver (PlanSolver/TimegatedItem) deliberately does NOT
+        // consume it yet - TimegatedCapType has no Seasonal member. Wiring
+        // that in is a later package (see KNOWN-ISSUES.md item 28 DEFERRED
+        // note / M38 WP-15).
         //
         // M37 (KNOWN-ISSUES #24): "Has requirement" is populated by the
         // {{vendor table row|requirement=...}} parameter (confirmed live via
@@ -68,6 +81,7 @@ namespace VendorOfferUpdater
             "|?Located in" +
             "|?Has daily purchase cap" +
             "|?Has weekly purchase cap" +
+            "|?Has seasonal purchase cap" +
             "|?Has requirement";
 
         /// <summary>
@@ -83,6 +97,8 @@ namespace VendorOfferUpdater
         ///   Located in           - location pages
         ///   Has daily purchase cap  - daily purchase limit (absent = uncapped)
         ///   Has weekly purchase cap - weekly purchase limit (absent = uncapped)
+        ///   Has seasonal purchase cap - Wizard's Vault seasonal purchase limit
+        ///                               (absent = uncapped or not a Vault offer)
         ///
         /// The wiki SMW API limits pagination to ~5500 results per query condition.
         /// When that limit is hit, the query is automatically partitioned by vendor
@@ -509,6 +525,15 @@ namespace VendorOfferUpdater
                 result.WeeklyCap = weeklyCap[0].GetInt32();
             }
 
+            // Has seasonal purchase cap - same empty-array-means-uncapped shape.
+            // Astral Acclaim package: live-confirmed exclusively on Wizard's
+            // Vault subobjects (see the PrintoutSuffix doc comment above).
+            if (printouts.TryGetProperty("Has seasonal purchase cap", out var seasonalCap) &&
+                seasonalCap.GetArrayLength() > 0)
+            {
+                result.SeasonalCap = seasonalCap[0].GetInt32();
+            }
+
             // Has requirement (M37, KNOWN-ISSUES #24) - a _txt property, so
             // its array entries are plain strings (e.g. "one [[Homestead
             // Upgrade: Ore Trade Efficiency]]"), not page-link objects.
@@ -692,6 +717,11 @@ namespace VendorOfferUpdater
         public List<string> Locations { get; set; } = new List<string>();
         public int? DailyCap { get; set; }
         public int? WeeklyCap { get; set; }
+
+        // Astral Acclaim package: Wizard's Vault seasonal purchase cap, or
+        // null if the row has none (or isn't a Wizard's Vault offer). See
+        // the PrintoutSuffix doc comment above.
+        public int? SeasonalCap { get; set; }
 
         // M37 (KNOWN-ISSUES #24): raw "Has requirement" text, or null if
         // the row has none. See HomesteadTierResolver.
