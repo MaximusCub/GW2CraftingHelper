@@ -2243,7 +2243,7 @@ future cleanup wave - not suppressed and not fixed in this change:
 None of this is a behavior change - severity stays warning, never error, per
 WP-02's design; only the suppression list and this doc entry changed.
 
-## 33. Dead live-wiki vendor-offer resolver removed (M38 WP-10)
+## 34. Dead live-wiki vendor-offer resolver removed (M38 WP-10)
 `Services/VendorOfferResolver.cs` (a rate-limited, retrying, concurrency-
 bounded live wiki-lookup client), `Services/IWikiVendorClient.cs`,
 `Services/WikiLookupOptions.cs`, and `Models/ResolveResult.cs` - plus their
