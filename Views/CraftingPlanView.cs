@@ -2911,9 +2911,13 @@ namespace GW2CraftingHelper.Views
             }
 
             string sourceTag = ShoppingSourceTag(row);
-            Panel tagPanel = !string.IsNullOrEmpty(sourceTag)
-                ? LabelHelpers.CreateSmallTag(rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9)
-                : null;
+            Panel tagPanel = null;
+            if (!string.IsNullOrEmpty(sourceTag))
+            {
+                GetPillColors(PillKind.Locked, false, out Color tagBorder, out Color tagFill);
+                tagPanel = LabelHelpers.CreateSmallTag(
+                    rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9, tagBorder, tagFill);
+            }
 
             var qtyLabel = new Label()
             {
@@ -4140,10 +4144,7 @@ namespace GW2CraftingHelper.Views
         /// THIS specific Ignore pill is the active/"IGNORED" state, i.e.
         /// node.IsIgnored) - ignored for every other kind.
         /// </summary>
-        // internal (was private): Views/Rendering/LabelHelpers.CreateSmallTag
-        // (M38 WP-21) reuses the Locked pill's colors and needs to call back
-        // into this class - no logic change, accessibility only.
-        internal static void GetPillColors(PillKind kind, bool isIgnoreActive, out Color border, out Color fill)
+        private static void GetPillColors(PillKind kind, bool isIgnoreActive, out Color border, out Color fill)
         {
             switch (kind)
             {

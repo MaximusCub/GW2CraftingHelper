@@ -1,7 +1,5 @@
 using Blish_HUD;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
 
@@ -15,7 +13,12 @@ namespace GW2CraftingHelper.Views.Rendering
     // static -> internal static, no logic changes. Callers in
     // CraftingPlanView now qualify as LabelHelpers.CreateRowDivider /
     // LabelHelpers.CreateRightAlignedLabel / LabelHelpers.CreateSmallTag /
-    // LabelHelpers.EllipsizeToWidth.
+    // LabelHelpers.EllipsizeToWidth. This class takes no dependency back on
+    // CraftingPlanView (CreateSmallTag's pill colors are resolved by the
+    // caller and passed in) - review fix (WP-21 findings pass): the initial
+    // move had CreateSmallTag call CraftingPlanView.GetPillColors directly,
+    // which was a reverse Rendering -> CraftingPlanView edge; removed so
+    // this namespace stays a true leaf.
     internal static class LabelHelpers
     {
         // Only consumer is CreateRowDivider below - moved alongside it from
@@ -100,16 +103,18 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// Small grey informational tag (reuses the tree's Locked pill
-        /// styling) - used for the shopping list's source tag and anywhere
-        /// else a short non-interactive label needs pill chrome.
+        /// Small grey informational tag - used for the shopping list's
+        /// source tag and anywhere else a short non-interactive label needs
+        /// pill chrome. border/fill are supplied by the caller (typically
+        /// the tree's Locked pill styling, via CraftingPlanView.GetPillColors)
+        /// so this helper never has to call back into the view it was
+        /// extracted from.
         /// </summary>
-        internal static Panel CreateSmallTag(Panel parent, string text, int x, int y)
+        internal static Panel CreateSmallTag(Panel parent, string text, int x, int y, Color border, Color fill)
         {
             var font = GameService.Content.DefaultFont12;
             int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
             int width = textWidth + 12;
-            CraftingPlanView.GetPillColors(PillKind.Locked, false, out Color border, out Color fill);
 
             var outer = new Panel()
             {
