@@ -14,7 +14,10 @@ namespace VendorOfferUpdater
     {
         private const string CurrenciesUrl = "https://api.guildwars2.com/v2/currencies";
         private readonly HttpClient _httpClient;
-        private Dictionary<string, int> _currencyNameToId;
+
+        // Null until LoadCurrenciesAsync completes; ResolveCurrencyId
+        // already null-guards every access below.
+        private Dictionary<string, int>? _currencyNameToId;
 
         public Gw2ApiHelper(HttpClient httpClient)
         {
@@ -30,7 +33,14 @@ namespace VendorOfferUpdater
 
             // First get all IDs
             var idsResponse = await _httpClient.GetStringAsync(CurrenciesUrl);
-            var ids = JsonSerializer.Deserialize<List<int>>(idsResponse);
+
+            // Deserialize<List<int>> can only return null if the response
+            // body is the literal JSON token "null" - a malformed/empty
+            // response the GW2 API never legitimately sends for this
+            // endpoint. Fail loudly rather than let ids.Count NRE below.
+            var ids = JsonSerializer.Deserialize<List<int>>(idsResponse)
+                ?? throw new InvalidOperationException(
+                    "GW2 API currencies response deserialized to null.");
 
             // Fetch in batches of 200
             _currencyNameToId = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -45,7 +55,9 @@ namespace VendorOfferUpdater
 
                 foreach (var currency in currencies.RootElement.EnumerateArray())
                 {
-                    var name = currency.GetProperty("name").GetString();
+                    // The GW2 API's currencies endpoint always returns
+                    // "name" as a JSON string, never JSON null.
+                    var name = currency.GetProperty("name").GetString()!;
                     var id = currency.GetProperty("id").GetInt32();
                     _currencyNameToId[name] = id;
                 }
@@ -58,7 +70,7 @@ namespace VendorOfferUpdater
         /// Resolves a wiki currency name to a GW2 API currency ID.
         /// Returns null if the currency name is not recognized.
         /// </summary>
-        public int? ResolveCurrencyId(string currencyName)
+        public int? ResolveCurrencyId(string? currencyName)
         {
             if (string.IsNullOrEmpty(currencyName))
             {

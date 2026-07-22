@@ -19,11 +19,18 @@ namespace GW2CraftingHelper.Services
         public const int EachMinWidth = 110;
         public const int ColumnGap = 20;
 
-        public struct ColumnEdges
+        public readonly struct ColumnEdges
         {
-            public int TotalRightEdge;
-            public int EachRightEdge;
-            public int QtyRightEdge;
+            public readonly int TotalRightEdge;
+            public readonly int EachRightEdge;
+            public readonly int QtyRightEdge;
+
+            public ColumnEdges(int totalRightEdge, int eachRightEdge, int qtyRightEdge)
+            {
+                TotalRightEdge = totalRightEdge;
+                EachRightEdge = eachRightEdge;
+                QtyRightEdge = qtyRightEdge;
+            }
         }
 
         /// <summary>
@@ -43,12 +50,7 @@ namespace GW2CraftingHelper.Services
             int eachRightEdge = totalRightEdge - totalColWidth - ColumnGap;
             int qtyRightEdge = eachRightEdge - eachColWidth - ColumnGap;
 
-            return new ColumnEdges
-            {
-                TotalRightEdge = totalRightEdge,
-                EachRightEdge = eachRightEdge,
-                QtyRightEdge = qtyRightEdge
-            };
+            return new ColumnEdges(totalRightEdge, eachRightEdge, qtyRightEdge);
         }
 
         /// <summary>

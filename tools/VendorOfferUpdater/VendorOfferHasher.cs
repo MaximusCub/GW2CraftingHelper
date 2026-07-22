@@ -13,9 +13,9 @@ namespace VendorOfferUpdater
         public static string ComputeOfferId(
             int outputItemId,
             int outputCount,
-            IReadOnlyList<CostLine> costLines,
-            string merchantName,
-            IReadOnlyList<string> locations,
+            IReadOnlyList<CostLine>? costLines,
+            string? merchantName,
+            IReadOnlyList<string>? locations,
             int? dailyCap,
             int? weeklyCap,
             // M37 (KNOWN-ISSUES #24): optional so a caller need not pass

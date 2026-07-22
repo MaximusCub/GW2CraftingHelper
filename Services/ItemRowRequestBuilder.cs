@@ -21,10 +21,16 @@ namespace GW2CraftingHelper.Services
         /// yet - gw2e's own `{id: null}` row shape) and the row's raw
         /// quantity textbox contents.
         /// </summary>
-        public struct RowInput
+        public readonly struct RowInput
         {
-            public int? ItemId;
-            public string QuantityText;
+            public readonly int? ItemId;
+            public readonly string QuantityText;
+
+            public RowInput(int? itemId, string quantityText)
+            {
+                ItemId = itemId;
+                QuantityText = quantityText;
+            }
         }
 
         /// <summary>

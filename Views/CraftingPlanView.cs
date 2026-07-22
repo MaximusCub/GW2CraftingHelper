@@ -1998,7 +1998,7 @@ namespace GW2CraftingHelper.Views
                     anyQtyInvalid = true;
                 }
                 row.QuantityText = qty.ToString();
-                rowInputs.Add(new ItemRowRequestBuilder.RowInput { ItemId = row.ItemId, QuantityText = row.QuantityText });
+                rowInputs.Add(new ItemRowRequestBuilder.RowInput(row.ItemId, row.QuantityText));
             }
 
             var requestItems = ItemRowRequestBuilder.Build(rowInputs);

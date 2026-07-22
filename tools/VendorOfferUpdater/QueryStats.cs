@@ -18,7 +18,9 @@ namespace VendorOfferUpdater
 
     public class PartitionStats
     {
-        public string Prefix { get; set; }
+        // Null for the root (unpartitioned) query - only set once a
+        // partition has been split by vendor-name prefix.
+        public string? Prefix { get; set; }
         public int Depth { get; set; }
         public int RowsAdded { get; set; }
         public int HttpRequests { get; set; }

@@ -52,9 +52,9 @@ namespace VendorOfferUpdater
 
         private static async Task<int> RunAsync(string[] args, CancellationToken ct)
         {
-            string outputPath = null;
-            string queryCondition = null;
-            string mergeIntoPath = null;
+            string? outputPath = null;
+            string? queryCondition = null;
+            string? mergeIntoPath = null;
             bool dryRun = false;
             bool skipItemResolution = false;
             bool resolveOnly = false;
@@ -166,7 +166,9 @@ namespace VendorOfferUpdater
 
                     Console.WriteLine($"Loading wiki vendor cache from {wikiCachePath}...");
                     string cacheJson = await File.ReadAllTextAsync(wikiCachePath);
-                    wikiResults = JsonSerializer.Deserialize<List<WikiVendorResult>>(cacheJson);
+                    wikiResults = JsonSerializer.Deserialize<List<WikiVendorResult>>(cacheJson)
+                        ?? throw new InvalidOperationException(
+                            $"Wiki cache at {wikiCachePath} deserialized to null.");
                     Console.WriteLine($"  Loaded {wikiResults.Count} cached wiki results.");
                     Console.WriteLine();
                 }
@@ -231,6 +233,10 @@ namespace VendorOfferUpdater
                         .Where(name => !string.IsNullOrEmpty(name)
                             && !apiHelper.ResolveCurrencyId(name).HasValue
                             && !itemIdCache.ContainsKey(name))
+                        // IsNullOrEmpty above already proved non-null/non-empty;
+                        // the static element type just doesn't narrow across
+                        // the Where lambda boundary.
+                        .Select(name => name!)
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
 
@@ -414,7 +420,7 @@ namespace VendorOfferUpdater
 
                 string json = EscapeNonAscii(JsonSerializer.Serialize(dataset, jsonOptions));
 
-                string dir = Path.GetDirectoryName(outputPath);
+                string? dir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 {
                     Directory.CreateDirectory(dir);
@@ -475,7 +481,7 @@ namespace VendorOfferUpdater
         /// </summary>
         internal sealed class WikiCacheMergeResult
         {
-            public List<WikiVendorResult> Merged { get; set; }
+            public List<WikiVendorResult> Merged { get; set; } = new();
             public int Added { get; set; }
             public int Refreshed { get; set; }
             public int Unchanged { get; set; }
@@ -535,9 +541,9 @@ namespace VendorOfferUpdater
         /// </summary>
         internal sealed class BaselineMergeResult
         {
-            public List<VendorOffer> Merged { get; set; }
+            public List<VendorOffer> Merged { get; set; } = new();
             public int RemovedFromBaseline { get; set; }
-            public List<string> MerchantNamesReplaced { get; set; }
+            public List<string> MerchantNamesReplaced { get; set; } = new();
         }
 
         /// <summary>
@@ -593,7 +599,7 @@ namespace VendorOfferUpdater
         /// Returns null if any cost line cannot be resolved.
         /// </summary>
         // internal for testability (VendorOfferUpdater.Tests)
-        internal static VendorOffer ConvertToOffer(
+        internal static VendorOffer? ConvertToOffer(
             WikiVendorResult result,
             Gw2ApiHelper apiHelper,
             Dictionary<string, int> itemIdMap)
@@ -601,7 +607,7 @@ namespace VendorOfferUpdater
             int outputCount = result.OutputQuantity ?? 1;
             if (outputCount <= 0) outputCount = 1;
 
-            string merchant = result.MerchantName;
+            string? merchant = result.MerchantName;
             if (string.IsNullOrEmpty(merchant)) return null;
 
             var costLines = new List<CostLine>();
@@ -780,7 +786,7 @@ namespace VendorOfferUpdater
 
         private static string FindRepoRoot()
         {
-            string dir = AppContext.BaseDirectory;
+            string? dir = AppContext.BaseDirectory;
             while (dir != null)
             {
                 if (Directory.Exists(Path.Combine(dir, ".git")))
