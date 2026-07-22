@@ -15,6 +15,12 @@
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
     <TargetFrameworkProfile />
+    <!-- Pinned to the value this legacy (non-SDK) net48 project actually resolves to
+         today - measured via a diagnostic-verbosity build (csc.exe /langversion:7.3) -
+         so the effective C# language version is a committed fact, not dependent on
+         whatever "latest non-preview" the installed csc.exe on a given machine
+         resolves to (M38 WP-02 / a6-csharp.md section 10). -->
+    <LangVersion>7.3</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
