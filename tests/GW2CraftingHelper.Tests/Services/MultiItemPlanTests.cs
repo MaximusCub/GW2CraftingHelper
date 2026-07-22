@@ -1358,5 +1358,141 @@ namespace GW2CraftingHelper.Tests.Services
                 System.IO.Directory.Delete(tempDir, true);
             }
         }
+
+        // --- M37 (KNOWN-ISSUES #26): achievement-bit ingredient dedup -
+        // the report's exact multi-item-request double-count scenario
+        // (docs/research/m37-r3-achievement-dedup.md Section 4.6), using
+        // the real, wiki/API-verified Infinite Trebuchet Blueprint ids. ---
+
+        [Fact]
+        public async Task GenerateStructuredAsync_BlueprintAchievementRecipe_PlusDirectBitItemRequest_DedupsSharedIngredient()
+        {
+            // Infinite Trebuchet Blueprint (item 103980, achievement 8493)
+            // needs one of each of 4 achievement-bit ingredients (bits 0-3:
+            // items 103886/103834/103801/103974). The user ALSO separately
+            // requests 1x item 103886 (Pile of Recycled Trebuchets)
+            // directly, for some unrelated reason - exactly the report's
+            // constructed repro. Before this fix, the tree would carry TWO
+            // independent demands for 103886; after, the achievement-bit
+            // occurrence (nested inside the Blueprint) is zeroed and the
+            // direct request keeps its own full, un-deduped demand of 1.
+            const int blueprintId = 103980;
+            const int bit0PileOfRecycledTrebuchets = 103886;
+            const int bit1TrebuchetMechanism = 103834;
+            const int bit2ProofOfSiegeExpertise = 103801;
+            const int bit3BoxOfScavengedTrebuchetParts = 103974;
+            const int blueprintRecipeId = -1592;
+
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(blueprintId, blueprintRecipeId);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = blueprintRecipeId,
+                OutputItemId = blueprintId,
+                OutputItemCount = 1,
+                AchievementId = 8493,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = bit0PileOfRecycledTrebuchets, Count = 1, AchievementId = 8493, AchievementBit = 0 },
+                    new RawIngredient { Type = "Item", Id = bit1TrebuchetMechanism, Count = 1, AchievementId = 8493, AchievementBit = 1 },
+                    new RawIngredient { Type = "Item", Id = bit2ProofOfSiegeExpertise, Count = 1, AchievementId = 8493, AchievementBit = 2 },
+                    new RawIngredient { Type = "Item", Id = bit3BoxOfScavengedTrebuchetParts, Count = 1, AchievementId = 8493, AchievementBit = 3 }
+                },
+                Disciplines = new List<string> { "Achievement" }
+            });
+            // No recipe registered for any of the 4 bit items - each is
+            // priced directly (a real acquisition path per gw2e's own
+            // Merchant sub-recipes is out of scope for this specific test;
+            // exercised separately by the seeded ref/recipes_seed.json
+            // entries in production).
+
+            // InMemoryPriceApiClient.AddPrice(id, buyUnitPrice, sellUnitPrice)
+            // feeds RawPriceEntry.BuyUnitPrice/SellUnitPrice, which
+            // TradingPostService maps INVERTED onto ItemPrice
+            // (BuyInstant = entry.SellUnitPrice, SellInstant =
+            // entry.BuyUnitPrice - "instant buy" = the lowest active SELL
+            // listing) - sellUnitPrice below is therefore the InstantBuy
+            // cost this test's PriceBasis.InstantBuy actually reads.
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(bit0PileOfRecycledTrebuchets, buyUnitPrice: 90, sellUnitPrice: 100);
+            priceApi.AddPrice(bit1TrebuchetMechanism, buyUnitPrice: 45, sellUnitPrice: 50);
+            priceApi.AddPrice(bit2ProofOfSiegeExpertise, buyUnitPrice: 25, sellUnitPrice: 30);
+            priceApi.AddPrice(bit3BoxOfScavengedTrebuchetParts, buyUnitPrice: 15, sellUnitPrice: 20);
+            // No price for the Blueprint itself - forces Craft (its own
+            // achievement "recipe" is the only path).
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(blueprintId, "Infinite Trebuchet Blueprint", "blueprint.png");
+            itemApi.AddItem(bit0PileOfRecycledTrebuchets, "Pile of Recycled Trebuchets", "pile.png");
+            itemApi.AddItem(bit1TrebuchetMechanism, "Trebuchet Mechanism", "mechanism.png");
+            itemApi.AddItem(bit2ProofOfSiegeExpertise, "Proof of Siege Expertise", "proof.png");
+            itemApi.AddItem(bit3BoxOfScavengedTrebuchetParts, "Box of Scavenged Trebuchet Parts", "box.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = blueprintId, Quantity = 1 },
+                new PlanRequestItem { ItemId = bit0PileOfRecycledTrebuchets, Quantity = 1 }
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(
+                items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(2, result.MultiItemRoots.Count);
+            var blueprintRoot = result.MultiItemRoots[0];
+            var directPileRoot = result.MultiItemRoots[1];
+            Assert.Equal(blueprintId, blueprintRoot.ItemId);
+            Assert.Equal(bit0PileOfRecycledTrebuchets, directPileRoot.ItemId);
+
+            // The Blueprint's own bit-0 ingredient is deduped: HAVE display,
+            // COUNTED-ELSEWHERE flag, zero quantity, no children of its own.
+            var dedupedBit0 = blueprintRoot.Children.Single(c => c.ItemId == bit0PileOfRecycledTrebuchets);
+            Assert.Equal(CraftingDecision.Have, dedupedBit0.Decision);
+            Assert.True(dedupedBit0.IsAchievementBitDeduped);
+            Assert.Equal(0, dedupedBit0.Quantity);
+            Assert.Empty(dedupedBit0.Children);
+
+            // Bits 1-3 have no coexisting normal occurrence anywhere in
+            // this plan, so none of them are deduped - each keeps its own
+            // real quantity/cost.
+            var bit1Node = blueprintRoot.Children.Single(c => c.ItemId == bit1TrebuchetMechanism);
+            var bit2Node = blueprintRoot.Children.Single(c => c.ItemId == bit2ProofOfSiegeExpertise);
+            var bit3Node = blueprintRoot.Children.Single(c => c.ItemId == bit3BoxOfScavengedTrebuchetParts);
+            Assert.False(bit1Node.IsAchievementBitDeduped);
+            Assert.False(bit2Node.IsAchievementBitDeduped);
+            Assert.False(bit3Node.IsAchievementBitDeduped);
+            Assert.Equal(CraftingDecision.BuyFromTp, bit1Node.Decision);
+            Assert.Equal(50, bit1Node.SubtreeCost);
+            Assert.Equal(CraftingDecision.BuyFromTp, bit2Node.Decision);
+            Assert.Equal(30, bit2Node.SubtreeCost);
+            Assert.Equal(CraftingDecision.BuyFromTp, bit3Node.Decision);
+            Assert.Equal(20, bit3Node.SubtreeCost);
+
+            // The directly-requested root keeps its own full, un-deduped
+            // demand of 1 - not affected by the dedup at all.
+            Assert.False(directPileRoot.IsAchievementBitDeduped);
+            Assert.Equal(1, directPileRoot.Quantity);
+            Assert.Equal(CraftingDecision.BuyFromTp, directPileRoot.Decision);
+            Assert.Equal(100, directPileRoot.SubtreeCost);
+
+            // Exactly ONE step for item 103886 in the whole plan (Quantity
+            // 1, cost 100) - not two, not a zero-quantity ghost row on top.
+            var pileSteps = result.Plan.Steps.Where(s => s.ItemId == bit0PileOfRecycledTrebuchets).ToList();
+            var pileStep = Assert.Single(pileSteps);
+            Assert.Equal(1, pileStep.Quantity);
+            Assert.Equal(100, pileStep.TotalCost);
+
+            // Total plan cost: Blueprint's own craft cost (0 for the deduped
+            // bit0 + 50 + 30 + 20 = 100) plus the direct Pile purchase
+            // (100) = 200 - NOT 300, which is what double-counting the
+            // shared bit-0 demand would have produced.
+            Assert.Equal(200, result.Plan.TotalCoinCost);
+        }
     }
 }

@@ -23,7 +23,16 @@ namespace GW2CraftingHelper.Services
         // ("IGNORE" vs "IGNORED") carries the current state; Kind stays the
         // same for both so the view can style the two states from one
         // switch arm using CraftingTreeNode.IsIgnored.
-        Ignore
+        Ignore,
+
+        // Non-interactive "COUNTED ELSEWHERE" annotation (M37, KNOWN-ISSUES
+        // #26, gw2e's achievement-bit ingredient dedup) - the sole pill on a
+        // node AchievementBitDedupPrePass zeroed. Unlike Ignore, there is
+        // nothing for the user to toggle/undo here, so it replaces the
+        // plain HAVE pill entirely rather than appending alongside it (a
+        // genuinely-owned node's HAVE display must never be confused with
+        // "this still needs to be obtained once, just not counted twice").
+        AchievementBitDeduped
     }
 
     public struct PillSpec
@@ -67,6 +76,16 @@ namespace GW2CraftingHelper.Services
 
             if (node.Decision == CraftingDecision.Have)
             {
+                // M37 (KNOWN-ISSUES #26): a dedup-zeroed node gets ONLY the
+                // "COUNTED ELSEWHERE" pill, never the plain HAVE a
+                // genuinely-owned node gets - nothing here is actually
+                // owned, so showing HAVE alongside would be misleading
+                // (see PillKind.AchievementBitDeduped's own doc comment).
+                if (node.IsAchievementBitDeduped)
+                {
+                    specs.Add(new PillSpec { Text = "COUNTED ELSEWHERE", Source = null, Kind = PillKind.AchievementBitDeduped });
+                    return specs;
+                }
                 specs.Add(new PillSpec { Text = "HAVE", Source = null, Kind = PillKind.Have });
                 // A node collapses to Have both for genuine full ownership
                 // (Quantity == 0 via real reduction) and for a manually

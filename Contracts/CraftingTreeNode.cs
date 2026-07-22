@@ -45,6 +45,19 @@ namespace GW2CraftingHelper.Contracts
         // pill a naturally-owned node gets.
         public bool IsIgnored { get; set; }
 
+        // True when this exact tree occurrence was zeroed by
+        // AchievementBitDedupPrePass (M37, KNOWN-ISSUES #26) because the
+        // same item id is already being counted elsewhere in the tree (an
+        // earlier achievement-bit occurrence of itself, or a plain/normal
+        // occurrence of the same id anywhere). Like IsIgnored, this
+        // coexists with Decision == Have (Quantity == 0) but means
+        // something different: nothing here is actually owned - the item
+        // still needs to be obtained once, just not counted twice. The
+        // pill layer renders a distinct, non-interactive "COUNTED
+        // ELSEWHERE" annotation instead of the plain HAVE a genuinely-owned
+        // node gets (see DecisionPillPlanner).
+        public bool IsAchievementBitDeduped { get; set; }
+
         // Feasible acquisition paths for this node (drives override cycling).
         public bool CanCraft { get; set; }
         public bool CanBuyTp { get; set; }

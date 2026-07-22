@@ -48,10 +48,17 @@ namespace GW2CraftingHelper.Services
                         : 0
             };
 
-            // Quantity-zero nodes are already owned
+            // Quantity-zero nodes are already owned - OR, M37 (KNOWN-ISSUES
+            // #26), zeroed by AchievementBitDedupPrePass because this exact
+            // item id is already being counted elsewhere in the tree. Both
+            // collapse to the same Have display; IsAchievementBitDeduped is
+            // the only thing that distinguishes the two for the pill layer
+            // (see DecisionPillPlanner), matching the IsIgnored precedent
+            // just below.
             if (node.Quantity == 0)
             {
                 treeNode.Decision = CraftingDecision.Have;
+                treeNode.IsAchievementBitDeduped = node.IsAchievementBitDeduped;
                 return treeNode;
             }
 
