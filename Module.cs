@@ -151,7 +151,7 @@ namespace GW2CraftingHelper
             // (unbounded recursion into the sink whose own write just
             // failed).
             var logStore = new ModuleLogStore(dataDir, (message, ex) => Logger.Warn(ex, message));
-            ModuleLog.Shared.Configure(logStore, _settings.LogMaxSizeBytes.Value, (message, ex) => Logger.Warn(ex, message));
+            ModuleLog.Shared.Configure(logStore, _settings.GetClampedLogMaxSizeBytes(), (message, ex) => Logger.Warn(ex, message));
             ModuleLog.Shared.DiagnosticsEnabled = _settings.LogDiagnosticsEnabled.Value;
 
             // Once-per-session age-based retention enforcement, BEFORE the
@@ -162,7 +162,7 @@ namespace GW2CraftingHelper
             // is even constructed, so the seeded pre-session history always
             // sorts before this session's own first log line - see
             // ModuleLog.SeedFromStore's own doc comment.
-            ModuleLog.Shared.PruneOlderThan(_settings.LogRetentionDays.Value);
+            ModuleLog.Shared.PruneOlderThan(_settings.GetClampedLogRetentionDays());
             ModuleLog.Shared.SeedFromStore();
 
             // WP-16 shape (d2-log-system.md Section 4.2/11): every other
@@ -591,7 +591,17 @@ namespace GW2CraftingHelper
             _mainWindow?.Dispose();
 
             // Module-level log system (d2-log-system.md Section 7): the
-            // in-memory ring is cleared only here (process exit / module
+            // file-sink append/trim now happens on a background flush
+            // queue, never on the calling thread (see ModuleLog's own class
+            // doc comment) - give any writes already queued (e.g. from a
+            // scrolldiag burst moments before unload) a brief, bounded
+            // chance to land on disk before the ring is cleared. Best
+            // effort only: Unload must never hang on a stuck flush (a
+            // locked/very slow disk), so this is capped short rather than
+            // waited on indefinitely.
+            ModuleLog.Shared.WaitForPendingFileWrites(TimeSpan.FromMilliseconds(250));
+
+            // The in-memory ring is cleared only here (process exit / module
             // disable) - never by any in-tab user action. The on-disk file
             // is untouched (survives across sessions by design).
             ModuleLog.Shared.Clear();

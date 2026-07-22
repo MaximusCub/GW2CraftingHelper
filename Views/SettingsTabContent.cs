@@ -579,8 +579,13 @@ namespace GW2CraftingHelper.Views
                 // smaller/larger cap until the next module reload. Mirrors
                 // DiagnosticsEnabled's own immediate-apply behavior above,
                 // even though this row uses the TextBox+Save idiom rather
-                // than a plain checkbox.
-                ModuleLog.Shared.MaxFileSizeBytes = maxSizeBytes;
+                // than a plain checkbox. Routed through the same clamp as
+                // Module.cs's own Configure call (redundant here in
+                // practice, since TryParseLogMaxSizeMb already rejected
+                // anything outside 1-1000 MB above, but keeps every live
+                // consumer of this setting going through one clamped
+                // accessor rather than two separately-trusted paths).
+                ModuleLog.Shared.MaxFileSizeBytes = _settings.GetClampedLogMaxSizeBytes();
             }
             else if (_logMaxSizeErrorLabel != null)
             {

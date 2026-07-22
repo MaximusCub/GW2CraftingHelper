@@ -182,7 +182,7 @@ namespace GW2CraftingHelper.Services
                     catch (Exception ex) when (!(ex is OperationCanceledException))
                     {
                         Logger.Warn(ex, "Failed to fetch inventory for character {CharacterName}", name);
-                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch inventory for a character: {ex.GetType().Name} - {ex.Message}");
+                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch inventory for character {name}: {ex.GetType().Name} - {ex.Message}");
                     }
                 }
             }

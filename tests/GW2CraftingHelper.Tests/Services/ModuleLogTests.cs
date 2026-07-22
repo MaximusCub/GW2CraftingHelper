@@ -197,10 +197,12 @@ namespace GW2CraftingHelper.Tests.Services
 
                 log.DiagnosticsEnabled = false;
                 log.Write(ModuleLogLevel.Debug, "scrolldiag", "hidden");
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
                 Assert.Empty(store.ReadAll());
 
                 log.DiagnosticsEnabled = true;
                 log.Write(ModuleLogLevel.Debug, "scrolldiag", "visible");
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
                 var afterEnabled = store.ReadAll();
                 Assert.Single(afterEnabled);
                 Assert.Equal("visible", afterEnabled[0].Message);
@@ -225,8 +227,57 @@ namespace GW2CraftingHelper.Tests.Services
                 log.Write(ModuleLogLevel.Warn, "t", "w");
                 log.Write(ModuleLogLevel.Error, "t", "e");
 
+                // The file-sink append happens on a background flush queue
+                // (never on the calling thread - see ModuleLog's own class
+                // doc comment on why), so the write is only guaranteed to
+                // have landed once this returns true.
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
                 Assert.Equal(3, store.ReadAll().Count);
             }
+        }
+
+        // --- Background file-sink flush queue: order preservation and the
+        // WaitForPendingFileWrites synchronization helper. ---
+
+        [Fact]
+        public void Write_ManyEntriesToFileSink_BackgroundFlushPreservesCallOrder()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                var store = new ModuleLogStore(tmp.Path);
+                var log = new ModuleLog();
+                log.Configure(store, 0, null);
+
+                const int entryCount = 50;
+                for (int i = 0; i < entryCount; i++)
+                {
+                    log.Write(ModuleLogLevel.Info, "t", "m" + i);
+                }
+
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+
+                var result = store.ReadAll();
+                Assert.Equal(entryCount, result.Count);
+                for (int i = 0; i < entryCount; i++)
+                {
+                    Assert.Equal("m" + i, result[i].Message);
+                }
+            }
+        }
+
+        [Fact]
+        public void WaitForPendingFileWrites_NoStoreAttached_ReturnsTrueImmediately()
+        {
+            var log = new ModuleLog();
+            log.Write(ModuleLogLevel.Info, "t", "m"); // never configured - nothing can be queued
+            Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromMilliseconds(50)));
+        }
+
+        [Fact]
+        public void WaitForPendingFileWrites_NothingEverWritten_ReturnsTrueImmediately()
+        {
+            var log = new ModuleLog();
+            Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromMilliseconds(50)));
         }
 
         [Fact]

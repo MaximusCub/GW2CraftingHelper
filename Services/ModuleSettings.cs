@@ -177,6 +177,64 @@ namespace GW2CraftingHelper.Services
             return tier;
         }
 
+        // Mirrors SettingsInputParser.TryParseLogMaxSizeMb's own 1-1000 MB
+        // bound (same deliberate duplication as ClampTier/TryParseTier's
+        // shared 0-2 range above, and for the same reason). A persisted
+        // value outside this range is reachable only via a hand-edited
+        // settings.json - the Settings tab's own parser rejects it before
+        // it is ever assigned - but ModuleLogStore.AppendLine's self-trim
+        // check is `if (maxSizeBytes > 0)`: a persisted 0 or negative value
+        // would silently disable the size cap for the whole session, which
+        // is the exact "endless crap on disk" outcome this feature exists
+        // to prevent.
+        private const int MinLogMaxSizeBytes = 1 * 1024 * 1024;
+        private const int MaxLogMaxSizeBytes = 1000 * 1024 * 1024;
+
+        private static int ClampLogMaxSizeBytes(int maxSizeBytes)
+        {
+            if (maxSizeBytes < MinLogMaxSizeBytes) return MinLogMaxSizeBytes;
+            if (maxSizeBytes > MaxLogMaxSizeBytes) return MaxLogMaxSizeBytes;
+            return maxSizeBytes;
+        }
+
+        // Mirrors SettingsInputParser.TryParseRetentionDays's own 1-365 day
+        // bound - see ClampLogMaxSizeBytes' own comment for why the
+        // duplication is deliberate and why a persisted value must never
+        // bypass this. ModuleLogStore.PruneOlderThan's own no-op guard is
+        // `if (retentionDays <= 0) return;`, so a persisted 0/negative
+        // value would silently disable age-based retention entirely.
+        private const int MinLogRetentionDays = 1;
+        private const int MaxLogRetentionDays = 365;
+
+        private static int ClampRetentionDays(int retentionDays)
+        {
+            if (retentionDays < MinLogRetentionDays) return MinLogRetentionDays;
+            if (retentionDays > MaxLogRetentionDays) return MaxLogRetentionDays;
+            return retentionDays;
+        }
+
+        /// <summary>
+        /// Clamped LogMaxSizeBytes for actual use - see
+        /// ClampLogMaxSizeBytes' own comment. Callers (Module.cs's
+        /// Configure call, and SettingsTabContent's live-push after a save)
+        /// should always read this instead of LogMaxSizeBytes.Value
+        /// directly, the same way GetHomesteadEfficiencyTiers already
+        /// clamps rather than exposing HomesteadFiberTier.Value raw.
+        /// </summary>
+        public int GetClampedLogMaxSizeBytes()
+        {
+            return ClampLogMaxSizeBytes(LogMaxSizeBytes.Value);
+        }
+
+        /// <summary>
+        /// Clamped LogRetentionDays for actual use - see
+        /// ClampRetentionDays' own comment.
+        /// </summary>
+        public int GetClampedLogRetentionDays()
+        {
+            return ClampRetentionDays(LogRetentionDays.Value);
+        }
+
         /// <summary>
         /// Reads the persisted currency valuations. Returns
         /// CurrencyValuation.None when nothing has been configured or the

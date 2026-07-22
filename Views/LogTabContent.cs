@@ -47,11 +47,39 @@ namespace GW2CraftingHelper.Views
         private StandardButton _clearViewButton;
         private Label _statusLabel;
 
-        // Last Version this view rendered from - PollForUpdates uses this
-        // to decide whether a rebuild is needed at all (a cheap long
-        // compare on every frame the tab happens to be open, not a full
-        // rebuild - d2 Section 4.3's "dirty-flag/Version poll" idiom).
+        // Last Version this view has fully rendered up to (via either
+        // RebuildRows or AppendNewRows) - PollForUpdates uses this both to
+        // decide whether any work is needed at all (a cheap long compare on
+        // every frame the tab happens to be open, not a full rebuild - d2
+        // Section 4.3's "dirty-flag/Version poll" idiom) and as the
+        // lower bound for the next incremental append. Always set to the
+        // EXACT version the rendering method itself just read from
+        // ModuleLog.Snapshot - never pre-set by a caller with a possibly
+        // stale value - so two consecutive appends can never double-render
+        // (or skip) an entry landed in the gap between reading Version here
+        // and re-reading it inside Snapshot.
         private long _lastSeenVersion = -1;
+
+        // True once RebuildRows or AppendNewRows has left at least one real
+        // row (not the empty-state Label) in the content panel. Gates
+        // whether PollForUpdates may use the incremental AppendNewRows path
+        // at all - see PollForUpdates' own doc comment for why the
+        // empty-to-non-empty transition still always goes through a full
+        // RebuildRows.
+        private bool _hasRenderedAnyRow;
+
+        // FIFO of every currently-displayed "real" row (never the
+        // empty-state Label), oldest-first, each tagged with the absolute
+        // ring index it was rendered from. AppendNewRows enqueues onto the
+        // back and RebuildRows rebuilds this from scratch; both then trim
+        // from the front any row whose absolute index has since fallen
+        // below the ring's own current earliest-available index (i.e. the
+        // underlying entry was evicted from the ring). Without this, the
+        // incremental append path would leave stale rows on screen forever
+        // and grow _contentPanel's Label count without bound over a long
+        // session - append-only alone only solves the "every frame" cost
+        // the design doc warned about, not eviction.
+        private readonly Queue<(long AbsoluteIndex, Label Control)> _renderedRows = new Queue<(long AbsoluteIndex, Label Control)>();
 
         // Set by "Clear view" to the ring Version at click time; any entry
         // whose absolute ring index is before this is hidden from the
@@ -153,7 +181,6 @@ namespace GW2CraftingHelper.Views
                 PositionToolbarButtons(newWidth);
             };
 
-            _lastSeenVersion = _log.Version;
             RebuildRows();
         }
 
@@ -165,16 +192,34 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Called from Module.Update() only while this tab is the selected
-        /// one (a cheap Version compare when nothing changed) - the "PLUS a
-        /// poll" half of d2 Section 4.3's refresh design, on top of the
-        /// TabChanged-driven <see cref="Refresh"/> below. Rebuilds only
-        /// when Follow is checked; an unchecked Follow freezes the current
-        /// view exactly like a paused `tail -f`, even though new entries
-        /// keep arriving in the ring underneath it.
+        /// one (a cheap Version compare when nothing changed, and a no-op
+        /// at all while Follow is unchecked) - the "PLUS a poll" half of d2
+        /// Section 4.3's refresh design, on top of the TabChanged-driven
+        /// <see cref="Refresh"/> below. An unchecked Follow freezes the
+        /// current view exactly like a paused `tail -f`, even though new
+        /// entries keep arriving in the ring underneath it.
+        /// <para>
+        /// When Follow IS checked and new entries arrived, this uses the
+        /// incremental <see cref="AppendNewRows"/> path (d2 Section 4.3:
+        /// "append-only incremental update... rather than the full-rebuild
+        /// Refresh() on every version bump") instead of tearing down and
+        /// recreating every already-visible row - unless the panel is
+        /// currently showing the empty-state Label instead of real rows
+        /// (<see cref="_hasRenderedAnyRow"/> false), which has no
+        /// incremental equivalent and still falls back to a full
+        /// <see cref="RebuildRows"/>. Full rebuild otherwise stays reserved
+        /// for the filter-changed paths (level dropdown / search box /
+        /// Clear view) and for <see cref="Refresh"/>'s own tab-switch case.
+        /// </para>
         /// </summary>
         public void PollForUpdates()
         {
             if (!IsLive)
+            {
+                return;
+            }
+
+            if (_followCheckbox == null || !_followCheckbox.Checked)
             {
                 return;
             }
@@ -185,9 +230,11 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            _lastSeenVersion = currentVersion;
-
-            if (_followCheckbox != null && _followCheckbox.Checked)
+            if (_hasRenderedAnyRow)
+            {
+                AppendNewRows();
+            }
+            else
             {
                 RebuildRows();
             }
@@ -206,7 +253,6 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            _lastSeenVersion = _log.Version;
             RebuildRows();
         }
 
@@ -273,6 +319,16 @@ namespace GW2CraftingHelper.Views
             _statusLabel.TextColor = isError ? ErrorColor : StatusColor;
         }
 
+        /// <summary>
+        /// Full dispose+rebuild from the ring, respecting the current
+        /// filter state. Reserved for the filter-changed paths (level
+        /// dropdown / search box / Clear view), <see cref="Refresh"/>'s
+        /// tab-switch case, and the empty-to-non-empty transition
+        /// <see cref="AppendNewRows"/> cannot handle incrementally - NOT
+        /// called on every live Version bump while the tab is open and
+        /// Follow is checked; see <see cref="PollForUpdates"/> for that
+        /// path.
+        /// </summary>
         private void RebuildRows()
         {
             if (!IsLive)
@@ -284,12 +340,14 @@ namespace GW2CraftingHelper.Views
             {
                 child.Dispose();
             }
+            _renderedRows.Clear();
 
             var result = GetFilteredEntries();
+            _lastSeenVersion = result.Version;
 
             foreach (var item in result.Filtered)
             {
-                new Label
+                var label = new Label
                 {
                     Text = item.Line,
                     AutoSizeWidth = true,
@@ -297,7 +355,10 @@ namespace GW2CraftingHelper.Views
                     TextColor = ColorForLevel(item.Entry.Level),
                     Parent = _contentPanel
                 };
+                _renderedRows.Enqueue((item.AbsoluteIndex, label));
             }
+
+            _hasRenderedAnyRow = result.Filtered.Count > 0;
 
             if (result.Filtered.Count == 0)
             {
@@ -317,22 +378,109 @@ namespace GW2CraftingHelper.Views
             }
             else if (_followCheckbox != null && _followCheckbox.Checked)
             {
-                // Scroll-to-bottom via VerticalScrollOffset's public setter
-                // (confirmed present on Blish_HUD.Controls.Panel) -
-                // deliberately NOT the private-field Scrollbar.ScrollDistance
-                // reflection CraftingPlanView needs for its own much more
-                // exacting restore/verify contract (KNOWN-ISSUES #12/#14);
-                // this tab carries none of that contract, so the simple
-                // public property is the correct, far cheaper choice.
-                // Overshoots (int.MaxValue) rather than measuring exact
-                // content height - a scroll offset past the real maximum
-                // clamps to the bottom, landing there regardless of how
-                // tall the freshly rebuilt content is.
-                _contentPanel.VerticalScrollOffset = int.MaxValue;
+                ScrollToBottom();
             }
         }
 
-        private (List<(ModuleLogEntry Entry, string Line)> Filtered, int RawCount) GetFilteredEntries()
+        /// <summary>
+        /// Incremental counterpart to <see cref="RebuildRows"/> (d2 Section
+        /// 4.3): appends Label controls only for entries newer than
+        /// <see cref="_lastSeenVersion"/>, instead of tearing down and
+        /// recreating every already-visible row. Only ever called from
+        /// <see cref="PollForUpdates"/>, and only while
+        /// <see cref="_hasRenderedAnyRow"/> is true - see that method's own
+        /// doc comment for why the empty-state transition is excluded.
+        /// <para>
+        /// Also trims from the FRONT of <see cref="_renderedRows"/> any row
+        /// whose underlying ring entry has since been evicted (the ring
+        /// only holds its own capacity's worth of history) - append-only
+        /// with no matching removal would otherwise leave stale rows on
+        /// screen and grow the panel's Label count without bound over a
+        /// long session, which is exactly the kind of unbounded-retention
+        /// regression the append fix must not trade the every-frame-cost
+        /// regression for.
+        /// </para>
+        /// </summary>
+        private void AppendNewRows()
+        {
+            if (!IsLive)
+            {
+                return;
+            }
+
+            long previousVersion = _lastSeenVersion;
+            var entries = _log.Snapshot(out long version);
+            long startIndex = version - entries.Count;
+
+            // Clamp to whatever the ring can still produce - if more
+            // entries arrived between polls than the ring holds, the
+            // oldest of those were evicted before this view (or any view)
+            // ever had a chance to render them; there is nothing to append
+            // for them either way, incrementally or otherwise.
+            long from = Math.Max(previousVersion, startIndex);
+
+            ModuleLogLevel minLevel = MinLevelForFilter();
+            string search = _searchBox?.Text?.Trim() ?? string.Empty;
+            bool appendedAny = false;
+
+            for (long absoluteIndex = from; absoluteIndex < version; absoluteIndex++)
+            {
+                if (absoluteIndex < _clearedBeforeVersion)
+                {
+                    continue;
+                }
+
+                var entry = entries[(int)(absoluteIndex - startIndex)];
+                if (!TryFormatFiltered(entry, minLevel, search, out string line))
+                {
+                    continue;
+                }
+
+                var label = new Label
+                {
+                    Text = line,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    TextColor = ColorForLevel(entry.Level),
+                    Parent = _contentPanel
+                };
+                _renderedRows.Enqueue((absoluteIndex, label));
+                appendedAny = true;
+            }
+
+            while (_renderedRows.Count > 0 && _renderedRows.Peek().AbsoluteIndex < startIndex)
+            {
+                var stale = _renderedRows.Dequeue();
+                stale.Control.Dispose();
+            }
+
+            _lastSeenVersion = version;
+            _hasRenderedAnyRow = _renderedRows.Count > 0;
+
+            if (appendedAny && _followCheckbox != null && _followCheckbox.Checked)
+            {
+                ScrollToBottom();
+            }
+        }
+
+        /// <summary>
+        /// Scroll-to-bottom via VerticalScrollOffset's public setter
+        /// (confirmed present on Blish_HUD.Controls.Panel) - deliberately
+        /// NOT the private-field Scrollbar.ScrollDistance reflection
+        /// CraftingPlanView needs for its own much more exacting
+        /// restore/verify contract (KNOWN-ISSUES #12/#14); this tab carries
+        /// none of that contract, so the simple public property is the
+        /// correct, far cheaper choice. Overshoots (int.MaxValue) rather
+        /// than measuring exact content height - a scroll offset past the
+        /// real maximum clamps to the bottom, landing there regardless of
+        /// how tall the content is after a rebuild or append.
+        /// </summary>
+        private void ScrollToBottom()
+        {
+            _contentPanel.VerticalScrollOffset = int.MaxValue;
+        }
+
+        private (List<(ModuleLogEntry Entry, string Line, long AbsoluteIndex)> Filtered, int RawCount, long Version) GetFilteredEntries()
         {
             var entries = _log.Snapshot(out long version);
             long startIndex = version - entries.Count;
@@ -340,7 +488,7 @@ namespace GW2CraftingHelper.Views
             ModuleLogLevel minLevel = MinLevelForFilter();
             string search = _searchBox?.Text?.Trim() ?? string.Empty;
 
-            var filtered = new List<(ModuleLogEntry Entry, string Line)>();
+            var filtered = new List<(ModuleLogEntry Entry, string Line, long AbsoluteIndex)>();
             for (int i = 0; i < entries.Count; i++)
             {
                 long absoluteIndex = startIndex + i;
@@ -350,22 +498,43 @@ namespace GW2CraftingHelper.Views
                 }
 
                 var entry = entries[i];
-                if (entry.Level < minLevel)
+                if (!TryFormatFiltered(entry, minLevel, search, out string line))
                 {
                     continue;
                 }
 
-                string line = FormatLine(entry);
-                if (search.Length > 0 &&
-                    line.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    continue;
-                }
-
-                filtered.Add((entry, line));
+                filtered.Add((entry, line, absoluteIndex));
             }
 
-            return (filtered, entries.Count);
+            return (filtered, entries.Count, version);
+        }
+
+        /// <summary>
+        /// Shared level/search filter test used by both
+        /// <see cref="GetFilteredEntries"/> (full rebuild) and
+        /// <see cref="AppendNewRows"/> (incremental append), so the two
+        /// rendering paths can never silently diverge on which entries
+        /// count as "visible". Returns false (with <paramref name="line"/>
+        /// set to null) when <paramref name="entry"/> fails either filter.
+        /// </summary>
+        private static bool TryFormatFiltered(ModuleLogEntry entry, ModuleLogLevel minLevel, string search, out string line)
+        {
+            line = null;
+
+            if (entry.Level < minLevel)
+            {
+                return false;
+            }
+
+            string candidate = FormatLine(entry);
+            if (search.Length > 0 &&
+                candidate.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                return false;
+            }
+
+            line = candidate;
+            return true;
         }
 
         private ModuleLogLevel MinLevelForFilter()

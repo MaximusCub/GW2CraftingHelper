@@ -2243,6 +2243,83 @@ future cleanup wave - not suppressed and not fixed in this change:
 None of this is a behavior change - severity stays warning, never error, per
 WP-02's design; only the suppression list and this doc entry changed.
 
+## 33. M39 module log system: WP-16/WP-17 subsumption + JSONL/rotation rationale (FIXED in M39)
+Two bookkeeping gaps a code-review finding on the M39 log-system PR caught:
+the PR fully implements m38-cleanup-plan.md's WP-16 and WP-17 (confirmed via
+diff), but neither that plan nor this file recorded the subsumption, so a
+concurrent branch or a future session reading the plan could duplicate the
+work; separately, the log-system design proposal itself asked whichever PR
+implemented it to record its own "why JSONL, why these caps" rationale here,
+which had not been done anywhere in the diff either. This entry closes both.
+
+**WP-16 (M38 Wave D) - CLOSED.** An `onError` callback was added to every
+store's constructor, wired (in Module.cs) to append a Warn entry to the new
+ModuleLog instead of the previous silent `Debug.WriteLine`:
+- `SnapshotStore` (also switched its own `Save` to the atomic
+  `.tmp` + `File.Replace` pattern `StatusStore`/`VendorOfferStore` already
+  used, closing a separate pre-existing gap the same proposal flagged).
+- `StatusStore`
+- `VendorOfferStore`
+- `Services/Recipes/OverlayRecipeCacheStore`
+
+**WP-17 (M38 Wave D) - CLOSED.** All six bare `catch` blocks in Module.cs
+were converted to `catch (Exception ex)` with a matching ModuleLog/Logger
+call (the recipe-seed and recipe-seed-manifest sites' own doc comments
+record why those two stay deliberately silent beyond that logging - a
+missing seed file is an expected, already-handled fallback, not a failure).
+`Module.Unload`
+now also calls `CraftingPlanView.StopLiveTickers()` to cancel the
+scroll-verify/resize-debounce/wheel-wrap-verify FrameTickers, which are
+parented to the SpriteScreen rather than the view's own control tree and so
+would otherwise keep running past module unload.
+
+**JSONL vs. one big JSON array (d2-log-system.md Section 4.1).** Every other
+persisted store (`SnapshotStore`/`StatusStore`/`VendorOfferStore`) uses the
+project's usual single-JSON-object-rewritten-atomically shape. The log store
+deliberately does not: a log is fundamentally append-heavy (potentially many
+writes per session, vs. one rewrite per store per session for the others),
+and a crash mid-write to one big JSON array can corrupt the entire file,
+whereas a crash mid-append to newline-delimited JSON (JSONL) loses at most
+the last, already-tolerated-as-partial line (`ModuleLogStore.ReadAll` skips
+a malformed trailing line rather than aborting the read). Property names on
+the wire are also short (`t`/`lvl`/`tag`/`msg`) rather than descriptive,
+specifically because this file is written far more often than any other
+persisted file in the module, so every byte compounds across the retention
+window.
+
+**Size and age rotation caps (d2-log-system.md Section 4.2/Section 6).** Two
+independent, independently-configurable caps, both defaulting to a
+deliberately conservative value:
+- Size (`LogMaxSizeBytes`, default 2 MB): checked on every file-sink append;
+  once exceeded, the oldest ~25% of lines (by count) are dropped and the
+  file rewritten atomically. Framed in the design as "a hard backstop even
+  if a user forgets diagnostics is on, not just a soft preference" - the
+  goal is to make it structurally impossible for this feature to become the
+  "endless crap on disk" problem it was commissioned to prevent, without
+  requiring the user to remember to turn diagnostics back off.
+- Age (`LogRetentionDays`, default 14): enforced once per session
+  (`Module.Initialize`, before the ring is seeded from disk) rather than on
+  every write, since age-based pruning does not need per-write cost.
+
+Both are user-configurable from the Settings tab (1-1000 MB / 1-365 days,
+enforced by `SettingsInputParser`) and are now additionally clamped at their
+Module.cs/SettingsTabContent consumption sites (`ModuleSettings.
+GetClampedLogMaxSizeBytes`/`GetClampedLogRetentionDays`) against a
+hand-edited, out-of-range persisted settings value silently disabling either
+cap for a whole session - the same defense-in-depth precedent
+`GetHomesteadEfficiencyTiers`'s own `ClampTier` already established for a
+different setting.
+
+Also fixed in the same pass (a related, not-yet-filed threading defect the
+same review found): `ModuleLog.Write` used to perform the file-sink append
+and, when the size cap tripped, the resulting full read+rewrite trim
+synchronously on whichever thread called it - including the main/UI thread,
+since the high-volume `[scrolldiag]` Debug channel (see #12/#14 above) calls
+`Write` from inside `CraftingPlanView`'s frame-timing-sensitive scroll-verify
+loop. The file sink now goes through a single-consumer background flush
+queue (order-preserving) so `Write`, `Version`, and `Snapshot` can never
+block behind file IO regardless of the caller's thread.
+
 ## M37 desktop-wave observations (2026-07-22)
 Open notes from the live desktop session that verified items 29 and 30
 above (screenshot loop on the merged M37 build over the isolated
