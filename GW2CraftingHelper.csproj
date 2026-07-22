@@ -158,7 +158,7 @@
     <Compile Include="Models\CraftingTreeNode.cs" />
     <Compile Include="Services\DecisionPillPlanner.cs" />
     <Compile Include="Contracts\IItemSearchProvider.cs" />
-    <Compile Include="Contracts\StaticItemSearchProvider.cs" />
+    <Compile Include="Services\StaticItemSearchProvider.cs" />
     <Compile Include="Services\CraftableItemSearchProvider.cs" />
     <Compile Include="Services\ItemSearchProviderFactory.cs" />
     <Compile Include="Services\Diagnostics\PlanTimingAnalyzer.cs" />

@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using GW2CraftingHelper.Contracts;
 
-namespace GW2CraftingHelper.Contracts
+namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Temporary default <see cref="IItemSearchProvider"/> that returns a
