@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
@@ -1491,15 +1490,15 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Multi-item plans (M35, gw2efficiency parity) ---
 
-        private static Contracts.CraftingTreeNode RootNode(int nodeId, int itemId, string name)
+        private static CraftingTreeNode RootNode(int nodeId, int itemId, string name)
         {
-            return new Contracts.CraftingTreeNode
+            return new CraftingTreeNode
             {
                 NodeId = nodeId,
                 ItemId = itemId,
                 Name = name,
                 Quantity = 1,
-                Decision = Contracts.CraftingDecision.Craft
+                Decision = CraftingDecision.Craft
             };
         }
 
@@ -1524,7 +1523,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void MultiItemRequest_TwoOrMoreItems_PopulatesMultiItemRootsNotTreeRoot()
         {
             var meta = MetaFor((1, "Gift of Exordium", "a.png"), (2, "Second Item", "b.png"));
-            var roots = new List<Contracts.CraftingTreeNode>
+            var roots = new List<CraftingTreeNode>
             {
                 RootNode(10, 1, "Gift of Exordium"),
                 RootNode(11, 2, "Second Item")
@@ -1555,7 +1554,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanRequestItem { ItemId = 2, Quantity = 1 }
             };
             var result = MakeResult(targetQuantity: 999, metadata: meta, requestedItems: requested,
-                multiItemRoots: new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
+                multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
 
             var vm = _builder.Build(result);
 
@@ -1573,7 +1572,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanRequestItem { ItemId = 3, Quantity = 1 }
             };
             var result = MakeResult(metadata: meta, requestedItems: requested,
-                multiItemRoots: new List<Contracts.CraftingTreeNode>
+                multiItemRoots: new List<CraftingTreeNode>
                 {
                     RootNode(1, 1, "Gift of Exordium"), RootNode(2, 2, "B"), RootNode(3, 3, "C")
                 });
@@ -1595,7 +1594,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanRequestItem { ItemId = 2, Quantity = 1 }
             };
             var result = MakeResult(metadata: meta, requestedItems: requested,
-                multiItemRoots: new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "Gift of Exordium"), RootNode(2, 2, "B") });
+                multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "Gift of Exordium"), RootNode(2, 2, "B") });
 
             var vm = _builder.Build(result);
 
@@ -1612,7 +1611,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanRequestItem { ItemId = 2, Quantity = 1 }
             };
             var result = MakeResult(totalCoinCost: 500, metadata: meta, requestedItems: requested,
-                multiItemRoots: new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
+                multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
             // M37 review fix: the note row is gated on the SAME
             // result.NetSaleValue.HasValue condition as the Sell value/
             // Profit rows above it - it must never be shown next to zero
@@ -1640,7 +1639,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanRequestItem { ItemId = 2, Quantity = 1 }
             };
             var result = MakeResult(totalCoinCost: 500, metadata: meta, requestedItems: requested,
-                multiItemRoots: new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
+                multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
 
             var vm = _builder.Build(result);
             var summaryRows = vm.Sections[0].Rows;
@@ -1669,9 +1668,9 @@ namespace GW2CraftingHelper.Tests.Services
             };
         }
 
-        private static List<Contracts.CraftingTreeNode> TwoRoots()
+        private static List<CraftingTreeNode> TwoRoots()
         {
-            return new List<Contracts.CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") };
+            return new List<CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") };
         }
 
         [Fact]

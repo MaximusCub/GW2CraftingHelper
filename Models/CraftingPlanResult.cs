@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using GW2CraftingHelper.Contracts;
 
 namespace GW2CraftingHelper.Models
 {

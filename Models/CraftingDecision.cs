@@ -1,7 +1,7 @@
-namespace GW2CraftingHelper.Contracts
+namespace GW2CraftingHelper.Models
 {
     /// <summary>
-    /// The display-layer vocabulary for a <see cref="Contracts.CraftingTreeNode"/> - what the
+    /// The display-layer vocabulary for a <see cref="Models.CraftingTreeNode"/> - what the
     /// UI (tree rows, pills) renders. Deliberately kept separate from the solver's own
     /// <see cref="Models.AcquisitionSource"/> (M38 DO-NOT-TOUCH #15): this enum adds
     /// <see cref="Have"/>, a display-only state the solver has no concept of (an owned or
