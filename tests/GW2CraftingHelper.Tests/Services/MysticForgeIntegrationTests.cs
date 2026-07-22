@@ -473,8 +473,9 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanSolver(),
                 new ItemMetadataService(itemApi));
 
-            var result = await pipeline.GenerateAsync(
-                MysticSalvageKitId, 1, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(
+                MysticSalvageKitId, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.NotNull(result.Plan);
             Assert.True(result.Plan.Steps.Count > 0);

@@ -44,7 +44,8 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanSolver(),
                 new ItemMetadataService(itemApi));
 
-            var result = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.NotNull(result.Plan);
             Assert.True(result.Plan.Steps.Count > 0);
@@ -71,7 +72,8 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanSolver(),
                 new ItemMetadataService(itemApi));
 
-            var result = await pipeline.GenerateAsync(1, 5, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 5, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.Single(result.Plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
@@ -112,7 +114,8 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanSolver(),
                 new ItemMetadataService(itemApi));
 
-            var result = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             foreach (var step in result.Plan.Steps)
             {
@@ -278,7 +281,8 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanSolver(),
                 new ItemMetadataService(itemApi));
 
-            var result = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.NotNull(result.Plan);
             Assert.Single(result.Plan.Steps);
@@ -328,7 +332,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new ItemMetadataService(itemApi),
                     store);
 
-                var result = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
+                var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy);
 
                 Assert.Single(result.Plan.Steps);
                 Assert.Equal(AcquisitionSource.BuyFromVendor, result.Plan.Steps[0].Source);
@@ -352,15 +357,25 @@ namespace GW2CraftingHelper.Tests.Services
                 new ItemMetadataService(itemApi),
                 null);
 
-            var result = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.NotNull(result.Plan);
             Assert.Single(result.Plan.Steps);
             Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
         }
 
+        // M38 WP-14: this test used to prove the (now-deleted, test-only)
+        // GenerateAsync produced the same base plan as GenerateStructuredAsync
+        // with a null snapshot, plus the latter's extra structured fields.
+        // With only one entry point left, the assertion intent becomes:
+        // GenerateStructuredAsync itself, with no snapshot, still produces
+        // the expected craft-vs-buy plan (same economics as before - craft
+        // via 3x item 2 at 300 total beats buying item 1 outright at 10000)
+        // and still populates its structured-only fields on a snapshot-free
+        // run.
         [Fact]
-        public async Task GenerateStructuredAsync_NullSnapshot_SameAsOriginal()
+        public async Task GenerateStructuredAsync_NullSnapshot_ProducesCraftPlanAndPopulatesStructuredFields()
         {
             var recipeApi = new InMemoryRecipeApiClient();
             recipeApi.AddSearchResult(1, 10);
@@ -393,24 +408,26 @@ namespace GW2CraftingHelper.Tests.Services
                 new ItemMetadataService(itemApi),
                 reducer: new InventoryReducer());
 
-            var original = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
-            var structured = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
 
-            // Same plan steps
-            Assert.Equal(original.Plan.Steps.Count, structured.Plan.Steps.Count);
-            for (int i = 0; i < original.Plan.Steps.Count; i++)
-            {
-                Assert.Equal(original.Plan.Steps[i].ItemId, structured.Plan.Steps[i].ItemId);
-                Assert.Equal(original.Plan.Steps[i].Source, structured.Plan.Steps[i].Source);
-                Assert.Equal(original.Plan.Steps[i].Quantity, structured.Plan.Steps[i].Quantity);
-            }
+            // Craft (3 x 100 = 300, InstantBuy basis) beats buying item 1
+            // outright (10000): one craft step for item 1, one buy step for
+            // its 3x item 2 ingredient.
+            Assert.Equal(2, result.Plan.Steps.Count);
+            var craftStep = result.Plan.Steps.FirstOrDefault(s => s.ItemId == 1);
+            Assert.NotNull(craftStep);
+            Assert.Equal(AcquisitionSource.Craft, craftStep.Source);
+            var buyStep = result.Plan.Steps.FirstOrDefault(s => s.ItemId == 2);
+            Assert.NotNull(buyStep);
+            Assert.Equal(AcquisitionSource.BuyFromTp, buyStep.Source);
+            Assert.Equal(3, buyStep.Quantity);
 
             // Structured result has extra fields populated
-            Assert.NotNull(structured.RequiredDisciplines);
-            Assert.NotNull(structured.RequiredRecipes);
-            Assert.NotNull(structured.DebugLog);
-            Assert.Empty(structured.UsedMaterials);
+            Assert.NotNull(result.RequiredDisciplines);
+            Assert.NotNull(result.RequiredRecipes);
+            Assert.NotNull(result.DebugLog);
+            Assert.Empty(result.UsedMaterials);
         }
 
         [Fact]
@@ -641,7 +658,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task GenerateAsync_DebugLogContainsTimingEntries()
+        public async Task GenerateStructuredAsync_DebugLogContainsTimingEntries()
         {
             var recipeApi = new InMemoryRecipeApiClient();
             recipeApi.AddSearchResult(1, 10);
@@ -670,13 +687,18 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanSolver(),
                 new ItemMetadataService(itemApi));
 
-            var result = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
 
             Assert.NotNull(result.DebugLog);
 
-            // All 6 GenerateAsync phase prefixes must appear with timing
-            // (M38 WP-10: the dead "Resolve vendor offers" step was removed
-            // along with the always-null VendorOfferResolver seam)
+            // These 6 phase prefixes are shared with (were originally pinned
+            // against) the now-deleted GenerateAsync and must still appear
+            // with timing (M38 WP-10: the dead "Resolve vendor offers" step
+            // was removed along with the always-null VendorOfferResolver
+            // seam); GenerateStructuredAsync's own additional phases
+            // (Inventory reduction, Fetch currency metadata, Fetch learned
+            // recipes, Build result) are a superset and not asserted here.
             var expectedPrefixes = new[]
             {
                 "Build recipe tree",
@@ -1638,7 +1660,7 @@ namespace GW2CraftingHelper.Tests.Services
         ]";
 
         [Fact]
-        public async Task GenerateAsync_WithCurrencyMetadataService_PopulatesCurrencyMetadata()
+        public async Task GenerateStructuredAsync_WithCurrencyMetadataService_PopulatesCurrencyMetadata()
         {
             var recipeApi = new InMemoryRecipeApiClient();
             // No recipe for item 1 - simplest leaf-buy plan.
@@ -1660,7 +1682,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new ItemMetadataService(itemApi),
                     currencyMetadataService: currencyService);
 
-                var result = await pipeline.GenerateAsync(1, 1, CancellationToken.None);
+                var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy);
 
                 Assert.NotNull(result.CurrencyMetadata);
                 Assert.True(result.CurrencyMetadata.ContainsKey(2));

@@ -1626,16 +1626,19 @@ upstream unit test quoted in the report):
 - New `Services/AchievementBitDedupPrePass.cs` (pure, Blish-free)
   implements this, wired into `CraftingPlanPipeline` unconditionally
   (no settings toggle - pure correctness, not user policy) right after
-  the tree is built and before inventory reduction/Solve, in all three
-  tree-building entry points (`GenerateAsync`, single- and multi-item
-  `GenerateStructuredAsync`). Architectural departure from upstream,
-  deliberate (Section 4.2 of the report): since this module bakes each
-  `RecipeNode`'s absolute `Quantity` once at tree-build time (unlike
-  gw2e's per-edge-ratio design), a zeroed duplicate occurrence also has
-  its own `Recipes` cleared - mirroring `InventoryReducer.ReduceNode`'s
-  identical treatment of a genuinely fully-owned node - so
-  `PlanSolver.Evaluate` has no craft path left to consider for it and
-  the ordinary zero-quantity Buy/Have collapse takes over cleanly.
+  the tree is built and before inventory reduction/Solve, in both
+  tree-building entry points (single- and multi-item
+  `GenerateStructuredAsync`). A third call site, the legacy test-only
+  `GenerateAsync`, carried the same wiring until it was deleted in M38
+  WP-14 as test-only dead code (no production callers). Architectural
+  departure from upstream, deliberate (Section 4.2 of the report):
+  since this module bakes each `RecipeNode`'s absolute `Quantity` once
+  at tree-build time (unlike gw2e's per-edge-ratio design), a zeroed
+  duplicate occurrence also has its own `Recipes` cleared - mirroring
+  `InventoryReducer.ReduceNode`'s identical treatment of a genuinely
+  fully-owned node - so `PlanSolver.Evaluate` has no craft path left
+  to consider for it and the ordinary zero-quantity Buy/Have collapse
+  takes over cleanly.
   Runs exactly once, never re-run across local override/Ignore
   re-solves - deliberately narrower than gw2e's own `updateTree.ts`
   (which restarts its "first occurrence wins" bookkeeping from an empty,
