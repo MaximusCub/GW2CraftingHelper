@@ -1169,7 +1169,7 @@ gw2e sources remain publicly fetchable (recipe-calculation/recipe-nesting
 on GitHub; the live app bundle at gw2efficiency.com; the custom-recipes
 repo is GONE from GitHub - recover via Wayback Machine if needed).
 
-## 24. Homestead refinement handling (parity gap)
+## 24. Homestead refinement handling (parity gap) (FIXED in M37)
 gw2e's solver models Janthir Wilds homestead refinements - its
 cheapestTree has homestead-refinement merchant-name matching (observed
 in the M34 research of cheapestTree.ts). We model nothing. Refinement
@@ -1180,6 +1180,197 @@ toggle and its default, daily caps, which material families) plus wiki
 ground truth for the conversions (rates, daily limits, unlock state).
 Then: wiki-verified static seed for the conversions, a Settings toggle,
 solver participation mirroring gw2e, display. No invented data.
+
+FIXED in M37 (research: docs/research/m37-r1-homestead.md, live-verified
+`cheapestTree.ts` mechanism plus complete wiki conversion tables for all
+three stations). This item combined a modeling gap ("we model nothing")
+with a real, independently-confirmed LIVE DEFECT: the module's seed
+already carried all 236 wiki-scraped Homestead Refinement offer rows
+(all three tiers, unconditionally, no `Tier` field existed on
+`VendorOffer` at all), so `EvaluateVendorOffers` had no way to prefer a
+cheaper/worse tier and always silently picked whichever tier priced
+lowest - almost always the highest tier, since it needs the least raw
+input per unit output. In effect the module behaved as if every account
+owned every efficiency upgrade on every station, the opposite of gw2e's
+own conservative tier-0 default, with no way to turn it off. This was
+not merely "we don't model homestead" - the module already modeled it,
+silently and wrongly.
+
+Mechanism:
+- New `Models/HomesteadEfficiencyTiers.cs`: a per-material (Fiber/Metal/
+  Wood) integer tier 0/1/2 configuration, mirroring gw2e's own
+  `cheapestTree.ts` `userEfficiencyTiers` parameter exactly (same three
+  item ids, same 0/1/2 range, same default). **Default tier 0 for every
+  material** - this is not an invented default; it is gw2e's own
+  hardcoded default AND its own documented no-API-key fallback (the
+  research report's Section 1.3), and it is the only default consistent
+  with this repo's "never invent an assumed ownership/progression state"
+  posture (the exact opposite of the pre-fix live-defect behavior, which
+  effectively assumed maximum ownership).
+- `Models/VendorOffer.cs` gains a nullable `HomesteadTier` field
+  (additive; null for every non-Homestead offer). Tagging mechanism
+  (the task's Route A/Route B fork): a live SMW `ask` probe against
+  Homestead Refinement-Metal Forge confirmed the wiki's `{{vendor table
+  row|requirement=...}}` parameter IS exposed as a queryable "Has
+  requirement" property (empty for tier-0 rows; literal text `"one
+  [[Homestead Upgrade: ...]]"` / `"two [[Homestead Upgrade: ...]]"` for
+  tier-1/tier-2), so Route A was taken: `tools/VendorOfferUpdater`'s
+  `WikiSmwClient` now scrapes it, and the new `HomesteadTierResolver`
+  (pure, unit-tested) interprets it - but ONLY for offers whose own
+  `OutputItemId` is one of the three known refined materials (a review
+  finding: the same three merchant pages also sell unrelated rows -
+  each station's own one-time efficiency/capacity Upgrade-purchase
+  items - under the byte-identical merchant name, since the wiki's
+  "Has vendor" property is hardcoded to the page name for every row
+  regardless of subsection; without this guard those 21 rows would have
+  been mistagged tier 0). All 237 tagged/verified rows were regenerated
+  via a `--query` scoped to just the three station pages and a new
+  `--merge-into` mode (`Program.MergeIntoBaseline`, unit-tested) that
+  replaces ONLY the merchants a scoped query actually covered in the
+  full baseline, leaving all other 53,292 offers byte-for-byte
+  unchanged (independently diff-verified before promoting the file).
+  236 -> 237 rows recovers one previously-silently-dropped row: Farm's
+  Potato conversion is a documented, wiki-confirmed real game anomaly
+  (tier-1 is NOT discounted from tier-0 - both are "8 Potato -> 1
+  Fiber"), so before this milestone's tier-aware `VendorOfferHasher` and
+  Requirement-text-aware raw-scrape dedup key existed, the tier-0 and
+  tier-1 subobjects collided (byte-identical content) and one was
+  silently dropped - a real but functionally inert gap (tier-1's rate
+  was identical to tier-0's anyway), now fixed as a side effect.
+- `VendorOfferHasher.ComputeOfferId` folds `HomesteadTier` into the
+  content-derived `OfferId` (optional trailing parameter, default null -
+  every pre-existing call site/offer keeps its exact prior hash).
+  Churn confined to the 216 now-tier-tagged rows, verified by direct
+  comparison against the pre-M37 baseline.
+- `PlanSolver.EvaluateVendorOffers` gains the actual fix: before an
+  offer is considered comparable or fallback, a Homestead-tagged offer
+  whose tier exceeds the configured tier for its output material is
+  skipped entirely. Keyed on the offer's own `OutputItemId` (not a
+  merchant-name substring check at this hot-path call site) because
+  `HomesteadTier` is only ever non-null on rows the seeding pass already
+  confirmed matched gw2e's own `merchant.name.includes('Homestead
+  Refinement')` shape - re-checking the string on every offer/every
+  solve would be redundant work in a loop that already runs per vendor
+  offer per tree node (performance-sensitive path, per this repo's
+  review checklist). `HomesteadEfficiencyTiers`/the tier setting threads
+  through `PlanSolver.Solve` -> `CraftingPlanPipeline` -> `Module.cs` the
+  identical way `CurrencyValuation` already does (optional trailing
+  parameter, snapshotted onto `PlanSolveContext.HomesteadTiers` at
+  generation time, reused as-is by `ResolveWithOverrides`) - every
+  existing call site is unaffected (byte-identical, confirmed by the
+  full pre-existing test suite passing unmodified plus a live-verified
+  Exordium `--dump-tree` diff, see Verification below).
+- Three new `ModuleSettings` entries (`HomesteadFiberTier`/
+  `HomesteadMetalTier`/`HomesteadWoodTier`, plain `SettingEntry<int>`,
+  default 0) and a new "Homestead Refinement" Settings-tab section
+  (three TextBox+Save rows, following the exact same pattern the
+  Currency Valuations section already uses - a 3-valued integer needs
+  validation before persisting, unlike `ValueOwnMaterials`' plain
+  immediate-apply Checkbox). Labels name the material family and
+  station only ("Fiber (Farm)", "Metal (Metal Forge)", "Wood (Lumber
+  Mill)") - no raw item/vendor ids are ever displayed (repo invariant).
+- Cap data: PR #55's fresh wiki cap re-scrape had already populated
+  `WeeklyCap` on the Homestead rows (100/week per Farm row, 250/week per
+  Metal Forge/Lumber Mill row) - confirmed present after this
+  milestone's own re-scrape too, so no additional cap seeding was
+  needed. Documented divergence: these are the wiki's own literal
+  per-row SMW values, not the TRUE cap - the real weekly cap is per-
+  STATION (200 base, rising to 800 fully upgraded) shared across every
+  input-material choice at that station, while our cap machinery is
+  per-offer/per-merged-step. This is a conservative, documented
+  approximation carried over from #28's own warn-only design - it never
+  gates the solve, only produces an informational notice, and using the
+  wiki's own already-scraped per-row number (rather than inventing a
+  reconciled per-station figure) keeps faith with "no invented data."
+- Homestead-specific cap-notice gap fix (KNOWN-ISSUES #25's own Section
+  3.3, the "Conflict-suppression" gap): `PlanSolver.FinalizeVendorBatches`
+  previously suppressed its cap-exceeded notice entirely whenever two
+  tree occurrences of the same output picked different specific offers
+  (`Conflict == true`) - the NORMAL Homestead case, since a plan needing
+  many units of one refined material is very likely to satisfy
+  different occurrences via different specific input-material rows.
+  Assessed as bounded and feasible (per the research report's own
+  Section 4.5 sketch) and FIXED, not deferred: `VendorBatchState` now
+  additionally ratchets a separate, coarser `CapConflict` flag that only
+  compares the raw `(DailyCap, WeeklyCap)` tuple across occurrences,
+  independent of full offer-shape agreement - every Homestead offer for
+  a given output+station shares the identical station-wide cap even
+  when the specific input material differs, so a per-offer mismatch no
+  longer silently suppresses an otherwise-computable notice. When
+  `Conflict` is true but `CapConflict` is false, a new branch sums each
+  occurrence's OWN true purchase count (its own offer's `OutputCount`,
+  never a borrowed one) against the agreed cap. Cost/UnitCost/currency-
+  line recomputation is untouched in this branch (still the pre-existing
+  documented conservative fallback - genuinely different offers still
+  have no single "true" merged cost). When occurrences disagree on BOTH
+  the offer AND the cap itself, the notice is still correctly suppressed
+  (no single agreed cap exists to check against) - this narrower,
+  remaining limitation is captured by a regression test rather than
+  silently left to bit-rot.
+
+Deferred (recorded, not implemented):
+- **HomesteadUnlocked master gate**: gw2e has NO "do you even own
+  Homestead" gate anywhere in its algorithm (confirmed by the research
+  report's exhaustive source read) - it always offers the tier-0 rate to
+  every account, unconditionally. Per this milestone's fixed design
+  decision, this module echoes that exactly (no master gate in code).
+  A prior draft of the research report recommended adding one anyway
+  (default off, hiding every Homestead-tagged offer until the user
+  opts in) on the grounds that this module runs in-client for players
+  who may have never touched Janthir Wilds, unlike a browser tool
+  typically used by already-progressed players. Recorded here as a
+  deliberate, confirmed-with-the-orchestrator divergence option for a
+  future milestone, not implemented - v1 ships pure parity (tier 0
+  default, no gate), which is already a large correctness improvement
+  over the pre-fix unconditional-best-tier live defect.
+- **Black Market path** (300 purchases of 25/week per station, coin-only,
+  escalating price, no efficiency-tier interaction at all): confirmed
+  entirely unseeded before AND after this milestone (the live re-scrape
+  used for tier tagging skipped all Black Market rows - they failed
+  wiki game-id resolution, 30 rows across the three stations, and were
+  never present in the pre-M37 baseline either). Out of scope per the
+  fixed design decision; a future milestone could seed these as plain
+  vendor offers (`HomesteadTier = null`, tier-independent) once the
+  game-id resolution gap is separately investigated.
+
+Verification: `PlanSolverTests` (real production `Solve()` path) cover
+default-tier exclusion, tier-1/tier-2 admission, per-material
+independence, non-Homestead-offer non-interference, and both the fixed
+mixed-offer-same-cap notice and the documented mixed-offer-different-cap
+suppression: `HomesteadOffer_DefaultTierZero_ExcludesHigherTierOffers`,
+`HomesteadOffer_TierTwoConfigured_AdmitsCheaperHigherTierOffer`,
+`HomesteadOffer_TierOneConfigured_AdmitsTierOneButNotTierTwo`,
+`HomesteadTierConfigured_ForDifferentMaterial_DoesNotAffectThisOne`,
+`NonHomesteadVendorOffer_UnaffectedByHomesteadTierSetting`,
+`MixedOfferSameWeeklyCap_StillSurfacesTimegatedNotice`,
+`MixedOfferSameWeeklyCap_NeededWithinCap_NoNoticeFires`,
+`MixedOfferDifferentWeeklyCap_NoticeStillSuppressed_DocumentedLimitation`.
+`ExordiumStyleTree_NoHomesteadOffersReachable_ByteIdenticalAtAnyTier`
+mirrors the research report's own BFS-verified finding (Exordium's tree
+reaches zero Homestead materials) with a synthetic tree.
+`CraftingPlanPipelineTests` confirm `PlanSolveContext.HomesteadTiers` is
+snapshotted at generation time and reused by `ResolveWithOverrides`
+exactly like `CurrencyValuation`. LIVE-VERIFIED 2026-07-21 via the
+offline Harness's new `--homestead-tier` flag against the real seed data
+(`--profile 3`, Klobjarne Geirr, item 103815, real network prices via
+`--live` since the offline harness has no TP prices for the raw ore/crop
+inputs Homestead offers cost - matching the same documented limitation
+KNOWN-ISSUES #17 already noted for other vendor-priced items): at tier 0
+the three materials priced at unit=128c (Metal)/142c (Fiber)/84c (Wood);
+at tier 2, unit=32c/35c/21c - roughly a 4x reduction per material,
+matching the conversion tables' "half the input per tier, twice at
+tier 2 for the doubling materials" shape. The reduction propagated
+correctly through the full tree: Gift of Embracing Refuge's subtree
+cost fell from 646750c to 580375c, Gift of the Homesteader's from
+6035038c to 5968663c, and Klobjarne Geirr's own root subtree cost from
+17782176c to 17715901c (a small, expected discrepancy between the two
+top-level deltas is attributable to live TP price movement between the
+two separate live API calls, not a solver artifact). Exordium
+(`--profile 2 --dump-tree`) confirmed byte-identical with and without
+`--homestead-tier`, matching the report's own BFS finding that Exordium
+has zero Homestead reachability. The full 869-test GW2CraftingHelper.Tests
+suite and 107-test VendorOfferUpdater.Tests suite pass unmodified plus
+the new tests above.
 
 ## 25. Multi-item sell-side economics (parity gap, deliberate M35 gap) (FIXED in M37)
 M35 left SellableQuantity/NetSaleValue/CraftingProfit unset for batches
@@ -1593,6 +1784,18 @@ concurrent generate/re-solve/refresh.
   or consuming logic for them (TimegatedCapType is Daily/Weekly only)
   and no account/character concept at all. Left for a future
   milestone's own design pass.
+- Homestead `HomesteadUnlocked` master gate (#24): gw2e has no "do you
+  even own Homestead" gate at all; this module echoes that (no gate),
+  matching v1's fixed design decision. A prior research draft flagged a
+  divergence option (default-off master gate, since this module runs
+  in-client for players who may never have touched Janthir Wilds) -
+  recorded as a future confirm-with-maintainer option, not implemented.
+- Homestead Black Market path (#24): 300 purchases of 25/week per
+  station, coin-only, tier-independent - confirmed still entirely
+  unseeded (the live re-scrape used for tier tagging failed wiki
+  game-id resolution for all 30 Black Market rows across the three
+  stations). A future milestone could seed these as plain vendor
+  offers once that resolution gap is separately investigated.
 
 ## Handoff notes for the implementing session
 - Project memory holds everything: parity goal + full M33-M36 record
