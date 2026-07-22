@@ -3,6 +3,7 @@ using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
@@ -428,8 +429,8 @@ namespace GW2CraftingHelper.Views
                 RebuildContent();
             };
 
-            // Coin display (unchanged - WP-21/22 will repoint this to the
-            // shared CoinCurrencyRenderer once it lands; out of scope here).
+            // Coin display panel - see UpdateCoinDisplay's doc comment for
+            // the M38 WP-22 repoint to the shared CoinCurrencyRenderer.
             _coinPanel = new Panel()
             {
                 Size = new Point(w, CoinHeight),
@@ -807,6 +808,36 @@ namespace GW2CraftingHelper.Views
             };
         }
 
+        // M38 WP-22 (architecture report S6): this used to carry its own
+        // GetCoinColor/AddCoinSegment copies, byte-identical to the ones
+        // CraftingPlanView carried before its own coin/currency rendering
+        // was extracted into Views/Rendering/CoinCurrencyRenderer (WP-21) -
+        // the second independent encoding of the coin invariant. Both are
+        // deleted; this now builds its own CoinSegmentSpec list (still
+        // always exactly 3 segments - gold, silver, copper - via plain
+        // ToString(), no leading-zero-unit omission or zero-padding: that
+        // formatting choice is unchanged from before this package,
+        // deliberately, per the M38 plan's behavior-preservation-by-
+        // default rule) via the shared CoinCurrencyRenderer.AddSegmentSpec
+        // (bumped private -> internal for this reuse, mirroring the WP-21-
+        // prep GetPillColors bump) and hands it to LayoutCoinSegments with
+        // startX = 0 (left-anchored) instead of the right-anchored
+        // RenderValueCellRightAligned/MeasureValueWidth entry points
+        // CraftingPlanView's mixed coin+currency value cells use - those
+        // two are for a different rendering shape entirely (right-edge-
+        // relative, with an unpriced-dash fallback this coin-only wallet
+        // total never needs) and are untouched by this package.
+        // ANCHORING: no new parameter was needed on CoinCurrencyRenderer -
+        // LayoutCoinSegments already takes a caller-supplied startX and
+        // lays out left-to-right from it, i.e. it is anchor-neutral by
+        // construction; only the higher-level right-aligned convenience
+        // wrappers are direction-locked, and this call site does not use
+        // them. GetCoinColor is now applied internally by
+        // LayoutCoinSegments, so this call site does not need it at all -
+        // the per-segment geometry (icon size 20, label-to-icon gap 2,
+        // inter-segment gap 6; label then icon to its right) is now the
+        // exact same CoinSegmentMath-driven code CraftingPlanView's coin
+        // cells use, not just a matching copy of it.
         private void UpdateCoinDisplay(int copper)
         {
             if (_coinPanel == null) return;
@@ -822,48 +853,13 @@ namespace GW2CraftingHelper.Views
             int silver = (copper % 10000) / 100;
             int cop = copper % 100;
 
-            int x = 0;
-            x = AddCoinSegment(_coinPanel, x, 156904, gold.ToString());
-            x = AddCoinSegment(_coinPanel, x, 156907, silver.ToString());
-            AddCoinSegment(_coinPanel, x, 156902, cop.ToString());
-        }
+            var font = GameService.Content.DefaultFont14;
+            var segments = new List<CoinSegmentMath.CoinSegmentSpec>(3);
+            CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156904, gold.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156907, silver.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156902, cop.ToString());
 
-        private static Color GetCoinColor(int assetId)
-        {
-            switch (assetId)
-            {
-                case 156904: return new Color(255, 204, 0);
-                case 156907: return new Color(192, 192, 192);
-                case 156902: return new Color(205, 127, 50);
-                default:     return Color.White;
-            }
-        }
-
-        private static int AddCoinSegment(Panel parent, int x, int assetId, string value)
-        {
-            const int iconSize = 20;
-            const int gap = 2;
-            const int segmentGap = 6;
-
-            var label = new Label()
-            {
-                Text = value,
-                TextColor = GetCoinColor(assetId),
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(x, 2),
-                Parent = parent
-            };
-
-            new Panel()
-            {
-                Size = new Point(iconSize, iconSize),
-                Location = new Point(x + label.Width + gap, 2),
-                BackgroundTexture = AsyncTexture2D.FromAssetId(assetId),
-                Parent = parent
-            };
-
-            return x + label.Width + gap + iconSize + segmentGap;
+            CoinCurrencyRenderer.LayoutCoinSegments(_coinPanel, segments, 0, 2, font);
         }
     }
 }
