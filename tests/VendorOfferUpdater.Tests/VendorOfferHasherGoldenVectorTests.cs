@@ -68,7 +68,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void GoldenVectors_FixtureHasExpectedRowCount()
         {
-            Assert.Equal(12, VendorOfferHasherVectorFixture.Load().Count);
+            Assert.Equal(19, VendorOfferHasherVectorFixture.Load().Count);
         }
     }
 }

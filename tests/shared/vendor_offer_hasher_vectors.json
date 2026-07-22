@@ -251,6 +251,150 @@
       "homesteadTier": null,
       "seasonalCap": null,
       "expectedOfferId": "cbef8196645256744d164c0794f0cfba22a53c486017c4e7606b88b0d8a5ef0e"
+    },
+    {
+      "name": "locations_unsorted_input_order_guard",
+      "outputItemId": 19685,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 100
+        }
+      ],
+      "merchantName": "Merchant",
+      "locations": [
+        "Lion's Arch",
+        "Hoelbrak",
+        "Divinity's Reach"
+      ],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "b8a245cf3d384ea2e4d80f71631f1848e92ccb05c8461775c1635934493f1951"
+    },
+    {
+      "name": "cost_line_sort_type_before_id_priority_guard",
+      "outputItemId": 19685,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Item",
+          "id": 1,
+          "count": 5
+        },
+        {
+          "type": "Currency",
+          "id": 999,
+          "count": 100
+        }
+      ],
+      "merchantName": "Merchant",
+      "locations": [],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "85f70a00190055c2def56beabf37e5b8806aa9e22697e5b9c0867e8f2a575fbf"
+    },
+    {
+      "name": "scalar_field_isolation_base",
+      "outputItemId": 44444,
+      "outputCount": 3,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 300
+        }
+      ],
+      "merchantName": "Test Merchant Alpha",
+      "locations": [
+        "Lion's Arch"
+      ],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "d00910e2e4cbee7f858d49b5baffd318286933fc36a2cf9bf2b9779d1f4e503a"
+    },
+    {
+      "name": "scalar_field_isolation_output_item_id_changed",
+      "outputItemId": 55555,
+      "outputCount": 3,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 300
+        }
+      ],
+      "merchantName": "Test Merchant Alpha",
+      "locations": [
+        "Lion's Arch"
+      ],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "0ad910b9344d88bed95a6903aeff013004f3c5cb3bd5974f9b6a7687973c22e8"
+    },
+    {
+      "name": "scalar_field_isolation_output_count_changed",
+      "outputItemId": 44444,
+      "outputCount": 7,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 300
+        }
+      ],
+      "merchantName": "Test Merchant Alpha",
+      "locations": [
+        "Lion's Arch"
+      ],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "70f2199a856395684c5d2a11e2dedf87004f137034e9cf092df172eefa37ea00"
+    },
+    {
+      "name": "scalar_field_isolation_merchant_name_changed",
+      "outputItemId": 44444,
+      "outputCount": 3,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 300
+        }
+      ],
+      "merchantName": "Test Merchant Beta",
+      "locations": [
+        "Lion's Arch"
+      ],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "6805b4e7690185106162dd044b5069d0e3f0447a42c2fd54421cdb66cc0748fe"
+    },
+    {
+      "name": "empty_cost_lines",
+      "outputItemId": 19685,
+      "outputCount": 1,
+      "costLines": [],
+      "merchantName": "Merchant",
+      "locations": [],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "51f9eef92a8ab771c0d457aff8bbdf731890f43748855dabcc2565f7c0aeeddc"
     }
   ]
 }
