@@ -55,11 +55,41 @@ namespace GW2CraftingHelper.Services
         // M33 C1 (#12 diagnostics): gates the scroll-machinery diagnostic
         // logging in CraftingPlanView (wheel events, restore/guard writes
         // and state transitions). Default false; instrumentation only -
-        // never changes scroll/guard/restore behavior. Unlike
-        // ValueOwnMaterials (see above), this has no checkbox in the
-        // Settings tab; it is flipped via the persisted settings JSON for
-        // diagnosis.
+        // never changes scroll/guard/restore behavior.
+        // M39 (log system): SUBSUMED by LogDiagnosticsEnabled below per the
+        // tab-roadmap-proposal synthesis (Section 2.1) - the Settings tab
+        // now ships exactly ONE diagnostics checkbox (LogDiagnosticsEnabled),
+        // not two. This setting is kept defined (not removed) purely for
+        // backward compatibility with any already-persisted value: renaming
+        // the key outright would silently drop a hand-set true for existing
+        // users, whereas CraftingPlanView.ScrollDiagEnabled now reads BOTH
+        // this and LogDiagnosticsEnabled (a plain bool OR - trivially cheap,
+        // no extra I/O) so an old persisted true still gates the
+        // [scrolldiag] channel exactly as before. No UI checkbox for this
+        // one; new users only ever see LogDiagnosticsEnabled.
         public SettingEntry<bool> ScrollDiagnosticsEnabled { get; private set; }
+
+        // M39 (log system, d2-log-system.md Section 5): size cap for the
+        // module log file (data/module_log.jsonl), in bytes. Default 2 MB.
+        // Checked on every ModuleLog write (self-trimming) - see
+        // ModuleLogStore.AppendLine.
+        public SettingEntry<int> LogMaxSizeBytes { get; private set; }
+
+        // M39 (log system, d2-log-system.md Section 5): age-based retention
+        // for the module log file, in days. Default 14. Enforced once per
+        // session at Module.LoadAsync - see ModuleLogStore.PruneOlderThan.
+        public SettingEntry<int> LogRetentionDays { get; private set; }
+
+        // M39 (log system, d2-log-system.md Section 5/tab-roadmap-proposal
+        // Section 2.1): the ONE diagnostics toggle for the whole module -
+        // subsumes ScrollDiagnosticsEnabled above and additionally gates
+        // whether Debug-level ModuleLog entries reach the file sink (they
+        // always still land in the in-memory ring regardless - see
+        // ModuleLog's own policy). Default false, matching
+        // ScrollDiagnosticsEnabled's own prior default. Has a real Settings
+        // tab checkbox (idiom (a), immediate-apply, no Save button - see
+        // SettingsTabContent).
+        public SettingEntry<bool> LogDiagnosticsEnabled { get; private set; }
 
         public ModuleSettings(SettingCollection settings)
         {
@@ -102,6 +132,21 @@ namespace GW2CraftingHelper.Services
                 "ScrollDiagnosticsEnabled", false,
                 () => "Scroll diagnostics",
                 () => "Log scroll machinery events for debugging");
+
+            LogMaxSizeBytes = settings.DefineSetting(
+                "LogMaxSizeBytes", 2 * 1024 * 1024,
+                () => "Log max size (bytes)",
+                () => "Maximum size of the module log file on disk before old entries are trimmed");
+
+            LogRetentionDays = settings.DefineSetting(
+                "LogRetentionDays", 14,
+                () => "Log retention (days)",
+                () => "Number of days of module log history to keep on disk");
+
+            LogDiagnosticsEnabled = settings.DefineSetting(
+                "LogDiagnosticsEnabled", false,
+                () => "Diagnostics logging",
+                () => "Log fine-grained diagnostic events (including scroll machinery) to the Log tab and file");
         }
 
         /// <summary>
@@ -170,6 +215,9 @@ namespace GW2CraftingHelper.Services
             HomesteadMetalTier.Value = 0;
             HomesteadWoodTier.Value = 0;
             ScrollDiagnosticsEnabled.Value = false;
+            LogMaxSizeBytes.Value = 2 * 1024 * 1024;
+            LogRetentionDays.Value = 14;
+            LogDiagnosticsEnabled.Value = false;
         }
     }
 }

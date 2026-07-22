@@ -81,5 +81,83 @@ namespace GW2CraftingHelper.Services
             tier = parsed;
             return true;
         }
+
+        // M39 (log system, d2-log-system.md Section 5): the Settings tab
+        // accepts a human-friendly MB value for LogMaxSizeBytes ("2", not a
+        // raw byte count) and converts here. 1-1000 MB is a generous but
+        // still sane bound - large enough that no realistic retention
+        // policy is blocked, small enough to catch an obvious typo (e.g. an
+        // extra zero) before it is persisted.
+        private const int MinLogSizeMb = 1;
+        private const int MaxLogSizeMb = 1000;
+        private const long BytesPerMb = 1024L * 1024L;
+
+        /// <summary>
+        /// Attempts to parse <paramref name="text"/> as a positive integer
+        /// megabyte value (1-1000) and converts it to a byte count. Returns
+        /// false (with <paramref name="maxSizeBytes"/> set to 0) for null,
+        /// blank, non-numeric, or out-of-range input - mirrors TryParseTier's
+        /// own shape.
+        /// </summary>
+        public static bool TryParseLogMaxSizeMb(string text, out long maxSizeBytes)
+        {
+            maxSizeBytes = 0;
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            string trimmed = text.Trim();
+
+            if (!int.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out int parsedMb))
+            {
+                return false;
+            }
+
+            if (parsedMb < MinLogSizeMb || parsedMb > MaxLogSizeMb)
+            {
+                return false;
+            }
+
+            maxSizeBytes = parsedMb * BytesPerMb;
+            return true;
+        }
+
+        // M39 (log system, d2-log-system.md Section 5, tab-roadmap-proposal
+        // Section 2.1): "clamp 1-365" for LogRetentionDays.
+        private const int MinRetentionDays = 1;
+        private const int MaxRetentionDays = 365;
+
+        /// <summary>
+        /// Attempts to parse <paramref name="text"/> as a positive integer
+        /// retention-day count (1-365). Returns false (with
+        /// <paramref name="retentionDays"/> set to 0) for null, blank,
+        /// non-numeric, or out-of-range input.
+        /// </summary>
+        public static bool TryParseRetentionDays(string text, out int retentionDays)
+        {
+            retentionDays = 0;
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            string trimmed = text.Trim();
+
+            if (!int.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out int parsed))
+            {
+                return false;
+            }
+
+            if (parsed < MinRetentionDays || parsed > MaxRetentionDays)
+            {
+                return false;
+            }
+
+            retentionDays = parsed;
+            return true;
+        }
     }
 }
