@@ -338,6 +338,50 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // --- M38 (WP-08 / tests T7): the shipped ref/vendor_offers.json
+        // (13.3MB) was already exercised through the production
+        // VendorOfferLoader by the Homestead test above, but only for a
+        // 237-row subset - this pins the loader's parse of the *entire*
+        // file, guarding the WP-08 ReadToEnd->DeserializeAsync(Stream)
+        // switch (and the leading-BOM handling it depends on) against
+        // silent drift.
+        [Fact]
+        public void ShippedSeedFile_VendorOfferLoader_ParsesAllOffers()
+        {
+            string path = FindRepoFile(Path.Combine("ref", "vendor_offers.json"));
+            Assert.False(
+                string.IsNullOrEmpty(path),
+                "Could not locate ref/vendor_offers.json by walking up from the test assembly's directory.");
+
+            using (var stream = File.OpenRead(path))
+            {
+                var dataset = _loader.Load(stream);
+
+                Assert.Equal(1, dataset.SchemaVersion);
+                Assert.Equal(53529, dataset.Offers.Count);
+
+                Assert.All(dataset.Offers, o =>
+                {
+                    Assert.False(string.IsNullOrEmpty(o.OfferId));
+                    Assert.True(o.OutputItemId > 0);
+                    Assert.True(o.OutputCount > 0);
+
+                    // CostLines can legitimately be empty (e.g. free
+                    // Jukebox tracks), so only shape/non-null is checked.
+                    Assert.NotNull(o.CostLines);
+                });
+
+                // Keyed by the offer's own stable OfferId rather than list
+                // position, so a future re-scrape that merely reorders rows
+                // (without changing this row's content) does not trip this
+                // wire - only an actual content change should.
+                var knownOffer = dataset.Offers.Single(o =>
+                    o.OfferId == "00012ce13cdf45c768ceb6edb81af590edf658e90a582b02b65ccf89834024be");
+                Assert.Equal(84618, knownOffer.OutputItemId);
+                Assert.Equal("Drojkor, Spirit Squall", knownOffer.MerchantName);
+            }
+        }
+
         // FindRepoFile comes from Helpers/RepoFileLocator.cs.
     }
 }
