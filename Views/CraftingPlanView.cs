@@ -438,7 +438,33 @@ namespace GW2CraftingHelper.Views
         // used to repeat "_settings != null && _settings.ScrollDiagnosticsEnabled.Value"
         // verbatim. Pure property, same short-circuit null-guard, no behavior
         // change - see docs/KNOWN-ISSUES.md #12 for why this stays gated.
-        private bool ScrollDiagEnabled => _settings != null && _settings.ScrollDiagnosticsEnabled.Value;
+        // M39 (log system, tab-roadmap-proposal Section 2.1): ALSO true when
+        // the new unified LogDiagnosticsEnabled setting is on -
+        // LogDiagnosticsEnabled subsumes ScrollDiagnosticsEnabled (one
+        // Settings-tab checkbox for the whole module going forward), but
+        // ScrollDiagnosticsEnabled itself is kept readable here (a plain
+        // bool OR - trivially cheap, no extra I/O) so an already-persisted
+        // true for the old setting keeps gating this channel exactly as
+        // before, rather than silently losing it on upgrade - see
+        // ModuleSettings.ScrollDiagnosticsEnabled's own doc comment.
+        private bool ScrollDiagEnabled => _settings != null &&
+            (_settings.LogDiagnosticsEnabled.Value || _settings.ScrollDiagnosticsEnabled.Value);
+
+        /// <summary>
+        /// M39 (log system, d2-log-system.md Section 8): routes every
+        /// [scrolldiag] line to BOTH sinks - Blish's own Logger (unchanged,
+        /// additive) and the new module-wide ModuleLog at Debug level, tag
+        /// "scrolldiag" - so the channel is visible in-module via the Log
+        /// tab, gated on the same ScrollDiagEnabled the call sites already
+        /// check before formatting anything. Centralized here (rather than
+        /// duplicating the ModuleLog.Shared.Write call at each of the ~14
+        /// sites) so the tag/level is defined exactly once.
+        /// </summary>
+        private void LogScrollDiag(string message)
+        {
+            Logger.Debug(message);
+            ModuleLog.Shared.Write(ModuleLogLevel.Debug, "scrolldiag", message);
+        }
 
         #endregion // Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
 
@@ -623,6 +649,38 @@ namespace GW2CraftingHelper.Views
 
         #endregion // 6. The FrameTicker control (nested Control subclass) - KNOWN-ISSUES #12/#13
 
+        #region 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13, M39/WP-17
+
+        /// <summary>
+        /// Cancels every live FrameTicker (scroll-verify, resize-debounce,
+        /// wheel-wrap-verify) and resets their associated pending state.
+        /// Two callers: the top of every <see cref="Build"/> (a fresh build
+        /// cycle supersedes any ticker from the previous one - unchanged
+        /// behavior, just factored out of that method) and
+        /// Module.Unload (M39/WP-17: these tickers are parented to the
+        /// SpriteScreen, not this view's own control tree - see the ticker
+        /// fields' own comments - so nothing else tears them down if the
+        /// module unloads while a tab holding this view is open and a
+        /// ticker is mid-flight; each ticker also bails itself out on its
+        /// own next frame as a second line of defense, but Unload should
+        /// not depend on "one more frame runs after unload" being true).
+        /// </summary>
+        public void StopLiveTickers()
+        {
+            _scrollVerifyTicker?.Cancel();
+            _scrollVerifyTicker = null;
+            _resizeDebounceTicker?.Cancel();
+            _resizeDebounceTicker = null;
+            _wheelWrapVerifyTicker?.Cancel();
+            _wheelWrapVerifyTicker = null;
+            _resizeSettlePending = false;
+            _resizeScrollRestorePending = false;
+            _resizeScrollSavedOffset = 0;
+            _lastWheelEventUtc = null;
+        }
+
+        #endregion // 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13, M39/WP-17
+
         #region 3. Scroll preserve/restore/verify (continued) - KNOWN-ISSUES #12/#14/#19
 
         /// <summary>
@@ -661,8 +719,7 @@ namespace GW2CraftingHelper.Views
 
             if (diagEnabled)
             {
-                Logger.Debug("{0} write writer=SyncRestore frame={1} before={2:0.0000} after={3:0.0000} contentHeight={4} savedOffset={5} generation={6}",
-                    ScrollDiagTag, ScrollDiagFrame(), before, ratio, contentHeight, savedOffset, capturedGeneration);
+                LogScrollDiag($"{ScrollDiagTag} write writer=SyncRestore frame={ScrollDiagFrame()} before={before:0.0000} after={ratio:0.0000} contentHeight={contentHeight} savedOffset={savedOffset} generation={capturedGeneration}");
             }
 
             StartScrollVerify(capturedPanel, capturedGeneration, savedOffset, scrollbar);
@@ -734,8 +791,7 @@ namespace GW2CraftingHelper.Views
 
             if (ScrollDiagEnabled)
             {
-                Logger.Debug("{0} verify-armed frame={1} savedOffset={2} generation={3}",
-                    ScrollDiagTag, ScrollDiagFrame(), savedOffset, capturedGeneration);
+                LogScrollDiag($"{ScrollDiagTag} verify-armed frame={ScrollDiagFrame()} savedOffset={savedOffset} generation={capturedGeneration}");
             }
 
             bool VerifyTick(GameTime gameTime)
@@ -752,8 +808,7 @@ namespace GW2CraftingHelper.Views
                 {
                     if (diagEnabled)
                     {
-                        Logger.Debug("{0} verify exit reason=stale-generation frame={1} realFrame={2} generation={3} liveGeneration={4}",
-                            ScrollDiagTag, ScrollDiagFrame(), frame, capturedGeneration, _scrollRestoreGeneration);
+                        LogScrollDiag($"{ScrollDiagTag} verify exit reason=stale-generation frame={ScrollDiagFrame()} realFrame={frame} generation={capturedGeneration} liveGeneration={_scrollRestoreGeneration}");
                     }
                     return false;
                 }
@@ -770,8 +825,7 @@ namespace GW2CraftingHelper.Views
                     {
                         if (diagEnabled)
                         {
-                            Logger.Debug("{0} verify exit reason=wheel-observed frame={1} realFrame={2}",
-                                ScrollDiagTag, ScrollDiagFrame(), frame);
+                            LogScrollDiag($"{ScrollDiagTag} verify exit reason=wheel-observed frame={ScrollDiagFrame()} realFrame={frame}");
                         }
                         return false;
                     }
@@ -803,16 +857,14 @@ namespace GW2CraftingHelper.Views
 
                         if (diagEnabled)
                         {
-                            Logger.Debug("{0} write writer=Verify/zeroReassert frame={1} realFrame={2} before={3:0.0000} after={4:0.0000} contentHeight={5} bounceCount={6}",
-                                ScrollDiagTag, ScrollDiagFrame(), frame, current, target, contentHeight, zeroReassert);
+                            LogScrollDiag($"{ScrollDiagTag} write writer=Verify/zeroReassert frame={ScrollDiagFrame()} realFrame={frame} before={current:0.0000} after={target:0.0000} contentHeight={contentHeight} bounceCount={zeroReassert}");
                         }
 
                         if (zeroReassert >= ScrollVerifyZeroReassertCap)
                         {
                             if (diagEnabled)
                             {
-                                Logger.Debug("{0} verify exit reason=zero-reassert-cap-exceeded frame={1} realFrame={2} bounceCount={3}",
-                                    ScrollDiagTag, ScrollDiagFrame(), frame, zeroReassert);
+                                LogScrollDiag($"{ScrollDiagTag} verify exit reason=zero-reassert-cap-exceeded frame={ScrollDiagFrame()} realFrame={frame} bounceCount={zeroReassert}");
                             }
                             return false;
                         }
@@ -825,8 +877,7 @@ namespace GW2CraftingHelper.Views
                         // re-assert over legitimate user input.
                         if (diagEnabled)
                         {
-                            Logger.Debug("{0} verify exit reason=user-scroll-detected frame={1} realFrame={2} observed={3:0.0000} target={4:0.0000} contentHeight={5}",
-                                ScrollDiagTag, ScrollDiagFrame(), frame, current, target, contentHeight);
+                            LogScrollDiag($"{ScrollDiagTag} verify exit reason=user-scroll-detected frame={ScrollDiagFrame()} realFrame={frame} observed={current:0.0000} target={target:0.0000} contentHeight={contentHeight}");
                         }
                         return false;
                     }
@@ -840,8 +891,7 @@ namespace GW2CraftingHelper.Views
                         // fighting the restore.
                         if (diagEnabled)
                         {
-                            Logger.Debug("{0} verify exit reason=stable frame={1} realFrame={2} target={3:0.0000} contentHeight={4}",
-                                ScrollDiagTag, ScrollDiagFrame(), frame, target, contentHeight);
+                            LogScrollDiag($"{ScrollDiagTag} verify exit reason=stable frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
                         }
                         return false;
                     }
@@ -853,8 +903,7 @@ namespace GW2CraftingHelper.Views
 
                     if (diagEnabled)
                     {
-                        Logger.Debug("{0} verify exit reason=max-frames frame={1} realFrame={2} target={3:0.0000} contentHeight={4}",
-                            ScrollDiagTag, ScrollDiagFrame(), frame, target, contentHeight);
+                        LogScrollDiag($"{ScrollDiagTag} verify exit reason=max-frames frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
                     }
                     return false;
                 }
@@ -865,8 +914,7 @@ namespace GW2CraftingHelper.Views
                     Logger.Warn(ex, "Scroll verify stopped by exception");
                     if (diagEnabled)
                     {
-                        Logger.Debug("{0} verify exit reason=disposed-exception frame={1} realFrame={2} error={3}",
-                            ScrollDiagTag, ScrollDiagFrame(), frame, ex.GetType().Name);
+                        LogScrollDiag($"{ScrollDiagTag} verify exit reason=disposed-exception frame={ScrollDiagFrame()} realFrame={frame} error={ex.GetType().Name}");
                     }
                     return false;
                 }
@@ -1068,8 +1116,7 @@ namespace GW2CraftingHelper.Views
 
             if (ScrollDiagEnabled)
             {
-                Logger.Debug("{0} write writer=WheelWrapFix frame={1} rawIn={2} intendedDelta={3} before={4:0.0000} after={5:0.0000}",
-                    ScrollDiagTag, ScrollDiagFrame(), rawIn, intendedDelta, before, after);
+                LogScrollDiag($"{ScrollDiagTag} write writer=WheelWrapFix frame={ScrollDiagFrame()} rawIn={rawIn} intendedDelta={intendedDelta} before={before:0.0000} after={after:0.0000}");
             }
 
             StartWheelWrapVerify(scrollbar, after);
@@ -1120,8 +1167,7 @@ namespace GW2CraftingHelper.Views
                         scrollbar.ScrollDistance = target;
                         if (diagEnabled)
                         {
-                            Logger.Debug("{0} write writer=WheelWrapFix/reassert frame={1} before={2:0.0000} after={3:0.0000}",
-                                ScrollDiagTag, ScrollDiagFrame(), current, target);
+                            LogScrollDiag($"{ScrollDiagTag} write writer=WheelWrapFix/reassert frame={ScrollDiagFrame()} before={current:0.0000} after={target:0.0000}");
                         }
                         return false;
                     }
@@ -1167,10 +1213,7 @@ namespace GW2CraftingHelper.Views
             int wheelValue = GameService.Input.Mouse.State.ScrollWheelValue;
             bool verifyLive = _scrollVerifyTicker != null && _scrollVerifyTicker.IsActive;
 
-            Logger.Debug(
-                "{0} wheel frame={1} sign={2} raw={3} scrollDistance={4:0.0000} contentHeight={5} verifyLive={6}",
-                ScrollDiagTag, ScrollDiagFrame(), System.Math.Sign(wheelValue), wheelValue,
-                scrollbar?.ScrollDistance ?? -1f, contentHeight, verifyLive);
+            LogScrollDiag($"{ScrollDiagTag} wheel frame={ScrollDiagFrame()} sign={System.Math.Sign(wheelValue)} raw={wheelValue} scrollDistance={(scrollbar?.ScrollDistance ?? -1f):0.0000} contentHeight={contentHeight} verifyLive={verifyLive}");
         }
 
         #endregion // 4. Wheel-wrap correction (continued) - KNOWN-ISSUES #12 (reopened)
@@ -1401,23 +1444,12 @@ namespace GW2CraftingHelper.Views
             // here.
 
             // Cleanup for any leftover scroll-verify/resize-debounce/
-            // wheel-wrap-verify tickers from the previous build cycle -
-            // see the field comments above. Reset _resizeSettlePending
-            // too, or a ticker canceled mid-debounce here would leave it
-            // stuck true and silently disable all future resize
-            // debouncing. Also drop any wheel-recency state from the
-            // previous render's tab so it cannot influence a brand new
-            // one's verify window.
-            _scrollVerifyTicker?.Cancel();
-            _scrollVerifyTicker = null;
-            _resizeDebounceTicker?.Cancel();
-            _resizeDebounceTicker = null;
-            _wheelWrapVerifyTicker?.Cancel();
-            _wheelWrapVerifyTicker = null;
-            _resizeSettlePending = false;
-            _resizeScrollRestorePending = false;
-            _resizeScrollSavedOffset = 0;
-            _lastWheelEventUtc = null;
+            // wheel-wrap-verify tickers from the previous build cycle, plus
+            // their associated pending state - see StopLiveTickers' own
+            // doc comment (M39 factored this block out into a named method
+            // so Module.Unload can also call it - see that method's doc
+            // comment for why unload needs the same cleanup).
+            StopLiveTickers();
 
             _buildPanel = buildPanel;
             int w = buildPanel.ContentRegion.Width;
@@ -1743,8 +1775,7 @@ namespace GW2CraftingHelper.Views
 
             if (ScrollDiagEnabled)
             {
-                Logger.Debug("{0} write writer=ResizePreserve frame={1} before={2:0.0000} after={3:0.0000} contentHeight={4} savedOffset={5} newHeight={6}",
-                    ScrollDiagTag, ScrollDiagFrame(), before, ratio, contentHeight, savedOffsetPx, newContentPanelHeight);
+                LogScrollDiag($"{ScrollDiagTag} write writer=ResizePreserve frame={ScrollDiagFrame()} before={before:0.0000} after={ratio:0.0000} contentHeight={contentHeight} savedOffset={savedOffsetPx} newHeight={newContentPanelHeight}");
             }
         }
 
