@@ -2205,6 +2205,44 @@ for these three audits) gets its own small delta-audit before the
 desktop wave - the orchestrator handles scheduling that, not this
 session.
 
+## 32. StyleCop analyzer debt: SA1101/SA1200 suppressed, smaller rules tracked (M38 WP-02)
+A code-review finding on the WP-02 ruleset (473a9e9) caught that its stated
+purpose - "suppresses only the rules that actively fight this codebase's
+documented, deliberate house style; everything else stays at default severity
+so drift gets caught for free" - was false for the two highest-volume
+default-severity rules, and that the commit's own claim to have "reported
+separately" the resulting pre-existing-violation counts pointed at nothing
+(this entry is that report). A forced-recompile diagnostic build (`dotnet
+build GW2CraftingHelper.csproj -p:Platform=x64 -t:Rebuild`) measured:
+
+- SA1101 (prefix local calls with this): 1467 warnings across 46 of 118
+  compiled files. No call site anywhere in the codebase uses this-
+  qualification, so the rule was fighting an established convention, not
+  catching drift against one.
+- SA1200 (using directive must appear within the namespace): 364 warnings
+  across 93 of 118 files (79%). Usings are placed outside the namespace
+  everywhere, the opposite of what the rule wants.
+
+Together these two rules were 61% (1831/2978) of every warning the ruleset
+produced on a clean build - loud enough to bury the 39% that is real,
+actionable drift. Both are now suppressed in `GW2CraftingHelper.ruleset` with
+the same style of inline rationale as the pre-existing SA1309 suppression,
+for the same reason: they contradict the codebase's actual, near-universal
+convention rather than catching drift against it.
+
+The remaining default-severity rules with a non-trivial pre-existing
+footprint (measured on the same rebuild; left enabled per WP-02's original
+scope, which only committed to preserving SA1500/one-statement-per-line/
+using-order at default severity) are recorded here as candidates for a
+future cleanup wave - not suppressed and not fixed in this change:
+
+- SA1413 (trailing comma in multi-line initializers): 253 warnings / 45 files.
+- SA1516 (blank line required between members): 174 warnings / 49 files.
+- SA1503 (braces should not be omitted): 123 warnings / 20 files.
+
+None of this is a behavior change - severity stays warning, never error, per
+WP-02's design; only the suppression list and this doc entry changed.
+
 ## M37 desktop-wave observations (2026-07-22)
 Open notes from the live desktop session that verified items 29 and 30
 above (screenshot loop on the merged M37 build over the isolated

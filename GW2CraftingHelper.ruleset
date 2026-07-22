@@ -31,6 +31,27 @@
          those same fields - leaving it on would contradict the naming convention this
          same change encodes, not "catch drift" against it. -->
     <Rule Id="SA1309" Action="None" /> <!-- FieldNamesMustNotBeginWithUnderscore -->
+
+    <!-- SA1101 ("prefix local calls with this") and SA1200 ("using directive
+         must appear within a namespace") were left at default severity when
+         this ruleset first landed, on the assumption they were "already 100%
+         followed" (a6-csharp.md section 9) and would therefore only catch
+         future drift. A forced-recompile diagnostic build of this exact
+         codebase measured that assumption false: SA1101 fires 1467 times
+         across 46 of 118 compiled files (no call site anywhere in the
+         codebase uses this-qualification) and SA1200 fires 364 times across
+         93 of 118 files, 79% (usings are always placed outside the
+         namespace, the opposite of what the rule wants). Together the two
+         are 61% (1831/2978) of every warning this ruleset produced on a
+         clean build of pre-existing code - loud enough to bury the 39% that
+         is real, actionable drift, which defeats this file's own stated
+         purpose. Suppressed for the same reason as SA1309 above: they
+         contradict the codebase's actual, near-universal convention rather
+         than catching drift against it. See docs/KNOWN-ISSUES.md #32 for the
+         measurement and the smaller-scale rules (SA1413/SA1516/SA1503) that
+         remain enabled as tracked cleanup-wave candidates. -->
+    <Rule Id="SA1101" Action="None" /> <!-- PrefixLocalCallsWithThis -->
+    <Rule Id="SA1200" Action="None" /> <!-- UsingDirectivesMustBePlacedCorrectly -->
   </Rules>
   <Rules AnalyzerId="Microsoft.CodeAnalysis.CSharp.NetAnalyzers" RuleNamespace="Microsoft.CodeAnalysis.CSharp.NetAnalyzers">
     <!-- Not currently produced (no NetAnalyzers package is referenced by this project),
