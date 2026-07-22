@@ -32,10 +32,6 @@ namespace GW2CraftingHelper.Contracts
         public bool IsPlanTarget { get; set; }
     }
 
-    // TODO: Consider renaming to IPlanTargetSearchProvider if the seam's
-    //       semantics expand beyond simple item search (e.g. filtering by
-    //       discipline, rarity, or account unlock status).
-
     /// <summary>
     /// Provides searchable access to items that are valid plan targets.
     /// <para>
