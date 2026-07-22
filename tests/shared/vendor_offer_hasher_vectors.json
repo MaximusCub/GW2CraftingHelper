@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "sourceHashers": [
+    "Services/VendorOfferHasher.cs",
+    "tools/VendorOfferUpdater/VendorOfferHasher.cs"
+  ],
+  "vectors": [
+    {
+      "name": "coin_cost_only",
+      "outputItemId": 19685,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 100
+        }
+      ],
+      "merchantName": "Merchant",
+      "locations": [
+        "Lion's Arch"
+      ],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "5790a63735605dc476b0de9837beb56a5312b315432df9a3436b0f5c17a17ee3"
+    },
+    {
+      "name": "currency_cost_karma",
+      "outputItemId": 71358,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 2,
+          "count": 924
+        }
+      ],
+      "merchantName": "Cadet Ostin",
+      "locations": [
+        "Stronghold of Ebonhawke"
+      ],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "4cbbf4e9226dee35ef8eb71317684b613ddedc3bc0d9e4abaa63cf380746ead1"
+    },
+    {
+      "name": "item_cost_only",
+      "outputItemId": 102205,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Item",
+          "id": 19697,
+          "count": 8
+        }
+      ],
+      "merchantName": "Homestead Refinement - Metal Forge",
+      "locations": [],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "d9faa4182d0689598e5e38ac6e268b77f9aa607cd4786110985366d5658d1ce4"
+    },
+    {
+      "name": "mixed_costs_coin_item_currency",
+      "outputItemId": 19685,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 250
+        },
+        {
+          "type": "Item",
+          "id": 19697,
+          "count": 5
+        },
+        {
+          "type": "Currency",
+          "id": 2,
+          "count": 1000
+        }
+      ],
+      "merchantName": "Merchant",
+      "locations": [
+        "Divinity's Reach",
+        "Lion's Arch"
+      ],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "b8f9db4937e994f39136c6cfdf9d1065dffcb0fa1c0623345d899e0e0362b929"
+    },
+    {
+      "name": "daily_cap_only",
+      "outputItemId": 19685,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 100
+        }
+      ],
+      "merchantName": "Merchant",
+      "locations": [],
+      "dailyCap": 5,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "b7f597ad03d3b5eb76684e5e9aa8ad81308e039a93927916d0731d098b5cde67"
+    },
+    {
+      "name": "weekly_cap_only",
+      "outputItemId": 19685,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 100
+        }
+      ],
+      "merchantName": "Merchant",
+      "locations": [],
+      "dailyCap": null,
+      "weeklyCap": 10,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "622dee090ea4c9ff48326b2175f8ed7ce08198e4e538fd9277124c052a37f66a"
+    },
+    {
+      "name": "seasonal_cap_only",
+      "outputItemId": 19675,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 63,
+          "count": 60
+        }
+      ],
+      "merchantName": "Wizard's Vault",
+      "locations": [],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": 20,
+      "expectedOfferId": "a30ae3708b74c8c4675f733cd5f0abe6737683eaf8fe5740ebba3bbc9c3c3ec7"
+    },
+    {
+      "name": "homestead_tier_only",
+      "outputItemId": 102205,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Item",
+          "id": 19697,
+          "count": 8
+        }
+      ],
+      "merchantName": "Homestead Refinement - Metal Forge",
+      "locations": [],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": 1,
+      "seasonalCap": null,
+      "expectedOfferId": "5eaaf1a182c7fb681dfee9655820a861990599e7bc8fa9434a0bbaef8927e50c"
+    },
+    {
+      "name": "homestead_tier_zero_distinct_from_null",
+      "outputItemId": 102205,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Item",
+          "id": 19697,
+          "count": 8
+        }
+      ],
+      "merchantName": "Homestead Refinement - Metal Forge",
+      "locations": [],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": 0,
+      "seasonalCap": null,
+      "expectedOfferId": "a96ce1c7bb7ef83fff1368aae4a3057fb1774053feb2ce7be9f2b64d82b1030f"
+    },
+    {
+      "name": "all_optional_fields_distinct_field_order_guard",
+      "outputItemId": 19685,
+      "outputCount": 1,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 100
+        }
+      ],
+      "merchantName": "Merchant",
+      "locations": [
+        "Lion's Arch"
+      ],
+      "dailyCap": 5,
+      "weeklyCap": 10,
+      "homesteadTier": 1,
+      "seasonalCap": 20,
+      "expectedOfferId": "b737a1d1948a409ba717d5e0c3269ee88aaa5c7e5d28ad5f1d5e8f73f099575f"
+    },
+    {
+      "name": "output_count_five",
+      "outputItemId": 19685,
+      "outputCount": 5,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 500
+        }
+      ],
+      "merchantName": "Merchant",
+      "locations": [],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "343edd49d4ec7639039216409bb1afde5ca36863829564a81ffa363d81e23289"
+    },
+    {
+      "name": "output_count_large_batch",
+      "outputItemId": 19685,
+      "outputCount": 250,
+      "costLines": [
+        {
+          "type": "Currency",
+          "id": 1,
+          "count": 25000
+        }
+      ],
+      "merchantName": "Merchant",
+      "locations": [],
+      "dailyCap": null,
+      "weeklyCap": null,
+      "homesteadTier": null,
+      "seasonalCap": null,
+      "expectedOfferId": "cbef8196645256744d164c0794f0cfba22a53c486017c4e7606b88b0d8a5ef0e"
+    }
+  ]
+}
