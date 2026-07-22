@@ -794,11 +794,7 @@ namespace GW2CraftingHelper.Services
             return result;
         }
 
-        /// <summary>
-        /// Return shape for FetchPricedVendorContextAsync - the vendor
-        /// offers queried for a request's item ids, paired with the price
-        /// dictionary after merging in any vendor-only cost-item prices.
-        /// </summary>
+        /// <summary>Vendor offers for a request, paired with vendor-augmented prices.</summary>
         private readonly struct PricedVendorContext
         {
             public PricedVendorContext(
@@ -815,15 +811,9 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Queries vendor offers for the given item ids (Step 4 of every
-        /// Generate*Async overload) and folds in TP prices for any vendor
-        /// cost-line items not already covered by <paramref name="prices"/>
-        /// - see AugmentWithVendorCostPricesAsync's own doc comment for why
-        /// that augmentation is needed. Vendor offers can charge ITEMS that
-        /// appear nowhere in the recipe tree (e.g. Gift of Glory costs 250x
-        /// Shard of Glory); without their prices the solver silently skips
-        /// the offer as unpriceable. Shared verbatim by GenerateAsync,
-        /// GenerateStructuredAsync, and GenerateStructuredMultiAsync.
+        /// Queries vendor offers for the given item ids, then augments prices for
+        /// vendor-only cost items not covered by the recipe-tree price fetch (see
+        /// AugmentWithVendorCostPricesAsync).
         /// </summary>
         private async Task<PricedVendorContext> FetchPricedVendorContextAsync(
             HashSet<int> allItemIds,
@@ -848,16 +838,9 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Awaits the decorative currency-metadata fetch kicked off earlier
-        /// (in parallel with item metadata), reporting progress and timing
-        /// exactly like every other pipeline step. Optional dependency: null
-        /// currencyTask (not wired up, e.g. the CLI harness) short-circuits
-        /// to a null result, in which case CurrencyCost rows stay text-only
-        /// via the offline Gw2Constants fallback (see PlanViewModelBuilder).
-        /// Any failure besides genuine caller cancellation is swallowed here
-        /// too, consistent with the service's own contract of returning an
-        /// empty result. Shared verbatim by GenerateAsync,
-        /// GenerateStructuredAsync, and GenerateStructuredMultiAsync.
+        /// Awaits the currency-metadata fetch started earlier. Null task or any
+        /// non-cancellation failure yields null (currency rows fall back to
+        /// text-only formatting via PlanViewModelBuilder's Gw2Constants fallback).
         /// </summary>
         private static async Task<IReadOnlyDictionary<int, CurrencyMetadata>> AwaitCurrencyMetadataOrNullAsync(
             Task<IReadOnlyDictionary<int, CurrencyMetadata>> currencyTask,
@@ -890,16 +873,10 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Fetches learned recipe ids (if the account client is wired up and
-        /// has permission), reporting progress and timing exactly like every
-        /// other pipeline step. KNOWN-ISSUES api-degradation F4: any
-        /// non-cancellation failure degrades to null (the same as never
-        /// having permission), mirroring AwaitCurrencyMetadataOrNullAsync's
-        /// own try/catch shape - PlanResultBuilder already treats null
-        /// learnedRecipeIds as a supported degraded state, so a transient
-        /// failure here must not discard an otherwise fully-successful,
-        /// fully-priced plan. Shared verbatim by GenerateStructuredAsync and
-        /// GenerateStructuredMultiAsync.
+        /// Fetches learned recipe ids if the account client is wired up and
+        /// permitted. KNOWN-ISSUES api-degradation F4: any non-cancellation
+        /// failure degrades to null, a state PlanResultBuilder already treats
+        /// as supported rather than discarding an otherwise-priced plan.
         /// </summary>
         private async Task<ISet<int>> FetchLearnedRecipeIdsAsync(
             IProgress<PlanStatus> progress,
@@ -931,10 +908,8 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Prepends the timing log (plus its PlanTimingAnalyzer summary) to
-        /// <paramref name="result"/>.DebugLog, initializing the list if
-        /// PlanResultBuilder left it null. Shared verbatim by
-        /// GenerateStructuredAsync and GenerateStructuredMultiAsync.
+        /// Prepends the timing log and its PlanTimingAnalyzer summary to
+        /// <paramref name="result"/>.DebugLog, initializing the list if needed.
         /// </summary>
         private static void FinishTimingLog(CraftingPlanResult result, List<string> timingLog)
         {
