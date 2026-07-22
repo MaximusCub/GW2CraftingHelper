@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Contracts;
@@ -210,6 +211,28 @@ namespace GW2CraftingHelper.Services
             return children;
         }
 
+        /// <summary>
+        /// The single bridge between the solver's <see cref="AcquisitionSource"/> vocabulary
+        /// and the display-layer <see cref="CraftingDecision"/> vocabulary (M38 DO-NOT-TOUCH
+        /// #15 - see both enums' own doc comments for the full per-member mapping and why the
+        /// two vocabularies are deliberately kept separate).
+        ///
+        /// <see cref="AcquisitionSource.UnknownSource"/> has its own explicit arm rather than
+        /// falling into <c>default</c> - it is a genuinely reachable production value
+        /// (gw2efficiency's "Not sold or crafted": no recipe, no TP price, no vendor offer; see
+        /// PlanSolverTests.NoRecipeAndNoPrice_IsUnknownSource_WithAllFlagsFalse), so its mapping
+        /// to <see cref="CraftingDecision.Unknown"/> must be preserved verbatim.
+        /// <see cref="AcquisitionSource.Currency"/> is deliberately NOT given an arm: it cannot
+        /// reach this method today (the caller sets
+        /// <see cref="CraftingTreeNode.Decision"/> = <see cref="CraftingDecision.Currency"/>
+        /// directly for a non-"Item" node, before any decision lookup happens - see
+        /// <see cref="BuildNode"/>), so any call with it would mean that invariant broke.
+        /// Falling through to <c>default</c> - which now throws instead of silently returning
+        /// <see cref="CraftingDecision.Unknown"/> - is the one intentional behavior change this
+        /// method makes (M38 WP-05): it also fails loudly for any future
+        /// <see cref="AcquisitionSource"/> member added without a matching arm here, rather
+        /// than quietly mis-displaying it as Unknown.
+        /// </summary>
         private static CraftingDecision MapSource(AcquisitionSource source)
         {
             switch (source)
@@ -217,7 +240,10 @@ namespace GW2CraftingHelper.Services
                 case AcquisitionSource.Craft: return CraftingDecision.Craft;
                 case AcquisitionSource.BuyFromTp: return CraftingDecision.BuyFromTp;
                 case AcquisitionSource.BuyFromVendor: return CraftingDecision.BuyFromVendor;
-                default: return CraftingDecision.Unknown;
+                case AcquisitionSource.UnknownSource: return CraftingDecision.Unknown;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(source), source, "Unmapped AcquisitionSource - add a CraftingDecision case above.");
             }
         }
 
