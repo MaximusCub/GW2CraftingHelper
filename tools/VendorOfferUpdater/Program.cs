@@ -195,32 +195,13 @@ namespace VendorOfferUpdater
                         string existingCacheJson = await File.ReadAllTextAsync(wikiCachePath);
                         var existing = JsonSerializer.Deserialize<List<WikiVendorResult>>(
                             existingCacheJson) ?? new List<WikiVendorResult>();
-                        var merged = new Dictionary<string, WikiVendorResult>(
-                            StringComparer.Ordinal);
-                        foreach (var r in existing)
-                        {
-                            merged[r.PageName ?? string.Empty] = r;
-                        }
-                        int added = 0;
-                        int refreshed = 0;
-                        foreach (var r in wikiResults)
-                        {
-                            string key = r.PageName ?? string.Empty;
-                            if (merged.ContainsKey(key))
-                            {
-                                refreshed++;
-                            }
-                            else
-                            {
-                                added++;
-                            }
-                            merged[key] = r;
-                        }
-                        int unchanged = existing.Count - refreshed;
+                        var mergeResult = MergeWikiCache(existing, wikiResults);
                         Console.WriteLine(
-                            $"Merged wiki cache: {added} new + {refreshed} refreshed + " +
-                            $"{unchanged} unchanged = {merged.Count} total");
-                        wikiResults = merged.Values.ToList();
+                            $"Merged wiki cache: {mergeResult.Added} new + " +
+                            $"{mergeResult.Refreshed} refreshed + " +
+                            $"{mergeResult.Unchanged} unchanged = " +
+                            $"{mergeResult.Merged.Count} total");
+                        wikiResults = mergeResult.Merged;
                     }
                     string cacheJson = JsonSerializer.Serialize(wikiResults);
                     await File.WriteAllTextAsync(wikiCachePath, cacheJson);
@@ -404,6 +385,66 @@ namespace VendorOfferUpdater
             }
 
             Console.WriteLine();
+        }
+
+        /// <summary>
+        /// Result of merging a freshly-queried batch of wiki results into an
+        /// existing wiki-results cache. See <see cref="MergeWikiCache"/>.
+        /// </summary>
+        internal sealed class WikiCacheMergeResult
+        {
+            public List<WikiVendorResult> Merged { get; set; }
+            public int Added { get; set; }
+            public int Refreshed { get; set; }
+            public int Unchanged { get; set; }
+        }
+
+        /// <summary>
+        /// Merges freshly-queried wiki results into an existing wiki-results cache,
+        /// keyed by PageName. A fresh result for a PageName already present in the
+        /// cache always overwrites the cached entry in full (so newly-added fields,
+        /// e.g. purchase caps, are never silently discarded by a stale cached copy).
+        /// A cached PageName not present in the fresh batch is preserved unchanged.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static WikiCacheMergeResult MergeWikiCache(
+            List<WikiVendorResult> existing,
+            List<WikiVendorResult> fresh)
+        {
+            existing ??= new List<WikiVendorResult>();
+            fresh ??= new List<WikiVendorResult>();
+
+            var merged = new Dictionary<string, WikiVendorResult>(StringComparer.Ordinal);
+            foreach (var r in existing)
+            {
+                merged[r.PageName ?? string.Empty] = r;
+            }
+
+            int added = 0;
+            int refreshed = 0;
+            foreach (var r in fresh)
+            {
+                string key = r.PageName ?? string.Empty;
+                if (merged.ContainsKey(key))
+                {
+                    refreshed++;
+                }
+                else
+                {
+                    added++;
+                }
+                merged[key] = r;
+            }
+
+            int unchanged = existing.Count - refreshed;
+
+            return new WikiCacheMergeResult
+            {
+                Merged = merged.Values.ToList(),
+                Added = added,
+                Refreshed = refreshed,
+                Unchanged = unchanged
+            };
         }
 
         /// <summary>
