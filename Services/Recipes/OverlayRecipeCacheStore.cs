@@ -25,16 +25,21 @@ namespace GW2CraftingHelper.Services.Recipes
         private DateTime _lastFlushUtc = DateTime.MinValue;
         private int? _storedBuildId;
 
+        // M39 (WP-16 shape, d2-log-system.md Section 4.2): see StatusStore's
+        // matching field comment.
+        private readonly Action<string, Exception> _onError;
+
         private static readonly TimeSpan FlushDebounce = TimeSpan.FromSeconds(2);
 
         public RecipeCacheStats Stats => _stats;
 
-        public OverlayRecipeCacheStore(string dataDir)
+        public OverlayRecipeCacheStore(string dataDir, Action<string, Exception> onError = null)
         {
             _cacheDir = Path.Combine(dataDir, "recipe_cache");
             _searchPath = Path.Combine(_cacheDir, "search_overlay.json");
             _recipesPath = Path.Combine(_cacheDir, "recipes_overlay.json");
             _manifestPath = Path.Combine(_cacheDir, "overlay_manifest.json");
+            _onError = onError;
         }
 
         public void Load(int? currentGw2BuildId)
@@ -64,8 +69,7 @@ namespace GW2CraftingHelper.Services.Recipes
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine(
-                            $"Failed to load overlay manifest: {ex.Message}");
+                        _onError?.Invoke("Failed to load overlay manifest", ex);
                     }
                 }
 
@@ -96,8 +100,7 @@ namespace GW2CraftingHelper.Services.Recipes
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine(
-                            $"Failed to load search overlay: {ex.Message}");
+                        _onError?.Invoke("Failed to load search overlay", ex);
                         _searches = new Dictionary<int, IReadOnlyList<int>>();
                     }
                 }
@@ -118,8 +121,7 @@ namespace GW2CraftingHelper.Services.Recipes
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine(
-                            $"Failed to load recipe overlay: {ex.Message}");
+                        _onError?.Invoke("Failed to load recipe overlay", ex);
                         _recipes = new Dictionary<int, RawRecipe>();
                     }
                 }
@@ -245,7 +247,7 @@ namespace GW2CraftingHelper.Services.Recipes
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to persist recipe overlay: {ex.Message}");
+                _onError?.Invoke("Failed to persist recipe overlay", ex);
             }
         }
 
@@ -283,8 +285,7 @@ namespace GW2CraftingHelper.Services.Recipes
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(
-                    $"Failed to delete overlay files: {ex.Message}");
+                _onError?.Invoke("Failed to delete overlay files", ex);
             }
         }
     }

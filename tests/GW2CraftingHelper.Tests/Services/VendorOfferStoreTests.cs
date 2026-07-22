@@ -383,6 +383,40 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // --- M39 (WP-16 shape): onError callback, real IO failure. ---
+
+        [Fact]
+        public void LoadBaseline_StreamThrows_InvokesOnErrorInsteadOfThrowing()
+        {
+            string capturedMessage = null;
+            Exception capturedException = null;
+            var store = new VendorOfferStore(_tempDir, _loader, (message, ex) =>
+            {
+                capturedMessage = message;
+                capturedException = ex;
+            });
+
+            using (var badStream = new MemoryStream(Encoding.UTF8.GetBytes("not valid json")))
+            {
+                store.LoadBaseline(badStream);
+            }
+
+            Assert.NotNull(capturedMessage);
+            Assert.NotNull(capturedException);
+            Assert.False(store.HasAnyOffer(100));
+        }
+
+        [Fact]
+        public void LoadBaseline_NoOnErrorProvided_DoesNotThrowOnFailure()
+        {
+            var store = new VendorOfferStore(_tempDir, _loader);
+
+            using (var badStream = new MemoryStream(Encoding.UTF8.GetBytes("not valid json")))
+            {
+                store.LoadBaseline(badStream); // no-op onError default - must not throw
+            }
+        }
+
         // FindRepoFile comes from Helpers/RepoFileLocator.cs.
     }
 }

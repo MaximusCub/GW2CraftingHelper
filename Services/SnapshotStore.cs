@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using GW2CraftingHelper.Models;
 
@@ -9,9 +8,14 @@ namespace GW2CraftingHelper.Services
     {
         private readonly string _filePath;
 
-        public SnapshotStore(string dataDirectoryPath)
+        // M39 (WP-16 shape, d2-log-system.md Section 4.2): see StatusStore's
+        // matching field comment.
+        private readonly Action<string, Exception> _onError;
+
+        public SnapshotStore(string dataDirectoryPath, Action<string, Exception> onError = null)
         {
             _filePath = Path.Combine(dataDirectoryPath, "snapshot.json");
+            _onError = onError;
         }
 
         public AccountSnapshot LoadLatest()
@@ -24,11 +28,19 @@ namespace GW2CraftingHelper.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to load snapshot from {_filePath}: {ex.Message}");
+                _onError?.Invoke($"Failed to load snapshot from {_filePath}", ex);
                 return null;
             }
         }
 
+        // M39 (one-store-convention, tab-roadmap-proposal Section 2.2):
+        // previously a plain, non-atomic File.WriteAllText - the scout note
+        // three independent M38 design proposals (D2/D3/D4) each flagged as
+        // wrong (it claimed all three existing stores shared StatusStore's
+        // atomic .tmp+Replace pattern; this one did not). Switched to the
+        // same atomic pattern StatusStore.Save/VendorOfferStore.SaveOverlay
+        // already use, so a crash/power-loss mid-write can no longer leave
+        // a half-written snapshot.json that LoadLatest then fails to parse.
         public void Save(AccountSnapshot snapshot)
         {
             try
@@ -36,11 +48,21 @@ namespace GW2CraftingHelper.Services
                 string dir = Path.GetDirectoryName(_filePath);
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
                 string json = Serialize(snapshot);
-                File.WriteAllText(_filePath, json);
+                string tmpPath = _filePath + ".tmp";
+                File.WriteAllText(tmpPath, json);
+
+                if (File.Exists(_filePath))
+                {
+                    File.Replace(tmpPath, _filePath, null);
+                }
+                else
+                {
+                    File.Move(tmpPath, _filePath);
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to save snapshot to {_filePath}: {ex.Message}");
+                _onError?.Invoke($"Failed to save snapshot to {_filePath}", ex);
             }
         }
 
@@ -52,7 +74,7 @@ namespace GW2CraftingHelper.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to delete snapshot at {_filePath}: {ex.Message}");
+                _onError?.Invoke($"Failed to delete snapshot at {_filePath}", ex);
             }
         }
 
