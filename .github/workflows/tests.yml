@@ -11,6 +11,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: ASCII-only source check (advisory)
+        shell: bash
+        run: |
+          echo "CLAUDE.md requires ASCII-only .cs source. Listing current violations below;"
+          echo "this step is advisory (non-blocking) until the pre-existing violations it"
+          echo "found are cleaned up in a follow-up pass - see M38 WP-02."
+          violations=$(grep -rlP '[^\x00-\x7F]' --include='*.cs' . \
+            | grep -v '^\./packages/' | grep -v '/obj/' | grep -v '/bin/' || true)
+          if [ -n "$violations" ]; then
+            echo "$violations"
+          else
+            echo "(clean - no non-ASCII characters found in .cs source)"
+          fi
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
