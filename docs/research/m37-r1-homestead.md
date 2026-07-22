@@ -364,11 +364,11 @@ efficiency tiers + capacity maxed).
 | Input (item id) | Tier 0 | Tier 1 | Tier 2 |
 |---|---|---|---|
 | Green Wood Log (19723) | 20 -> 1 | 10 -> 1 | 5 -> 1 |
-| Hard Wood Log (19724) | 12 -> 1 | 6 -> 1 | 3 -> 1 |
-| Ancient Wood Log (19725) | 4 -> 1 | 2 -> 1 | 1 -> 1 |
-| Soft Wood Log (19726) | 4 -> 1 | 2 -> 1 | 1 -> 1 |
+| Hard Wood Log (19724) | 4 -> 1 | 2 -> 1 | 1 -> 1 |
+| Ancient Wood Log (19725) | 2 -> 1 | 1 -> 1 | 1 -> 2 |
+| Soft Wood Log (19726) | 12 -> 1 | 6 -> 1 | 3 -> 1 |
 | Elder Wood Log (19722) | 4 -> 1 | 2 -> 1 | 1 -> 1 |
-| Seasoned Wood Log (19727) | 2 -> 1 | 1 -> 1 | 1 -> 2 |
+| Seasoned Wood Log (19727) | 4 -> 1 | 2 -> 1 | 1 -> 1 |
 
 Max weekly output: 1050 Refined Homestead Wood/week fully upgraded.
 
@@ -886,9 +886,29 @@ raw-wikitext fetches of all four wiki pages (`Homestead`, `Homestead_Refinementâ
   `19725`=Ancient Wood Log, `19726`=Soft Wood Log, `19727`=Seasoned Wood Log, but the table
   had paired `19724` with "Soft Wood Log", `19725` with "Seasoned Wood Log", `19726` with
   "Hard Wood Log", and `19727` with "Ancient Wood Log" - Soft/Hard and Seasoned/Ancient
-  transposed. Corrected above: only the name column changed per row; the id column and every
-  ratio cell are untouched, since `ref/vendor_offers.json`'s rows key off the real item id
-  (confirmed correct) rather than this report's name column, so no runtime data was affected.
+  transposed. Corrected above: only the name column changed per row; the id column was left
+  untouched, since `ref/vendor_offers.json`'s rows key off the real item id (confirmed
+  correct) rather than this report's name column, so no runtime data was affected. **This
+  pass's claim that "every ratio cell" was also untouched and therefore fine was itself
+  wrong** - see the follow-up correction immediately below.
+- **Section 2.2, Lumber Mill table, ratio cells (second-pass correction).** A further
+  adversarial review caught what the previous correction introduced: moving the *name*
+  column onto the row whose *id* and *ratio* were left in place re-paired id-to-name
+  correctly but left name-to-ratio (and therefore id-to-ratio) wrong for 4 of the 6 rows,
+  including transplanting a real tier-2 output-doubling behavior onto the wrong material.
+  Re-fetched `wiki.guildwars2.com/index.php?title=Homestead_Refinement%E2%80%94Lumber_Mill&action=raw`
+  directly and confirmed the true per-material ratios: Green Wood Log (19723) 20/10/5 -> 1
+  (unchanged), Hard Wood Log (19724) 4/2/1 -> 1, Ancient Wood Log (19725) 2/1/1 -> 2 (its
+  tier-2 row's raw wikitext carries `quantity=2`, a real doubling), Soft Wood Log (19726)
+  12/6/3 -> 1, Elder Wood Log (19722) 4/2/1 -> 1 (unchanged), Seasoned Wood Log (19727)
+  4/2/1 -> 1 (no doubling - the previous table's `1->2` cell for Seasoned was fabricated by
+  the prior fix, carried over from Ancient's real ratio). The correct remediation was to move
+  the *id* column onto the row whose name+ratio were already correct, not the name column
+  onto the row whose id+ratio were left in place; applied that way this time. Table corrected
+  above. No runtime data was affected (`ref/vendor_offers.json` keys off item id and was never
+  derived from this report's table), but this report's own stated purpose as ground truth for
+  a future re-seed or test fixture was wrong for Hard/Ancient/Soft/Seasoned Wood Log until this
+  correction.
 
 **Independently confirmed, no changes needed:** every other quoted code body
 (`cheapestTree.ts`, `dailyCooldowns.ts`, `recipe-nesting`'s `api.d.ts`/`index.ts`) matches
@@ -897,7 +917,8 @@ supporting the "informational-only" claim; the live bundle's account-scoped
 `efficiencyTiers` persistence, `$watchGroup`, and `Account_HomesteadRefinementsController`
 wiring match exactly; all 11 item ids resolve to the names/types/rarities stated; the Metal
 Forge table, weekly-cap structure, and Black Market price ladder match the wiki exactly with
-no corrections needed (the Lumber Mill table required the id/name correction above); all
+no corrections needed (the Lumber Mill table required the id/name and, in a later pass, the
+ratio-cell correction above); all
 repo-side line numbers, counts (236 seeded Homestead offers: 183/28/25; 14,732 recipes;
 168-item Exordium BFS closure; 167-item Klobjarne Geirr BFS closure), and the absence of
 `MerchantName`/`Tier` usage in `PlanSolver.cs`/`PlanViewModelBuilder.cs`/`Views/` were
