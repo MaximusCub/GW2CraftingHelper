@@ -41,6 +41,15 @@ namespace GW2CraftingHelper
         private static readonly Logger Logger = Logger.GetLogger<Module>();
         private static readonly TimeSpan StaleThreshold = TimeSpan.FromMinutes(10);
 
+        // Bounds the whole multi-step account-snapshot fetch (wallet, bank,
+        // shared inventory, materials, one call per character) so a full
+        // network outage fails fast instead of stacking several ~100s HTTP
+        // timeouts sequentially (KNOWN-ISSUES 31b/api-degradation F6) -
+        // mirrors CurrencyMetadataService's own internal-timeout pattern,
+        // just with a larger budget since this fetch does far more work on
+        // a genuine success than a single /v2/currencies call.
+        private static readonly TimeSpan SnapshotFetchTimeout = TimeSpan.FromSeconds(60);
+
         internal ContentsManager ContentsManager => this.ModuleParameters.ContentsManager;
         internal DirectoriesManager DirectoriesManager => this.ModuleParameters.DirectoriesManager;
         internal Gw2ApiManager Gw2ApiManager => this.ModuleParameters.Gw2ApiManager;
@@ -77,7 +86,24 @@ namespace GW2CraftingHelper
         private Texture2D _emblemTexture;
 
         private CancellationTokenSource _refreshCts;
-        private bool _refreshInProgress;
+
+        // KNOWN-ISSUES 31a-F3 (nice-to-have): written in the finally of
+        // RefreshSnapshotInBackgroundAsync/UserRefreshAsync, which may
+        // resume on a ThreadPool continuation (Blish's XNA host installs no
+        // SynchronizationContext), and read from Update() on the main
+        // thread as a mutual-exclusion gate - a genuine cross-thread field,
+        // so it needs the visibility guarantee volatile provides even
+        // though no torn read is possible for a bool.
+        private volatile bool _refreshInProgress;
+
+        // KNOWN-ISSUES 31a-F1: bumped only by ClearCache; a fetch that
+        // captured an older value before starting must discard its result
+        // rather than commit over a cleared cache - see SnapshotEpochGuard.
+        // volatile for the same cross-thread reason as _refreshInProgress
+        // above: captured on the main thread (both refresh entry points run
+        // synchronously up to their first await) but re-checked on whatever
+        // thread the post-await continuation resumes on.
+        private volatile int _snapshotEpoch;
 
         [ImportingConstructor]
         public Module([Import("ModuleParameters")] ModuleParameters moduleParameters) : base(moduleParameters) { }
@@ -454,7 +480,43 @@ namespace GW2CraftingHelper
         {
             Logger.Info("Refreshing account snapshot...");
 
-            var snapshot = await _snapshotService.FetchSnapshotAsync(ct);
+            // Captured before the fetch starts (main thread - see the
+            // field's own comment) so the post-await commit below can
+            // detect a Clear Cache that ran while this fetch was still in
+            // flight (KNOWN-ISSUES 31a-F1).
+            int myEpoch = _snapshotEpoch;
+
+            AccountSnapshot snapshot;
+            using (var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+            {
+                timeoutCts.CancelAfter(SnapshotFetchTimeout);
+                try
+                {
+                    snapshot = await _snapshotService.FetchSnapshotAsync(timeoutCts.Token);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    // The internal timeout fired, not the caller's own
+                    // token - a genuine fetch failure (KNOWN-ISSUES
+                    // api-degradation F6), not a cancellation. Re-thrown as
+                    // a plain Exception so callers' "cancelled" catch
+                    // (which must stay silent) does not swallow it.
+                    throw new TimeoutException(
+                        $"Account snapshot fetch exceeded {SnapshotFetchTimeout.TotalSeconds:0}s.");
+                }
+            }
+
+            if (!SnapshotEpochGuard.ShouldCommit(myEpoch, _snapshotEpoch))
+            {
+                // Clear Cache ran while this fetch was in flight; committing
+                // now would resurrect data the user explicitly cleared
+                // (KNOWN-ISSUES 31a-F1). Drop the result - _currentSnapshot,
+                // _pendingSnapshot, _snapshotDirty, and the on-disk file are
+                // all left untouched.
+                Logger.Info("Discarding snapshot fetch superseded by Clear Cache (epoch {0} != {1})",
+                    myEpoch, _snapshotEpoch);
+                return null;
+            }
 
             _currentSnapshot = snapshot;
             _snapshotStore.Save(snapshot);
@@ -480,8 +542,15 @@ namespace GW2CraftingHelper
             try
             {
                 var snapshot = await FetchAndSaveSnapshotAsync(_refreshCts.Token);
-                var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
-                SaveStatusThreadSafe(status);
+                if (snapshot != null)
+                {
+                    var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
+                    SaveStatusThreadSafe(status);
+                }
+                // else: superseded by Clear Cache while this fetch was in
+                // flight (KNOWN-ISSUES 31a-F1, see SnapshotEpochGuard) -
+                // Clear Cache already wrote its own status; nothing further
+                // to report here.
             }
             catch (OperationCanceledException)
             {
@@ -520,6 +589,12 @@ namespace GW2CraftingHelper
 
         private void ClearCache()
         {
+            // Bumped before anything else so a snapshot fetch already in
+            // flight (which captured an epoch before this call ran) fails
+            // its post-await commit check (KNOWN-ISSUES 31a-F1) - see
+            // SnapshotEpochGuard and _snapshotEpoch's own doc comment.
+            _snapshotEpoch++;
+
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
             _refreshCts = null;
