@@ -6,6 +6,7 @@ using Blish_HUD.Input;
 using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
@@ -51,18 +52,19 @@ namespace GW2CraftingHelper.Views
         private const int SectionSpacing = 16;
 
         // M36 fix-pass (NICETOHAVE c): overall outer size (icon + both
-        // border edges) of CreateRarityFramedIcon's DEFAULT frame (32px
+        // border edges) of IconControls.CreateRarityFramedIcon's DEFAULT frame (32px
         // icon + 1px border each side - see that method's own default
         // parameters). Named so the row-height-vs-icon-frame arithmetic
         // comments this pass touches (CreateRecipeRow) reference one
         // source of truth instead of re-hardcoding "34" independently of
-        // CreateRarityFramedIcon's actual defaults.
+        // IconControls.CreateRarityFramedIcon's actual defaults.
         private const int RarityFramedIconOuterSize = 34;
 
-        // Shared divider greys. Both readable against the parchment texture;
-        // SectionDividerColor is the brighter of the two, one tier below the
-        // 180-grey structural separators (window chrome, unrelated to these).
-        private static readonly Color RowDividerColor = new Color(100, 100, 100);
+        // Section divider grey, readable against the parchment texture, one
+        // tier below the 180-grey structural separators (window chrome,
+        // unrelated to this). The row-divider twin (RowDividerColor) moved
+        // to Views/Rendering/LabelHelpers.cs alongside
+        // LabelHelpers.CreateRowDivider (M38 WP-21) - it had no other caller.
         private static readonly Color SectionDividerColor = new Color(130, 130, 130);
 
         /// <summary>
@@ -245,7 +247,7 @@ namespace GW2CraftingHelper.Views
         // MeasureString) replayed on EVERY resize tick via OnPanelResized -
         // see ReplayRelayout. _reellipsisActions holds the small subset of
         // sections that truncate text (Used Materials name, Shopping row
-        // name, Tree row name - the 3 EllipsizeToWidth call sites m2's
+        // name, Tree row name - the 3 LabelHelpers.EllipsizeToWidth call sites m2's
         // research inventoried); these are text-only (Label.Text/tooltip)
         // updates on already-existing controls, replayed only once at drag
         // settle - see RunReellipsis. Neither list ever changes a control's
@@ -259,7 +261,7 @@ namespace GW2CraftingHelper.Views
         // relayout tick already runs synchronously in OnPanelResized (no
         // debounce needed for pure width/position writes - see
         // ReplayRelayout); this debounce exists ONLY to bound how often the
-        // 3 EllipsizeToWidth call sites re-measure text, which is
+        // 3 LabelHelpers.EllipsizeToWidth call sites re-measure text, which is
         // comparatively expensive over a long shopping list or deep tree.
         // _resizeSettlePending gates a single in-flight settle ticker; each
         // real frame it checks whether ResizeDebounceMs has elapsed since
@@ -1893,7 +1895,7 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// M33 C2b: the settle-only text-measurement pass. Every relayout
         /// closure already ran (and re-ran) synchronously on every drag
-        /// tick via ReplayRelayout; this only re-runs the 3 EllipsizeToWidth
+        /// tick via ReplayRelayout; this only re-runs the 3 LabelHelpers.EllipsizeToWidth
         /// call sites' MEASURE work (Used Materials, Shopping List, Tree row
         /// names), since MeasureString is comparatively expensive to run on
         /// every tick across a long list/deep tree and the visible cost of
@@ -2337,7 +2339,7 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            var iconFrame = CreateRarityFramedIcon(
+            var iconFrame = IconControls.CreateRarityFramedIcon(
                 titlePanel, vm.TargetIconUrl, vm.TargetRarity, startX, iconY,
                 iconSize: iconSize, borderThickness: iconBorder);
 
@@ -2357,7 +2359,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = nameText,
                 Font = titleFont,
-                TextColor = GetRarityNameColor(vm.TargetRarity),
+                TextColor = RarityColors.GetRarityNameColor(vm.TargetRarity),
                 ShowShadow = true,
                 ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
@@ -2512,9 +2514,9 @@ namespace GW2CraftingHelper.Views
             // Divider under the header - identical chrome for every section.
             // M36: 2px, bottom-anchored inside the 30px headerPanel
             // (Location.Y = 28, i.e. headerPanel.Height - 2) - see
-            // CreateRowDivider's doc comment for why 1px is unsafe under
+            // LabelHelpers.CreateRowDivider's doc comment for why 1px is unsafe under
             // Blish's non-integer UI-scale GPU transform (KNOWN-ISSUES #23).
-            // NOT built via CreateRowDivider (headerPanel is not a row of a
+            // NOT built via LabelHelpers.CreateRowDivider (headerPanel is not a row of a
             // list, it has its own fixed 30px height) but it is built the
             // SAME way (a Panel child bottom-anchored near its parent's
             // bottom edge) and is subject to the identical Container.Paint
@@ -2653,129 +2655,6 @@ namespace GW2CraftingHelper.Views
 
         #endregion // 7. Section builders
 
-        #region 11. Generic control/format helpers - KNOWN-ISSUES #23 (CreateRowDivider divider math)
-
-        /// <summary>
-        /// 2px divider at the bottom edge of a row panel - the shared "list
-        /// row" chrome used by every table-style section except the tree
-        /// (which uses indent guidelines instead, per gw2e's own convention).
-        /// M36: was 1px, bottom-anchored via rowHeight - 1. Blish applies
-        /// its UI-scale (e.g. the "Normal" GW2 UI size's 0.897) as a real
-        /// GPU scale matrix, not an integer-pixel-snapped one, so a 1px-tall
-        /// quad rasterizes to 0.897 physical pixels - guaranteed physical
-        /// coverage is floor(0.897) = 0, i.e. it can disappear entirely
-        /// depending on scroll-offset sub-pixel alignment (KNOWN-ISSUES
-        /// #23). At 2px, floor(2 * 0.897) = floor(1.794) = 1 guarantees at
-        /// least one covered physical scanline for the divider's OWN
-        /// quad-vs-scissor math analyzed in isolation.
-        ///
-        /// M36b (KNOWN-ISSUES #23 follow-up): that isolated argument is
-        /// necessary but not sufficient. rowPanel is itself a Container, and
-        /// every Container.Paint() performs a SECOND, independent
-        /// floor/ceil round trip - it unscales the physical scissor it was
-        /// just given back to logical space (ScaleBy(1/UIScaleMultiplier))
-        /// before re-intersecting and re-scaling it for its own children
-        /// (Container.cs:377-381, Control.cs:1176-1177 in the decompiled
-        /// Blish HUD binary). That round trip can shrink the clip rectangle
-        /// propagated to the divider by exactly 1 logical pixel, but
-        /// provably only at the row's BOTTOM edge (the reconstructed START
-        /// never exceeds the true start - floor(floor(Y*s)/s) &lt;= Y for any
-        /// positive scale s). Whether that 1px shrink actually deletes the
-        /// divider depends on rowHeight: simulation across every rowHeight
-        /// in this file and all four GW2 UI Size scale factors (0.81 /
-        /// 0.897 / 1.0 / 1.103) shows 44px rows (CraftStepRowHeight,
-        /// RecipeRowHeightWithSublabel) and 32px rows (DisciplineRowHeight)
-        /// vanish completely (0 physical scanlines) at ~10.2% of scroll
-        /// phases at the default scale; 36px rows (UsedMaterialRowHeight,
-        /// ShoppingRowHeight, RecipeRowHeightNoSublabel) are immune at every
-        /// tested scale.
-        ///
-        /// Fix: bottomClearance - an extra logical pixel of gap between the
-        /// divider and rowHeight, i.e. Location.Y = rowHeight - 2 -
-        /// bottomClearance. This moves the divider's own interval entirely
-        /// inside the worst-case-shrunk clip window, which simulation
-        /// confirms is immune (0/5000 vanishes) for every (rowHeight, scale)
-        /// pair tested - proven, not just observed clean at one scale.
-        /// Callers pass 1 for the vulnerable 44px/32px row types above and 0
-        /// for the immune 36px row types (CreateUsedMaterialRow,
-        /// CreateShoppingRow, CreateRecipeRow's no-sublabel branch) - those
-        /// three were tuned in M36 to a flush icon(0..34) + divider(34..36)
-        /// fit with zero slack, and giving them clearance they don't need
-        /// would reintroduce the icon/divider overlap M36 fixed.
-        /// </summary>
-        private static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight, int bottomClearance)
-        {
-            return new Panel()
-            {
-                Size = new Point(panelWidth, 2),
-                Location = new Point(0, rowHeight - 2 - bottomClearance),
-                BackgroundColor = RowDividerColor,
-                Parent = rowPanel
-            };
-        }
-
-        private static Label CreateRightAlignedLabel(
-            Panel parent, string text, BitmapFont font, Color color, int rightEdgeX, int y)
-        {
-            int width = (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
-            return new Label()
-            {
-                Text = text ?? "",
-                Font = font,
-                TextColor = color,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(rightEdgeX - width, y),
-                Parent = parent
-            };
-        }
-
-        /// <summary>
-        /// Small grey informational tag (reuses the tree's Locked pill
-        /// styling) - used for the shopping list's source tag and anywhere
-        /// else a short non-interactive label needs pill chrome.
-        /// </summary>
-        private static Panel CreateSmallTag(Panel parent, string text, int x, int y)
-        {
-            var font = GameService.Content.DefaultFont12;
-            int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
-            int width = textWidth + 12;
-            GetPillColors(PillKind.Locked, false, out Color border, out Color fill);
-
-            var outer = new Panel()
-            {
-                Size = new Point(width, 18),
-                Location = new Point(x, y),
-                BackgroundColor = border,
-                Parent = parent
-            };
-            var inner = new Panel()
-            {
-                Size = new Point(width - 2, 16),
-                Location = new Point(1, 1),
-                BackgroundColor = fill,
-                Parent = outer
-            };
-            new Label()
-            {
-                Text = text,
-                Font = font,
-                // White, not border: the fill exposes the border hue behind
-                // the label, so border-colored text has zero contrast
-                // against its own backdrop - same fix as RenderDecisionPills
-                // (M30 #11); KNOWN-ISSUES #15 is this same bug on this tag.
-                TextColor = Color.White,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point((width - 2 - textWidth) / 2, 1),
-                Parent = inner
-            };
-
-            return outer;
-        }
-
-        #endregion // 11. Generic control/format helpers - KNOWN-ISSUES #23 (CreateRowDivider divider math)
-
         #region 7. Section builders (continued)
 
         // --- Used Materials section ---
@@ -2799,7 +2678,7 @@ namespace GW2CraftingHelper.Views
             // divider's top pixel by 1 row. Moving the icon up by 1 makes
             // frame height (34) + divider height (2) exactly fill rowHeight
             // with no overlap.
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
+            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
 
             const int nameX = 50;
             int qtyRightEdge = panelWidth - 8;
@@ -2810,12 +2689,12 @@ namespace GW2CraftingHelper.Views
             int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(qtyRightEdge, qtyWidth, 12, nameX);
 
             string fullName = row.Label ?? "";
-            string displayName = EllipsizeToWidth(font, fullName, nameMaxWidth);
+            string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
             var nameLabel = new Label()
             {
                 Text = displayName,
                 Font = font,
-                TextColor = GetRarityNameColor(row.Rarity),
+                TextColor = RarityColors.GetRarityNameColor(row.Rarity),
                 ShowShadow = true,
                 ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
@@ -2841,10 +2720,10 @@ namespace GW2CraftingHelper.Views
 
             // M36b: bottomClearance 0 - UsedMaterialRowHeight (36) is
             // immune to the Container.Paint round-trip defect (see
-            // CreateRowDivider's doc comment) and its icon frame is
+            // LabelHelpers.CreateRowDivider's doc comment) and its icon frame is
             // flush-fit with zero slack; giving it clearance it doesn't
             // need would reintroduce the icon/divider overlap M36 fixed.
-            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight, 0);
+            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 0);
 
             // M33 C2b: qty label position is a pure reposition (qtyWidth is
             // font-only); the name is left untouched during drag ticks and
@@ -2859,7 +2738,7 @@ namespace GW2CraftingHelper.Views
             _reellipsisActions.Add(w =>
             {
                 int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(w - 8, qtyWidth, 12, nameX);
-                string newDisplayName = EllipsizeToWidth(font, fullName, newMaxWidth);
+                string newDisplayName = LabelHelpers.EllipsizeToWidth(font, fullName, newMaxWidth);
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
@@ -2885,7 +2764,7 @@ namespace GW2CraftingHelper.Views
             var coinFont = GameService.Content.DefaultFont14;
 
             // Pre-scan: widest actual coin+currency value width per column
-            // this render (MeasureValueWidth accounts for a currency-only
+            // this render (CoinCurrencyRenderer.MeasureValueWidth accounts for a currency-only
             // or mixed row's icon(s) too, not just coin - KNOWN-ISSUES
             // #16). One pass over the section's rows (shopping lists run to
             // maybe 50-60 rows in practice) - negligible next to the
@@ -2894,10 +2773,10 @@ namespace GW2CraftingHelper.Views
             int maxTotalWidth = 0;
             foreach (var row in section.Rows)
             {
-                int eachW = MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
+                int eachW = CoinCurrencyRenderer.MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
                 if (eachW > maxEachWidth) maxEachWidth = eachW;
 
-                int totalW = MeasureValueWidth(row.CoinValue, row.CurrencyCosts, coinFont);
+                int totalW = CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, row.CurrencyCosts, coinFont);
                 if (totalW > maxTotalWidth) maxTotalWidth = totalW;
             }
 
@@ -2935,9 +2814,9 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(50, 4), Parent = rowPanel
             };
-            var amountLabel = CreateRightAlignedLabel(rowPanel, "Amount", font, color, edges.QtyRightEdge, 4);
-            var eachLabel = CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
-            var totalLabel = CreateRightAlignedLabel(rowPanel, "Total", font, color, edges.TotalRightEdge, 4);
+            var amountLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Amount", font, color, edges.QtyRightEdge, 4);
+            var eachLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
+            var totalLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Total", font, color, edges.TotalRightEdge, 4);
 
             // M33 C2b: header column labels are font-only (fixed text) -
             // pure reposition on every drag tick, recomputing edges from
@@ -2979,7 +2858,7 @@ namespace GW2CraftingHelper.Views
             // M36: y=0 (was 1) - see the identical note in
             // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
             // shape, same 1px shortfall against the new 2px divider.
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
+            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
 
             const int nameX = 50;
             var font = GameService.Content.DefaultFont14;
@@ -2990,12 +2869,12 @@ namespace GW2CraftingHelper.Views
 
             string fullName = row.Label ?? "";
             string hintText = row.HintText;
-            string displayName = EllipsizeToWidth(font, fullName, nameMaxWidth);
+            string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
             var nameLabel = new Label()
             {
                 Text = displayName,
                 Font = font,
-                TextColor = GetRarityNameColor(row.Rarity),
+                TextColor = RarityColors.GetRarityNameColor(row.Rarity),
                 ShowShadow = true,
                 ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
@@ -3032,9 +2911,13 @@ namespace GW2CraftingHelper.Views
             }
 
             string sourceTag = ShoppingSourceTag(row);
-            Panel tagPanel = !string.IsNullOrEmpty(sourceTag)
-                ? CreateSmallTag(rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9)
-                : null;
+            Panel tagPanel = null;
+            if (!string.IsNullOrEmpty(sourceTag))
+            {
+                GetPillColors(PillKind.Locked, false, out Color tagBorder, out Color tagFill);
+                tagPanel = LabelHelpers.CreateSmallTag(
+                    rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9, tagBorder, tagFill);
+            }
 
             var qtyLabel = new Label()
             {
@@ -3053,17 +2936,17 @@ namespace GW2CraftingHelper.Views
             // alongside/instead of coin; a row with neither (genuinely
             // unpriceable - gw2e: "Not sold or crafted") renders a dash,
             // never a blank cell (KNOWN-ISSUES #16).
-            var eachCell = RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
-            var totalCell = RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
+            var eachCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
+            var totalCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
 
             // M36b: bottomClearance 0 - ShoppingRowHeight (36) is immune to
-            // the Container.Paint round-trip defect (see CreateRowDivider's
+            // the Container.Paint round-trip defect (see LabelHelpers.CreateRowDivider's
             // doc comment) and its icon frame is flush-fit with zero
             // slack; see the identical note in CreateUsedMaterialRow.
-            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight, 0);
+            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 0);
 
             // M33 C2b: qty + Each/Total cells reposition every drag tick
-            // (no MeasureString - RepositionValueCellRightAligned uses only
+            // (no MeasureString - CoinCurrencyRenderer.RepositionValueCellRightAligned uses only
             // cached segment text widths). The name label and its source
             // tag are untouched here; both depend on ellipsis truncation
             // and only update at settle (RunReellipsis) below.
@@ -3072,15 +2955,15 @@ namespace GW2CraftingHelper.Views
                 var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
                 rowPanel.Size = new Point(w, rowHeight);
                 qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
-                RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
-                RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
+                CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
+                CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
                 if (divider != null) divider.Size = new Point(w, 2);
             });
             _reellipsisActions.Add(w =>
             {
                 var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
                 int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(e.QtyRightEdge, qtyWidth, 12, nameX);
-                string newDisplayName = EllipsizeToWidth(font, fullName, newMaxWidth);
+                string newDisplayName = LabelHelpers.EllipsizeToWidth(font, fullName, newMaxWidth);
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
@@ -3156,7 +3039,7 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, iconX, 5);
+            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, iconX, 5);
 
             var textFont = GameService.Content.DefaultFont16;
             var greyColor = new Color(170, 170, 170);
@@ -3180,7 +3063,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
-                Text = row.Label ?? "", Font = textFont, TextColor = GetRarityNameColor(row.Rarity),
+                Text = row.Label ?? "", Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
                 ShowShadow = true, ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(x, 13), Parent = rowPanel
@@ -3189,18 +3072,18 @@ namespace GW2CraftingHelper.Views
             Label sublabelLabel = null;
             if (!string.IsNullOrEmpty(row.Sublabel))
             {
-                sublabelLabel = CreateRightAlignedLabel(
+                sublabelLabel = LabelHelpers.CreateRightAlignedLabel(
                     rowPanel, row.Sublabel, GameService.Content.DefaultFont12,
                     new Color(153, 153, 153), panelWidth - 8, 16);
             }
 
             // M36b: bottomClearance 1 - CraftStepRowHeight (44) is
             // VULNERABLE to the Container.Paint round-trip defect (see
-            // CreateRowDivider's doc comment): its icon frame bottom
+            // LabelHelpers.CreateRowDivider's doc comment): its icon frame bottom
             // (iconY 5 + 34 = 39) sits 2px clear of the new divider top
             // (rowHeight-3 = 41), so the 1px shift is free of
             // icon-clearance side effects.
-            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
+            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
 
             // M33 C2b: name/qty labels sit at a fixed x (font-only, not
             // width-dependent - textX never depended on panelWidth); only
@@ -3235,7 +3118,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(leftX, 5), Parent = rowPanel
             };
-            var rightLabelControl = CreateRightAlignedLabel(rowPanel, rightLabel, font, Color.White, panelWidth - 8, 5);
+            var rightLabelControl = LabelHelpers.CreateRightAlignedLabel(rowPanel, rightLabel, font, Color.White, panelWidth - 8, 5);
 
             _relayoutActions.Add(w =>
             {
@@ -3265,18 +3148,18 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(8, 7), Parent = rowPanel
             };
-            var levelLabel = CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
+            var levelLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
 
             // M36b: bottomClearance 1 - DisciplineRowHeight (32) is
             // VULNERABLE to the Container.Paint round-trip defect (see
-            // CreateRowDivider's doc comment), same ~10.2% vanish rate as
+            // LabelHelpers.CreateRowDivider's doc comment), same ~10.2% vanish rate as
             // the 44px rows; the M36b investigation confirmed this via
             // simulation but omitted it from its fix list by oversight.
             // No icon in this row (two DefaultFont14 labels at y=7 only),
             // so there is no icon-clearance side effect to worry about -
             // the new divider top (rowHeight - 3 = 29) sits well clear of
             // the text baseline.
-            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
+            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
 
             _relayoutActions.Add(w =>
             {
@@ -3318,7 +3201,7 @@ namespace GW2CraftingHelper.Views
 
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, hasSublabel ? 1 : 0);
+            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, hasSublabel ? 1 : 0);
 
             var font = GameService.Content.DefaultFont14;
             int nameY = hasSublabel ? 4 : 8;
@@ -3326,7 +3209,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = row.Label ?? "",
                 Font = font,
-                TextColor = GetRarityNameColor(row.Rarity),
+                TextColor = RarityColors.GetRarityNameColor(row.Rarity),
                 ShowShadow = true,
                 ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
@@ -3361,18 +3244,18 @@ namespace GW2CraftingHelper.Views
                 {
                     statusColor = new Color(150, 200, 150);
                 }
-                statusLabel = CreateRightAlignedLabel(rowPanel, row.StatusTag, font, statusColor, panelWidth - 8, hasSublabel ? 10 : 8);
+                statusLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.StatusTag, font, statusColor, panelWidth - 8, hasSublabel ? 10 : 8);
             }
 
             // M36b: bottomClearance depends on which rowHeight this branch
             // used. hasSublabel (44px, RecipeRowHeightWithSublabel) is
             // VULNERABLE to the Container.Paint round-trip defect (see
-            // CreateRowDivider's doc comment) - icon frame bottom (1 + 34 =
+            // LabelHelpers.CreateRowDivider's doc comment) - icon frame bottom (1 + 34 =
             // 35) leaves ample headroom below rowHeight-3 (41). The
             // no-sublabel branch (36px, RecipeRowHeightNoSublabel) is
             // immune and flush-fit with zero slack (M36); giving it
             // clearance it doesn't need would reintroduce that overlap.
-            Panel divider = isLast ? null : CreateRowDivider(rowPanel, panelWidth, rowHeight, hasSublabel ? 1 : 0);
+            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, hasSublabel ? 1 : 0);
 
             _relayoutActions.Add(w =>
             {
@@ -3400,7 +3283,7 @@ namespace GW2CraftingHelper.Views
         private sealed class CostTileHandle
         {
             public Label CaptionLabel;
-            public SegmentLayoutHandle Segments;
+            public CoinCurrencyRenderer.SegmentLayoutHandle Segments;
         }
 
         private void CreateCostTileRow(List<PlanRowViewModel> coinRows, FlowPanel parent, int panelWidth)
@@ -3442,10 +3325,10 @@ namespace GW2CraftingHelper.Views
                     Parent = rowPanel
                 };
 
-                var segments = BuildCoinSegments(row.CoinValue, amountFont);
-                int segmentsWidth = TotalCoinSegmentsWidth(segments);
+                var segments = CoinCurrencyRenderer.BuildCoinSegments(row.CoinValue, amountFont);
+                int segmentsWidth = CoinCurrencyRenderer.TotalCoinSegmentsWidth(segments);
                 int coinStartX = tileX + PlanRelayoutMath.CenterX(geometry.TileWidth, segmentsWidth);
-                var segmentHandle = LayoutCoinSegments(rowPanel, segments, coinStartX, 30, amountFont);
+                var segmentHandle = CoinCurrencyRenderer.LayoutCoinSegments(rowPanel, segments, coinStartX, 30, amountFont);
 
                 tiles.Add(new CostTileHandle { CaptionLabel = captionLabel, Segments = segmentHandle });
             }
@@ -3464,9 +3347,9 @@ namespace GW2CraftingHelper.Views
 
                     tile.CaptionLabel.Location = new Point(tileX + PlanRelayoutMath.CenterX(g.TileWidth, tile.CaptionLabel.Width), 6);
 
-                    int segmentsWidth = ShoppingColumnMath.SegmentRunWidth(tile.Segments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
+                    int segmentsWidth = ShoppingColumnMath.SegmentRunWidth(tile.Segments.TextWidths, CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinLabelIconGap, CoinSegmentMath.CoinSegmentGap);
                     int coinStartX = tileX + PlanRelayoutMath.CenterX(g.TileWidth, segmentsWidth);
-                    RepositionSegments(tile.Segments, coinStartX, 30);
+                    CoinCurrencyRenderer.RepositionSegments(tile.Segments, coinStartX, 30);
                 }
             });
         }
@@ -3540,9 +3423,9 @@ namespace GW2CraftingHelper.Views
 
         // Sized between the tree/row item-icon (32px) and the coin-segment
         // icon (20px) since it sits inside a plain 28px text row; reuses
-        // CoinLabelIconGap (below, in the coin display helpers) for the
-        // text-to-icon gap so both follow the same "number/text first, gap,
-        // icon" convention.
+        // CoinSegmentMath.CoinLabelIconGap (M38 WP-21 findings fix: moved out of
+        // CoinCurrencyRenderer) for the text-to-icon gap so both follow the
+        // same "number/text first, gap, icon" convention.
         private const int CurrencyRowHeight = PlanContentHeightMath.CurrencyRowHeight;
         private const int CurrencyIconSize = 18;
 
@@ -3576,9 +3459,9 @@ namespace GW2CraftingHelper.Views
             int cursorX = 8 + label.Width;
             if (!string.IsNullOrEmpty(row.IconUrl))
             {
-                int iconX = cursorX + CoinLabelIconGap;
+                int iconX = cursorX + CoinSegmentMath.CoinLabelIconGap;
                 int iconY = (CurrencyRowHeight - CurrencyIconSize) / 2;
-                CreateItemIcon(rowPanel, row.IconUrl, iconX, iconY, CurrencyIconSize);
+                IconControls.CreateItemIcon(rowPanel, row.IconUrl, iconX, iconY, CurrencyIconSize);
                 cursorX = iconX + CurrencyIconSize;
             }
 
@@ -3591,7 +3474,7 @@ namespace GW2CraftingHelper.Views
                     TextColor = new Color(153, 153, 153),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(cursorX + CoinLabelIconGap, 4),
+                    Location = new Point(cursorX + CoinSegmentMath.CoinLabelIconGap, 4),
                     Parent = rowPanel
                 };
             }
@@ -3979,8 +3862,8 @@ namespace GW2CraftingHelper.Views
             // panels have no tint/filter property, so a translucent black
             // overlay approximates gw2e's grayscale+opacity filter).
             int iconX = indent + TreeCaretColWidth;
-            Color frameColor = dimmed ? new Color(60, 60, 60) : GetRarityBorderColor(node.Rarity);
-            CreateRarityFramedIcon(rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
+            Color frameColor = dimmed ? new Color(60, 60, 60) : RarityColors.GetRarityBorderColor(node.Rarity);
+            IconControls.CreateRarityFramedIcon(rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
             if (dimmed)
             {
                 new Panel()
@@ -4014,10 +3897,10 @@ namespace GW2CraftingHelper.Views
             int costRightEdge = edges.CostRightEdge;
 
             string fullName = node.Name ?? "";
-            string displayName = EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
+            string displayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
 
             Color qtyColor = new Color(170, 170, 170);
-            Color nameColor = GetRarityNameColor(node.Rarity);
+            Color nameColor = RarityColors.GetRarityNameColor(node.Rarity);
             if (dimmed)
             {
                 qtyColor *= 0.45f;
@@ -4062,7 +3945,7 @@ namespace GW2CraftingHelper.Views
                 (node.Decision == CraftingDecision.BuyFromTp ||
                  node.Decision == CraftingDecision.BuyFromVendor))
             {
-                extraTooltipLines.Add("Unit price: " + FormatCoinText(node.UnitCost.Value));
+                extraTooltipLines.Add("Unit price: " + CoinCurrencyRenderer.FormatCoinText(node.UnitCost.Value));
             }
             if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
             {
@@ -4084,16 +3967,16 @@ namespace GW2CraftingHelper.Views
             // Within that: a BuyFromVendor node priced wholly or partly in
             // a non-coin currency renders currency segments alongside/
             // instead of coin (sibling site to the shopping list's #16
-            // fix, same RenderValueCellRightAligned entry point); a
+            // fix, same CoinCurrencyRenderer.RenderValueCellRightAligned entry point); a
             // decision whose real cost is genuinely zero-and-uncosted
             // renders a dash instead of an invented "0".
-            ValueCellHandle costCell = null;
+            CoinCurrencyRenderer.ValueCellHandle costCell = null;
             if (node.SubtreeCost.HasValue)
             {
                 var costFont = GameService.Content.DefaultFont14;
                 var currencyAmounts = CurrencyDisplayResolver.ResolveAmounts(
                     node.VendorCurrencyCosts, _currentPlan?.CurrencyMetadata);
-                costCell = RenderValueCellRightAligned(
+                costCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
                     rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
             }
 
@@ -4184,7 +4067,7 @@ namespace GW2CraftingHelper.Views
 
             // M33 C2b: pills/cost cell reposition every drag tick (no
             // MeasureString - pill widths are already-known control Width,
-            // RepositionValueCellRightAligned uses only cached segment text
+            // CoinCurrencyRenderer.RepositionValueCellRightAligned uses only cached segment text
             // widths); childFlow's width tracks panelWidth with its Height
             // preserved exactly (never perturbs scroll - M33 C2a already
             // made every row/container height explicit). The name label is
@@ -4206,7 +4089,7 @@ namespace GW2CraftingHelper.Views
                 }
                 if (costCell != null)
                 {
-                    RepositionValueCellRightAligned(costCell, e.CostRightEdge, 12);
+                    CoinCurrencyRenderer.RepositionValueCellRightAligned(costCell, e.CostRightEdge, 12);
                 }
                 if (childFlow != null)
                 {
@@ -4217,7 +4100,7 @@ namespace GW2CraftingHelper.Views
             {
                 var e = PlanRelayoutMath.ComputeTreeColumnEdges(
                     w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
-                string newDisplayName = EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
+                string newDisplayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
@@ -4362,7 +4245,7 @@ namespace GW2CraftingHelper.Views
                 }
 
                 // Border simulated as an outer colored panel with a 1px-inset
-                // fill panel - same nesting technique as CreateRarityFramedIcon.
+                // fill panel - same nesting technique as IconControls.CreateRarityFramedIcon.
                 var outer = new Panel()
                 {
                     Size = new Point(pillWidth, 20),
@@ -4452,542 +4335,6 @@ namespace GW2CraftingHelper.Views
         }
 
         #endregion // 9. Decision pills
-
-        #region 10. Coin/currency value rendering primitives
-
-        // Plain "12g 34s 56c" text for contexts that cannot render coin
-        // icons (BasicTooltipText has no inline-image support).
-        private static string FormatCoinText(long copper)
-        {
-            if (copper < 0) copper = 0;
-            long gold = copper / 10000;
-            long silver = (copper % 10000) / 100;
-            long cop = copper % 100;
-            return $"{gold}g {silver}s {cop}c";
-        }
-
-        #endregion // 10. Coin/currency value rendering primitives
-
-        #region 11. Generic control/format helpers (continued)
-
-        /// <summary>
-        /// Truncates text to fit maxWidth, appending "..." when it doesn't
-        /// fit whole. Binary-searches the longest prefix (rather than
-        /// trimming one character at a time) since MeasureString is not
-        /// free and item names can run long.
-        /// </summary>
-        private static string EllipsizeToWidth(BitmapFont font, string text, int maxWidth)
-        {
-            if (string.IsNullOrEmpty(text)) return text ?? "";
-            if (maxWidth <= 0) return "";
-
-            int fullWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
-            if (fullWidth <= maxWidth) return text;
-
-            const string ellipsis = "...";
-            int ellipsisWidth = (int)System.Math.Ceiling(font.MeasureString(ellipsis).Width);
-            if (ellipsisWidth >= maxWidth)
-            {
-                // Degenerate (extremely narrow column): still show the
-                // ellipsis rather than nothing, so the row reads as
-                // "truncated" instead of "blank/broken".
-                return ellipsis;
-            }
-
-            int lo = 0, hi = text.Length;
-            while (lo < hi)
-            {
-                int mid = (lo + hi + 1) / 2;
-                int width = (int)System.Math.Ceiling(font.MeasureString(text.Substring(0, mid)).Width) + ellipsisWidth;
-                if (width <= maxWidth) lo = mid; else hi = mid - 1;
-            }
-            return lo <= 0 ? ellipsis : text.Substring(0, lo) + ellipsis;
-        }
-
-        /// <summary>
-        /// Standard GW2 rarity palette for icon borders. Unknown/absent
-        /// rarity renders a neutral dark grey - never guess a rarity.
-        /// </summary>
-        private static Color GetRarityBorderColor(string rarity)
-        {
-            switch (rarity)
-            {
-                case "Junk": return new Color(170, 170, 170);
-                // Deliberately NOT white: a white border reads as borderless
-                // next to the tinted frames around it (this row's icon frame
-                // in particular sits beside Fine/Rare/etc. frames that are
-                // clearly colored). Distinct from the (60, 60, 60)
-                // unknown/absent-rarity fallback below - M19 design intent.
-                case "Basic": return new Color(90, 90, 90);
-                case "Fine": return new Color(98, 164, 218);
-                case "Masterwork": return new Color(26, 147, 6);
-                case "Rare": return new Color(252, 208, 11);
-                case "Exotic": return new Color(255, 164, 5);
-                case "Ascended": return new Color(251, 62, 141);
-                case "Legendary": return new Color(160, 95, 240);
-                default: return new Color(60, 60, 60);
-            }
-        }
-
-        /// <summary>
-        /// GW2's in-game-bright rarity palette for item NAME text on Blish's
-        /// dark background (gw2efficiency's own name-color palette is
-        /// deliberately dimmed for a white page and is illegible here).
-        /// Unknown/absent rarity renders a neutral light grey - never guess.
-        /// </summary>
-        private static Color GetRarityNameColor(string rarity)
-        {
-            switch (rarity)
-            {
-                case "Junk": return new Color(170, 170, 170);
-                case "Basic": return new Color(255, 255, 255);
-                case "Fine": return new Color(98, 164, 218);
-                case "Masterwork": return new Color(26, 147, 6);
-                case "Rare": return new Color(252, 208, 11);
-                case "Exotic": return new Color(255, 164, 5);
-                case "Ascended": return new Color(251, 62, 141);
-                case "Legendary": return new Color(160, 95, 240);
-                default: return new Color(200, 200, 200);
-            }
-        }
-
-        #endregion // 11. Generic control/format helpers (continued)
-
-        #region 10. Coin/currency value rendering primitives (continued)
-
-        // --- Coin display helpers ---
-        //
-        // gw2e's Coins component renders NumberFormat(gold) -> icon ->
-        // NumberFormat(silver, zero-padded once gold precedes it) -> icon ->
-        // NumberFormat(copper, zero-padded once silver precedes it) -> icon,
-        // omitting leading all-zero units (a sub-1-gold amount starts at
-        // silver, un-padded). Segments are measured up front so the same
-        // spec list can be laid out left-anchored, right-anchored (table
-        // price columns), or centered (cost tiles) without re-measuring.
-
-        private const int CoinIconSize = 20;
-        private const int CoinLabelIconGap = 2;
-        private const int CoinSegmentGap = 6;
-
-        private struct CoinSegmentSpec
-        {
-            public int AssetId;
-            public string Text;
-            public int TextWidth;
-        }
-
-        private static List<CoinSegmentSpec> BuildCoinSegments(long copper, BitmapFont font)
-        {
-            if (copper < 0) copper = 0;
-
-            long gold = copper / 10000;
-            long silver = (copper % 10000) / 100;
-            long cop = copper % 100;
-
-            bool showGold = gold > 0;
-            bool showSilver = showGold || silver > 0;
-
-            var segments = new List<CoinSegmentSpec>(3);
-            if (showGold)
-            {
-                AddSegmentSpec(segments, font, 156904, gold.ToString());
-            }
-            if (showSilver)
-            {
-                AddSegmentSpec(segments, font, 156907, showGold ? silver.ToString("D2") : silver.ToString());
-            }
-            // Copper always renders (even "0") so a zero total is never a blank row.
-            AddSegmentSpec(segments, font, 156902, showSilver ? cop.ToString("D2") : cop.ToString());
-            return segments;
-        }
-
-        private static void AddSegmentSpec(List<CoinSegmentSpec> segments, BitmapFont font, int assetId, string text)
-        {
-            int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
-            segments.Add(new CoinSegmentSpec { AssetId = assetId, Text = text, TextWidth = width });
-        }
-
-        private static int TotalCoinSegmentsWidth(List<CoinSegmentSpec> segments)
-        {
-            if (segments.Count == 0) return 0;
-            int width = 0;
-            foreach (var seg in segments)
-            {
-                width += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
-            }
-            return width - CoinSegmentGap;
-        }
-
-        /// <summary>
-        /// M33 C2b: a coin/currency segment run's already-created controls
-        /// plus each segment's cached (font-only, panelWidth-invariant)
-        /// text width, so a relayout closure can reposition the whole run
-        /// at a new x without ever calling MeasureString again - see
-        /// RepositionSegments. Controls/TextWidths are always the same
-        /// length and share indices.
-        /// </summary>
-        private struct SegmentLayoutHandle
-        {
-            public (Label Label, Panel Icon)[] Controls;
-            public int[] TextWidths;
-
-            public static readonly SegmentLayoutHandle Empty =
-                new SegmentLayoutHandle { Controls = System.Array.Empty<(Label, Panel)>(), TextWidths = System.Array.Empty<int>() };
-        }
-
-        /// <summary>
-        /// Lays out coin segments left-to-right starting at x. alphaScale
-        /// dims the number labels (not the icons - Panel has no tint
-        /// property) for dimmed not-crafted subtree rows.
-        /// </summary>
-        private static SegmentLayoutHandle LayoutCoinSegments(
-            Panel parent, List<CoinSegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
-        {
-            var controls = new (Label, Panel)[segments.Count];
-            var widths = new int[segments.Count];
-            int x = startX;
-            for (int i = 0; i < segments.Count; i++)
-            {
-                var seg = segments[i];
-                Color textColor = GetCoinColor(seg.AssetId);
-                if (alphaScale < 1f) textColor *= alphaScale;
-
-                var label = new Label()
-                {
-                    Text = seg.Text,
-                    Font = font,
-                    TextColor = textColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(x, y),
-                    Parent = parent
-                };
-
-                var icon = new Panel()
-                {
-                    Size = new Point(CoinIconSize, CoinIconSize),
-                    Location = new Point(x + seg.TextWidth + CoinLabelIconGap, y),
-                    BackgroundTexture = AsyncTexture2D.FromAssetId(seg.AssetId),
-                    Parent = parent
-                };
-
-                controls[i] = (label, icon);
-                widths[i] = seg.TextWidth;
-                x += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
-            }
-
-            return new SegmentLayoutHandle { Controls = controls, TextWidths = widths };
-        }
-
-        /// <summary>
-        /// M33 C2b: non-allocating reposition twin to LayoutCoinSegments/
-        /// LayoutCurrencySegments (m2 3.7/4) - moves EXISTING segment
-        /// controls to new x-positions using the cached TextWidths, never
-        /// creating a control or calling MeasureString. Shared by both coin
-        /// and currency segment runs since they follow the identical
-        /// "label, gap, icon, gap" geometry (same CoinIconSize/
-        /// CoinLabelIconGap/CoinSegmentGap constants).
-        /// </summary>
-        private static void RepositionSegments(SegmentLayoutHandle handle, int startX, int y)
-        {
-            int x = startX;
-            for (int i = 0; i < handle.Controls.Length; i++)
-            {
-                var (label, icon) = handle.Controls[i];
-                int textWidth = handle.TextWidths[i];
-                label.Location = new Point(x, y);
-                icon.Location = new Point(x + textWidth + CoinLabelIconGap, y);
-                x += textWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
-            }
-        }
-
-        private static Color GetCoinColor(int assetId)
-        {
-            switch (assetId)
-            {
-                case 156904: return new Color(255, 204, 0);
-                case 156907: return new Color(192, 192, 192);
-                case 156902: return new Color(205, 127, 50);
-                default: return Color.White;
-            }
-        }
-
-        // --- Currency + mixed value display helpers (KNOWN-ISSUES #16) ---
-        //
-        // A BuyFromVendor decision can be priced wholly or partly in a
-        // non-coin currency (spirit shards, karma, ...). CurrencyAmountViewModel
-        // (shopping rows, via PlanViewModelBuilder) and CraftingTreeNode.
-        // VendorCurrencyCosts (tree, resolved here via CurrencyDisplayResolver)
-        // both feed the same rendering below, so the two sibling sites named
-        // in KNOWN-ISSUES #16 (shopping Each/Total cells and the tree cost
-        // column) can never drift apart. Currency segments follow the exact
-        // same "amount label, then icon to the RIGHT" convention as coin
-        // segments (the coin invariant) and reuse its icon size/gaps; a
-        // mixed value renders coin segments first, then currency segments.
-        // A value with neither a coin price nor a currency cost is
-        // genuinely unpriceable (gw2e: "Not sold or crafted") and renders a
-        // plain dash - never a blank cell, never an invented "0".
-
-        // ASCII-only source rule: em dash via escape, never a raw pasted
-        // Unicode character - this IS the gw2e-style unpriceable dash
-        // itself (KNOWN-ISSUES #16b), not incidental prose.
-        private const string UnpricedDashText = "\u2014";
-        private static readonly Color UnpricedDashColor = new Color(140, 140, 140);
-
-        private struct CurrencySegmentSpec
-        {
-            public string IconUrl;
-            public string Text;
-            public int TextWidth;
-        }
-
-        private static List<CurrencySegmentSpec> BuildCurrencySegments(
-            IReadOnlyList<CurrencyAmountViewModel> amounts, BitmapFont font)
-        {
-            var segments = new List<CurrencySegmentSpec>();
-            if (amounts == null) return segments;
-
-            foreach (var amount in amounts)
-            {
-                // M34-B1 #2: a fractional-per-unit "Each" amount carries a
-                // literal "N for M" bundle label instead of a whole-number
-                // Amount (CurrencyDisplayResolver.ResolveUnitAmounts) -
-                // render that text verbatim rather than the numeric amount.
-                string text = amount.BundleLabel ?? amount.Amount.ToString();
-                int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
-                segments.Add(new CurrencySegmentSpec { IconUrl = amount.IconUrl, Text = text, TextWidth = width });
-            }
-            return segments;
-        }
-
-        /// <summary>
-        /// The actual width arithmetic lives in ShoppingColumnMath
-        /// (Blish-free, tested) so the pre-scan (MeasureValueWidth) and the
-        /// real layout (LayoutValueSegmentsRightAligned) below can never
-        /// drift apart; only the per-segment text measurement
-        /// (BitmapFont.MeasureString) is Blish-bound and stays here.
-        /// </summary>
-        private static int TotalCurrencySegmentsWidth(List<CurrencySegmentSpec> segments)
-        {
-            var widths = new List<int>(segments.Count);
-            foreach (var seg in segments) widths.Add(seg.TextWidth);
-            return ShoppingColumnMath.SegmentRunWidth(widths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
-        }
-
-        private static SegmentLayoutHandle LayoutCurrencySegments(
-            Panel parent, List<CurrencySegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
-        {
-            var controls = new (Label, Panel)[segments.Count];
-            var widths = new int[segments.Count];
-            int x = startX;
-            Color textColor = new Color(220, 220, 220);
-            if (alphaScale < 1f) textColor *= alphaScale;
-
-            for (int i = 0; i < segments.Count; i++)
-            {
-                var seg = segments[i];
-                var label = new Label()
-                {
-                    Text = seg.Text,
-                    Font = font,
-                    TextColor = textColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(x, y),
-                    Parent = parent
-                };
-
-                var icon = CreateItemIcon(parent, seg.IconUrl, x + seg.TextWidth + CoinLabelIconGap, y, CoinIconSize);
-
-                controls[i] = (label, icon);
-                widths[i] = seg.TextWidth;
-                x += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
-            }
-
-            return new SegmentLayoutHandle { Controls = controls, TextWidths = widths };
-        }
-
-        /// <summary>
-        /// Pixel width a coin/currency/mixed value would occupy if laid out
-        /// via LayoutValueSegmentsRightAligned - built from the exact same
-        /// BuildCoinSegments/BuildCurrencySegments + Total*SegmentsWidth
-        /// path that layout call uses, so the shopping list's pre-scan
-        /// (CreateShoppingListBody) can never drift from what actually
-        /// renders. copper == 0 with at least one currency amount is a
-        /// valid, currency-only case (not a "zero width" special case).
-        /// </summary>
-        private static int MeasureValueWidth(
-            long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts, BitmapFont font)
-        {
-            int coinWidth = copper > 0 ? TotalCoinSegmentsWidth(BuildCoinSegments(copper, font)) : 0;
-            int currencyWidth = TotalCurrencySegmentsWidth(BuildCurrencySegments(currencyAmounts, font));
-            return (coinWidth > 0 && currencyWidth > 0) ? coinWidth + CoinSegmentGap + currencyWidth : coinWidth + currencyWidth;
-        }
-
-        /// <summary>
-        /// M33 C2b: everything a relayout closure needs to reposition an
-        /// already-rendered value cell (RenderValueCellRightAligned's
-        /// result) at a new rightEdgeX without any MeasureString call -
-        /// either DashLabel is set (genuinely unpriceable row) or the two
-        /// SegmentLayoutHandles are (each individually empty when that half
-        /// of the mix is absent - e.g. CoinSegments.Controls.Length == 0
-        /// for a currency-only row).
-        /// </summary>
-        private sealed class ValueCellHandle
-        {
-            public SegmentLayoutHandle CoinSegments;
-            public SegmentLayoutHandle CurrencySegments;
-            public Label DashLabel;
-        }
-
-        /// <summary>
-        /// Right-aligns coin segments (if copper &gt; 0) followed by
-        /// currency segments (if any) to rightEdgeX - the "mixed
-        /// coin+currency renders coin segments then currency segments"
-        /// rule. Callers must not invoke this for a value with neither
-        /// (RenderValueCellRightAligned handles that dash case instead).
-        /// </summary>
-        private static ValueCellHandle LayoutValueSegmentsRightAligned(
-            Panel parent, long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts,
-            int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
-        {
-            var coinSegments = copper > 0 ? BuildCoinSegments(copper, font) : new List<CoinSegmentSpec>();
-            var currencySegments = BuildCurrencySegments(currencyAmounts, font);
-            int coinWidth = TotalCoinSegmentsWidth(coinSegments);
-            int currencyWidth = TotalCurrencySegmentsWidth(currencySegments);
-            int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentGap : 0;
-
-            int startX = rightEdgeX - (coinWidth + gap + currencyWidth);
-            var coinHandle = LayoutCoinSegments(parent, coinSegments, startX, y, font, alphaScale);
-            var currencyHandle = LayoutCurrencySegments(parent, currencySegments, startX + coinWidth + gap, y, font, alphaScale);
-
-            return new ValueCellHandle { CoinSegments = coinHandle, CurrencySegments = currencyHandle };
-        }
-
-        /// <summary>
-        /// Single entry point for a shopping/tree value cell: coin-only,
-        /// currency-only, and mixed all render via
-        /// LayoutValueSegmentsRightAligned unchanged from (or, for
-        /// currency/mixed, newly matching) the coin invariant; a value with
-        /// neither a coin price nor a currency cost renders a plain dash
-        /// instead of a blank cell or an invented "0" (KNOWN-ISSUES #16b).
-        /// Returns a handle so a relayout closure can reposition the cell
-        /// at a new rightEdgeX later - see RepositionValueCellRightAligned.
-        /// </summary>
-        private static ValueCellHandle RenderValueCellRightAligned(
-            Panel parent, long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts,
-            int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
-        {
-            bool hasCoin = copper > 0;
-            bool hasCurrency = currencyAmounts != null && currencyAmounts.Count > 0;
-
-            if (!hasCoin && !hasCurrency)
-            {
-                Color dashColor = alphaScale < 1f ? UnpricedDashColor * alphaScale : UnpricedDashColor;
-                var dashLabel = CreateRightAlignedLabel(parent, UnpricedDashText, font, dashColor, rightEdgeX, y);
-                return new ValueCellHandle
-                {
-                    CoinSegments = SegmentLayoutHandle.Empty,
-                    CurrencySegments = SegmentLayoutHandle.Empty,
-                    DashLabel = dashLabel
-                };
-            }
-
-            return LayoutValueSegmentsRightAligned(parent, copper, currencyAmounts, rightEdgeX, y, font, alphaScale);
-        }
-
-        /// <summary>
-        /// M33 C2b: non-allocating reposition twin to
-        /// RenderValueCellRightAligned - moves an EXISTING value cell's
-        /// controls to a new rightEdgeX, using only the cached per-segment
-        /// TextWidths (ShoppingColumnMath.SegmentRunWidth, the same pure
-        /// function the shopping column pre-scan uses, so the width this
-        /// computes can never drift from what LayoutValueSegmentsRightAligned
-        /// actually laid out). No MeasureString, no new controls.
-        /// </summary>
-        private static void RepositionValueCellRightAligned(ValueCellHandle handle, int rightEdgeX, int y)
-        {
-            if (handle.DashLabel != null)
-            {
-                handle.DashLabel.Location = new Point(rightEdgeX - handle.DashLabel.Width, y);
-                return;
-            }
-
-            int coinWidth = ShoppingColumnMath.SegmentRunWidth(handle.CoinSegments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
-            int currencyWidth = ShoppingColumnMath.SegmentRunWidth(handle.CurrencySegments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
-            int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentGap : 0;
-
-            int startX = rightEdgeX - (coinWidth + gap + currencyWidth);
-            RepositionSegments(handle.CoinSegments, startX, y);
-            RepositionSegments(handle.CurrencySegments, startX + coinWidth + gap, y);
-        }
-
-        #endregion // 10. Coin/currency value rendering primitives (continued)
-
-        #region 11. Generic control/format helpers (continued)
-
-        // --- Icon helper ---
-
-        /// <summary>
-        /// Item icon inside a rarity-colored frame. Defaults to the tree/row
-        /// size (32px icon, 1px border = 34px overall); the plan header uses
-        /// a larger 40px/2px variant (44px overall, gw2e's .tooltip-item).
-        /// </summary>
-        private static Panel CreateRarityFramedIcon(
-            Panel parent, string iconUrl, string rarity, int x, int y,
-            int iconSize = 32, int borderThickness = 1)
-        {
-            return CreateRarityFramedIcon(
-                parent, iconUrl, GetRarityBorderColor(rarity), x, y, iconSize, borderThickness);
-        }
-
-        /// <summary>
-        /// Same as above with an explicit frame color, for dimmed
-        /// not-crafted subtree rows (neutral grey frame instead of rarity).
-        /// Returns the outer frame Panel so a caller whose icon position
-        /// depends on panelWidth (currently only the plan header's centered
-        /// title) can reposition it on relayout without recreating it.
-        /// </summary>
-        private static Panel CreateRarityFramedIcon(
-            Panel parent, string iconUrl, Color frameColor, int x, int y,
-            int iconSize = 32, int borderThickness = 1)
-        {
-            int frameSize = iconSize + borderThickness * 2;
-            var frame = new Panel()
-            {
-                Size = new Point(frameSize, frameSize),
-                Location = new Point(x, y),
-                BackgroundColor = frameColor,
-                Parent = parent
-            };
-            CreateItemIcon(frame, iconUrl, borderThickness, borderThickness, iconSize);
-            return frame;
-        }
-
-        private static Panel CreateItemIcon(Panel parent, string iconUrl, int x, int y, int size = 32)
-        {
-            // Missing icon: render a neutral empty-slot square, not the
-            // alarming red error texture - a data gap is not a failure.
-            if (string.IsNullOrEmpty(iconUrl))
-            {
-                return new Panel()
-                {
-                    Size = new Point(size, size),
-                    Location = new Point(x, y),
-                    BackgroundColor = new Color(45, 45, 45),
-                    Parent = parent
-                };
-            }
-
-            return new Panel()
-            {
-                Size = new Point(size, size),
-                Location = new Point(x, y),
-                BackgroundTexture = GameService.Content.GetRenderServiceTexture(iconUrl),
-                Parent = parent
-            };
-        }
-        #endregion // 11. Generic control/format helpers (continued)
     }
 }
 

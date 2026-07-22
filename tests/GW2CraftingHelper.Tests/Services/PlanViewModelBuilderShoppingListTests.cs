@@ -334,8 +334,9 @@ namespace GW2CraftingHelper.Tests.Services
             // exact combination the view renders as a dash instead of a
             // blank cell (KNOWN-ISSUES #16b). This test locks in the
             // view-model side of that condition; the dash glyph itself is
-            // rendered by CraftingPlanView.RenderValueCellRightAligned,
-            // which is Blish-only and not covered here.
+            // rendered by CoinCurrencyRenderer.RenderValueCellRightAligned
+            // (Views/Rendering, M38 WP-21), which is Blish-only and not
+            // covered here.
             var result = MakeResult(steps: new List<PlanStep>
             {
                 new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }

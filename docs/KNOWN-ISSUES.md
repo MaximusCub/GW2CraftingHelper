@@ -1104,8 +1104,9 @@ the vulnerable 44px/32px row types (`CreateCraftStepRow`,
 (unchanged) for the immune 36px row types. Proven immune by
 simulation across every `rowHeight` value in the file and all four GW2
 UI Size scale factors (0.81/0.897/1.0/1.103), not just the default -
-see `CreateRowDivider`'s doc comment in Views/CraftingPlanView.cs for
-the full derivation. Required Disciplines was not part of the user's
+see `CreateRowDivider`'s doc comment in Views/Rendering/LabelHelpers.cs
+(M38 WP-21 - moved out of CraftingPlanView.cs, byte-identical) for the
+full derivation. Required Disciplines was not part of the user's
 report but was confirmed mathematically identical exposure (~10.2%
 vanish rate) and free of any icon-clearance side effect (that row has
 no icon, just two `DefaultFont14` labels well clear of the new divider
@@ -1128,6 +1129,67 @@ scanned clean at two offsets; Shopping List (immune 36px class)
 previously verified at three offsets. Required Disciplines (32px,
 3 text-only rows, same shared-helper fix, simulation-proven) was not
 individually pixel-scanned.
+WP-21 MOVE VERIFICATION STATE (2026-07-22): a line-by-line diff of the
+pre-move `CraftingPlanView.cs` method body against the post-move
+`Views/Rendering/*.cs` body was run for every Tier-1 primitive moved in
+that batch. `CreateRowDivider` (this divider's math/bottomClearance
+constants), `CreateRightAlignedLabel`, `EllipsizeToWidth`, both
+`GetRarityBorderColor`/`GetRarityNameColor` tables, `CreateRarityFramedIcon`/
+`CreateItemIcon`, `FormatCoinText`, and the full coin/currency segment
+build/layout/reposition/measure set in `CoinCurrencyRenderer` are
+confirmed byte-identical to the pre-move source, modulo only the
+`private`->`internal` accessibility keyword (where a cross-class call
+now requires it) and qualifying a call to a sibling that moved to a
+different class (e.g. `CreateItemIcon` -> `IconControls.CreateItemIcon`)
+- zero logic or constant changes. `CreateSmallTag` is the one exception:
+it is NOT byte-identical - its border/fill colors are now caller-supplied
+parameters instead of an internal `GetPillColors` call, a deliberate
+signature change already reasoned through and reviewed in 5c56b2a (the
+reverse-dependency fix), not a verbatim move; that commit's own
+same-colors/same-output argument is asserted, not diff-verified, for
+this one method. TWO of the moved segment-width primitives -
+`CoinCurrencyRenderer.TotalCoinSegmentsWidth`/`TotalCurrencySegmentsWidth`
+- take only plain data structs (no XNA/Blish types) and are pure
+arithmetic; per the WP-21 Approach line's "add a Blish-free unit test
+where segment-width arithmetic can be made XNA-free" instruction, that
+arithmetic (plus the `CoinSegmentSpec`/`CurrencySegmentSpec` structs and
+the `CoinIconSize`/`CoinLabelIconGap`/`CoinSegmentGap` constants it is
+built from) is now extracted verbatim into `Services/CoinSegmentMath.cs`
+(mirroring the existing `ShoppingColumnMath` pattern) and covered by
+`tests/GW2CraftingHelper.Tests/Services/CoinSegmentMathTests.cs`
+(zero/single/multi-segment cases against the real constants, plus a
+case pinning the gap arithmetic exactly and a cross-check that the coin
+and currency formulas agree for equivalent input), mirroring
+`ShoppingColumnMathTests`. An earlier findings-fix pass on this branch
+instead added a test file under `tests/.../Views/Rendering/` that
+called `CoinCurrencyRenderer` (Blish-bound) directly - that would have
+violated the repo invariant that tests must never reference UI code;
+that file has been removed and replaced by the Services-based
+extraction above. All of the above (the diff evidence and the new
+Services tests) is static, by-construction evidence only - it does NOT
+substitute for this package's `needsVisualLoop` gate
+(m38-cleanup-plan.md WP-21 Verify line / EXECUTION PREAMBLE item 8: a
+live Blish-over-Paint screenshot/pixel-scan pass on the Exordium
+`--profile 2` reference plan comparing coin/currency cells, rarity icon
+frames, and row dividers before/after the branch, at multiple scroll
+offsets).
+
+CURRENT STATE (2026-07-22): pre-merge live visual verification
+(Blish-over-Paint screenshot loop on an Exordium plan: coin/currency
+cells, rarity icon frames, row dividers at multiple scroll offsets) is
+being run by the orchestrating session, in parallel with this
+findings-fix pass, on the desktop session holding the user's direct
+automation authorization. Result recorded here and in the PR before
+merge: PASS (orchestrator, 2026-07-22, live Blish-over-Paint session on
+the branch build, captures wp21_02/04/05 in C:/Dev/Blish/preflight/captures):
+Total Cost coin tiles and all 7 currency rows render icons-right-of-numbers
+in correct metal/currency coloring; tree rows show correct rarity name
+colors and rarity icon frames with right-aligned coin columns; Shopping
+List coin columns, currency cells (incl. the merged-ceil 180 Obsidian
+Shard laurel cell), and source tags render identically to the M37
+reference captures; scan_dividers.py at two scroll offsets shows uniform
+29/30 pitches with zero missing boundaries. No visual deltas beyond live
+price drift.
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every

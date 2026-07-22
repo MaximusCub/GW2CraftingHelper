@@ -78,6 +78,7 @@
     <Compile Include="Services\ScrollMath.cs" />
     <Compile Include="Services\WheelDeltaSanitizer.cs" />
     <Compile Include="Services\ShoppingColumnMath.cs" />
+    <Compile Include="Services\CoinSegmentMath.cs" />
     <Compile Include="Services\PlanContentHeightMath.cs" />
     <Compile Include="Services\PlanRelayoutMath.cs" />
     <Compile Include="Services\ItemRowRequestBuilder.cs" />
@@ -117,6 +118,10 @@
     <Compile Include="Views\AutocompleteTextBox.cs" />
     <Compile Include="Views\SuggestionPanel.cs" />
     <Compile Include="Views\CraftingPlanView.cs" />
+    <Compile Include="Views\Rendering\RarityColors.cs" />
+    <Compile Include="Views\Rendering\IconControls.cs" />
+    <Compile Include="Views\Rendering\LabelHelpers.cs" />
+    <Compile Include="Views\Rendering\CoinCurrencyRenderer.cs" />
     <Compile Include="Views\ModalDialog.cs" />
     <Compile Include="Views\LogTabContent.cs" />
     <Compile Include="Views\SettingsTabContent.cs" />
