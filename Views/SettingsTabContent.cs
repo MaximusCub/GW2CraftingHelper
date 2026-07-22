@@ -19,10 +19,20 @@ namespace GW2CraftingHelper.Views
     public class SettingsTabContent
     {
         // Curated list of common plan currencies: Karma, Laurels, Spirit
-        // Shards, and the Rift Essence tiers. The coin currency itself
-        // (Gw2Constants.CoinCurrencyId) is never listed here - it is
-        // already directly comparable and CurrencyValuation rejects
+        // Shards, the Rift Essence tiers, and Astral Acclaim. The coin
+        // currency itself (Gw2Constants.CoinCurrencyId) is never listed here
+        // - it is already directly comparable and CurrencyValuation rejects
         // coin-keyed entries outright.
+        //
+        // Astral Acclaim (63) - addendum-astral-acclaim.md P1: added so a
+        // user CAN value it if they choose to, but with no suggested rate
+        // (see the info line in BuildCurrencyValuationsSection below) - the
+        // maintainer explicitly rejected a single implied copper-per-AA
+        // anchor (the addendum's "REVISED" section), since AA's per-item
+        // deal quality varies across the Wizard's Vault and any one implied
+        // rate would misrepresent that. Leaving this row blank (the
+        // default) keeps AA out of price comparisons entirely, same as any
+        // other unset currency.
         private static readonly int[] CuratedCurrencyIds =
         {
             2,  // Karma
@@ -30,7 +40,8 @@ namespace GW2CraftingHelper.Views
             23, // Spirit Shards
             78, // Fine Rift Essence
             79, // Rare Rift Essence
-            80  // Masterwork Rift Essence
+            80, // Masterwork Rift Essence
+            63  // Astral Acclaim
         };
 
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
@@ -160,6 +171,14 @@ namespace GW2CraftingHelper.Views
             {
                 AddCurrencyRow(currencyId, panelWidth);
             }
+
+            // addendum-astral-acclaim.md P1: neutral, no-single-anchor hint
+            // for Astral Acclaim specifically - it is untradable and earned
+            // via capped seasonal play, so unlike the other currencies
+            // above, there is no rate this settings row can honestly
+            // suggest. Left blank (the default) simply keeps it out of
+            // price comparisons, same as any other unset currency.
+            AddInfoLine("Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.", panelWidth);
 
             AddSaveRow(panelWidth);
         }
