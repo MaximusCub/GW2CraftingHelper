@@ -1104,8 +1104,9 @@ the vulnerable 44px/32px row types (`CreateCraftStepRow`,
 (unchanged) for the immune 36px row types. Proven immune by
 simulation across every `rowHeight` value in the file and all four GW2
 UI Size scale factors (0.81/0.897/1.0/1.103), not just the default -
-see `CreateRowDivider`'s doc comment in Views/CraftingPlanView.cs for
-the full derivation. Required Disciplines was not part of the user's
+see `CreateRowDivider`'s doc comment in Views/Rendering/LabelHelpers.cs
+(M38 WP-21 - moved out of CraftingPlanView.cs, byte-identical) for the
+full derivation. Required Disciplines was not part of the user's
 report but was confirmed mathematically identical exposure (~10.2%
 vanish rate) and free of any icon-clearance side effect (that row has
 no icon, just two `DefaultFont14` labels well clear of the new divider
