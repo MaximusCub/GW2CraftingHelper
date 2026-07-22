@@ -1156,7 +1156,10 @@ Localization is explicitly DEFERRED to the long-term backlog (user: "not
 core functionality"); upstream Blish HUD issue posts are explicitly
 SKIPPED (the v1.3.0 wheel-delta bug is already fixed on their unreleased
 dev branch; our module-side sanitizer stays until a fixed release ships,
-then can be retired at leisure).
+then can be retired at leisure). All eight items in this backlog (24-31)
+are now closed as of the 2026-07-22 live desktop session, which also
+verified items 29 and 30 live for the first time (see the "M37
+desktop-wave observations" section below).
 
 ## THE METHOD (still governs items 24-26)
 Research how gw2efficiency handles each behavior FIRST (dev-time only -
@@ -1584,6 +1587,13 @@ crafted/bought and tradable/untradable requested items should be
 screenshot-loop verified before this is treated as visually confirmed,
 matching this file's existing convention for other M35/M37 UI changes.
 
+LIVE-VERIFIED 2026-07-22 (see the "M37 desktop-wave observations
+(2026-07-22)" section below, note (d)): both gating states confirmed on
+the merged M37 build - an all-bound batch (Exordium + Gift of Fortune)
+correctly showed no tiles/banner, per the NetSaleValue.HasValue gate;
+a mixed batch (Exordium + Orichalcum Ingot) rendered all four tiles,
+including "Sell value 2s37c" and "Loss if sold", plus the banner row.
+
 ## 26. Achievement-bit ingredient dedup (parity micro-gap) (FIXED in M37)
 gw2e ships ~274 achievement-discipline custom recipes (achievement_id,
 ingredients mirroring collection requirements) and de-duplicates
@@ -1914,7 +1924,7 @@ from-scratch re-scrape also picked up alongside the cap data - adopting
 it wholesale was out of this item's stale-offer-sweep scope and is
 recorded as a candidate for a future "missing offers" pass instead.
 
-## 29. Owned-materials UI live verification (verification debt)
+## 29. Owned-materials UI live verification (VERIFIED in M37, live desktop session 2026-07-22)
 USING-N-OWNED pills, owned-currency annotations, and the owned/needed
 shopping splits (M34 B2b) are unit-tested but have never been SEEN
 rendering. Method (no real API key needed): write a synthetic
@@ -1926,7 +1936,46 @@ Shards), enable Use Own Materials, generate Exordium, verify via the
 screenshot loop: partial-owned pills, full-owned HAVE, currency
 owned/needed annotations, and that totals shrink accordingly.
 
-## 30. Required Disciplines divider pixel-scan (verification debt)
+VERIFIED in M37 (live desktop session 2026-07-22, screenshot loop on the
+merged M37 build over the isolated preflight profile; captures in
+C:\Dev\Blish\preflight\captures\m37_*.png). Actual snapshot written per
+this item's own method: 4 items (Augur's Stone, Mystic Clover,
+Stabilizing Matrix, Mystic Runestone) plus 50 Spirit Shards in the
+wallet, in the isolated preflight data dir - a narrower stock list than
+the "e.g." example above, but exercising the identical partial-owned/
+full-owned/currency-annotation paths. Baseline Exordium (no owned
+materials) totaled 2463g75s81c; the owned pass totaled 2099g64s02c, and
+a new "Own materials" column showing 6g89s26c appeared - totals shrink
+accordingly, as this item required. Tree pills: "47x Mystic Clover
+CRAFT|VENDOR|USING 30 OWNED" at depth 2 (quantity correctly reduced from
+item 17's baseline 77x to 47x for 30 owned; the Mystic Clover EV subtree
+re-scaled with it - ceil(47/0.31)*6 = 152 attempts * 6 Philosopher's
+Stone = 912 Philosopher's Stones, arithmetic confirmed by hand against
+item 17's own formula); "45x Stabilizing Matrix TP|USING 30 OWNED" at
+depth 4 (75 - 30 = 45); Mystic Runestone collapsed to the plain,
+non-interactive HAVE pill on full ownership, matching item 20.4's B2b
+design decision (a fully-owned node does not also show USING N OWNED);
+"1x Bloodstone Shard VENDOR 200 [Spirit Shards icon]" forced to its
+single available source, unaffected by ownership. Total Cost showed the
+plan-wide currency annotation "309x Spirit Shard (50 owned, 259
+needed)"; the Shopping List's Bloodstone row tooltip showed "Spirit
+Shard: 50 owned, 150 needed" - a different number by design, since the
+Shopping List annotation nets per-row while Total Cost nets plan-wide
+(item 20.4's "Total Cost inline; Shopping List as a tooltip" split) -
+both scopes are internally consistent on their own terms, not a bug.
+Used Materials (4) listed exactly Augur's Stone 1x / Mystic Clover 30x /
+Stabilizing Matrix 30x / Mystic Runestone 100x, which also verifies
+Augur's Stone's own HAVE status through its consumption row (the
+mechanism itself was already proven directly on Mystic Runestone above).
+Crafting Steps correctly showed "Craft 47x Mystic Clover". Every number
+differs from this item's own "e.g." prep-checklist estimate exactly per
+its own live-prices caveat (Trading Post prices move between sessions,
+the same caveat this file already documents elsewhere, e.g. item 24's
+Verification section) - every mechanism claim (partial-owned pill,
+full-owned collapse, forced single-source, plan-wide vs. row-scoped
+currency netting, Used Materials attribution) held.
+
+## 30. Required Disciplines divider pixel-scan (VERIFIED in M37, live desktop session 2026-07-22)
 The M36b clearance fix covered 32px discipline rows via the shared
 helper (simulation-proven) but that section was never individually
 pixel-scanned - it is short and sits somewhere above Required Recipes
@@ -1935,6 +1984,29 @@ scroll offsets with the committed scanner
 (C:\Dev\Blish\preflight\scan_dividers.py - methodology and verdict
 reading documented in the script header; environment UI scale is 0.81
 so 32px rows pitch at ~25.9px).
+
+VERIFIED in M37 (live desktop session 2026-07-22, scan_dividers.py
+against the fully-expanded Exordium plan, content height 27,684px,
+environment UI scale 0.81). Required Disciplines (32px rows) located and
+scanned at TWO scroll offsets: between-row dividers present at both,
+physical pitch 26px (= 32 * 0.81, matching this item's own ~25.9px
+prediction). Required Recipes (44px sublabel rows) scanned at two
+offsets, uniform 35/36px pitch - consistent with item 23's own
+five-offset scan of the same section. Crafting Steps (44px) scanned at
+two offsets, uniform 35/36px - also consistent with item 23. Shopping
+List (36px) scanned at two offsets, uniform 29/30px, with one 27+31px
+pair that is a grouping artifact summing to two normal pitches (58px ~=
+two of 29/30), not a missing boundary - the same immune 36px class item
+23 already established. Used Materials (36px) scanned at one offset,
+clean - same immune class as Shopping List. Section header dividers
+(H=30, item 23's inline-built divider) were detected, grouped by
+brightness into ~130/180 clusters (both valid divider signatures),
+wherever a section header appeared in a captured frame this session.
+Important clarification discovered during this scan and verified against
+code: the last row of every section deliberately has no divider (the
+`isLast ? null : CreateRowDivider(...)` pattern) and column-header rows
+never had one either - scanner "missing boundary" readings at those
+positions are by-design absences, not defects.
 
 ## 31. Concurrency and degradation audits (verification debt) (FIXED in M37)
 Three never-formally-swept reviews, each producing classified findings
@@ -2132,6 +2204,60 @@ Note: m37-homestead's diff (a separate in-flight worktree, out of scope
 for these three audits) gets its own small delta-audit before the
 desktop wave - the orchestrator handles scheduling that, not this
 session.
+
+## M37 desktop-wave observations (2026-07-22)
+Open notes from the live desktop session that verified items 29 and 30
+above (screenshot loop on the merged M37 build over the isolated
+preflight profile). Expected-until-checked style, per this file's own
+convention - not new backlog items in their own right.
+
+(a) Snapshot tab shows "No snapshot available. Click Refresh Now." for a
+DISK-RESTORED snapshot until a live API refresh runs: MainView is
+constructed before Module.LoadAsync calls SnapshotStore.LoadLatest, and
+SetSnapshot only fires from the pending-refresh drain - the generate
+path correctly uses _currentSnapshot (proven by this session's own
+owned-materials run, item 29 above), so this is cosmetic display
+staleness only. M38 cleanup candidate.
+
+(b) A single wheel event carrying a multi-notch delta (raw -1440, sent by
+an automation tool as one mouse_event) is observed by [scrolldiag] but
+produces no scroll movement, while discrete -120 events step normally.
+Distinct from the M36 wheel-wrap bug (negative deltas are clean here);
+appears to be stock Blish sign-only single-step handling where the step
+did not land. Automation guidance: use discrete per-notch events. Low
+priority; not obviously user-reachable with real hardware.
+
+(c) The item 26 verification seed (Infinite Trebuchet Blueprint, 103980)
+is NOT surfaced by the item-search suggestions, so the COUNTED ELSEWHERE
+pill has not yet been SEEN rendering live (the behavior and the pill are
+already unit-tested through the real pipeline per item 26's own
+resolution note; the search-provider filter criteria for
+achievement-discipline recipes were not investigated this session).
+Follow-up: either make the seeded blueprint searchable or verify the
+pill via a Harness-driven render if desired.
+
+(d) BONUS live verifications landed this session, beyond items 29/30's
+own scope: the vendor purchase-cap notice rendered for the first time
+ever - "Glob of Ectoplasm is timegated - Weekly limit: 1 (plan needs
+86)" (item 28's seeded Candy Corn Weekly cap flowing correctly through
+the M34 warn-only machinery, live, for the first time; this particular
+plan's occurrences did not trigger item 24's separately-documented
+Conflict-suppression limitation, which remains an accepted, unfixed
+gap for the conflicting-offers case per item 24's own regression tests -
+not something this observation resolves or contradicts); item 25's
+batch economics verified in BOTH gating states
+(all-bound batch Exordium+Gift of Fortune -> no tiles/banner, correct per
+the NetSaleValue.HasValue gate; mixed batch Exordium+Orichalcum Ingot ->
+four tiles including "Sell value 2s37c" and "Loss if sold" plus the
+banner row); item 27's "Decisions updated (0 override(s))" status
+confirmed live on an ignore round-trip that also re-verified tree-wide
+ignore economics (4000x Unbound Magic row disappearing/reappearing,
+totals 2099g<->1930g exact); item 24's Settings-tab Homestead Refinement
+section renders with per-material tier inputs defaulting 0 and no
+internal ids. These are recorded here rather than reopening items 24/25/
+27/28, whose own mechanism resolutions already stand - this is
+additional live confirmation layered on top, not a correction to any of
+them.
 
 ## DEFERRED (recorded, not M37 scope)
 - Localization (en/de/fr/es via API lang param): user-deferred backlog,
