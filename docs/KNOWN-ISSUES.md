@@ -2300,9 +2300,10 @@ them.
 ## DEFERRED (recorded, not M37 scope)
 - Localization (en/de/fr/es via API lang param): user-deferred backlog,
   "not core functionality". Full-milestone scale when picked up.
-- Upstream Blish HUD issue/PR for the wheel-delta wrap: skipped by user
-  decision; fix already exists on Blish dev; our sanitizer is
-  forward-compatible and retirable after their next release.
+- Upstream Blish HUD issue/PR for the wheel-delta wrap: REMOVED from the
+  backlog entirely by user decision (2026-07-22) - no upstream posts are
+  planned. The module-side sanitizer stays until a fixed Blish release
+  ships, then can be retired at leisure.
 - Ignore-pill cascade semantics + own-materials gating divergences
   (#20.4): revisit only on user feedback.
 - Multi-item row reordering (gw2e moveRecipe): out of scope per M35.
