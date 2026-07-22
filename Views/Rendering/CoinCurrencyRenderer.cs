@@ -70,7 +70,13 @@ namespace GW2CraftingHelper.Views.Rendering
             return segments;
         }
 
-        private static void AddSegmentSpec(List<CoinSegmentMath.CoinSegmentSpec> segments, BitmapFont font, int assetId, string text)
+        // private -> internal (M38 WP-22, mirroring the WP-21-prep
+        // GetPillColors bump): MainView needs to build its own 3-segment
+        // gold/silver/copper spec list (its own show-all/no-padding
+        // formatting - a deliberate MainView behavior, out of this
+        // package's scope to change) without duplicating this measure-
+        // and-wrap one-liner.
+        internal static void AddSegmentSpec(List<CoinSegmentMath.CoinSegmentSpec> segments, BitmapFont font, int assetId, string text)
         {
             int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
             segments.Add(new CoinSegmentMath.CoinSegmentSpec { AssetId = assetId, Text = text, TextWidth = width });
