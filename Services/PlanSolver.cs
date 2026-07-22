@@ -898,6 +898,18 @@ namespace GW2CraftingHelper.Services
             // owned case (the comment immediately below, predating this
             // fix, already claimed a real Quantity == 0 node produces "no
             // step" - this guard is what makes that claim actually true).
+            //
+            // Invariant this guard relies on (not enforced here, only
+            // documented): every "Item" node that reaches this line with
+            // Quantity == 0 must already have empty Recipes. True today
+            // because both InventoryReducer.ReduceNode and
+            // AchievementBitDedupPrePass always pair Quantity = 0 with
+            // Recipes.Clear(). If that pairing is ever broken by a future
+            // pre-pass or bug, this guard would silently skip recursing
+            // into that node's children too - dropping their real,
+            // nonzero-Quantity costs from the plan, not just suppressing a
+            // zero-cost ghost row for the parent - so keep any new
+            // Quantity-zeroing code paired with clearing Recipes.
             if (node.Quantity == 0)
             {
                 return;
