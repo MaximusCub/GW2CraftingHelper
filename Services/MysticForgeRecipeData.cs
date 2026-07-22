@@ -32,6 +32,8 @@ namespace GW2CraftingHelper.Services
 
         public IReadOnlyList<string> LoadWarnings => _loadWarnings;
 
+        public int RecipeCount => _byRecipeId.Count;
+
         public IReadOnlyList<int> SearchByOutput(int itemId)
         {
             if (_byOutputItemId.TryGetValue(itemId, out var ids))

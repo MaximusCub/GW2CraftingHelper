@@ -2,6 +2,7 @@ using System.IO;
 using System.Text;
 using GW2CraftingHelper.Services;
 using Xunit;
+using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
 
 namespace GW2CraftingHelper.Tests.Services
 {
@@ -521,6 +522,39 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(recipe);
             Assert.Empty(data.LoadWarnings);
             Assert.Null(recipe.ExpectedOutputCount);
+        }
+
+        // --- M38 (WP-08 / tests T7): ref/mystic_forge_recipes.json (868KB)
+        // was never exercised through the production MysticForgeRecipeData
+        // loader by a committed test - mirrors the FindRepoFile shipped-
+        // file pattern established in AcquisitionHintServiceTests /
+        // RecipeCacheSerializerTests.
+        [Fact]
+        public void Load_ShippedSeedFile_ParsesAllRecipesWithNoWarnings()
+        {
+            string path = FindRepoFile(Path.Combine("ref", "mystic_forge_recipes.json"));
+            Assert.False(
+                string.IsNullOrEmpty(path),
+                "Could not locate ref/mystic_forge_recipes.json by walking up from the test assembly's directory.");
+
+            using (var stream = File.OpenRead(path))
+            {
+                var data = MysticForgeRecipeData.Load(stream);
+
+                Assert.Empty(data.LoadWarnings);
+                Assert.Equal(1591, data.RecipeCount);
+
+                // Recipe: Tray of Banana Cream Pies (from wiki).
+                var recipe = data.GetRecipe(-1);
+                Assert.NotNull(recipe);
+                Assert.Equal(9638, recipe.OutputItemId);
+                Assert.Equal(1, recipe.OutputItemCount);
+                Assert.Equal(4, recipe.Ingredients.Count);
+                Assert.Contains("MysticForge", recipe.Disciplines);
+
+                Assert.NotEmpty(data.SearchByOutput(9638));
+                Assert.Contains(-1, data.SearchByOutput(9638));
+            }
         }
     }
 }

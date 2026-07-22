@@ -28,16 +28,27 @@ namespace GW2CraftingHelper.Services.Recipes
                 return new ItemNameSeedData(null);
             }
 
-            using (var reader = new StreamReader(stream))
+            var options = new JsonSerializerOptions
             {
-                string json = reader.ReadToEnd();
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                };
-                var entries = JsonSerializer.Deserialize<List<ItemNameEntry>>(json, options);
-                return new ItemNameSeedData(entries);
-            }
+                PropertyNameCaseInsensitive = true
+            };
+
+            // See VendorOfferLoader.Load for why this reads the UTF-8 bytes
+            // directly (via DeserializeAsync, blocked synchronously) instead
+            // of StreamReader.ReadToEnd() + Deserialize<string>: it avoids
+            // ReadToEnd's full UTF-16 string materialization (and the
+            // internal UTF-8 re-encoding System.Text.Json performs to parse
+            // a string) on this seed file (M38 WP-08 / perf P2a).
+            // System.Text.Json 5.0.0 (net461) has no synchronous
+            // Deserialize(Stream) overload. The File.ReadAllBytes() +
+            // Deserialize<T>(ReadOnlySpan<byte>) sync overload was also
+            // rejected: this file ships with a leading UTF-8 BOM, and
+            // (verified empirically) the span-based overload throws
+            // JsonException on a leading BOM instead of skipping it, unlike
+            // the stream-based overloads.
+            var entries = JsonSerializer.DeserializeAsync<List<ItemNameEntry>>(stream, options)
+                .GetAwaiter().GetResult();
+            return new ItemNameSeedData(entries);
         }
     }
 }
