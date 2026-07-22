@@ -55,11 +55,41 @@ namespace GW2CraftingHelper.Services
         // M33 C1 (#12 diagnostics): gates the scroll-machinery diagnostic
         // logging in CraftingPlanView (wheel events, restore/guard writes
         // and state transitions). Default false; instrumentation only -
-        // never changes scroll/guard/restore behavior. Unlike
-        // ValueOwnMaterials (see above), this has no checkbox in the
-        // Settings tab; it is flipped via the persisted settings JSON for
-        // diagnosis.
+        // never changes scroll/guard/restore behavior.
+        // M39 (log system): SUBSUMED by LogDiagnosticsEnabled below per the
+        // tab-roadmap-proposal synthesis (Section 2.1) - the Settings tab
+        // now ships exactly ONE diagnostics checkbox (LogDiagnosticsEnabled),
+        // not two. This setting is kept defined (not removed) purely for
+        // backward compatibility with any already-persisted value: renaming
+        // the key outright would silently drop a hand-set true for existing
+        // users, whereas CraftingPlanView.ScrollDiagEnabled now reads BOTH
+        // this and LogDiagnosticsEnabled (a plain bool OR - trivially cheap,
+        // no extra I/O) so an old persisted true still gates the
+        // [scrolldiag] channel exactly as before. No UI checkbox for this
+        // one; new users only ever see LogDiagnosticsEnabled.
         public SettingEntry<bool> ScrollDiagnosticsEnabled { get; private set; }
+
+        // M39 (log system, d2-log-system.md Section 5): size cap for the
+        // module log file (data/module_log.jsonl), in bytes. Default 2 MB.
+        // Checked on every ModuleLog write (self-trimming) - see
+        // ModuleLogStore.AppendLine.
+        public SettingEntry<int> LogMaxSizeBytes { get; private set; }
+
+        // M39 (log system, d2-log-system.md Section 5): age-based retention
+        // for the module log file, in days. Default 14. Enforced once per
+        // session at Module.LoadAsync - see ModuleLogStore.PruneOlderThan.
+        public SettingEntry<int> LogRetentionDays { get; private set; }
+
+        // M39 (log system, d2-log-system.md Section 5/tab-roadmap-proposal
+        // Section 2.1): the ONE diagnostics toggle for the whole module -
+        // subsumes ScrollDiagnosticsEnabled above and additionally gates
+        // whether Debug-level ModuleLog entries reach the file sink (they
+        // always still land in the in-memory ring regardless - see
+        // ModuleLog's own policy). Default false, matching
+        // ScrollDiagnosticsEnabled's own prior default. Has a real Settings
+        // tab checkbox (idiom (a), immediate-apply, no Save button - see
+        // SettingsTabContent).
+        public SettingEntry<bool> LogDiagnosticsEnabled { get; private set; }
 
         public ModuleSettings(SettingCollection settings)
         {
@@ -102,6 +132,21 @@ namespace GW2CraftingHelper.Services
                 "ScrollDiagnosticsEnabled", false,
                 () => "Scroll diagnostics",
                 () => "Log scroll machinery events for debugging");
+
+            LogMaxSizeBytes = settings.DefineSetting(
+                "LogMaxSizeBytes", 2 * 1024 * 1024,
+                () => "Log max size (bytes)",
+                () => "Maximum size of the module log file on disk before old entries are trimmed");
+
+            LogRetentionDays = settings.DefineSetting(
+                "LogRetentionDays", 14,
+                () => "Log retention (days)",
+                () => "Number of days of module log history to keep on disk");
+
+            LogDiagnosticsEnabled = settings.DefineSetting(
+                "LogDiagnosticsEnabled", false,
+                () => "Diagnostics logging",
+                () => "Log fine-grained diagnostic events (including scroll machinery) to the Log tab and file");
         }
 
         /// <summary>
@@ -130,6 +175,64 @@ namespace GW2CraftingHelper.Services
             if (tier < 0) return 0;
             if (tier > 2) return 2;
             return tier;
+        }
+
+        // Mirrors SettingsInputParser.TryParseLogMaxSizeMb's own 1-1000 MB
+        // bound (same deliberate duplication as ClampTier/TryParseTier's
+        // shared 0-2 range above, and for the same reason). A persisted
+        // value outside this range is reachable only via a hand-edited
+        // settings.json - the Settings tab's own parser rejects it before
+        // it is ever assigned - but ModuleLogStore.AppendLine's self-trim
+        // check is `if (maxSizeBytes > 0)`: a persisted 0 or negative value
+        // would silently disable the size cap for the whole session, which
+        // is the exact "endless crap on disk" outcome this feature exists
+        // to prevent.
+        private const int MinLogMaxSizeBytes = 1 * 1024 * 1024;
+        private const int MaxLogMaxSizeBytes = 1000 * 1024 * 1024;
+
+        private static int ClampLogMaxSizeBytes(int maxSizeBytes)
+        {
+            if (maxSizeBytes < MinLogMaxSizeBytes) return MinLogMaxSizeBytes;
+            if (maxSizeBytes > MaxLogMaxSizeBytes) return MaxLogMaxSizeBytes;
+            return maxSizeBytes;
+        }
+
+        // Mirrors SettingsInputParser.TryParseRetentionDays's own 1-365 day
+        // bound - see ClampLogMaxSizeBytes' own comment for why the
+        // duplication is deliberate and why a persisted value must never
+        // bypass this. ModuleLogStore.PruneOlderThan's own no-op guard is
+        // `if (retentionDays <= 0) return;`, so a persisted 0/negative
+        // value would silently disable age-based retention entirely.
+        private const int MinLogRetentionDays = 1;
+        private const int MaxLogRetentionDays = 365;
+
+        private static int ClampRetentionDays(int retentionDays)
+        {
+            if (retentionDays < MinLogRetentionDays) return MinLogRetentionDays;
+            if (retentionDays > MaxLogRetentionDays) return MaxLogRetentionDays;
+            return retentionDays;
+        }
+
+        /// <summary>
+        /// Clamped LogMaxSizeBytes for actual use - see
+        /// ClampLogMaxSizeBytes' own comment. Callers (Module.cs's
+        /// Configure call, and SettingsTabContent's live-push after a save)
+        /// should always read this instead of LogMaxSizeBytes.Value
+        /// directly, the same way GetHomesteadEfficiencyTiers already
+        /// clamps rather than exposing HomesteadFiberTier.Value raw.
+        /// </summary>
+        public int GetClampedLogMaxSizeBytes()
+        {
+            return ClampLogMaxSizeBytes(LogMaxSizeBytes.Value);
+        }
+
+        /// <summary>
+        /// Clamped LogRetentionDays for actual use - see
+        /// ClampRetentionDays' own comment.
+        /// </summary>
+        public int GetClampedLogRetentionDays()
+        {
+            return ClampRetentionDays(LogRetentionDays.Value);
         }
 
         /// <summary>
@@ -170,6 +273,9 @@ namespace GW2CraftingHelper.Services
             HomesteadMetalTier.Value = 0;
             HomesteadWoodTier.Value = 0;
             ScrollDiagnosticsEnabled.Value = false;
+            LogMaxSizeBytes.Value = 2 * 1024 * 1024;
+            LogRetentionDays.Value = 14;
+            LogDiagnosticsEnabled.Value = false;
         }
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 
 namespace GW2CraftingHelper.Services
@@ -8,9 +7,16 @@ namespace GW2CraftingHelper.Services
     {
         private readonly string _filePath;
 
-        public StatusStore(string dataDirectoryPath)
+        // M39 (WP-16 shape, d2-log-system.md Section 4.2): called instead of
+        // a bare Debug.WriteLine on any IO failure. No-op default preserves
+        // every existing caller (Module.cs, tests) unchanged; Module.cs
+        // wires this to ModuleLog.
+        private readonly Action<string, Exception> _onError;
+
+        public StatusStore(string dataDirectoryPath, Action<string, Exception> onError = null)
         {
             _filePath = Path.Combine(dataDirectoryPath, "status.txt");
+            _onError = onError;
         }
 
         public string Load()
@@ -22,7 +28,7 @@ namespace GW2CraftingHelper.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to load status from {_filePath}: {ex.Message}");
+                _onError?.Invoke($"Failed to load status from {_filePath}", ex);
                 return "";
             }
         }
@@ -40,7 +46,7 @@ namespace GW2CraftingHelper.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to save status to {_filePath}: {ex.Message}");
+                _onError?.Invoke($"Failed to save status to {_filePath}", ex);
             }
         }
     }

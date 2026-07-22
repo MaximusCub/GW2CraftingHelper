@@ -140,8 +140,41 @@ namespace GW2CraftingHelper
         protected override void Initialize()
         {
             string dataDir = DirectoriesManager.GetFullDirectoryPath("data");
-            _snapshotStore = new SnapshotStore(dataDir);
-            _statusStore = new StatusStore(dataDir);
+
+            // M39 (log system): configured before any other store so their
+            // onError callbacks (below) can always reach ModuleLog.Shared
+            // regardless of construction order - Write() is always safe to
+            // call even before Configure() attaches the file store (writes
+            // just stay ring-only until then). The log store's OWN IO
+            // failure is wired straight to Blish's Logger, never back into
+            // ModuleLog - see ModuleLogStore's doc comment on why
+            // (unbounded recursion into the sink whose own write just
+            // failed).
+            var logStore = new ModuleLogStore(dataDir, (message, ex) => Logger.Warn(ex, message));
+            ModuleLog.Shared.Configure(logStore, _settings.GetClampedLogMaxSizeBytes(), (message, ex) => Logger.Warn(ex, message));
+            ModuleLog.Shared.DiagnosticsEnabled = _settings.LogDiagnosticsEnabled.Value;
+
+            // Once-per-session age-based retention enforcement, BEFORE the
+            // ring is seeded from the file below - the ring then mirrors
+            // exactly what survived retention, rather than briefly showing
+            // an entry this same call is about to prune from disk. Both run
+            // here (Initialize, not LoadAsync) and before any other store
+            // is even constructed, so the seeded pre-session history always
+            // sorts before this session's own first log line - see
+            // ModuleLog.SeedFromStore's own doc comment.
+            ModuleLog.Shared.PruneOlderThan(_settings.GetClampedLogRetentionDays());
+            ModuleLog.Shared.SeedFromStore();
+
+            // WP-16 shape (d2-log-system.md Section 4.2/11): every other
+            // store's IO-failure callback routes to ModuleLog (in addition
+            // to whatever it already does) rather than the previous silent
+            // Debug.WriteLine, so a store failure is now visible in-module
+            // via the Log tab, not just in an attached debugger.
+            Action<string, Exception> onStoreError = (message, ex) =>
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "store", $"{message}: {ex.GetType().Name} - {ex.Message}");
+
+            _snapshotStore = new SnapshotStore(dataDir, onStoreError);
+            _statusStore = new StatusStore(dataDir, onStoreError);
             _snapshotService = new Gw2AccountSnapshotService(Gw2ApiManager);
             _lastStatus = _statusStore.Load();
 
@@ -153,7 +186,7 @@ namespace GW2CraftingHelper
             var itemApi = new Gw2ItemApiClient(_httpClient);
 
             var vendorLoader = new VendorOfferLoader();
-            _vendorOfferStore = new VendorOfferStore(dataDir, vendorLoader);
+            _vendorOfferStore = new VendorOfferStore(dataDir, vendorLoader, onStoreError);
             try
             {
                 using (var baselineStream = ContentsManager.GetFileStream("vendor_offers.json"))
@@ -161,8 +194,9 @@ namespace GW2CraftingHelper
                     _vendorOfferStore.LoadBaseline(baselineStream);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Vendor baseline load failed, starting with an empty baseline: {ex.GetType().Name} - {ex.Message}");
                 _vendorOfferStore.LoadBaseline(null);
             }
             _vendorOfferStore.LoadOverlay();
@@ -177,9 +211,13 @@ namespace GW2CraftingHelper
                     recipeSeed.Load(searchStream, recipesStream);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // No seed files yet - graceful degradation
+                // No seed files yet - graceful degradation. Previously a
+                // fully silent bare catch (d2-log-system.md Section 8: "a
+                // real gap the migration closes, not just a routing
+                // change") - now visible in the Log tab at Warn.
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe seed load failed, starting with an empty seed cache: {ex.GetType().Name} - {ex.Message}");
             }
 
             try
@@ -189,9 +227,11 @@ namespace GW2CraftingHelper
                     recipeSeed.LoadManifest(manifestStream);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // No manifest - staleness detection disabled
+                // No manifest - staleness detection disabled. Previously a
+                // fully silent bare catch - see the recipe-seed catch above.
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe seed manifest load failed, staleness detection disabled: {ex.GetType().Name} - {ex.Message}");
             }
 
             // Item name seed for search provider; the parsed seed is also
@@ -206,12 +246,14 @@ namespace GW2CraftingHelper
                     if (fallbackReason != null)
                     {
                         Logger.Info("Item search fallback to static provider: {0}", fallbackReason);
+                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Item search fallback to static provider: {fallbackReason}");
                     }
                 }
             }
             catch (Exception ex)
             {
                 Logger.Info("Item search fallback to static provider: [{0}] {1}", ex.GetType().Name, ex.Message);
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Item search fallback to static provider: [{ex.GetType().Name}] {ex.Message}");
                 _itemSearchProvider = new StaticItemSearchProvider();
             }
 
@@ -231,10 +273,11 @@ namespace GW2CraftingHelper
             catch (Exception ex)
             {
                 Logger.Info("Acquisition hints unavailable: [{0}] {1}", ex.GetType().Name, ex.Message);
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Acquisition hints unavailable: [{ex.GetType().Name}] {ex.Message}");
                 acquisitionHints = null;
             }
 
-            var recipeOverlay = new OverlayRecipeCacheStore(dataDir);
+            var recipeOverlay = new OverlayRecipeCacheStore(dataDir, onStoreError);
             recipeOverlay.Load(currentGw2BuildId: null);
 
             // Async build ID fetch for overlay invalidation + seed staleness
@@ -249,6 +292,7 @@ namespace GW2CraftingHelper
                 catch (Exception ex)
                 {
                     Logger.Debug("Could not fetch GW2 build ID for cache validation: {0}", ex.Message);
+                    ModuleLog.Shared.Write(ModuleLogLevel.Debug, "startup", $"Could not fetch GW2 build ID for cache validation: {ex.Message}");
                 }
             });
 
@@ -269,8 +313,9 @@ namespace GW2CraftingHelper
             {
                 _moduleIconTexture = ContentsManager.GetTexture("icon.png");
             }
-            catch
+            catch (Exception ex)
             {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Module icon texture load failed, using the fallback error texture: {ex.GetType().Name} - {ex.Message}");
                 _moduleIconTexture = ContentService.Textures.Error;
             }
 
@@ -278,8 +323,9 @@ namespace GW2CraftingHelper
             {
                 _emblemTexture = ContentsManager.GetTexture("emblem.png");
             }
-            catch
+            catch (Exception ex)
             {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Emblem texture load failed, reusing the module icon: {ex.GetType().Name} - {ex.Message}");
                 _emblemTexture = _moduleIconTexture;
             }
 
@@ -316,9 +362,18 @@ namespace GW2CraftingHelper
                             activeChar = mumble.PlayerCharacter.Name;
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Gw2Mumble unavailable - graceful fallback
+                        // Gw2Mumble unavailable - graceful fallback. Debug,
+                        // not Warn: this runs once per Generate click (a
+                        // human-paced action, not a hot loop), but a user
+                        // running Blish without Mumble wired up would hit
+                        // it every single click - Debug (ring-always,
+                        // file-only-when-diagnostics-on) keeps that from
+                        // becoming routine file noise for a purely
+                        // cosmetic fallback (active-character is only used
+                        // for account-bound recipe checks).
+                        ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan", $"Gw2Mumble unavailable, active character unknown: {ex.GetType().Name} - {ex.Message}");
                     }
 
                     var currencyValuation = _settings.GetCurrencyValuation();
@@ -384,7 +439,7 @@ namespace GW2CraftingHelper
                 AsyncTexture2D.FromAssetId(156701),
                 () => new ViewAdapter("Log", c =>
                 {
-                    _logContent = new LogTabContent(() => _craftingContent.LastDebugLog);
+                    _logContent = new LogTabContent(ModuleLog.Shared);
                     _logContent.Build(c);
                 }),
                 "Log");
@@ -495,6 +550,16 @@ namespace GW2CraftingHelper
                 }
             }
 
+            // M39 (log system, d2 Section 4.3): the Log tab's own poll, run
+            // only while it is the selected tab - a cheap Version compare
+            // when nothing changed, not a full rebuild every frame. This is
+            // the "PLUS a poll" half of the refresh design; TabChanged
+            // above already covers "just switched to this tab".
+            if (_logContent != null && _mainWindow?.SelectedTab == _logTab)
+            {
+                _logContent.PollForUpdates();
+            }
+
             if (_refreshInProgress) return;
             if (_currentSnapshot == null) return;
             if (DateTime.UtcNow - _currentSnapshot.CapturedAt < StaleThreshold) return;
@@ -510,10 +575,35 @@ namespace GW2CraftingHelper
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
 
+            // WP-17 (FrameTicker teardown-on-Unload): the scroll-verify/
+            // resize-debounce/wheel-wrap-verify tickers are parented to the
+            // SpriteScreen, not this view's own control tree (see their own
+            // field comments in CraftingPlanView), so nothing else tears
+            // them down when the module unloads while a tab holding this
+            // view is open and a ticker is mid-flight - this must be called
+            // explicitly, before disposing the window that hosts the view.
+            _craftingContent?.StopLiveTickers();
+
             _httpClient?.Dispose();
             _modalDialog?.Dispose();
             _cornerIcon?.Dispose();
             _mainWindow?.Dispose();
+
+            // Module-level log system (d2-log-system.md Section 7): the
+            // file-sink append/trim now happens on a background flush
+            // queue, never on the calling thread (see ModuleLog's own class
+            // doc comment) - give any writes already queued (e.g. from a
+            // scrolldiag burst moments before unload) a brief, bounded
+            // chance to land on disk before the ring is cleared. Best
+            // effort only: Unload must never hang on a stuck flush (a
+            // locked/very slow disk), so this is capped short rather than
+            // waited on indefinitely.
+            ModuleLog.Shared.WaitForPendingFileWrites(TimeSpan.FromMilliseconds(250));
+
+            // The in-memory ring is cleared only here (process exit / module
+            // disable) - never by any in-tab user action. The on-disk file
+            // is untouched (survives across sessions by design).
+            ModuleLog.Shared.Clear();
         }
 
         private void OnSubtokenUpdated(object sender, ValueEventArgs<IEnumerable<Gw2Sharp.WebApi.V2.Models.TokenPermission>> e)
@@ -527,6 +617,7 @@ namespace GW2CraftingHelper
         private async Task<AccountSnapshot> FetchAndSaveSnapshotAsync(CancellationToken ct)
         {
             Logger.Info("Refreshing account snapshot...");
+            ModuleLog.Shared.Write(ModuleLogLevel.Info, "snapshot", "Refreshing account snapshot...");
 
             // Captured before the fetch starts (main thread - see the
             // field's own comment) so the post-await commit below can
@@ -576,11 +667,14 @@ namespace GW2CraftingHelper
                 // _snapshotDirty, and the on-disk file are all left
                 // untouched by this call.
                 Logger.Info("Discarding snapshot fetch superseded by Clear Cache (epoch {0})", myEpoch);
+                ModuleLog.Shared.Write(ModuleLogLevel.Info, "snapshot", $"Discarding snapshot fetch superseded by Clear Cache (epoch {myEpoch})");
                 return null;
             }
 
             Logger.Info("Fetched snapshot CapturedAt={0:o} items={1} wallet={2} coin={3}",
                 snapshot.CapturedAt, snapshot.Items.Count, snapshot.Wallet.Count, snapshot.CoinCopper);
+            ModuleLog.Shared.Write(ModuleLogLevel.Info, "snapshot",
+                $"Fetched snapshot CapturedAt={snapshot.CapturedAt:o} items={snapshot.Items.Count} wallet={snapshot.Wallet.Count} coin={snapshot.CoinCopper}");
 
             return snapshot;
         }
@@ -630,6 +724,7 @@ namespace GW2CraftingHelper
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Failed to refresh account snapshot");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot", $"Failed to refresh account snapshot: {ex.GetType().Name} - {ex.Message}");
                 Interlocked.Exchange(ref _lastFailedRefreshAttemptTicks, DateTime.UtcNow.Ticks);
                 var status = $"Refresh failed \u2014 {DateTime.Now:t}";
                 SaveStatusThreadSafe(status);

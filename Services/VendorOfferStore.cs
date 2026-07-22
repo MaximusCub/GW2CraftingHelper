@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -18,10 +17,15 @@ namespace GW2CraftingHelper.Services
         private Dictionary<string, VendorOffer> _mergedById;
         private Dictionary<int, List<VendorOffer>> _mergedByOutput;
 
-        public VendorOfferStore(string dataDirectoryPath, VendorOfferLoader loader)
+        // M39 (WP-16 shape, d2-log-system.md Section 4.2): see StatusStore's
+        // matching field comment.
+        private readonly Action<string, Exception> _onError;
+
+        public VendorOfferStore(string dataDirectoryPath, VendorOfferLoader loader, Action<string, Exception> onError = null)
         {
             _overlayPath = Path.Combine(dataDirectoryPath, "vendor_offers_overlay.json");
             _loader = loader;
+            _onError = onError;
             _baseline = new VendorOfferDataset { SchemaVersion = 1, Offers = new List<VendorOffer>() };
             _overlay = new VendorOfferDataset { SchemaVersion = 1, Offers = new List<VendorOffer>() };
             RebuildIndex();
@@ -37,7 +41,7 @@ namespace GW2CraftingHelper.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Failed to load vendor baseline: {ex.Message}");
+                    _onError?.Invoke("Failed to load vendor baseline", ex);
                     _baseline = new VendorOfferDataset { SchemaVersion = 1, Offers = new List<VendorOffer>() };
                 }
             }
@@ -66,7 +70,7 @@ namespace GW2CraftingHelper.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to load vendor overlay: {ex.Message}");
+                _onError?.Invoke("Failed to load vendor overlay", ex);
                 _overlay = new VendorOfferDataset { SchemaVersion = 1, Offers = new List<VendorOffer>() };
             }
             RebuildIndex();

@@ -123,6 +123,10 @@
     <Compile Include="Services\ModuleSettings.cs" />
     <Compile Include="Services\CurrencyValuationSerializer.cs" />
     <Compile Include="Services\SettingsInputParser.cs" />
+    <Compile Include="Services\ModuleLogLevel.cs" />
+    <Compile Include="Services\ModuleLogEntry.cs" />
+    <Compile Include="Services\ModuleLog.cs" />
+    <Compile Include="Services\ModuleLogStore.cs" />
     <Compile Include="Models\Gw2Constants.cs" />
     <Compile Include="Models\CostLine.cs" />
     <Compile Include="Models\VendorOffer.cs" />

@@ -92,6 +92,53 @@ namespace GW2CraftingHelper.Tests.Services
         {
             _store.Delete();
         }
+
+        // --- M39 (one-store-convention): atomic .tmp+Replace, matching
+        // StatusStore/VendorOfferStore - previously a plain, non-atomic
+        // File.WriteAllText (tab-roadmap-proposal.md Section 2.2's
+        // correction). ---
+
+        [Fact]
+        public void Save_LeavesNoTmpFileBehind()
+        {
+            _store.Save(CreateSnapshot(42));
+
+            string tmpPath = Path.Combine(_tempDir, "snapshot.json.tmp");
+            Assert.False(File.Exists(tmpPath));
+        }
+
+        [Fact]
+        public void Save_Overwrite_LeavesNoTmpFileBehindEither()
+        {
+            _store.Save(CreateSnapshot(1));
+            _store.Save(CreateSnapshot(2));
+
+            string tmpPath = Path.Combine(_tempDir, "snapshot.json.tmp");
+            Assert.False(File.Exists(tmpPath));
+            Assert.Equal(2, _store.LoadLatest().CoinCopper);
+        }
+
+        // --- M39 (WP-16 shape): onError callback, real IO failure. ---
+
+        [Fact]
+        public void Save_DirectoryCreationFails_InvokesOnErrorInsteadOfThrowing()
+        {
+            string blockingPath = Path.Combine(_tempDir, "blocked-data-dir");
+            File.WriteAllText(blockingPath, "not a directory");
+
+            string capturedMessage = null;
+            Exception capturedException = null;
+            var store = new SnapshotStore(blockingPath, (message, ex) =>
+            {
+                capturedMessage = message;
+                capturedException = ex;
+            });
+
+            store.Save(CreateSnapshot());
+
+            Assert.NotNull(capturedMessage);
+            Assert.NotNull(capturedException);
+        }
     }
 
 }

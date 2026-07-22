@@ -77,6 +77,19 @@ namespace GW2CraftingHelper.Views
         private Label _homesteadStatusLabel;
         private Checkbox _valueOwnMaterialsCheckbox;
 
+        // M39 (log system, d2-log-system.md Section 5 / tab-roadmap-proposal
+        // Section 2.1): the ONE "Diagnostics" checkbox + the two log-file
+        // policy rows (max size / retention). No separate
+        // ScrollDiagnosticsEnabled checkbox is surfaced here - see
+        // ModuleSettings' own doc comment on that setting's backward-compat
+        // read.
+        private Checkbox _logDiagnosticsCheckbox;
+        private TextBox _logMaxSizeInput;
+        private Label _logMaxSizeErrorLabel;
+        private TextBox _logRetentionDaysInput;
+        private Label _logRetentionDaysErrorLabel;
+        private Label _logStatusLabel;
+
         public SettingsTabContent(ModuleSettings settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -85,6 +98,19 @@ namespace GW2CraftingHelper.Views
         public void Build(Container container)
         {
             _rows.Clear();
+
+            // Pre-existing gap found during M39 review (this same file's
+            // reused-instance-per-reopen shape is exactly why _rows.Clear()
+            // above already exists): Module.cs's Settings tab reuses this
+            // SAME SettingsTabContent instance across every tab re-open
+            // (unlike the Log tab's "new instance per open" factory), so
+            // without clearing here, re-opening Settings more than once
+            // per session would accumulate stale HomesteadTierRow entries
+            // pointing at controls the previous Build() cycle's container
+            // already disposed - LoadCurrentHomesteadTiers/
+            // SaveHomesteadTiers would then read/write through them
+            // alongside the current cycle's real rows.
+            _homesteadRows.Clear();
 
             int panelWidth = container.ContentRegion.Width - RightEdgePadding;
 
@@ -106,9 +132,11 @@ namespace GW2CraftingHelper.Views
             BuildCurrencyValuationsSection(panelWidth);
             BuildPlanDefaultsSection(panelWidth);
             BuildHomesteadRefinementSection(panelWidth);
+            BuildLoggingSection(panelWidth);
 
             LoadCurrentValuations();
             LoadCurrentHomesteadTiers();
+            LoadCurrentLoggingSettings();
         }
 
         private void BuildCurrencyValuationsSection(int panelWidth)
@@ -340,6 +368,266 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        /// <summary>
+        /// M39 (log system): one "Diagnostics" checkbox (idiom (a),
+        /// immediate-apply - matches ValueOwnMaterials above) plus two
+        /// TextBox+Save rows (idiom (b) - matches the Homestead section
+        /// above) for the log file's size cap and retention window. This is
+        /// the ONE diagnostics toggle for the whole module per the
+        /// tab-roadmap-proposal synthesis (Section 2.1) - no separate
+        /// ScrollDiagnosticsEnabled checkbox is added alongside it.
+        /// </summary>
+        private void BuildLoggingSection(int panelWidth)
+        {
+            AddSectionHeader("Logging", panelWidth);
+            AddInfoLine("Controls the module's own log file (data/module_log.jsonl), separate from Blish HUD's own log.", panelWidth);
+            AddInfoLine("The Log tab always shows the current session regardless of these settings.", panelWidth);
+
+            AddLogDiagnosticsRow(panelWidth);
+            AddLogMaxSizeRow(panelWidth);
+            AddLogRetentionDaysRow(panelWidth);
+            AddLogSaveRow(panelWidth);
+        }
+
+        private void AddLogDiagnosticsRow(int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, RowHeight),
+                Parent = _rootPanel
+            };
+
+            _logDiagnosticsCheckbox = new Checkbox()
+            {
+                Text = "Diagnostics logging",
+                Checked = _settings.LogDiagnosticsEnabled.Value,
+                Location = new Point(NameColumnX, 7),
+                Parent = rowPanel
+            };
+            _logDiagnosticsCheckbox.CheckedChanged += (_, e) =>
+            {
+                _settings.LogDiagnosticsEnabled.Value = e.Checked;
+                ModuleLog.Shared.DiagnosticsEnabled = e.Checked;
+            };
+
+            new Label()
+            {
+                Text = "Log fine-grained diagnostic events (including scroll machinery) to the Log tab and file",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = InfoTextColor,
+                Location = new Point(NameColumnX + 170, 7),
+                Parent = rowPanel
+            };
+        }
+
+        private void AddLogMaxSizeRow(int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, RowHeight),
+                Parent = _rootPanel
+            };
+
+            new Label()
+            {
+                Text = "Log max size",
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = NameColumnWidth,
+                Location = new Point(NameColumnX, 7),
+                Parent = rowPanel
+            };
+
+            _logMaxSizeInput = new TextBox()
+            {
+                Size = new Point(InputWidth, 26),
+                Location = new Point(NameColumnX + NameColumnWidth, 3),
+                Parent = rowPanel
+            };
+
+            new Label()
+            {
+                Text = "MB (1-1000)",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = InfoTextColor,
+                Location = new Point(HintX, 7),
+                Parent = rowPanel
+            };
+
+            _logMaxSizeErrorLabel = new Label()
+            {
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = ErrorTextColor,
+                Location = new Point(ErrorX, 7),
+                Parent = rowPanel
+            };
+        }
+
+        private void AddLogRetentionDaysRow(int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, RowHeight),
+                Parent = _rootPanel
+            };
+
+            new Label()
+            {
+                Text = "Log retention",
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = NameColumnWidth,
+                Location = new Point(NameColumnX, 7),
+                Parent = rowPanel
+            };
+
+            _logRetentionDaysInput = new TextBox()
+            {
+                Size = new Point(InputWidth, 26),
+                Location = new Point(NameColumnX + NameColumnWidth, 3),
+                Parent = rowPanel
+            };
+
+            new Label()
+            {
+                Text = "days (1-365)",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = InfoTextColor,
+                Location = new Point(HintX, 7),
+                Parent = rowPanel
+            };
+
+            _logRetentionDaysErrorLabel = new Label()
+            {
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = ErrorTextColor,
+                Location = new Point(ErrorX, 7),
+                Parent = rowPanel
+            };
+        }
+
+        private void AddLogSaveRow(int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, 40),
+                Parent = _rootPanel
+            };
+
+            var saveButton = new StandardButton()
+            {
+                Text = "Save",
+                Size = new Point(80, 28),
+                Location = new Point(NameColumnX, 6),
+                Parent = rowPanel
+            };
+            saveButton.Click += (_, __) => SaveLoggingSettings();
+
+            _logStatusLabel = new Label()
+            {
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(NameColumnX + 80 + 12, 12),
+                Parent = rowPanel
+            };
+        }
+
+        private void LoadCurrentLoggingSettings()
+        {
+            if (_logMaxSizeInput != null)
+            {
+                long mb = _settings.LogMaxSizeBytes.Value / (1024 * 1024);
+                _logMaxSizeInput.Text = mb.ToString(CultureInfo.InvariantCulture);
+            }
+            if (_logMaxSizeErrorLabel != null)
+            {
+                _logMaxSizeErrorLabel.Text = "";
+            }
+
+            if (_logRetentionDaysInput != null)
+            {
+                _logRetentionDaysInput.Text = _settings.LogRetentionDays.Value.ToString(CultureInfo.InvariantCulture);
+            }
+            if (_logRetentionDaysErrorLabel != null)
+            {
+                _logRetentionDaysErrorLabel.Text = "";
+            }
+        }
+
+        private void SaveLoggingSettings()
+        {
+            int invalidCount = 0;
+
+            if (_logMaxSizeErrorLabel != null)
+            {
+                _logMaxSizeErrorLabel.Text = "";
+            }
+            if (SettingsInputParser.TryParseLogMaxSizeMb(_logMaxSizeInput?.Text, out long maxSizeBytes))
+            {
+                _settings.LogMaxSizeBytes.Value = (int)maxSizeBytes;
+
+                // Pushed live immediately (not just persisted) - the
+                // running ModuleLog instance otherwise would not pick up a
+                // smaller/larger cap until the next module reload. Mirrors
+                // DiagnosticsEnabled's own immediate-apply behavior above,
+                // even though this row uses the TextBox+Save idiom rather
+                // than a plain checkbox. Routed through the same clamp as
+                // Module.cs's own Configure call (redundant here in
+                // practice, since TryParseLogMaxSizeMb already rejected
+                // anything outside 1-1000 MB above, but keeps every live
+                // consumer of this setting going through one clamped
+                // accessor rather than two separately-trusted paths).
+                ModuleLog.Shared.MaxFileSizeBytes = _settings.GetClampedLogMaxSizeBytes();
+            }
+            else if (_logMaxSizeErrorLabel != null)
+            {
+                _logMaxSizeErrorLabel.Text = "Must be 1-1000";
+                invalidCount++;
+            }
+
+            if (_logRetentionDaysErrorLabel != null)
+            {
+                _logRetentionDaysErrorLabel.Text = "";
+            }
+            if (SettingsInputParser.TryParseRetentionDays(_logRetentionDaysInput?.Text, out int retentionDays))
+            {
+                // Retention is only enforced once per session at
+                // Module.Initialize (age-based pruning does not need
+                // per-write cost - d2-log-system.md Section 4.2), so a
+                // saved value here intentionally takes effect next session,
+                // not immediately - no live push needed, unlike the size
+                // cap above.
+                _settings.LogRetentionDays.Value = retentionDays;
+            }
+            else if (_logRetentionDaysErrorLabel != null)
+            {
+                _logRetentionDaysErrorLabel.Text = "Must be 1-365";
+                invalidCount++;
+            }
+
+            if (_logStatusLabel == null) return;
+
+            if (invalidCount == 0)
+            {
+                _logStatusLabel.Text = $"Saved - {DateTime.Now:t}";
+                _logStatusLabel.TextColor = SuccessTextColor;
+            }
+            else
+            {
+                string entryWord = invalidCount == 1 ? "entry" : "entries";
+                _logStatusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
+                _logStatusLabel.TextColor = WarningTextColor;
+            }
+        }
+
         private void AddSectionHeader(string title, int panelWidth)
         {
             var headerPanel = new Panel()
@@ -528,6 +816,7 @@ namespace GW2CraftingHelper.Views
                 // visible status message instead of an unhandled
                 // exception on the UI thread.
                 Logger.Warn(ex, "Failed to save currency valuations");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "settings", $"Failed to save currency valuations: {ex.GetType().Name} - {ex.Message}");
                 if (_statusLabel != null)
                 {
                     _statusLabel.Text = "Save failed - see log";

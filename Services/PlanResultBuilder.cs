@@ -57,15 +57,20 @@ namespace GW2CraftingHelper.Services
                 // Scope note (documented descope, not silently dropped): the
                 // approved WP-07 scope also asked to gate this construction
                 // behind an "is anyone reading this debug log" check. No such
-                // flag exists anywhere in this codebase - the only consumer
-                // (Module.cs's LogTabContent, via CraftingPlanView.LastDebugLog)
-                // reads CraftingPlanResult.DebugLog lazily through a Func<>,
-                // but only at Log-tab-open/Refresh() time, long after this
-                // Build() call has already returned with every line
-                // pre-formatted into strings. Wiring a real "will this be
-                // read" check through to here would mean either plumbing a
-                // "Log tab is open" bool from Module.cs/CraftingPlanView down
-                // through CraftingPlanPipeline into this method, or changing
+                // flag exists anywhere in this codebase - CraftingPlanView
+                // stores this result on CraftingPlanView.LastDebugLog
+                // (public, currently consumed by no view - M39 moved the Log
+                // tab onto the separate module-wide ModuleLog ring instead of
+                // this per-plan DebugLog; LastDebugLog is left untouched as
+                // out-of-scope per d2-log-system.md's own brief, and remains
+                // available for a future consumer, e.g. Plan History). Any
+                // reader would only ever see this at some later, unrelated
+                // point in time, long after this Build() call has already
+                // returned with every line pre-formatted into strings. Wiring
+                // a real "will this be read" check through to here would mean
+                // either plumbing a "something is reading LastDebugLog right
+                // now" bool from whatever consumer exists down through
+                // CraftingPlanPipeline into this method, or changing
                 // CraftingPlanResult.DebugLog's element type to defer
                 // formatting to read time - both reach outside this package's
                 // Services/PlanResultBuilder.cs scope and are scope creep for

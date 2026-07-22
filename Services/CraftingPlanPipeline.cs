@@ -455,17 +455,51 @@ namespace GW2CraftingHelper.Services
                 throw new ArgumentException("At least one plan request item is required.", nameof(items));
             }
 
-            if (items.Count == 1)
-            {
-                return await GenerateStructuredAsync(
-                    items[0].ItemId, items[0].Quantity, snapshot, ct, progress,
-                    activeCharacterName, priceBasis, currencyValuation, ownMaterialsMode,
-                    homesteadTiers);
-            }
+            // M39 (log system, d2-log-system.md Section 8's last row): NEW
+            // plan-lifecycle events, not a migration of an existing call -
+            // this is the one entry point Module.cs's own generateAsync
+            // lambda actually calls (a single-entry list short-circuits to
+            // the untouched single-item overload below, exactly as before -
+            // see that overload's own doc comment), so wrapping ONLY this
+            // thin dispatcher covers every real call site without touching
+            // either branch's internals - deliberately scoped this way so
+            // it does not collide with WP-13's planned extraction of shared
+            // helpers across the Generate*Async overloads (tab-roadmap-
+            // proposal.md Section 2.3's sequencing note).
+            var sw = Stopwatch.StartNew();
+            string itemWord = items.Count == 1 ? "item" : "items";
+            ModuleLog.Shared.Write(ModuleLogLevel.Info, "plan", $"Generation started ({items.Count} {itemWord})");
 
-            return await GenerateStructuredMultiAsync(
-                items, snapshot, ct, progress, activeCharacterName,
-                priceBasis, currencyValuation, ownMaterialsMode, homesteadTiers);
+            try
+            {
+                CraftingPlanResult result;
+                if (items.Count == 1)
+                {
+                    result = await GenerateStructuredAsync(
+                        items[0].ItemId, items[0].Quantity, snapshot, ct, progress,
+                        activeCharacterName, priceBasis, currencyValuation, ownMaterialsMode,
+                        homesteadTiers);
+                }
+                else
+                {
+                    result = await GenerateStructuredMultiAsync(
+                        items, snapshot, ct, progress, activeCharacterName,
+                        priceBasis, currencyValuation, ownMaterialsMode, homesteadTiers);
+                }
+
+                ModuleLog.Shared.Write(ModuleLogLevel.Info, "plan", $"Generation finished in {sw.ElapsedMilliseconds}ms");
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Info, "plan", $"Generation cancelled after {sw.ElapsedMilliseconds}ms");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan", $"Generation failed after {sw.ElapsedMilliseconds}ms: {ex.GetType().Name} - {ex.Message}");
+                throw;
+            }
         }
 
         /// <summary>

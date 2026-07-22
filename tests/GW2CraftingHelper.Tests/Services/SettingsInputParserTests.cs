@@ -144,5 +144,110 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(ok);
             Assert.Equal(0, tier);
         }
+
+        // --- M39 (log system): TryParseLogMaxSizeMb ---
+
+        [Theory]
+        [InlineData("1", 1)]
+        [InlineData("2", 2)]
+        [InlineData("1000", 1000)]
+        [InlineData("  50  ", 50)]
+        public void TryParseLogMaxSizeMb_ValidRange_ReturnsTrueWithByteCount(string text, int expectedMb)
+        {
+            bool ok = SettingsInputParser.TryParseLogMaxSizeMb(text, out long maxSizeBytes);
+
+            Assert.True(ok);
+            Assert.Equal((long)expectedMb * 1024 * 1024, maxSizeBytes);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void TryParseLogMaxSizeMb_NullOrBlank_ReturnsFalseWithZero(string text)
+        {
+            bool ok = SettingsInputParser.TryParseLogMaxSizeMb(text, out long maxSizeBytes);
+
+            Assert.False(ok);
+            Assert.Equal(0, maxSizeBytes);
+        }
+
+        [Theory]
+        [InlineData("0")]
+        [InlineData("-1")]
+        [InlineData("1001")]
+        [InlineData("99999")]
+        public void TryParseLogMaxSizeMb_OutOfRange_ReturnsFalse(string text)
+        {
+            bool ok = SettingsInputParser.TryParseLogMaxSizeMb(text, out long maxSizeBytes);
+
+            Assert.False(ok);
+            Assert.Equal(0, maxSizeBytes);
+        }
+
+        [Theory]
+        [InlineData("1.5")]
+        [InlineData("+1")]
+        [InlineData("abc")]
+        [InlineData("2MB")]
+        public void TryParseLogMaxSizeMb_MalformedText_ReturnsFalse(string text)
+        {
+            bool ok = SettingsInputParser.TryParseLogMaxSizeMb(text, out long maxSizeBytes);
+
+            Assert.False(ok);
+            Assert.Equal(0, maxSizeBytes);
+        }
+
+        // --- M39 (log system): TryParseRetentionDays ---
+
+        [Theory]
+        [InlineData("1", 1)]
+        [InlineData("14", 14)]
+        [InlineData("365", 365)]
+        [InlineData("  7  ", 7)]
+        public void TryParseRetentionDays_ValidRange_ReturnsTrueWithValue(string text, int expected)
+        {
+            bool ok = SettingsInputParser.TryParseRetentionDays(text, out int days);
+
+            Assert.True(ok);
+            Assert.Equal(expected, days);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void TryParseRetentionDays_NullOrBlank_ReturnsFalseWithZero(string text)
+        {
+            bool ok = SettingsInputParser.TryParseRetentionDays(text, out int days);
+
+            Assert.False(ok);
+            Assert.Equal(0, days);
+        }
+
+        [Theory]
+        [InlineData("0")]
+        [InlineData("-1")]
+        [InlineData("366")]
+        public void TryParseRetentionDays_OutOfRange_ReturnsFalse(string text)
+        {
+            bool ok = SettingsInputParser.TryParseRetentionDays(text, out int days);
+
+            Assert.False(ok);
+            Assert.Equal(0, days);
+        }
+
+        [Theory]
+        [InlineData("1.5")]
+        [InlineData("+1")]
+        [InlineData("abc")]
+        [InlineData("14 days")]
+        public void TryParseRetentionDays_MalformedText_ReturnsFalse(string text)
+        {
+            bool ok = SettingsInputParser.TryParseRetentionDays(text, out int days);
+
+            Assert.False(ok);
+            Assert.Equal(0, days);
+        }
     }
 }

@@ -51,6 +51,39 @@ namespace GW2CraftingHelper.Tests.Services
             _store.Save("Second");
             Assert.Equal("Second", _store.Load());
         }
+
+        // --- M39 (WP-16 shape): onError callback, real IO failure. ---
+
+        [Fact]
+        public void Save_DirectoryCreationFails_InvokesOnErrorInsteadOfThrowing()
+        {
+            string blockingPath = Path.Combine(_tempDir, "blocked-data-dir");
+            File.WriteAllText(blockingPath, "not a directory");
+
+            string capturedMessage = null;
+            Exception capturedException = null;
+            var store = new StatusStore(blockingPath, (message, ex) =>
+            {
+                capturedMessage = message;
+                capturedException = ex;
+            });
+
+            store.Save("some status");
+
+            Assert.NotNull(capturedMessage);
+            Assert.NotNull(capturedException);
+        }
+
+        [Fact]
+        public void Save_NoOnErrorProvided_DoesNotThrowOnFailure()
+        {
+            string blockingPath = Path.Combine(_tempDir, "blocked-data-dir-2");
+            File.WriteAllText(blockingPath, "not a directory");
+
+            var store = new StatusStore(blockingPath);
+
+            store.Save("some status"); // no-op onError default - must not throw
+        }
     }
 
 }
