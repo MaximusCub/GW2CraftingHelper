@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -151,6 +152,54 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(2, api.Calls.Count);
             Assert.Equal(200, api.Calls[0].Count);
             Assert.Equal(50, api.Calls[1].Count);
+        }
+
+        // KNOWN-ISSUES api-degradation F3: a hard-failing FIRST-WAVE batch
+        // must not abort the whole call - it degrades (here, healed by the
+        // existing retry wave) instead of discarding an earlier batch's
+        // already-fetched data.
+        [Fact]
+        public async Task FirstWaveBatchFailure_DoesNotAbort_HealedByRetryWave()
+        {
+            var api = new InMemoryItemApiClient();
+            var ids = new List<int>();
+            for (int i = 1; i <= 250; i++)
+            {
+                api.AddItem(i, $"Item {i}", $"https://example.com/{i}.png");
+                ids.Add(i);
+            }
+            // First wave: batch 1 (ids 1-200) is call #1 and succeeds;
+            // batch 2 (ids 201-250) is call #2 and hard-fails.
+            api.ThrowOnCallNumber = 2;
+
+            var svc = new ItemMetadataService(api);
+            var result = await svc.GetMetadataAsync(ids, CancellationToken.None);
+
+            // Batch 1's data survived the later batch's failure (the
+            // pre-fix bug would have thrown before returning anything),
+            // and the retry wave (call #3, which does not match
+            // ThrowOnCallNumber) healed batch 2's ids.
+            Assert.Equal(250, result.Count);
+            Assert.Equal("Item 1", result[1].Name);
+            Assert.Equal("Item 201", result[201].Name);
+            Assert.Equal(3, api.Calls.Count);
+        }
+
+        // KNOWN-ISSUES api-degradation F3: a genuine total first-wave
+        // outage (every batch fails) must still surface as an error,
+        // matching the pre-existing single-batch behavior - it must not be
+        // silently swallowed into an all-Unknown-Item result.
+        [Fact]
+        public async Task FirstWaveAllBatchesFail_Throws()
+        {
+            var api = new InMemoryItemApiClient();
+            api.AddItem(1, "Item 1", "https://example.com/1.png");
+            api.ThrowOnCallNumber = 1;
+
+            var svc = new ItemMetadataService(api);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => svc.GetMetadataAsync(new[] { 1 }, CancellationToken.None));
         }
 
         [Fact]
