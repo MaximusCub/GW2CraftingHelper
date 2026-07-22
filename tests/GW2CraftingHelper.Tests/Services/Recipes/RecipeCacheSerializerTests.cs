@@ -4,6 +4,7 @@ using System.Linq;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Services.Recipes;
 using Xunit;
+using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
 
 namespace GW2CraftingHelper.Tests.Services.Recipes
 {
@@ -113,27 +114,6 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             }
         }
 
-        /// <summary>
-        /// Walks up from the running test assembly's directory looking for
-        /// relativePath, so this test finds the repo's ref/ folder
-        /// regardless of build configuration (Debug/Release) or platform
-        /// subfolder depth. Returns null if not found within a reasonable
-        /// number of levels, rather than throwing or scanning unrelated
-        /// directories.
-        /// </summary>
-        private static string FindRepoFile(string relativePath)
-        {
-            var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            for (int i = 0; dir != null && i < 12; i++)
-            {
-                string candidate = Path.Combine(dir.FullName, relativePath);
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-                dir = dir.Parent;
-            }
-            return null;
-        }
+        // FindRepoFile comes from Helpers/RepoFileLocator.cs.
     }
 }
