@@ -33,7 +33,8 @@ namespace VendorOfferUpdater.Tests
             List<WikiCostEntry> costEntries = null,
             List<string> locations = null,
             int? dailyCap = null,
-            int? weeklyCap = null)
+            int? weeklyCap = null,
+            string requirement = null)
         {
             return new WikiVendorResult
             {
@@ -43,7 +44,8 @@ namespace VendorOfferUpdater.Tests
                 CostEntries = costEntries ?? new List<WikiCostEntry>(),
                 Locations = locations ?? new List<string>(),
                 DailyCap = dailyCap,
-                WeeklyCap = weeklyCap
+                WeeklyCap = weeklyCap,
+                Requirement = requirement
             };
         }
 
@@ -253,6 +255,103 @@ namespace VendorOfferUpdater.Tests
             // offer that gains a real WeeklyCap must change OfferId, since the
             // hasher folds dailyCap/weeklyCap into the hashed string.
             Assert.NotEqual(uncapped.OfferId, capped.OfferId);
+        }
+
+        // M37 (KNOWN-ISSUES #24): HomesteadTier wiring end-to-end through
+        // ConvertToOffer.
+
+        [Fact]
+        public async Task NonHomesteadMerchant_HomesteadTierStaysNull()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(merchantName: "Miyani");
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Null(offer.HomesteadTier);
+        }
+
+        [Fact]
+        public async Task HomesteadMerchant_NoRequirement_HomesteadTierIsZero()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(merchantName: "Homestead Refinement—Metal Forge");
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Equal(0, offer.HomesteadTier);
+        }
+
+        [Fact]
+        public async Task HomesteadMerchant_OneRequirement_HomesteadTierIsOne()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(
+                merchantName: "Homestead Refinement—Metal Forge",
+                requirement: "one [[Homestead Upgrade: Ore Trade Efficiency]]");
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Equal(1, offer.HomesteadTier);
+        }
+
+        [Fact]
+        public async Task HomesteadMerchant_TwoRequirement_HomesteadTierIsTwo()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(
+                merchantName: "Homestead Refinement—Metal Forge",
+                requirement: "two [[Homestead Upgrade: Ore Trade Efficiency]]");
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Equal(2, offer.HomesteadTier);
+        }
+
+        [Fact]
+        public async Task DifferentHomesteadTiers_ProduceDifferentOfferIds()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var tier0 = Program.ConvertToOffer(
+                MakeResult(merchantName: "Homestead Refinement—Metal Forge"),
+                helper, new Dictionary<string, int>());
+            var tier1 = Program.ConvertToOffer(
+                MakeResult(
+                    merchantName: "Homestead Refinement—Metal Forge",
+                    requirement: "one [[Homestead Upgrade: Ore Trade Efficiency]]"),
+                helper, new Dictionary<string, int>());
+
+            Assert.NotNull(tier0);
+            Assert.NotNull(tier1);
+            // Same GameId/output/cost/merchant otherwise - only the tier
+            // differs, and it must still change the OfferId (this is the
+            // Potato T0/T1 collision the row-content-only hasher used to
+            // miss - see WikiSmwClient.ComputeCompositeKey's doc comment).
+            Assert.NotEqual(tier0.OfferId, tier1.OfferId);
+        }
+
+        [Fact]
+        public async Task HomesteadMerchant_UnrecognizedRequirement_HomesteadTierStaysNull()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(
+                merchantName: "Homestead Refinement—Farm",
+                requirement: "[[Some Unrelated Achievement]]");
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Null(offer.HomesteadTier);
         }
     }
 }

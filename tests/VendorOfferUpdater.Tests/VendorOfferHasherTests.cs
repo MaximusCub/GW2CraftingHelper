@@ -214,5 +214,46 @@ namespace VendorOfferUpdater.Tests
 
             Assert.Matches("^[0-9a-f]{64}$", hash);
         }
+
+        // M37 (KNOWN-ISSUES #24): omitting homesteadTier must reproduce the
+        // exact pre-M37 hash.
+        [Fact]
+        public void OmittedHomesteadTier_MatchesExplicitNull()
+        {
+            var costs = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+            };
+
+            string hashOmitted = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), null, null);
+            string hashExplicitNull = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant", new List<string>(), null, null, null);
+
+            Assert.Equal(hashOmitted, hashExplicitNull);
+        }
+
+        [Fact]
+        public void DifferentHomesteadTiers_ProduceDifferentHashes()
+        {
+            var costs = new List<CostLine>
+            {
+                new CostLine { Type = "Item", Id = 19697, Count = 8 }
+            };
+
+            string hashNoTier = VendorOfferHasher.ComputeOfferId(
+                102205, 1, costs, "Homestead Refinement—Metal Forge", new List<string>(), null, null, null);
+            string hashTier0 = VendorOfferHasher.ComputeOfferId(
+                102205, 1, costs, "Homestead Refinement—Metal Forge", new List<string>(), null, null, 0);
+            string hashTier1 = VendorOfferHasher.ComputeOfferId(
+                102205, 1, costs, "Homestead Refinement—Metal Forge", new List<string>(), null, null, 1);
+            string hashTier2 = VendorOfferHasher.ComputeOfferId(
+                102205, 1, costs, "Homestead Refinement—Metal Forge", new List<string>(), null, null, 2);
+
+            Assert.NotEqual(hashNoTier, hashTier0);
+            Assert.NotEqual(hashTier0, hashTier1);
+            Assert.NotEqual(hashTier1, hashTier2);
+            Assert.NotEqual(hashTier0, hashTier2);
+        }
     }
 }

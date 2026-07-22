@@ -510,6 +510,21 @@ namespace VendorOfferUpdater
 
             var offerLocations = locations.Count > 0 ? locations : null;
 
+            // M37 (KNOWN-ISSUES #24): null for every non-Homestead-
+            // Refinement offer; for a Homestead Refinement row with
+            // unrecognized requirement text, also null (with a console
+            // warning) rather than guessing - never invent a tier.
+            int? homesteadTier = HomesteadTierResolver.ResolveTier(merchant, result.Requirement);
+            if (homesteadTier == null &&
+                !string.IsNullOrEmpty(merchant) &&
+                merchant.Contains("Homestead Refinement", StringComparison.Ordinal) &&
+                !string.IsNullOrWhiteSpace(result.Requirement))
+            {
+                Console.WriteLine(
+                    $"  WARNING: Homestead Refinement row for game id {result.GameId} " +
+                    $"has unrecognized requirement text \"{result.Requirement}\" - left untagged.");
+            }
+
             string offerId = VendorOfferHasher.ComputeOfferId(
                 result.GameId,
                 outputCount,
@@ -517,7 +532,8 @@ namespace VendorOfferUpdater
                 merchant,
                 offerLocations,
                 result.DailyCap,
-                result.WeeklyCap);
+                result.WeeklyCap,
+                homesteadTier);
 
             return new VendorOffer
             {
@@ -528,7 +544,8 @@ namespace VendorOfferUpdater
                 MerchantName = merchant,
                 Locations = offerLocations,
                 DailyCap = result.DailyCap,
-                WeeklyCap = result.WeeklyCap
+                WeeklyCap = result.WeeklyCap,
+                HomesteadTier = homesteadTier
             };
         }
 
