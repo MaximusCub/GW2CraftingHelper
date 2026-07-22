@@ -815,5 +815,56 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains(result.RequiredDisciplines, d => d.Discipline == "Armorsmith" && d.MinRating == 999);
             Assert.DoesNotContain(result.RequiredDisciplines, d => d.Discipline == "Weaponsmith");
         }
+
+        [Fact]
+        public void Build_NullTree_WithCraftStep_ThrowsLikeOldFindRecipeOption()
+        {
+            // M38 WP-07 fix-pass: BuildRecipeOptionIndex intentionally has no
+            // null-tree guard. Pinning that a null treeUsedForSolve combined
+            // with at least one Craft step fails loud (NullReferenceException)
+            // rather than silently returning an empty index/missing recipe
+            // data - exactly matching the pre-WP-07 FindRecipeOption(node, id),
+            // which dereferenced node.Recipes with no null check.
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 1 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+
+            Assert.Throws<System.NullReferenceException>(
+                () => _builder.Build(plan, null, metadata, null, null));
+        }
+
+        [Fact]
+        public void Build_NullTree_WithNoCraftSteps_DoesNotThrow()
+        {
+            // Companion to the test above: with zero Craft steps, the old
+            // FindRecipeOption was never called at all (both call sites are
+            // inside `foreach (var step in craftSteps)`), so a null
+            // treeUsedForSolve never threw. BuildRecipeOptionIndex must stay
+            // just as lazy - only walking (and dereferencing) the tree when
+            // there is actually a Craft step to resolve.
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.BuyFromTp }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, null, metadata, null, null);
+
+            Assert.Empty(result.RequiredRecipes);
+            Assert.Empty(result.RequiredDisciplines);
+        }
     }
 }

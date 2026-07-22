@@ -53,6 +53,25 @@ namespace GW2CraftingHelper.Services
             {
                 // M38 WP-07 (perf P5): manual loop instead of Select().ToList() -
                 // same content/order, one fewer LINQ iterator+delegate per Build().
+                //
+                // Scope note (documented descope, not silently dropped): the
+                // approved WP-07 scope also asked to gate this construction
+                // behind an "is anyone reading this debug log" check. No such
+                // flag exists anywhere in this codebase - the only consumer
+                // (Module.cs's LogTabContent, via CraftingPlanView.LastDebugLog)
+                // reads CraftingPlanResult.DebugLog lazily through a Func<>,
+                // but only at Log-tab-open/Refresh() time, long after this
+                // Build() call has already returned with every line
+                // pre-formatted into strings. Wiring a real "will this be
+                // read" check through to here would mean either plumbing a
+                // "Log tab is open" bool from Module.cs/CraftingPlanView down
+                // through CraftingPlanPipeline into this method, or changing
+                // CraftingPlanResult.DebugLog's element type to defer
+                // formatting to read time - both reach outside this package's
+                // Services/PlanResultBuilder.cs scope and are scope creep for
+                // this work package. Left eager/unconditional; noted here as
+                // a candidate follow-up (perf P5) rather than dropped
+                // silently.
                 var parts = new List<string>(usedMaterials.Count);
                 foreach (var used in usedMaterials)
                 {
@@ -105,7 +124,18 @@ namespace GW2CraftingHelper.Services
             // result the old recursive short-circuit search would have
             // returned, even if the same RecipeId legitimately appears at
             // more than one tree position.
-            var recipeOptionIndex = BuildRecipeOptionIndex(treeUsedForSolve);
+            //
+            // Only walk the tree when there is at least one Craft step:
+            // both loops below that consult recipeOptionIndex are
+            // `foreach (var step in craftSteps)`, so when craftSteps is
+            // empty the old FindRecipeOption was never called at all and a
+            // null treeUsedForSolve never threw. Matching that laziness
+            // here (rather than unconditionally indexing treeUsedForSolve)
+            // preserves that exact behavior instead of newly throwing on a
+            // null tree whenever there happen to be zero craft steps.
+            var recipeOptionIndex = craftSteps.Count > 0
+                ? BuildRecipeOptionIndex(treeUsedForSolve)
+                : new Dictionary<int, RecipeOption>();
 
             // Resolve craft step options (deduplicated by RecipeId)
             var seenOptionIds = new HashSet<int>();
@@ -322,14 +352,19 @@ namespace GW2CraftingHelper.Services
         // craft-step RecipeId, twice per Build - once for stepOptions, once
         // for requiredRecipes - so the old code paid for the whole tree scan
         // up to 2x uniqueRecipeCount times per Build/pill-click).
+        //
+        // Deliberately no null check on root: the caller only invokes this
+        // when craftSteps.Count > 0, which is exactly when the old
+        // FindRecipeOption(treeUsedForSolve, ...) would have run and thrown
+        // a NullReferenceException on a null tree. Guarding here instead
+        // would silently swap that fail-loud crash for a quietly-empty
+        // index (every craft step's recipe/discipline data dropped with no
+        // error), which is a behavior change WP-07's scope does not
+        // authorize.
         private static Dictionary<int, RecipeOption> BuildRecipeOptionIndex(RecipeNode root)
         {
             var index = new Dictionary<int, RecipeOption>();
-            if (root != null)
-            {
-                IndexRecipeOptions(root, index);
-            }
-
+            IndexRecipeOptions(root, index);
             return index;
         }
 
