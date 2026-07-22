@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Models
 
         // Winning vendor offer's batch shape (Source == BuyFromVendor only,
         // and only when every tree occurrence merged into this step used
-        // the IDENTICAL offer - see PlanSolver.FinalizeVendorBatches):
+        // the IDENTICAL offer - see VendorBatchSolver.FinalizeVendorBatches):
         // OutputCount is the offer's own per-purchase output count, and
         // VendorOfferCurrencyCostLinesPerBatch is that offer's UNSCALED
         // non-coin currency cost for ONE purchase (not this step's

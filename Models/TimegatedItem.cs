@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Models
     /// re-routes the solver to a different acquisition source - it is
     /// surfaced purely as a "this will take you more than one day/week"
     /// notice, computed once per merged shopping-list row after the plan is
-    /// fully solved. See PlanSolver.FinalizeVendorBatches.
+    /// fully solved. See VendorBatchSolver.FinalizeVendorBatches.
     /// </summary>
     public class TimegatedItem
     {

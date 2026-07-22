@@ -272,7 +272,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- M37 (KNOWN-ISSUES #24): shipped Homestead Refinement tier
-        // data invariant. PlanSolver.EvaluateVendorOffers admits any offer
+        // data invariant. VendorBatchSolver.EvaluateVendorOffers admits any offer
         // whose HomesteadTier is null at every configured tier setting -
         // correct for the 21 one-time "Upgrade" purchase rows the same
         // three merchant pages also sell, but WRONG for a material-
@@ -323,7 +323,7 @@ namespace GW2CraftingHelper.Tests.Services
                         offer.HomesteadTier.HasValue,
                         $"Homestead Refinement material-conversion offer '{offer.OfferId}' " +
                         $"(output item {offer.OutputItemId}) has a null HomesteadTier. " +
-                        "PlanSolver.EvaluateVendorOffers admits a null-tier offer at every " +
+                        "VendorBatchSolver.EvaluateVendorOffers admits a null-tier offer at every " +
                         "configured tier by design (that is correct for the 21 one-time " +
                         "Upgrade-purchase rows, not for a material conversion row), so this " +
                         "would silently reintroduce the always-max-tier defect PR #57 fixed.");
