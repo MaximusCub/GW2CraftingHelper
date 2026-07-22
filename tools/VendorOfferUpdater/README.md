@@ -90,6 +90,8 @@ DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
    - `Has item cost` — record type with `Has item value` (amount) and `Has item currency` (name)
    - `Has vendor` — NPC vendor page
    - `Located in` — location pages
+   - `Has daily purchase cap` - daily purchase limit (absent = uncapped)
+   - `Has weekly purchase cap` - weekly purchase limit (absent = uncapped)
 
 ## Rate Limiting
 
@@ -137,3 +139,12 @@ Offers are deduplicated by `offerId` and sorted alphabetically. Null fields are 
 - **Wiki updates** when the community documents new or corrected vendor data
 - **Periodically** (e.g. quarterly) to pick up gradual wiki improvements
 - After modifying the VendorOfferUpdater tool itself, to verify output correctness
+- **After adding new printouts/fields to `WikiSmwClient`** - Re-running Pass 2 alone
+  (`--resolve-item-currencies-only`) against `ref/wiki_vendor_cache.json` reuses the
+  old cached `WikiVendorResult` shape and will silently omit the new fields forever;
+  a full Pass 1 re-scrape is required to fetch them. Pass 1's cache merge overwrites
+  any existing entry for a re-queried `PageName` with the freshly-fetched result (see
+  `Program.cs`), so a normal full re-scrape backfills new fields for every page without
+  needing to delete `ref/wiki_vendor_cache.json` first. Deleting the cache first is only
+  needed if a page must be dropped from the cache entirely (e.g. it no longer resolves
+  on the wiki) rather than refreshed.

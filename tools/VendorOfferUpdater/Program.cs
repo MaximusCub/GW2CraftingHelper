@@ -185,26 +185,23 @@ namespace VendorOfferUpdater
                     }
 
                     // Save wiki results cache for --resolve-item-currencies-only
-                    // Merge with existing cache if present (supports multi-pass querying)
+                    // Merge with existing cache if present (supports multi-pass querying).
+                    // Freshly-queried pages always overwrite any existing cache entry for
+                    // the same PageName, so a full Pass 1 re-scrape after a WikiVendorResult
+                    // schema change (e.g. new printouts/fields) is not silently discarded by
+                    // stale cache data. Pages not touched by this pass keep their cached copy.
                     if (File.Exists(wikiCachePath))
                     {
                         string existingCacheJson = await File.ReadAllTextAsync(wikiCachePath);
                         var existing = JsonSerializer.Deserialize<List<WikiVendorResult>>(
                             existingCacheJson) ?? new List<WikiVendorResult>();
-                        var existingPages = new HashSet<string>(
-                            existing.Select(r => r.PageName), StringComparer.Ordinal);
-                        int added = 0;
-                        foreach (var r in wikiResults)
-                        {
-                            if (!existingPages.Contains(r.PageName))
-                            {
-                                existing.Add(r);
-                                added++;
-                            }
-                        }
+                        var mergeResult = MergeWikiCache(existing, wikiResults);
                         Console.WriteLine(
-                            $"Merged wiki cache: {added} new + {existing.Count - added} existing = {existing.Count} total");
-                        wikiResults = existing;
+                            $"Merged wiki cache: {mergeResult.Added} new + " +
+                            $"{mergeResult.Refreshed} refreshed + " +
+                            $"{mergeResult.Unchanged} unchanged = " +
+                            $"{mergeResult.Merged.Count} total");
+                        wikiResults = mergeResult.Merged;
                     }
                     string cacheJson = JsonSerializer.Serialize(wikiResults);
                     await File.WriteAllTextAsync(wikiCachePath, cacheJson);
@@ -391,6 +388,66 @@ namespace VendorOfferUpdater
         }
 
         /// <summary>
+        /// Result of merging a freshly-queried batch of wiki results into an
+        /// existing wiki-results cache. See <see cref="MergeWikiCache"/>.
+        /// </summary>
+        internal sealed class WikiCacheMergeResult
+        {
+            public List<WikiVendorResult> Merged { get; set; }
+            public int Added { get; set; }
+            public int Refreshed { get; set; }
+            public int Unchanged { get; set; }
+        }
+
+        /// <summary>
+        /// Merges freshly-queried wiki results into an existing wiki-results cache,
+        /// keyed by PageName. A fresh result for a PageName already present in the
+        /// cache always overwrites the cached entry in full (so newly-added fields,
+        /// e.g. purchase caps, are never silently discarded by a stale cached copy).
+        /// A cached PageName not present in the fresh batch is preserved unchanged.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static WikiCacheMergeResult MergeWikiCache(
+            List<WikiVendorResult> existing,
+            List<WikiVendorResult> fresh)
+        {
+            existing ??= new List<WikiVendorResult>();
+            fresh ??= new List<WikiVendorResult>();
+
+            var merged = new Dictionary<string, WikiVendorResult>(StringComparer.Ordinal);
+            foreach (var r in existing)
+            {
+                merged[r.PageName ?? string.Empty] = r;
+            }
+
+            int added = 0;
+            int refreshed = 0;
+            foreach (var r in fresh)
+            {
+                string key = r.PageName ?? string.Empty;
+                if (merged.ContainsKey(key))
+                {
+                    refreshed++;
+                }
+                else
+                {
+                    added++;
+                }
+                merged[key] = r;
+            }
+
+            int unchanged = existing.Count - refreshed;
+
+            return new WikiCacheMergeResult
+            {
+                Merged = merged.Values.ToList(),
+                Added = added,
+                Refreshed = refreshed,
+                Unchanged = unchanged
+            };
+        }
+
+        /// <summary>
         /// Converts a single wiki vendor result to a VendorOffer.
         /// Returns null if any cost line cannot be resolved.
         /// </summary>
@@ -459,8 +516,8 @@ namespace VendorOfferUpdater
                 costLines,
                 merchant,
                 offerLocations,
-                null,
-                null);
+                result.DailyCap,
+                result.WeeklyCap);
 
             return new VendorOffer
             {
@@ -469,7 +526,9 @@ namespace VendorOfferUpdater
                 OutputCount = outputCount,
                 CostLines = costLines,
                 MerchantName = merchant,
-                Locations = offerLocations
+                Locations = offerLocations,
+                DailyCap = result.DailyCap,
+                WeeklyCap = result.WeeklyCap
             };
         }
 

@@ -1412,7 +1412,7 @@ Normalize, used by MainView); StatusText.ForOverrideResolve extends
 that existing seam rather than inventing a new one, and is covered by
 StatusTextTests (Blish-free, per repo invariants).
 
-## 28. Vendor cap data seeding + stale-offer sweep (data)
+## 28. Vendor cap data seeding + stale-offer sweep (PARTIAL - core FIXED in M37; gaps deferred, see DEFERRED below)
 M34 shipped gw2e-parity warn-only cap machinery (TimegatedItems +
 Crafting Steps notice) but 0 of ~53,530 seeded offers carry
 DailyCap/WeeklyCap values, so it is inert. Extend tools/VendorOfferUpdater
@@ -1426,6 +1426,102 @@ in 2016). Scope guard: prioritize offers actually reachable from seeded
 recipe trees before attempting all 53k. Known concrete case to verify:
 the "Candy Corn Vendor (Weekly)" Ecto offers carry no caps despite the
 name (M34 research).
+
+FIXED in M37 (cap seeding): WikiSmwClient's PrintoutSuffix extended with
+two new SMW printouts (Has daily purchase cap, Has weekly purchase cap);
+ConvertToOffer now threads the parsed values into both VendorOfferHasher
+and the emitted VendorOffer instead of a hardcoded null,null. A full
+fresh two-pass re-scrape (63,055-row ref/wiki_vendor_cache.json, 819 rows
+carry a real cap) seeded 689 of the 53,530 baseline offers with a real
+DailyCap/WeeklyCap (0 lost a cap, 0 changed between two different real
+values). VendorOfferHasher.OfferId churn was verified confined exactly to
+those 689 offers in both directions (no offer changed its id without a
+cap change, and vice versa), so the merge-by-OfferId contract in
+VendorOfferStore is unaffected. Verified concrete case: the three "Candy
+Corn Vendor (Weekly)" Glob of Ectoplasm offers (cost 1 Gibbering Skull /
+1 Tyria's Best Nougat Center / 1 High-Quality Plastic Fangs) now carry
+WeeklyCap=1, cross-checked three independent ways (SMW ask query, raw
+wikitext `{{vendor table row|...|per week=1}}`, and the rendered page's
+"Limit" column) - see docs/research/m37-r4-vendor-caps.md Section 2b for
+the full triangulation. Has character purchase cap, Has total purchase
+cap, and Has seasonal purchase cap are real, populated SMW properties
+(confirmed) but were deliberately NOT seeded this milestone - the module
+has no model field or consuming logic for them (TimegatedCapType is
+Daily/Weekly only) and no account/character concept at all, so seeded
+values would have nowhere to go; left for a future milestone's own
+design pass.
+
+FIXED in M37 (stale-offer sweep, reachable-only): computed the reachable
+offer set as every vendor offer whose output item appears as an
+ingredient of some ref/recipes_seed.json recipe (5,487 of the 53,530
+baseline offers, ~10.2%, matching M34's projection) and swept only that
+set, per this item's scope guard. An initial automated pass (identity
+diff of the reachable set against stage 2's fresh 63,055-row wiki cache)
+produced 394 raw candidates, but investigation showed that signal alone
+is unreliable: ~278 were SMW GameId-resolution misses (the item is still
+listed, e.g. Tycho's Leather Bag/Crude Salvage Kit, but that pass's fetch
+failed to resolve a game id for the row) and most of the remainder were
+large-vendor-page row-capture gaps in the same fresh scrape (Tycho, Brass
+Nettlemoor, Chef Kaga, and Traveling Elonian Trader were all directly
+re-verified live and are still selling the "missing" items at the same
+cost). After filtering those out and re-checking every remaining
+candidate against a fresh, independent full per-merchant SMW query, only
+23 of 394 stayed unmatched. Two-route wiki verification (a live SMW ask
+re-query plus the vendor's dedicated /Historical wiki subpage, which
+records the exact game-update patch note for each removed row) confirmed
+exactly 2 offers as genuinely discontinued and removed them:
+  - Memory of Battle (outputItemId 71581) from Dugan, cost 75 Badge of
+    Honor + 100 WvW Skirmish Claim Ticket + 1 Emblem of the Avenger -
+    removed per the April 16, 2024 game update (Dugan/Historical), and
+    independently confirmed as the only [[Sells item::Memory of
+    Battle]] SMW match anywhere on the current wiki (i.e. the wiki
+    itself has no live replacement source). Safe to remove: Memory of
+    Battle is Trading-Post-tradable (checked via /v2/commerce/prices),
+    so no recipe needing it regresses to a false Unknown node (the
+    item 17 precedent's exact regression check).
+  - Shield Generator Blueprint (outputItemId 76483) from Dugan, cost 1
+    Emblem of the Avenger + 10 Shield Generator Blueprint + 10 WvW
+    Skirmish Claim Ticket - removed per the November 19, 2024 game
+    update (Dugan/Historical). Safe to remove: the item retains 18
+    other live vendor offers in the seed.
+ref/vendor_offers.json now carries 53,528 offers (5,485 reachable,
+~10.2% - down from 5,487 pre-sweep since both removed offers were
+themselves reachable). The remaining 21 of the 23 unmatched candidates
+were investigated and deferred (documented here rather than removed,
+per this item's two-independent-checks bar):
+  - 18 offers naming "Skirmish Supervisor", "Lionguard (Skirmish
+    Merchant)", or "Mercenary (Skirmish Merchant)" as the merchant
+    (Mist Pendant, Mist Band (Infused), Obsidian Shard, Ascended
+    Salvage Kit, Mists-Charged Jade Band (Infused), Pile of Soybeans):
+    all three wiki pages were restructured into /Armor, /Weapons,
+    /Others subpages; the items are still sold in-game under the split
+    pages (confirmed live). This is a missing-offer/rename gap for a
+    future re-scrape to follow, not a stale offer - NOT removed.
+  - 2 Brass Nettlemoor offers (Healing Signet, Plague Signet): the
+    wiki's own item pages gained a "(ring)" disambiguation suffix
+    (avoiding a name clash with same-named skills); the items, ids, and
+    costs are unchanged and still correctly seeded - NOT removed, no
+    action needed.
+  - 1 "Merchant (Untamed Crags)" offer (Hydrocatalytic Reagent, 50
+    Research Note): that exact vendor page no longer resolves on the
+    wiki (no page, no redirect), while the underlying item+cost is
+    still valid via dozens of other crafting-material vendors - deferred
+    pending further research into whether the page was renamed or the
+    original scrape mislabeled the vendor.
+A --detect-stale updater mode (per the design sketched in
+docs/research/m37-r4-vendor-caps.md Section 4e) was evaluated and
+deliberately skipped: the investigation above showed a naive automated
+diff is dominated by false positives (394 raw candidates, 2 survived
+two-route verification) driven by scraper coverage gaps and wiki page
+renames that need human judgment to tell apart from genuine removals.
+Shipping that as unattended tooling now would risk encouraging
+unverified mass removals later; the manual method is documented in the
+research report instead. Also out of scope for this pass and left
+uncommitted/discarded: the incidental ~5,400-offer wiki-drift superset
+(new Homestead recipes, unrelated vendor page changes) that a full
+from-scratch re-scrape also picked up alongside the cap data - adopting
+it wholesale was out of this item's stale-offer-sweep scope and is
+recorded as a candidate for a future "missing offers" pass instead.
 
 ## 29. Owned-materials UI live verification (verification debt)
 USING-N-OWNED pills, owned-currency annotations, and the owned/needed
@@ -1473,6 +1569,30 @@ concurrent generate/re-solve/refresh.
 - Ignore-pill cascade semantics + own-materials gating divergences
   (#20.4): revisit only on user feedback.
 - Multi-item row reordering (gw2e moveRecipe): out of scope per M35.
+- Skirmish Merchant-family wiki page split (#28, 18 offers): Skirmish
+  Supervisor / Lionguard (Skirmish Merchant) / Mercenary (Skirmish
+  Merchant) wiki pages were restructured into /Armor, /Weapons, /Others
+  subpages; the items are still sold in-game under the split pages, but
+  the seed's merchant-page linkage is now stale-shaped. Missing-offer/
+  rename gap for a future re-scrape to follow up; not removed.
+- "Merchant (Untamed Crags)" vendor-page-name mismatch (#28, 1 offer):
+  the Hydrocatalytic Reagent / 50 Research Note offer's exact vendor
+  page no longer resolves on the wiki (no page, no redirect), while the
+  item and cost remain valid via other crafting-material vendors.
+  Deferred pending research into whether the page was renamed or the
+  original scrape mislabeled the vendor.
+- Wiki-drift missing-offers superset (#28, ~5,400 offers): M37's full
+  from-scratch re-scrape (for cap seeding) incidentally picked up new
+  Homestead recipes and unrelated vendor page changes beyond the
+  stale-offer-sweep scope. Discarded uncommitted; recorded here as a
+  candidate for a future dedicated "missing offers" pass.
+- Character/total/seasonal purchase caps (#28): the wiki's "Has
+  character purchase cap", "Has total purchase cap", and "Has seasonal
+  purchase cap" SMW properties are real and populated (confirmed in
+  M37) but were deliberately not seeded - the module has no model field
+  or consuming logic for them (TimegatedCapType is Daily/Weekly only)
+  and no account/character concept at all. Left for a future
+  milestone's own design pass.
 
 ## Handoff notes for the implementing session
 - Project memory holds everything: parity goal + full M33-M36 record
