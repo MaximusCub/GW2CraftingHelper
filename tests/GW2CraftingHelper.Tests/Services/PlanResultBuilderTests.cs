@@ -420,6 +420,105 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void RequiredDisciplines_RealMysticForgeDiscipline_StillShown()
+        {
+            // Regression guard for the adversarial-review fix-pass: real
+            // production Mystic Forge recipes always carry
+            // Disciplines = ["MysticForge"] (MysticForgeRecipeData.Load
+            // sets this unconditionally), unlike the empty-Disciplines test
+            // fixture above. Confirms the fix-pass's narrower
+            // NonCraftingDisciplines filter (Achievement/Merchant only)
+            // leaves this pre-existing, out-of-scope behavior unchanged.
+            var tree = TreeWithCraftStep(
+                1, -100, 1,
+                new List<string> { "MysticForge" }, 0, new List<string>(),
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("MysticForge", result.RequiredDisciplines[0].Discipline);
+            Assert.Single(result.RequiredRecipes);
+            Assert.False(result.RequiredRecipes[0].IsMissing);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_AchievementOrMerchantDiscipline_ExcludedFromList()
+        {
+            // M37 fix-pass (adversarial review finding): "Achievement"/
+            // "Merchant" are gw2e-borrowed informational source tags on the
+            // new achievement-bit seed recipes, not real, player-levelable
+            // GW2 crafting disciplines - they must never appear in Required
+            // Disciplines (which the player reads as "disciplines to
+            // unlock/level for this plan").
+            var tree = TreeWithCraftStep(
+                1, -1592, 1,
+                new List<string> { "Achievement" }, 0, new List<string>(),
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -1592 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Empty(result.RequiredDisciplines);
+            Assert.Single(result.RequiredRecipes);
+            Assert.Contains("Achievement", result.RequiredRecipes[0].Disciplines);
+        }
+
+        [Fact]
+        public void RequiredRecipes_AchievementRecipe_IsMissingFalse_NotFlaggedAsUnlockable()
+        {
+            // M37 fix-pass: an achievement-sourced recipe (negative id,
+            // adjacent to but distinct from the Mystic Forge id range) is
+            // inherently available - no "learn this recipe" concept
+            // applies - exactly like a real Mystic Forge recipe, even
+            // though the underlying check is no longer a bare
+            // "recipeId < 0" sign check (see PlanResultBuilder's
+            // InherentlyAvailableDisciplines).
+            var tree = TreeWithCraftStep(
+                1, -1592, 1,
+                new List<string> { "Achievement" }, 0, new List<string>(),
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -1592 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var learnedRecipeIds = new HashSet<int>(); // player has learned nothing
+            var result = _builder.Build(plan, tree, metadata, null, learnedRecipeIds);
+
+            Assert.Single(result.RequiredRecipes);
+            Assert.False(result.RequiredRecipes[0].IsMissing);
+        }
+
+        [Fact]
         public void RequiredDisciplines_NoCraftSteps_EmptyList()
         {
             var tree = Leaf(1, 5);
