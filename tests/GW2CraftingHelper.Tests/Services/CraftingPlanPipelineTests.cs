@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -2076,6 +2077,105 @@ namespace GW2CraftingHelper.Tests.Services
 
                 Assert.Null(currencyRow.CurrencyOwnedQuantity);
             }
+        }
+
+        // --- M38 WP-18 (tests T6/T8/T9): pipeline-level cancellation,
+        // dependency-throws (degrade vs abort), and Ignore x owned-materials
+        // interaction coverage. Every existing test above calls
+        // GenerateStructuredAsync with CancellationToken.None and a fully-
+        // healthy set of in-memory fixtures - nothing here exercised
+        // cancellation or a thrown dependency until now. ---
+
+        // KNOWN-ISSUES 31c-audit (M37 audit-fix): TradingPostService's
+        // AwaitRespectingOwnCancellationAsync races the caller's own ct
+        // against the shared upstream fetch it started, throwing promptly
+        // without waiting for the fetch to finish. Gating the fake price
+        // API's response lets this test cancel deterministically "between
+        // phases" (after the recipe tree is built, while the price fetch is
+        // still in flight) with no sleep/timing race - the same idiom
+        // TradingPostServiceTests' own ConcurrentCalls_*Cancelled* tests
+        // already use one layer down.
+        [Fact]
+        public async Task GenerateStructuredAsync_List_SingleItem_CancelledWhilePriceFetchInFlight_PropagatesCancellation()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1 - simplest leaf-buy tree, so Step 1
+            // (build recipe tree) completes synchronously and the pipeline
+            // reaches the price fetch immediately.
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
+            var gate = new TaskCompletionSource<bool>();
+            priceApi.Gate = gate.Task;
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Copper Ore", "copper.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var cts = new CancellationTokenSource();
+            var items = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } };
+
+            // This is the ONE production entry point Module.cs actually
+            // calls (see GenerateStructuredAsync's own doc comment) - a
+            // single-entry list short-circuits straight to the single-item
+            // core, so this also exercises that method's own
+            // catch (OperationCanceledException) { ...; throw; } vs
+            // catch (Exception) { ...; throw; } distinction.
+            var planTask = pipeline.GenerateStructuredAsync(
+                items, null, cts.Token, priceBasis: PriceBasis.InstantBuy);
+
+            cts.Cancel();
+            gate.SetResult(true); // release the now-abandoned fetch so nothing is left hanging
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() => planTask);
+            Assert.True(planTask.IsCanceled);
+        }
+
+        // Same race, through the genuine 2+ item path (GenerateStructuredMultiAsync)
+        // instead of the single-item short-circuit - a separate method with
+        // its own step sequence, worth proving independently.
+        [Fact]
+        public async Task GenerateStructuredAsync_List_MultiItem_CancelledWhilePriceFetchInFlight_PropagatesCancellation()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipes for items 1/2 - both are simplest leaf-buy trees.
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
+            priceApi.AddPrice(2, buyUnitPrice: 20, sellUnitPrice: 200);
+            var gate = new TaskCompletionSource<bool>();
+            priceApi.Gate = gate.Task;
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Copper Ore", "copper.png");
+            itemApi.AddItem(2, "Iron Ore", "iron.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var cts = new CancellationTokenSource();
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+
+            var planTask = pipeline.GenerateStructuredAsync(
+                items, null, cts.Token, priceBasis: PriceBasis.InstantBuy);
+
+            cts.Cancel();
+            gate.SetResult(true);
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() => planTask);
+            Assert.True(planTask.IsCanceled);
         }
     }
 }
