@@ -1191,6 +1191,74 @@ reference captures; scan_dividers.py at two scroll offsets shows uniform
 29/30 pitches with zero missing boundaries. No visual deltas beyond live
 price drift.
 
+## WP-22: MainView coin panel repointed to shared CoinCurrencyRenderer (M38)
+Architecture report S6 flagged `Views/MainView.cs`'s private
+`GetCoinColor`/`AddCoinSegment` as the second independent encoding of the
+coin invariant, byte-identical to the copies `CraftingPlanView` carried
+before WP-21 extracted its own coin/currency rendering into
+`Views/Rendering/CoinCurrencyRenderer.cs`. Both methods are deleted;
+`UpdateCoinDisplay` (the sole call site - confirmed by a full-file grep,
+no other MainView method touched coin rendering) now builds its own
+3-element `CoinSegmentMath.CoinSegmentSpec` list (still always exactly
+gold/silver/copper via plain `ToString()` - no leading-zero-unit
+omission, no zero-padding once a higher unit precedes: this formatting
+is an unchanged MainView behavior, not touched by this package) via
+`CoinCurrencyRenderer.AddSegmentSpec` (bumped `private` -> `internal` for
+this reuse, mirroring the WP-21-prep `GetPillColors` bump) and hands it
+to `LayoutCoinSegments` with `startX = 0` (left-anchored, MainView's
+existing panel layout).
+ANCHORING: no new parameter was needed on `CoinCurrencyRenderer`.
+`LayoutCoinSegments` already takes a caller-supplied `startX` and lays
+out left-to-right from it - it is anchor-neutral by construction. Only
+the higher-level *right-aligned* convenience wrappers
+(`RenderValueCellRightAligned`/`LayoutValueSegmentsRightAligned`/
+`MeasureValueWidth`, built for CraftingPlanView's mixed coin+currency
+value cells with an unpriced-dash fallback) are direction-locked, and
+MainView's coin-only wallet total never needs those (no currency
+amounts, never genuinely "unpriced"). CraftingPlanView's call sites are
+therefore completely untouched by this package.
+DIFF EVIDENCE: `GetCoinColor` is whitespace-insensitively byte-identical
+to `CoinCurrencyRenderer`'s own private `GetCoinColor` (`diff -Bw`
+confirmed) - deleting MainView's copy and letting `LayoutCoinSegments`'s
+internal call to the shared one replace it is a pure no-op on coloring.
+`AddCoinSegment`'s per-segment geometry (icon size 20, label-to-icon gap
+2, inter-segment gap 6; label then icon to its right at
+`x + textWidth + gap`; next segment starts at
+`x + textWidth + gap + iconSize + segmentGap`) matches
+`CoinSegmentMath.CoinIconSize`/`CoinLabelIconGap`/`CoinSegmentGap` and
+`LayoutCoinSegments`'s loop body constant-for-constant; the one
+structural difference is that the old code measured each label's width
+AFTER Blish created it (`label.Width`, `AutoSizeWidth = true`) while
+`LayoutCoinSegments` uses a pre-computed `BitmapFont.MeasureString`
+width (`CoinSegmentSpec.TextWidth`, via the now-shared `AddSegmentSpec`)
+BEFORE creating the label - the same pre-measure-then-render split every
+other coin/value cell in the app already relies on (M33 C2b) and
+already visual-gate-proven in WP-21; not independently re-verified here
+beyond that existing trust.
+NOT-FULLY-PROVEN CAVEAT (flagged, not swept under the diff evidence
+above): the coin Label's font becomes the explicit
+`GameService.Content.DefaultFont14` that `AddSegmentSpec`/
+`LayoutCoinSegments` require for `MeasureString` - the old code never
+set `Label.Font` at all and relied on Blish's own implicit default. This
+sandbox has no live Blish process to read that default from, so whether
+it equals `DefaultFont14` (the font every other coin/value display in
+the app already uses explicitly) is asserted, not measured, here; this
+is exactly the kind of view-only risk the live visual gate below exists
+to catch, in the same spirit as this file's own "capture Blish's own
+real default rather than guessing" convention (see MainView's
+`_defaultStatusColor` field).
+VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped;
+unchanged from the pre-WP-22 floor - this view has no automated test
+net, so green tests prove only that nothing else broke, not that the
+rendering is correct). Live pre-merge visual verification (Blish-over-
+Paint screenshot/pixel-scan loop) on both the Snapshot tab's coin panel
+(this package's change, including the DefaultFont14 caveat above) and
+the Crafting Plan tab's coin/currency cells (confirming
+CraftingPlanView's untouched call sites still render correctly) is being
+run by the orchestrating session per the M38 plan's `needsVisualLoop`
+gate. Result recorded here and in the PR before merge:
+[PENDING - the orchestrator fills in PASS/FAIL].
+
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
 capture across three desktop sessions and two machines' font stacks
