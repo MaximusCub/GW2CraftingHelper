@@ -121,6 +121,60 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // KNOWN-ISSUES api-degradation F4: a failing learned-recipes fetch
+        // must degrade to null (the same supported "unknown known-recipe
+        // status" state PlanResultBuilder already handles) rather than
+        // aborting an otherwise fully-successful, fully-priced plan.
+        [Fact]
+        public async Task GenerateStructuredAsync_LearnedRecipeFetchFails_DegradesToNull_DoesNotAbortPlan()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target Item", "target.png");
+            itemApi.AddItem(2, "Ingredient", "ingredient.png");
+
+            var accountClient = new InMemoryAccountRecipeClient();
+            accountClient.ThrowOnGet = true; // has permission by default, but the fetch itself fails
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                accountRecipeClient: accountClient);
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            // The plan itself must be fully built despite the failure.
+            Assert.NotNull(result.Plan);
+            Assert.True(result.Plan.Steps.Count > 0);
+
+            // Recipe 10 is not inherently-available (no MysticForge/
+            // Achievement/Merchant discipline) and learnedRecipeIds is
+            // null, so IsMissing must be null ("unknown"), not crash and
+            // not silently claim the recipe is known.
+            var recipe = result.RequiredRecipes.FirstOrDefault(r => r.RecipeId == 10);
+            Assert.NotNull(recipe);
+            Assert.Null(recipe.IsMissing);
+        }
+
         [Fact]
         public async Task MissingItemMetadata_StillProducesValidPlan()
         {
