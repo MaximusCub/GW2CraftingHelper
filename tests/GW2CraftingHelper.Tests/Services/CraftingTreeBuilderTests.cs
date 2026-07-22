@@ -1,6 +1,6 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
@@ -955,6 +955,32 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, treeNode.OwnedQuantityUsed);
             Assert.Single(treeNode.Children);
             Assert.Equal(2, treeNode.Children[0].OwnedQuantityUsed);
+        }
+
+        // ---- M38 WP-05: MapSource fails loudly on an unmapped AcquisitionSource ----
+
+        [Fact]
+        public void MapSource_UnmappedAcquisitionSource_ThrowsArgumentOutOfRangeException()
+        {
+            // AcquisitionSource.Currency is a real enum member that MapSource's switch
+            // deliberately gives no explicit arm (see MapSource's own doc comment) -
+            // it can never reach MapSource through the real BuildNode flow (a
+            // non-"Item" node is intercepted and set to CraftingDecision.Currency
+            // directly, before any decision lookup). A manually-constructed decision
+            // is the only way to drive the default arm, which pins the one
+            // intentional M38 WP-05 behavior change: throw instead of silently
+            // returning CraftingDecision.Unknown.
+            var node = Leaf(1, 1);
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>
+            {
+                { 0, new SolverDecision { Source = AcquisitionSource.Currency, TotalCost = 100 } }
+            };
+            var metadata = Meta((1, "Item", "i.png"));
+
+            var builder = new CraftingTreeBuilder();
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => builder.BuildTree(node, decisions, metadata));
         }
 
         private static void AssertChildrenNeverNull(CraftingTreeNode node)

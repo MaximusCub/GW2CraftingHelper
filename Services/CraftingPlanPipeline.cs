@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services.Diagnostics;
 
@@ -771,6 +770,13 @@ namespace GW2CraftingHelper.Services
             });
             sw.Restart();
 
+            // Kick off the decorative currency-metadata fetch now, in
+            // parallel with item metadata, rather than sequentially after
+            // it - the service has its own internal timeout (see
+            // CurrencyMetadataService), so a hung /v2/currencies can no
+            // longer add to the plan-generation critical path. Observed
+            // independently of the await below so a fault is never left
+            // unobserved if item metadata throws first.
             var currencyTask = _currencyMetadataService?.GetAllAsync(ct);
             ObserveFault(currencyTask);
 

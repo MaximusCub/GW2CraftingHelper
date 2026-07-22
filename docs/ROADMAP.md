@@ -90,10 +90,10 @@ When starting a new thread of work:
 
 ### IItemSearchProvider
 
-Decouples item selection from `CraftingPlanView`'s hardcoded dictionary. The interface lives in `Contracts/`, with a default `StaticItemSearchProvider` that returns the current two-item list.
+Decouples item selection from `CraftingPlanView`'s hardcoded dictionary. The interface lives in `Contracts/`, with a default `StaticItemSearchProvider` (in `Services/`) that returns the current two-item list.
 
 - **Interface**: `Contracts/IItemSearchProvider.cs`
-- **Default impl**: `Contracts/StaticItemSearchProvider.cs`
+- **Default impl**: `Services/StaticItemSearchProvider.cs`
 - **Consumer**: `Views/CraftingPlanView.cs` accepts `IItemSearchProvider` via constructor
 - **Future**: Lane 2 can implement a real GW2 API-backed search provider without touching the view
 
