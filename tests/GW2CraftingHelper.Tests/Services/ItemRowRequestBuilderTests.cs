@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Tests.Services
     {
         private static ItemRowRequestBuilder.RowInput Row(int? itemId, string qtyText = "1")
         {
-            return new ItemRowRequestBuilder.RowInput { ItemId = itemId, QuantityText = qtyText };
+            return new ItemRowRequestBuilder.RowInput(itemId, qtyText);
         }
 
         [Fact]
