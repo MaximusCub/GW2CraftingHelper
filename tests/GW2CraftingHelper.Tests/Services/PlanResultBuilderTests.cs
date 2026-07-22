@@ -3,6 +3,7 @@ using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
+using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
@@ -42,15 +43,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
         }
 
-        private static RecipeNode Leaf(int id, int qty)
-        {
-            return new RecipeNode
-            {
-                Id = id,
-                IngredientType = "Item",
-                Quantity = qty
-            };
-        }
+        // Leaf comes from Helpers/RecipeNodeBuilders.cs.
 
         [Fact]
         public void RequiredDisciplines_FromCraftSteps_HighestRatingWins()

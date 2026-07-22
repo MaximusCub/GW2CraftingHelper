@@ -3,54 +3,12 @@ using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
+using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
     public class PlanSolverTests
     {
-        private static RecipeNode Leaf(int id, int quantity, string type = "Item")
-        {
-            return new RecipeNode
-            {
-                Id = id,
-                IngredientType = type,
-                Quantity = quantity,
-                Recipes = new List<RecipeOption>()
-            };
-        }
-
-        private static RecipeNode Craftable(int id, int quantity, params RecipeOption[] recipes)
-        {
-            var node = new RecipeNode
-            {
-                Id = id,
-                IngredientType = "Item",
-                Quantity = quantity,
-                Recipes = new List<RecipeOption>()
-            };
-            if (recipes != null)
-            {
-                node.Recipes.AddRange(recipes);
-            }
-            return node;
-        }
-
-        private static RecipeOption Option(int recipeId, int outputCount, int craftsNeeded, params RecipeNode[] ingredients)
-        {
-            var opt = new RecipeOption
-            {
-                RecipeId = recipeId,
-                OutputCount = outputCount,
-                CraftsNeeded = craftsNeeded,
-                Ingredients = new List<RecipeNode>()
-            };
-            if (ingredients != null)
-            {
-                opt.Ingredients.AddRange(ingredients);
-            }
-            return opt;
-        }
-
         [Fact]
         public void LeafItem_HasTpPrice_ReturnsBuyFromTp()
         {
@@ -2576,14 +2534,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- M35-B1: synthetic multi-item wrapper root (gw2e parity) ---
-
-        private static RecipeNode WrapperOf(params RecipeNode[] itemRoots)
-        {
-            var wrapper = Craftable(
-                Gw2Constants.MultiItemWrapperItemId, 1,
-                Option(Gw2Constants.MultiItemWrapperRecipeId, 1, 1, itemRoots));
-            return wrapper;
-        }
+        // WrapperOf lives in Helpers/RecipeNodeBuilders.cs.
 
         [Fact]
         public void WrapperRoot_NeverAppearsAsItsOwnStep_OnlyItemRootsDo()
