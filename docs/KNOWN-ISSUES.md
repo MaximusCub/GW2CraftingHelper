@@ -1200,7 +1200,11 @@ report referenced above was lost). Mechanism:
   bump, sell-price lookup, own-materials opportunity cost) out of
   `CraftingPlanPipeline.ApplySellSideEconomics` into two pure helpers -
   `ComputePerItemEconomics` (one requested root's own
-  SellableQuantity/NetSaleValue/TargetUnitSellPrice/ItemCraftCost/IsCraft)
+  SellableQuantity/NetSaleValue/TargetUnitSellPrice/ItemCraftCost -
+  correction, M37 item 26 fix-pass: the `PerItemEconomics` struct has no
+  `IsCraft` field, and never did; NetSaleValue/TargetUnitSellPrice are
+  gated purely on live-sell-price presence, `prices[itemId].SellInstant
+  > 0`, not a craft-vs-buy flag)
   and `ComputeMaterialOpportunityCost` (the batch-merged UsedMaterials
   sum). `ApplySellSideEconomics` itself is a pure extraction - same
   fields, same order, same arithmetic - proved byte-identical by the
@@ -1366,7 +1370,7 @@ crafted/bought and tradable/untradable requested items should be
 screenshot-loop verified before this is treated as visually confirmed,
 matching this file's existing convention for other M35/M37 UI changes.
 
-## 26. Achievement-bit ingredient dedup (parity micro-gap)
+## 26. Achievement-bit ingredient dedup (parity micro-gap) (FIXED in M37)
 gw2e ships ~274 achievement-discipline custom recipes (achievement_id,
 ingredients mirroring collection requirements) and de-duplicates
 achievement-bit ingredients across the tree (flagged in M34 research as
@@ -1374,6 +1378,137 @@ a known absent behavior in our module; zero Exordium impact - pick a
 real affected item for verification, e.g. a legendary with an
 achievement-gated collection component). Research exact dedup semantics
 from gw2e sources first; echo. Small.
+
+FIXED in M37 (research: docs/research/m37-r3-achievement-dedup.md,
+independently verified). The research corrected the backlog's own
+example guess: recipe-level `achievement_id` (the ~274-recipe
+population above) is NOT what the dedup mechanism reads at all -
+gw2efficiency's actual `ignoredBitItemIds` mechanism keys on
+INGREDIENT-level `achievement_bit`, present on only 7 recovered custom
+recipes (the WvW "Infinite [siege weapon] Blueprint" achievement
+rewards). None of gw2e's genuine legendary/collection recipes use
+`achievement_bit` at all. Mechanism (ported 1:1 from gw2e's own
+`initialTreeChecks`/`calculateTreeQuantity`, ground-truth-tested via the
+upstream unit test quoted in the report):
+- Walk the whole tree once, classifying every non-Currency item id into
+  "seen via an achievement-bit ingredient" and/or "seen via a plain
+  ingredient" (the same id can be both). Any id seen BOTH ways has every
+  one of its achievement-bit occurrences zeroed, tree-wide - even the
+  first one encountered. An id seen only via achievement-bit occurrences
+  keeps its first (DFS) occurrence and zeroes every later one. An
+  ordinary duplicate item id with no achievement_bit at all is never
+  touched (PlanSolver's own per-stepKey aggregation already handles
+  that, unrelated to this mechanism).
+- New `Services/AchievementBitDedupPrePass.cs` (pure, Blish-free)
+  implements this, wired into `CraftingPlanPipeline` unconditionally
+  (no settings toggle - pure correctness, not user policy) right after
+  the tree is built and before inventory reduction/Solve, in all three
+  tree-building entry points (`GenerateAsync`, single- and multi-item
+  `GenerateStructuredAsync`). Architectural departure from upstream,
+  deliberate (Section 4.2 of the report): since this module bakes each
+  `RecipeNode`'s absolute `Quantity` once at tree-build time (unlike
+  gw2e's per-edge-ratio design), a zeroed duplicate occurrence also has
+  its own `Recipes` cleared - mirroring `InventoryReducer.ReduceNode`'s
+  identical treatment of a genuinely fully-owned node - so
+  `PlanSolver.Evaluate` has no craft path left to consider for it and
+  the ordinary zero-quantity Buy/Have collapse takes over cleanly.
+  Runs exactly once, never re-run across local override/Ignore
+  re-solves - deliberately narrower than gw2e's own `updateTree.ts`
+  (which restarts its "first occurrence wins" bookkeeping from an empty,
+  un-pre-seeded array on every interaction, a real upstream fragility
+  the report flags in Section 1.5) - strictly safer than upstream, not a
+  parity gap.
+- Additive-only schema: `RawIngredient.AchievementId`/`AchievementBit`
+  (nullable), `RawRecipe.AchievementId` (nullable, informational only -
+  not read by the dedup mechanism, added now per the report's own
+  Section 6 open question to avoid a second migration later), and the
+  same two nullable fields plus a new `RecipeNode.IsAchievementBitDeduped`
+  bool, propagated through `RecipeService.BuildNodeAsync` and preserved
+  across `InventoryReducer.CloneNode` (same bug class as the M33 Finding
+  2 `ExpectedOutputCount`-drop fix - any field not explicitly copied
+  there is silently lost on every Reduce() clone). All 14,736 existing
+  seed rows parse and behave byte-identically (regression-tested).
+- Display: `CraftingTreeNode.IsAchievementBitDeduped` mirrors the
+  `IsIgnored` precedent, set in `CraftingTreeBuilder.BuildNode`'s
+  existing `Quantity == 0` early return. `DecisionPillPlanner` renders a
+  single non-interactive "COUNTED ELSEWHERE" pill (new `PillKind.
+  AchievementBitDeduped`) that REPLACES the plain HAVE pill entirely
+  (unlike Ignore, which appends alongside HAVE) - nothing here is
+  actually owned, so showing HAVE would be misleading.
+- Fix-pass finding (verified, not assumed, per the milestone brief's own
+  instruction): the report's claim that a zeroed node's cost/steps
+  "falls out free" through the existing zero-quantity path was traced
+  by hand and found FALSE in one case - when a deduped occurrence's
+  forced-degraded Source (Buy/Vendor/Unknown, since its Recipes are
+  cleared) does not match its "kept" counterpart's own Source/stepKey
+  (e.g. the kept occurrence crafts while the deduped one can only buy),
+  the two never merge via `PlanSolver.Collect`'s per-stepKey aggregation
+  and the deduped occurrence leaves a standalone "buy/craft 0 units, 0
+  cost" ghost row in `Plan.Steps`. Fixed with a new general guard in
+  `PlanSolver.Collect` (any `Quantity == 0` "Item" node returns
+  immediately, mirroring `CraftingTreeBuilder`'s own precedent) - this
+  was already a latent, previously-untested gap for the pre-existing
+  genuinely-owned case too (a fully-owned ingredient nested under a
+  chosen Craft parent), not something new introduced by this feature;
+  fixing it generally was simpler and safer than special-casing only for
+  achievement-bit dedup. Regression-tested (`PlanSolverTests`,
+  mismatched- and matching-stepKey scenarios) and confirmed to change
+  nothing for the full pre-existing 845-test baseline.
+- Seed addition (wiki/API-verified, provenance recorded in the seed
+  commit message): the Infinite Trebuchet Blueprint achievement recipe
+  (item 103980, achievement 8493, recipe id -1592) plus its 3
+  Merchant-discipline sub-recipes (items 103886/103834/103974, recipe
+  ids -1593/-1594/-1595) in `ref/recipes_seed.json`, with matching
+  `ref/recipe_search_seed.json` search-index entries (a pure-append diff
+  in both files, sorted-position-correct in the search index) - without
+  these, the achievement recipe is unreachable in production regardless
+  of the code fix, since it has no equivalent in the real official GW2
+  API at all. Item 103801 (Proof of Siege Expertise, bit 2) correctly
+  gets an empty search entry and no recipe - it has no acquisition path
+  of any kind per the recovered gw2efficiency data, so it renders
+  Unknown, which is correct, not a gap.
+- Tests: `AchievementBitDedupPrePassTests` (ports gw2e's own
+  ground-truth unit test scenarios 1:1 - bit-and-normal coexistence
+  zeroing ALL bit occurrences, bit-only first-occurrence-keeps
+  semantics, ordinary duplicates unaffected, Currency/multi-item-
+  wrapper exclusion, multi-recipe-option coverage), `CraftingTreeBuilderTests`/
+  `DecisionPillPlannerTests` (the new flag/pill), `RecipeServiceTests`/
+  `InventoryReducerTests` (field propagation and clone preservation),
+  `PlanSolverTests` (the ghost-row fix), and one full end-to-end
+  `MultiItemPlanTests` case reproducing the report's exact repro
+  (Blueprint + a direct second request for one of its own bit
+  ingredients) through the real `CraftingPlanPipeline` - confirms the
+  shared item's cost is counted once (200 total), not twice (300, the
+  pre-fix expectation).
+
+Known, accepted display nuance (not fixed - matches upstream's own
+convention, not a defect): since this module has no "Merchant"/
+"Achievement" discipline concept of its own (vendor purchases are
+modeled separately via `ref/vendor_offers.json`, a pre-existing
+architectural divergence documented in the M34 R2 report, unrelated to
+this fix), a plan whose solved path ends up choosing to "craft" the new
+Blueprint recipe or one of its Merchant sub-recipes (likely, since these
+WvW-only items have no live TP price) will show "Achievement" or
+"Merchant" in the Required Disciplines list - a literal echo of
+gw2efficiency's own custom-recipes data, which uses the identical tag
+for the identical purpose (Section 2.2 of the report). Not addressed
+here since inventing special-case discipline filtering is out of scope
+for a "Small" correctness fix and was not directed by the milestone
+brief.
+
+VERIFICATION STATE: confirmed by a green build and the full 848-test
+suite (real production-path tests throughout: `RecipeService`,
+`InventoryReducer`, `PlanSolver`, `CraftingTreeBuilder`,
+`DecisionPillPlanner`, `CraftingPlanPipeline`/`MultiItemPlanTests`), plus
+a temporary check (run then discarded, not committed) confirming the
+hand-edited seed JSON deserializes correctly through the real
+`RecipeCacheSerializer`/System.Text.Json loading path, not just via the
+Python tooling used to edit it. Not yet live-verified in-game (no
+in-game achievement-bit scenario was screenshot-loop checked this
+milestone) - a fresh capture of a WvW Infinite Trebuchet Blueprint plan
+alongside a direct Pile of Recycled Trebuchets request would be the
+natural follow-up, matching this file's existing convention for other
+M35/M37 UI changes.
 
 ## 27. Ignore-pill click status label (FIXED in M37, closes #22)
 Item #22 above: clicking IGNORE/IGNORED re-solves correctly but writes
