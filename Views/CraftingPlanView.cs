@@ -4261,7 +4261,10 @@ namespace GW2CraftingHelper.Views
         /// THIS specific Ignore pill is the active/"IGNORED" state, i.e.
         /// node.IsIgnored) - ignored for every other kind.
         /// </summary>
-        private static void GetPillColors(PillKind kind, bool isIgnoreActive, out Color border, out Color fill)
+        // internal (was private): Views/Rendering/LabelHelpers.CreateSmallTag
+        // (M38 WP-21) reuses the Locked pill's colors and needs to call back
+        // into this class - no logic change, accessibility only.
+        internal static void GetPillColors(PillKind kind, bool isIgnoreActive, out Color border, out Color fill)
         {
             switch (kind)
             {
