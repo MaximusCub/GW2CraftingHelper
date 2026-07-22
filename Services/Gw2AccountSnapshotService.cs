@@ -75,6 +75,7 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to fetch wallet");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch wallet: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
             }
 
@@ -98,6 +99,7 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to fetch bank");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch bank: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
             }
 
@@ -121,6 +123,7 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to fetch shared inventory");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch shared inventory: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
             }
 
@@ -144,6 +147,7 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to fetch material storage");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch material storage: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
             }
 
@@ -178,12 +182,14 @@ namespace GW2CraftingHelper.Services
                     catch (Exception ex) when (!(ex is OperationCanceledException))
                     {
                         Logger.Warn(ex, "Failed to fetch inventory for character {CharacterName}", name);
+                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch inventory for a character: {ex.GetType().Name} - {ex.Message}");
                     }
                 }
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to fetch character list");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch character list: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
             }
 
@@ -249,6 +255,7 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to resolve item names/icons");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to resolve item names/icons: {ex.GetType().Name} - {ex.Message}");
             }
         }
 
@@ -291,6 +298,7 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 Logger.Warn(ex, "Failed to resolve currency names/icons");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to resolve currency names/icons: {ex.GetType().Name} - {ex.Message}");
             }
         }
     }

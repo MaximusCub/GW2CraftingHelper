@@ -193,6 +193,7 @@ namespace GW2CraftingHelper.Views
                 catch (Exception ex)
                 {
                     Logger.Warn(ex, "Refresh Now failed");
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot", $"Refresh Now failed: {ex.GetType().Name} - {ex.Message}");
                     var status = $"Refresh failed \u2014 {DateTime.Now:t}";
                     _saveStatusThreadSafe(status);
                     MainThreadMarshal.Run(() =>
