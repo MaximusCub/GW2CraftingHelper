@@ -96,14 +96,15 @@ namespace GW2CraftingHelper
         // though no torn read is possible for a bool.
         private volatile bool _refreshInProgress;
 
-        // KNOWN-ISSUES 31a-F1: bumped only by ClearCache; a fetch that
-        // captured an older value before starting must discard its result
-        // rather than commit over a cleared cache - see SnapshotEpochGuard.
-        // volatile for the same cross-thread reason as _refreshInProgress
-        // above: captured on the main thread (both refresh entry points run
-        // synchronously up to their first await) but re-checked on whatever
-        // thread the post-await continuation resumes on.
-        private volatile int _snapshotEpoch;
+        // KNOWN-ISSUES 31a-F1 (audit-of-fix): bumped only by ClearCache; a
+        // fetch that captured an older epoch before starting must discard
+        // its result rather than commit over a cleared cache. A bare
+        // volatile counter (the original fix) left the check and the
+        // commit as separate unsynchronized steps, so the gate now owns
+        // both the epoch and the lock that makes ClearCache's bump/clear
+        // and FetchAndSaveSnapshotAsync's check/commit mutually exclusive
+        // - see SnapshotCommitGate's own doc comment for the full race.
+        private readonly SnapshotCommitGate _snapshotCommitGate = new SnapshotCommitGate();
 
         // KNOWN-ISSUES 31c-audit (api-F1 follow-up): UTC ticks of the most
         // recent FAILED background refresh, or 0 if none. api-F1 made a
@@ -116,8 +117,9 @@ namespace GW2CraftingHelper
         // RefreshFailureBackoff - see RefreshSnapshotInBackgroundAsync.
         // long, not DateTime, because C# disallows `volatile` on 64-bit
         // primitives; Interlocked.Read/Exchange give the same cross-thread
-        // visibility guarantee _refreshInProgress/_snapshotEpoch get from
-        // volatile, without needing a lock.
+        // visibility guarantee _refreshInProgress gets from volatile
+        // (_snapshotCommitGate below gets it from its own internal lock
+        // instead), without needing a lock of its own here.
         private long _lastFailedRefreshAttemptTicks;
 
         // KNOWN-ISSUES 31c-audit: minimum wait after a failed background
@@ -506,7 +508,7 @@ namespace GW2CraftingHelper
             // field's own comment) so the post-await commit below can
             // detect a Clear Cache that ran while this fetch was still in
             // flight (KNOWN-ISSUES 31a-F1).
-            int myEpoch = _snapshotEpoch;
+            int myEpoch = _snapshotCommitGate.Epoch;
 
             AccountSnapshot snapshot;
             using (var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
@@ -528,23 +530,30 @@ namespace GW2CraftingHelper
                 }
             }
 
-            if (!SnapshotEpochGuard.ShouldCommit(myEpoch, _snapshotEpoch))
+            // Re-check and commit run inside SnapshotCommitGate's lock -
+            // the same lock ClearCache's own bump+clear runs under below -
+            // so the two can never interleave (KNOWN-ISSUES 31a-F1
+            // audit-of-fix; see SnapshotCommitGate's doc comment).
+            bool committed = _snapshotCommitGate.TryCommit(myEpoch, () =>
             {
-                // Clear Cache ran while this fetch was in flight; committing
-                // now would resurrect data the user explicitly cleared
-                // (KNOWN-ISSUES 31a-F1). Drop the result - _currentSnapshot,
-                // _pendingSnapshot, _snapshotDirty, and the on-disk file are
-                // all left untouched.
-                Logger.Info("Discarding snapshot fetch superseded by Clear Cache (epoch {0} != {1})",
-                    myEpoch, _snapshotEpoch);
+                _currentSnapshot = snapshot;
+                _snapshotStore.Save(snapshot);
+
+                _pendingSnapshot = snapshot;
+                _snapshotDirty = true;
+            });
+
+            if (!committed)
+            {
+                // Clear Cache ran (fully, atomically) either before or
+                // during this check; committing now would resurrect data
+                // the user explicitly cleared (KNOWN-ISSUES 31a-F1). Drop
+                // the result - _currentSnapshot, _pendingSnapshot,
+                // _snapshotDirty, and the on-disk file are all left
+                // untouched by this call.
+                Logger.Info("Discarding snapshot fetch superseded by Clear Cache (epoch {0})", myEpoch);
                 return null;
             }
-
-            _currentSnapshot = snapshot;
-            _snapshotStore.Save(snapshot);
-
-            _pendingSnapshot = snapshot;
-            _snapshotDirty = true;
 
             Logger.Info("Fetched snapshot CapturedAt={0:o} items={1} wallet={2} coin={3}",
                 snapshot.CapturedAt, snapshot.Items.Count, snapshot.Wallet.Count, snapshot.CoinCopper);
@@ -628,19 +637,24 @@ namespace GW2CraftingHelper
 
         private void ClearCache()
         {
-            // Bumped before anything else so a snapshot fetch already in
-            // flight (which captured an epoch before this call ran) fails
-            // its post-await commit check (KNOWN-ISSUES 31a-F1) - see
-            // SnapshotEpochGuard and _snapshotEpoch's own doc comment.
-            _snapshotEpoch++;
-
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
             _refreshCts = null;
-            _snapshotStore.Delete();
-            _currentSnapshot = null;
-            _pendingSnapshot = null;
-            _snapshotDirty = false;
+
+            // Epoch bump + on-disk delete + field resets all run inside
+            // SnapshotCommitGate's lock so a snapshot fetch already in
+            // flight (which captured an epoch before this call ran) either
+            // commits fully before this runs, or has its post-fetch commit
+            // check fail atomically against this bump - no interleaving,
+            // no torn field state (KNOWN-ISSUES 31a-F1 audit-of-fix; see
+            // SnapshotCommitGate's own doc comment).
+            _snapshotCommitGate.Clear(() =>
+            {
+                _snapshotStore.Delete();
+                _currentSnapshot = null;
+                _pendingSnapshot = null;
+                _snapshotDirty = false;
+            });
         }
 
         private void PersistStatus(string status)
