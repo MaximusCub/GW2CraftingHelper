@@ -19,11 +19,11 @@ namespace GW2CraftingHelper.Models
         // Additive, backward-compatible - existing offers deserialize with
         // this null. DELIBERATELY NOT CONSUMED YET: TimegatedCapType (see
         // Models/TimegatedItem.cs) has no Seasonal member, and
-        // PlanSolver.FinalizeVendorBatches only ever reads DailyCap/
-        // WeeklyCap - a Wizard's Vault offer's seasonal cap is seeded here
-        // for future use but produces no TimegatedItem/notice today. Wiring
-        // a Seasonal cap type through the solver and notice UI is an
-        // explicitly later package (M38 WP-15 must land first).
+        // VendorBatchSolver.FinalizeVendorBatches (moved out of PlanSolver
+        // by WP-15) only ever reads DailyCap/WeeklyCap - a Wizard's Vault
+        // offer's seasonal cap is seeded here for future use but produces
+        // no TimegatedItem/notice today. Wiring a Seasonal cap type through
+        // the solver and notice UI remains a later package.
         public int? SeasonalCap { get; set; }
 
         // M37 (KNOWN-ISSUES #24, gw2e parity): the Homestead Refinement
@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Models
         // Wiki-sourced per-row quantities already bake in the game's own
         // per-material tier anomalies (Onion/Potato/Iron Ore), so tagging
         // existing rows rather than collapsing them into a formula avoids
-        // re-deriving those bugs in code - see PlanSolver.EvaluateVendorOffers.
+        // re-deriving those bugs in code - see VendorBatchSolver.EvaluateVendorOffers.
         public int? HomesteadTier { get; set; }
     }
 }
