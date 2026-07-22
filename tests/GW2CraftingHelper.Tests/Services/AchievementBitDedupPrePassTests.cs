@@ -216,13 +216,23 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void MultipleRecipeOptions_BothWalkedForClassificationAndZeroing()
+        public void MultipleRecipeOptions_OnlyPrimaryOptionWalked_OtherOptionUntouched()
         {
-            // This module's architecture (unlike gw2e's single-recipe-per-
-            // node nested tree) carries multiple alternate RecipeOptions per
-            // node for cost comparison (PlanSolver.Evaluate walks every
-            // option) - the dedup walk must cover every option's
-            // Ingredients too, not just the first.
+            // Adversarial-review fix-pass: unlike gw2e's single-recipe-per-
+            // node nested tree, this module's RecipeNode can carry multiple
+            // MUTUALLY EXCLUSIVE alternate RecipeOptions for the same node
+            // (PlanSolver.Evaluate compares them for cost; only one is ever
+            // actually chosen). The pre-fix behavior walked every option
+            // for both classification and zeroing, which could zero an
+            // achievement-bit occurrence that lives ONLY in an option
+            // PlanSolver never ends up choosing - or worse, the occurrence
+            // that turns out to be the ONLY real occurrence on the
+            // actually-solved path - purely because a sibling, never-chosen
+            // option happened to be visited first. Mirrors
+            // InventoryReducer.ReduceNode's own existing precedent for this
+            // exact ambiguity (only node.Recipes[0] is ever treated as
+            // canonical): the second option's bit occurrence is left
+            // completely alone by this pass.
             var bitInOptionA = Leaf(55, 1, achievementId: 1, achievementBit: 0);
             var bitInOptionB = Leaf(55, 1, achievementId: 1, achievementBit: 0);
 
@@ -234,8 +244,49 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(1, bitInOptionA.Quantity);
             Assert.False(bitInOptionA.IsAchievementBitDeduped);
-            Assert.Equal(0, bitInOptionB.Quantity);
-            Assert.True(bitInOptionB.IsAchievementBitDeduped);
+            Assert.Equal(1, bitInOptionB.Quantity);
+            Assert.False(bitInOptionB.IsAchievementBitDeduped);
+        }
+
+        [Fact]
+        public void MultipleRecipeOptions_PrePassNeverUndercutsTheHonestOption()
+        {
+            // End-to-end regression for the adversarial-review finding's
+            // direct repro: node 999 has two alternate RecipeOptions, both
+            // needing achievement-bit item 55 (true cost 100 via TP).
+            // Option A (recipe 10) needs only item 55. Option B (recipe 11)
+            // needs item 55 PLUS item 60 (price 10, true cost 110). With the
+            // pre-fix "walk every option" behavior, Option A being visited
+            // first caused item 55 to be wrongly zeroed in Option B, making
+            // Option B evaluate to a fake cost of 10 - cheaper than Option
+            // A's honest 100 - so PlanSolver picked the objectively worse
+            // Option B and item 55's real 100-copper cost vanished from the
+            // plan entirely. With the fix (only node.Recipes[0] walked),
+            // item 55 in Option B is never classified or zeroed, so
+            // PlanSolver sees Option B's true cost (110) and correctly
+            // keeps Option A (100).
+            var bitInOptionA = Leaf(55, 1, achievementId: 1, achievementBit: 0);
+            var bitInOptionB = Leaf(55, 1, achievementId: 1, achievementBit: 0);
+            var item60 = Leaf(60, 1);
+
+            var root = Leaf(999, 1);
+            root.Recipes.Add(Option(10, bitInOptionA));
+            root.Recipes.Add(Option(11, bitInOptionB, item60));
+
+            AchievementBitDedupPrePass.Apply(root);
+
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 55, new ItemPrice { ItemId = 55, BuyInstant = 100 } },
+                { 60, new ItemPrice { ItemId = 60, BuyInstant = 10 } }
+            };
+
+            var solver = new PlanSolver();
+            var result = solver.Solve(root, prices);
+
+            Assert.Equal(10, result.Decisions[root.NodeId].RecipeId);
+            Assert.Equal(100, result.Decisions[root.NodeId].TotalCost);
+            Assert.Contains(result.Plan.Steps, s => s.ItemId == 55 && s.TotalCost == 100);
         }
     }
 }

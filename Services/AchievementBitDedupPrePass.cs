@@ -93,16 +93,28 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Mirrors gw2e's collectItemDataForIgnoringBits/initialTreeChecks:
-        /// walks every node (root and descendants, every recipe option's
-        /// ingredients - not just the eventually-chosen one, since
-        /// PlanSolver.Evaluate itself evaluates every option for cost
-        /// comparison) and classifies each "Item"-type node's id into
-        /// bitItemIds (its OWN AchievementBit is set) or normalItemIds
-        /// (else). Currency-type nodes and the synthetic multi-item wrapper
-        /// sentinel are skipped entirely (never real GW2 items - see
-        /// Gw2Constants.MultiItemWrapperItemId's own doc comment), matching
-        /// upstream's explicit Currency exclusion, but their descendants
-        /// (the wrapper's own N real item roots) are still walked normally.
+        /// walks the tree (root and descendants) and classifies each
+        /// "Item"-type node's id into bitItemIds (its OWN AchievementBit is
+        /// set) or normalItemIds (else). Currency-type nodes and the
+        /// synthetic multi-item wrapper sentinel are skipped entirely (never
+        /// real GW2 items - see Gw2Constants.MultiItemWrapperItemId's own
+        /// doc comment), matching upstream's explicit Currency exclusion,
+        /// but their descendants (the wrapper's own N real item roots) are
+        /// still walked normally.
+        ///
+        /// Only descends through each node's PRIMARY option
+        /// (node.Recipes[0]) - mirroring InventoryReducer.ReduceNode's own
+        /// existing precedent for the identical ambiguity (see its
+        /// consumeFromPool doc comment): PlanSolver has not run yet at
+        /// pre-pass time, so which of a node's alternate RecipeOptions will
+        /// actually be chosen is unknowable here, and gw2efficiency's own
+        /// nested tree never has this ambiguity (recipe-nesting resolves
+        /// exactly one recipe per node before pricing). Walking every
+        /// option here (the pre-fix behavior) could classify an
+        /// achievement-bit occurrence that lives ONLY in an option
+        /// PlanSolver never ends up choosing as "seen", corrupting the
+        /// zeroing decision made below for a sibling option's occurrence of
+        /// the same id that IS on the actually-solved path.
         /// </summary>
         private static void CollectItemIdsForDedup(
             RecipeNode node, HashSet<int> bitItemIds, HashSet<int> normalItemIds)
@@ -119,9 +131,9 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            foreach (var option in node.Recipes)
+            if (node.Recipes.Count > 0)
             {
-                foreach (var ingredient in option.Ingredients)
+                foreach (var ingredient in node.Recipes[0].Ingredients)
                 {
                     CollectItemIdsForDedup(ingredient, bitItemIds, normalItemIds);
                 }
@@ -130,21 +142,30 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Mirrors gw2e's calculateTreeQuantityInner's achievement_bit
-        /// check, walked in the same node.Recipes[i].Ingredients order
-        /// PlanSolver.Evaluate/Collect will later use. For a node whose own
-        /// AchievementBit is set: if its id is already in
-        /// <paramref name="seenBitItemIds"/> (pre-seeded above, or pushed by
-        /// an earlier achievement-bit occurrence of the same id seen
-        /// earlier in THIS walk), zero this occurrence (Quantity, Recipes -
-        /// see this class's own doc comment for why Recipes is cleared too
-        /// - and the new IsAchievementBitDeduped flag) and stop descending
-        /// into it: everything below an already-zeroed occurrence is dead
-        /// weight the ordinary zero-quantity path already hides, and (per
-        /// the verified 7-recipe/28-ingredient dataset this pass targets)
-        /// never itself contains a further achievement-bit id that would
-        /// need independent zeroing. Otherwise, this is the first
-        /// occurrence of this id in the walk - record it as seen and keep
-        /// walking normally.
+        /// check. For a node whose own AchievementBit is set: if its id is
+        /// already in <paramref name="seenBitItemIds"/> (pre-seeded above,
+        /// or pushed by an earlier achievement-bit occurrence of the same
+        /// id seen earlier in THIS walk), zero this occurrence (Quantity,
+        /// Recipes - see this class's own doc comment for why Recipes is
+        /// cleared too - and the new IsAchievementBitDeduped flag) and stop
+        /// descending into it: everything below an already-zeroed
+        /// occurrence is dead weight the ordinary zero-quantity path
+        /// already hides, and (per the verified 7-recipe/28-ingredient
+        /// dataset this pass targets) never itself contains a further
+        /// achievement-bit id that would need independent zeroing.
+        /// Otherwise, this is the first occurrence of this id in the walk -
+        /// record it as seen and keep walking normally.
+        ///
+        /// Only descends through each node's PRIMARY option
+        /// (node.Recipes[0]), for the exact same reason given in
+        /// CollectItemIdsForDedup's doc comment - and critically so here
+        /// too: zeroing an occurrence that lives in a non-primary option
+        /// PlanSolver never chooses would silently discard that option's
+        /// true cost from PlanSolver.Evaluate's comparison (Evaluate sums
+        /// each option's OWN ingredient costs independently), which can
+        /// make an objectively worse, never-actually-cheaper option look
+        /// artificially cheap enough to be picked over the honest primary
+        /// option.
         /// </summary>
         private static void ZeroDuplicateBitOccurrences(
             RecipeNode node, HashSet<int> seenBitItemIds)
@@ -163,9 +184,9 @@ namespace GW2CraftingHelper.Services
                 seenBitItemIds.Add(node.Id);
             }
 
-            foreach (var option in node.Recipes)
+            if (node.Recipes.Count > 0)
             {
-                foreach (var ingredient in option.Ingredients)
+                foreach (var ingredient in node.Recipes[0].Ingredients)
                 {
                     ZeroDuplicateBitOccurrences(ingredient, seenBitItemIds);
                 }
