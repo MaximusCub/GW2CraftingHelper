@@ -1180,7 +1180,16 @@ cells, rarity icon frames, row dividers at multiple scroll offsets) is
 being run by the orchestrating session, in parallel with this
 findings-fix pass, on the desktop session holding the user's direct
 automation authorization. Result recorded here and in the PR before
-merge: [PENDING - the orchestrator fills in PASS/FAIL].
+merge: PASS (orchestrator, 2026-07-22, live Blish-over-Paint session on
+the branch build, captures wp21_02/04/05 in C:/Dev/Blish/preflight/captures):
+Total Cost coin tiles and all 7 currency rows render icons-right-of-numbers
+in correct metal/currency coloring; tree rows show correct rarity name
+colors and rarity icon frames with right-aligned coin columns; Shopping
+List coin columns, currency cells (incl. the merged-ceil 180 Obsidian
+Shard laurel cell), and source tags render identically to the M37
+reference captures; scan_dividers.py at two scroll offsets shows uniform
+29/30 pitches with zero missing boundaries. No visual deltas beyond live
+price drift.
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
