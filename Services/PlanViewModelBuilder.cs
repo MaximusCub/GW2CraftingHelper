@@ -430,7 +430,25 @@ namespace GW2CraftingHelper.Services
                 foreach (var timegated in result.Plan.TimegatedItems)
                 {
                     string itemName = ResolveName(timegated.ItemId, result.ItemMetadata);
-                    string capLabel = timegated.CapType == TimegatedCapType.Daily ? "Daily" : "Weekly";
+
+                    // Astral Acclaim package (KNOWN-ISSUES #33): Seasonal
+                    // uses the noun "Season" (matching gw2e's own Wizard's
+                    // Vault wording), not the adjective "Seasonal" - keeps
+                    // the same "{CapLabel} limit: N" shape as Daily/Weekly.
+                    string capLabel;
+                    if (timegated.CapType == TimegatedCapType.Daily)
+                    {
+                        capLabel = "Daily";
+                    }
+                    else if (timegated.CapType == TimegatedCapType.Weekly)
+                    {
+                        capLabel = "Weekly";
+                    }
+                    else
+                    {
+                        capLabel = "Season";
+                    }
+
                     section.Rows.Add(new PlanRowViewModel
                     {
                         RowType = PlanRowType.TimegatedNotice,
