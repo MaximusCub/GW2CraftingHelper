@@ -2281,14 +2281,29 @@ constraint).
 
 **Data seeding (scoped, reviewable)**: used the `--query`/`--merge-into`
 mechanism item 24 established, scoped to `[[Has vendor::~Wizard's
-Vault*]]` (the three Wizard's Vault NPC pages - current, `/Historical
-Astral Rewards`, `/Legacy Rewards`). A live wiki-wide probe
-(`[[Has seasonal purchase cap::+]]`, no vendor filter) confirmed this
-property is used EXCLUSIVELY by these three pages (29 rows total,
-nothing elsewhere on the wiki) - so this scope is not an approximation,
-it is the complete set. Found and worked around a real tool gap while
-doing this: a combined `--query`+`--merge-into` run only stays scoped
-for `ref/vendor_offers.json` when `ref/wiki_vendor_cache.json` does not
+Vault*]]` - a prefix wildcard that structurally matches all three
+Wizard's Vault NPC pages (current, `/Historical Astral Rewards`,
+`/Legacy Rewards`). A live wiki-wide probe (`[[Has seasonal purchase
+cap::+]]`, no vendor filter) confirmed the property itself is actually
+populated on only TWO of those three pages (29 rows total: `Wizard's
+Vault` and `.../Historical Astral Rewards`; zero on `.../Legacy
+Rewards`) - nothing elsewhere on the wiki carries it, so those 29 rows
+are the complete set of what exists to seed. Correspondingly, this
+pass's `--query` run only actually reprocessed the `Wizard's Vault` and
+`.../Historical Astral Rewards` merchants (see Result below); `.../Legacy
+Rewards`, though matched by the wildcard pattern, came back with no rows
+this run, so its 18 pre-existing offers were left untouched and passed
+through byte-identical - confirmed by offerId-set comparison against
+the pre-PR baseline (same 18 offerIds, unchanged), which is meaningful
+because `ComputeOfferId`'s new `seasonalCap` parameter is appended
+unconditionally and would have changed the hash of anything actually
+reprocessed. Why the wildcard query didn't return `.../Legacy Rewards`
+rows this run is not established; recording it here as a known follow-up
+for whoever next refreshes Wizard's Vault data, rather than assuming
+that page's offers are current as of this pass. Found and worked around
+a real tool gap while doing this: a combined `--query`+`--merge-into`
+run only stays scoped for `ref/vendor_offers.json` when
+`ref/wiki_vendor_cache.json` does not
 already contain the full baseline - `Program.cs`'s Step 2 reassigns its
 working `wikiResults` list to the FULL post-merge cache before Step 4
 converts it to offers, so with the real (62,926-row) cache present, a

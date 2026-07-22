@@ -388,6 +388,42 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // Astral Acclaim package (KNOWN-ISSUES #33): pins SeasonalCap for
+        // the two task-named Wizard's Vault rows, mirroring the guard
+        // docs/research/m37-r4-vendor-caps.md section 4f recommended for
+        // the analogous daily/weekly case (item 28's Candy-Corn-Ecto
+        // WeeklyCap pin). The count assertion above only catches a row
+        // being added/removed, not its SeasonalCap value silently
+        // changing or dropping to null on a future scoped re-scrape - the
+        // exact class of bug this same package's own Lesser Essence of
+        // Gold gap proved possible for one row. Keyed by stable OfferId
+        // per this file's established convention.
+        [Fact]
+        public void ShippedSeedFile_WizardsVaultSeasonalCaps_MysticCloverAndMysticCoin()
+        {
+            string path = FindRepoFile(Path.Combine("ref", "vendor_offers.json"));
+            Assert.False(
+                string.IsNullOrEmpty(path),
+                "Could not locate ref/vendor_offers.json by walking up from the test assembly's directory.");
+
+            using (var stream = File.OpenRead(path))
+            {
+                var dataset = _loader.Load(stream);
+
+                var mysticClover = dataset.Offers.Single(o =>
+                    o.OfferId == "a30ae3708b74c8c4675f733cd5f0abe6737683eaf8fe5740ebba3bbc9c3c3ec7");
+                Assert.Equal(19675, mysticClover.OutputItemId);
+                Assert.Equal("Wizard's Vault", mysticClover.MerchantName);
+                Assert.Equal(20, mysticClover.SeasonalCap);
+
+                var mysticCoin = dataset.Offers.Single(o =>
+                    o.OfferId == "e1721409d2879cf8bc6063fb449e21a5fbbf1649ad1d2ea84a3d679903c3b8ef");
+                Assert.Equal(19976, mysticCoin.OutputItemId);
+                Assert.Equal("Wizard's Vault", mysticCoin.MerchantName);
+                Assert.Equal(60, mysticCoin.SeasonalCap);
+            }
+        }
+
         // FindRepoFile comes from Helpers/RepoFileLocator.cs.
     }
 }

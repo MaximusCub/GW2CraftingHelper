@@ -167,11 +167,14 @@ no separate field is needed to distinguish them:
 | `Wizard's Vault/Legacy Rewards` | Cosmetics that rotated out of the live store into a permanent "Legacy" tab. | Grows over time; separate from the seasonal-cap system entirely (no `seasonalCap` values observed on this page). |
 
 **Confirmed live (2026-07-22):** `Has seasonal purchase cap` is used
-*exclusively* by these three pages wiki-wide (a `[[Has seasonal purchase
-cap::+]]` probe with no vendor filter returned 29 rows total, all three under
-one of the page names above) - no other vendor on the wiki uses this
-property, so scoping a re-scrape to these three pages captures every
-seasonal-cap-bearing row that exists.
+*exclusively* by pages under this `merchantName` prefix wiki-wide - but
+only TWO of the three pages actually carry it: a `[[Has seasonal
+purchase cap::+]]` probe with no vendor filter returned 29 rows total,
+split between `Wizard's Vault` and `.../Historical Astral Rewards` only
+(zero on `.../Legacy Rewards`, consistent with that page's "separate
+from the seasonal-cap system entirely" note in the table above). No
+other vendor on the wiki uses this property, so those 29 rows are the
+complete set that exists to seed.
 
 **Known wiki-documentation quirk (Bag of Coins tiering):** the two-tier
 "Bag of Coins (1 Gold)" item is represented as two *separate* wiki item
@@ -198,12 +201,18 @@ dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj -- \
   ref/vendor_offers.json
 ```
 
-This re-queries only the three Wizard's Vault pages, replaces their offers in
-the baseline, and leaves every other merchant's offers byte-for-byte
-unchanged. `~Wizard's Vault*` is a prefix wildcard match on `Has vendor`, so
-it covers all three page names above and nothing else (verified: `Wizard's
+`~Wizard's Vault*` is a prefix wildcard match on `Has vendor` that covers all
+three page names above and nothing else (verified: `Wizard's
 Gobbler`/`Portable Wizard's Tower Exchange`, which share the "Wizard's" word
-but not the "Wizard's Vault" prefix, are not matched).
+but not the "Wizard's Vault" prefix, are not matched), and leaves every
+other merchant's offers byte-for-byte unchanged - but matching the wildcard
+pattern is not the same as coming back with rows to merge. The 2026-07-22
+seeding pass's run of this exact command only actually returned/replaced
+offers for `Wizard's Vault` and `.../Historical Astral Rewards`;
+`.../Legacy Rewards` came back with no rows that run and its existing
+offers passed through untouched (see KNOWN-ISSUES.md item 33). Do not
+assume this command refreshes all three merchants every time it is run -
+check which merchant names actually changed in the resulting diff.
 
 **Stale-offer sweep status:** no automated stale-offer detector exists for
 Wizard's Vault specifically (the general sweep is manual - see
