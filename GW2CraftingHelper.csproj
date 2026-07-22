@@ -54,10 +54,13 @@
     <Compile Include="Models\AccountSnapshot.cs" />
     <Compile Include="Models\SnapshotItemEntry.cs" />
     <Compile Include="Models\SnapshotWalletEntry.cs" />
+    <Compile Include="Models\SnapshotSearchRow.cs" />
+    <Compile Include="Models\SnapshotSourceFilter.cs" />
     <Compile Include="Module.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\Gw2AccountSnapshotService.cs" />
     <Compile Include="Services\SnapshotHelpers.cs" />
+    <Compile Include="Services\SnapshotSearchResultBuilder.cs" />
     <Compile Include="Services\SnapshotStore.cs" />
     <Compile Include="Services\StatusStore.cs" />
     <Compile Include="Services\StatusText.cs" />
