@@ -119,6 +119,21 @@ namespace GW2CraftingHelper.Harness
                         if (i + 1 < args.Length)
                         {
                             homesteadTier = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                            // Adversarial-review finding: HomesteadEfficiencyTiers'
+                            // constructor throws ArgumentOutOfRangeException for
+                            // any tier > 2, and this flag's own usage string below
+                            // documents <0|1|2> as the only valid values - reject
+                            // out-of-range input here with a usage error instead
+                            // of letting the exception crash the tool, mirroring
+                            // ModuleSettings.ClampTier / SettingsInputParser.
+                            // TryParseTier's reject-invalid discipline.
+                            if (homesteadTier < 0 || homesteadTier > 2)
+                            {
+                                Console.Error.WriteLine(
+                                    $"Invalid --homestead-tier value: {homesteadTier} " +
+                                    "(must be 0, 1, or 2).");
+                                return 1;
+                            }
                         }
                         break;
                 }

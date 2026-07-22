@@ -1282,31 +1282,33 @@ Mechanism:
   gates the solve, only produces an informational notice, and using the
   wiki's own already-scraped per-row number (rather than inventing a
   reconciled per-station figure) keeps faith with "no invented data."
-- Homestead-specific cap-notice gap fix (KNOWN-ISSUES #25's own Section
-  3.3, the "Conflict-suppression" gap): `PlanSolver.FinalizeVendorBatches`
-  previously suppressed its cap-exceeded notice entirely whenever two
-  tree occurrences of the same output picked different specific offers
+- Homestead-specific cap-notice gap (KNOWN-ISSUES #25's own Section 3.3,
+  the "Conflict-suppression" gap): `PlanSolver.FinalizeVendorBatches`
+  suppresses its cap-exceeded notice entirely whenever two tree
+  occurrences of the same output picked different specific offers
   (`Conflict == true`) - the NORMAL Homestead case, since a plan needing
   many units of one refined material is very likely to satisfy
-  different occurrences via different specific input-material rows.
-  Assessed as bounded and feasible (per the research report's own
-  Section 4.5 sketch) and FIXED, not deferred: `VendorBatchState` now
-  additionally ratchets a separate, coarser `CapConflict` flag that only
-  compares the raw `(DailyCap, WeeklyCap)` tuple across occurrences,
-  independent of full offer-shape agreement - every Homestead offer for
-  a given output+station shares the identical station-wide cap even
-  when the specific input material differs, so a per-offer mismatch no
-  longer silently suppresses an otherwise-computable notice. When
-  `Conflict` is true but `CapConflict` is false, a new branch sums each
-  occurrence's OWN true purchase count (its own offer's `OutputCount`,
-  never a borrowed one) against the agreed cap. Cost/UnitCost/currency-
-  line recomputation is untouched in this branch (still the pre-existing
-  documented conservative fallback - genuinely different offers still
-  have no single "true" merged cost). When occurrences disagree on BOTH
-  the offer AND the cap itself, the notice is still correctly suppressed
-  (no single agreed cap exists to check against) - this narrower,
-  remaining limitation is captured by a regression test rather than
-  silently left to bit-rot.
+  different occurrences via different specific input-material rows. A
+  fix was attempted this milestone: `VendorBatchState` would additionally
+  ratchet a separate, coarser `CapConflict` flag comparing only the raw
+  `(DailyCap, WeeklyCap)` tuple across occurrences, independent of full
+  offer-shape agreement, on the theory that every Homestead offer for a
+  given output+station shares the identical station-wide cap even when
+  the specific input material differs. Adversarial review found that
+  theory false and REVERTED the fix, deferring per the research report's
+  own Section 4.5 "regression-test + defer" recommendation instead: the
+  cap data note directly above already documents that the shared number
+  is the wiki's own per-row SMW template parameter, not the confirmed
+  per-station aggregate, so two occurrences agreeing on that raw number
+  does not mean they agree on a real shared limit worth summing against.
+  Because every row within one station shares that same wiki-scraped
+  number, the summing branch fired for the ordinary Homestead case (many
+  crop/ore offers resolving one output), not a rare edge case, producing
+  false-positive "exceeds weekly cap" notices for totals that may not
+  exceed the real (unseeded) per-station aggregate at all. `Conflict`
+  alone continues to suppress the notice, as it did before this
+  milestone; two regression tests document the suppression for both the
+  same-cap and different-cap shapes rather than leaving it to bit-rot.
 
 Deferred (recorded, not implemented):
 - **HomesteadUnlocked master gate**: gw2e has NO "do you even own
@@ -1335,15 +1337,14 @@ Deferred (recorded, not implemented):
 
 Verification: `PlanSolverTests` (real production `Solve()` path) cover
 default-tier exclusion, tier-1/tier-2 admission, per-material
-independence, non-Homestead-offer non-interference, and both the fixed
-mixed-offer-same-cap notice and the documented mixed-offer-different-cap
-suppression: `HomesteadOffer_DefaultTierZero_ExcludesHigherTierOffers`,
+independence, non-Homestead-offer non-interference, and the documented
+mixed-offer-cap-notice suppression for both the same-cap and
+different-cap shapes: `HomesteadOffer_DefaultTierZero_ExcludesHigherTierOffers`,
 `HomesteadOffer_TierTwoConfigured_AdmitsCheaperHigherTierOffer`,
 `HomesteadOffer_TierOneConfigured_AdmitsTierOneButNotTierTwo`,
 `HomesteadTierConfigured_ForDifferentMaterial_DoesNotAffectThisOne`,
 `NonHomesteadVendorOffer_UnaffectedByHomesteadTierSetting`,
-`MixedOfferSameWeeklyCap_StillSurfacesTimegatedNotice`,
-`MixedOfferSameWeeklyCap_NeededWithinCap_NoNoticeFires`,
+`MixedOfferSameWeeklyCap_NoticeStillSuppressed_DocumentedLimitation`,
 `MixedOfferDifferentWeeklyCap_NoticeStillSuppressed_DocumentedLimitation`.
 `ExordiumStyleTree_NoHomesteadOffersReachable_ByteIdenticalAtAnyTier`
 mirrors the research report's own BFS-verified finding (Exordium's tree

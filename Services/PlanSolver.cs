@@ -72,20 +72,20 @@ namespace GW2CraftingHelper.Services
             public bool Conflict;
 
             // M37 (KNOWN-ISSUES #24/#25 3.3, gw2e parity - the Homestead
-            // Refinement cap-notice gap): tracks whether every occurrence's
-            // winning offer agreed on (DailyCap, WeeklyCap) ALONE,
-            // independent of full batch-shape agreement (Conflict above).
-            // Homestead Refinement is the prototypical case this exists
-            // for: every offer for a given output+station shares the
-            // identical weekly cap even when occurrences pick different
-            // specific input-material offers (Conflict is true there), so
-            // a per-offer batch-shape disagreement should not by itself
-            // suppress the cap notice when the cap itself is not actually
-            // in dispute. Ratchet only, same discipline as Conflict - see
-            // FinalizeVendorBatches' mixed-offer cap-check branch.
-            public int? CapDailyCap;
-            public int? CapWeeklyCap;
-            public bool CapConflict;
+            // Refinement cap-notice gap) previously added a second, coarser
+            // (CapDailyCap, CapWeeklyCap, CapConflict) ratchet here so a
+            // mixed-offer step could still sum a cap notice when every
+            // occurrence's offer agreed on the raw cap tuple, even if the
+            // full batch shape (Conflict above) disagreed. Reverted:
+            // adversarial review found the premise false - the wiki's
+            // per-row WeeklyCap is a template parameter, not a confirmed
+            // per-station aggregate (see KNOWN-ISSUES #24's "Cap data"
+            // note), so two occurrences agreeing on that raw number does
+            // not mean they agree on a real shared limit worth summing
+            // against. Conflict alone continues to suppress the notice for
+            // this step, as it did before this milestone - see
+            // FinalizeVendorBatches and the MixedOffer*_DocumentedLimitation
+            // tests in PlanSolverTests.
         }
 
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
@@ -180,17 +180,9 @@ namespace GW2CraftingHelper.Services
             // (ItemId, RecipeId) craft, taken BEFORE the correction passes
             // below ever run (see RefreshCraftStepCosts's doc comment).
             var craftOccurrences = new Dictionary<(int, AcquisitionSource, int), List<int>>();
-            // M37 (KNOWN-ISSUES #24/#25 3.3): every tree occurrence's own
-            // Quantity and winning VendorOfferBatch for a merged
-            // BuyFromVendor stepKey, in first-seen (DFS) order - see
-            // VendorBatchState.CapConflict's doc comment and
-            // FinalizeVendorBatches' mixed-offer cap-check branch. Separate
-            // from vendorOccurrences (which tracks NodeId, not Batch) so
-            // AllocateVendorNodeCosts' existing tuple shape is untouched.
-            var vendorCapOccurrences = new Dictionary<(int, AcquisitionSource, int), List<(int Quantity, VendorOfferBatch Batch)>>();
             int craftCounter = 0;
 
-            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
 
             // Pass 2b (M34-B1 #1/#3): re-derive each merged vendor step's
             // true cost from its AGGREGATE Quantity and the winning offer's
@@ -198,7 +190,7 @@ namespace GW2CraftingHelper.Services
             // several already-per-occurrence-ceil'd costs; also folds the
             // (now-correct) vendor currency costs into currencyMap and
             // collects any post-solve "timegated" (cap-exceeded) notices.
-            var timegatedItems = FinalizeVendorBatches(stepMap, vendorBatchTracking, vendorCapOccurrences, currencyMap);
+            var timegatedItems = FinalizeVendorBatches(stepMap, vendorBatchTracking, currencyMap);
 
             // Pass 2c (M34 fix - Critical review finding): FinalizeVendorBatches
             // only corrects the MERGED PlanStep/currencyMap view; it never
@@ -927,7 +919,6 @@ namespace GW2CraftingHelper.Services
             Dictionary<(int, int), int> craftOrder,
             Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
             Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
-            Dictionary<(int, AcquisitionSource, int), List<(int Quantity, VendorOfferBatch Batch)>> vendorCapOccurrences,
             Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences,
             ref int craftCounter,
             ISet<int> ignoredItemIds = null)
@@ -984,7 +975,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var itemRoot in wrapperRecipe.Ingredients)
                     {
-                        Collect(itemRoot, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+                        Collect(itemRoot, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
                     }
                 }
                 return;
@@ -998,7 +989,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var ingredient in chosenRecipe.Ingredients)
                     {
-                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
                     }
                 }
 
@@ -1010,7 +1001,7 @@ namespace GW2CraftingHelper.Services
                 }
 
                 var stepKey = (node.Id, AcquisitionSource.Craft, decision.RecipeId);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
             }
             else if (decision.Source == AcquisitionSource.BuyFromVendor)
             {
@@ -1022,12 +1013,12 @@ namespace GW2CraftingHelper.Services
                 // re-introduce the exact per-occurrence-then-sum overcount
                 // FinalizeVendorBatches exists to fix (M34-B1 #1).
                 var stepKey = (node.Id, AcquisitionSource.BuyFromVendor, 0);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
             }
             else
             {
                 var stepKey = (node.Id, decision.Source, 0);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, vendorCapOccurrences, craftOccurrences);
+                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
             }
         }
 
@@ -1038,7 +1029,6 @@ namespace GW2CraftingHelper.Services
             Decision decision,
             Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
             Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
-            Dictionary<(int, AcquisitionSource, int), List<(int Quantity, VendorOfferBatch Batch)>> vendorCapOccurrences,
             Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences)
         {
             if (decision.Source == AcquisitionSource.Craft)
@@ -1071,29 +1061,13 @@ namespace GW2CraftingHelper.Services
                         // occurrence already raised.
                         trackedState.Conflict = true;
                     }
-
-                    // M37 (KNOWN-ISSUES #24/#25 3.3): a separate, coarser
-                    // ratchet on the cap tuple ALONE - see
-                    // VendorBatchState.CapConflict's doc comment. Every
-                    // occurrence's (DailyCap, WeeklyCap) must agree for the
-                    // mixed-offer cap-check branch below to fire; disagreeing
-                    // batch shapes (Conflict above) are irrelevant to this.
-                    if (!trackedState.CapConflict &&
-                        (trackedState.CapDailyCap != batch.DailyCap ||
-                         trackedState.CapWeeklyCap != batch.WeeklyCap))
-                    {
-                        trackedState.CapConflict = true;
-                    }
                 }
                 else
                 {
                     vendorBatchTracking[stepKey] = new VendorBatchState
                     {
                         Batch = batch,
-                        Conflict = false,
-                        CapDailyCap = batch.DailyCap,
-                        CapWeeklyCap = batch.WeeklyCap,
-                        CapConflict = false
+                        Conflict = false
                     };
                 }
 
@@ -1111,19 +1085,6 @@ namespace GW2CraftingHelper.Services
                     vendorOccurrences[stepKey] = occurrenceList;
                 }
                 occurrenceList.Add((node.NodeId, node.Quantity));
-
-                // M37 (KNOWN-ISSUES #24/#25 3.3): the Batch-carrying twin of
-                // the list above, used only by FinalizeVendorBatches' new
-                // mixed-offer cap-check branch to sum true per-occurrence
-                // purchase counts (each occurrence's OWN offer shape) when
-                // occurrences disagreed on the winning offer but still
-                // agreed on the cap.
-                if (!vendorCapOccurrences.TryGetValue(stepKey, out var capOccurrenceList))
-                {
-                    capOccurrenceList = new List<(int Quantity, VendorOfferBatch Batch)>();
-                    vendorCapOccurrences[stepKey] = capOccurrenceList;
-                }
-                capOccurrenceList.Add((node.Quantity, batch));
             }
 
             if (stepMap.TryGetValue(stepKey, out var existing))
@@ -1261,22 +1222,24 @@ namespace GW2CraftingHelper.Services
         /// a MustFix-level display nuance - a deliberate, narrower scope
         /// than the currency fix, not an oversight.
         ///
-        /// M37 addendum (KNOWN-ISSUES #24/#25 3.3): when occurrences
-        /// disagree on the winning offer (Conflict true, so cost recompute
-        /// above is skipped as documented) but still agree on the raw
-        /// (DailyCap, WeeklyCap) tuple, a SEPARATE branch below still
-        /// produces a cap notice - summing each occurrence's own true
-        /// purchase count rather than borrowing one occurrence's OutputCount
-        /// for all of them. This targets the Homestead Refinement case
-        /// directly: many distinct input-material offers for the same
-        /// output share one identical station-wide weekly cap, so a
-        /// per-offer batch-shape disagreement should not by itself suppress
-        /// a real, correctly-computable cap notice.
+        /// M37 (KNOWN-ISSUES #24/#25 3.3) investigated a second branch here
+        /// that would still sum a cap notice when occurrences disagreed on
+        /// the winning offer's batch shape (Conflict true) but agreed on the
+        /// raw (DailyCap, WeeklyCap) tuple - targeting the Homestead
+        /// Refinement case, where many distinct input-material offers for
+        /// the same output all carry an identical WeeklyCap. Adversarial
+        /// review found the premise false (that shared number is the wiki's
+        /// per-row template parameter, not a confirmed per-station
+        /// aggregate - see KNOWN-ISSUES #24's "Cap data" note) and the
+        /// summing itself unsound across occurrences that share only a
+        /// subset of one offer, so this was reverted: Conflict alone still
+        /// suppresses the notice for this step, as it did before this
+        /// milestone. See the MixedOffer*_DocumentedLimitation tests in
+        /// PlanSolverTests.
         /// </summary>
         private static List<TimegatedItem> FinalizeVendorBatches(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
             Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
-            Dictionary<(int, AcquisitionSource, int), List<(int Quantity, VendorOfferBatch Batch)>> vendorCapOccurrences,
             Dictionary<int, long> currencyMap)
         {
             var timegatedItems = new List<TimegatedItem>();
@@ -1332,53 +1295,13 @@ namespace GW2CraftingHelper.Services
                         });
                     }
                 }
-                else if (state != null && state.Conflict && !state.CapConflict &&
-                         vendorCapOccurrences.TryGetValue(kvp.Key, out var capOccurrences))
-                {
-                    // M37 (KNOWN-ISSUES #24/#25 3.3, gw2e parity - the
-                    // Homestead Refinement cap-notice gap): occurrences
-                    // disagreed on the winning offer's exact batch shape
-                    // (Conflict is true, so cost/UnitCost/currency lines are
-                    // deliberately left as AggregateStep already computed
-                    // them - unchanged from the block above), but every
-                    // occurrence's own offer still carries the IDENTICAL
-                    // (DailyCap, WeeklyCap) tuple (CapConflict is false).
-                    // Homestead Refinement is the prototypical case: many
-                    // different input-material offers for the same output
-                    // share one station-wide weekly cap. Sum each
-                    // occurrence's OWN true purchase count (its own offer's
-                    // OutputCount, not a borrowed one) so the notice reflects
-                    // real trades, not a mixed-offer cost blend.
-                    int? cap = state.CapDailyCap.HasValue && state.CapDailyCap.Value > 0
-                        ? state.CapDailyCap
-                        : (state.CapWeeklyCap.HasValue && state.CapWeeklyCap.Value > 0 ? state.CapWeeklyCap : (int?)null);
-
-                    if (cap.HasValue)
-                    {
-                        int totalPurchases = 0;
-                        foreach (var occurrence in capOccurrences)
-                        {
-                            if (occurrence.Batch.OutputCount > 0 && occurrence.Quantity > 0)
-                            {
-                                totalPurchases += (int)Math.Ceiling(
-                                    (double)occurrence.Quantity / occurrence.Batch.OutputCount);
-                            }
-                        }
-
-                        if (totalPurchases > cap.Value)
-                        {
-                            timegatedItems.Add(new TimegatedItem
-                            {
-                                ItemId = step.ItemId,
-                                CapType = (state.CapDailyCap.HasValue && state.CapDailyCap.Value > 0)
-                                    ? TimegatedCapType.Daily
-                                    : TimegatedCapType.Weekly,
-                                CapValue = cap.Value,
-                                NeededCount = totalPurchases
-                            });
-                        }
-                    }
-                }
+                // Conflict == true (occurrences disagreed on the winning
+                // offer's exact batch shape) intentionally produces no cap
+                // notice here - see this method's doc comment and
+                // KNOWN-ISSUES #24's "Cap data" note for why a cap notice
+                // cannot be soundly computed across genuinely different
+                // offers with only a wiki-scraped per-row cap number to
+                // compare against.
 
                 if (step.VendorCurrencyCosts != null)
                 {

@@ -364,11 +364,11 @@ efficiency tiers + capacity maxed).
 | Input (item id) | Tier 0 | Tier 1 | Tier 2 |
 |---|---|---|---|
 | Green Wood Log (19723) | 20 -> 1 | 10 -> 1 | 5 -> 1 |
-| Soft Wood Log (19724) | 12 -> 1 | 6 -> 1 | 3 -> 1 |
-| Seasoned Wood Log (19725) | 4 -> 1 | 2 -> 1 | 1 -> 1 |
-| Hard Wood Log (19726) | 4 -> 1 | 2 -> 1 | 1 -> 1 |
+| Hard Wood Log (19724) | 12 -> 1 | 6 -> 1 | 3 -> 1 |
+| Ancient Wood Log (19725) | 4 -> 1 | 2 -> 1 | 1 -> 1 |
+| Soft Wood Log (19726) | 4 -> 1 | 2 -> 1 | 1 -> 1 |
 | Elder Wood Log (19722) | 4 -> 1 | 2 -> 1 | 1 -> 1 |
-| Ancient Wood Log (19727) | 2 -> 1 | 1 -> 1 | 1 -> 2 |
+| Seasoned Wood Log (19727) | 2 -> 1 | 1 -> 1 | 1 -> 2 |
 
 Max weekly output: 1050 Refined Homestead Wood/week fully upgraded.
 
@@ -879,6 +879,16 @@ raw-wikitext fetches of all four wiki pages (`Homestead`, `Homestead_Refinementâ
   Section 2.2 table exactly. (Against the original, uncorrected table this claim was false
   for that one cell; the seed data was right and the report's table was wrong. No other
   discrepancies were found across the remaining 235 seeded Homestead offers.)
+- **Section 2.2, Lumber Mill table, item id column.** A later adversarial review caught a
+  transposition error this pass's own "match the wiki exactly, no corrections needed" claim
+  (below) had missed: a live GW2 API lookup (`api.guildwars2.com/v2/items`) for the six wood
+  log ids confirms `19722`=Elder Wood Log, `19723`=Green Wood Log, `19724`=Hard Wood Log,
+  `19725`=Ancient Wood Log, `19726`=Soft Wood Log, `19727`=Seasoned Wood Log, but the table
+  had paired `19724` with "Soft Wood Log", `19725` with "Seasoned Wood Log", `19726` with
+  "Hard Wood Log", and `19727` with "Ancient Wood Log" - Soft/Hard and Seasoned/Ancient
+  transposed. Corrected above: only the name column changed per row; the id column and every
+  ratio cell are untouched, since `ref/vendor_offers.json`'s rows key off the real item id
+  (confirmed correct) rather than this report's name column, so no runtime data was affected.
 
 **Independently confirmed, no changes needed:** every other quoted code body
 (`cheapestTree.ts`, `dailyCooldowns.ts`, `recipe-nesting`'s `api.d.ts`/`index.ts`) matches
@@ -886,11 +896,12 @@ source verbatim; `dailyCooldowns()` is confirmed unreferenced by any pricing/cra
 supporting the "informational-only" claim; the live bundle's account-scoped
 `efficiencyTiers` persistence, `$watchGroup`, and `Account_HomesteadRefinementsController`
 wiring match exactly; all 11 item ids resolve to the names/types/rarities stated; the Metal
-Forge and Lumber Mill tables, weekly-cap structure, and Black Market price ladder match the
-wiki exactly with no corrections needed; all repo-side line numbers, counts (236 seeded
-Homestead offers: 183/28/25; 14,732 recipes; 168-item Exordium BFS closure; 167-item
-Klobjarne Geirr BFS closure), and the absence of `MerchantName`/`Tier` usage in
-`PlanSolver.cs`/`PlanViewModelBuilder.cs`/`Views/` were reproduced exactly.
+Forge table, weekly-cap structure, and Black Market price ladder match the wiki exactly with
+no corrections needed (the Lumber Mill table required the id/name correction above); all
+repo-side line numbers, counts (236 seeded Homestead offers: 183/28/25; 14,732 recipes;
+168-item Exordium BFS closure; 167-item Klobjarne Geirr BFS closure), and the absence of
+`MerchantName`/`Tier` usage in `PlanSolver.cs`/`PlanViewModelBuilder.cs`/`Views/` were
+reproduced exactly.
 
 **Remaining uncertainty (unchanged from the original report, carried forward as still
 open):** the live numeric `daily_purchase_cap`/`weekly_purchase_cap` gw2efficiency actually

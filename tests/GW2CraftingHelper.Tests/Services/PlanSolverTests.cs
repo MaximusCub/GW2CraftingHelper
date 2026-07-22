@@ -2882,26 +2882,35 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- M37: mixed-offer Homestead cap-notice fix (KNOWN-ISSUES
-        // #24/#25 Section 3.3) - a cap notice for the same output+station
-        // must still fire when tree occurrences picked different specific
-        // input-material offers (Conflict=true), as long as every occurrence
-        // agreed on the raw (DailyCap, WeeklyCap) tuple - the normal
-        // Homestead case, since every offer for one output+station shares
-        // one station-wide weekly cap. ---
+        // --- M37: Homestead mixed-offer cap-notice gap (KNOWN-ISSUES
+        // #24/#25 Section 3.3) - a fix was attempted here (summing each
+        // occurrence's own true purchase count when occurrences disagreed
+        // on the winning offer but agreed on the raw (DailyCap, WeeklyCap)
+        // tuple) but reverted after adversarial review: the wiki's per-row
+        // WeeklyCap the Homestead seed data carries is a template
+        // parameter, not a confirmed per-station aggregate (see
+        // KNOWN-ISSUES #24's "Cap data" note), so two occurrences agreeing
+        // on that raw number does not mean they agree on a real shared
+        // limit worth summing against - and every Homestead row within one
+        // station shares that same number, so the summing branch fired for
+        // the ordinary case, not a rare edge case. The pre-existing
+        // suppress-on-Conflict behavior is kept; both tests below document
+        // that as an intentional, narrower limitation rather than a silent
+        // regression risk. ---
 
         [Fact]
-        public void MixedOfferSameWeeklyCap_StillSurfacesTimegatedNotice()
+        public void MixedOfferSameWeeklyCap_NoticeStillSuppressed_DocumentedLimitation()
         {
             // Same bulk-discount-threshold shape as
             // MultiOccurrenceDifferentWinningOffers_LeavesPerOccurrenceSumUnmerged
             // (qty=1 deterministically favors the 1-for-2 offer, qty=100
             // deterministically favors the 100-for-150 offer - genuine
-            // disagreement, not a tie), but both offers now share the
-            // identical WeeklyCap=1. Occurrence A needs 1 purchase,
-            // occurrence B needs 1 purchase - 2 total, exceeding the shared
-            // cap of 1, so a notice must still fire even though Conflict
-            // (the offer-shape ratchet) is true.
+            // disagreement, not a tie). Both offers happen to share the
+            // identical WeeklyCap=1 (the normal Homestead shape - every
+            // offer at one station carries the same wiki-scraped per-row
+            // number), but Conflict (the offer-shape ratchet) alone still
+            // suppresses the notice: there is no verified single cap to
+            // check the mixed-offer total against.
             var tree = Craftable(1, 1,
                 Option(10, 1, 1, Leaf(99, 1), Leaf(99, 100)));
             var prices = new Dictionary<int, ItemPrice>();
@@ -2922,41 +2931,11 @@ namespace GW2CraftingHelper.Tests.Services
 
             var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
             // Confirms Conflict actually ratcheted true here (matching the
-            // pre-existing sibling test's own proof for this exact shape).
+            // pre-existing sibling test's own proof for this exact shape),
+            // so the empty-notice assertion below is testing genuine
+            // Conflict suppression, not merely "no cap was ever exceeded".
             Assert.Equal(0, vendorStep.VendorOfferOutputCount);
             Assert.Equal(152, vendorStep.TotalCost);
-
-            var notice = Assert.Single(plan.TimegatedItems);
-            Assert.Equal(99, notice.ItemId);
-            Assert.Equal(TimegatedCapType.Weekly, notice.CapType);
-            Assert.Equal(1, notice.CapValue);
-            // occurrence A: ceil(1/1)=1 purchase; occurrence B: ceil(100/100)=1
-            // purchase; total 2, each computed via its OWN offer's
-            // OutputCount, not a borrowed one.
-            Assert.Equal(2, notice.NeededCount);
-        }
-
-        [Fact]
-        public void MixedOfferSameWeeklyCap_NeededWithinCap_NoNoticeFires()
-        {
-            var tree = Craftable(1, 1,
-                Option(10, 1, 1, Leaf(99, 1), Leaf(99, 100)));
-            var prices = new Dictionary<int, ItemPrice>();
-            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
-            {
-                {
-                    99, new List<VendorOffer>
-                    {
-                        CoinVendorOffer(99, 2, outputCount: 1, weeklyCap: 5),
-                        CoinVendorOffer(99, 150, outputCount: 100, weeklyCap: 5)
-                    }
-                }
-            };
-            var solver = new PlanSolver();
-
-            // occurrence A: ceil(1/1)=1; occurrence B: ceil(100/100)=1;
-            // total 2, well within the shared cap of 5.
-            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy).Plan;
 
             Assert.Empty(plan.TimegatedItems);
         }
@@ -2969,12 +2948,11 @@ namespace GW2CraftingHelper.Tests.Services
             // (qty=1 favors the 1-for-2 offer, qty=100 favors the
             // 100-for-150 offer - genuine, deterministic disagreement, not
             // a tie), but this time the two offers ALSO carry different
-            // WeeklyCap values. When occurrences disagree on BOTH the offer
-            // AND the cap itself, there is no single agreed cap to check
-            // against - the notice is correctly suppressed (CapConflict
-            // ratchets true), same as before this milestone's fix. This
-            // documents that remaining, narrower limitation as intentional
-            // rather than a silent regression risk.
+            // WeeklyCap values. Whether or not the raw cap number happens to
+            // match across occurrences, Conflict alone suppresses the
+            // notice - same as before this milestone. This documents that
+            // limitation as intentional rather than a silent regression
+            // risk.
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
                     Leaf(99, 1),
@@ -2996,8 +2974,8 @@ namespace GW2CraftingHelper.Tests.Services
 
             // Confirms Conflict actually ratcheted true here (matching the
             // pre-existing sibling test's own proof for this exact shape),
-            // so the empty-notice assertion below is testing CapConflict
-            // suppression, not merely "no cap was ever exceeded".
+            // so the empty-notice assertion below is testing genuine
+            // Conflict suppression, not merely "no cap was ever exceeded".
             var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
             Assert.Equal(0, vendorStep.VendorOfferOutputCount);
 
