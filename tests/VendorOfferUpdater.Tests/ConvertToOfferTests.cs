@@ -278,7 +278,7 @@ namespace VendorOfferUpdater.Tests
         {
             var (helper, httpClient) = await CreateLoadedHelper();
             using var _ = httpClient;
-            var result = MakeResult(merchantName: "Homestead Refinement—Metal Forge");
+            var result = MakeResult(gameId: 102205, merchantName: "Homestead Refinement—Metal Forge");
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
 
@@ -292,6 +292,7 @@ namespace VendorOfferUpdater.Tests
             var (helper, httpClient) = await CreateLoadedHelper();
             using var _ = httpClient;
             var result = MakeResult(
+                gameId: 102205,
                 merchantName: "Homestead Refinement—Metal Forge",
                 requirement: "one [[Homestead Upgrade: Ore Trade Efficiency]]");
 
@@ -307,6 +308,7 @@ namespace VendorOfferUpdater.Tests
             var (helper, httpClient) = await CreateLoadedHelper();
             using var _ = httpClient;
             var result = MakeResult(
+                gameId: 102205,
                 merchantName: "Homestead Refinement—Metal Forge",
                 requirement: "two [[Homestead Upgrade: Ore Trade Efficiency]]");
 
@@ -322,10 +324,11 @@ namespace VendorOfferUpdater.Tests
             var (helper, httpClient) = await CreateLoadedHelper();
             using var _ = httpClient;
             var tier0 = Program.ConvertToOffer(
-                MakeResult(merchantName: "Homestead Refinement—Metal Forge"),
+                MakeResult(gameId: 102205, merchantName: "Homestead Refinement—Metal Forge"),
                 helper, new Dictionary<string, int>());
             var tier1 = Program.ConvertToOffer(
                 MakeResult(
+                    gameId: 102205,
                     merchantName: "Homestead Refinement—Metal Forge",
                     requirement: "one [[Homestead Upgrade: Ore Trade Efficiency]]"),
                 helper, new Dictionary<string, int>());
@@ -345,8 +348,31 @@ namespace VendorOfferUpdater.Tests
             var (helper, httpClient) = await CreateLoadedHelper();
             using var _ = httpClient;
             var result = MakeResult(
+                gameId: 102306,
                 merchantName: "Homestead Refinement—Farm",
                 requirement: "[[Some Unrelated Achievement]]");
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Null(offer.HomesteadTier);
+        }
+
+        [Fact]
+        public async Task HomesteadMerchant_NonMaterialOutput_HomesteadTierStaysNull()
+        {
+            // The station's own one-time efficiency/capacity Upgrade
+            // purchase items share the identical merchant name (wiki's
+            // "Has vendor" is hardcoded to the page name for every row on
+            // the page) but are NOT a refined-material conversion - must
+            // never be tagged with a tier concept that doesn't apply to
+            // them, even though their own row has no requirement text
+            // either (which would otherwise read as tier 0).
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(
+                gameId: 102415, // Homestead Upgrade: Ore Trade Efficiency
+                merchantName: "Homestead Refinement—Metal Forge");
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
 

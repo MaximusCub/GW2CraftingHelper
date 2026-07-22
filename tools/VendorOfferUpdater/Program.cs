@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -52,6 +54,7 @@ namespace VendorOfferUpdater
         {
             string outputPath = null;
             string queryCondition = null;
+            string mergeIntoPath = null;
             bool dryRun = false;
             bool skipItemResolution = false;
             bool resolveOnly = false;
@@ -93,6 +96,10 @@ namespace VendorOfferUpdater
                 else if (args[i] == "--resolve-item-currencies-only")
                 {
                     resolveOnly = true;
+                }
+                else if (args[i] == "--merge-into" && i + 1 < args.Length)
+                {
+                    mergeIntoPath = args[++i];
                 }
                 else if (!args[i].StartsWith("--"))
                 {
@@ -314,23 +321,98 @@ namespace VendorOfferUpdater
                 Console.WriteLine($"  Unique offers: {uniqueOffers.Count}");
                 Console.WriteLine();
 
-                // Step 5: Write output
+                // Step 5: Merge into an existing baseline, if requested
+                // (M37, KNOWN-ISSUES #24: "regenerate ONLY those pages'
+                // rows" - a scoped re-scrape, via --query, of a handful of
+                // merchant pages should not replace the WHOLE baseline
+                // dataset the way a from-scratch run does; --merge-into
+                // instead removes only the merchants this pass actually
+                // queried, then unions in the fresh, freshly-tagged offers
+                // for exactly those merchants).
+                var finalOffers = uniqueOffers;
+                if (mergeIntoPath != null)
+                {
+                    if (!File.Exists(mergeIntoPath))
+                    {
+                        Console.Error.WriteLine($"ERROR: --merge-into baseline not found at {mergeIntoPath}.");
+                        return 1;
+                    }
+
+                    string baselineJson = await File.ReadAllTextAsync(mergeIntoPath, ct);
+                    var readOptions = new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        PropertyNameCaseInsensitive = true
+                    };
+                    var baseline = JsonSerializer.Deserialize<VendorOfferDataset>(baselineJson, readOptions)
+                                   ?? new VendorOfferDataset();
+
+                    // VendorOffer.Locations defaults to a fresh empty List
+                    // (field initializer), so deserializing an offer whose
+                    // "locations" key was OMITTED (null when originally
+                    // written - DefaultIgnoreCondition.WhenWritingNull only
+                    // omits null, never an empty-but-present array) leaves
+                    // Locations as an empty list, not null. Re-serializing
+                    // would then write "locations":[] where the baseline
+                    // never had the key at all - a large, spurious diff
+                    // across every untouched offer with no location data.
+                    // Restored to null here so an offer this pass does NOT
+                    // touch round-trips byte-for-byte. CostLines needs no
+                    // equivalent fix - the baseline never omits that key
+                    // (confirmed: every offer has it, sometimes as `[]`).
+                    foreach (var offer in baseline.Offers)
+                    {
+                        if (offer.Locations != null && offer.Locations.Count == 0)
+                        {
+                            offer.Locations = null;
+                        }
+                    }
+
+                    var mergeResult = MergeIntoBaseline(baseline.Offers, uniqueOffers);
+                    finalOffers = mergeResult.Merged;
+                    Console.WriteLine(
+                        $"Merged into baseline ({baseline.Offers.Count} offers): " +
+                        $"removed {mergeResult.RemovedFromBaseline} offer(s) for " +
+                        $"{mergeResult.MerchantNamesReplaced.Count} merchant(s), " +
+                        $"added {finalOffers.Count - (baseline.Offers.Count - mergeResult.RemovedFromBaseline)} " +
+                        $"=> {finalOffers.Count} total");
+                    Console.WriteLine();
+                }
+
+                // Step 6: Write output
                 var dataset = new VendorOfferDataset
                 {
                     SchemaVersion = 1,
                     GeneratedAt = DateTime.UtcNow.ToString("o"),
                     Source = "gw2wiki-smw",
-                    Offers = uniqueOffers
+                    Offers = finalOffers
                 };
 
+                // M37 (KNOWN-ISSUES #24) fix: System.Text.Json's DEFAULT
+                // encoder conservatively HTML-escapes '\'', '&', '<', '>'
+                // (as ' etc.) even for pure JSON output with no HTML
+                // context - but the already-checked-in ref/vendor_offers.json
+                // never does this (confirmed: 222 literal '&' characters, 0
+                // & escapes; "Hearth's Glow" stored with a literal
+                // apostrophe). UnsafeRelaxedJsonEscaping skips that extra
+                // HTML-safety escaping (while still escaping the JSON-
+                // mandatory '"'/'\\'/control characters) but ALSO stops
+                // escaping non-ASCII text, which the existing file DOES do
+                // (e.g. "Homestead Refinement—Farm"). EscapeNonAscii
+                // below restores exactly that: non-ASCII escaped, everything
+                // else literal - matching the existing file's convention so
+                // a scoped --merge-into run's diff stays confined to the
+                // offers actually changed, not every apostrophe/ampersand
+                // in the whole 53k-row dataset.
                 var jsonOptions = new JsonSerializerOptions
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                     WriteIndented = false,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
                 };
 
-                string json = JsonSerializer.Serialize(dataset, jsonOptions);
+                string json = EscapeNonAscii(JsonSerializer.Serialize(dataset, jsonOptions));
 
                 string dir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
@@ -339,7 +421,7 @@ namespace VendorOfferUpdater
                 }
 
                 await File.WriteAllTextAsync(outputPath, json);
-                Console.WriteLine($"Written {uniqueOffers.Count} offers to {outputPath}");
+                Console.WriteLine($"Written {finalOffers.Count} offers to {outputPath}");
                 Console.WriteLine($"File size: {new FileInfo(outputPath).Length:N0} bytes");
 
                 return 0;
@@ -448,6 +530,65 @@ namespace VendorOfferUpdater
         }
 
         /// <summary>
+        /// Result of merging a scoped, freshly-queried batch of offers into
+        /// an existing baseline dataset. See <see cref="MergeIntoBaseline"/>.
+        /// </summary>
+        internal sealed class BaselineMergeResult
+        {
+            public List<VendorOffer> Merged { get; set; }
+            public int RemovedFromBaseline { get; set; }
+            public List<string> MerchantNamesReplaced { get; set; }
+        }
+
+        /// <summary>
+        /// M37 (KNOWN-ISSUES #24) support for a --merge-into run: merges a
+        /// scoped, freshly-queried batch of offers (e.g. from a --query
+        /// targeting a handful of merchant pages) into an existing full
+        /// baseline dataset, replacing ONLY the merchants the scoped query
+        /// actually covered - every other merchant's offers in the
+        /// baseline are carried through byte-for-byte untouched. This is
+        /// the "regenerate ONLY those pages' rows" operation: a merchant
+        /// name appearing anywhere in <paramref name="fresh"/> has every
+        /// one of its baseline offers removed first (even ones the fresh
+        /// query happened not to re-find, e.g. a row that became stale/was
+        /// removed from the wiki since the baseline was built), then every
+        /// fresh offer for that merchant is added - never a partial,
+        /// offer-by-offer union that could leave stale rows alongside new
+        /// ones for the same merchant.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static BaselineMergeResult MergeIntoBaseline(
+            List<VendorOffer> baseline,
+            List<VendorOffer> fresh)
+        {
+            baseline ??= new List<VendorOffer>();
+            fresh ??= new List<VendorOffer>();
+
+            var merchantsReplaced = fresh
+                .Select(o => o.MerchantName ?? string.Empty)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(m => m, StringComparer.Ordinal)
+                .ToList();
+            var merchantsReplacedSet = new HashSet<string>(merchantsReplaced, StringComparer.Ordinal);
+
+            var kept = baseline
+                .Where(o => !merchantsReplacedSet.Contains(o.MerchantName ?? string.Empty))
+                .ToList();
+            int removed = baseline.Count - kept.Count;
+
+            var merged = kept.Concat(fresh)
+                .OrderBy(o => o.OfferId, StringComparer.Ordinal)
+                .ToList();
+
+            return new BaselineMergeResult
+            {
+                Merged = merged,
+                RemovedFromBaseline = removed,
+                MerchantNamesReplaced = merchantsReplaced
+            };
+        }
+
+        /// <summary>
         /// Converts a single wiki vendor result to a VendorOffer.
         /// Returns null if any cost line cannot be resolved.
         /// </summary>
@@ -511,11 +652,23 @@ namespace VendorOfferUpdater
             var offerLocations = locations.Count > 0 ? locations : null;
 
             // M37 (KNOWN-ISSUES #24): null for every non-Homestead-
-            // Refinement offer; for a Homestead Refinement row with
-            // unrecognized requirement text, also null (with a console
-            // warning) rather than guessing - never invent a tier.
-            int? homesteadTier = HomesteadTierResolver.ResolveTier(merchant, result.Requirement);
+            // Refinement offer. Also gated on the OUTPUT being one of the
+            // three known refined materials - the same three "Homestead
+            // Refinement—X" merchant pages also sell unrelated rows under
+            // the identical merchant name (the station's own one-time
+            // efficiency/capacity Upgrade purchase items, "Has vendor" is
+            // hardcoded to the page name for every row on the page
+            // regardless of subsection - confirmed live: without this
+            // guard, an Upgrade-purchase row's requirement-less "Has
+            // requirement" would otherwise be misread as tier 0). For a
+            // Homestead Refinement row with unrecognized requirement text,
+            // also null (with a console warning) rather than guessing -
+            // never invent a tier.
+            int? homesteadTier = Gw2Constants.IsHomesteadRefinementMaterialId(result.GameId)
+                ? HomesteadTierResolver.ResolveTier(merchant, result.Requirement)
+                : null;
             if (homesteadTier == null &&
+                Gw2Constants.IsHomesteadRefinementMaterialId(result.GameId) &&
                 !string.IsNullOrEmpty(merchant) &&
                 merchant.Contains("Homestead Refinement", StringComparison.Ordinal) &&
                 !string.IsNullOrWhiteSpace(result.Requirement))
@@ -586,6 +739,43 @@ namespace VendorOfferUpdater
             string json = JsonSerializer.Serialize(sorted, options);
             File.WriteAllText(path, json);
             Console.WriteLine($"  Saved item ID cache ({cache.Count} entries) to {path}");
+        }
+
+        /// <summary>
+        /// Escapes every character above U+007F as a lowercase \uXXXX
+        /// sequence, leaving every ASCII character (including '\'', '&amp;',
+        /// '&lt;', '&gt;') exactly as JsonSerializer.UnsafeRelaxedJsonEscaping
+        /// already left it. Matches ref/vendor_offers.json's established
+        /// convention exactly (see the call site's doc comment) - a plain
+        /// per-char scan rather than a Regex, since this runs once over the
+        /// whole serialized dataset and needs no backtracking/pattern
+        /// matching. Assumes the input is already valid, escaped JSON (a
+        /// literal '\' is never re-escaped here, since JsonSerializer's own
+        /// escaping already turned any real backslash into "\\\\" before
+        /// this runs - each '\\' char in that pair is &lt;= 0x7F and passes
+        /// through unchanged, which is correct).
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string EscapeNonAscii(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+            {
+                return json;
+            }
+
+            var sb = new StringBuilder(json.Length);
+            foreach (char c in json)
+            {
+                if (c > 0x7F)
+                {
+                    sb.Append("\\u").Append(((int)c).ToString("x4"));
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+            return sb.ToString();
         }
 
         private static string FindRepoRoot()
