@@ -378,15 +378,15 @@ namespace GW2CraftingHelper.Services
             // way, a winning offer's non-coin currency lines are always
             // reported on the plan (VendorCurrencyCosts) - valuation only
             // affects comparison, never the displayed currency cost.
-            EvaluateVendorOffers(
-                node, prices, vendorOffers, priceBasis, currencyValuation, tiers,
-                out long? comparableVendorValue,
-                out long? comparableVendorCoinCost,
-                out List<CostLine> comparableVendorCurrencyCosts,
-                out VendorOfferBatch? comparableVendorBatch,
-                out long? fallbackVendorCoinCost,
-                out List<CostLine> fallbackVendorCurrencyCosts,
-                out VendorOfferBatch? fallbackVendorBatch);
+            var vendorEvaluation = EvaluateVendorOffers(
+                node, prices, vendorOffers, priceBasis, currencyValuation, tiers);
+            long? comparableVendorValue = vendorEvaluation.BestComparableValue;
+            long? comparableVendorCoinCost = vendorEvaluation.BestComparableCoinCost;
+            List<CostLine> comparableVendorCurrencyCosts = vendorEvaluation.BestComparableCurrencyCosts;
+            VendorOfferBatch? comparableVendorBatch = vendorEvaluation.BestComparableBatch;
+            long? fallbackVendorCoinCost = vendorEvaluation.FallbackCoinCost;
+            List<CostLine> fallbackVendorCurrencyCosts = vendorEvaluation.FallbackCurrencyCosts;
+            VendorOfferBatch? fallbackVendorBatch = vendorEvaluation.FallbackBatch;
 
             // Evaluate recipe options. EVERY non-currency ingredient of
             // EVERY recipe is always evaluated (M33 Finding 1 fix) - no
@@ -599,6 +599,46 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// EvaluateVendorOffers' result (WP-11, simplify #4 - was 7
+        /// out-params). Pure data carrier, mirrors the M37
+        /// CraftingPlanPipeline.PerItemEconomics pattern: a private
+        /// readonly struct returned by value from a single call site
+        /// instead of mutated out-parameters. Field meanings are
+        /// exactly the former out-params of the same name (see
+        /// EvaluateVendorOffers' own doc comment for the comparable/
+        /// fallback split, valuation rules, and cap-notice plumbing this
+        /// carries) - this is a shape change only, not a behavior change.
+        /// </summary>
+        private readonly struct VendorOfferEvaluation
+        {
+            public readonly long? BestComparableValue;
+            public readonly long? BestComparableCoinCost;
+            public readonly List<CostLine> BestComparableCurrencyCosts;
+            public readonly VendorOfferBatch? BestComparableBatch;
+            public readonly long? FallbackCoinCost;
+            public readonly List<CostLine> FallbackCurrencyCosts;
+            public readonly VendorOfferBatch? FallbackBatch;
+
+            public VendorOfferEvaluation(
+                long? bestComparableValue,
+                long? bestComparableCoinCost,
+                List<CostLine> bestComparableCurrencyCosts,
+                VendorOfferBatch? bestComparableBatch,
+                long? fallbackCoinCost,
+                List<CostLine> fallbackCurrencyCosts,
+                VendorOfferBatch? fallbackBatch)
+            {
+                BestComparableValue = bestComparableValue;
+                BestComparableCoinCost = bestComparableCoinCost;
+                BestComparableCurrencyCosts = bestComparableCurrencyCosts;
+                BestComparableBatch = bestComparableBatch;
+                FallbackCoinCost = fallbackCoinCost;
+                FallbackCurrencyCosts = fallbackCurrencyCosts;
+                FallbackBatch = fallbackBatch;
+            }
+        }
+
+        /// <summary>
         /// M37 (KNOWN-ISSUES #24, gw2e parity): before any of the above, a
         /// Homestead Refinement offer (VendorOffer.HomesteadTier.HasValue)
         /// whose tagged tier exceeds <paramref name="homesteadTiers"/>'
@@ -614,11 +654,14 @@ namespace GW2CraftingHelper.Services
         /// currency lines at all, OR every one of its non-coin currency lines
         /// has a user-provided valuation (<paramref name="currencyValuation"/>):
         /// its comparison value is coin part + sum(count * copperPerUnit) over
-        /// those valued lines, reported via <paramref name="bestComparableValue"/>.
+        /// those valued lines, reported via
+        /// <see cref="VendorOfferEvaluation.BestComparableValue"/>.
         /// The winning comparable offer's real coin part and (if any) currency
-        /// lines are reported separately via <paramref name="bestComparableCoinCost"/>
-        /// and <paramref name="bestComparableCurrencyCosts"/> - the valuation
-        /// affects comparison only, never the amounts committed to the plan.
+        /// lines are reported separately via
+        /// <see cref="VendorOfferEvaluation.BestComparableCoinCost"/>
+        /// and <see cref="VendorOfferEvaluation.BestComparableCurrencyCosts"/> -
+        /// the valuation affects comparison only, never the amounts committed
+        /// to the plan.
         /// An offer with at least one non-coin currency line that has NO
         /// valuation (including when it is mixed with other, valued lines) is
         /// incomparable with coin costs and reported only as a FALLBACK,
@@ -639,35 +682,35 @@ namespace GW2CraftingHelper.Services
         /// against the item's AGGREGATE (post-merge) demand rather than any
         /// single tree occurrence's local quantity.
         /// </summary>
-        private static void EvaluateVendorOffers(
+        private static VendorOfferEvaluation EvaluateVendorOffers(
             RecipeNode node,
             IReadOnlyDictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             PriceBasis priceBasis,
             CurrencyValuation currencyValuation,
-            HomesteadEfficiencyTiers homesteadTiers,
-            out long? bestComparableValue,
-            out long? bestComparableCoinCost,
-            out List<CostLine> bestComparableCurrencyCosts,
-            out VendorOfferBatch? bestComparableBatch,
-            out long? fallbackCoinCost,
-            out List<CostLine> fallbackCurrencyCosts,
-            out VendorOfferBatch? fallbackBatch)
+            HomesteadEfficiencyTiers homesteadTiers)
         {
-            bestComparableValue = null;
-            bestComparableCoinCost = null;
-            bestComparableCurrencyCosts = null;
-            bestComparableBatch = null;
-            fallbackCoinCost = null;
-            fallbackCurrencyCosts = null;
-            fallbackBatch = null;
+            long? bestComparableValue = null;
+            long? bestComparableCoinCost = null;
+            List<CostLine> bestComparableCurrencyCosts = null;
+            VendorOfferBatch? bestComparableBatch = null;
+            long? fallbackCoinCost = null;
+            List<CostLine> fallbackCurrencyCosts = null;
+            VendorOfferBatch? fallbackBatch = null;
             long fallbackCurrencyUnits = 0;
             int fallbackSingleCurrencyId = -1;
 
             if (vendorOffers == null ||
                 !vendorOffers.TryGetValue(node.Id, out var offers))
             {
-                return;
+                return new VendorOfferEvaluation(
+                    bestComparableValue,
+                    bestComparableCoinCost,
+                    bestComparableCurrencyCosts,
+                    bestComparableBatch,
+                    fallbackCoinCost,
+                    fallbackCurrencyCosts,
+                    fallbackBatch);
             }
 
             foreach (var offer in offers)
@@ -860,6 +903,15 @@ namespace GW2CraftingHelper.Services
                     };
                 }
             }
+
+            return new VendorOfferEvaluation(
+                bestComparableValue,
+                bestComparableCoinCost,
+                bestComparableCurrencyCosts,
+                bestComparableBatch,
+                fallbackCoinCost,
+                fallbackCurrencyCosts,
+                fallbackBatch);
         }
 
         /// <summary>
