@@ -2243,6 +2243,53 @@ future cleanup wave - not suppressed and not fixed in this change:
 None of this is a behavior change - severity stays warning, never error, per
 WP-02's design; only the suppression list and this doc entry changed.
 
+## 33. Dead live-wiki vendor-offer resolver removed (M38 WP-10)
+`Services/VendorOfferResolver.cs` (a rate-limited, retrying, concurrency-
+bounded live wiki-lookup client), `Services/IWikiVendorClient.cs`,
+`Services/WikiLookupOptions.cs`, and `Models/ResolveResult.cs` - plus their
+sole test file (`VendorOfferResolverTests.cs`) and test double
+(`InMemoryWikiVendorClient.cs`) - have been deleted. This subsystem
+implemented an earlier, pre-seed-era design (resolve missing vendor offers
+live from the wiki at plan-generation time) that was superseded by the
+static seed-store path (`VendorOfferLoader`/`VendorOfferStore`, populated
+offline by `tools/VendorOfferUpdater`) and never wired into production:
+`Module.cs` always constructed `CraftingPlanPipeline` with `resolver: null`
+(confirmed before deletion: `grep -rn "new VendorOfferResolver"` outside
+`tests/` returned zero hits anywhere in the repo, and `IWikiVendorClient`
+had no production implementer), so the `_resolver`-guarded branches in
+`CraftingPlanPipeline`'s three `Generate*Async` methods were unreachable by
+construction. The `resolver` constructor parameter, `_resolver` field, and
+the three dead `if (_resolver != null && _vendorOfferStore != null)` guard
+blocks (each wrapping a "Resolve missing vendor offers" pipeline step that
+could never run) were removed along with the always-empty step itself; the
+adjacent "Query vendor offers" step absorbs its old step number in each of
+the three methods. This also removes the always-null seam's timing-log
+entry and progress message ("Resolve vendor offers" / "Resolving vendor
+offers..."), the one intentional observable-output change this deletion
+makes - the three tests asserting the pipeline's phase sequence
+(`CraftingPlanPipelineTests`, `ZojjasClaymoreValidationTests`) were updated
+to match. M37's homestead work had added a guard comment inside
+`VendorOfferResolver.ConvertToVendorOffer` (never invent a `HomesteadTier`
+for a wiki-scraped row); nothing outside the deleted files referenced any
+of this subsystem's types except a one-line mention in `TempDirectory.cs`'s
+doc comment (updated) and historical, point-in-time research/archive docs
+(`docs/research/m37-r4-vendor-caps.md`, `docs/research/m37-r5-audits.md`,
+`docs/archive/plans/2026-02-15/milestones-phase-b.md`) left as-is since they
+correctly describe the state of the world when they were written.
+
+Dissent (recorded per the M38 plan's reviewer gate): the architecture
+analyst argued for keep-and-comment instead - retain the seam as a
+documented, intentional always-null dependency rather than delete it,
+since it also removed the suite's single largest runtime cost (real
+`Task.Delay` retry/backoff waits in `VendorOfferResolverTests` were ~32% of
+total wall time; the module test suite's measured `dotnet test` duration
+dropped from 5s to well under 1s after this change with an identical
+0-failed/0-skipped count minus the 10 deleted tests). The simplify and
+csharp analysts both independently confirmed the subsystem is runtime-dead.
+Deletion is a clean `git revert` away if a live-wiki resolve mode is ever
+wanted again - the revert restores the seam, its tests, and the guard
+branches exactly as they were.
+
 ## M37 desktop-wave observations (2026-07-22)
 Open notes from the live desktop session that verified items 29 and 30
 above (screenshot loop on the merged M37 build over the isolated
