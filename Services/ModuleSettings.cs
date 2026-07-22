@@ -91,6 +91,16 @@ namespace GW2CraftingHelper.Services
         // SettingsTabContent).
         public SettingEntry<bool> LogDiagnosticsEnabled { get; private set; }
 
+        // M39 (d1-snapshot-about-settings.md Feature 3): replaces Module.cs's
+        // previously-hardcoded `StaleThreshold` constant. Default 10 minutes
+        // (matching the constant it replaces), clamped 1-120. Read directly
+        // by Module.Update()'s own staleness check via
+        // GetClampedSnapshotRefreshIntervalMinutes below - a hand-edited
+        // settings file with an out-of-range value must clamp, never crash
+        // or disable the auto-refresh gate (same contract as
+        // GetClampedLogMaxSizeBytes/GetClampedLogRetentionDays above).
+        public SettingEntry<int> SnapshotRefreshIntervalMinutes { get; private set; }
+
         public ModuleSettings(SettingCollection settings)
         {
             ModalDialogX = settings.DefineSetting(
@@ -147,6 +157,11 @@ namespace GW2CraftingHelper.Services
                 "LogDiagnosticsEnabled", false,
                 () => "Diagnostics logging",
                 () => "Log fine-grained diagnostic events (including scroll machinery) to the Log tab and file");
+
+            SnapshotRefreshIntervalMinutes = settings.DefineSetting(
+                "SnapshotRefreshIntervalMinutes", 10,
+                () => "Snapshot refresh interval (minutes)",
+                () => "How long a cached account snapshot may sit before an automatic background refresh is triggered");
         }
 
         /// <summary>
@@ -235,6 +250,36 @@ namespace GW2CraftingHelper.Services
             return ClampRetentionDays(LogRetentionDays.Value);
         }
 
+        // Mirrors SettingsInputParser.TryParseRefreshIntervalMinutes' own
+        // 1-120 minute bound - see ClampLogMaxSizeBytes' own comment above
+        // for why the duplication is deliberate. Module.Update()'s
+        // staleness check must never see a persisted 0/negative value (that
+        // would make every tick immediately "stale", defeating the point of
+        // the backoff/throttling already in place around
+        // RefreshSnapshotInBackgroundAsync) or an absurdly large one (that
+        // would silently disable auto-refresh for a hand-edited settings
+        // file).
+        private const int MinSnapshotRefreshIntervalMinutes = 1;
+        private const int MaxSnapshotRefreshIntervalMinutes = 120;
+
+        private static int ClampSnapshotRefreshIntervalMinutes(int minutes)
+        {
+            if (minutes < MinSnapshotRefreshIntervalMinutes) return MinSnapshotRefreshIntervalMinutes;
+            if (minutes > MaxSnapshotRefreshIntervalMinutes) return MaxSnapshotRefreshIntervalMinutes;
+            return minutes;
+        }
+
+        /// <summary>
+        /// Clamped SnapshotRefreshIntervalMinutes for actual use - see
+        /// ClampSnapshotRefreshIntervalMinutes' own comment. Module.Update()
+        /// should always read this instead of
+        /// SnapshotRefreshIntervalMinutes.Value directly.
+        /// </summary>
+        public int GetClampedSnapshotRefreshIntervalMinutes()
+        {
+            return ClampSnapshotRefreshIntervalMinutes(SnapshotRefreshIntervalMinutes.Value);
+        }
+
         /// <summary>
         /// Reads the persisted currency valuations. Returns
         /// CurrencyValuation.None when nothing has been configured or the
@@ -276,6 +321,7 @@ namespace GW2CraftingHelper.Services
             LogMaxSizeBytes.Value = 2 * 1024 * 1024;
             LogRetentionDays.Value = 14;
             LogDiagnosticsEnabled.Value = false;
+            SnapshotRefreshIntervalMinutes.Value = 10;
         }
     }
 }

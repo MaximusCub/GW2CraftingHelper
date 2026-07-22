@@ -19,10 +19,20 @@ namespace GW2CraftingHelper.Views
     public class SettingsTabContent
     {
         // Curated list of common plan currencies: Karma, Laurels, Spirit
-        // Shards, and the Rift Essence tiers. The coin currency itself
-        // (Gw2Constants.CoinCurrencyId) is never listed here - it is
-        // already directly comparable and CurrencyValuation rejects
+        // Shards, the Rift Essence tiers, and Astral Acclaim. The coin
+        // currency itself (Gw2Constants.CoinCurrencyId) is never listed here
+        // - it is already directly comparable and CurrencyValuation rejects
         // coin-keyed entries outright.
+        //
+        // Astral Acclaim (63) - addendum-astral-acclaim.md P1: added so a
+        // user CAN value it if they choose to, but with no suggested rate
+        // (see the info line in BuildCurrencyValuationsSection below) - the
+        // maintainer explicitly rejected a single implied copper-per-AA
+        // anchor (the addendum's "REVISED" section), since AA's per-item
+        // deal quality varies across the Wizard's Vault and any one implied
+        // rate would misrepresent that. Leaving this row blank (the
+        // default) keeps AA out of price comparisons entirely, same as any
+        // other unset currency.
         private static readonly int[] CuratedCurrencyIds =
         {
             2,  // Karma
@@ -30,7 +40,8 @@ namespace GW2CraftingHelper.Views
             23, // Spirit Shards
             78, // Fine Rift Essence
             79, // Rare Rift Essence
-            80  // Masterwork Rift Essence
+            80, // Masterwork Rift Essence
+            63  // Astral Acclaim
         };
 
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
@@ -90,6 +101,15 @@ namespace GW2CraftingHelper.Views
         private Label _logRetentionDaysErrorLabel;
         private Label _logStatusLabel;
 
+        // M39 (d1-snapshot-about-settings.md Feature 3): standalone
+        // "Snapshot" section, its own new section (not folded into "Plan
+        // Defaults", which is about per-plan choices - a different
+        // concern). TextBox+Save+error-label idiom, same shape as the
+        // Homestead tier rows above.
+        private TextBox _snapshotRefreshIntervalInput;
+        private Label _snapshotRefreshIntervalErrorLabel;
+        private Label _snapshotStatusLabel;
+
         public SettingsTabContent(ModuleSettings settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -133,10 +153,12 @@ namespace GW2CraftingHelper.Views
             BuildPlanDefaultsSection(panelWidth);
             BuildHomesteadRefinementSection(panelWidth);
             BuildLoggingSection(panelWidth);
+            BuildSnapshotSection(panelWidth);
 
             LoadCurrentValuations();
             LoadCurrentHomesteadTiers();
             LoadCurrentLoggingSettings();
+            LoadCurrentSnapshotSettings();
         }
 
         private void BuildCurrencyValuationsSection(int panelWidth)
@@ -149,6 +171,14 @@ namespace GW2CraftingHelper.Views
             {
                 AddCurrencyRow(currencyId, panelWidth);
             }
+
+            // addendum-astral-acclaim.md P1: neutral, no-single-anchor hint
+            // for Astral Acclaim specifically - it is untradable and earned
+            // via capped seasonal play, so unlike the other currencies
+            // above, there is no rate this settings row can honestly
+            // suggest. Left blank (the default) simply keeps it out of
+            // price comparisons, same as any other unset currency.
+            AddInfoLine("Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.", panelWidth);
 
             AddSaveRow(panelWidth);
         }
@@ -625,6 +655,141 @@ namespace GW2CraftingHelper.Views
                 string entryWord = invalidCount == 1 ? "entry" : "entries";
                 _logStatusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
                 _logStatusLabel.TextColor = WarningTextColor;
+            }
+        }
+
+        /// <summary>
+        /// M39 (d1-snapshot-about-settings.md Feature 3): one TextBox+Save
+        /// row for SnapshotRefreshIntervalMinutes - replaces Module.cs's
+        /// previously-hardcoded StaleThreshold constant, so the Snapshot
+        /// tab's own staleness indicator and Module's auto-refresh trigger
+        /// read the same number and can never silently disagree about what
+        /// "stale" means.
+        /// </summary>
+        private void BuildSnapshotSection(int panelWidth)
+        {
+            AddSectionHeader("Snapshot", panelWidth);
+            AddInfoLine("How long a cached account snapshot may sit before an automatic background refresh runs.", panelWidth);
+
+            AddSnapshotRefreshIntervalRow(panelWidth);
+            AddSnapshotSaveRow(panelWidth);
+        }
+
+        private void AddSnapshotRefreshIntervalRow(int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, RowHeight),
+                Parent = _rootPanel
+            };
+
+            new Label()
+            {
+                Text = "Refresh interval",
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = NameColumnWidth,
+                Location = new Point(NameColumnX, 7),
+                Parent = rowPanel
+            };
+
+            _snapshotRefreshIntervalInput = new TextBox()
+            {
+                Size = new Point(InputWidth, 26),
+                Location = new Point(NameColumnX + NameColumnWidth, 3),
+                Parent = rowPanel
+            };
+
+            new Label()
+            {
+                Text = "minutes (1-120)",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = InfoTextColor,
+                Location = new Point(HintX, 7),
+                Parent = rowPanel
+            };
+
+            _snapshotRefreshIntervalErrorLabel = new Label()
+            {
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = ErrorTextColor,
+                Location = new Point(ErrorX, 7),
+                Parent = rowPanel
+            };
+        }
+
+        private void AddSnapshotSaveRow(int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, 40),
+                Parent = _rootPanel
+            };
+
+            var saveButton = new StandardButton()
+            {
+                Text = "Save",
+                Size = new Point(80, 28),
+                Location = new Point(NameColumnX, 6),
+                Parent = rowPanel
+            };
+            saveButton.Click += (_, __) => SaveSnapshotSettings();
+
+            _snapshotStatusLabel = new Label()
+            {
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(NameColumnX + 80 + 12, 12),
+                Parent = rowPanel
+            };
+        }
+
+        private void LoadCurrentSnapshotSettings()
+        {
+            if (_snapshotRefreshIntervalInput != null)
+            {
+                _snapshotRefreshIntervalInput.Text = _settings.SnapshotRefreshIntervalMinutes.Value.ToString(CultureInfo.InvariantCulture);
+            }
+            if (_snapshotRefreshIntervalErrorLabel != null)
+            {
+                _snapshotRefreshIntervalErrorLabel.Text = "";
+            }
+        }
+
+        private void SaveSnapshotSettings()
+        {
+            int invalidCount = 0;
+
+            if (_snapshotRefreshIntervalErrorLabel != null)
+            {
+                _snapshotRefreshIntervalErrorLabel.Text = "";
+            }
+            if (SettingsInputParser.TryParseRefreshIntervalMinutes(_snapshotRefreshIntervalInput?.Text, out int minutes))
+            {
+                _settings.SnapshotRefreshIntervalMinutes.Value = minutes;
+            }
+            else if (_snapshotRefreshIntervalErrorLabel != null)
+            {
+                _snapshotRefreshIntervalErrorLabel.Text = "Must be 1-120";
+                invalidCount++;
+            }
+
+            if (_snapshotStatusLabel == null) return;
+
+            if (invalidCount == 0)
+            {
+                _snapshotStatusLabel.Text = $"Saved - {DateTime.Now:t}";
+                _snapshotStatusLabel.TextColor = SuccessTextColor;
+            }
+            else
+            {
+                string entryWord = invalidCount == 1 ? "entry" : "entries";
+                _snapshotStatusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
+                _snapshotStatusLabel.TextColor = WarningTextColor;
             }
         }
 

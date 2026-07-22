@@ -1,0 +1,558 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using Blish_HUD;
+using Blish_HUD.Content;
+using Blish_HUD.Controls;
+using Blish_HUD.Modules;
+using GW2CraftingHelper.Services;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Newtonsoft.Json;
+
+namespace GW2CraftingHelper.Views
+{
+    /// <summary>
+    /// The About tab (M39, d1-snapshot-about-settings.md Feature 2): static,
+    /// mostly-derived information about the module itself - name, version,
+    /// author/contributors, source URL, the Blish HUD version it targets,
+    /// this repo's own license, a Blish HUD MIT-license credit line, and
+    /// the module's data directory (useful when a user needs to attach
+    /// snapshot.json/status.json/etc. to a bug report). Same shape as
+    /// LogTabContent.cs: one FlowPanel(CanScroll),
+    /// Build(Container) populates it once, no relayout registry, no M33
+    /// involvement - nothing here is interactive beyond plain
+    /// selectable/copyable text, so there is nothing to keep "sticky"
+    /// across tab revisits (see MainView.cs's own cross-cutting note on
+    /// rebuild-per-visit).
+    /// <para>
+    /// Name/version/author/url/description/dependencies are read live from
+    /// ModuleParameters.Manifest - the exact same object Blish HUD itself
+    /// already parsed and validated in order to even load this module, so
+    /// under normal operation this read cannot fail - with a defensive
+    /// fallback to hand-parsing the packaged manifest.json if it ever does
+    /// (null Manifest, an unexpectedly blank Name, or any exception).
+    /// Mirrors the try/catch-with-graceful-fallback shape already used four
+    /// times in Module.Initialize() for seed files.
+    /// </para>
+    /// <para>
+    /// Two of Manifest's own properties (Version, and a dependency's
+    /// VersionRange) are typed as SemVer.Version/SemVer.Range from the
+    /// external "SemVer" NuGet package that Blish HUD embeds via Costura at
+    /// runtime - this project has no compile-time reference to that
+    /// package, so those two fields are read via reflection (ToString()
+    /// only) instead of a direct property access, to avoid adding a new
+    /// package reference for a two-field, display-only read.
+    /// </para>
+    /// </summary>
+    public class AboutTabContent
+    {
+        private static readonly Logger Logger = Logger.GetLogger<AboutTabContent>();
+
+        private const string ModuleDisplayName = "GW2 Crafting Helper";
+        private const string UnknownText = "unknown";
+        private const string BlishHudDependencyNamespace = "bh.blishhud";
+
+        // d1 Feature 2's "Licenses & Attributions" section: the Blish HUD
+        // MIT-license credit line. d1 flags this exact wording as MEASURED
+        // (verified via WebSearch against Blish HUD's own repo) and
+        // low-risk to ship, unlike the ArenaNet/GW2 disclaimer below, which
+        // stays out pending maintainer sign-off. Kept as its own constant
+        // (not folded into the "Built with:" row) because "Built with:"
+        // reports the live SemVer.Range this module targets - a distinct,
+        // manifest-derived value - while this is fixed attribution text.
+        private const string BlishHudCreditLine = "Built on Blish HUD (MIT License) - github.com/blish-hud/Blish-HUD";
+
+        // Manual fallback for the "Built with Blish HUD" note, only ever
+        // shown if BOTH the live Dependencies read (ReadBlishHudDependencyRange)
+        // and the manifest.json fallback read fail to produce a value -
+        // mirrors manifest.json's own currently-declared
+        // dependencies.bh.blishhud value (d1 Feature 2, option (a): a
+        // doc-only literal, same maintenance cost as any other
+        // rarely-changing constant).
+        private const string FallbackBlishHudVersionRange = ">=1.3.0";
+
+        private static readonly Color InfoTextColor = new Color(170, 170, 170);
+
+        private const int RightEdgePadding = 20;
+        private const int RowHeight = 30;
+        private const int InfoRowHeight = 20;
+        private const int SpacerHeight = 10;
+        private const int HeaderRowHeight = 44;
+        private const int NameColumnX = 16;
+        private const int NameColumnWidth = 150;
+        private const int ValueColumnX = NameColumnX + NameColumnWidth;
+        private const int IconSize = 32;
+        private const int MinValueBoxWidth = 200;
+
+        private readonly ModuleParameters _moduleParameters;
+        private readonly string _dataDirectoryPath;
+        private readonly Texture2D _moduleIconTexture;
+
+        private FlowPanel _rootPanel;
+
+        public AboutTabContent(ModuleParameters moduleParameters, string dataDirectoryPath, Texture2D moduleIconTexture)
+        {
+            _moduleParameters = moduleParameters ?? throw new ArgumentNullException(nameof(moduleParameters));
+            _dataDirectoryPath = dataDirectoryPath ?? "";
+            _moduleIconTexture = moduleIconTexture;
+        }
+
+        public void Build(Container container)
+        {
+            var info = LoadAboutInfo();
+
+            int panelWidth = container.ContentRegion.Width - RightEdgePadding;
+
+            _rootPanel = new FlowPanel()
+            {
+                Size = new Point(container.ContentRegion.Width, container.ContentRegion.Height),
+                FlowDirection = ControlFlowDirection.SingleTopToBottom,
+                CanScroll = true,
+                Parent = container
+            };
+
+            container.Resized += (_, __) =>
+            {
+                _rootPanel.Size = new Point(
+                    container.ContentRegion.Width,
+                    container.ContentRegion.Height);
+            };
+
+            AddHeaderRow(info, panelWidth);
+
+            if (!string.IsNullOrWhiteSpace(info.Description))
+            {
+                AddInfoLine(info.Description, panelWidth);
+            }
+
+            AddSpacer(panelWidth);
+
+            AddValueRow("Source:", string.IsNullOrWhiteSpace(info.Url) ? "Not set in manifest.json" : info.Url, panelWidth, copyable: true);
+            AddValueRow("Author:", info.AuthorDisplay ?? "Not listed in manifest.json", panelWidth);
+            AddValueRow("Built with:", $"Blish HUD {info.BlishVersionRange ?? FallbackBlishHudVersionRange}", panelWidth);
+
+            // "License:" (this project's own license) and "Credits:" (the
+            // Blish HUD attribution d1 Feature 2 asked for) are two
+            // separate, differently-sourced rows and are deliberately kept
+            // side by side rather than merged: "License:" is this repo's
+            // own MIT license (not present in d1's original wireframe -
+            // added here so a reader always sees which license applies to
+            // this module's own code), while "Credits:" is d1's
+            // already-verified Blish HUD MIT-license credit line, carried
+            // over unchanged. Do not collapse these into one row or drop
+            // either without updating this comment.
+            AddValueRow("License:", "MIT (see LICENSE in the repo)", panelWidth);
+            AddValueRow("Credits:", BlishHudCreditLine, panelWidth, copyable: true);
+            AddValueRow("Data directory:", string.IsNullOrWhiteSpace(_dataDirectoryPath) ? "Not available" : _dataDirectoryPath, panelWidth, copyable: true);
+
+            // d1 Feature 2's wireframe also proposed a GW2/ArenaNet
+            // fan-content disclaimer line in the same "Licenses &
+            // Attributions" section as the Blish HUD credit above -
+            // deliberately NOT included here. d1's own text flags that
+            // draft wording as an unverified, INFERRED paraphrase,
+            // explicitly "not something to ship as-is" (Open Question 3:
+            // get the exact required wording verified against ArenaNet's
+            // own legal pages first). Per the repo's "do not invent data"
+            // posture, this stays an open item for the maintainer rather
+            // than shipping unverified legal text - see this milestone's
+            // PR notes.
+        }
+
+        private void AddHeaderRow(AboutInfo info, int panelWidth)
+        {
+            var headerPanel = new Panel()
+            {
+                Size = new Point(panelWidth, HeaderRowHeight),
+                Parent = _rootPanel
+            };
+
+            int nameX = NameColumnX;
+            if (_moduleIconTexture != null)
+            {
+                new Image()
+                {
+                    Texture = new AsyncTexture2D(_moduleIconTexture),
+                    Size = new Point(IconSize, IconSize),
+                    Location = new Point(NameColumnX, (HeaderRowHeight - IconSize) / 2),
+                    Parent = headerPanel
+                };
+                nameX = NameColumnX + IconSize + 10;
+            }
+
+            new Label()
+            {
+                Text = $"{info.Name} v{info.Version}",
+                Font = GameService.Content.DefaultFont18,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(nameX, 10),
+                Parent = headerPanel
+            };
+        }
+
+        private void AddInfoLine(string text, int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, InfoRowHeight),
+                Parent = _rootPanel
+            };
+
+            new Label()
+            {
+                Text = text,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = InfoTextColor,
+                Location = new Point(NameColumnX, 2),
+                Parent = rowPanel
+            };
+        }
+
+        private void AddSpacer(int panelWidth)
+        {
+            new Panel()
+            {
+                Size = new Point(panelWidth, SpacerHeight),
+                Parent = _rootPanel
+            };
+        }
+
+        private void AddValueRow(string label, string value, int panelWidth, bool copyable = false)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, RowHeight),
+                Parent = _rootPanel
+            };
+
+            new Label()
+            {
+                Text = label,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(NameColumnX, 7),
+                Parent = rowPanel
+            };
+
+            if (copyable)
+            {
+                // Plain TextBox, not a click-to-launch-browser button (d1
+                // Feature 2: no precedent anywhere in this codebase, and no
+                // confirmed-safe way to launch an external process from
+                // inside the GW2 overlay sandbox). TextBox natively
+                // supports select-all/copy (TextInputBase.HandleCopy), so
+                // this is already "selectable/copyable" with no extra
+                // control needed - the field is never read back or
+                // persisted, so a user editing it in-place is harmless and
+                // resets on the next tab visit anyway.
+                int width = Math.Max(MinValueBoxWidth, panelWidth - ValueColumnX - RightEdgePadding);
+                new TextBox()
+                {
+                    Text = value,
+                    Size = new Point(width, 26),
+                    Location = new Point(ValueColumnX, 3),
+                    Parent = rowPanel
+                };
+            }
+            else
+            {
+                new Label()
+                {
+                    Text = value,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    TextColor = InfoTextColor,
+                    Location = new Point(ValueColumnX, 7),
+                    Parent = rowPanel
+                };
+            }
+        }
+
+        private class AboutInfo
+        {
+            public string Name;
+            public string Version;
+            public string Description;
+            public string Url;
+            public string AuthorDisplay;
+            public string BlishVersionRange;
+        }
+
+        private class ManifestFallbackContributorDto
+        {
+            [JsonProperty("name")]
+            public string Name;
+        }
+
+        private class ManifestFallbackDto
+        {
+            [JsonProperty("name")]
+            public string Name;
+
+            [JsonProperty("version")]
+            public string Version;
+
+            [JsonProperty("description")]
+            public string Description;
+
+            [JsonProperty("url")]
+            public string Url;
+
+            [JsonProperty("author")]
+            public ManifestFallbackContributorDto Author;
+
+            [JsonProperty("contributors")]
+            public List<ManifestFallbackContributorDto> Contributors;
+
+            [JsonProperty("dependencies")]
+            public Dictionary<string, string> Dependencies;
+        }
+
+        private AboutInfo LoadAboutInfo()
+        {
+            return TryReadFromLiveManifest() ?? ReadFromManifestJsonFallback();
+        }
+
+        private AboutInfo TryReadFromLiveManifest()
+        {
+            try
+            {
+                var manifest = _moduleParameters.Manifest;
+                if (manifest == null)
+                {
+                    return null;
+                }
+
+                string name = manifest.Name;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    return null;
+                }
+
+                return new AboutInfo
+                {
+                    Name = name,
+                    Version = ReadVersionText(manifest) ?? UnknownText,
+                    Description = manifest.Description ?? "",
+                    Url = manifest.Url ?? "",
+                    AuthorDisplay = ResolveAuthorDisplay(manifest.Author, manifest.Contributors),
+                    BlishVersionRange = ReadBlishHudDependencyRange(manifest.Dependencies)
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Failed to read the live module manifest for the About tab, falling back to manifest.json");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "about", $"Failed to read the live module manifest for the About tab, falling back to manifest.json: {ex.GetType().Name} - {ex.Message}");
+                return null;
+            }
+        }
+
+        // manifest.Version is a SemVer.Version (external package, see class
+        // doc comment) - read via reflection so this project never needs a
+        // compile-time reference to it. ToString() on that type is what
+        // Blish HUD's own Manifest.GetDetailedName() uses to render a
+        // version, so this matches Blish's own display convention.
+        private static string ReadVersionText(Manifest manifest)
+        {
+            try
+            {
+                var versionProperty = manifest.GetType().GetProperty("Version");
+                object versionValue = versionProperty?.GetValue(manifest);
+                string text = versionValue?.ToString();
+                return string.IsNullOrWhiteSpace(text) ? null : text;
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("Could not read the live manifest's Version via reflection: {0}", ex.Message);
+                return null;
+            }
+        }
+
+        // AUTHOR NOTE (M39 task): the maintainer has not supplied a public
+        // author/byline. This renders whatever the manifest already
+        // contains - Author if set, else the Contributors list joined - and
+        // changes nothing about manifest identity. Today's manifest.json
+        // has no top-level "author", only contributors: [{ name:
+        // "MaximusCub" }], so this currently resolves to "MaximusCub". Which
+        // name is ultimately authoritative is WP-28's call (d1 Feature 2,
+        // Open Question 5), not this tab's - flagged in this milestone's PR
+        // as still awaiting the maintainer.
+        private static string ResolveAuthorDisplay(ModuleContributor author, List<ModuleContributor> contributors)
+        {
+            if (author != null && !string.IsNullOrWhiteSpace(author.Name))
+            {
+                return author.Name;
+            }
+
+            if (contributors == null || contributors.Count == 0)
+            {
+                return null;
+            }
+
+            var names = contributors
+                .Where(c => c != null && !string.IsNullOrWhiteSpace(c.Name))
+                .Select(c => c.Name)
+                .ToList();
+
+            return names.Count == 0 ? null : string.Join(", ", names);
+        }
+
+        // A dependency's VersionRange is a SemVer.Range (external package,
+        // see class doc comment) - read via reflection for the same reason
+        // as ReadVersionText above. ModuleDependency.IsBlishHud itself is a
+        // plain bool and safe to call directly.
+        private static string ReadBlishHudDependencyRange(List<ModuleDependency> dependencies)
+        {
+            if (dependencies == null)
+            {
+                return null;
+            }
+
+            foreach (var dependency in dependencies)
+            {
+                if (dependency == null || !dependency.IsBlishHud)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var rangeProperty = dependency.GetType().GetProperty("VersionRange");
+                    object rangeValue = rangeProperty?.GetValue(dependency);
+                    string text = rangeValue?.ToString();
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        return text;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug("Could not read a live manifest dependency's VersionRange via reflection: {0}", ex.Message);
+                }
+            }
+
+            return null;
+        }
+
+        private AboutInfo ReadFromManifestJsonFallback()
+        {
+            try
+            {
+                using (var stream = TryOpenManifestJsonFallbackStream())
+                {
+                    if (stream == null)
+                    {
+                        return FallbackDefaultInfo();
+                    }
+
+                    using (var reader = new StreamReader(stream))
+                    {
+                        string json = reader.ReadToEnd();
+                        var dto = JsonConvert.DeserializeObject<ManifestFallbackDto>(json);
+                        if (dto == null)
+                        {
+                            return FallbackDefaultInfo();
+                        }
+
+                        string authorDisplay = null;
+                        if (dto.Author != null && !string.IsNullOrWhiteSpace(dto.Author.Name))
+                        {
+                            authorDisplay = dto.Author.Name;
+                        }
+                        else if (dto.Contributors != null && dto.Contributors.Count > 0)
+                        {
+                            var names = dto.Contributors
+                                .Where(c => c != null && !string.IsNullOrWhiteSpace(c.Name))
+                                .Select(c => c.Name)
+                                .ToList();
+                            if (names.Count > 0)
+                            {
+                                authorDisplay = string.Join(", ", names);
+                            }
+                        }
+
+                        string blishRange = null;
+                        if (dto.Dependencies != null &&
+                            dto.Dependencies.TryGetValue(BlishHudDependencyNamespace, out string range) &&
+                            !string.IsNullOrWhiteSpace(range))
+                        {
+                            blishRange = range;
+                        }
+
+                        return new AboutInfo
+                        {
+                            Name = string.IsNullOrWhiteSpace(dto.Name) ? ModuleDisplayName : dto.Name,
+                            Version = string.IsNullOrWhiteSpace(dto.Version) ? UnknownText : dto.Version,
+                            Description = dto.Description ?? "",
+                            Url = dto.Url ?? "",
+                            AuthorDisplay = authorDisplay,
+                            BlishVersionRange = blishRange
+                        };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Failed to read the manifest.json fallback for the About tab");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "about", $"Failed to read the manifest.json fallback for the About tab: {ex.GetType().Name} - {ex.Message}");
+                return FallbackDefaultInfo();
+            }
+        }
+
+        /// <summary>
+        /// Locates the packaged manifest.json next to this module's own
+        /// loaded assembly. Deliberately NOT
+        /// ContentsManager.GetFileStream("manifest.json") - ContentsManager
+        /// is rooted at the module package's "ref" subfolder (Blish HUD's
+        /// own ContentsManager.GetModuleInstance calls
+        /// module.DataReader.GetSubPath("ref")), but BlishHUD.targets'
+        /// BuildBlishHUDModule target copies manifest.json to the package
+        /// ROOT alongside the compiled module DLL, never into ref/ - so
+        /// ContentsManager can never see it there. Reading next to
+        /// Assembly.GetExecutingAssembly().Location matches how the
+        /// package is actually laid out on disk.
+        /// </summary>
+        private static Stream TryOpenManifestJsonFallbackStream()
+        {
+            try
+            {
+                string assemblyLocation = Assembly.GetExecutingAssembly().Location;
+                if (string.IsNullOrWhiteSpace(assemblyLocation))
+                {
+                    return null;
+                }
+
+                string directory = Path.GetDirectoryName(assemblyLocation);
+                if (string.IsNullOrWhiteSpace(directory))
+                {
+                    return null;
+                }
+
+                string manifestPath = Path.Combine(directory, "manifest.json");
+                return File.Exists(manifestPath) ? File.OpenRead(manifestPath) : null;
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("Could not locate the packaged manifest.json next to the module assembly: {0}", ex.Message);
+                return null;
+            }
+        }
+
+        private static AboutInfo FallbackDefaultInfo()
+        {
+            return new AboutInfo
+            {
+                Name = ModuleDisplayName,
+                Version = UnknownText,
+                Description = "",
+                Url = "",
+                AuthorDisplay = null,
+                BlishVersionRange = null
+            };
+        }
+    }
+}

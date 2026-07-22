@@ -39,7 +39,6 @@ namespace GW2CraftingHelper
     public class Module : Blish_HUD.Modules.Module
     {
         private static readonly Logger Logger = Logger.GetLogger<Module>();
-        private static readonly TimeSpan StaleThreshold = TimeSpan.FromMinutes(10);
 
         // Bounds the whole multi-step account-snapshot fetch (wallet, bank,
         // shared inventory, materials, one call per character) so a full
@@ -62,6 +61,7 @@ namespace GW2CraftingHelper
         private LogTabContent _logContent;
         private Tab _logTab;
         private SettingsTabContent _settingsContent;
+        private AboutTabContent _aboutContent;
 
         private ModuleSettings _settings;
         private SnapshotStore _snapshotStore;
@@ -400,6 +400,14 @@ namespace GW2CraftingHelper
 
             _settingsContent = new SettingsTabContent(_settings);
 
+            // M39 (d1-snapshot-about-settings.md Feature 2): dataDir and
+            // _moduleIconTexture are both already in scope at this point in
+            // Initialize() (dataDir computed at the top of this method,
+            // _moduleIconTexture loaded a few lines above) - trivial
+            // plumbing, no new fields needed on Module itself beyond the
+            // view instance.
+            _aboutContent = new AboutTabContent(this.ModuleParameters, dataDir, _moduleIconTexture);
+
             // Minimum size (930x710) matches the window region intentionally.
             // Validated in-game to align with Event Table / Blish HUD's own
             // TabbedWindow dimensions and the 1024x1024 background texture (502049).
@@ -462,7 +470,7 @@ namespace GW2CraftingHelper
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(157097),
-                () => new ViewAdapter("About", BuildPlaceholder),
+                () => new ViewAdapter("About", c => _aboutContent.Build(c)),
                 "About"));
 
             // Refresh log content when switching to the Log tab
@@ -562,7 +570,14 @@ namespace GW2CraftingHelper
 
             if (_refreshInProgress) return;
             if (_currentSnapshot == null) return;
-            if (DateTime.UtcNow - _currentSnapshot.CapturedAt < StaleThreshold) return;
+
+            // M39 (d1-snapshot-about-settings.md Feature 3): reads the
+            // clamped setting fresh on every tick (cheap - a single
+            // SettingEntry read plus two int comparisons, no I/O) rather
+            // than caching it, so a Settings tab save takes effect on the
+            // very next Update() without any separate live-push plumbing.
+            var staleThreshold = TimeSpan.FromMinutes(_settings.GetClampedSnapshotRefreshIntervalMinutes());
+            if (DateTime.UtcNow - _currentSnapshot.CapturedAt < staleThreshold) return;
             if (!_snapshotService.HasRequiredPermissions()) return;
 
             _ = RefreshSnapshotInBackgroundAsync();

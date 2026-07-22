@@ -16,10 +16,15 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void SerializeThenDeserialize_RoundTripsEntries()
         {
+            // Currency 63 (Astral Acclaim) - addendum-astral-acclaim.md P1:
+            // added to SettingsTabContent.CuratedCurrencyIds alongside
+            // Karma/Spirit Shards, so its valuation must round-trip through
+            // this same serializer exactly like any other curated currency.
             var valuation = new CurrencyValuation(new Dictionary<int, long>
             {
                 { 2, 5 },
-                { 23, 1200 }
+                { 23, 1200 },
+                { 63, 800 }
             });
 
             string json = CurrencyValuationSerializer.Serialize(valuation);
@@ -29,6 +34,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(5, karmaValue);
             Assert.True(roundTripped.TryGetCopperValue(23, out long spiritShardValue));
             Assert.Equal(1200, spiritShardValue);
+            Assert.True(roundTripped.TryGetCopperValue(63, out long astralAcclaimValue));
+            Assert.Equal(800, astralAcclaimValue);
         }
 
         [Fact]
