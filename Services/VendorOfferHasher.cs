@@ -25,7 +25,14 @@ namespace GW2CraftingHelper.Services
             // appended unconditionally (as "null" when omitted), so any
             // offer's OfferId changes the first time it is recomputed with
             // this code, whether or not its own tier is null.
-            int? homesteadTier = null)
+            int? homesteadTier = null,
+            // Astral Acclaim package (KNOWN-ISSUES #28): same non-backward-
+            // compatible-hash caveat as homesteadTier above, appended last
+            // so existing positional callers that already pass homesteadTier
+            // keep meaning exactly what they meant before this parameter
+            // existed. Mirrors tools/VendorOfferUpdater/VendorOfferHasher.cs
+            // exactly.
+            int? seasonalCap = null)
         {
             var sb = new StringBuilder();
 
@@ -76,6 +83,11 @@ namespace GW2CraftingHelper.Services
             sb.Append(";homesteadTier=");
             sb.Append(homesteadTier.HasValue
                 ? homesteadTier.Value.ToString(CultureInfo.InvariantCulture)
+                : "null");
+
+            sb.Append(";seasonalCap=");
+            sb.Append(seasonalCap.HasValue
+                ? seasonalCap.Value.ToString(CultureInfo.InvariantCulture)
                 : "null");
 
             using (var sha = SHA256.Create())
