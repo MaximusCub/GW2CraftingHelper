@@ -31,6 +31,15 @@ namespace GW2CraftingHelper.Services
         // FetchOwnBatchesAsync Task for that call. Only ever mutated under
         // _cacheLock, and never while the lock is held across an await -
         // every access below is a plain synchronous dictionary op.
+        //
+        // KNOWN-ISSUES 31c-audit: a shared FetchOwnBatchesAsync Task here
+        // is never tied to any single caller's CancellationToken (it
+        // always runs with CancellationToken.None internally - see that
+        // method) precisely because it is shared - a joiner's or the
+        // owner's own cancellation must never abandon work the OTHER
+        // caller still needs. Each caller instead observes its own ct
+        // while awaiting via AwaitRespectingOwnCancellationAsync below, so
+        // cancellation stays strictly per-caller in both directions.
         private readonly Dictionary<int, Task> _inFlight = new Dictionary<int, Task>();
 
         public TradingPostService(IPriceApiClient api, Func<DateTime> utcNow = null)
@@ -88,7 +97,10 @@ namespace GW2CraftingHelper.Services
 
                 if (freshIds.Count > 0)
                 {
-                    ownTask = FetchOwnBatchesAsync(freshIds, now, ct);
+                    // Deliberately NOT this caller's ct - see
+                    // FetchOwnBatchesAsync's own doc comment and the
+                    // KNOWN-ISSUES 31c-audit note on _inFlight above.
+                    ownTask = FetchOwnBatchesAsync(freshIds, now);
                     foreach (var id in freshIds)
                     {
                         _inFlight[id] = ownTask;
@@ -117,7 +129,11 @@ namespace GW2CraftingHelper.Services
                 attempted++;
                 try
                 {
-                    await ownTask;
+                    // Respects THIS call's own ct even though ownTask
+                    // itself runs with CancellationToken.None internally
+                    // (KNOWN-ISSUES 31c-audit) - see
+                    // AwaitRespectingOwnCancellationAsync's doc comment.
+                    await AwaitRespectingOwnCancellationAsync(ownTask, ct);
                     succeeded++;
                 }
                 catch (Exception ex) when (!(ex is OperationCanceledException))
@@ -131,7 +147,12 @@ namespace GW2CraftingHelper.Services
                 attempted++;
                 try
                 {
-                    await task;
+                    // `task` belongs to a DIFFERENT overlapping caller
+                    // that owns it; joining must still respect THIS
+                    // caller's own ct rather than inheriting whatever
+                    // that other caller's cancellation state is
+                    // (KNOWN-ISSUES 31c-audit).
+                    await AwaitRespectingOwnCancellationAsync(task, ct);
                     succeeded++;
                 }
                 catch (Exception ex) when (!(ex is OperationCanceledException))
@@ -168,7 +189,18 @@ namespace GW2CraftingHelper.Services
         // pre-M37 inline for-loop, so a single caller's own batch
         // count/order/timing is unaffected by the KNOWN-ISSUES 31c-1
         // coalescing added around it.
-        private async Task FetchOwnBatchesAsync(List<int> ids, DateTime fetchedUtc, CancellationToken ct)
+        //
+        // KNOWN-ISSUES 31c-audit: deliberately takes no CancellationToken.
+        // The returned Task is registered into _inFlight and may be
+        // awaited by other overlapping GetPricesAsync callers besides the
+        // one that decided to run it (a "joiner"); threading any single
+        // caller's ct into the actual upstream fetch would let that one
+        // caller's cancellation abandon work another, still-active caller
+        // depends on. Every caller - owner or joiner - instead observes
+        // its own ct only while awaiting the shared Task, via
+        // AwaitRespectingOwnCancellationAsync below; the fetch itself
+        // always runs to completion (success or genuine failure).
+        private async Task FetchOwnBatchesAsync(List<int> ids, DateTime fetchedUtc)
         {
             // Always suspend here first, before doing any real work. The
             // caller (GetPricesAsync) invokes this method from inside
@@ -207,7 +239,9 @@ namespace GW2CraftingHelper.Services
 
                     try
                     {
-                        var entries = await _api.GetPricesAsync(batch, ct);
+                        // CancellationToken.None, not any caller's ct -
+                        // see this method's own doc comment.
+                        var entries = await _api.GetPricesAsync(batch, CancellationToken.None);
 
                         lock (_cacheLock)
                         {
@@ -245,6 +279,34 @@ namespace GW2CraftingHelper.Services
                     }
                 }
             }
+        }
+
+        // KNOWN-ISSUES 31c-audit: awaits a shared fetch Task (owned or
+        // joined) while respecting only THIS caller's own `ct`, never the
+        // cancellation state of whichever caller happens to own `task`.
+        // If `ct` fires first, throws a fresh OperationCanceledException
+        // tied to `ct` immediately - `task` itself is left running
+        // untouched for any other caller still awaiting it. If `task`
+        // completes first, its own result/exception is propagated as-is.
+        private static async Task AwaitRespectingOwnCancellationAsync(Task task, CancellationToken ct)
+        {
+            if (!ct.CanBeCanceled)
+            {
+                await task;
+                return;
+            }
+
+            var cancellationSignal = new TaskCompletionSource<bool>();
+            using (ct.Register(() => cancellationSignal.TrySetResult(true)))
+            {
+                var completed = await Task.WhenAny(task, cancellationSignal.Task);
+                if (completed == cancellationSignal.Task)
+                {
+                    throw new OperationCanceledException(ct);
+                }
+            }
+
+            await task;
         }
     }
 }

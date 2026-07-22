@@ -105,6 +105,28 @@ namespace GW2CraftingHelper
         // thread the post-await continuation resumes on.
         private volatile int _snapshotEpoch;
 
+        // KNOWN-ISSUES 31c-audit (api-F1 follow-up): UTC ticks of the most
+        // recent FAILED background refresh, or 0 if none. api-F1 made a
+        // failed FetchSnapshotAsync throw instead of stamping
+        // _currentSnapshot.CapturedAt with a fresh timestamp - correct
+        // (no more silent data corruption), but that stamping used to be
+        // the only thing making Update()'s staleness gate wait before
+        // retrying. Without this, a persistent failure would re-arm the
+        // gate on every single Update() tick instead of waiting out
+        // RefreshFailureBackoff - see RefreshSnapshotInBackgroundAsync.
+        // long, not DateTime, because C# disallows `volatile` on 64-bit
+        // primitives; Interlocked.Read/Exchange give the same cross-thread
+        // visibility guarantee _refreshInProgress/_snapshotEpoch get from
+        // volatile, without needing a lock.
+        private long _lastFailedRefreshAttemptTicks;
+
+        // KNOWN-ISSUES 31c-audit: minimum wait after a failed background
+        // refresh before RefreshSnapshotInBackgroundAsync is allowed to
+        // auto-retrigger again. Deliberately does NOT gate UserRefreshAsync
+        // (the explicit "Refresh Now" button) - a user-initiated retry
+        // should never be throttled by an earlier automatic failure.
+        private static readonly TimeSpan RefreshFailureBackoff = TimeSpan.FromSeconds(60);
+
         [ImportingConstructor]
         public Module([Import("ModuleParameters")] ModuleParameters moduleParameters) : base(moduleParameters) { }
 
@@ -533,6 +555,21 @@ namespace GW2CraftingHelper
         private async Task RefreshSnapshotInBackgroundAsync()
         {
             if (_refreshInProgress) return;
+
+            // KNOWN-ISSUES 31c-audit: refuse to auto-retrigger again so
+            // soon after a failed attempt - see _lastFailedRefreshAttemptTicks'
+            // own doc comment. Both callers of this method (Update()'s
+            // staleness tick and OnSubtokenUpdated) can otherwise re-fire
+            // far faster than any real transient failure needs to be
+            // retried at.
+            var lastFailedTicks = Interlocked.Read(ref _lastFailedRefreshAttemptTicks);
+            if (lastFailedTicks != 0 &&
+                DateTime.UtcNow - new DateTime(lastFailedTicks, DateTimeKind.Utc) < RefreshFailureBackoff)
+            {
+                Logger.Debug("Skipping snapshot refresh retry - within backoff window after a prior failure");
+                return;
+            }
+
             _refreshInProgress = true;
 
             _refreshCts?.Cancel();
@@ -542,6 +579,7 @@ namespace GW2CraftingHelper
             try
             {
                 var snapshot = await FetchAndSaveSnapshotAsync(_refreshCts.Token);
+                Interlocked.Exchange(ref _lastFailedRefreshAttemptTicks, 0);
                 if (snapshot != null)
                 {
                     var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
@@ -559,6 +597,7 @@ namespace GW2CraftingHelper
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Failed to refresh account snapshot");
+                Interlocked.Exchange(ref _lastFailedRefreshAttemptTicks, DateTime.UtcNow.Ticks);
                 var status = $"Refresh failed \u2014 {DateTime.Now:t}";
                 SaveStatusThreadSafe(status);
             }

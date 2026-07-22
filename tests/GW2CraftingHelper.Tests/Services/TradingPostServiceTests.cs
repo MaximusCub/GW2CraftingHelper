@@ -260,6 +260,68 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(3, result2.Count);
         }
 
+        // KNOWN-ISSUES 31c-audit: the owning caller's cancellation must
+        // never abandon the shared fetch a DIFFERENT, still-live caller is
+        // joined onto. Caller A (owner) is cancelled while the upstream
+        // fetch is still gated; caller B (joiner, never cancelled) must
+        // still see its own price once the gate releases, not inherit A's
+        // OperationCanceledException.
+        [Fact]
+        public async Task ConcurrentCalls_OwnerCancelled_JoinerWithLiveTokenStillSucceeds()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            var gate = new TaskCompletionSource<bool>();
+            api.Gate = gate.Task;
+            var svc = new TradingPostService(api);
+            var ownerCts = new CancellationTokenSource();
+
+            var ownerTask = svc.GetPricesAsync(new[] { 1 }, ownerCts.Token);
+            var joinerTask = svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            ownerCts.Cancel();
+            gate.SetResult(true);
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() => ownerTask);
+            var joinerResult = await joinerTask;
+
+            Assert.Equal(200, joinerResult[1].BuyInstant);
+            Assert.Single(api.Calls); // still just one shared upstream fetch
+        }
+
+        // KNOWN-ISSUES 31c-audit: a joining caller's own cancellation must
+        // be observed - it must not silently ride along on whatever the
+        // owning caller's fetch eventually does. Caller B (joiner) is
+        // cancelled while the upstream fetch is still gated (unreleased);
+        // B must throw promptly on its own token without waiting for the
+        // owner's fetch to finish, and the owner (never cancelled) must
+        // still succeed once the gate is released.
+        [Fact]
+        public async Task ConcurrentCalls_JoinerCancelled_ThrowsPromptlyWithoutAffectingOwner()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            var gate = new TaskCompletionSource<bool>();
+            api.Gate = gate.Task;
+            var svc = new TradingPostService(api);
+            var joinerCts = new CancellationTokenSource();
+
+            var ownerTask = svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+            var joinerTask = svc.GetPricesAsync(new[] { 1 }, joinerCts.Token);
+
+            joinerCts.Cancel();
+
+            // B's own cancellation must surface without the gate ever
+            // being released - proves it did not wait on the owner's task.
+            await Assert.ThrowsAsync<OperationCanceledException>(() => joinerTask);
+
+            gate.SetResult(true);
+            var ownerResult = await ownerTask;
+
+            Assert.Equal(200, ownerResult[1].BuyInstant);
+            Assert.Single(api.Calls); // still just one shared upstream fetch
+        }
+
         // KNOWN-ISSUES api-degradation F2: one bad batch amid otherwise-
         // healthy ones must degrade to missing ids (unpriceable holes
         // downstream) instead of aborting the whole call.
