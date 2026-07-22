@@ -34,6 +34,13 @@ namespace GW2CraftingHelper.Services
             public List<CostLine> CurrencyCostLinesPerBatch;
             public int? DailyCap;
             public int? WeeklyCap;
+
+            // Astral Acclaim package (KNOWN-ISSUES #33): Wizard's Vault
+            // seasonal purchase cap. Independent of DailyCap/WeeklyCap -
+            // see FinalizeVendorBatches, which checks it separately so an
+            // offer carrying both a Seasonal cap and a Daily/Weekly cap can
+            // surface both notices.
+            public int? SeasonalCap;
         }
 
         // Per-item-id (BuyFromVendor stepKey) bookkeeping built up across
@@ -150,7 +157,9 @@ namespace GW2CraftingHelper.Services
         /// DailyCap/WeeklyCap through via <see cref="VendorOfferBatch"/> so
         /// FinalizeVendorBatches can produce that notice once, against the
         /// item's AGGREGATE (post-merge) demand rather than any single tree
-        /// occurrence's local quantity.
+        /// occurrence's local quantity. SeasonalCap (Astral Acclaim package,
+        /// KNOWN-ISSUES #33) is carried through the exact same way and
+        /// checked independently of Daily/Weekly by FinalizeVendorBatches.
         /// </summary>
         internal VendorOfferEvaluation EvaluateVendorOffers(
             RecipeNode node,
@@ -339,7 +348,8 @@ namespace GW2CraftingHelper.Services
                             CoinCostPerBatch = coinCost,
                             CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
                             DailyCap = offer.DailyCap,
-                            WeeklyCap = offer.WeeklyCap
+                            WeeklyCap = offer.WeeklyCap,
+                            SeasonalCap = offer.SeasonalCap
                         };
                     }
                     continue;
@@ -369,7 +379,8 @@ namespace GW2CraftingHelper.Services
                         CoinCostPerBatch = coinCost,
                         CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
                         DailyCap = offer.DailyCap,
-                        WeeklyCap = offer.WeeklyCap
+                        WeeklyCap = offer.WeeklyCap,
+                        SeasonalCap = offer.SeasonalCap
                     };
                 }
             }
@@ -460,8 +471,13 @@ namespace GW2CraftingHelper.Services
         /// directly (see PlanSolver.Collect's BuyFromVendor branch) - and
         /// collects a post-solve "timegated" notice (gw2e parity, M34-B1
         /// #3) for any uniform step whose aggregate purchase count exceeds
-        /// the winning offer's daily (preferred) or weekly cap. Caps never
-        /// exclude an offer or change Source/TotalCost - purely
+        /// the winning offer's daily (preferred) or weekly cap, PLUS an
+        /// independent second notice (Astral Acclaim package, KNOWN-ISSUES
+        /// #33) when that same offer also carries a SeasonalCap the
+        /// aggregate exceeds - the two checks do not suppress each other,
+        /// since Daily/Weekly and Seasonal are unrelated real-world limits
+        /// (e.g. a Wizard's Vault offer's per-season Astral Acclaim cap).
+        /// Caps never exclude an offer or change Source/TotalCost - purely
         /// informational.
         ///
         /// The recomputed step.UnitCost (M34 fix, sibling to B1 #2's
@@ -546,6 +562,28 @@ namespace GW2CraftingHelper.Services
                                 ? TimegatedCapType.Daily
                                 : TimegatedCapType.Weekly,
                             CapValue = cap.Value,
+                            NeededCount = unitsNeeded
+                        });
+                    }
+
+                    // Astral Acclaim package (KNOWN-ISSUES #33): SeasonalCap
+                    // is checked independently of Daily/Weekly above - not
+                    // folded into the same "pick one" cap variable - so an
+                    // offer carrying both a Seasonal cap and a Daily/Weekly
+                    // cap surfaces BOTH notices when both are exceeded,
+                    // rather than one suppressing the other the way Daily
+                    // takes precedence over Weekly. Same warn-only semantics
+                    // (never gates or reroutes the solve) and zero-cap
+                    // convention (an explicit 0 means uncapped) as the
+                    // Daily/Weekly check above.
+                    if (batch.SeasonalCap.HasValue && batch.SeasonalCap.Value > 0 &&
+                        unitsNeeded > batch.SeasonalCap.Value)
+                    {
+                        timegatedItems.Add(new TimegatedItem
+                        {
+                            ItemId = step.ItemId,
+                            CapType = TimegatedCapType.Seasonal,
+                            CapValue = batch.SeasonalCap.Value,
                             NeededCount = unitsNeeded
                         });
                     }

@@ -3,7 +3,14 @@ namespace GW2CraftingHelper.Models
     public enum TimegatedCapType
     {
         Daily,
-        Weekly
+        Weekly,
+
+        // Astral Acclaim package: Wizard's Vault seasonal purchase cap
+        // (resets each Vault season). Independent of Daily/Weekly - an
+        // offer can carry a Seasonal cap alongside either of them, and
+        // both notices are reported when both are exceeded (see
+        // VendorBatchSolver.FinalizeVendorBatches).
+        Seasonal
     }
 
     /// <summary>
