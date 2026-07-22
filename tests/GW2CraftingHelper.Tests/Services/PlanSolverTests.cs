@@ -3191,6 +3191,95 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(plan.TimegatedItems);
         }
 
+        // --- Adversarial review of the M37 mixed-offer Weekly pair above
+        // found the Conflict-suppression parity claim for the KNOWN-ISSUES
+        // #33 SeasonalCap package unverified: FinalizeVendorBatches checks
+        // Seasonal inside the exact same "!state.Conflict" guard as Daily/
+        // Weekly (an implementation coincidence, not a pinned contract), so
+        // nothing failed if that guard were ever hoisted apart for Seasonal
+        // specifically. These two tests mirror the Weekly pair exactly,
+        // substituting seasonalCap for weeklyCap, to pin the same suppress-
+        // on-Conflict behavior for Seasonal. ---
+
+        [Fact]
+        public void MixedOfferSameSeasonalCap_NoticeStillSuppressed_DocumentedLimitation()
+        {
+            // Same bulk-discount-threshold shape as
+            // MixedOfferSameWeeklyCap_NoticeStillSuppressed_DocumentedLimitation
+            // (qty=1 deterministically favors the 1-for-2 offer, qty=100
+            // deterministically favors the 100-for-150 offer - genuine
+            // disagreement, not a tie). Both offers happen to share the
+            // identical SeasonalCap=1, but Conflict (the offer-shape
+            // ratchet) alone still suppresses the notice - same as Weekly.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, Leaf(99, 1), Leaf(99, 100)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    99, new List<VendorOffer>
+                    {
+                        CoinVendorOffer(99, 2, outputCount: 1, seasonalCap: 1),
+                        CoinVendorOffer(99, 150, outputCount: 100, seasonalCap: 1)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy);
+            var plan = result.Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            // Confirms Conflict actually ratcheted true here (matching the
+            // pre-existing Weekly sibling test's own proof for this exact
+            // shape), so the empty-notice assertion below is testing genuine
+            // Conflict suppression, not merely "no cap was ever exceeded".
+            Assert.Equal(0, vendorStep.VendorOfferOutputCount);
+            Assert.Equal(152, vendorStep.TotalCost);
+
+            Assert.Empty(plan.TimegatedItems);
+        }
+
+        [Fact]
+        public void MixedOfferDifferentSeasonalCap_NoticeStillSuppressed_DocumentedLimitation()
+        {
+            // Same bulk-discount-threshold shape as
+            // MixedOfferDifferentWeeklyCap_NoticeStillSuppressed_DocumentedLimitation
+            // (qty=1 favors the 1-for-2 offer, qty=100 favors the
+            // 100-for-150 offer - genuine, deterministic disagreement, not
+            // a tie), but this time the two offers ALSO carry different
+            // SeasonalCap values. Whether or not the raw cap number happens
+            // to match across occurrences, Conflict alone suppresses the
+            // notice - same as Weekly.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(99, 1),
+                    Leaf(99, 100)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    99, new List<VendorOffer>
+                    {
+                        CoinVendorOffer(99, 2, outputCount: 1, seasonalCap: 5),
+                        CoinVendorOffer(99, 150, outputCount: 100, seasonalCap: 999)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy).Plan;
+
+            // Confirms Conflict actually ratcheted true here (matching the
+            // pre-existing Weekly sibling test's own proof for this exact
+            // shape), so the empty-notice assertion below is testing genuine
+            // Conflict suppression, not merely "no cap was ever exceeded".
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(0, vendorStep.VendorOfferOutputCount);
+
+            Assert.Empty(plan.TimegatedItems);
+        }
+
         // --- M37 (KNOWN-ISSUES #26 fix-pass finding): a Quantity == 0 node
         // must never leave a standalone "ghost" step, even when its own
         // resolved Source/stepKey does not match any other occurrence's ---
