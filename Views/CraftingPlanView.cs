@@ -1871,16 +1871,6 @@ namespace GW2CraftingHelper.Views
 
         private async Task TriggerGenerate()
         {
-            // Captured before anything else. Both entry points that reach
-            // TriggerGenerate (the Generate button's Click and the modal
-            // confirm callback wired in OnOwnMaterialsToggled/ModalDialog)
-            // are Blish UI event handlers, so this increment always runs on
-            // the main thread before any await - no lock needed, and every
-            // deferred callback below reads _generateSequence from the main
-            // thread too (inside a MainThreadMarshal.Run callback).
-            int myGen = ++_generateSequence;
-            _statusClosedForCurrentGeneration = false;
-
             // M35 (gw2efficiency parity - multi-item plans): gather every
             // row's selection + quantity into the request list the
             // pipeline needs. Per-row quantity validation mirrors the
@@ -1905,9 +1895,29 @@ namespace GW2CraftingHelper.Views
             var requestItems = ItemRowRequestBuilder.Build(rowInputs);
             if (requestItems.Count == 0)
             {
+                // KNOWN-ISSUES 31a-F2: this no-op validation failure must
+                // NOT consume a generation-sequence slot. Bumping
+                // _generateSequence before this early-return (the previous
+                // behavior) would invalidate an in-flight generation's
+                // guarded button re-enable (myGen != _generateSequence in
+                // its finally below) even though this call never disables
+                // or re-enables the button itself - leaving Generate stuck
+                // disabled. The button-disable/re-enable pairing below only
+                // ever runs once we know a generation will actually start.
                 SetStatus("Select at least one item before generating.");
                 return;
             }
+
+            // Captured only once we know this call will actually run a
+            // generation (past the early-return above). Both entry points
+            // that reach here (the Generate button's Click and the modal
+            // confirm callback wired in OnOwnMaterialsToggled/ModalDialog)
+            // are Blish UI event handlers, so this increment always runs on
+            // the main thread before any await - no lock needed, and every
+            // deferred callback below reads _generateSequence from the main
+            // thread too (inside a MainThreadMarshal.Run callback).
+            int myGen = ++_generateSequence;
+            _statusClosedForCurrentGeneration = false;
 
             _generateButton.Enabled = false;
             _lastDebugLog = null;
