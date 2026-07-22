@@ -37,7 +37,7 @@ namespace VendorOfferUpdater
         /// invent a tier for unrecognized requirement text - a caller
         /// should log and leave the row untagged in that case).
         /// </summary>
-        public static int? ResolveTier(string merchantName, string requirement)
+        public static int? ResolveTier(string? merchantName, string? requirement)
         {
             if (string.IsNullOrEmpty(merchantName) ||
                 merchantName.IndexOf(HomesteadRefinementMarker, StringComparison.Ordinal) < 0)
