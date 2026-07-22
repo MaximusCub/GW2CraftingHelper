@@ -2332,5 +2332,51 @@ namespace GW2CraftingHelper.Tests.Services
                 pipeline.GenerateStructuredAsync(
                     1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy));
         }
+
+        // KNOWN-ISSUES 20.4's "Conservative reading": Ignore (per-solve,
+        // keyed by ItemId, zeroes cost via PlanSolver's ignoredItemIds) and
+        // ownership (InventoryReducer, runs BEFORE Solve, zeroes cost by
+        // reducing node.Quantity) are two independently-evolved mechanisms.
+        // Unlike ResolveWithOverrides_IgnoredItemIds_ZeroesIngredientCost
+        // above (which deliberately tests Ignore alone, "no snapshot"), this
+        // combines both: 3 of 5 needed units are genuinely owned via a real
+        // reduction, and the same ingredient id is then also Ignored on a
+        // later local re-solve.
+        [Fact]
+        public async Task ResolveWithOverrides_IgnoredItemIds_PartiallyOwnedIngredient_ShowsBothOwnedAndIgnored()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi, ingredientCount: 5);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100); // BuyInstant (craft-cost basis) = 100
+
+            // Own 3 of the 5 needed via a real reduction.
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnIngredient(3), CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            Assert.Equal(200, initial.Plan.TotalCoinCost); // (5-3) x 100 = 200, unaffected by Ignore
+            Assert.Equal(3, initial.CraftingTree.Children[0].OwnedQuantityUsed);
+            Assert.False(initial.CraftingTree.Children[0].IsIgnored);
+
+            var resolved = pipeline.ResolveWithOverrides(
+                initial.SolveContext, null, new HashSet<int> { 2 });
+
+            // Ignore zeroes cost outright, same as with no ownership at all -
+            // it does not matter that 3 of the 5 were already owned.
+            Assert.Equal(0, resolved.Plan.TotalCoinCost);
+            Assert.DoesNotContain(resolved.Plan.Steps, s => s.ItemId == 2);
+
+            // Both mechanisms leave their own mark on the same node:
+            // CraftingTreeBuilder.BuildNode sets OwnedQuantityUsed
+            // unconditionally BEFORE its IsIgnored early return, so both
+            // survive on the same CraftingTreeNode simultaneously.
+            var ingredientNode = resolved.CraftingTree.Children[0];
+            Assert.Equal(CraftingDecision.Have, ingredientNode.Decision);
+            Assert.True(ingredientNode.IsIgnored);
+            Assert.Equal(3, ingredientNode.OwnedQuantityUsed);
+
+            // The top-level UsedMaterials list (set once at generation/
+            // reduction time) is untouched by the later Ignore re-solve.
+            Assert.Single(resolved.UsedMaterials);
+            Assert.Equal(3, resolved.UsedMaterials[0].QuantityUsed);
+        }
     }
 }

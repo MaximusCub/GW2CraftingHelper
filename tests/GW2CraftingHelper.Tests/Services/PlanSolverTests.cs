@@ -2533,6 +2533,35 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(500, result.Plan.TotalCoinCost);
         }
 
+        // M38 WP-18 (tests T6, KNOWN-ISSUES 20.4 "Conservative reading"):
+        // ownership (InventoryReducer) runs BEFORE Solve and already
+        // consumed the owned pool by the time a node reaches here - this
+        // node's Quantity=2 stands in for a real reduction's leftover-to-buy
+        // amount (as if 3 of an original 5 were already owned). The Ignore
+        // check keys off node.Id alone and fires before any Quantity-based
+        // cost math (see Evaluate/Collect), so it "skips" the node
+        // identically to the fully-unreduced case above
+        // (IgnoredItemIds_LeafBuyNode_ZeroCostNoStep) - the earlier pool
+        // consumption is not double-counted or treated any differently just
+        // because part of the demand was already satisfied by ownership.
+        [Fact]
+        public void IgnoredItemIds_NodeAlreadyReducedByPartialOwnership_StillZeroCostNoStep()
+        {
+            var tree = Leaf(1, 2);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(
+                tree, prices, null, PriceBasis.InstantBuy, null, null,
+                ignoredItemIds: new HashSet<int> { 1 });
+
+            Assert.Empty(result.Plan.Steps);
+            Assert.Equal(0, result.Plan.TotalCoinCost);
+        }
+
         // --- M35-B1: synthetic multi-item wrapper root (gw2e parity) ---
         // WrapperOf lives in Helpers/RecipeNodeBuilders.cs.
 
