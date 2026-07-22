@@ -2388,6 +2388,26 @@ purchase cap` remain fully unseeded and unmodeled - the module still has
 no account/character concept at all - left for a future milestone's own
 design pass, unchanged from item 28's original note.
 
+**Runtime consumption wired (follow-up package, AA P2 runtime half)**: the
+"deliberately NOT wired" note above is now superseded. `TimegatedCapType`
+(`Models/TimegatedItem.cs`) gained a `Seasonal` member, and
+`VendorBatchSolver.FinalizeVendorBatches` now checks `SeasonalCap`
+independently of Daily/Weekly (not folded into the same "pick one" cap
+variable), so an offer carrying both a Seasonal cap and a Daily/Weekly cap
+surfaces BOTH notices when both are exceeded - mirroring the existing
+Daily/Weekly warn-only semantics exactly (never gates or reroutes the
+solve; an explicit 0 still means uncapped). `PlanViewModelBuilder`'s
+notice wording gained a third branch: `"{Item} is timegated - Season
+limit: N (plan needs M)"` (the noun "Season", matching gw2e's own
+Wizard's Vault wording, not the adjective "Seasonal"). Covered in
+`PlanSolverTests` (exceeds cap, within cap, zero-cap-is-uncapped,
+Seasonal+Weekly both-reported, and a cap-never-changes-decisions
+regression guard - including one case through the real currency-
+valuation comparable-tier path, since live Wizard's Vault offers are
+priced in unvalued Astral Acclaim and are only ever selected when the
+user supplies a `CurrencyValuation` for it) and `PlanViewModelBuilderTests`
+(Season wording). No seed data changes.
+
 ## 34. Dead live-wiki vendor-offer resolver removed (M38 WP-10)
 `Services/VendorOfferResolver.cs` (a rate-limited, retrying, concurrency-
 bounded live wiki-lookup client), `Services/IWikiVendorClient.cs`,
