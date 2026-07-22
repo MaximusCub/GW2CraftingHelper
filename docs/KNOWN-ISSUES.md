@@ -1384,7 +1384,7 @@ top-level deltas is attributable to live TP price movement between the
 two separate live API calls, not a solver artifact). Exordium
 (`--profile 2 --dump-tree`) confirmed byte-identical with and without
 `--homestead-tier`, matching the report's own BFS finding that Exordium
-has zero Homestead reachability. The full 869-test GW2CraftingHelper.Tests
+has zero Homestead reachability. The full 870-test GW2CraftingHelper.Tests
 suite and 107-test VendorOfferUpdater.Tests suite pass unmodified plus
 the new tests above.
 
