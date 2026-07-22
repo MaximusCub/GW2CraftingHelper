@@ -55,9 +55,21 @@ namespace GW2CraftingHelper.Services
 
         public Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
         {
+            // Membership check, not a bare sign check: a negative recipeId
+            // is Mystic Forge ONLY if MysticForgeRecipeData actually
+            // recognizes it. Other negative-id synthetic recipes (e.g. the
+            // M37 achievement/merchant seed recipes, ref/recipes_seed.json
+            // ids -1592..-1595, adjacent to but not part of the Mystic
+            // Forge id range) are NOT Mystic Forge recipes and must fall
+            // through to primary instead of being silently swallowed as a
+            // false "not found" from mfData alone.
             if (recipeId < 0)
             {
-                return Task.FromResult(_mfData.GetRecipe(recipeId));
+                var mfRecipe = _mfData.GetRecipe(recipeId);
+                if (mfRecipe != null)
+                {
+                    return Task.FromResult(mfRecipe);
+                }
             }
 
             return _primary.GetRecipeAsync(recipeId, ct);

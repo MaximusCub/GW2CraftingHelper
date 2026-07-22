@@ -21,7 +21,8 @@ namespace GW2CraftingHelper.Tests.Services
         private static CraftingTreeNode Node(
             CraftingDecision decision,
             bool canCraft = false, bool canBuyTp = false, bool canBuyVendor = false,
-            string acquisitionBadge = null, int ownedQuantityUsed = 0, bool isIgnored = false)
+            string acquisitionBadge = null, int ownedQuantityUsed = 0, bool isIgnored = false,
+            bool isAchievementBitDeduped = false)
         {
             return new CraftingTreeNode
             {
@@ -35,7 +36,8 @@ namespace GW2CraftingHelper.Tests.Services
                 CanBuyVendor = canBuyVendor,
                 AcquisitionBadge = acquisitionBadge,
                 OwnedQuantityUsed = ownedQuantityUsed,
-                IsIgnored = isIgnored
+                IsIgnored = isIgnored,
+                IsAchievementBitDeduped = isAchievementBitDeduped
             };
         }
 
@@ -76,6 +78,38 @@ namespace GW2CraftingHelper.Tests.Services
             var ignorePill = specs.Single(s => s.Kind == PillKind.Ignore);
             Assert.Equal("IGNORED", ignorePill.Text);
             Assert.Null(ignorePill.Source); // toggled via node identity, not an AcquisitionSource
+        }
+
+        // ---- M37 (KNOWN-ISSUES #26): achievement-bit dedup pill ----
+
+        [Fact]
+        public void Have_AchievementBitDeduped_SingleCountedElsewherePill_NoPlainHave()
+        {
+            // Unlike Ignore, the dedup pill REPLACES HAVE entirely (Section
+            // 4.3 of the research report - "a single non-interactive
+            // pill") since nothing here is actually owned.
+            var node = Node(CraftingDecision.Have, isAchievementBitDeduped: true);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("COUNTED ELSEWHERE", specs[0].Text);
+            Assert.Equal(PillKind.AchievementBitDeduped, specs[0].Kind);
+            Assert.Null(specs[0].Source);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Have);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Ignore);
+        }
+
+        [Fact]
+        public void Have_NotAchievementBitDeduped_PlainHaveUnaffected()
+        {
+            // Regression: the new check must not change the plain HAVE case
+            // (the overwhelming majority - every existing seed row).
+            var node = Node(CraftingDecision.Have, isAchievementBitDeduped: false);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("HAVE", specs[0].Text);
+            Assert.Equal(PillKind.Have, specs[0].Kind);
         }
 
         [Fact]

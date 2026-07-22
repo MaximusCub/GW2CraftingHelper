@@ -4119,6 +4119,13 @@ namespace GW2CraftingHelper.Views
                     border = isIgnoreActive ? new Color(229, 168, 60) : new Color(138, 138, 138); // #E5A83C / #8A8A8A
                     fill = isIgnoreActive ? border * 0.15f : Color.Transparent;
                     break;
+                case PillKind.AchievementBitDeduped:
+                    // Muted violet - distinct from Have's blue and
+                    // OwnedInfo's gold: nothing here is actually owned, just
+                    // already required elsewhere (M37, KNOWN-ISSUES #26).
+                    border = new Color(155, 118, 219); // #9B76DB
+                    fill = border * 0.15f;
+                    break;
                 case PillKind.Locked:
                 default:
                     border = new Color(107, 107, 107); // #6B6B6B
