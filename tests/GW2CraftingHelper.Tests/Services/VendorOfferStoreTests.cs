@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
@@ -267,6 +268,96 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.False(store.HasAnyOffer(100));
             Assert.True(store.HasAnyOffer(200));
+        }
+
+        // --- M37 (KNOWN-ISSUES #24): shipped Homestead Refinement tier
+        // data invariant. PlanSolver.EvaluateVendorOffers admits any offer
+        // whose HomesteadTier is null at every configured tier setting -
+        // correct for the 21 one-time "Upgrade" purchase rows the same
+        // three merchant pages also sell, but WRONG for a material-
+        // conversion row, which would then silently reintroduce the
+        // pre-M37 always-max-tier defect PR #57 fixed. The solver has no
+        // independent way to catch a mistagged row - this test is the
+        // only defense against a future wiki re-scrape shipping one, since
+        // otherwise the only existing check is a dev-time console warning
+        // in tools/VendorOfferUpdater/Program.cs. Loads the REAL shipped
+        // ref/vendor_offers.json through the production VendorOfferLoader,
+        // following the FindRepoFile convention established in
+        // AcquisitionHintServiceTests.
+        [Fact]
+        public void ShippedSeedFile_HomesteadRefinementMaterialRows_AllHaveNonNullTierInRange()
+        {
+            string path = FindRepoFile(Path.Combine("ref", "vendor_offers.json"));
+            Assert.False(
+                string.IsNullOrEmpty(path),
+                "Could not locate ref/vendor_offers.json by walking up from the test assembly's directory.");
+
+            using (var stream = File.OpenRead(path))
+            {
+                var dataset = _loader.Load(stream);
+
+                var homesteadOffers = dataset.Offers
+                    .Where(o => !string.IsNullOrEmpty(o.MerchantName) &&
+                                o.MerchantName.Contains("Homestead Refinement"))
+                    .ToList();
+
+                var materialRows = homesteadOffers
+                    .Where(o => Gw2Constants.HomesteadRefinementMaterialIds.Contains(o.OutputItemId))
+                    .ToList();
+                var nonMaterialRows = homesteadOffers
+                    .Where(o => !Gw2Constants.HomesteadRefinementMaterialIds.Contains(o.OutputItemId))
+                    .ToList();
+
+                // Exact-count trip-wires (this repo's established seed-pin
+                // style): any change to these numbers means a wiki
+                // re-scrape altered the shipped Homestead Refinement rows
+                // and warrants a manual look before this test is updated.
+                Assert.Equal(237, homesteadOffers.Count);
+                Assert.Equal(216, materialRows.Count);
+                Assert.Equal(21, nonMaterialRows.Count);
+
+                foreach (var offer in materialRows)
+                {
+                    Assert.True(
+                        offer.HomesteadTier.HasValue,
+                        $"Homestead Refinement material-conversion offer '{offer.OfferId}' " +
+                        $"(output item {offer.OutputItemId}) has a null HomesteadTier. " +
+                        "PlanSolver.EvaluateVendorOffers admits a null-tier offer at every " +
+                        "configured tier by design (that is correct for the 21 one-time " +
+                        "Upgrade-purchase rows, not for a material conversion row), so this " +
+                        "would silently reintroduce the always-max-tier defect PR #57 fixed.");
+                    Assert.InRange(offer.HomesteadTier.Value, 0, 2);
+                }
+
+                // The 21 non-material rows are expected to be null-tier
+                // (one-time Upgrade purchases are tier-independent by
+                // design) - documented here so this test also notices if
+                // that population unexpectedly starts carrying tiers.
+                Assert.All(nonMaterialRows, o => Assert.Null(o.HomesteadTier));
+            }
+        }
+
+        /// <summary>
+        /// Walks up from the running test assembly's directory looking for
+        /// relativePath, so this test finds the repo's ref/ folder
+        /// regardless of build configuration (Debug/Release) or platform
+        /// subfolder depth. Returns null if not found within a reasonable
+        /// number of levels, rather than throwing or scanning unrelated
+        /// directories.
+        /// </summary>
+        private static string FindRepoFile(string relativePath)
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (int i = 0; dir != null && i < 12; i++)
+            {
+                string candidate = Path.Combine(dir.FullName, relativePath);
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+                dir = dir.Parent;
+            }
+            return null;
         }
     }
 }

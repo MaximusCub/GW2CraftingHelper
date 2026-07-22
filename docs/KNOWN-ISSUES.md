@@ -1388,6 +1388,13 @@ has zero Homestead reachability. The full 870-test GW2CraftingHelper.Tests
 suite and 107-test VendorOfferUpdater.Tests suite pass unmodified plus
 the new tests above.
 
+M37 follow-up (delta-audit MustFix, tests-only): the shipped-data and
+runtime invariants this fix depends on are now pinned by
+`ShippedSeedFile_HomesteadRefinementMaterialRows_AllHaveNonNullTierInRange`
+(`VendorOfferStoreTests`, real `ref/vendor_offers.json`) and
+`NullHomesteadTier_OnMaterialOutput_IsAdmittedRegardlessOfConfiguredTier`
+(`PlanSolverTests`).
+
 ## 25. Multi-item sell-side economics (parity gap, deliberate M35 gap) (FIXED in M37)
 M35 left SellableQuantity/NetSaleValue/CraftingProfit unset for batches
 (documented in GenerateStructuredMultiAsync). gw2e's multi mode shows a
