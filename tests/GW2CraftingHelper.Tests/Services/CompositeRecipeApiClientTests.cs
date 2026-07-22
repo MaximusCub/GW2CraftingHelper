@@ -196,8 +196,17 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task GetRecipe_NegativeIdNotInMf_ReturnsNullWithoutCallingPrimary()
+        public async Task GetRecipe_NegativeIdNotInMf_FallsThroughToPrimary()
         {
+            // Adversarial-review fix-pass: a negative recipeId is Mystic
+            // Forge only if MysticForgeRecipeData actually recognizes it -
+            // otherwise it must fall through to primary rather than being
+            // silently swallowed as "not found" purely because it is
+            // negative. Guards against a real id-space collision: the M37
+            // achievement/merchant seed recipes use negative ids (-1592..
+            // -1595) adjacent to, but not part of, the Mystic Forge range,
+            // and were previously never given a chance at primary on a
+            // cache miss.
             var recorder = new RecordingRecipeApiClient();
             var mfData = LoadMfData(TwoMfRecipesJson);
 
@@ -205,7 +214,7 @@ namespace GW2CraftingHelper.Tests.Services
             var recipe = await composite.GetRecipeAsync(-999, CancellationToken.None);
 
             Assert.Null(recipe);
-            Assert.False(recorder.GetRecipeCalled, "Primary should not be called for negative IDs");
+            Assert.True(recorder.GetRecipeCalled, "Primary should be tried when a negative ID is not a recognized Mystic Forge recipe");
         }
     }
 }

@@ -6,6 +6,31 @@ namespace GW2CraftingHelper.Services
 {
     public class PlanResultBuilder
     {
+        // Disciplines that are informational source tags, not real,
+        // player-levelable GW2 crafting disciplines: a recipe carrying one
+        // of these is inherently available whenever its ingredients are,
+        // with no "learn this recipe" unlock concept at all (mirrors the
+        // pre-existing Mystic Forge treatment below).
+        private static readonly HashSet<string> InherentlyAvailableDisciplines =
+            new HashSet<string> { "MysticForge", "Achievement", "Merchant" };
+
+        // M37 fix-pass (adversarial review finding): "Achievement"/
+        // "Merchant" are gw2e-borrowed informational tags on the new
+        // achievement-bit seed recipes (ref/recipes_seed.json ids
+        // -1592..-1595) - not real GW2 crafting disciplines the player can
+        // select or level. This module otherwise models vendor purchases
+        // via ref/vendor_offers.json, never as a discipline (see
+        // docs/KNOWN-ISSUES.md #26). Filtered out of Required Disciplines
+        // below so the player is never told to "level" a discipline that
+        // does not exist; RequiredRecipes' own per-recipe Disciplines field
+        // is left untouched (accurate, informational metadata about that
+        // specific recipe's real source). MysticForge intentionally stays
+        // OUT of this narrower set - it already shows in Required
+        // Disciplines today (pre-existing, out-of-scope behavior) and
+        // gw2efficiency itself surfaces "Mystic Forge" the same way.
+        private static readonly HashSet<string> NonCraftingDisciplines =
+            new HashSet<string> { "Achievement", "Merchant" };
+
         public CraftingPlanResult Build(
             CraftingPlan plan,
             RecipeNode treeUsedForSolve,
@@ -76,10 +101,25 @@ namespace GW2CraftingHelper.Services
                     continue;
                 }
                 var option = FindRecipeOption(treeUsedForSolve, step.RecipeId);
-                if (option != null && option.Disciplines.Count > 0)
+                if (option == null)
                 {
-                    stepOptions.Add(option);
+                    continue;
                 }
+
+                var realDisciplines = option.Disciplines
+                    .Where(d => !NonCraftingDisciplines.Contains(d))
+                    .ToList();
+                if (realDisciplines.Count == 0)
+                {
+                    continue;
+                }
+
+                stepOptions.Add(new RecipeOption
+                {
+                    RecipeId = option.RecipeId,
+                    Disciplines = realDisciplines,
+                    MinRating = option.MinRating
+                });
             }
 
             // Pass 1: single-discipline recipes (must-use)
@@ -193,9 +233,16 @@ namespace GW2CraftingHelper.Services
 
                 bool isAutoLearned = option.Flags.Contains("AutoLearned");
                 bool? isMissing;
-                if (IsMysticForgeRecipeId(step.RecipeId))
+                if (option.Disciplines.Any(d => InherentlyAvailableDisciplines.Contains(d)))
                 {
-                    // Mystic Forge recipes are inherently available - no unlock needed
+                    // Membership check on the recipe's own declared
+                    // Disciplines, not a bare "recipeId < 0" sign check
+                    // (adversarial review finding: the M37 achievement/
+                    // merchant seed recipes also use negative ids, adjacent
+                    // to but distinct from the Mystic Forge id range, so a
+                    // sign check alone cannot tell them apart). Mystic
+                    // Forge/Achievement/Merchant recipes are all inherently
+                    // available - no unlock needed.
                     isMissing = false;
                 }
                 else
@@ -244,11 +291,6 @@ namespace GW2CraftingHelper.Services
                 RequiredRecipes = requiredRecipes,
                 DebugLog = debugLog
             };
-        }
-
-        private static bool IsMysticForgeRecipeId(int recipeId)
-        {
-            return recipeId < 0;
         }
 
         private static RecipeOption FindRecipeOption(RecipeNode node, int recipeId)

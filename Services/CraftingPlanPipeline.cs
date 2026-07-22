@@ -76,6 +76,14 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Build recipe tree: {sw.ElapsedMilliseconds}ms");
 
+            // M37 (KNOWN-ISSUES #26): pure correctness fix, always applied
+            // (no settings toggle) - a no-op whenever the tree has no
+            // achievement-bit ingredients at all (every existing seed row).
+            // Must run before anything below reads item ids/quantities from
+            // the tree - see AchievementBitDedupPrePass's own doc comment
+            // for why it runs BEFORE inventory reduction too.
+            AchievementBitDedupPrePass.Apply(tree);
+
             // Step 2: Collect all item IDs from the tree for price lookup
             progress?.Report(new PlanStatus { Message = "Collecting item IDs..." });
             sw.Restart();
@@ -239,6 +247,14 @@ namespace GW2CraftingHelper.Services
             }
             sw.Stop();
             timingLog.Add($"Build recipe tree: {sw.ElapsedMilliseconds}ms");
+
+            // M37 (KNOWN-ISSUES #26): pure correctness fix, always applied
+            // (no settings toggle) - a no-op whenever the tree has no
+            // achievement-bit ingredients at all (every existing seed row).
+            // Runs BEFORE inventory reduction (Step 6) and the force-buy
+            // pre-pass's own zero-owned-baseline solve below - see
+            // AchievementBitDedupPrePass's own doc comment for why.
+            AchievementBitDedupPrePass.Apply(tree);
 
             // Step 2: Collect all item IDs from the tree for price lookup
             progress?.Report(new PlanStatus { Message = "Collecting item IDs..." });
@@ -610,6 +626,15 @@ namespace GW2CraftingHelper.Services
             }
             sw.Stop();
             timingLog.Add($"Build recipe trees: {sw.ElapsedMilliseconds}ms ({items.Count} items)");
+
+            // M37 (KNOWN-ISSUES #26): same unconditional pre-pass as the
+            // single-item path, applied to the whole wrapper tree at once -
+            // an achievement-bit ingredient nested under one requested item
+            // can coexist with a plain occurrence of the same id under a
+            // DIFFERENT requested item, which only the merged wrapper tree
+            // can see (see the class's own doc comment and
+            // MultiItemPlanTests' dedicated coverage of exactly this case).
+            AchievementBitDedupPrePass.Apply(tree);
 
             // Step 2: Collect all item IDs from the tree for price lookup
             progress?.Report(new PlanStatus { Message = "Collecting item IDs..." });

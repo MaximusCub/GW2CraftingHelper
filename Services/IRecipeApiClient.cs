@@ -9,6 +9,18 @@ namespace GW2CraftingHelper.Services
         public string Type { get; set; }
         public int Id { get; set; }
         public int Count { get; set; }
+
+        // M37 (KNOWN-ISSUES #26, gw2e parity - achievement-bit ingredient
+        // dedup): mirrors gw2efficiency's own achievement_id/achievement_bit
+        // ingredient fields exactly (docs/research/m37-r3-achievement-dedup.md
+        // Section 1.0/4.1). Null for every existing seed row (JSON-absent =
+        // ordinary ingredient, fully backward compatible). Only
+        // AchievementBit drives the dedup mechanism (AchievementBitDedupPrePass) -
+        // AchievementId is carried alongside purely because it is present on
+        // the same upstream ingredient objects and costs nothing extra to
+        // keep; it is never read by the dedup logic itself.
+        public int? AchievementId { get; set; }
+        public int? AchievementBit { get; set; }
     }
 
     public class RawRecipe
@@ -31,6 +43,17 @@ namespace GW2CraftingHelper.Services
         public List<string> Disciplines { get; set; } = new List<string>();
         public int MinRating { get; set; }
         public List<string> Flags { get; set; } = new List<string>();
+
+        // M37 (KNOWN-ISSUES #26): recipe-level achievement_id, mirroring
+        // gw2efficiency's own custom-recipes field (marks the RECIPE itself
+        // as achievement-gated - e.g. a collection reward). Informational
+        // only: NOT read by AchievementBitDedupPrePass, which keys purely on
+        // ingredient-level RawIngredient.AchievementBit. Added now, populated
+        // for the M37 achievement-recipe seed additions, so a future task
+        // surfacing "this recipe is achievement-gated" does not need a
+        // second schema migration (m37-r3-achievement-dedup.md Section 6,
+        // open question 5).
+        public int? AchievementId { get; set; }
     }
 
     public interface IRecipeApiClient

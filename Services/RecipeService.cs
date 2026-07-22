@@ -275,13 +275,20 @@ namespace GW2CraftingHelper.Services
 
         private async Task<RecipeNode> BuildNodeAsync(
             int id, string ingredientType, int quantity,
-            HashSet<int> visiting, CancellationToken ct)
+            HashSet<int> visiting, CancellationToken ct,
+            // M37 (KNOWN-ISSUES #26): carried straight from the parent
+            // RawIngredient that produced this node - null for the tree
+            // root (never itself an ingredient) and for every ordinary
+            // ingredient. See RecipeNode.AchievementBit's doc comment.
+            int? achievementId = null, int? achievementBit = null)
         {
             var node = new RecipeNode
             {
                 Id = id,
                 IngredientType = ingredientType,
-                Quantity = quantity
+                Quantity = quantity,
+                AchievementId = achievementId,
+                AchievementBit = achievementBit
             };
 
             if (!string.IsNullOrEmpty(ingredientType) && ingredientType != "Item")
@@ -353,7 +360,7 @@ namespace GW2CraftingHelper.Services
                         int ingredientQuantity = craftsNeeded * ingredient.Count;
                         var childNode = await BuildNodeAsync(
                             ingredient.Id, ingredient.Type, ingredientQuantity,
-                            visiting, ct);
+                            visiting, ct, ingredient.AchievementId, ingredient.AchievementBit);
                         option.Ingredients.Add(childNode);
                     }
 

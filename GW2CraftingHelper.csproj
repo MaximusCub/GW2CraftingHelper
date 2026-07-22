@@ -131,6 +131,7 @@
     <Compile Include="Services\AccountCurrencyIndex.cs" />
     <Compile Include="Services\InventoryReducer.cs" />
     <Compile Include="Services\OwnedMaterialsForceBuyPrePass.cs" />
+    <Compile Include="Services\AchievementBitDedupPrePass.cs" />
     <Compile Include="Services\RecipeNodeIds.cs" />
     <Compile Include="Models\RequiredDiscipline.cs" />
     <Compile Include="Models\RequiredRecipe.cs" />

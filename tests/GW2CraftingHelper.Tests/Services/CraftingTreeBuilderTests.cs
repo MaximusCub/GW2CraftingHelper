@@ -294,6 +294,35 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(treeNode.IsReferenceBranch);
             Assert.Empty(treeNode.Children);
             Assert.False(treeNode.IsIgnored); // genuine ownership, not the M34-B2b Ignore toggle
+            Assert.False(treeNode.IsAchievementBitDeduped); // genuine ownership, not the M37 dedup flag
+        }
+
+        // ---- M37 (KNOWN-ISSUES #26): achievement-bit dedup collapses to Have + IsAchievementBitDeduped ----
+
+        [Fact]
+        public void AchievementBitDedupedNode_CollapsesToHave_SetsFlag()
+        {
+            // Mirrors AchievementBitDedupPrePass's own contract: a deduped
+            // occurrence has Quantity == 0 and IsAchievementBitDeduped ==
+            // true set directly on the RecipeNode (no NodeId/decisions
+            // lookup involved at all - matches how genuine ownership's
+            // Quantity == 0 short-circuit works above).
+            var node = Leaf(1, 0);
+            node.NodeId = 0;
+            node.AchievementId = 8493;
+            node.AchievementBit = 0;
+            node.IsAchievementBitDeduped = true;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta((1, "Pile of Recycled Trebuchets", "pile.png"));
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.Have, treeNode.Decision);
+            Assert.Equal(0, treeNode.Quantity);
+            Assert.True(treeNode.IsAchievementBitDeduped);
+            Assert.False(treeNode.IsIgnored);
+            Assert.Empty(treeNode.Children);
         }
 
         // ---- M34-B2b: manually "Ignore"-d items collapse to Have + IsIgnored ----
