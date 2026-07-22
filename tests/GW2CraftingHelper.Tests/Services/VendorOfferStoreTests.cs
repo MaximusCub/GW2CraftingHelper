@@ -359,7 +359,12 @@ namespace GW2CraftingHelper.Tests.Services
                 var dataset = _loader.Load(stream);
 
                 Assert.Equal(1, dataset.SchemaVersion);
-                Assert.Equal(53529, dataset.Offers.Count);
+                // Astral Acclaim package (KNOWN-ISSUES #28): a scoped
+                // Wizard's Vault re-scrape (--query + --merge-into) net
+                // added 7 offers (100 removed/replaced, 107 added) while
+                // seeding SeasonalCap - see the package's commit for the
+                // full accounting.
+                Assert.Equal(53536, dataset.Offers.Count);
 
                 Assert.All(dataset.Offers, o =>
                 {
