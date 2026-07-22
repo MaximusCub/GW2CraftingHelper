@@ -576,8 +576,10 @@ namespace GW2CraftingHelper.Services
         /// so none of that logic needed to change.
         ///
         /// M37 (gw2efficiency parity - multi-item sell-side economics,
-        /// closes KNOWN-ISSUES #25): calls ApplyBatchSellSideEconomics
-        /// below to populate SellableQuantity/NetSaleValue/CraftingProfit/
+        /// closes KNOWN-ISSUES #25): calls
+        /// SellSideEconomics.ApplyBatchSellSideEconomics
+        /// (Services/SellSideEconomics.cs) to populate
+        /// SellableQuantity/NetSaleValue/CraftingProfit/
         /// MaterialOpportunityCost as a sum across every requested root
         /// that has a live TP sell price - see that method's own doc
         /// comment for the exact aggregation and its deliberate

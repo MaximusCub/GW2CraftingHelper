@@ -601,13 +601,15 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// EvaluateVendorOffers' result (WP-11, simplify #4 - was 7
         /// out-params). Pure data carrier, mirrors the M37
-        /// CraftingPlanPipeline.PerItemEconomics pattern: a private
-        /// readonly struct returned by value from a single call site
-        /// instead of mutated out-parameters. Field meanings are
-        /// exactly the former out-params of the same name (see
-        /// EvaluateVendorOffers' own doc comment for the comparable/
-        /// fallback split, valuation rules, and cap-notice plumbing this
-        /// carries) - this is a shape change only, not a behavior change.
+        /// SellSideEconomics.PerItemEconomics pattern: a readonly struct
+        /// returned by value from a single call site instead of mutated
+        /// out-parameters (kept private here, unlike PerItemEconomics,
+        /// since this struct has no callers outside EvaluateVendorOffers).
+        /// Field meanings are exactly the former out-params of the same
+        /// name (see EvaluateVendorOffers' own doc comment for the
+        /// comparable/fallback split, valuation rules, and cap-notice
+        /// plumbing this carries) - this is a shape change only, not a
+        /// behavior change.
         /// </summary>
         private readonly struct VendorOfferEvaluation
         {

@@ -16,9 +16,9 @@ namespace GW2CraftingHelper.Services
     /// directly unit-testable; CraftingPlanPipeline calls these statics in
     /// place of the methods it used to own.
     /// </summary>
-    public static class SellSideEconomics
+    internal static class SellSideEconomics
     {
-        public static void ApplySellSideEconomics(
+        internal static void ApplySellSideEconomics(
             CraftingPlanResult result,
             RecipeNode treeUsedForSolve,
             SolveResult solveResult,
@@ -99,7 +99,7 @@ namespace GW2CraftingHelper.Services
         /// uses it, to attribute each item's own fair share of a batch's
         /// (possibly materials-shared) total cost.
         /// </summary>
-        public struct PerItemEconomics
+        internal struct PerItemEconomics
         {
             public int SellableQuantity;
             public long? NetSaleValue;
@@ -107,7 +107,7 @@ namespace GW2CraftingHelper.Services
             public long ItemCraftCost;
         }
 
-        public static PerItemEconomics ComputePerItemEconomics(
+        internal static PerItemEconomics ComputePerItemEconomics(
             RecipeNode itemRoot,
             int itemId,
             int requestedQuantity,
@@ -169,7 +169,7 @@ namespace GW2CraftingHelper.Services
         /// otherwise a sum where an unsellable material contributes 0
         /// rather than being excluded.
         /// </summary>
-        public static long? ComputeMaterialOpportunityCost(
+        internal static long? ComputeMaterialOpportunityCost(
             List<UsedMaterial> usedMaterials,
             IReadOnlyDictionary<int, ItemPrice> prices,
             OwnMaterialsMode ownMaterialsMode)
@@ -257,7 +257,7 @@ namespace GW2CraftingHelper.Services
         /// so it is intentional, not a new gap - see
         /// MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostIsWholeTreeSum.
         /// </summary>
-        public static void ApplyBatchSellSideEconomics(
+        internal static void ApplyBatchSellSideEconomics(
             CraftingPlanResult result,
             RecipeNode wrapperTree,
             SolveResult solveResult,

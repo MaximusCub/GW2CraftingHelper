@@ -1415,7 +1415,7 @@ re-fetched live from the app bundle 2026-07-21 since the earlier M34
 report referenced above was lost). Mechanism:
 - Extracted the M20 single-item per-item arithmetic (over-production
   bump, sell-price lookup, own-materials opportunity cost) out of
-  `CraftingPlanPipeline.ApplySellSideEconomics` into two pure helpers -
+  `SellSideEconomics.ApplySellSideEconomics` into two pure helpers -
   `ComputePerItemEconomics` (one requested root's own
   SellableQuantity/NetSaleValue/TargetUnitSellPrice/ItemCraftCost -
   correction, M37 item 26 fix-pass: the `PerItemEconomics` struct has no
@@ -1431,7 +1431,7 @@ report referenced above was lost). Mechanism:
   `MultiItemPlanTests.GenerateStructuredAsync_SingleEntryList_MatchesLegacySingleItemCall`
   assertion comparing every economics field between the direct
   single-item call and the list-of-one entry point.
-- New `CraftingPlanPipeline.ApplyBatchSellSideEconomics`: calls
+- New `SellSideEconomics.ApplyBatchSellSideEconomics`: calls
   `ComputePerItemEconomics` once per requested root (paired by index
   with the wrapper recipe's own `Ingredients`, both built in request
   order by `RecipeService.BuildMultiItemTreeAsync`), then sums the

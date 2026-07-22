@@ -42,11 +42,12 @@ namespace GW2CraftingHelper.Models
         // informational line appended to the Summary/Total Cost section
         // ONLY for a genuine multi-item batch (2+ requested items). M37
         // (KNOWN-ISSUES #25) added a real batch-level Sell value/Profit
-        // rollup - see CraftingPlanPipeline.ApplyBatchSellSideEconomics
+        // rollup - see SellSideEconomics.ApplyBatchSellSideEconomics
         // and PlanViewModelBuilder.BuildSummarySection - and reworded
         // this note's Label text to describe it. The rollup has NO
-        // craft-vs-buy filter at all (ApplyBatchSellSideEconomics' own
-        // doc comment, divergence item 1): a bought-but-tradable root
+        // craft-vs-buy filter at all
+        // (SellSideEconomics.ApplyBatchSellSideEconomics' own doc comment,
+        // divergence item 1): a bought-but-tradable root
         // with a live sell price still contributes to the sum. The
         // Label text is therefore deliberately NOT gw2e's own verbatim
         // Cost Breakdown banner ("Profit numbers are the sum of all
