@@ -1,0 +1,269 @@
+using System.Collections.Generic;
+using System.Linq;
+using GW2CraftingHelper.Models;
+using GW2CraftingHelper.Services;
+using Xunit;
+using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
+using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
+
+namespace GW2CraftingHelper.Tests.Services
+{
+    public class PlanSolverPriceBasisAndOverrideTests
+    {
+        // --- Price basis tests ---
+
+        [Fact]
+        public void BuyOrderBasis_UsesBuyOrderPrice()
+        {
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 60 } }
+            };
+            var solver = new PlanSolver();
+
+            var instant = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.InstantBuy).Plan;
+            var order = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.BuyOrder).Plan;
+
+            Assert.Equal(200, instant.TotalCoinCost);
+            Assert.Equal(120, order.TotalCoinCost);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_NoBuyOrders_ItemNotPriceable()
+        {
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(Leaf(1, 1), prices, null, PriceBasis.BuyOrder).Plan;
+
+            Assert.Equal(AcquisitionSource.UnknownSource, plan.Steps[0].Source);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_CanFlipBuyVsCraftDecision()
+        {
+            // Output: instant 100 / order 90. Craft from 2x ingredient:
+            // instant 2x60=120 (buy wins), order 2x30=60 (craft wins).
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 90 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 60, SellInstant = 30 } }
+            };
+            var solver = new PlanSolver();
+
+            var instant = solver.Solve(
+                Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2))), prices, null,
+                PriceBasis.InstantBuy).Plan;
+            var order = solver.Solve(
+                Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2))), prices, null,
+                PriceBasis.BuyOrder).Plan;
+
+            Assert.Single(instant.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, instant.Steps[0].Source);
+            Assert.Contains(order.Steps, s => s.Source == AcquisitionSource.Craft);
+            Assert.Equal(60, order.TotalCoinCost);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_VendorItemBarter_PricedAtBasis()
+        {
+            // Offer: 5x item 42. Instant 10 -> 50; order 4 -> 20.
+            var offer = new VendorOffer
+            {
+                OfferId = "test-barter-basis",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Item", Id = 42, Count = 5 }
+                },
+                MerchantName = "Barter Vendor",
+                Locations = new List<string>()
+            };
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200, SellInstant = 100 } },
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10, SellInstant = 4 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var order = solver.Solve(Leaf(1, 1), prices, vendorOffers, PriceBasis.BuyOrder).Plan;
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, order.Steps[0].Source);
+            Assert.Equal(20, order.TotalCoinCost);
+        }
+
+        // --- Per-node override tests ---
+
+        [Fact]
+        public void Override_ForcesBuyOverCheaperCraft()
+        {
+            // Craft = 60 beats buy = 100; user forces buy on the root.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+            };
+            var solver = new PlanSolver();
+
+            var baseline = solver.Solve(tree, prices, null);
+            int rootNodeId = 0; // DFS pre-pass: root is always node 0
+            Assert.Equal(AcquisitionSource.Craft, baseline.Decisions[rootNodeId].Source);
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { rootNodeId, AcquisitionSource.BuyFromTp }
+            };
+            var forced = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
+
+            Assert.Single(forced.Plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, forced.Plan.Steps[0].Source);
+            Assert.Equal(100, forced.Plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void Override_ForcesCraftOverCheaperBuy()
+        {
+            // Buy = 50 beats craft = 200; user forces craft.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 50 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { 0, AcquisitionSource.Craft }
+            };
+            var forced = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
+
+            Assert.Contains(forced.Plan.Steps, s => s.Source == AcquisitionSource.Craft && s.ItemId == 1);
+            Assert.Equal(200, forced.Plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void Override_Infeasible_IgnoredAndBestPathApplies()
+        {
+            // Leaf with no recipes: forcing Craft is infeasible.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { 0, AcquisitionSource.Craft }
+            };
+            var plan = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides).Plan;
+
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+        }
+
+        [Fact]
+        public void Override_OnChildNode_ParentCraftCostUsesForcedChildCost()
+        {
+            // Child 2: craft (20) beats buy (100). Forcing child to buy makes
+            // the parent's craft cost 100, so the parent flips to buying at 90.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Craftable(2, 1,
+                        Option(20, 1, 1, Leaf(3, 2)))));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 90 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 10 } }
+            };
+            var solver = new PlanSolver();
+
+            var baseline = solver.Solve(tree, prices, null);
+            // Baseline: craft chain, total 20
+            Assert.Equal(20, baseline.Plan.TotalCoinCost);
+
+            // Child 2 is NodeId 1 (DFS: root=0, first child=1)
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { 1, AcquisitionSource.BuyFromTp }
+            };
+            var forced = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
+
+            // Parent now prefers its own buy at 90 over craft-with-forced-child at 100
+            Assert.Equal(AcquisitionSource.BuyFromTp, forced.Decisions[0].Source);
+            Assert.Equal(90, forced.Plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void UnpriceableRecipe_CanCraftIsTrue_ForceCraftSucceedsWithZeroFilledCost()
+        {
+            // M33 partial-pricing parity (superseded
+            // "Override_ForcedCraftOnUnpriceableRecipe_IgnoredKeepsBuy"):
+            // CanCraft now means "has a recipe" (gw2e's hasComponents), not
+            // "recipe is fully priceable" - a recipe with an unpriceable
+            // ingredient is always force-craftable (the ingredient just
+            // zero-fills the craft cost). Item 1 is TP-priced (100) AND has
+            // a recipe whose ingredient has no price; without any override
+            // at all, craft (0, zero-filled) already strictly beats buy
+            // (100), so this also demonstrates the natural (non-forced)
+            // pick, not just the override path.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var natural = solver.Solve(tree, prices, null);
+            Assert.Equal(AcquisitionSource.Craft, natural.Decisions[0].Source);
+            Assert.True(natural.Decisions[0].CanCraft);
+            Assert.True(natural.Decisions[0].CanBuyTp);
+            Assert.Equal(0, natural.Plan.TotalCoinCost);
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { 0, AcquisitionSource.Craft }
+            };
+            var forced = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
+
+            Assert.Equal(AcquisitionSource.Craft, forced.Decisions[0].Source);
+            Assert.Equal(0, forced.Plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public void AvailabilityFlags_ReflectFeasiblePaths()
+        {
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 2, new List<VendorOffer> { CoinVendorOffer(2, 500) } }
+            };
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+
+            // Root: craftable, no TP price, no vendor offer
+            Assert.True(result.Decisions[0].CanCraft);
+            Assert.False(result.Decisions[0].CanBuyTp);
+            Assert.False(result.Decisions[0].CanBuyVendor);
+            // Child: leaf with TP price and vendor offer
+            Assert.False(result.Decisions[1].CanCraft);
+            Assert.True(result.Decisions[1].CanBuyTp);
+            Assert.True(result.Decisions[1].CanBuyVendor);
+        }
+    }
+}
