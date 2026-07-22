@@ -18,10 +18,15 @@ namespace VendorOfferUpdater
             IReadOnlyList<string> locations,
             int? dailyCap,
             int? weeklyCap,
-            // M37 (KNOWN-ISSUES #24): optional so every pre-existing call
-            // site keeps producing the exact same OfferId it always has -
-            // only a caller that explicitly threads a tier value changes
-            // the hash. Mirrors Services/VendorOfferHasher.cs exactly.
+            // M37 (KNOWN-ISSUES #24): optional so a caller need not pass
+            // it, but this does NOT keep the hash byte-for-byte identical
+            // to the pre-M37 value: the ";homesteadTier=" segment below is
+            // appended unconditionally (as "null" when omitted), so any
+            // offer's OfferId changes the first time it is recomputed with
+            // this code, whether or not its own tier is null. Existing
+            // rows only stay stable because callers like --merge-into copy
+            // untouched baseline objects through rather than recomputing
+            // them. Mirrors Services/VendorOfferHasher.cs exactly.
             int? homesteadTier = null)
         {
             var sb = new StringBuilder();

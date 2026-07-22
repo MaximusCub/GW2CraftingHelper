@@ -18,10 +18,13 @@ namespace GW2CraftingHelper.Services
             IReadOnlyList<string> locations,
             int? dailyCap,
             int? weeklyCap,
-            // M37 (KNOWN-ISSUES #24): optional so every pre-existing call
-            // site (none of which know about Homestead tiers) keeps
-            // producing the exact same OfferId it always has - only a
-            // caller that explicitly threads a tier value changes the hash.
+            // M37 (KNOWN-ISSUES #24): optional so a pre-existing call site
+            // (none of which know about Homestead tiers) need not pass it,
+            // but this does NOT keep the hash byte-for-byte identical to
+            // the pre-M37 value: the ";homesteadTier=" segment below is
+            // appended unconditionally (as "null" when omitted), so any
+            // offer's OfferId changes the first time it is recomputed with
+            // this code, whether or not its own tier is null.
             int? homesteadTier = null)
         {
             var sb = new StringBuilder();

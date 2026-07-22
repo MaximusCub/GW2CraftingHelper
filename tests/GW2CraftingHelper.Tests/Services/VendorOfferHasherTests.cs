@@ -176,10 +176,13 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Matches("^[0-9a-f]{64}$", hash);
         }
 
-        // M37 (KNOWN-ISSUES #24): omitting homesteadTier must reproduce the
-        // exact pre-M37 hash - every offer that isn't Homestead Refinement
-        // (the overwhelming majority of the seed) must be byte-identical
-        // through this change.
+        // M37 (KNOWN-ISSUES #24): omitting homesteadTier is equivalent to
+        // passing explicit null - it does NOT reproduce the pre-M37 hash,
+        // since ComputeOfferId appends the ";homesteadTier=" segment
+        // unconditionally (as "null" when omitted). This only pins down
+        // self-consistency of the default value, not backward
+        // compatibility with hashes computed before this parameter
+        // existed.
         [Fact]
         public void OmittedHomesteadTier_MatchesExplicitNull()
         {

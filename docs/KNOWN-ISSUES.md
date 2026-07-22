@@ -1238,10 +1238,25 @@ Mechanism:
   silently dropped - a real but functionally inert gap (tier-1's rate
   was identical to tier-0's anyway), now fixed as a side effect.
 - `VendorOfferHasher.ComputeOfferId` folds `HomesteadTier` into the
-  content-derived `OfferId` (optional trailing parameter, default null -
-  every pre-existing call site/offer keeps its exact prior hash).
-  Churn confined to the 216 now-tier-tagged rows, verified by direct
-  comparison against the pre-M37 baseline.
+  content-derived `OfferId` via a new optional trailing parameter -
+  "optional" only means a caller need not pass it (it defaults to
+  null); it does NOT mean the resulting hash matches what the same
+  inputs hashed to before this parameter existed. The function
+  unconditionally appends a `;homesteadTier=<value-or-"null">` segment
+  for every call, so any offer's hash changes the moment it is
+  recomputed, regardless of whether its own tier is null. Churn in the
+  committed `ref/vendor_offers.json` is confined to the 237
+  Homestead-Refinement-merchant rows - 216 now tier-tagged rows plus 21
+  untagged one-time "Upgrade" purchase rows under the same three
+  merchant names (content-identical, but with a new offerId - e.g.
+  outputItemId 102415 "Homestead Upgrade: Ore Trade Efficiency" moves
+  from `04ff9e53...39d` to `4cc0d33b...ed9`) - independently
+  diff-verified against the pre-M37 baseline. That narrow blast radius
+  is a property of `--merge-into` copying every untouched baseline
+  object through byte-for-byte, NOT a property of the hash function
+  being backward-compatible for omitted-parameter callers in general:
+  a future full (non-scoped) regeneration would change every offerId
+  in the file, not just Homestead's.
 - `PlanSolver.EvaluateVendorOffers` gains the actual fix: before an
   offer is considered comparable or fallback, a Homestead-tagged offer
   whose tier exceeds the configured tier for its output material is
