@@ -1746,7 +1746,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // M37 review fix: the batch rollup has NO craft-vs-buy filter
             // (a bought-but-tradable root still contributes - see
-            // CraftingPlanPipeline.ApplyBatchSellSideEconomics' own doc
+            // SellSideEconomics.ApplyBatchSellSideEconomics' own doc
             // comment, divergence item 1), so the note text must not claim
             // gw2e's own "sum of all crafted recipes" wording verbatim -
             // that would be inaccurate here.

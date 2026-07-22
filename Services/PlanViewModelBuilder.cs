@@ -161,7 +161,7 @@ namespace GW2CraftingHelper.Services
             // price. M37 (KNOWN-ISSUES #25): in multi-item mode,
             // NetSaleValue/CraftingProfit are the BATCH sum across every
             // requested item that has one (see
-            // CraftingPlanPipeline.ApplyBatchSellSideEconomics) - labels
+            // SellSideEconomics.ApplyBatchSellSideEconomics) - labels
             // are worded as a batch total, and the single-item "Nx"
             // overproduction qualifier is dropped since there is no single
             // requested quantity to compare a batch sum against.
@@ -238,7 +238,7 @@ namespace GW2CraftingHelper.Services
             // own Cost Breakdown banner concept for a multi-item batch (M34
             // r1 report). M37 (KNOWN-ISSUES #25) added the real batch-level
             // Sell value/Profit rows above (see
-            // CraftingPlanPipeline.ApplyBatchSellSideEconomics) - gated on
+            // SellSideEconomics.ApplyBatchSellSideEconomics) - gated on
             // the SAME result.NetSaleValue.HasValue condition as those rows
             // (mirroring gw2e's own shared ng-show condition, research
             // report Section 1.3b) so this note never references a profit
@@ -246,9 +246,10 @@ namespace GW2CraftingHelper.Services
             // root bought outright, or none tradable). The wording is NOT
             // gw2e's own verbatim banner text ("...sum of all crafted
             // recipes") because this module's rollup has no craft-vs-buy
-            // filter at all (ApplyBatchSellSideEconomics' own doc comment,
-            // divergence item 1) - a bought-but-tradable root can
-            // contribute too, so "crafted recipes" would be inaccurate.
+            // filter at all (SellSideEconomics.ApplyBatchSellSideEconomics'
+            // own doc comment, divergence item 1) - a bought-but-tradable
+            // root can contribute too, so "crafted recipes" would be
+            // inaccurate.
             if (isMultiItem && result.NetSaleValue.HasValue)
             {
                 section.Rows.Add(new PlanRowViewModel

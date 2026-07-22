@@ -106,6 +106,7 @@
     <Compile Include="Services\AcquisitionHintService.cs" />
     <Compile Include="Services\CraftingTreeBuilder.cs" />
     <Compile Include="Services\CraftingPlanPipeline.cs" />
+    <Compile Include="Services\SellSideEconomics.cs" />
     <Compile Include="Services\Gw2RecipeApiClient.cs" />
     <Compile Include="Services\Gw2PriceApiClient.cs" />
     <Compile Include="Services\Gw2ItemApiClient.cs" />
