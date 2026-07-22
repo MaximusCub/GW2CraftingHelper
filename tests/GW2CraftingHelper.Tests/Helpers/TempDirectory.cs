@@ -9,8 +9,8 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// create/try/finally/delete block at every call site (M38 WP-01,
     /// tests T4/T5 / simplify #5). Mirrors the constructor-creates /
     /// Dispose-deletes idiom already used by the per-test-class fixtures
-    /// in SnapshotStoreTests, StatusStoreTests, VendorOfferResolverTests
-    /// and VendorOfferStoreTests, packaged so any individual test method
+    /// in SnapshotStoreTests, StatusStoreTests, and VendorOfferStoreTests,
+    /// packaged so any individual test method
     /// can opt in with a single `using` statement instead of a class-level
     /// IDisposable.
     /// </summary>

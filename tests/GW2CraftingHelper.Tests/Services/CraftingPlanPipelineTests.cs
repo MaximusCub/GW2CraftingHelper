@@ -674,13 +674,14 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.NotNull(result.DebugLog);
 
-            // All 7 GenerateAsync phase prefixes must appear with timing
+            // All 6 GenerateAsync phase prefixes must appear with timing
+            // (M38 WP-10: the dead "Resolve vendor offers" step was removed
+            // along with the always-null VendorOfferResolver seam)
             var expectedPrefixes = new[]
             {
                 "Build recipe tree",
                 "Collect item IDs",
                 "Fetch TP prices",
-                "Resolve vendor offers",
                 "Query vendor offers",
                 "Solve",
                 "Fetch item metadata"
@@ -742,13 +743,14 @@ namespace GW2CraftingHelper.Tests.Services
                 1, 1, null, CancellationToken.None, progress,
                 priceBasis: PriceBasis.InstantBuy);
 
-            // All 10 expected phase messages in pipeline order
+            // All 9 expected phase messages in pipeline order
+            // (M38 WP-10: the dead "Resolving vendor offers..." message was
+            // removed along with the always-null VendorOfferResolver seam)
             var expectedSubstrings = new[]
             {
                 "recipe tree",
                 "Collecting item IDs",
                 "Fetching prices",
-                "Resolving vendor offers",
                 "Looking up vendor offers",
                 "Reducing inventory",
                 "Solving crafting plan",
