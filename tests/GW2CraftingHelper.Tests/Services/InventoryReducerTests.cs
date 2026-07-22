@@ -88,6 +88,35 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(5, tree.Recipes[0].Ingredients[0].Quantity);
         }
 
+        // --- M37 (KNOWN-ISSUES #26): CloneNode must preserve the new fields ---
+
+        [Fact]
+        public void CloneNode_PreservesAchievementFieldsAndDedupFlag()
+        {
+            // Same bug CLASS as the M33 Finding 2 fix for
+            // RecipeOption.ExpectedOutputCount (see CloneOption's own doc
+            // comment): any RecipeNode field not explicitly copied here is
+            // silently dropped (C# default) on every Reduce() clone.
+            // AchievementBitDedupPrePass runs on the pre-reduction tree, so
+            // its IsAchievementBitDeduped/AchievementId/AchievementBit
+            // fields MUST survive onto the reduced tree PlanSolver and
+            // CraftingTreeBuilder actually consume.
+            var dedupedIngredient = Leaf(55, 0);
+            dedupedIngredient.AchievementId = 8493;
+            dedupedIngredient.AchievementBit = 0;
+            dedupedIngredient.IsAchievementBitDeduped = true;
+
+            var tree = Craftable(1, 5, 10, 1, dedupedIngredient);
+            var pool = new Dictionary<int, int>();
+
+            var result = _reducer.Reduce(tree, pool);
+
+            var clonedIngredient = result.ReducedTree.Recipes[0].Ingredients[0];
+            Assert.Equal(8493, clonedIngredient.AchievementId);
+            Assert.Equal(0, clonedIngredient.AchievementBit);
+            Assert.True(clonedIngredient.IsAchievementBitDeduped);
+        }
+
         [Fact]
         public void LeafFullyOwned_QuantityZero()
         {

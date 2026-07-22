@@ -606,6 +606,64 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain("AutoLearned", option.Flags);
         }
 
+        // --- M37 (KNOWN-ISSUES #26): achievement-bit ingredient propagation ---
+
+        [Fact]
+        public async Task AchievementFields_PropagateFromRawIngredientOntoChildNode()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(103980, -1592);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = -1592,
+                OutputItemId = 103980,
+                OutputItemCount = 1,
+                AchievementId = 8493,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 103886, Count = 1, AchievementId = 8493, AchievementBit = 0 },
+                    new RawIngredient { Type = "Item", Id = 103974, Count = 1, AchievementId = 8493, AchievementBit = 3 }
+                }
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(103980, 1, CancellationToken.None);
+
+            var bit0 = node.Recipes[0].Ingredients.Single(i => i.Id == 103886);
+            Assert.Equal(8493, bit0.AchievementId);
+            Assert.Equal(0, bit0.AchievementBit);
+            Assert.False(bit0.IsAchievementBitDeduped); // not this class's job to set
+
+            var bit3 = node.Recipes[0].Ingredients.Single(i => i.Id == 103974);
+            Assert.Equal(8493, bit3.AchievementId);
+            Assert.Equal(3, bit3.AchievementBit);
+        }
+
+        [Fact]
+        public async Task OrdinaryIngredient_NoAchievementFields_LeavesBothNull()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(1, 10);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                }
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);
+
+            Assert.Null(node.AchievementId);
+            Assert.Null(node.AchievementBit);
+            Assert.Null(node.Recipes[0].Ingredients[0].AchievementId);
+            Assert.Null(node.Recipes[0].Ingredients[0].AchievementBit);
+        }
+
         // --- M35-B1: BuildMultiItemTreeAsync (gw2e parity, multi-item plans) ---
 
         [Fact]

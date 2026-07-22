@@ -356,7 +356,19 @@ namespace GW2CraftingHelper.Services
                 Id = node.Id,
                 IngredientType = node.IngredientType,
                 Quantity = node.Quantity,
-                NodeId = node.NodeId
+                NodeId = node.NodeId,
+                // M37 (KNOWN-ISSUES #26): must be copied explicitly, same as
+                // every other field here - see the M33 Finding 2 comment on
+                // RecipeOption.ExpectedOutputCount below for why a field
+                // silently missing from this clone is a real, previously-hit
+                // bug class in this codebase, not a hypothetical one.
+                // AchievementBitDedupPrePass runs on the pre-reduction tree
+                // (before this clone is made), so IsAchievementBitDeduped
+                // must survive onto the tree PlanSolver/CraftingTreeBuilder
+                // actually consume.
+                AchievementId = node.AchievementId,
+                AchievementBit = node.AchievementBit,
+                IsAchievementBitDeduped = node.IsAchievementBitDeduped
             };
 
             foreach (var option in node.Recipes)
