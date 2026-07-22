@@ -48,24 +48,26 @@ namespace GW2CraftingHelper.Services.Recipes
                 throw new ArgumentNullException(nameof(stream));
             }
 
-            using (var reader = new StreamReader(stream))
+            // See VendorOfferLoader.Load for why this reads the UTF-8 bytes
+            // directly (via DeserializeAsync, blocked synchronously) instead
+            // of StreamReader.ReadToEnd() + Deserialize<string> - this file
+            // ships with a leading UTF-8 BOM, which only the stream-based
+            // overload strips automatically (M38 WP-08 / perf P2a).
+            var data = JsonSerializer.DeserializeAsync<RecipeSearchSeedData>(stream, Options)
+                .GetAwaiter().GetResult();
+            if (data?.Searches == null)
             {
-                string json = reader.ReadToEnd();
-                var data = JsonSerializer.Deserialize<RecipeSearchSeedData>(json, Options);
-                if (data?.Searches == null)
-                {
-                    return new Dictionary<int, IReadOnlyList<int>>();
-                }
-
-                var result = new Dictionary<int, IReadOnlyList<int>>();
-                foreach (var kvp in data.Searches)
-                {
-                    int key = int.Parse(kvp.Key, CultureInfo.InvariantCulture);
-                    result[key] = kvp.Value?.AsReadOnly()
-                                  ?? (IReadOnlyList<int>)Array.Empty<int>();
-                }
-                return result;
+                return new Dictionary<int, IReadOnlyList<int>>();
             }
+
+            var result = new Dictionary<int, IReadOnlyList<int>>();
+            foreach (var kvp in data.Searches)
+            {
+                int key = int.Parse(kvp.Key, CultureInfo.InvariantCulture);
+                result[key] = kvp.Value?.AsReadOnly()
+                              ?? (IReadOnlyList<int>)Array.Empty<int>();
+            }
+            return result;
         }
 
         public static Dictionary<int, RawRecipe> LoadRecipeSeed(Stream stream)
@@ -75,22 +77,24 @@ namespace GW2CraftingHelper.Services.Recipes
                 throw new ArgumentNullException(nameof(stream));
             }
 
-            using (var reader = new StreamReader(stream))
+            // See VendorOfferLoader.Load for why this reads the UTF-8 bytes
+            // directly (via DeserializeAsync, blocked synchronously) instead
+            // of StreamReader.ReadToEnd() + Deserialize<string> - this file
+            // ships with a leading UTF-8 BOM, which only the stream-based
+            // overload strips automatically (M38 WP-08 / perf P2a).
+            var data = JsonSerializer.DeserializeAsync<RecipeSeedData>(stream, Options)
+                .GetAwaiter().GetResult();
+            if (data?.Recipes == null)
             {
-                string json = reader.ReadToEnd();
-                var data = JsonSerializer.Deserialize<RecipeSeedData>(json, Options);
-                if (data?.Recipes == null)
-                {
-                    return new Dictionary<int, RawRecipe>();
-                }
-
-                var result = new Dictionary<int, RawRecipe>();
-                foreach (var recipe in data.Recipes)
-                {
-                    result[recipe.Id] = recipe;
-                }
-                return result;
+                return new Dictionary<int, RawRecipe>();
             }
+
+            var result = new Dictionary<int, RawRecipe>();
+            foreach (var recipe in data.Recipes)
+            {
+                result[recipe.Id] = recipe;
+            }
+            return result;
         }
 
         public static T LoadManifest<T>(Stream stream) where T : class, new()

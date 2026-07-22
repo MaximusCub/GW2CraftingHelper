@@ -21,12 +21,21 @@ namespace GW2CraftingHelper.Services
                 throw new ArgumentNullException(nameof(stream));
             }
 
-            using (var reader = new StreamReader(stream))
-            {
-                string json = reader.ReadToEnd();
-                return JsonSerializer.Deserialize<VendorOfferDataset>(json, Options)
-                       ?? new VendorOfferDataset();
-            }
+            // Deserializes directly from the UTF-8 byte stream instead of
+            // StreamReader.ReadToEnd() + Deserialize<string> - the old path
+            // fully materialized the file as a UTF-16 string (and then
+            // System.Text.Json re-encoded that string back to UTF-8
+            // internally to parse it), doubling the transient memory/CPU
+            // cost on the largest shipped seed file (M38 WP-08 / perf P2a).
+            // System.Text.Json 5.0.0 (net461) has no synchronous
+            // Deserialize(Stream) overload, only DeserializeAsync(Stream);
+            // blocking on it here is safe because Blish's XNA host has no
+            // SynchronizationContext to deadlock against (see DO-NOT-TOUCH
+            // #2/#12), and the call site remains synchronous by design
+            // (P2b - moving load off Initialize - is explicitly excluded).
+            return JsonSerializer.DeserializeAsync<VendorOfferDataset>(stream, Options)
+                       .GetAwaiter().GetResult()
+                   ?? new VendorOfferDataset();
         }
 
         public string Serialize(VendorOfferDataset dataset)

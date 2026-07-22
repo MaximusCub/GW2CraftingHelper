@@ -28,16 +28,19 @@ namespace GW2CraftingHelper.Services.Recipes
                 return new ItemNameSeedData(null);
             }
 
-            using (var reader = new StreamReader(stream))
+            var options = new JsonSerializerOptions
             {
-                string json = reader.ReadToEnd();
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                };
-                var entries = JsonSerializer.Deserialize<List<ItemNameEntry>>(json, options);
-                return new ItemNameSeedData(entries);
-            }
+                PropertyNameCaseInsensitive = true
+            };
+
+            // See VendorOfferLoader.Load for why this reads the UTF-8 bytes
+            // directly (via DeserializeAsync, blocked synchronously) instead
+            // of StreamReader.ReadToEnd() + Deserialize<string> - this file
+            // ships with a leading UTF-8 BOM, which only the stream-based
+            // overload strips automatically (M38 WP-08 / perf P2a).
+            var entries = JsonSerializer.DeserializeAsync<List<ItemNameEntry>>(stream, options)
+                .GetAwaiter().GetResult();
+            return new ItemNameSeedData(entries);
         }
     }
 }
