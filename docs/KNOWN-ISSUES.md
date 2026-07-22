@@ -1129,6 +1129,35 @@ scanned clean at two offsets; Shopping List (immune 36px class)
 previously verified at three offsets. Required Disciplines (32px,
 3 text-only rows, same shared-helper fix, simulation-proven) was not
 individually pixel-scanned.
+WP-21 MOVE VERIFICATION STATE (2026-07-22): a line-by-line diff of the
+pre-move `CraftingPlanView.cs` method body against the post-move
+`Views/Rendering/*.cs` body was run for every Tier-1 primitive moved in
+that batch. `CreateRowDivider` (this divider's math/bottomClearance
+constants), `CreateRightAlignedLabel`, `EllipsizeToWidth`, both
+`GetRarityBorderColor`/`GetRarityNameColor` tables, `CreateRarityFramedIcon`/
+`CreateItemIcon`, `FormatCoinText`, and the full coin/currency segment
+build/layout/reposition/measure set in `CoinCurrencyRenderer` are
+confirmed byte-identical to the pre-move source, modulo only the
+`private`->`internal` accessibility keyword (where a cross-class call
+now requires it) and qualifying a call to a sibling that moved to a
+different class (e.g. `CreateItemIcon` -> `IconControls.CreateItemIcon`)
+- zero logic or constant changes. `CreateSmallTag` is the one exception:
+it is NOT byte-identical - its border/fill colors are now caller-supplied
+parameters instead of an internal `GetPillColors` call, a deliberate
+signature change already reasoned through and reviewed in 5c56b2a (the
+reverse-dependency fix), not a verbatim move; that commit's own
+same-colors/same-output argument is asserted, not diff-verified, for
+this one method. All of the above is static, by-construction evidence
+only - it does NOT substitute for this package's `needsVisualLoop` gate
+(m38-cleanup-plan.md WP-21 Verify line / EXECUTION PREAMBLE item 8: a
+live Blish-over-Paint screenshot/pixel-scan pass on the Exordium
+`--profile 2` reference plan comparing coin/currency cells, rarity icon
+frames, and row dividers before/after the branch). That live pass has
+NOT been run, and this note does not claim otherwise or waive it on the
+implementer's own authority - it remains an OPEN item, owned by the
+orchestrator's mandatory post-merge desktop screenshot verification for
+this batch, and must be recorded (pass/fail) or explicitly waived by
+the maintainer in the PR before this package is considered done.
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
