@@ -434,6 +434,12 @@ namespace GW2CraftingHelper.Views
             return _scrollDiagFrameCounter;
         }
 
+        // M38 WP-04: single read-through for the ~7 call sites below that
+        // used to repeat "_settings != null && _settings.ScrollDiagnosticsEnabled.Value"
+        // verbatim. Pure property, same short-circuit null-guard, no behavior
+        // change - see docs/KNOWN-ISSUES.md #12 for why this stays gated.
+        private bool ScrollDiagEnabled => _settings != null && _settings.ScrollDiagnosticsEnabled.Value;
+
         #endregion // Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
 
         #region General: construction & status
@@ -646,7 +652,7 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            bool diagEnabled = _settings != null && _settings.ScrollDiagnosticsEnabled.Value;
+            bool diagEnabled = ScrollDiagEnabled;
 
             int contentHeight = MeasureContentHeight(capturedPanel);
             float ratio = ScrollMath.RatioForOffset(savedOffset, contentHeight, capturedPanel.Height);
@@ -726,7 +732,7 @@ namespace GW2CraftingHelper.Views
             int zeroReassert = 0;
             DateTime armedAtUtc = DateTime.UtcNow;
 
-            if (_settings != null && _settings.ScrollDiagnosticsEnabled.Value)
+            if (ScrollDiagEnabled)
             {
                 Logger.Debug("{0} verify-armed frame={1} savedOffset={2} generation={3}",
                     ScrollDiagTag, ScrollDiagFrame(), savedOffset, capturedGeneration);
@@ -734,7 +740,7 @@ namespace GW2CraftingHelper.Views
 
             bool VerifyTick(GameTime gameTime)
             {
-                bool diagEnabled = _settings != null && _settings.ScrollDiagnosticsEnabled.Value;
+                bool diagEnabled = ScrollDiagEnabled;
 
                 // A newer restore superseded this loop, Build() swapped in
                 // a fresh content panel, or the panel was torn down (tab
@@ -1060,7 +1066,7 @@ namespace GW2CraftingHelper.Views
             float after = ScrollMath.ApplyPixelDelta(before, deltaPixels, contentHeight, _contentPanel.Height);
             scrollbar.ScrollDistance = after;
 
-            if (_settings != null && _settings.ScrollDiagnosticsEnabled.Value)
+            if (ScrollDiagEnabled)
             {
                 Logger.Debug("{0} write writer=WheelWrapFix frame={1} rawIn={2} intendedDelta={3} before={4:0.0000} after={5:0.0000}",
                     ScrollDiagTag, ScrollDiagFrame(), rawIn, intendedDelta, before, after);
@@ -1088,7 +1094,7 @@ namespace GW2CraftingHelper.Views
         {
             int frame = 0;
             DateTime correctedAtUtc = _lastWheelEventUtc ?? DateTime.UtcNow;
-            bool diagEnabled = _settings != null && _settings.ScrollDiagnosticsEnabled.Value;
+            bool diagEnabled = ScrollDiagEnabled;
 
             bool VerifyTick(GameTime gameTime)
             {
@@ -1148,7 +1154,7 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void OnScrollDiagWheelScrolled(object sender, MouseEventArgs e)
         {
-            if (_settings == null || !_settings.ScrollDiagnosticsEnabled.Value)
+            if (!ScrollDiagEnabled)
             {
                 return;
             }
@@ -1735,7 +1741,7 @@ namespace GW2CraftingHelper.Views
             _resizeScrollRestorePending = true;
             _resizeScrollSavedOffset = savedOffsetPx;
 
-            if (_settings != null && _settings.ScrollDiagnosticsEnabled.Value)
+            if (ScrollDiagEnabled)
             {
                 Logger.Debug("{0} write writer=ResizePreserve frame={1} before={2:0.0000} after={3:0.0000} contentHeight={4} savedOffset={5} newHeight={6}",
                     ScrollDiagTag, ScrollDiagFrame(), before, ratio, contentHeight, savedOffsetPx, newContentPanelHeight);
