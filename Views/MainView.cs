@@ -7,6 +7,7 @@ using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Views
@@ -20,7 +21,12 @@ namespace GW2CraftingHelper.Views
     /// AutocompleteTextBox - that machinery is shaped for picking exactly
     /// one plan-target item, not general item-name search) drives a
     /// synchronous, in-memory substring scan over data that is already
-    /// fully loaded, with no cancellation/marshal ceremony needed.
+    /// fully loaded. The actual scan/rebuild itself needs no cancellation -
+    /// each call is a plain, side-effect-free pass over already-loaded
+    /// data - but a short cancel-and-replace delay (see
+    /// <see cref="ScheduleSearchRebuild"/>/<see cref="SearchDebounceMs"/>)
+    /// bounds how often it runs while the search box is being typed into,
+    /// which is where the cancellation/marshal ceremony below comes from.
     /// </summary>
     public class MainView
     {
@@ -39,6 +45,17 @@ namespace GW2CraftingHelper.Views
 
         private AccountSnapshot _snapshot;
         private AccountItemIndex _accountItemIndex;
+
+        // itemId -> representative-entry map, built once per snapshot
+        // (constructor and SetSnapshot, alongside _accountItemIndex) and
+        // reused by every RebuildContent/BuildItemRows call for that
+        // snapshot - i.e. once per search-box keystroke - instead of
+        // BuildItemRows re-scanning the full raw _snapshot.Items list (which
+        // can run into the thousands across a large account's characters,
+        // bank, material storage, and shared inventory) from scratch on
+        // every call. See SnapshotSearchResultBuilder.BuildRepresentativeIndex.
+        private Dictionary<int, SnapshotItemEntry> _itemsById;
+
         private string _initialStatus;
         private readonly Func<Task<AccountSnapshot>> _refreshAsync;
         private readonly Action _clearCache;
@@ -61,6 +78,20 @@ namespace GW2CraftingHelper.Views
         private bool _materialStorageEnabled = true;
         private bool _sharedInventoryEnabled = true;
         private bool _charactersEnabled = true;
+
+        // Trailing debounce for the search box's per-keystroke rebuild -
+        // mirrors CraftingPlanView's ResizeDebounceMs/FrameTicker trailing-
+        // settle pattern in spirit, but uses a plain cancel-and-replace
+        // CancellationTokenSource + Task.Delay (the same shape
+        // SuggestionPanel.OnTextChanged already uses for its own per-
+        // keystroke search) rather than a second FrameTicker subclass,
+        // since there is no per-frame work to drive here - only a single
+        // one-shot delay before the next RebuildContent call. Without this,
+        // RebuildContent (which disposes and recreates every visible row's
+        // Panel/Label/AsyncTexture2D) ran once per character typed, not
+        // once per pause in typing.
+        private const int SearchDebounceMs = 150;
+        private CancellationTokenSource _searchDebounceCts;
 
         // Layout constants
         private const int HeaderRowY = 5;
@@ -112,8 +143,9 @@ namespace GW2CraftingHelper.Views
             // SetSnapshot - the index needs its own build call here too,
             // not just inside SetSnapshot (d1 Feature 1's explicit
             // call-out). AccountItemIndex's constructor already tolerates
-            // a null items list.
+            // a null items list, and so does BuildRepresentativeIndex.
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
+            _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
             _initialStatus = initialStatus;
             _refreshAsync = refreshAsync;
             _clearCache = clearCache;
@@ -125,6 +157,7 @@ namespace GW2CraftingHelper.Views
         {
             _snapshot = snapshot;
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
+            _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
             UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
             ApplyStatusDisplay();
             RebuildContent();
@@ -138,6 +171,16 @@ namespace GW2CraftingHelper.Views
 
         public void Build(Container buildPanel)
         {
+            // A fresh build cycle supersedes any debounced rebuild still
+            // pending from a previous visit to this tab (the old
+            // _contentPanel/_searchBox this timer was armed against are
+            // about to be replaced) - mirrors CraftingPlanView's own "top
+            // of Build() cancels leftover tickers from the previous cycle"
+            // convention (StopLiveTickers).
+            _searchDebounceCts?.Cancel();
+            _searchDebounceCts?.Dispose();
+            _searchDebounceCts = null;
+
             int w = buildPanel.ContentRegion.Width;
 
             // Header row
@@ -301,7 +344,7 @@ namespace GW2CraftingHelper.Views
             _searchBox.TextChanged += (_, __) =>
             {
                 _lastSearchText = _searchBox.Text ?? "";
-                RebuildContent();
+                ScheduleSearchRebuild();
             };
 
             _filterDropdown = new Dropdown()
@@ -457,9 +500,73 @@ namespace GW2CraftingHelper.Views
             _statusLabel.Text = text;
         }
 
+        /// <summary>
+        /// Cancels-and-replaces the in-flight search debounce, then arms a
+        /// new <see cref="SearchDebounceMs"/> delay before the next
+        /// RebuildContent call - see the field doc comment on
+        /// <see cref="_searchDebounceCts"/>. Called once per search-box
+        /// keystroke; a fast typist therefore triggers exactly one rebuild
+        /// after the last keystroke, not one per character.
+        /// </summary>
+        private void ScheduleSearchRebuild()
+        {
+            _searchDebounceCts?.Cancel();
+            _searchDebounceCts?.Dispose();
+            var cts = new CancellationTokenSource();
+            _searchDebounceCts = cts;
+
+            RunSearchDebounceAsync(cts.Token);
+        }
+
+        /// <summary>
+        /// Waits <see cref="SearchDebounceMs"/>, then marshals the actual
+        /// rebuild back onto the main thread - Blish HUD's XNA host installs
+        /// no SynchronizationContext, so the continuation after
+        /// <see cref="Task.Delay"/> may resume on a ThreadPool thread. The
+        /// cancel-and-replace CancellationTokenSource shape (see
+        /// ScheduleSearchRebuild) mirrors SuggestionPanel.OnTextChanged's
+        /// own per-keystroke cancellation, though that method has no added
+        /// delay of its own (it cancels a stale in-flight search, not a
+        /// timer) - here the awaited step IS the delay itself.
+        /// <paramref name="token"/> is a thread-safe struct to read from any
+        /// thread; only the eventual RebuildContent call (a control
+        /// mutation) needs marshaling.
+        /// </summary>
+        private async void RunSearchDebounceAsync(CancellationToken token)
+        {
+            try
+            {
+                await Task.Delay(SearchDebounceMs, token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            MainThreadMarshal.Run(() =>
+            {
+                // A newer keystroke may have canceled this token, or the
+                // tab/module may have been torn down while this was
+                // pending (Build() tears down and recreates every control
+                // on each tab visit - see the class doc comment) - either
+                // way there is nothing to render into.
+                if (token.IsCancellationRequested) return;
+                if (_contentPanel == null || _contentPanel.Parent == null) return;
+                RebuildContent();
+            });
+        }
+
         private void RebuildContent()
         {
             if (_contentPanel == null) return;
+
+            // Whatever triggered this rebuild (an explicit checkbox/
+            // dropdown click, or the debounced search callback itself)
+            // supersedes any older still-pending debounced rebuild - avoids
+            // a redundant extra rebuild landing a moment after this one.
+            _searchDebounceCts?.Cancel();
+            _searchDebounceCts?.Dispose();
+            _searchDebounceCts = null;
 
             foreach (var child in _contentPanel.Children.ToArray())
             {
@@ -496,7 +603,7 @@ namespace GW2CraftingHelper.Views
                 };
 
                 itemRows = SnapshotSearchResultBuilder.BuildItemRows(
-                    _snapshot.Items, _accountItemIndex, searchText, sourceFilter, GetActiveCharacterName());
+                    _itemsById, _accountItemIndex, searchText, sourceFilter, GetActiveCharacterName());
             }
 
             if (filter == "All" || filter == "Wallet")
@@ -515,9 +622,27 @@ namespace GW2CraftingHelper.Views
                 // call-out: today's code silently renders a blank list
                 // here instead).
                 string trimmedSearch = (searchText ?? "").Trim();
-                string message = trimmedSearch.Length == 0
-                    ? "No items match the selected sources."
-                    : $"No items match \"{trimmedSearch}\" in the selected sources.";
+                string message;
+                if (filter == "Wallet")
+                {
+                    // Wallet has no per-source breakdown at all - the four
+                    // Bank/Material Storage/Shared Inventory/Characters
+                    // checkboxes are documented and implemented as having
+                    // zero effect here (FilterWallet takes no
+                    // SnapshotSourceFilter), so the items-oriented "in the
+                    // selected sources" wording below would be factually
+                    // false for this filter and would send a user chasing
+                    // checkbox toggles that cannot change the result.
+                    message = trimmedSearch.Length == 0
+                        ? "No currencies available."
+                        : $"No currencies match \"{trimmedSearch}\".";
+                }
+                else
+                {
+                    message = trimmedSearch.Length == 0
+                        ? "No items match the selected sources."
+                        : $"No items match \"{trimmedSearch}\" in the selected sources.";
+                }
 
                 new Label()
                 {

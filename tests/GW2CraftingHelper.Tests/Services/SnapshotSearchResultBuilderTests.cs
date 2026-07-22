@@ -23,10 +23,77 @@ namespace GW2CraftingHelper.Tests.Services
 
         private static string CharSource(string name) => AccountItemIndex.CharacterSourcePrefix + name;
 
+        // Builds the itemId -> representative-entry map the way MainView
+        // does once per snapshot (see SnapshotSearchResultBuilder.
+        // BuildRepresentativeIndex) - every BuildItemRows test below feeds
+        // its raw items list through this helper first, exactly like the
+        // real caller, rather than passing the raw list to BuildItemRows
+        // directly (BuildItemRows now takes the already-deduped map, not
+        // the raw per-source entry list - see the M39 fix-pass finding this
+        // signature change addresses).
+        private static IReadOnlyDictionary<int, SnapshotItemEntry> ItemsById(IReadOnlyList<SnapshotItemEntry> items) =>
+            SnapshotSearchResultBuilder.BuildRepresentativeIndex(items);
+
+        // ---- BuildRepresentativeIndex ----
+
+        [Fact]
+        public void BuildRepresentativeIndex_NullItems_ReturnsEmpty()
+        {
+            var result = SnapshotSearchResultBuilder.BuildRepresentativeIndex(null);
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public void BuildRepresentativeIndex_EmptyItems_ReturnsEmpty()
+        {
+            var result = SnapshotSearchResultBuilder.BuildRepresentativeIndex(new List<SnapshotItemEntry>());
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public void BuildRepresentativeIndex_NullEntryInList_Skipped()
+        {
+            var items = new List<SnapshotItemEntry> { Entry(100, "Iron Ore", 5, AccountItemIndex.SourceBank), null };
+
+            var result = SnapshotSearchResultBuilder.BuildRepresentativeIndex(items);
+
+            Assert.Single(result);
+            Assert.True(result.ContainsKey(100));
+        }
+
+        [Fact]
+        public void BuildRepresentativeIndex_DuplicateItemId_FirstSeenEntryWins()
+        {
+            var first = Entry(100, "Iron Ore", 10, AccountItemIndex.SourceBank);
+            var second = Entry(100, "Iron Ore", 7, AccountItemIndex.SourceMaterialStorage);
+            var items = new List<SnapshotItemEntry> { first, second };
+
+            var result = SnapshotSearchResultBuilder.BuildRepresentativeIndex(items);
+
+            Assert.Single(result);
+            Assert.Same(first, result[100]);
+        }
+
+        [Fact]
+        public void BuildRepresentativeIndex_DistinctItemIds_OneEntryPerId()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(1, "Iron Ore", 10, AccountItemIndex.SourceBank),
+                Entry(2, "Linen Scrap", 5, AccountItemIndex.SourceBank)
+            };
+
+            var result = SnapshotSearchResultBuilder.BuildRepresentativeIndex(items);
+
+            Assert.Equal(2, result.Count);
+        }
+
         // ---- BuildItemRows ----
 
         [Fact]
-        public void BuildItemRows_NullItems_ReturnsEmpty()
+        public void BuildItemRows_NullItemsById_ReturnsEmpty()
         {
             var index = new AccountItemIndex(null);
             var result = SnapshotSearchResultBuilder.BuildItemRows(null, index, "", new SnapshotSourceFilter(), null);
@@ -38,7 +105,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void BuildItemRows_NullIndex_ReturnsEmpty()
         {
             var items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 5, "Bank") };
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, null, "", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), null, "", new SnapshotSourceFilter(), null);
 
             Assert.Empty(result);
         }
@@ -48,7 +115,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>());
             var result = SnapshotSearchResultBuilder.BuildItemRows(
-                new List<SnapshotItemEntry>(), index, "", new SnapshotSourceFilter(), null);
+                ItemsById(new List<SnapshotItemEntry>()), index, "", new SnapshotSourceFilter(), null);
 
             Assert.Empty(result);
         }
@@ -59,7 +126,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry> { Entry(100, "Iron Ore", 40, AccountItemIndex.SourceBank) };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", new SnapshotSourceFilter(), null);
 
             Assert.Single(result);
             Assert.Equal(100, result[0].ItemId);
@@ -80,7 +147,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", new SnapshotSourceFilter(), null);
 
             Assert.Single(result);
             Assert.Equal(250, result[0].TotalCount);
@@ -102,7 +169,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "iron", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "iron", new SnapshotSourceFilter(), null);
 
             Assert.Single(result);
             Assert.Equal("Iron Ore", result[0].Name);
@@ -114,7 +181,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 10, AccountItemIndex.SourceBank) };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "linen", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "linen", new SnapshotSourceFilter(), null);
 
             Assert.Empty(result);
         }
@@ -127,7 +194,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 10, CharSource("Zaeed")) };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "zaeed", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "zaeed", new SnapshotSourceFilter(), null);
 
             Assert.Empty(result);
         }
@@ -143,7 +210,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(items);
             var filter = new SnapshotSourceFilter { Bank = false };
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", filter, null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", filter, null);
 
             Assert.Single(result);
             Assert.Equal(150, result[0].TotalCount);
@@ -158,7 +225,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(items);
             var filter = new SnapshotSourceFilter { Bank = false, MaterialStorage = false, SharedInventory = false, Characters = false };
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", filter, null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", filter, null);
 
             Assert.Empty(result);
         }
@@ -175,7 +242,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(items);
             var filter = new SnapshotSourceFilter { Characters = false };
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", filter, null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", filter, null);
 
             Assert.Single(result);
             Assert.Equal(10, result[0].TotalCount);
@@ -189,7 +256,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry> { Entry(100, "Iron Ore", 40, AccountItemIndex.SourceBank) };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", null, null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", null, null);
 
             Assert.Single(result);
             Assert.Equal(40, result[0].TotalCount);
@@ -206,7 +273,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", new SnapshotSourceFilter(), null);
 
             Assert.Equal(3, result.Count);
             Assert.Equal("Ancient Wood", result[0].Name);
@@ -224,7 +291,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", new SnapshotSourceFilter(), null);
 
             Assert.Equal(2, result.Count);
             Assert.Equal(100, result[0].ItemId);
@@ -241,7 +308,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", new SnapshotSourceFilter(), null);
 
             Assert.Single(result);
             Assert.Equal(17, result[0].TotalCount);
@@ -253,19 +320,19 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry> { Entry(100, "", 5, AccountItemIndex.SourceBank) };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", new SnapshotSourceFilter(), null);
 
             Assert.Single(result);
             Assert.Equal("Unknown Item", result[0].Name);
         }
 
         [Fact]
-        public void BuildItemRows_NullEntryInList_Skipped()
+        public void BuildItemRows_NullEntryInList_SkippedViaRepresentativeIndex()
         {
             var items = new List<SnapshotItemEntry> { Entry(100, "Iron Ore", 5, AccountItemIndex.SourceBank), null };
             var index = new AccountItemIndex(items.Where(i => i != null).ToList());
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", new SnapshotSourceFilter(), null);
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", new SnapshotSourceFilter(), null);
 
             Assert.Single(result);
         }
@@ -281,7 +348,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var index = new AccountItemIndex(items);
 
-            var result = SnapshotSearchResultBuilder.BuildItemRows(items, index, "", new SnapshotSourceFilter(), "Zaeed");
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "", new SnapshotSourceFilter(), "Zaeed");
 
             Assert.Single(result);
             Assert.Equal("Character: Zaeed", result[0].Breakdown[0].Label);

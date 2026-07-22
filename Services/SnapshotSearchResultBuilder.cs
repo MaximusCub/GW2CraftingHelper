@@ -24,41 +24,30 @@ namespace GW2CraftingHelper.Services
     public static class SnapshotSearchResultBuilder
     {
         /// <summary>
-        /// Builds one <see cref="SnapshotSearchRow"/> per distinct itemId in
-        /// <paramref name="items"/> that (a) matches
-        /// <paramref name="searchText"/> by case-insensitive substring
-        /// against the item's own name (never against source/character
-        /// labels - Feature 1 Open Question 2's accepted choice) and (b)
-        /// has a positive total once <paramref name="sourceFilter"/> has
-        /// excluded any unchecked sources. An item with zero quantity
-        /// across the checked sources drops out of the list entirely
-        /// rather than appearing as a zero-count row. Rows are sorted by
-        /// name (ordinal, case-insensitive) for a stable, predictable
-        /// order across rebuilds. Returns an empty list, never null, for
-        /// null/empty <paramref name="items"/> or a null
-        /// <paramref name="index"/>.
+        /// Builds one representative <see cref="SnapshotItemEntry"/> per
+        /// distinct itemId in <paramref name="items"/> (name/icon are
+        /// resolved identically for every entry sharing an itemId - see
+        /// Gw2AccountSnapshotService.ResolveItemDetailsAsync's shared
+        /// per-id cache - so the first one seen is sufficient). Callers
+        /// (MainView) build this once per snapshot, alongside their
+        /// AccountItemIndex, and reuse the same map across every
+        /// <see cref="BuildItemRows"/> call for that snapshot (e.g. once
+        /// per search-box keystroke) instead of re-scanning the full raw
+        /// entry list - potentially thousands of rows across a large
+        /// account's characters/bank/material storage/shared inventory -
+        /// on every call. Returns an empty dictionary, never null, for a
+        /// null <paramref name="items"/>; null entries within it are
+        /// skipped.
         /// </summary>
-        public static List<SnapshotSearchRow> BuildItemRows(
-            IReadOnlyList<SnapshotItemEntry> items,
-            AccountItemIndex index,
-            string searchText,
-            SnapshotSourceFilter sourceFilter,
-            string activeCharacterName)
+        public static Dictionary<int, SnapshotItemEntry> BuildRepresentativeIndex(IReadOnlyList<SnapshotItemEntry> items)
         {
-            var rows = new List<SnapshotSearchRow>();
+            var firstSeenByItemId = new Dictionary<int, SnapshotItemEntry>();
 
-            if (items == null || index == null)
+            if (items == null)
             {
-                return rows;
+                return firstSeenByItemId;
             }
 
-            string trimmedSearch = (searchText ?? string.Empty).Trim();
-
-            // One representative entry per itemId (name/icon are resolved
-            // identically for every entry sharing an itemId - see
-            // Gw2AccountSnapshotService.ResolveItemDetailsAsync's shared
-            // per-id cache - so the first one seen is sufficient).
-            var firstSeenByItemId = new Dictionary<int, SnapshotItemEntry>();
             foreach (var entry in items)
             {
                 if (entry == null)
@@ -72,7 +61,49 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            foreach (var kvp in firstSeenByItemId)
+            return firstSeenByItemId;
+        }
+
+        /// <summary>
+        /// Builds one <see cref="SnapshotSearchRow"/> per distinct itemId in
+        /// <paramref name="itemsById"/> that (a) matches
+        /// <paramref name="searchText"/> by case-insensitive substring
+        /// against the item's own name (never against source/character
+        /// labels - Feature 1 Open Question 2's accepted choice) and (b)
+        /// has a positive total once <paramref name="sourceFilter"/> has
+        /// excluded any unchecked sources. An item with zero quantity
+        /// across the checked sources drops out of the list entirely
+        /// rather than appearing as a zero-count row. Rows are sorted by
+        /// name (ordinal, case-insensitive) for a stable, predictable
+        /// order across rebuilds. Returns an empty list, never null, for
+        /// null/empty <paramref name="itemsById"/> or a null
+        /// <paramref name="index"/>.
+        /// <para>
+        /// <paramref name="itemsById"/> is the already-deduped itemId -&gt;
+        /// representative-entry map (see <see cref="BuildRepresentativeIndex"/>)
+        /// - this method never re-scans the raw per-source entry list
+        /// itself, so it stays cheap to call on every keystroke as long as
+        /// the caller builds the map once per snapshot rather than once
+        /// per call.
+        /// </para>
+        /// </summary>
+        public static List<SnapshotSearchRow> BuildItemRows(
+            IReadOnlyDictionary<int, SnapshotItemEntry> itemsById,
+            AccountItemIndex index,
+            string searchText,
+            SnapshotSourceFilter sourceFilter,
+            string activeCharacterName)
+        {
+            var rows = new List<SnapshotSearchRow>();
+
+            if (itemsById == null || index == null)
+            {
+                return rows;
+            }
+
+            string trimmedSearch = (searchText ?? string.Empty).Trim();
+
+            foreach (var kvp in itemsById)
             {
                 int itemId = kvp.Key;
 
