@@ -38,18 +38,14 @@ namespace GW2CraftingHelper.Views.Rendering
         // spec list can be laid out left-anchored, right-anchored (table
         // price columns), or centered (cost tiles) without re-measuring.
 
-        internal const int CoinIconSize = 20;
-        internal const int CoinLabelIconGap = 2;
-        internal const int CoinSegmentGap = 6;
+        // M38 WP-21 findings fix: CoinIconSize/CoinLabelIconGap/CoinSegmentGap,
+        // CoinSegmentSpec/CurrencySegmentSpec, and the TotalCoinSegmentsWidth/
+        // TotalCurrencySegmentsWidth arithmetic moved to Services/CoinSegmentMath.cs
+        // (Blish-free, unit-tested) so the width formulas can be tested without
+        // referencing UI code. Everything below that still touches Label/Panel/
+        // BitmapFont references CoinSegmentMath's constants/structs directly.
 
-        internal struct CoinSegmentSpec
-        {
-            public int AssetId;
-            public string Text;
-            public int TextWidth;
-        }
-
-        internal static List<CoinSegmentSpec> BuildCoinSegments(long copper, BitmapFont font)
+        internal static List<CoinSegmentMath.CoinSegmentSpec> BuildCoinSegments(long copper, BitmapFont font)
         {
             if (copper < 0) copper = 0;
 
@@ -60,7 +56,7 @@ namespace GW2CraftingHelper.Views.Rendering
             bool showGold = gold > 0;
             bool showSilver = showGold || silver > 0;
 
-            var segments = new List<CoinSegmentSpec>(3);
+            var segments = new List<CoinSegmentMath.CoinSegmentSpec>(3);
             if (showGold)
             {
                 AddSegmentSpec(segments, font, 156904, gold.ToString());
@@ -74,21 +70,15 @@ namespace GW2CraftingHelper.Views.Rendering
             return segments;
         }
 
-        private static void AddSegmentSpec(List<CoinSegmentSpec> segments, BitmapFont font, int assetId, string text)
+        private static void AddSegmentSpec(List<CoinSegmentMath.CoinSegmentSpec> segments, BitmapFont font, int assetId, string text)
         {
             int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
-            segments.Add(new CoinSegmentSpec { AssetId = assetId, Text = text, TextWidth = width });
+            segments.Add(new CoinSegmentMath.CoinSegmentSpec { AssetId = assetId, Text = text, TextWidth = width });
         }
 
-        internal static int TotalCoinSegmentsWidth(List<CoinSegmentSpec> segments)
+        internal static int TotalCoinSegmentsWidth(List<CoinSegmentMath.CoinSegmentSpec> segments)
         {
-            if (segments.Count == 0) return 0;
-            int width = 0;
-            foreach (var seg in segments)
-            {
-                width += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
-            }
-            return width - CoinSegmentGap;
+            return CoinSegmentMath.TotalCoinSegmentsWidth(segments);
         }
 
         /// <summary>
@@ -114,7 +104,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// property) for dimmed not-crafted subtree rows.
         /// </summary>
         internal static SegmentLayoutHandle LayoutCoinSegments(
-            Panel parent, List<CoinSegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
+            Panel parent, List<CoinSegmentMath.CoinSegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
         {
             var controls = new (Label, Panel)[segments.Count];
             var widths = new int[segments.Count];
@@ -138,15 +128,15 @@ namespace GW2CraftingHelper.Views.Rendering
 
                 var icon = new Panel()
                 {
-                    Size = new Point(CoinIconSize, CoinIconSize),
-                    Location = new Point(x + seg.TextWidth + CoinLabelIconGap, y),
+                    Size = new Point(CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinIconSize),
+                    Location = new Point(x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y),
                     BackgroundTexture = AsyncTexture2D.FromAssetId(seg.AssetId),
                     Parent = parent
                 };
 
                 controls[i] = (label, icon);
                 widths[i] = seg.TextWidth;
-                x += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
+                x += seg.TextWidth + CoinSegmentMath.CoinLabelIconGap + CoinSegmentMath.CoinIconSize + CoinSegmentMath.CoinSegmentGap;
             }
 
             return new SegmentLayoutHandle { Controls = controls, TextWidths = widths };
@@ -158,7 +148,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// controls to new x-positions using the cached TextWidths, never
         /// creating a control or calling MeasureString. Shared by both coin
         /// and currency segment runs since they follow the identical
-        /// "label, gap, icon, gap" geometry (same CoinIconSize/
+        /// "label, gap, icon, gap" geometry (same CoinSegmentMath.CoinIconSize/
         /// CoinLabelIconGap/CoinSegmentGap constants).
         /// </summary>
         internal static void RepositionSegments(SegmentLayoutHandle handle, int startX, int y)
@@ -169,8 +159,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 var (label, icon) = handle.Controls[i];
                 int textWidth = handle.TextWidths[i];
                 label.Location = new Point(x, y);
-                icon.Location = new Point(x + textWidth + CoinLabelIconGap, y);
-                x += textWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
+                icon.Location = new Point(x + textWidth + CoinSegmentMath.CoinLabelIconGap, y);
+                x += textWidth + CoinSegmentMath.CoinLabelIconGap + CoinSegmentMath.CoinIconSize + CoinSegmentMath.CoinSegmentGap;
             }
         }
 
@@ -207,17 +197,10 @@ namespace GW2CraftingHelper.Views.Rendering
         private const string UnpricedDashText = "\u2014";
         private static readonly Color UnpricedDashColor = new Color(140, 140, 140);
 
-        internal struct CurrencySegmentSpec
-        {
-            public string IconUrl;
-            public string Text;
-            public int TextWidth;
-        }
-
-        internal static List<CurrencySegmentSpec> BuildCurrencySegments(
+        internal static List<CoinSegmentMath.CurrencySegmentSpec> BuildCurrencySegments(
             IReadOnlyList<CurrencyAmountViewModel> amounts, BitmapFont font)
         {
-            var segments = new List<CurrencySegmentSpec>();
+            var segments = new List<CoinSegmentMath.CurrencySegmentSpec>();
             if (amounts == null) return segments;
 
             foreach (var amount in amounts)
@@ -228,27 +211,26 @@ namespace GW2CraftingHelper.Views.Rendering
                 // render that text verbatim rather than the numeric amount.
                 string text = amount.BundleLabel ?? amount.Amount.ToString();
                 int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
-                segments.Add(new CurrencySegmentSpec { IconUrl = amount.IconUrl, Text = text, TextWidth = width });
+                segments.Add(new CoinSegmentMath.CurrencySegmentSpec { IconUrl = amount.IconUrl, Text = text, TextWidth = width });
             }
             return segments;
         }
 
         /// <summary>
-        /// The actual width arithmetic lives in ShoppingColumnMath
-        /// (Blish-free, tested) so the pre-scan (MeasureValueWidth) and the
-        /// real layout (LayoutValueSegmentsRightAligned) below can never
-        /// drift apart; only the per-segment text measurement
-        /// (BitmapFont.MeasureString) is Blish-bound and stays here.
+        /// The actual width arithmetic lives in CoinSegmentMath (Blish-free,
+        /// tested), which itself delegates to ShoppingColumnMath, so the
+        /// pre-scan (MeasureValueWidth) and the real layout
+        /// (LayoutValueSegmentsRightAligned) below can never drift apart;
+        /// only the per-segment text measurement (BitmapFont.MeasureString)
+        /// is Blish-bound and stays here.
         /// </summary>
-        internal static int TotalCurrencySegmentsWidth(List<CurrencySegmentSpec> segments)
+        internal static int TotalCurrencySegmentsWidth(List<CoinSegmentMath.CurrencySegmentSpec> segments)
         {
-            var widths = new List<int>(segments.Count);
-            foreach (var seg in segments) widths.Add(seg.TextWidth);
-            return ShoppingColumnMath.SegmentRunWidth(widths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
+            return CoinSegmentMath.TotalCurrencySegmentsWidth(segments);
         }
 
         internal static SegmentLayoutHandle LayoutCurrencySegments(
-            Panel parent, List<CurrencySegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
+            Panel parent, List<CoinSegmentMath.CurrencySegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
         {
             var controls = new (Label, Panel)[segments.Count];
             var widths = new int[segments.Count];
@@ -270,11 +252,11 @@ namespace GW2CraftingHelper.Views.Rendering
                     Parent = parent
                 };
 
-                var icon = IconControls.CreateItemIcon(parent, seg.IconUrl, x + seg.TextWidth + CoinLabelIconGap, y, CoinIconSize);
+                var icon = IconControls.CreateItemIcon(parent, seg.IconUrl, x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y, CoinSegmentMath.CoinIconSize);
 
                 controls[i] = (label, icon);
                 widths[i] = seg.TextWidth;
-                x += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
+                x += seg.TextWidth + CoinSegmentMath.CoinLabelIconGap + CoinSegmentMath.CoinIconSize + CoinSegmentMath.CoinSegmentGap;
             }
 
             return new SegmentLayoutHandle { Controls = controls, TextWidths = widths };
@@ -294,7 +276,7 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             int coinWidth = copper > 0 ? TotalCoinSegmentsWidth(BuildCoinSegments(copper, font)) : 0;
             int currencyWidth = TotalCurrencySegmentsWidth(BuildCurrencySegments(currencyAmounts, font));
-            return (coinWidth > 0 && currencyWidth > 0) ? coinWidth + CoinSegmentGap + currencyWidth : coinWidth + currencyWidth;
+            return (coinWidth > 0 && currencyWidth > 0) ? coinWidth + CoinSegmentMath.CoinSegmentGap + currencyWidth : coinWidth + currencyWidth;
         }
 
         /// <summary>
@@ -324,11 +306,11 @@ namespace GW2CraftingHelper.Views.Rendering
             Panel parent, long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts,
             int rightEdgeX, int y, BitmapFont font, float alphaScale = 1f)
         {
-            var coinSegments = copper > 0 ? BuildCoinSegments(copper, font) : new List<CoinSegmentSpec>();
+            var coinSegments = copper > 0 ? BuildCoinSegments(copper, font) : new List<CoinSegmentMath.CoinSegmentSpec>();
             var currencySegments = BuildCurrencySegments(currencyAmounts, font);
             int coinWidth = TotalCoinSegmentsWidth(coinSegments);
             int currencyWidth = TotalCurrencySegmentsWidth(currencySegments);
-            int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentGap : 0;
+            int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentMath.CoinSegmentGap : 0;
 
             int startX = rightEdgeX - (coinWidth + gap + currencyWidth);
             var coinHandle = LayoutCoinSegments(parent, coinSegments, startX, y, font, alphaScale);
@@ -386,9 +368,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 return;
             }
 
-            int coinWidth = ShoppingColumnMath.SegmentRunWidth(handle.CoinSegments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
-            int currencyWidth = ShoppingColumnMath.SegmentRunWidth(handle.CurrencySegments.TextWidths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
-            int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentGap : 0;
+            int coinWidth = ShoppingColumnMath.SegmentRunWidth(handle.CoinSegments.TextWidths, CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinLabelIconGap, CoinSegmentMath.CoinSegmentGap);
+            int currencyWidth = ShoppingColumnMath.SegmentRunWidth(handle.CurrencySegments.TextWidths, CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinLabelIconGap, CoinSegmentMath.CoinSegmentGap);
+            int gap = (coinWidth > 0 && currencyWidth > 0) ? CoinSegmentMath.CoinSegmentGap : 0;
 
             int startX = rightEdgeX - (coinWidth + gap + currencyWidth);
             RepositionSegments(handle.CoinSegments, startX, y);

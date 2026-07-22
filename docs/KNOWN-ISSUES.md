@@ -1149,41 +1149,38 @@ reverse-dependency fix), not a verbatim move; that commit's own
 same-colors/same-output argument is asserted, not diff-verified, for
 this one method. TWO of the moved segment-width primitives -
 `CoinCurrencyRenderer.TotalCoinSegmentsWidth`/`TotalCurrencySegmentsWidth`
-- take only plain data structs (no XNA/Blish types) and are now covered
-by `tests/GW2CraftingHelper.Tests/Views/Rendering/CoinCurrencyRendererTests.cs`
-(zero/single/multi-segment cases against the real
-CoinLabelIconGap/CoinIconSize/CoinSegmentGap constants, plus a
-cross-check that the coin and currency formulas agree for equivalent
-input) per the WP-21 Approach line's "add a Blish-free unit test where
-segment-width arithmetic can be made XNA-free" instruction. All of the
-above (the diff evidence and the new tests) is static, by-construction
-evidence only - it does NOT substitute for this package's
-`needsVisualLoop` gate (m38-cleanup-plan.md WP-21 Verify line /
-EXECUTION PREAMBLE item 8: a live Blish-over-Paint screenshot/pixel-scan
-pass on the Exordium `--profile 2` reference plan comparing coin/
-currency cells, rarity icon frames, and row dividers before/after the
-branch).
+- take only plain data structs (no XNA/Blish types) and are pure
+arithmetic; per the WP-21 Approach line's "add a Blish-free unit test
+where segment-width arithmetic can be made XNA-free" instruction, that
+arithmetic (plus the `CoinSegmentSpec`/`CurrencySegmentSpec` structs and
+the `CoinIconSize`/`CoinLabelIconGap`/`CoinSegmentGap` constants it is
+built from) is now extracted verbatim into `Services/CoinSegmentMath.cs`
+(mirroring the existing `ShoppingColumnMath` pattern) and covered by
+`tests/GW2CraftingHelper.Tests/Services/CoinSegmentMathTests.cs`
+(zero/single/multi-segment cases against the real constants, plus a
+case pinning the gap arithmetic exactly and a cross-check that the coin
+and currency formulas agree for equivalent input), mirroring
+`ShoppingColumnMathTests`. An earlier findings-fix pass on this branch
+instead added a test file under `tests/.../Views/Rendering/` that
+called `CoinCurrencyRenderer` (Blish-bound) directly - that would have
+violated the repo invariant that tests must never reference UI code;
+that file has been removed and replaced by the Services-based
+extraction above. All of the above (the diff evidence and the new
+Services tests) is static, by-construction evidence only - it does NOT
+substitute for this package's `needsVisualLoop` gate
+(m38-cleanup-plan.md WP-21 Verify line / EXECUTION PREAMBLE item 8: a
+live Blish-over-Paint screenshot/pixel-scan pass on the Exordium
+`--profile 2` reference plan comparing coin/currency cells, rarity icon
+frames, and row dividers before/after the branch, at multiple scroll
+offsets).
 
-That live pass has NOT been run by any session to date, including this
-2026-07-22 findings-fix pass, and this note does not claim otherwise,
-does not self-waive it, and does not lean on any same-branch commit's
-own say-so (or any other uncorroborated "dispatch note") as
-authorization to defer it - a prior version of this entry did exactly
-that and was correctly called out for it; it is not repeated here.
-Per project memory (subagents decline desktop-automation tasks on
-consent grounds - orchestrator-relayed authorization is unverifiable to
-them; only the thread holding the user's direct authorization may drive
-a synthetic-input session), a fix-agent session inside this worktree is
-structurally not the right place to run the live loop even if it tried,
-so it did not attempt to. WP-21's plan text makes the live-verify pass
-part of pre-merge done-ness, not a post-merge nicety: this package
-remains genuinely BLOCKED at the visual-verification gate, and stays
-blocked until one of these two things happens and is recorded directly
-in this branch's PR (not merely re-asserted in this file) -
-(a) someone with direct desktop-automation authorization actually runs
-the live pass and records pass/fail, or (b) the maintainer explicitly
-records a waiver in the PR. No further prose added to this entry by any
-session substitutes for either.
+CURRENT STATE (2026-07-22): pre-merge live visual verification
+(Blish-over-Paint screenshot loop on an Exordium plan: coin/currency
+cells, rarity icon frames, row dividers at multiple scroll offsets) is
+being run by the orchestrating session, in parallel with this
+findings-fix pass, on the desktop session holding the user's direct
+automation authorization. Result recorded here and in the PR before
+merge: [PENDING - the orchestrator fills in PASS/FAIL].
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every

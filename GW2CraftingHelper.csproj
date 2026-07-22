@@ -78,6 +78,7 @@
     <Compile Include="Services\ScrollMath.cs" />
     <Compile Include="Services\WheelDeltaSanitizer.cs" />
     <Compile Include="Services\ShoppingColumnMath.cs" />
+    <Compile Include="Services\CoinSegmentMath.cs" />
     <Compile Include="Services\PlanContentHeightMath.cs" />
     <Compile Include="Services\PlanRelayoutMath.cs" />
     <Compile Include="Services\ItemRowRequestBuilder.cs" />

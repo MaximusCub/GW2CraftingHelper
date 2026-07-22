@@ -3347,7 +3347,7 @@ namespace GW2CraftingHelper.Views
 
                     tile.CaptionLabel.Location = new Point(tileX + PlanRelayoutMath.CenterX(g.TileWidth, tile.CaptionLabel.Width), 6);
 
-                    int segmentsWidth = ShoppingColumnMath.SegmentRunWidth(tile.Segments.TextWidths, CoinCurrencyRenderer.CoinIconSize, CoinCurrencyRenderer.CoinLabelIconGap, CoinCurrencyRenderer.CoinSegmentGap);
+                    int segmentsWidth = ShoppingColumnMath.SegmentRunWidth(tile.Segments.TextWidths, CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinLabelIconGap, CoinSegmentMath.CoinSegmentGap);
                     int coinStartX = tileX + PlanRelayoutMath.CenterX(g.TileWidth, segmentsWidth);
                     CoinCurrencyRenderer.RepositionSegments(tile.Segments, coinStartX, 30);
                 }
@@ -3423,9 +3423,9 @@ namespace GW2CraftingHelper.Views
 
         // Sized between the tree/row item-icon (32px) and the coin-segment
         // icon (20px) since it sits inside a plain 28px text row; reuses
-        // CoinCurrencyRenderer.CoinLabelIconGap (below, in the coin display helpers) for the
-        // text-to-icon gap so both follow the same "number/text first, gap,
-        // icon" convention.
+        // CoinSegmentMath.CoinLabelIconGap (M38 WP-21 findings fix: moved out of
+        // CoinCurrencyRenderer) for the text-to-icon gap so both follow the
+        // same "number/text first, gap, icon" convention.
         private const int CurrencyRowHeight = PlanContentHeightMath.CurrencyRowHeight;
         private const int CurrencyIconSize = 18;
 
@@ -3459,7 +3459,7 @@ namespace GW2CraftingHelper.Views
             int cursorX = 8 + label.Width;
             if (!string.IsNullOrEmpty(row.IconUrl))
             {
-                int iconX = cursorX + CoinCurrencyRenderer.CoinLabelIconGap;
+                int iconX = cursorX + CoinSegmentMath.CoinLabelIconGap;
                 int iconY = (CurrencyRowHeight - CurrencyIconSize) / 2;
                 IconControls.CreateItemIcon(rowPanel, row.IconUrl, iconX, iconY, CurrencyIconSize);
                 cursorX = iconX + CurrencyIconSize;
@@ -3474,7 +3474,7 @@ namespace GW2CraftingHelper.Views
                     TextColor = new Color(153, 153, 153),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(cursorX + CoinCurrencyRenderer.CoinLabelIconGap, 4),
+                    Location = new Point(cursorX + CoinSegmentMath.CoinLabelIconGap, 4),
                     Parent = rowPanel
                 };
             }
