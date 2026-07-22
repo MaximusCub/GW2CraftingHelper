@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Services;
@@ -13,6 +14,31 @@ namespace GW2CraftingHelper.Tests.Helpers
 
         public IReadOnlyList<IReadOnlyList<int>> Calls => _calls;
 
+        /// <summary>
+        /// 1-based call number (counted across this client's lifetime) on
+        /// which GetPricesAsync should throw instead of returning,
+        /// simulating one bad batch amid otherwise-healthy ones. 0
+        /// (default) disables this. Mirrors InMemoryItemApiClient's
+        /// ThrowOnCallNumber.
+        /// </summary>
+        public int ThrowOnCallNumber { get; set; }
+
+        /// <summary>
+        /// When true, every call throws - simulating a total price-API
+        /// outage across every batch, not just one.
+        /// </summary>
+        public bool ThrowAlways { get; set; }
+
+        /// <summary>
+        /// When set, every call awaits this task before deciding whether to
+        /// throw or return - lets a test deterministically hold a fetch
+        /// "in flight" while it starts a second overlapping call, then
+        /// release both together. _calls is recorded before the gate is
+        /// awaited, so callers can already observe an in-flight call count
+        /// while the gate is held.
+        /// </summary>
+        public Task Gate { get; set; }
+
         public void AddPrice(int itemId, int buyUnitPrice, int sellUnitPrice)
         {
             _prices[itemId] = new RawPriceEntry
@@ -23,17 +49,27 @@ namespace GW2CraftingHelper.Tests.Helpers
             };
         }
 
-        public Task<IReadOnlyList<RawPriceEntry>> GetPricesAsync(
+        public async Task<IReadOnlyList<RawPriceEntry>> GetPricesAsync(
             IReadOnlyList<int> itemIds, CancellationToken ct)
         {
             _calls.Add(itemIds);
+
+            if (Gate != null)
+            {
+                await Gate;
+            }
+
+            if (ThrowAlways || (ThrowOnCallNumber > 0 && _calls.Count == ThrowOnCallNumber))
+            {
+                throw new HttpRequestException("Simulated transient API failure.");
+            }
 
             var results = itemIds
                 .Where(id => _prices.ContainsKey(id))
                 .Select(id => _prices[id])
                 .ToList();
 
-            return Task.FromResult<IReadOnlyList<RawPriceEntry>>(results);
+            return results;
         }
     }
 }
