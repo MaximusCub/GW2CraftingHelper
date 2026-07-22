@@ -4,6 +4,7 @@ using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
+using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
@@ -11,21 +12,16 @@ namespace GW2CraftingHelper.Tests.Services
     {
         private readonly InventoryReducer _reducer = new InventoryReducer();
 
-        /// <summary>
-        /// Helper: build a leaf node (no recipes).
-        /// </summary>
-        private static RecipeNode Leaf(int id, int qty, string type = "Item")
-        {
-            return new RecipeNode
-            {
-                Id = id,
-                IngredientType = type,
-                Quantity = qty
-            };
-        }
+        // Leaf comes from Helpers/RecipeNodeBuilders.cs.
 
         /// <summary>
-        /// Helper: build a craftable node with one recipe option.
+        /// Helper: build a craftable node with one recipe option. Kept
+        /// local (not folded into RecipeNodeBuilders.Craftable) because
+        /// this one has a genuinely different shape - it takes a
+        /// recipeId/outputCount pair instead of pre-built RecipeOptions,
+        /// auto-computes CraftsNeeded from qty/outputCount, and bakes in
+        /// Disciplines/MinRating/Flags that the shared builder leaves
+        /// empty (M38 WP-01, tests T2).
         /// </summary>
         private static RecipeNode Craftable(
             int id, int qty, int recipeId, int outputCount,

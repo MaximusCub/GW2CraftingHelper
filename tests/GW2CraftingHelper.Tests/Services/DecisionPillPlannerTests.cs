@@ -4,6 +4,7 @@ using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
+using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
@@ -348,11 +349,7 @@ namespace GW2CraftingHelper.Tests.Services
         // --- End-to-end via the real solver + tree builder: proves the
         // pill mapping never desyncs from an actual PlanSolver decision,
         // not just a hand-built CraftingTreeNode. ---
-
-        private static RecipeNode Leaf(int id, int quantity)
-        {
-            return new RecipeNode { Id = id, IngredientType = "Item", Quantity = quantity, Recipes = new List<RecipeOption>() };
-        }
+        // Leaf comes from Helpers/RecipeNodeBuilders.cs.
 
         [Fact]
         public void RealSolver_TpCheaperThanVendor_TpPillSelected()

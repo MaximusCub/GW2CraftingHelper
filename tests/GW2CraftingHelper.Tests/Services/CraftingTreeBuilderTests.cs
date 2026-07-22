@@ -4,54 +4,12 @@ using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
+using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
     public class CraftingTreeBuilderTests
     {
-        private static RecipeNode Leaf(int id, int quantity, string type = "Item")
-        {
-            return new RecipeNode
-            {
-                Id = id,
-                IngredientType = type,
-                Quantity = quantity,
-                Recipes = new List<RecipeOption>()
-            };
-        }
-
-        private static RecipeNode Craftable(int id, int quantity, params RecipeOption[] recipes)
-        {
-            var node = new RecipeNode
-            {
-                Id = id,
-                IngredientType = "Item",
-                Quantity = quantity,
-                Recipes = new List<RecipeOption>()
-            };
-            if (recipes != null)
-            {
-                node.Recipes.AddRange(recipes);
-            }
-            return node;
-        }
-
-        private static RecipeOption Option(int recipeId, int outputCount, int craftsNeeded, params RecipeNode[] ingredients)
-        {
-            var opt = new RecipeOption
-            {
-                RecipeId = recipeId,
-                OutputCount = outputCount,
-                CraftsNeeded = craftsNeeded,
-                Ingredients = new List<RecipeNode>()
-            };
-            if (ingredients != null)
-            {
-                opt.Ingredients.AddRange(ingredients);
-            }
-            return opt;
-        }
-
         private static Dictionary<int, ItemMetadata> Meta(params (int id, string name, string icon)[] items)
         {
             var dict = new Dictionary<int, ItemMetadata>();

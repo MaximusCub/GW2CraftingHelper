@@ -2,29 +2,13 @@ using System.Collections.Generic;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
+using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
     public class OwnedMaterialsForceBuyPrePassTests
     {
-        private static RecipeNode Leaf(int id, int quantity, string type = "Item")
-        {
-            return new RecipeNode { Id = id, IngredientType = type, Quantity = quantity };
-        }
-
-        private static RecipeNode Craftable(int id, int quantity, params RecipeOption[] recipes)
-        {
-            var node = new RecipeNode { Id = id, IngredientType = "Item", Quantity = quantity };
-            node.Recipes.AddRange(recipes);
-            return node;
-        }
-
-        private static RecipeOption Option(int recipeId, int outputCount, int craftsNeeded, params RecipeNode[] ingredients)
-        {
-            var opt = new RecipeOption { RecipeId = recipeId, OutputCount = outputCount, CraftsNeeded = craftsNeeded };
-            opt.Ingredients.AddRange(ingredients);
-            return opt;
-        }
+        // Leaf/Craftable/Option come from Helpers/RecipeNodeBuilders.cs.
 
         [Fact]
         public void BuyBeatsCraftByMoreThan15Percent_ForcesRootIntoForceBuySet()

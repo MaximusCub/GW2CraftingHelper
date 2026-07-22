@@ -167,12 +167,9 @@ namespace GW2CraftingHelper.Tests.Services
             itemApi.AddItem(200, "Item B", "b.png");
             itemApi.AddItem(500, "Shared Material", "m.png");
 
-            var tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var loader = new VendorOfferLoader();
                 var store = new VendorOfferStore(tempDir, loader);
                 store.LoadBaseline(null);
@@ -240,10 +237,6 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Equal(2, result.RequestedItems.Count);
                 Assert.Equal(100, result.RequestedItems[0].ItemId);
                 Assert.Equal(200, result.RequestedItems[1].ItemId);
-            }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
             }
         }
 
@@ -1290,12 +1283,9 @@ namespace GW2CraftingHelper.Tests.Services
             itemApi.AddItem(200, "Item B", "b.png");
             itemApi.AddItem(500, "Shared Material", "m.png");
 
-            var tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var loader = new VendorOfferLoader();
                 var store = new VendorOfferStore(tempDir, loader);
                 store.LoadBaseline(null);
@@ -1352,10 +1342,6 @@ namespace GW2CraftingHelper.Tests.Services
                 // a double-counted or dropped one - the sum still equals
                 // NetSaleValue minus the real (undivided) Plan.TotalCoinCost.
                 Assert.Equal(batch.NetSaleValue.Value - batch.Plan.TotalCoinCost, batch.CraftingProfit);
-            }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
             }
         }
 

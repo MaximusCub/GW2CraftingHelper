@@ -81,13 +81,10 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CompositeCache_OverlayTakesPrecedence()
         {
-            string tempDir = Path.Combine(
-                Path.GetTempPath(),
-                "gw2_cache_test_" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(tempDir);
-
-            try
+            using (var tmp = new TempDirectory())
             {
+                string tempDir = tmp.Path;
+
                 // Seed has search for item 100
                 var searches = new Dictionary<int, IReadOnlyList<int>>
                 {
@@ -145,23 +142,15 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Equal(2, overridden.Count);
                 Assert.Equal(99, overridden[0]);
             }
-            finally
-            {
-                try { Directory.Delete(tempDir, recursive: true); }
-                catch { }
-            }
         }
 
         [Fact]
         public void Overlay_Invalidates_OnBuildChange()
         {
-            string tempDir = Path.Combine(
-                Path.GetTempPath(),
-                "gw2_cache_test_" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(tempDir);
-
-            try
+            using (var tmp = new TempDirectory())
             {
+                string tempDir = tmp.Path;
+
                 // Create overlay with data and flush
                 var overlay = new OverlayRecipeCacheStore(tempDir);
                 overlay.Load(currentGw2BuildId: null);
@@ -194,11 +183,6 @@ namespace GW2CraftingHelper.Tests.Services
                 overlay3.Load(currentGw2BuildId: 12345);
                 Assert.Null(overlay3.TryGetSearch(100));
                 Assert.Null(overlay3.TryGetRecipe(1));
-            }
-            finally
-            {
-                try { Directory.Delete(tempDir, recursive: true); }
-                catch { }
             }
         }
 

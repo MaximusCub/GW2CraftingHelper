@@ -299,12 +299,9 @@ namespace GW2CraftingHelper.Tests.Services
             itemApi.AddItem(1, "Vendor Item", "vendor.png");
 
             // Vendor offers 1x item for 100 coin - cheaper than TP
-            var tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var loader = new VendorOfferLoader();
                 var store = new VendorOfferStore(tempDir, loader);
                 store.LoadBaseline(null);
@@ -336,10 +333,6 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Single(result.Plan.Steps);
                 Assert.Equal(AcquisitionSource.BuyFromVendor, result.Plan.Steps[0].Source);
                 Assert.Equal(100, result.Plan.TotalCoinCost);
-            }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
             }
         }
 
@@ -840,12 +833,9 @@ namespace GW2CraftingHelper.Tests.Services
             itemApi.AddItem(1, "Gifted Item", "g.png");
             itemApi.AddItem(999, "Cost Token", "t.png");
 
-            var tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var loader = new VendorOfferLoader();
                 var store = new VendorOfferStore(tempDir, loader);
                 store.LoadBaseline(null);
@@ -879,10 +869,6 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Equal(AcquisitionSource.BuyFromVendor, result.Plan.Steps[0].Source);
                 // 250 x 2c (instant-buy basis) = 500
                 Assert.Equal(500, result.Plan.TotalCoinCost);
-            }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
             }
         }
 
@@ -1106,12 +1092,9 @@ namespace GW2CraftingHelper.Tests.Services
             var itemApi = new InMemoryItemApiClient();
             itemApi.AddItem(1, "Karma Item", "karma.png");
 
-            var tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var loader = new VendorOfferLoader();
                 var store = new VendorOfferStore(tempDir, loader);
                 store.LoadBaseline(null);
@@ -1165,10 +1148,6 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Equal(AcquisitionSource.BuyFromVendor, resolved.Plan.Steps[0].Source);
                 Assert.Single(resolved.Plan.CurrencyCosts);
                 Assert.Equal(50, resolved.Plan.CurrencyCosts[0].Amount);
-            }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
             }
         }
 
@@ -1227,11 +1206,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_HomesteadTiersArgument_GatesVendorOfferAndSnapshotsOnContext()
         {
-            string tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(), "gw2ch-test-" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var recipeApi = new InMemoryRecipeApiClient();
                 var priceApi = new InMemoryPriceApiClient();
                 priceApi.AddPrice(102205, buyUnitPrice: 1000, sellUnitPrice: 1000);
@@ -1309,10 +1286,6 @@ namespace GW2CraftingHelper.Tests.Services
                 var resolved = pipeline.ResolveWithOverrides(tieredResult.SolveContext, null);
                 Assert.Equal(AcquisitionSource.BuyFromVendor, resolved.Plan.Steps[0].Source);
                 Assert.Equal(2, resolved.Plan.Steps[0].TotalCost);
-            }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
             }
         }
 
@@ -1956,12 +1929,9 @@ namespace GW2CraftingHelper.Tests.Services
             // cosmetic-only annotation. A plan generated WITH wallet karma
             // must produce the IDENTICAL decisions/costs as one generated
             // with none - only OwnedCurrencyAmounts may differ.
-            var tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var pipeline = BuildVendorCurrencyPipeline(out _, tempDir);
 
                 var withoutWallet = await pipeline.GenerateStructuredAsync(
@@ -1993,21 +1963,14 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.NotNull(withWallet.OwnedCurrencyAmounts);
                 Assert.Equal(100000, withWallet.OwnedCurrencyAmounts[2]);
             }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task OwnedCurrency_PartialWalletAmount_CappedAtNeeded()
         {
-            var tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var pipeline = BuildVendorCurrencyPipeline(out _, tempDir);
 
                 var snapshot = new AccountSnapshot
@@ -2027,21 +1990,14 @@ namespace GW2CraftingHelper.Tests.Services
                 // never nets against the plan's own currency total).
                 Assert.Equal(500, result.Plan.CurrencyCosts[0].Amount);
             }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task OwnedCurrency_NoWalletAtAll_AmountsNull()
         {
-            var tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var pipeline = BuildVendorCurrencyPipeline(out _, tempDir);
 
                 var result = await pipeline.GenerateStructuredAsync(
@@ -2049,21 +2005,14 @@ namespace GW2CraftingHelper.Tests.Services
 
                 Assert.Null(result.OwnedCurrencyAmounts);
             }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task OwnedCurrency_ViewModel_CurrencyCostRowGetsOwnedQuantity()
         {
-            var tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var pipeline = BuildVendorCurrencyPipeline(out _, tempDir);
 
                 var snapshot = new AccountSnapshot
@@ -2083,21 +2032,14 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Equal(200, currencyRow.CurrencyOwnedQuantity);
                 Assert.Equal(500, currencyRow.Quantity);
             }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task OwnedCurrency_ViewModel_NoWallet_OwnedQuantityNull()
         {
-            var tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + System.Guid.NewGuid());
-            System.IO.Directory.CreateDirectory(tempDir);
-            try
+            using (var tmp = new TempDirectory())
             {
+                var tempDir = tmp.Path;
                 var pipeline = BuildVendorCurrencyPipeline(out _, tempDir);
 
                 var result = await pipeline.GenerateStructuredAsync(
@@ -2108,10 +2050,6 @@ namespace GW2CraftingHelper.Tests.Services
                 var currencyRow = summarySection.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
 
                 Assert.Null(currencyRow.CurrencyOwnedQuantity);
-            }
-            finally
-            {
-                System.IO.Directory.Delete(tempDir, true);
             }
         }
     }

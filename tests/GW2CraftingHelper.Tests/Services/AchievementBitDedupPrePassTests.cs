@@ -3,6 +3,7 @@ using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
+using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
@@ -23,18 +24,16 @@ namespace GW2CraftingHelper.Tests.Services
     /// </summary>
     public class AchievementBitDedupPrePassTests
     {
-        private static RecipeNode Leaf(int id, int quantity, int? achievementId = null, int? achievementBit = null, string type = "Item")
-        {
-            return new RecipeNode
-            {
-                Id = id,
-                IngredientType = type,
-                Quantity = quantity,
-                AchievementId = achievementId,
-                AchievementBit = achievementBit
-            };
-        }
+        // Leaf (with the achievementId/achievementBit named args used
+        // throughout this file) comes from Helpers/RecipeNodeBuilders.cs.
 
+        /// <summary>
+        /// Narrower Option shape (recipeId + ingredients only, OutputCount
+        /// and CraftsNeeded hardcoded to 1) used throughout this file.
+        /// Kept local rather than folded into RecipeNodeBuilders.Option,
+        /// which requires outputCount/craftsNeeded explicitly (M38 WP-01,
+        /// tests T2).
+        /// </summary>
         private static RecipeOption Option(int recipeId, params RecipeNode[] ingredients)
         {
             var opt = new RecipeOption { RecipeId = recipeId, OutputCount = 1, CraftsNeeded = 1 };
