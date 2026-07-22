@@ -39,7 +39,6 @@ namespace GW2CraftingHelper
     public class Module : Blish_HUD.Modules.Module
     {
         private static readonly Logger Logger = Logger.GetLogger<Module>();
-        private static readonly TimeSpan StaleThreshold = TimeSpan.FromMinutes(10);
 
         // Bounds the whole multi-step account-snapshot fetch (wallet, bank,
         // shared inventory, materials, one call per character) so a full
@@ -562,7 +561,14 @@ namespace GW2CraftingHelper
 
             if (_refreshInProgress) return;
             if (_currentSnapshot == null) return;
-            if (DateTime.UtcNow - _currentSnapshot.CapturedAt < StaleThreshold) return;
+
+            // M39 (d1-snapshot-about-settings.md Feature 3): reads the
+            // clamped setting fresh on every tick (cheap - a single
+            // SettingEntry read plus two int comparisons, no I/O) rather
+            // than caching it, so a Settings tab save takes effect on the
+            // very next Update() without any separate live-push plumbing.
+            var staleThreshold = TimeSpan.FromMinutes(_settings.GetClampedSnapshotRefreshIntervalMinutes());
+            if (DateTime.UtcNow - _currentSnapshot.CapturedAt < staleThreshold) return;
             if (!_snapshotService.HasRequiredPermissions()) return;
 
             _ = RefreshSnapshotInBackgroundAsync();

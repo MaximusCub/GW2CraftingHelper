@@ -159,5 +159,44 @@ namespace GW2CraftingHelper.Services
             retentionDays = parsed;
             return true;
         }
+
+        // M39 (d1-snapshot-about-settings.md Feature 3): the Settings tab's
+        // new "Snapshot" section accepts the refresh interval in minutes
+        // (1-120) - same shape as TryParseRetentionDays above, just a
+        // different range.
+        private const int MinRefreshIntervalMinutes = 1;
+        private const int MaxRefreshIntervalMinutes = 120;
+
+        /// <summary>
+        /// Attempts to parse <paramref name="text"/> as a positive integer
+        /// snapshot refresh interval, in minutes (1-120). Returns false
+        /// (with <paramref name="minutes"/> set to 0) for null, blank,
+        /// non-numeric, or out-of-range input - mirrors TryParseRetentionDays'
+        /// own shape.
+        /// </summary>
+        public static bool TryParseRefreshIntervalMinutes(string text, out int minutes)
+        {
+            minutes = 0;
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            string trimmed = text.Trim();
+
+            if (!int.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out int parsed))
+            {
+                return false;
+            }
+
+            if (parsed < MinRefreshIntervalMinutes || parsed > MaxRefreshIntervalMinutes)
+            {
+                return false;
+            }
+
+            minutes = parsed;
+            return true;
+        }
     }
 }

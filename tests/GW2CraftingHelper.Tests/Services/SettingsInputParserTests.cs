@@ -249,5 +249,58 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(ok);
             Assert.Equal(0, days);
         }
+
+        // --- M39 (d1-snapshot-about-settings.md Feature 3): TryParseRefreshIntervalMinutes ---
+
+        [Theory]
+        [InlineData("1", 1)]
+        [InlineData("10", 10)]
+        [InlineData("120", 120)]
+        [InlineData("  30  ", 30)]
+        public void TryParseRefreshIntervalMinutes_ValidRange_ReturnsTrueWithValue(string text, int expected)
+        {
+            bool ok = SettingsInputParser.TryParseRefreshIntervalMinutes(text, out int minutes);
+
+            Assert.True(ok);
+            Assert.Equal(expected, minutes);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void TryParseRefreshIntervalMinutes_NullOrBlank_ReturnsFalseWithZero(string text)
+        {
+            bool ok = SettingsInputParser.TryParseRefreshIntervalMinutes(text, out int minutes);
+
+            Assert.False(ok);
+            Assert.Equal(0, minutes);
+        }
+
+        [Theory]
+        [InlineData("0")]
+        [InlineData("-1")]
+        [InlineData("121")]
+        [InlineData("99999")]
+        public void TryParseRefreshIntervalMinutes_OutOfRange_ReturnsFalse(string text)
+        {
+            bool ok = SettingsInputParser.TryParseRefreshIntervalMinutes(text, out int minutes);
+
+            Assert.False(ok);
+            Assert.Equal(0, minutes);
+        }
+
+        [Theory]
+        [InlineData("1.5")]
+        [InlineData("+1")]
+        [InlineData("abc")]
+        [InlineData("10 minutes")]
+        public void TryParseRefreshIntervalMinutes_MalformedText_ReturnsFalse(string text)
+        {
+            bool ok = SettingsInputParser.TryParseRefreshIntervalMinutes(text, out int minutes);
+
+            Assert.False(ok);
+            Assert.Equal(0, minutes);
+        }
     }
 }
