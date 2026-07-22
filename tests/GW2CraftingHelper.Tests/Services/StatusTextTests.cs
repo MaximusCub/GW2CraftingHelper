@@ -1,3 +1,4 @@
+using System;
 using GW2CraftingHelper.Services;
 using Xunit;
 
@@ -45,6 +46,64 @@ namespace GW2CraftingHelper.Tests.Services
         public void ForOverrideResolve_BestPathPreset_ReturnsBestPathRestored()
         {
             Assert.Equal("Best path restored", StatusText.ForOverrideResolve(isBestPathPreset: true, overrideCount: 0));
+        }
+
+        // ---- ForSnapshotAge (M39 snapshot search) ----
+
+        [Fact]
+        public void ForSnapshotAge_LessThanOneMinute_ReturnsJustNow()
+        {
+            Assert.Equal("just now", StatusText.ForSnapshotAge(TimeSpan.FromSeconds(30)));
+        }
+
+        [Fact]
+        public void ForSnapshotAge_Zero_ReturnsJustNow()
+        {
+            Assert.Equal("just now", StatusText.ForSnapshotAge(TimeSpan.Zero));
+        }
+
+        [Fact]
+        public void ForSnapshotAge_Negative_ClampedToZero_ReturnsJustNow()
+        {
+            // CapturedAt momentarily ahead of the local clock (minor clock
+            // skew) must never render as a negative duration.
+            Assert.Equal("just now", StatusText.ForSnapshotAge(TimeSpan.FromSeconds(-5)));
+        }
+
+        [Fact]
+        public void ForSnapshotAge_UnderOneHour_ReturnsMinutesAgo()
+        {
+            Assert.Equal("2m ago", StatusText.ForSnapshotAge(TimeSpan.FromMinutes(2)));
+        }
+
+        [Fact]
+        public void ForSnapshotAge_JustUnderOneHour_ReturnsMinutesAgo()
+        {
+            Assert.Equal("59m ago", StatusText.ForSnapshotAge(TimeSpan.FromMinutes(59)));
+        }
+
+        [Fact]
+        public void ForSnapshotAge_UnderOneDay_ReturnsHoursAndMinutesAgo()
+        {
+            Assert.Equal("1h 5m ago", StatusText.ForSnapshotAge(TimeSpan.FromMinutes(65)));
+        }
+
+        [Fact]
+        public void ForSnapshotAge_ExactlyOneHour_ReturnsHoursAndMinutesAgo()
+        {
+            Assert.Equal("1h 0m ago", StatusText.ForSnapshotAge(TimeSpan.FromHours(1)));
+        }
+
+        [Fact]
+        public void ForSnapshotAge_OneDayOrMore_ReturnsDaysAgo()
+        {
+            Assert.Equal("2d ago", StatusText.ForSnapshotAge(TimeSpan.FromDays(2)));
+        }
+
+        [Fact]
+        public void ForSnapshotAge_ExactlyOneDay_ReturnsDaysAgo()
+        {
+            Assert.Equal("1d ago", StatusText.ForSnapshotAge(TimeSpan.FromDays(1)));
         }
     }
 
