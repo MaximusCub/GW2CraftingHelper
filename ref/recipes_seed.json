@@ -429411,6 +429411,123 @@
       "flags": [
         "AutoLearned"
       ]
+    },
+    {
+      "id": -1592,
+      "outputItemId": 103980,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 103886,
+          "count": 1,
+          "achievementId": 8493,
+          "achievementBit": 0
+        },
+        {
+          "type": "Item",
+          "id": 103834,
+          "count": 1,
+          "achievementId": 8493,
+          "achievementBit": 1
+        },
+        {
+          "type": "Item",
+          "id": 103801,
+          "count": 1,
+          "achievementId": 8493,
+          "achievementBit": 2
+        },
+        {
+          "type": "Item",
+          "id": 103974,
+          "count": 1,
+          "achievementId": 8493,
+          "achievementBit": 3
+        }
+      ],
+      "disciplines": [
+        "Achievement"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": 8493
+    },
+    {
+      "id": -1593,
+      "outputItemId": 103886,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 103913,
+          "count": 100
+        }
+      ],
+      "disciplines": [
+        "Merchant"
+      ],
+      "minRating": 0,
+      "flags": []
+    },
+    {
+      "id": -1594,
+      "outputItemId": 103834,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 87557,
+          "count": 25
+        },
+        {
+          "type": "Currency",
+          "id": 65,
+          "count": 1000
+        },
+        {
+          "type": "Currency",
+          "id": 26,
+          "count": 3000
+        },
+        {
+          "type": "Currency",
+          "id": 15,
+          "count": 5000
+        }
+      ],
+      "disciplines": [
+        "Merchant"
+      ],
+      "minRating": 0,
+      "flags": []
+    },
+    {
+      "id": -1595,
+      "outputItemId": 103974,
+      "outputItemCount": 1,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 93146,
+          "count": 3
+        },
+        {
+          "type": "Item",
+          "id": 19678,
+          "count": 5
+        },
+        {
+          "type": "Item",
+          "id": 93075,
+          "count": 100
+        }
+      ],
+      "disciplines": [
+        "Merchant"
+      ],
+      "minRating": 0,
+      "flags": []
     }
   ]
 }
