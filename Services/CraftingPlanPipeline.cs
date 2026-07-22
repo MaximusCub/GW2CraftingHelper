@@ -16,7 +16,6 @@ namespace GW2CraftingHelper.Services
         private readonly PlanSolver _solver;
         private readonly ItemMetadataService _itemMetadataService;
         private readonly VendorOfferStore _vendorOfferStore;
-        private readonly VendorOfferResolver _resolver;
         private readonly InventoryReducer _reducer;
         private readonly IAccountRecipeClient _accountRecipeClient;
         private readonly CurrencyMetadataService _currencyMetadataService;
@@ -28,7 +27,6 @@ namespace GW2CraftingHelper.Services
             PlanSolver solver,
             ItemMetadataService itemMetadataService,
             VendorOfferStore vendorOfferStore = null,
-            VendorOfferResolver resolver = null,
             InventoryReducer reducer = null,
             IAccountRecipeClient accountRecipeClient = null,
             CurrencyMetadataService currencyMetadataService = null,
@@ -39,7 +37,6 @@ namespace GW2CraftingHelper.Services
             _solver = solver;
             _itemMetadataService = itemMetadataService;
             _vendorOfferStore = vendorOfferStore;
-            _resolver = resolver;
             _reducer = reducer;
             _accountRecipeClient = accountRecipeClient;
             _currencyMetadataService = currencyMetadataService;
@@ -102,17 +99,7 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
-            // Step 4: Resolve missing vendor offers (if resolver available)
-            progress?.Report(new PlanStatus { Message = "Resolving vendor offers..." });
-            sw.Restart();
-            if (_resolver != null && _vendorOfferStore != null)
-            {
-                await _resolver.EnsureVendorOffersAsync(allItemIds, progress, ct);
-            }
-            sw.Stop();
-            timingLog.Add($"Resolve vendor offers: {sw.ElapsedMilliseconds}ms");
-
-            // Step 5: Query vendor offers
+            // Step 4: Query vendor offers
             progress?.Report(new PlanStatus { Message = "Looking up vendor offers..." });
             sw.Restart();
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
@@ -274,17 +261,7 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
-            // Step 4: Resolve missing vendor offers (if resolver available)
-            progress?.Report(new PlanStatus { Message = "Resolving vendor offers..." });
-            sw.Restart();
-            if (_resolver != null && _vendorOfferStore != null)
-            {
-                await _resolver.EnsureVendorOffersAsync(allItemIds, progress, ct);
-            }
-            sw.Stop();
-            timingLog.Add($"Resolve vendor offers: {sw.ElapsedMilliseconds}ms");
-
-            // Step 5: Query vendor offers
+            // Step 4: Query vendor offers
             progress?.Report(new PlanStatus { Message = "Looking up vendor offers..." });
             sw.Restart();
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;
@@ -671,17 +648,7 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
-            // Step 4: Resolve missing vendor offers (if resolver available)
-            progress?.Report(new PlanStatus { Message = "Resolving vendor offers..." });
-            sw.Restart();
-            if (_resolver != null && _vendorOfferStore != null)
-            {
-                await _resolver.EnsureVendorOffersAsync(allItemIds, progress, ct);
-            }
-            sw.Stop();
-            timingLog.Add($"Resolve vendor offers: {sw.ElapsedMilliseconds}ms");
-
-            // Step 5: Query vendor offers
+            // Step 4: Query vendor offers
             progress?.Report(new PlanStatus { Message = "Looking up vendor offers..." });
             sw.Restart();
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null;

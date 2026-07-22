@@ -260,7 +260,6 @@ namespace GW2CraftingHelper
                 new PlanSolver(),
                 new ItemMetadataService(itemApi, itemNameSeed),
                 _vendorOfferStore,
-                resolver: null,
                 reducer: new InventoryReducer(),
                 accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager),
                 currencyMetadataService: new CurrencyMetadataService(_httpClient),
