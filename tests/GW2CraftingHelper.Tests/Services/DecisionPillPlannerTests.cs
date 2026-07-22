@@ -80,6 +80,32 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(ignorePill.Source); // toggled via node identity, not an AcquisitionSource
         }
 
+        // M38 WP-18 (tests T6, KNOWN-ISSUES 20.4): a node can be BOTH
+        // manually ignored AND carry a nonzero OwnedQuantityUsed from an
+        // earlier real reduction - CraftingTreeBuilder.BuildNode sets
+        // OwnedQuantityUsed unconditionally BEFORE its IsIgnored early
+        // return (see that class's own doc comment), so the two fields
+        // coexist on the same node by construction. BuildPillSpecs' Have
+        // branch never calls AppendOwnershipPills, so the "USING N OWNED"
+        // annotation is silently dropped here - a deliberate scope decision
+        // (a fully-owned/ignored node keeps the plain HAVE+IGNORED
+        // treatment - see PartialOwnership_AddsOwnedInfoPill_SourcePillUnchanged
+        // and FullOwnership_CollapsesToHave_NoOwnedInfoPill for the
+        // non-ignored halves of this same distinction), not an oversight.
+        // This pins the actual rendered output for the combination.
+        [Fact]
+        public void Have_IgnoredAndPartiallyOwned_ShowsIgnoredNotOwnedInfo()
+        {
+            var node = Node(CraftingDecision.Have, isIgnored: true, ownedQuantityUsed: 3);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Equal(2, specs.Count);
+            Assert.Equal("HAVE", specs[0].Text);
+            var ignorePill = specs.Single(s => s.Kind == PillKind.Ignore);
+            Assert.Equal("IGNORED", ignorePill.Text);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
+        }
+
         // ---- M37 (KNOWN-ISSUES #26): achievement-bit dedup pill ----
 
         [Fact]
