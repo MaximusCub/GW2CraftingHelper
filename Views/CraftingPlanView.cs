@@ -13,10 +13,22 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+// M38 WP-04 (m38-a1-architecture.md S3c/S11): this file is the one deliberate,
+// reviewed use of #region in the codebase - navigation markers for an
+// ~4800-line class pending the Wave F/G extraction the architecture report
+// recommends, mirroring its 11-responsibility map. SA1124 exists to stop
+// regions hiding code from review, not to block a documented, plan-mandated
+// mapping pass; scoped to this file only, not the shared ruleset.
+#pragma warning disable SA1124 // Do not use regions
+
 namespace GW2CraftingHelper.Views
 {
     public class CraftingPlanView
     {
+        #region General: shared layout constants, colors, top-region geometry & dependencies
+
+        // Not one of the architecture report's 11 responsibilities - shared
+        // substrate consumed by several regions below (see m38-a1-architecture.md S3).
         private static readonly Logger Logger = Logger.GetLogger<CraftingPlanView>();
 
         // Layout constants
@@ -106,6 +118,10 @@ namespace GW2CraftingHelper.Views
         // rather than systematically overpricing every material.
         private PriceBasis _priceBasis = PriceBasis.BuyOrder;
 
+        #endregion // General: shared layout constants, colors, top-region geometry & dependencies
+
+        #region 1. Input rows (state) - M35 gw2efficiency parity, multi-item plans
+
         /// <summary>
         /// One row of the multi-item input strip (M35, gw2efficiency
         /// parity): the plain session-persistent selection fields survive
@@ -136,6 +152,10 @@ namespace GW2CraftingHelper.Views
         // docs/KNOWN-ISSUES.md's M35 section).
         private readonly List<ItemRowState> _itemRows = new List<ItemRowState>();
 
+        #endregion // 1. Input rows (state) - M35 gw2efficiency parity, multi-item plans
+
+        #region 2. Generate orchestration (state)
+
         // Bumped at the start of every TriggerGenerate call (Generate button
         // and OnOwnMaterialsToggled's modal-confirm path both funnel through
         // it). Each call captures its own value and every deferred callback
@@ -154,6 +174,10 @@ namespace GW2CraftingHelper.Views
         // callbacks share the same generation number.
         private bool _statusClosedForCurrentGeneration;
 
+        #endregion // 2. Generate orchestration (state)
+
+        #region 8. Tree rendering (state)
+
         // Per-node user decision overrides (keyed by solver NodeId) and
         // explicit tree expansion state; both survive local re-solves and
         // reset on a fresh Generate.
@@ -171,8 +195,15 @@ namespace GW2CraftingHelper.Views
         private readonly HashSet<int> _ignoredItemIds = new HashSet<int>();
         private readonly Dictionary<int, bool> _nodeExpansion =
             new Dictionary<int, bool>();
+        #endregion // 8. Tree rendering (state)
+
+        #region 7. Section builders (state: section expand/collapse)
         private readonly Dictionary<PlanSectionType, bool> _sectionExpansion =
             new Dictionary<PlanSectionType, bool>();
+
+        #endregion // 7. Section builders (state: section expand/collapse)
+
+        #region 2. Generate orchestration (state, continued)
 
         // Suppress flag for checkbox revert
         private bool _suppressToggle;
@@ -180,6 +211,10 @@ namespace GW2CraftingHelper.Views
         // Debug log from last plan generation
         private IReadOnlyList<string> _lastDebugLog;
         public IReadOnlyList<string> LastDebugLog => _lastDebugLog;
+
+        #endregion // 2. Generate orchestration (state, continued)
+
+        #region General: Blish UI control fields (shared across all responsibilities)
 
         // UI controls (stored for resize handler)
 
@@ -195,6 +230,10 @@ namespace GW2CraftingHelper.Views
         private Label _statusLabel;
         private Panel _separator;
         private FlowPanel _contentPanel;
+
+        #endregion // General: Blish UI control fields (shared across all responsibilities)
+
+        #region 5. Resize relayout (state) - KNOWN-ISSUES #13/#19
 
         // Resize tracking
         private int _lastRenderedWidth;
@@ -231,11 +270,19 @@ namespace GW2CraftingHelper.Views
         private DateTime _lastResizeEventUtc;
         private bool _resizeSettlePending;
 
+        #endregion // 5. Resize relayout (state) - KNOWN-ISSUES #13/#19
+
+        #region 3. Scroll preserve/restore/verify (state) - KNOWN-ISSUES #12/#14/#19
+
         // Bumped by every PreserveScrollAcross call; an in-flight
         // StartScrollVerify loop compares its captured value against the
         // current one each frame and bails as soon as a newer restore has
         // superseded it.
         private int _scrollRestoreGeneration;
+
+        #endregion // 3. Scroll preserve/restore/verify (state) - KNOWN-ISSUES #12/#14/#19
+
+        #region 5. Resize relayout (state, continued) - KNOWN-ISSUES #13/#19
 
         // M33 C2c (resize-scroll-preserve regression fix): set by
         // PreserveScrollAcrossResize whenever a height-changing resize tick
@@ -256,6 +303,10 @@ namespace GW2CraftingHelper.Views
         private bool _resizeScrollRestorePending;
         private int _resizeScrollSavedOffset;
 
+        #endregion // 5. Resize relayout (state, continued) - KNOWN-ISSUES #13/#19
+
+        #region 6. The FrameTicker control (ticker instance fields) - KNOWN-ISSUES #12/#13
+
         // Live FrameTicker instances (null when idle). Tracked so Build()
         // can cancel a leftover ticker from the previous build cycle before
         // starting a new one, using the same SpriteScreen-parented cleanup
@@ -267,6 +318,10 @@ namespace GW2CraftingHelper.Views
         // line of defense.
         private FrameTicker _scrollVerifyTicker;
         private FrameTicker _resizeDebounceTicker;
+
+        #endregion // 6. The FrameTicker control (ticker instance fields) - KNOWN-ISSUES #12/#13
+
+        #region 4. Wheel-wrap correction (state) - KNOWN-ISSUES #12 (reopened)
 
         // M36 fix-pass (KNOWN-ISSUES #12, CRITICAL-1): defensive one-shot
         // re-assert ticker for ApplyWheelWrapCorrection - see
@@ -283,6 +338,10 @@ namespace GW2CraftingHelper.Views
 
         // Matches StartScrollVerify's own stable-match tolerance.
         private const float WheelWrapVerifyEpsilon = 0.004f;
+
+        #endregion // 4. Wheel-wrap correction (state) - KNOWN-ISSUES #12 (reopened)
+
+        #region 3. Scroll preserve/restore/verify (state, continued) - KNOWN-ISSUES #12/#14/#19
 
         // M33 C2a (directive B): with container heights now finalized
         // synchronously during build (PlanContentHeightMath), the restore
@@ -322,6 +381,10 @@ namespace GW2CraftingHelper.Views
         // influence a brand new one.
         private DateTime? _lastWheelEventUtc;
 
+        #endregion // 3. Scroll preserve/restore/verify (state, continued) - KNOWN-ISSUES #12/#14/#19
+
+        #region 4. Wheel-wrap correction (state, continued) - KNOWN-ISSUES #12 (reopened)
+
         // M36 (KNOWN-ISSUES #12 reopened/root-caused): Blish HUD's
         // Scrollbar.SCROLL_WHEEL private const (vendored Controls/
         // Scrollbar.cs, BlishHUD v1.3.0, confirmed by decompiling the
@@ -334,6 +397,10 @@ namespace GW2CraftingHelper.Views
         // above), so this is hardcoded with this provenance note -
         // re-verify against the vendored source on any BlishHUD upgrade.
         private const int BlishScrollWheelStepPixels = 30;
+
+        #endregion // 4. Wheel-wrap correction (state, continued) - KNOWN-ISSUES #12 (reopened)
+
+        #region Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
 
         // M33 C1 (#12 diagnostics): instrumentation-only. Gated on
         // ModuleSettings.ScrollDiagnosticsEnabled (default false); every
@@ -367,6 +434,9 @@ namespace GW2CraftingHelper.Views
             return _scrollDiagFrameCounter;
         }
 
+        #endregion // Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
+
+        #region General: construction & status
         public CraftingPlanView(
             Func<IReadOnlyList<PlanRequestItem>, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
@@ -388,6 +458,10 @@ namespace GW2CraftingHelper.Views
                 _statusLabel.Text = status ?? "";
             }
         }
+
+        #endregion // General: construction & status
+
+        #region 3. Scroll preserve/restore/verify (reflection handle + PreserveScrollAcross) - KNOWN-ISSUES #12/#14/#19
 
         // Blish HUD keeps a Panel's Scrollbar in a private field and resets
         // it to top whenever content height changes; the field is the only
@@ -434,6 +508,10 @@ namespace GW2CraftingHelper.Views
                 ApplySavedScrollSynchronously(saved, capturedGeneration);
             }
         }
+
+        #endregion // 3. Scroll preserve/restore/verify (reflection handle + PreserveScrollAcross) - KNOWN-ISSUES #12/#14/#19
+
+        #region 6. The FrameTicker control (nested Control subclass) - KNOWN-ISSUES #12/#13
 
         /// <summary>
         /// Drives a per-real-frame step callback from Control.DoUpdate,
@@ -536,6 +614,10 @@ namespace GW2CraftingHelper.Views
                 Dispose();
             }
         }
+
+        #endregion // 6. The FrameTicker control (nested Control subclass) - KNOWN-ISSUES #12/#13
+
+        #region 3. Scroll preserve/restore/verify (continued) - KNOWN-ISSUES #12/#14/#19
 
         /// <summary>
         /// M33 C2a (directive B): writes the restore ratio to the scrollbar
@@ -787,6 +869,10 @@ namespace GW2CraftingHelper.Views
             _scrollVerifyTicker?.Cancel();
             _scrollVerifyTicker = new FrameTicker(VerifyTick);
         }
+
+        #endregion // 3. Scroll preserve/restore/verify (continued) - KNOWN-ISSUES #12/#14/#19
+
+        #region 4. Wheel-wrap correction (continued) - KNOWN-ISSUES #12 (reopened)
 
         /// <summary>
         /// M33 C2a (directive C): unconditional (NOT diagnostics-gated) tap
@@ -1081,6 +1167,10 @@ namespace GW2CraftingHelper.Views
                 scrollbar?.ScrollDistance ?? -1f, contentHeight, verifyLive);
         }
 
+        #endregion // 4. Wheel-wrap correction (continued) - KNOWN-ISSUES #12 (reopened)
+
+        #region 1. Input rows (continued)
+
         /// <summary>
         /// Disposes every current item row's live controls and rebuilds
         /// them from _itemRows (M35, gw2efficiency parity multi-item
@@ -1289,6 +1379,13 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        #endregion // 1. Input rows (continued)
+
+        #region General: view construction (Build) - wires every section/handler together
+
+        // Wires Input Rows (1), the wheel handlers (3/4), and the resize
+        // handler (5) together onto the freshly built controls; not itself
+        // one of the 11 - see m38-a1-architecture.md S3.
         public void Build(Container buildPanel)
         {
             // Screen-parented popups from the previous build cycle (one per
@@ -1442,6 +1539,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        #endregion // General: view construction (Build) - wires every section/handler together
+
+        #region 5. Resize relayout (continued) - KNOWN-ISSUES #13/#19
         private void OnPanelResized(object sender, ResizedEventArgs e)
         {
             var container = (Container)sender;
@@ -1837,6 +1937,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        #endregion // 5. Resize relayout (continued) - KNOWN-ISSUES #13/#19
+
+        #region 2. Generate orchestration (continued)
         private void OnOwnMaterialsToggled(object sender, CheckChangedEvent e)
         {
             if (_suppressToggle) return;
@@ -2045,6 +2148,10 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        #endregion // 2. Generate orchestration (continued)
+
+        #region General: current panel width helper
+
         /// <summary>
         /// The content panel's LIVE usable width (RightEdgePadding already
         /// subtracted). M33 C2b: OnPanelResized updates _contentPanel's own
@@ -2062,6 +2169,9 @@ namespace GW2CraftingHelper.Views
             return _contentPanel != null ? _contentPanel.Width - RightEdgePadding : 0;
         }
 
+        #endregion // General: current panel width helper
+
+        #region 7. Section builders
         private void RenderPlan(PlanViewModel vm)
         {
             if (_contentPanel == null) return;
@@ -2504,6 +2614,10 @@ namespace GW2CraftingHelper.Views
             contentFlow.Size = new Point(panelWidth, PlanContentHeightMath.SectionBodyHeight(section.SectionType, section.Rows));
         }
 
+        #endregion // 7. Section builders
+
+        #region 11. Generic control/format helpers - KNOWN-ISSUES #23 (CreateRowDivider divider math)
+
         /// <summary>
         /// 2px divider at the bottom edge of a row panel - the shared "list
         /// row" chrome used by every table-style section except the tree
@@ -2622,6 +2736,10 @@ namespace GW2CraftingHelper.Views
 
             return outer;
         }
+
+        #endregion // 11. Generic control/format helpers - KNOWN-ISSUES #23 (CreateRowDivider divider math)
+
+        #region 7. Section builders (continued)
 
         // --- Used Materials section ---
 
@@ -3447,6 +3565,10 @@ namespace GW2CraftingHelper.Views
             _relayoutActions.Add(w => rowPanel.Size = new Point(w, CurrencyRowHeight));
         }
 
+        #endregion // 7. Section builders (continued)
+
+        #region 8. Tree rendering (continued)
+
         // --- Recipe tree section ---
 
         private class TreeNodeState
@@ -4085,6 +4207,10 @@ namespace GW2CraftingHelper.Views
             rowPanel.BasicTooltipText = parts.Count > 0 ? string.Join("\n", parts) : null;
         }
 
+        #endregion // 8. Tree rendering (continued)
+
+        #region 9. Decision pills
+
         // --- Decision pills ---
         //
         // PillKind/PillSpec/BuildPillSpecs (the decision -> pill mapping,
@@ -4288,6 +4414,10 @@ namespace GW2CraftingHelper.Views
             return pillPanels;
         }
 
+        #endregion // 9. Decision pills
+
+        #region 10. Coin/currency value rendering primitives
+
         // Plain "12g 34s 56c" text for contexts that cannot render coin
         // icons (BasicTooltipText has no inline-image support).
         private static string FormatCoinText(long copper)
@@ -4298,6 +4428,10 @@ namespace GW2CraftingHelper.Views
             long cop = copper % 100;
             return $"{gold}g {silver}s {cop}c";
         }
+
+        #endregion // 10. Coin/currency value rendering primitives
+
+        #region 11. Generic control/format helpers (continued)
 
         /// <summary>
         /// Truncates text to fit maxWidth, appending "..." when it doesn't
@@ -4379,6 +4513,10 @@ namespace GW2CraftingHelper.Views
                 default: return new Color(200, 200, 200);
             }
         }
+
+        #endregion // 11. Generic control/format helpers (continued)
+
+        #region 10. Coin/currency value rendering primitives (continued)
 
         // --- Coin display helpers ---
         //
@@ -4747,6 +4885,10 @@ namespace GW2CraftingHelper.Views
             RepositionSegments(handle.CurrencySegments, startX + coinWidth + gap, y);
         }
 
+        #endregion // 10. Coin/currency value rendering primitives (continued)
+
+        #region 11. Generic control/format helpers (continued)
+
         // --- Icon helper ---
 
         /// <summary>
@@ -4808,5 +4950,8 @@ namespace GW2CraftingHelper.Views
                 Parent = parent
             };
         }
+        #endregion // 11. Generic control/format helpers (continued)
     }
 }
+
+#pragma warning restore SA1124 // Do not use regions
