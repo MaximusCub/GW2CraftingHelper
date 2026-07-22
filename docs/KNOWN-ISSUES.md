@@ -2257,6 +2257,15 @@ path correctly uses _currentSnapshot (proven by this session's own
 owned-materials run, item 29 above), so this is cosmetic display
 staleness only. M38 cleanup candidate.
 
+FIXED in M38: Module.LoadAsync now routes a successfully loaded disk
+snapshot through the same _pendingSnapshot/_snapshotDirty drain the
+network-refresh path already used, committed through the same
+SnapshotCommitGate epoch check FetchAndSaveSnapshotAsync uses - a Clear
+Cache racing the disk load discards it exactly like it already did for a
+racing network fetch (KNOWN-ISSUES 31a-F1), so no interleaving was
+introduced. The Snapshot tab now shows a disk-restored snapshot
+immediately, without waiting for a live refresh.
+
 (b) A single wheel event carrying a multi-notch delta (raw -1440, sent by
 an automation tool as one mouse_event) is observed by [scrolldiag] but
 produces no scroll movement, while discrete -120 events step normally.

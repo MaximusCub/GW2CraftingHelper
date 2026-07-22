@@ -436,7 +436,29 @@ namespace GW2CraftingHelper
 
         protected override async Task LoadAsync()
         {
-            _currentSnapshot = _snapshotStore.LoadLatest();
+            // KNOWN-ISSUES "M37 desktop-wave observations" note (a): a
+            // snapshot restored from disk here previously never reached the
+            // Snapshot tab, because _snapshotContent (built in Initialize()
+            // with the then-null _currentSnapshot) is only ever pushed to
+            // via the _pendingSnapshot/_snapshotDirty drain in Update() -
+            // and that drain used to fire only after a successful network
+            // refresh committed through _snapshotCommitGate. Routed through
+            // the same drain and the same gate here, so a Clear Cache
+            // racing this disk load composes exactly like it already does
+            // against a network fetch (KNOWN-ISSUES 31a-F1) - see
+            // SnapshotCommitGate's own doc comment.
+            int loadEpoch = _snapshotCommitGate.Epoch;
+            var loadedSnapshot = _snapshotStore.LoadLatest();
+
+            if (loadedSnapshot != null)
+            {
+                _snapshotCommitGate.TryCommit(loadEpoch, () =>
+                {
+                    _currentSnapshot = loadedSnapshot;
+                    _pendingSnapshot = loadedSnapshot;
+                    _snapshotDirty = true;
+                });
+            }
 
             Gw2ApiManager.SubtokenUpdated += OnSubtokenUpdated;
 
