@@ -51,9 +51,33 @@ namespace GW2CraftingHelper.Services
             }
             else
             {
-                var parts = usedMaterials
-                    .Select(u => $"{u.QuantityUsed} of item {u.ItemId}")
-                    .ToList();
+                // M38 WP-07 (perf P5): manual loop instead of Select().ToList() -
+                // same content/order, one fewer LINQ iterator+delegate per Build().
+                //
+                // Scope note (documented descope, not silently dropped): the
+                // approved WP-07 scope also asked to gate this construction
+                // behind an "is anyone reading this debug log" check. No such
+                // flag exists anywhere in this codebase - the only consumer
+                // (Module.cs's LogTabContent, via CraftingPlanView.LastDebugLog)
+                // reads CraftingPlanResult.DebugLog lazily through a Func<>,
+                // but only at Log-tab-open/Refresh() time, long after this
+                // Build() call has already returned with every line
+                // pre-formatted into strings. Wiring a real "will this be
+                // read" check through to here would mean either plumbing a
+                // "Log tab is open" bool from Module.cs/CraftingPlanView down
+                // through CraftingPlanPipeline into this method, or changing
+                // CraftingPlanResult.DebugLog's element type to defer
+                // formatting to read time - both reach outside this package's
+                // Services/PlanResultBuilder.cs scope and are scope creep for
+                // this work package. Left eager/unconditional; noted here as
+                // a candidate follow-up (perf P5) rather than dropped
+                // silently.
+                var parts = new List<string>(usedMaterials.Count);
+                foreach (var used in usedMaterials)
+                {
+                    parts.Add($"{used.QuantityUsed} of item {used.ItemId}");
+                }
+
                 debugLog.Add($"Reduced: used {usedMaterials.Count} owned items ({string.Join(", ", parts)})");
             }
 
@@ -91,6 +115,28 @@ namespace GW2CraftingHelper.Services
             var craftSteps = plan.Steps.Where(s => s.Source == AcquisitionSource.Craft).ToList();
             var disciplineMap = new Dictionary<string, int>(); // discipline -> max rating
 
+            // M38 WP-07 (perf P1): one tree walk, indexed by RecipeId,
+            // replaces the two independent per-recipe-id DFS re-walks that
+            // used to happen below (one while building stepOptions, one
+            // while building requiredRecipes) via the old private
+            // FindRecipeOption. See BuildRecipeOptionIndex/IndexRecipeOptions
+            // for why "first write per RecipeId wins" reproduces the same
+            // result the old recursive short-circuit search would have
+            // returned, even if the same RecipeId legitimately appears at
+            // more than one tree position.
+            //
+            // Only walk the tree when there is at least one Craft step:
+            // both loops below that consult recipeOptionIndex are
+            // `foreach (var step in craftSteps)`, so when craftSteps is
+            // empty the old FindRecipeOption was never called at all and a
+            // null treeUsedForSolve never threw. Matching that laziness
+            // here (rather than unconditionally indexing treeUsedForSolve)
+            // preserves that exact behavior instead of newly throwing on a
+            // null tree whenever there happen to be zero craft steps.
+            var recipeOptionIndex = craftSteps.Count > 0
+                ? BuildRecipeOptionIndex(treeUsedForSolve)
+                : new Dictionary<int, RecipeOption>();
+
             // Resolve craft step options (deduplicated by RecipeId)
             var seenOptionIds = new HashSet<int>();
             var stepOptions = new List<RecipeOption>();
@@ -100,15 +146,23 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
-                var option = FindRecipeOption(treeUsedForSolve, step.RecipeId);
-                if (option == null)
+                if (!recipeOptionIndex.TryGetValue(step.RecipeId, out var option))
                 {
                     continue;
                 }
 
-                var realDisciplines = option.Disciplines
-                    .Where(d => !NonCraftingDisciplines.Contains(d))
-                    .ToList();
+                // M38 WP-07 (perf P5): manual loop instead of Where().ToList() -
+                // same content/order, one fewer LINQ iterator+delegate per
+                // craft step, every Build() call.
+                var realDisciplines = new List<string>();
+                foreach (var discipline in option.Disciplines)
+                {
+                    if (!NonCraftingDisciplines.Contains(discipline))
+                    {
+                        realDisciplines.Add(discipline);
+                    }
+                }
+
                 if (realDisciplines.Count == 0)
                 {
                     continue;
@@ -225,8 +279,7 @@ namespace GW2CraftingHelper.Services
                     continue;
                 }
 
-                var option = FindRecipeOption(treeUsedForSolve, step.RecipeId);
-                if (option == null)
+                if (!recipeOptionIndex.TryGetValue(step.RecipeId, out var option))
                 {
                     continue;
                 }
@@ -293,26 +346,52 @@ namespace GW2CraftingHelper.Services
             };
         }
 
-        private static RecipeOption FindRecipeOption(RecipeNode node, int recipeId)
+        // M38 WP-07 (perf P1): builds a RecipeId -> RecipeOption index with a
+        // single tree walk, replacing the old FindRecipeOption's repeated
+        // per-recipe-id DFS re-walk from the root (called once per unique
+        // craft-step RecipeId, twice per Build - once for stepOptions, once
+        // for requiredRecipes - so the old code paid for the whole tree scan
+        // up to 2x uniqueRecipeCount times per Build/pill-click).
+        //
+        // Deliberately no null check on root: the caller only invokes this
+        // when craftSteps.Count > 0, which is exactly when the old
+        // FindRecipeOption(treeUsedForSolve, ...) would have run and thrown
+        // a NullReferenceException on a null tree. Guarding here instead
+        // would silently swap that fail-loud crash for a quietly-empty
+        // index (every craft step's recipe/discipline data dropped with no
+        // error), which is a behavior change WP-07's scope does not
+        // authorize.
+        private static Dictionary<int, RecipeOption> BuildRecipeOptionIndex(RecipeNode root)
+        {
+            var index = new Dictionary<int, RecipeOption>();
+            IndexRecipeOptions(root, index);
+            return index;
+        }
+
+        // Preorder DFS over node.Recipes then each option's Ingredients (in
+        // list order, fully descending into one ingredient's subtree before
+        // moving to the next) - exactly the traversal order the old
+        // recursive FindRecipeOption used. First write per RecipeId wins, so
+        // if the same RecipeId legitimately appears at more than one tree
+        // position, the indexed RecipeOption is the same one the old
+        // per-query search would have returned first (the old search
+        // stopped as soon as it matched; this walk cannot stop early since
+        // it is indexing every id in one pass, but visiting order - and
+        // therefore which occurrence is "first" - is unchanged).
+        private static void IndexRecipeOptions(RecipeNode node, Dictionary<int, RecipeOption> index)
         {
             foreach (var option in node.Recipes)
             {
-                if (option.RecipeId == recipeId)
+                if (!index.ContainsKey(option.RecipeId))
                 {
-                    return option;
+                    index[option.RecipeId] = option;
                 }
 
                 foreach (var ingredient in option.Ingredients)
                 {
-                    var found = FindRecipeOption(ingredient, recipeId);
-                    if (found != null)
-                    {
-                        return found;
-                    }
+                    IndexRecipeOptions(ingredient, index);
                 }
             }
-
-            return null;
         }
     }
 }

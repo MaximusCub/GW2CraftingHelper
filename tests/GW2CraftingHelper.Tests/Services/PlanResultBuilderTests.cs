@@ -691,5 +691,180 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(1, result.UsedMaterials[0].ItemId);
             Assert.Equal(3, result.UsedMaterials[0].QuantityUsed);
         }
+
+        /// <summary>
+        /// Helper for the M38 WP-07 duplicate-RecipeId regression tests below:
+        /// builds a root whose single option has two ingredient branches, each
+        /// carrying its own RecipeOption with the SAME RecipeId but different
+        /// Disciplines/MinRating (deliberately unrealistic - real GW2 recipe
+        /// data would never disagree with itself - but that is exactly what
+        /// makes the tree-position winner observable in a test).
+        /// </summary>
+        private static RecipeNode TreeWithDuplicateRecipeId(
+            RecipeNode firstBranch, RecipeNode secondBranch)
+        {
+            var rootOption = new RecipeOption
+            {
+                RecipeId = 1,
+                OutputCount = 1,
+                CraftsNeeded = 1,
+                Disciplines = new List<string> { "Tailor" },
+                MinRating = 100,
+                Flags = new List<string>()
+            };
+            rootOption.Ingredients.Add(firstBranch);
+            rootOption.Ingredients.Add(secondBranch);
+
+            return new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                Recipes = new List<RecipeOption> { rootOption }
+            };
+        }
+
+        private static RecipeNode DuplicateRecipeBranch(
+            int nodeId, string discipline, int minRating)
+        {
+            var option = new RecipeOption
+            {
+                RecipeId = 99,
+                OutputCount = 1,
+                CraftsNeeded = 1,
+                Disciplines = new List<string> { discipline },
+                MinRating = minRating,
+                Flags = new List<string>()
+            };
+
+            return new RecipeNode
+            {
+                Id = nodeId,
+                IngredientType = "Item",
+                Quantity = 1,
+                Recipes = new List<RecipeOption> { option }
+            };
+        }
+
+        [Fact]
+        public void DuplicateRecipeId_AcrossTreePositions_FirstDfsOccurrenceWins()
+        {
+            // Same RecipeId (99) exists at two different tree positions with
+            // different Disciplines/MinRating. The old FindRecipeOption did a
+            // preorder DFS over node.Recipes then each option's Ingredients
+            // (fully descending into one ingredient's subtree before moving
+            // to the next) and returned on first match - so with branchA
+            // first in the root option's Ingredients list, branchA's
+            // RecipeOption must win, exactly as it would have before the
+            // M38 WP-07 single-walk-Dictionary memoization.
+            var branchA = DuplicateRecipeBranch(2, "Weaponsmith", 400);
+            var branchB = DuplicateRecipeBranch(3, "Armorsmith", 999);
+            var tree = TreeWithDuplicateRecipeId(branchA, branchB);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 1 },
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 99 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            var required = result.RequiredRecipes.Single(r => r.RecipeId == 99);
+            Assert.Equal(400, required.MinRating);
+            Assert.Equal(new List<string> { "Weaponsmith" }, required.Disciplines);
+
+            Assert.Contains(result.RequiredDisciplines, d => d.Discipline == "Weaponsmith" && d.MinRating == 400);
+            Assert.DoesNotContain(result.RequiredDisciplines, d => d.Discipline == "Armorsmith");
+        }
+
+        [Fact]
+        public void DuplicateRecipeId_AcrossTreePositions_WinnerFollowsIngredientOrder()
+        {
+            // Same tree shape as above with the two branches swapped - proves
+            // the winner tracks true DFS visiting order (branchB now first)
+            // rather than some other tie-break (e.g. declaration/alphabetical
+            // order), which would silently mask a traversal-order bug.
+            var branchA = DuplicateRecipeBranch(2, "Weaponsmith", 400);
+            var branchB = DuplicateRecipeBranch(3, "Armorsmith", 999);
+            var tree = TreeWithDuplicateRecipeId(branchB, branchA);
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 1 },
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 99 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            var required = result.RequiredRecipes.Single(r => r.RecipeId == 99);
+            Assert.Equal(999, required.MinRating);
+            Assert.Equal(new List<string> { "Armorsmith" }, required.Disciplines);
+
+            Assert.Contains(result.RequiredDisciplines, d => d.Discipline == "Armorsmith" && d.MinRating == 999);
+            Assert.DoesNotContain(result.RequiredDisciplines, d => d.Discipline == "Weaponsmith");
+        }
+
+        [Fact]
+        public void Build_NullTree_WithCraftStep_ThrowsLikeOldFindRecipeOption()
+        {
+            // M38 WP-07 fix-pass: BuildRecipeOptionIndex intentionally has no
+            // null-tree guard. Pinning that a null treeUsedForSolve combined
+            // with at least one Craft step fails loud (NullReferenceException)
+            // rather than silently returning an empty index/missing recipe
+            // data - exactly matching the pre-WP-07 FindRecipeOption(node, id),
+            // which dereferenced node.Recipes with no null check.
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 1 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+
+            Assert.Throws<System.NullReferenceException>(
+                () => _builder.Build(plan, null, metadata, null, null));
+        }
+
+        [Fact]
+        public void Build_NullTree_WithNoCraftSteps_DoesNotThrow()
+        {
+            // Companion to the test above: with zero Craft steps, the old
+            // FindRecipeOption was never called at all (both call sites are
+            // inside `foreach (var step in craftSteps)`), so a null
+            // treeUsedForSolve never threw. BuildRecipeOptionIndex must stay
+            // just as lazy - only walking (and dereferencing) the tree when
+            // there is actually a Craft step to resolve.
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.BuyFromTp }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, null, metadata, null, null);
+
+            Assert.Empty(result.RequiredRecipes);
+            Assert.Empty(result.RequiredDisciplines);
+        }
     }
 }
