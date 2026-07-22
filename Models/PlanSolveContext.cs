@@ -100,5 +100,16 @@ namespace GW2CraftingHelper.Models
         /// item's own tree, not the synthetic wrapper).
         /// </summary>
         public IReadOnlyList<PlanRequestItem> RequestedItems { get; set; }
+
+        /// <summary>
+        /// The Homestead Refinement efficiency tier configuration in effect
+        /// at GENERATION time (M37, KNOWN-ISSUES #24), snapshotted here for
+        /// the same reason as CurrencyValuation/OwnMaterialsMode above: a
+        /// local override re-solve (ResolveWithOverrides) must keep gating
+        /// Homestead offers the way the original Generate did, not whatever
+        /// the setting reads right now. A freshly changed tier setting
+        /// applies starting with the next full Generate.
+        /// </summary>
+        public HomesteadEfficiencyTiers HomesteadTiers { get; set; }
     }
 }

@@ -70,6 +70,22 @@ namespace GW2CraftingHelper.Services
         {
             public VendorOfferBatch Batch;
             public bool Conflict;
+
+            // M37 (KNOWN-ISSUES #24/#25 3.3, gw2e parity - the Homestead
+            // Refinement cap-notice gap) previously added a second, coarser
+            // (CapDailyCap, CapWeeklyCap, CapConflict) ratchet here so a
+            // mixed-offer step could still sum a cap notice when every
+            // occurrence's offer agreed on the raw cap tuple, even if the
+            // full batch shape (Conflict above) disagreed. Reverted:
+            // adversarial review found the premise false - the wiki's
+            // per-row WeeklyCap is a template parameter, not a confirmed
+            // per-station aggregate (see KNOWN-ISSUES #24's "Cap data"
+            // note), so two occurrences agreeing on that raw number does
+            // not mean they agree on a real shared limit worth summing
+            // against. Conflict alone continues to suppress the notice for
+            // this step, as it did before this milestone - see
+            // FinalizeVendorBatches and the MixedOffer*_DocumentedLimitation
+            // tests in PlanSolverTests.
         }
 
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
@@ -123,9 +139,18 @@ namespace GW2CraftingHelper.Services
             // choice), this is per-ItemId, matching gw2e's own "Ignore
             // marks every occurrence of that item id, tree-wide" semantics.
             // Null (the default) behaves exactly as before this feature.
-            ISet<int> ignoredItemIds = null)
+            ISet<int> ignoredItemIds = null,
+            // M37 (KNOWN-ISSUES #24, gw2e parity): per-material Homestead
+            // Refinement efficiency tier configuration. Null (the default)
+            // behaves as HomesteadEfficiencyTiers.Default - tier 0 for
+            // every material, gw2e's own default - so every existing
+            // caller that doesn't know about this setting keeps excluding
+            // every Homestead Refinement offer above tier 0, exactly
+            // matching the live-defect fix's intended default behavior.
+            HomesteadEfficiencyTiers homesteadTiers = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
+            var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
             var memo = new Dictionary<int, Decision>();
 
             // Pre-pass: assign unique NodeIds to every node in the tree.
@@ -138,7 +163,7 @@ namespace GW2CraftingHelper.Services
             }
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds);
+            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds, tiers);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -299,12 +324,15 @@ namespace GW2CraftingHelper.Services
             CurrencyValuation currencyValuation,
             ISet<int> forceBuyOnlyNodeIds = null,
             Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
-            ISet<int> ignoredItemIds = null)
+            ISet<int> ignoredItemIds = null,
+            HomesteadEfficiencyTiers homesteadTiers = null)
         {
             if (node.IngredientType == "Currency")
             {
                 return null;
             }
+
+            var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
 
             // M34-B2b: an "Ignore"-d item id is treated as fully in-hand for
             // THIS node - zero cost, no recipe/vendor/TP evaluation, and (by
@@ -351,7 +379,7 @@ namespace GW2CraftingHelper.Services
             // reported on the plan (VendorCurrencyCosts) - valuation only
             // affects comparison, never the displayed currency cost.
             EvaluateVendorOffers(
-                node, prices, vendorOffers, priceBasis, currencyValuation,
+                node, prices, vendorOffers, priceBasis, currencyValuation, tiers,
                 out long? comparableVendorValue,
                 out long? comparableVendorCoinCost,
                 out List<CostLine> comparableVendorCurrencyCosts,
@@ -441,7 +469,7 @@ namespace GW2CraftingHelper.Services
 
                     long? ingredientCost = Evaluate(
                         ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation,
-                        forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds);
+                        forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds, tiers);
                     craftCost += ingredientCost ?? 0L;
                     craftRealCost += memo[ingredient.NodeId].TotalCost ?? 0L;
                 }
@@ -571,6 +599,16 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// M37 (KNOWN-ISSUES #24, gw2e parity): before any of the above, a
+        /// Homestead Refinement offer (VendorOffer.HomesteadTier.HasValue)
+        /// whose tagged tier exceeds <paramref name="homesteadTiers"/>'
+        /// configured tier for that output material is skipped entirely -
+        /// it never competes as comparable OR fallback. Fixes a live
+        /// defect (not merely a modeling gap): the baseline seed already
+        /// carries all 236 wiki-scraped Homestead Refinement rows
+        /// unconditionally, so before this gate the solver silently
+        /// behaved as if every account had every efficiency upgrade.
+        ///
         /// Splits vendor offers into two tiers. An offer is COMPARABLE (competes
         /// with TP/craft coin costs in PickCheapest) when it has no non-coin
         /// currency lines at all, OR every one of its non-coin currency lines
@@ -607,6 +645,7 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             PriceBasis priceBasis,
             CurrencyValuation currencyValuation,
+            HomesteadEfficiencyTiers homesteadTiers,
             out long? bestComparableValue,
             out long? bestComparableCoinCost,
             out List<CostLine> bestComparableCurrencyCosts,
@@ -634,6 +673,27 @@ namespace GW2CraftingHelper.Services
             foreach (var offer in offers)
             {
                 if (offer.OutputCount <= 0)
+                {
+                    continue;
+                }
+
+                // M37 (KNOWN-ISSUES #24, gw2e parity): a Homestead
+                // Refinement offer whose tagged tier exceeds the user's
+                // configured tier for that output material is excluded
+                // entirely - never comparable, never a fallback. Keyed on
+                // offer.OutputItemId (not a merchant-name string match at
+                // this hot-path call site) because HomesteadTier is only
+                // ever set on rows the seeding pass already confirmed carry
+                // a merchant name containing "Homestead Refinement" (see
+                // ConvertToOffer/HomesteadTierResolver) - the family
+                // mapping gw2e itself keys on (cheapestTree.ts's
+                // merchant.name.includes('Homestead Refinement') check) is
+                // therefore already baked into which rows have a non-null
+                // tag, so re-checking the merchant name string here on
+                // every offer/every solve would be redundant string work in
+                // a loop that already runs per vendor offer per tree node.
+                if (offer.HomesteadTier.HasValue &&
+                    offer.HomesteadTier.Value > homesteadTiers.GetTier(offer.OutputItemId))
                 {
                     continue;
                 }
@@ -1029,9 +1089,11 @@ namespace GW2CraftingHelper.Services
 
             if (decision.Source == AcquisitionSource.BuyFromVendor && decision.VendorBatch.HasValue)
             {
+                var batch = decision.VendorBatch.Value;
+
                 if (vendorBatchTracking.TryGetValue(stepKey, out var trackedState))
                 {
-                    if (!trackedState.Conflict && !VendorBatchesEqual(trackedState.Batch, decision.VendorBatch.Value))
+                    if (!trackedState.Conflict && !VendorBatchesEqual(trackedState.Batch, batch))
                     {
                         // Ratchet only: a later occurrence agreeing with the
                         // tracked batch must not clear a conflict a prior
@@ -1043,7 +1105,7 @@ namespace GW2CraftingHelper.Services
                 {
                     vendorBatchTracking[stepKey] = new VendorBatchState
                     {
-                        Batch = decision.VendorBatch.Value,
+                        Batch = batch,
                         Conflict = false
                     };
                 }
@@ -1198,6 +1260,21 @@ namespace GW2CraftingHelper.Services
         /// still truncates here rather than gaining new model/UI surface for
         /// a MustFix-level display nuance - a deliberate, narrower scope
         /// than the currency fix, not an oversight.
+        ///
+        /// M37 (KNOWN-ISSUES #24/#25 3.3) investigated a second branch here
+        /// that would still sum a cap notice when occurrences disagreed on
+        /// the winning offer's batch shape (Conflict true) but agreed on the
+        /// raw (DailyCap, WeeklyCap) tuple - targeting the Homestead
+        /// Refinement case, where many distinct input-material offers for
+        /// the same output all carry an identical WeeklyCap. Adversarial
+        /// review found the premise false (that shared number is the wiki's
+        /// per-row template parameter, not a confirmed per-station
+        /// aggregate - see KNOWN-ISSUES #24's "Cap data" note) and the
+        /// summing itself unsound across occurrences that share only a
+        /// subset of one offer, so this was reverted: Conflict alone still
+        /// suppresses the notice for this step, as it did before this
+        /// milestone. See the MixedOffer*_DocumentedLimitation tests in
+        /// PlanSolverTests.
         /// </summary>
         private static List<TimegatedItem> FinalizeVendorBatches(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
@@ -1257,6 +1334,13 @@ namespace GW2CraftingHelper.Services
                         });
                     }
                 }
+                // Conflict == true (occurrences disagreed on the winning
+                // offer's exact batch shape) intentionally produces no cap
+                // notice here - see this method's doc comment and
+                // KNOWN-ISSUES #24's "Cap data" note for why a cap notice
+                // cannot be soundly computed across genuinely different
+                // offers with only a wiki-scraped per-row cap number to
+                // compare against.
 
                 if (step.VendorCurrencyCosts != null)
                 {

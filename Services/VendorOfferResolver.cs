@@ -214,6 +214,30 @@ namespace GW2CraftingHelper.Services
                 return null;
             }
 
+            // Adversarial-review finding (KNOWN-ISSUES #24): this live
+            // wiki-lookup fallback has no way to determine a Homestead
+            // Refinement offer's efficiency-tier requirement -
+            // RawWikiVendorOffer/IWikiVendorClient carry no "Requirement"
+            // text at all, unlike the offline tools/VendorOfferUpdater's
+            // WikiSmwClient, which reads it and feeds
+            // HomesteadTierResolver.ResolveTier. Returning such a row with
+            // HomesteadTier left null would make
+            // PlanSolver.EvaluateVendorOffers' tier gate
+            // (`if (offer.HomesteadTier.HasValue && ...) continue;`)
+            // silently treat it as an ungated, tier-independent offer -
+            // resurrecting the exact live "always pick the best tier"
+            // defect this milestone fixed for the seeded data. Never invent
+            // a tier: drop the row instead. This path is currently dormant
+            // (Module.cs passes resolver: null), but must stay this way if
+            // ever wired up, until Requirement text is plumbed through to a
+            // real HomesteadTierResolver-equivalent call.
+            if (Gw2Constants.HomesteadRefinementMaterialIds.Contains(raw.OutputItemId) &&
+                !string.IsNullOrEmpty(raw.MerchantName) &&
+                raw.MerchantName.Contains("Homestead Refinement"))
+            {
+                return null;
+            }
+
             var costLines = raw.CostLines ?? new List<CostLine>();
             var locations = raw.Locations ?? new List<string>();
 

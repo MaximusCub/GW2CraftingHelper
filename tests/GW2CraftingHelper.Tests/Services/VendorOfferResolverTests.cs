@@ -312,6 +312,80 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task HomesteadRefinementMaterial_LiveWikiLookup_DroppedNotUntagged()
+        {
+            // Adversarial-review finding (KNOWN-ISSUES #24): this live
+            // wiki-lookup path has no Requirement text to resolve a real
+            // HomesteadTier from, so a raw offer for one of the three
+            // Homestead Refinement materials from a "Homestead
+            // Refinement-..." merchant must be dropped entirely rather than
+            // returned as an untagged (HomesteadTier == null) offer, which
+            // would silently bypass PlanSolver.EvaluateVendorOffers' tier
+            // gate and resurrect the pre-fix "always pick the best tier"
+            // defect for this one offer.
+            var wiki = new InMemoryWikiVendorClient();
+            wiki.AddOffers(Gw2Constants.RefinedHomesteadMetalItemId, new RawWikiVendorOffer
+            {
+                OutputItemId = Gw2Constants.RefinedHomesteadMetalItemId,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Item", Id = 19697, Count = 2 }
+                },
+                MerchantName = "Homestead Refinement\u2014Metal Forge"
+            });
+
+            var options = new WikiLookupOptions
+            {
+                MinDelayBetweenRequestsMs = 0,
+                JitterMs = 0,
+                MaxRetries = 0
+            };
+            var resolver = new VendorOfferResolver(wiki, _store, options);
+
+            var result = await resolver.EnsureVendorOffersAsync(
+                new[] { Gw2Constants.RefinedHomesteadMetalItemId }, null, CancellationToken.None);
+
+            Assert.Equal(0, result.OffersAdded);
+            Assert.Empty(result.FailedItemIds);
+            Assert.False(_store.HasAnyOffer(Gw2Constants.RefinedHomesteadMetalItemId));
+        }
+
+        [Fact]
+        public async Task NonHomesteadOffer_SameOutputAndCostShape_StillConverted()
+        {
+            // Sibling regression guard: the Homestead-merchant guard above
+            // must not over-match. A plain vendor offer for the exact same
+            // output item id, from a merchant whose name does not mention
+            // "Homestead Refinement", is unaffected.
+            var wiki = new InMemoryWikiVendorClient();
+            wiki.AddOffers(Gw2Constants.RefinedHomesteadMetalItemId, new RawWikiVendorOffer
+            {
+                OutputItemId = Gw2Constants.RefinedHomesteadMetalItemId,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 50 }
+                },
+                MerchantName = "Ordinary Vendor"
+            });
+
+            var options = new WikiLookupOptions
+            {
+                MinDelayBetweenRequestsMs = 0,
+                JitterMs = 0,
+                MaxRetries = 0
+            };
+            var resolver = new VendorOfferResolver(wiki, _store, options);
+
+            var result = await resolver.EnsureVendorOffersAsync(
+                new[] { Gw2Constants.RefinedHomesteadMetalItemId }, null, CancellationToken.None);
+
+            Assert.Equal(1, result.OffersAdded);
+            Assert.True(_store.HasAnyOffer(Gw2Constants.RefinedHomesteadMetalItemId));
+        }
+
+        [Fact]
         public async Task DuplicateInputIds_CoalescedToSingleLookup()
         {
             var wiki = new InMemoryWikiVendorClient();

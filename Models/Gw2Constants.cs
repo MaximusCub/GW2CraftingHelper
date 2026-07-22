@@ -41,6 +41,24 @@ namespace GW2CraftingHelper.Models
         /// </summary>
         public const int MultiItemWrapperRecipeId = int.MinValue;
 
+        /// <summary>
+        /// GW2 item ids of the three Homestead Refinement output materials
+        /// (M37, KNOWN-ISSUES #24 - gw2e parity). These are exactly the
+        /// item ids gw2efficiency's own cheapestTree.ts hardcodes
+        /// ('102306', '102205', '103049') for its per-material
+        /// userEfficiencyTiers gate. Confirmed via api.guildwars2.com/v2/items.
+        /// </summary>
+        public const int RefinedHomesteadFiberItemId = 102306;
+        public const int RefinedHomesteadMetalItemId = 102205;
+        public const int RefinedHomesteadWoodItemId = 103049;
+
+        /// <summary>
+        /// The three Homestead Refinement material ids, for iteration
+        /// (e.g. validating a HomesteadEfficiencyTiers map's keys).
+        /// </summary>
+        public static readonly IReadOnlyList<int> HomesteadRefinementMaterialIds =
+            new[] { RefinedHomesteadFiberItemId, RefinedHomesteadMetalItemId, RefinedHomesteadWoodItemId };
+
         // TODO: Currency names are sourced from api.guildwars2.com/v2/currencies.
         // Verify against the official API if broadening coverage beyond this set.
         public static readonly Dictionary<int, string> KnownCurrencyNames = new Dictionary<int, string>

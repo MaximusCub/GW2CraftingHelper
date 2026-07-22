@@ -44,6 +44,18 @@ namespace VendorOfferUpdater
         // per-offer subobjects, but the module has no consuming model for those
         // (Models/TimegatedItem.cs's TimegatedCapType is Daily/Weekly only) -
         // deliberately not scraped here. See KNOWN-ISSUES.md item 28.
+        //
+        // M37 (KNOWN-ISSUES #24): "Has requirement" is populated by the
+        // {{vendor table row|requirement=...}} parameter (confirmed live via
+        // a direct SMW ask probe against Homestead Refinement-Metal Forge:
+        // tier-0 rows return an empty array, tier-1/tier-2 rows return
+        // exactly "one [[Homestead Upgrade: ...]]" / "two [[Homestead
+        // Upgrade: ...]]" as a single _txt-typed value) - this is how
+        // ConvertToOffer/HomesteadTierResolver determine a Homestead
+        // Refinement offer's efficiency tier. The property is generic
+        // (used by many non-Homestead vendor rows too, e.g. achievement
+        // gates); HomesteadTierResolver only interprets it for the three
+        // known Homestead Refinement merchant names.
         private static readonly string PrintoutSuffix =
             "|?Sells item.Has game id" +
             "|?Sells item" +
@@ -52,19 +64,20 @@ namespace VendorOfferUpdater
             "|?Has vendor" +
             "|?Located in" +
             "|?Has daily purchase cap" +
-            "|?Has weekly purchase cap";
+            "|?Has weekly purchase cap" +
+            "|?Has requirement";
 
         /// <summary>
         /// Queries the wiki for items sold by vendors, returning raw parsed results
         /// and query statistics.
         ///
         /// Vendor data lives on subobject pages (e.g. "NPC#vendor1") with properties:
-        ///   Sells item          – the item page
-        ///   Sells item.Has game id – item's GW2 game ID (property chain)
-        ///   Has item quantity    – output count
-        ///   Has item cost        – record: { Has item value, Has item currency }
-        ///   Has vendor           – NPC page
-        ///   Located in           – location pages
+        ///   Sells item          - the item page
+        ///   Sells item.Has game id - item's GW2 game ID (property chain)
+        ///   Has item quantity    - output count
+        ///   Has item cost        - record: { Has item value, Has item currency }
+        ///   Has vendor           - NPC page
+        ///   Located in           - location pages
         ///   Has daily purchase cap  - daily purchase limit (absent = uncapped)
         ///   Has weekly purchase cap - weekly purchase limit (absent = uncapped)
         ///
@@ -233,7 +246,7 @@ namespace VendorOfferUpdater
                 return;
             }
 
-            // OVERFLOW — check depth limit
+            // OVERFLOW - check depth limit
             if (depth >= _options.MaxPrefixDepth)
             {
                 Console.WriteLine(
@@ -342,7 +355,7 @@ namespace VendorOfferUpdater
             }
             Console.WriteLine();
             Console.WriteLine(
-                "Actual request count is unknown without probing — " +
+                "Actual request count is unknown without probing - " +
                 "depends on data distribution.");
         }
 
@@ -357,7 +370,15 @@ namespace VendorOfferUpdater
                 .Select(c => $"{c.Value}:{c.Currency ?? ""}")
                 .ToArray();
 
-            return $"{r.GameId}|{r.OutputQuantity ?? 1}|{merchant}|{string.Join(";", costs)}";
+            // M37 (KNOWN-ISSUES #24): Requirement is folded in so two rows
+            // that differ ONLY by requirement text are not conflated as
+            // "the same row seen twice" - the real, wiki-documented Potato
+            // anomaly (Homestead Refinement-Farm: the tier-1 row is not
+            // discounted from the tier-0 row, so both are "8 Potato -> 1
+            // Fiber" with different Requirement text) would otherwise be
+            // silently collapsed to one row here, before ConvertToOffer/the
+            // OfferId hasher ever get a chance to tell them apart by tier.
+            return $"{r.GameId}|{r.OutputQuantity ?? 1}|{merchant}|{string.Join(";", costs)}|{r.Requirement ?? ""}";
         }
 
         private async Task<string> FetchWithRetryAsync(string url, CancellationToken ct)
@@ -388,7 +409,7 @@ namespace VendorOfferUpdater
                         {
                             cooldownMs = Math.Max(cooldownMs, (int)delta403.TotalMilliseconds);
                         }
-                        // Add jitter: ±10%
+                        // Add jitter: +/-10%
                         int jitter = (int)(cooldownMs * 0.1);
                         cooldownMs += Random.Shared.Next(-jitter, jitter + 1);
                         cooldownMs = Math.Max(cooldownMs, 0);
@@ -485,7 +506,20 @@ namespace VendorOfferUpdater
                 result.WeeklyCap = weeklyCap[0].GetInt32();
             }
 
-            // Has item cost — record type containing nested fields
+            // Has requirement (M37, KNOWN-ISSUES #24) - a _txt property, so
+            // its array entries are plain strings (e.g. "one [[Homestead
+            // Upgrade: Ore Trade Efficiency]]"), not page-link objects.
+            // First non-empty entry only: confirmed live that Homestead
+            // Refinement rows carry at most one value (no vendor-level
+            // default requirement is set on these pages) - see
+            // HomesteadTierResolver for the actual tier interpretation.
+            if (printouts.TryGetProperty("Has requirement", out var requirement) &&
+                requirement.GetArrayLength() > 0)
+            {
+                result.Requirement = requirement[0].GetString();
+            }
+
+            // Has item cost - record type containing nested fields
             if (printouts.TryGetProperty("Has item cost", out var costArray))
             {
                 foreach (var costRecord in costArray.EnumerateArray())
@@ -558,7 +592,7 @@ namespace VendorOfferUpdater
 
             int delay = _effectiveDelay;
 
-            // Batch into groups — wiki SMW limits query complexity (OR conditions).
+            // Batch into groups - wiki SMW limits query complexity (OR conditions).
             // 50 items per batch exceeds the wiki's depth limit; 10 is safe.
             const int batchSize = 10;
 
@@ -638,5 +672,9 @@ namespace VendorOfferUpdater
         public List<string> Locations { get; set; } = new List<string>();
         public int? DailyCap { get; set; }
         public int? WeeklyCap { get; set; }
+
+        // M37 (KNOWN-ISSUES #24): raw "Has requirement" text, or null if
+        // the row has none. See HomesteadTierResolver.
+        public string Requirement { get; set; }
     }
 }

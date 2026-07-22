@@ -17,7 +17,15 @@ namespace GW2CraftingHelper.Services
             string merchantName,
             IReadOnlyList<string> locations,
             int? dailyCap,
-            int? weeklyCap)
+            int? weeklyCap,
+            // M37 (KNOWN-ISSUES #24): optional so a pre-existing call site
+            // (none of which know about Homestead tiers) need not pass it,
+            // but this does NOT keep the hash byte-for-byte identical to
+            // the pre-M37 value: the ";homesteadTier=" segment below is
+            // appended unconditionally (as "null" when omitted), so any
+            // offer's OfferId changes the first time it is recomputed with
+            // this code, whether or not its own tier is null.
+            int? homesteadTier = null)
         {
             var sb = new StringBuilder();
 
@@ -63,6 +71,11 @@ namespace GW2CraftingHelper.Services
             sb.Append(";weeklyCap=");
             sb.Append(weeklyCap.HasValue
                 ? weeklyCap.Value.ToString(CultureInfo.InvariantCulture)
+                : "null");
+
+            sb.Append(";homesteadTier=");
+            sb.Append(homesteadTier.HasValue
+                ? homesteadTier.Value.ToString(CultureInfo.InvariantCulture)
                 : "null");
 
             using (var sha = SHA256.Create())

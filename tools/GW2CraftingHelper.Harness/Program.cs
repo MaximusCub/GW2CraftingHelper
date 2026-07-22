@@ -77,6 +77,12 @@ namespace GW2CraftingHelper.Harness
             bool printCacheStats = false;
             bool clearOverlayCache = false;
             bool dumpTree = false;
+            // M37 (KNOWN-ISSUES #24): -1 = not specified -> pipeline default
+            // (HomesteadEfficiencyTiers.Default, tier 0 for every material).
+            // Applies the SAME tier uniformly to Fiber/Metal/Wood - a single
+            // flag is sufficient for this offline verification tool; the
+            // live module exposes the three independently (Settings tab).
+            int homesteadTier = -1;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -109,6 +115,27 @@ namespace GW2CraftingHelper.Harness
                     case "--dump-tree":
                         dumpTree = true;
                         break;
+                    case "--homestead-tier":
+                        if (i + 1 < args.Length)
+                        {
+                            homesteadTier = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                            // Adversarial-review finding: HomesteadEfficiencyTiers'
+                            // constructor throws ArgumentOutOfRangeException for
+                            // any tier > 2, and this flag's own usage string below
+                            // documents <0|1|2> as the only valid values - reject
+                            // out-of-range input here with a usage error instead
+                            // of letting the exception crash the tool, mirroring
+                            // ModuleSettings.ClampTier / SettingsInputParser.
+                            // TryParseTier's reject-invalid discipline.
+                            if (homesteadTier < 0 || homesteadTier > 2)
+                            {
+                                Console.Error.WriteLine(
+                                    $"Invalid --homestead-tier value: {homesteadTier} " +
+                                    "(must be 0, 1, or 2).");
+                                return 1;
+                            }
+                        }
+                        break;
                 }
             }
 
@@ -117,7 +144,8 @@ namespace GW2CraftingHelper.Harness
                 Console.Error.WriteLine(
                     "Usage: GW2CraftingHelper.Harness --profile <n> " +
                     "[--iterations <n>] [--live] [--raw] " +
-                    "[--print-cache-stats] [--clear-overlay-cache] [--dump-tree]");
+                    "[--print-cache-stats] [--clear-overlay-cache] [--dump-tree] " +
+                    "[--homestead-tier <0|1|2>]");
                 return 1;
             }
 
@@ -270,16 +298,32 @@ namespace GW2CraftingHelper.Harness
                     currencyMetadataService: null,
                     acquisitionHints: acquisitionHints);
 
+                // M37 (KNOWN-ISSUES #24): null (unspecified --homestead-tier)
+                // -> GenerateStructuredAsync's own default
+                // (HomesteadEfficiencyTiers.Default, tier 0 everywhere).
+                HomesteadEfficiencyTiers homesteadTiers = null;
+                if (homesteadTier >= 0)
+                {
+                    homesteadTiers = new HomesteadEfficiencyTiers(new Dictionary<int, int>
+                    {
+                        { Gw2Constants.RefinedHomesteadFiberItemId, homesteadTier },
+                        { Gw2Constants.RefinedHomesteadMetalItemId, homesteadTier },
+                        { Gw2Constants.RefinedHomesteadWoodItemId, homesteadTier }
+                    });
+                    Console.WriteLine($"Homestead efficiency tier: {homesteadTier} (all materials)");
+                    Console.WriteLine();
+                }
+
                 // Run each profile item
                 foreach (var item in items)
                 {
                     if (dumpTree)
                     {
-                        await DumpItemTree(pipeline, item, mode);
+                        await DumpItemTree(pipeline, item, mode, homesteadTiers);
                     }
                     else
                     {
-                        await RunItemProfile(pipeline, item, iterations, raw, mode);
+                        await RunItemProfile(pipeline, item, iterations, raw, mode, homesteadTiers);
                     }
                     Console.WriteLine();
                 }
@@ -339,6 +383,25 @@ namespace GW2CraftingHelper.Harness
                             RequiresLive = false
                         }
                     };
+                case 3:
+                    // M37 (KNOWN-ISSUES #24): Klobjarne Geirr is the
+                    // concrete, currently-generatable plan the milestone's
+                    // research report identified as reaching Homestead
+                    // Refinement - via Gift of the Homesteader -> Gift of
+                    // Embracing Refuge -> 250 each Refined Homestead
+                    // Metal/Wood/Fiber (docs/research/m37-r1-homestead.md
+                    // Section 3.6). Use with --homestead-tier to compare
+                    // decisions/quantities at tier 0 vs tier 2.
+                    return new List<ProfileItem>
+                    {
+                        new ProfileItem
+                        {
+                            Name = "Klobjarne Geirr",
+                            ItemId = 103815,
+                            Quantity = 1,
+                            RequiresLive = false
+                        }
+                    };
                 default:
                     return null;
             }
@@ -354,13 +417,15 @@ namespace GW2CraftingHelper.Harness
         /// invariant, which only governs runtime UI surfaces).
         /// </summary>
         private static async Task DumpItemTree(
-            CraftingPlanPipeline pipeline, ProfileItem item, string mode)
+            CraftingPlanPipeline pipeline, ProfileItem item, string mode,
+            HomesteadEfficiencyTiers homesteadTiers = null)
         {
             Console.WriteLine($"=== {item.Name} ({item.ItemId}) x{item.Quantity} -- tree dump [{mode}] ===");
             Console.WriteLine();
 
             var result = await pipeline.GenerateStructuredAsync(
-                item.ItemId, item.Quantity, null, CancellationToken.None);
+                item.ItemId, item.Quantity, null, CancellationToken.None,
+                homesteadTiers: homesteadTiers);
 
             Console.WriteLine("--- Raw pre-solve recipe tree (node.Recipes.Count = seed coverage) ---");
             if (result.SolveContext != null && result.SolveContext.Tree != null)
@@ -472,7 +537,8 @@ namespace GW2CraftingHelper.Harness
             ProfileItem item,
             int iterations,
             bool raw,
-            string mode)
+            string mode,
+            HomesteadEfficiencyTiers homesteadTiers = null)
         {
             Console.WriteLine($"=== {item.Name} ({item.ItemId}) x{item.Quantity} -- {iterations} iteration(s) [{mode}] ===");
 
@@ -481,7 +547,8 @@ namespace GW2CraftingHelper.Harness
             for (int i = 0; i < iterations; i++)
             {
                 var result = await pipeline.GenerateStructuredAsync(
-                    item.ItemId, item.Quantity, null, CancellationToken.None);
+                    item.ItemId, item.Quantity, null, CancellationToken.None,
+                    homesteadTiers: homesteadTiers);
 
                 // Extract timing lines (everything before the summary header)
                 var timingLines = new List<string>();

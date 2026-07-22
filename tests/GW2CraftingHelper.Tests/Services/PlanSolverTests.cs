@@ -2638,6 +2638,350 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromTp, result.Decisions[itemB.NodeId].Source);
         }
 
+        // --- M37: Homestead Refinement efficiency tier gating (gw2e parity,
+        // KNOWN-ISSUES #24) - the live defect fix: our seed already carries
+        // all tier rows untagged, so before this gate the solver silently
+        // assumed every account had every efficiency upgrade. ---
+
+        private static VendorOffer HomesteadOffer(
+            int outputItemId, int inputCount, int outputCount, int homesteadTier,
+            int? weeklyCap = null, string merchantName = "Homestead Refinement\u2014Metal Forge")
+        {
+            return new VendorOffer
+            {
+                OfferId = $"homestead-{outputItemId}-{homesteadTier}-{inputCount}",
+                OutputItemId = outputItemId,
+                OutputCount = outputCount,
+                CostLines = new List<CostLine>
+                {
+                    // Item id is arbitrary/unique per test; only its buy
+                    // price (set by the caller) matters to the solver.
+                    new CostLine { Type = "Item", Id = 900 + homesteadTier, Count = inputCount }
+                },
+                MerchantName = merchantName,
+                Locations = new List<string> { "Hearth's Glow" },
+                WeeklyCap = weeklyCap,
+                HomesteadTier = homesteadTier
+            };
+        }
+
+        [Fact]
+        public void HomesteadOffer_DefaultTierZero_ExcludesHigherTierOffers()
+        {
+            // Metal Forge Iron Ore, matching the wiki-verified conversion
+            // table exactly: tier0 4->2, tier1 2->2, tier2 1->1 (docs/
+            // research/m37-r1-homestead.md Section 2.2). Iron ore costs 1
+            // coin each; tier2's 1-ore rate is far cheaper per unit of
+            // output than tier0's 4-ore rate. Default (no homesteadTiers
+            // argument -> HomesteadEfficiencyTiers.Default, tier 0 for
+            // every material) must still pick the tier-0 row.
+            var tree = Leaf(102205, 2); // Refined Homestead Metal, need 2
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 900, new ItemPrice { ItemId = 900, BuyInstant = 1 } }, // tier0 input (900+0)
+                { 901, new ItemPrice { ItemId = 901, BuyInstant = 1 } }, // tier1 input (900+1)
+                { 902, new ItemPrice { ItemId = 902, BuyInstant = 1 } }  // tier2 input (900+2)
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    102205, new List<VendorOffer>
+                    {
+                        HomesteadOffer(102205, inputCount: 4, outputCount: 2, homesteadTier: 0),
+                        HomesteadOffer(102205, inputCount: 2, outputCount: 2, homesteadTier: 1),
+                        HomesteadOffer(102205, inputCount: 1, outputCount: 1, homesteadTier: 2)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy).Plan;
+
+            var step = Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, step.Source);
+            // Tier0 offer: ceil(2/2)=1 purchase of 4 ore = 4 coin.
+            Assert.Equal(4, step.TotalCost);
+        }
+
+        [Fact]
+        public void HomesteadOffer_TierTwoConfigured_AdmitsCheaperHigherTierOffer()
+        {
+            var tree = Leaf(102205, 2);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 900, new ItemPrice { ItemId = 900, BuyInstant = 1 } },
+                { 901, new ItemPrice { ItemId = 901, BuyInstant = 1 } },
+                { 902, new ItemPrice { ItemId = 902, BuyInstant = 1 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    102205, new List<VendorOffer>
+                    {
+                        HomesteadOffer(102205, inputCount: 4, outputCount: 2, homesteadTier: 0),
+                        HomesteadOffer(102205, inputCount: 2, outputCount: 2, homesteadTier: 1),
+                        HomesteadOffer(102205, inputCount: 1, outputCount: 1, homesteadTier: 2)
+                    }
+                }
+            };
+            var tiers = new HomesteadEfficiencyTiers(new Dictionary<int, int>
+            {
+                { Gw2Constants.RefinedHomesteadMetalItemId, 2 }
+            });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(
+                tree, prices, vendorOffers, PriceBasis.InstantBuy,
+                homesteadTiers: tiers).Plan;
+
+            var step = Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, step.Source);
+            // Tier2 offer: ceil(2/1)=2 purchases of 1 ore = 2 coin - cheaper
+            // than tier0's 4 coin, and only reachable once tier 2 is
+            // configured for Metal.
+            Assert.Equal(2, step.TotalCost);
+        }
+
+        [Fact]
+        public void HomesteadOffer_TierOneConfigured_AdmitsTierOneButNotTierTwo()
+        {
+            var tree = Leaf(102205, 2);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 900, new ItemPrice { ItemId = 900, BuyInstant = 1 } },
+                { 901, new ItemPrice { ItemId = 901, BuyInstant = 1 } },
+                { 902, new ItemPrice { ItemId = 902, BuyInstant = 1 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    102205, new List<VendorOffer>
+                    {
+                        HomesteadOffer(102205, inputCount: 4, outputCount: 2, homesteadTier: 0),
+                        HomesteadOffer(102205, inputCount: 2, outputCount: 2, homesteadTier: 1),
+                        HomesteadOffer(102205, inputCount: 1, outputCount: 1, homesteadTier: 2)
+                    }
+                }
+            };
+            var tiers = new HomesteadEfficiencyTiers(new Dictionary<int, int>
+            {
+                { Gw2Constants.RefinedHomesteadMetalItemId, 1 }
+            });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(
+                tree, prices, vendorOffers, PriceBasis.InstantBuy,
+                homesteadTiers: tiers).Plan;
+
+            var step = Assert.Single(plan.Steps);
+            // Cheapest of {tier0, tier1} (tier2 excluded): tier1's 2-ore
+            // rate (ceil(2/2)=1 purchase = 2 coin) beats tier0's 4 coin.
+            Assert.Equal(2, step.TotalCost);
+        }
+
+        [Fact]
+        public void HomesteadTierConfigured_ForDifferentMaterial_DoesNotAffectThisOne()
+        {
+            // Configuring Fiber's tier to 2 must not admit a higher-tier
+            // Metal offer - the gate is per-material, not global.
+            var tree = Leaf(102205, 2);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 900, new ItemPrice { ItemId = 900, BuyInstant = 1 } },
+                { 902, new ItemPrice { ItemId = 902, BuyInstant = 1 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    102205, new List<VendorOffer>
+                    {
+                        HomesteadOffer(102205, inputCount: 4, outputCount: 2, homesteadTier: 0),
+                        HomesteadOffer(102205, inputCount: 1, outputCount: 1, homesteadTier: 2)
+                    }
+                }
+            };
+            var tiers = new HomesteadEfficiencyTiers(new Dictionary<int, int>
+            {
+                { Gw2Constants.RefinedHomesteadFiberItemId, 2 }
+            });
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(
+                tree, prices, vendorOffers, PriceBasis.InstantBuy,
+                homesteadTiers: tiers).Plan;
+
+            var step = Assert.Single(plan.Steps);
+            Assert.Equal(4, step.TotalCost);
+        }
+
+        [Fact]
+        public void NonHomesteadVendorOffer_UnaffectedByHomesteadTierSetting()
+        {
+            // A plain vendor offer with HomesteadTier == null (every
+            // existing non-Homestead offer in the seed) must be completely
+            // unaffected by any homesteadTiers configuration, at default or
+            // otherwise - byte-identical to before this feature existed.
+            var tree = Leaf(1, 2);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5) } }
+            };
+            var tiers = HomesteadEfficiencyTiers.Default;
+            var solver = new PlanSolver();
+
+            var planDefault = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy).Plan;
+            var planExplicit = solver.Solve(
+                tree, prices, vendorOffers, PriceBasis.InstantBuy, homesteadTiers: tiers).Plan;
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, planDefault.Steps[0].Source);
+            Assert.Equal(10, planDefault.TotalCoinCost);
+            Assert.Equal(planDefault.TotalCoinCost, planExplicit.TotalCoinCost);
+        }
+
+        [Fact]
+        public void ExordiumStyleTree_NoHomesteadOffersReachable_ByteIdenticalAtAnyTier()
+        {
+            // Regression guard mirroring the research report's own
+            // BFS-verified finding: Exordium's tree reaches zero Homestead
+            // Refinement materials, so a plan for a tree with NO homestead
+            // offers at all must be byte-identical regardless of the
+            // configured tier setting. A small synthetic tree stands in for
+            // the real (14k-recipe) Exordium tree here; the real tree is
+            // checked via the offline Harness per this milestone's manual
+            // verification step.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, Leaf(2, 3), Leaf(3, 5)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 20 } }
+            };
+            var solver = new PlanSolver();
+
+            var planTier0 = solver.Solve(tree, prices, null, PriceBasis.InstantBuy).Plan;
+            var maxTiers = new HomesteadEfficiencyTiers(new Dictionary<int, int>
+            {
+                { Gw2Constants.RefinedHomesteadFiberItemId, 2 },
+                { Gw2Constants.RefinedHomesteadMetalItemId, 2 },
+                { Gw2Constants.RefinedHomesteadWoodItemId, 2 }
+            });
+            var planTier2 = solver.Solve(
+                tree, prices, null, PriceBasis.InstantBuy, homesteadTiers: maxTiers).Plan;
+
+            Assert.Equal(planTier0.TotalCoinCost, planTier2.TotalCoinCost);
+            Assert.Equal(planTier0.Steps.Count, planTier2.Steps.Count);
+            for (int i = 0; i < planTier0.Steps.Count; i++)
+            {
+                Assert.Equal(planTier0.Steps[i].Source, planTier2.Steps[i].Source);
+                Assert.Equal(planTier0.Steps[i].TotalCost, planTier2.Steps[i].TotalCost);
+            }
+        }
+
+        // --- M37: Homestead mixed-offer cap-notice gap (KNOWN-ISSUES
+        // #24/#25 Section 3.3) - a fix was attempted here (summing each
+        // occurrence's own true purchase count when occurrences disagreed
+        // on the winning offer but agreed on the raw (DailyCap, WeeklyCap)
+        // tuple) but reverted after adversarial review: the wiki's per-row
+        // WeeklyCap the Homestead seed data carries is a template
+        // parameter, not a confirmed per-station aggregate (see
+        // KNOWN-ISSUES #24's "Cap data" note), so two occurrences agreeing
+        // on that raw number does not mean they agree on a real shared
+        // limit worth summing against - and every Homestead row within one
+        // station shares that same number, so the summing branch fired for
+        // the ordinary case, not a rare edge case. The pre-existing
+        // suppress-on-Conflict behavior is kept; both tests below document
+        // that as an intentional, narrower limitation rather than a silent
+        // regression risk. ---
+
+        [Fact]
+        public void MixedOfferSameWeeklyCap_NoticeStillSuppressed_DocumentedLimitation()
+        {
+            // Same bulk-discount-threshold shape as
+            // MultiOccurrenceDifferentWinningOffers_LeavesPerOccurrenceSumUnmerged
+            // (qty=1 deterministically favors the 1-for-2 offer, qty=100
+            // deterministically favors the 100-for-150 offer - genuine
+            // disagreement, not a tie). Both offers happen to share the
+            // identical WeeklyCap=1 (the normal Homestead shape - every
+            // offer at one station carries the same wiki-scraped per-row
+            // number), but Conflict (the offer-shape ratchet) alone still
+            // suppresses the notice: there is no verified single cap to
+            // check the mixed-offer total against.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, Leaf(99, 1), Leaf(99, 100)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    99, new List<VendorOffer>
+                    {
+                        CoinVendorOffer(99, 2, outputCount: 1, weeklyCap: 1),
+                        CoinVendorOffer(99, 150, outputCount: 100, weeklyCap: 1)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy);
+            var plan = result.Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            // Confirms Conflict actually ratcheted true here (matching the
+            // pre-existing sibling test's own proof for this exact shape),
+            // so the empty-notice assertion below is testing genuine
+            // Conflict suppression, not merely "no cap was ever exceeded".
+            Assert.Equal(0, vendorStep.VendorOfferOutputCount);
+            Assert.Equal(152, vendorStep.TotalCost);
+
+            Assert.Empty(plan.TimegatedItems);
+        }
+
+        [Fact]
+        public void MixedOfferDifferentWeeklyCap_NoticeStillSuppressed_DocumentedLimitation()
+        {
+            // Same bulk-discount-threshold shape as
+            // MultiOccurrenceDifferentWinningOffers_LeavesPerOccurrenceSumUnmerged
+            // (qty=1 favors the 1-for-2 offer, qty=100 favors the
+            // 100-for-150 offer - genuine, deterministic disagreement, not
+            // a tie), but this time the two offers ALSO carry different
+            // WeeklyCap values. Whether or not the raw cap number happens to
+            // match across occurrences, Conflict alone suppresses the
+            // notice - same as before this milestone. This documents that
+            // limitation as intentional rather than a silent regression
+            // risk.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(99, 1),
+                    Leaf(99, 100)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                {
+                    99, new List<VendorOffer>
+                    {
+                        CoinVendorOffer(99, 2, outputCount: 1, weeklyCap: 5),
+                        CoinVendorOffer(99, 150, outputCount: 100, weeklyCap: 999)
+                    }
+                }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy).Plan;
+
+            // Confirms Conflict actually ratcheted true here (matching the
+            // pre-existing sibling test's own proof for this exact shape),
+            // so the empty-notice assertion below is testing genuine
+            // Conflict suppression, not merely "no cap was ever exceeded".
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(0, vendorStep.VendorOfferOutputCount);
+
+            Assert.Empty(plan.TimegatedItems);
+        }
+
         // --- M37 (KNOWN-ISSUES #26 fix-pass finding): a Quantity == 0 node
         // must never leave a standalone "ghost" step, even when its own
         // resolved Source/stepKey does not match any other occurrence's ---

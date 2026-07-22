@@ -17,7 +17,17 @@ namespace VendorOfferUpdater
             string merchantName,
             IReadOnlyList<string> locations,
             int? dailyCap,
-            int? weeklyCap)
+            int? weeklyCap,
+            // M37 (KNOWN-ISSUES #24): optional so a caller need not pass
+            // it, but this does NOT keep the hash byte-for-byte identical
+            // to the pre-M37 value: the ";homesteadTier=" segment below is
+            // appended unconditionally (as "null" when omitted), so any
+            // offer's OfferId changes the first time it is recomputed with
+            // this code, whether or not its own tier is null. Existing
+            // rows only stay stable because callers like --merge-into copy
+            // untouched baseline objects through rather than recomputing
+            // them. Mirrors Services/VendorOfferHasher.cs exactly.
+            int? homesteadTier = null)
         {
             var sb = new StringBuilder();
 
@@ -63,6 +73,11 @@ namespace VendorOfferUpdater
             sb.Append(";weeklyCap=");
             sb.Append(weeklyCap.HasValue
                 ? weeklyCap.Value.ToString(CultureInfo.InvariantCulture)
+                : "null");
+
+            sb.Append(";homesteadTier=");
+            sb.Append(homesteadTier.HasValue
+                ? homesteadTier.Value.ToString(CultureInfo.InvariantCulture)
                 : "null");
 
             byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()));
