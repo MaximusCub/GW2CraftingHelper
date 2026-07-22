@@ -3,6 +3,10 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net48</TargetFramework>
+    <!-- Pinned to the value this net48 project actually resolves to today - measured
+         via a diagnostic-verbosity build - matching GW2CraftingHelper.csproj (M38
+         WP-02 / a6-csharp.md section 10). -->
+    <LangVersion>7.3</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

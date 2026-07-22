@@ -1,0 +1,87 @@
+# Root .editorconfig for GW2CraftingHelper.
+#
+# This codifies the house style CLAUDE.md already documents and that the
+# codebase already follows almost everywhere (measured by sampling files
+# across Models/, Services/, and Views/ during M38 WP-02) - it is not
+# introducing a new style. Build-time enforcement of the mechanical parts
+# (braces, one-statement-per-line, using order) comes from StyleCop.Analyzers
+# + GW2CraftingHelper.ruleset (see packages.config); the settings below are
+# consumed by editors/IDEs and by StyleCop's own settings resolution.
+root = true
+
+[*]
+indent_style = space
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.cs]
+charset = utf-8
+indent_size = 4
+tab_width = 4
+
+# Allman brace style (CLAUDE.md: "Use Allman brace style for C#"; StyleCop's
+# SA1500 enforces this at build time - see GW2CraftingHelper.ruleset, which
+# deliberately leaves SA1500 at its default warning severity).
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_new_line_between_query_expression_clauses = true
+
+# using directives: System.* namespaces first, ordered alphabetically within
+# each group (the majority pattern; StyleCop's SA1208/SA1210 catch drift at
+# build time). Views/*.cs has pre-existing exceptions (Blish_HUD usings
+# listed first) - left alone per WP-02 scope (no drive-by reformatting).
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# var vs explicit type: this codebase mixes both for built-in types with no
+# single enforced preference (measured). Left unopinionated (silent) rather
+# than introduce a new rule the existing code doesn't already follow.
+csharp_style_var_for_built_in_types = true:silent
+csharp_style_var_when_type_is_apparent = true:silent
+csharp_style_var_elsewhere = false:silent
+
+# Naming: private instance fields are _camelCase; private static/const
+# fields (treated as named constants) are PascalCase with no prefix. Both
+# are already ~100% consistent throughout the codebase (measured) - this
+# codifies the existing convention, it does not introduce a new one.
+# IDE-only (IDE1006): this legacy, non-SDK project doesn't wire the
+# built-in CodeStyle analyzers that would turn this into a build warning.
+dotnet_naming_style.camel_case_underscore_prefix.capitalization = camel_case
+dotnet_naming_style.camel_case_underscore_prefix.required_prefix = _
+
+dotnet_naming_style.pascal_case_no_prefix.capitalization = pascal_case
+
+dotnet_naming_symbols.private_static_fields.applicable_kinds = field
+dotnet_naming_symbols.private_static_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_fields.required_modifiers = static
+
+dotnet_naming_symbols.private_const_fields.applicable_kinds = field
+dotnet_naming_symbols.private_const_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_const_fields.required_modifiers = const
+
+dotnet_naming_symbols.private_instance_fields.applicable_kinds = field
+dotnet_naming_symbols.private_instance_fields.applicable_accessibilities = private
+
+dotnet_naming_rule.private_static_fields_should_be_pascal_case.symbols = private_static_fields
+dotnet_naming_rule.private_static_fields_should_be_pascal_case.style = pascal_case_no_prefix
+dotnet_naming_rule.private_static_fields_should_be_pascal_case.severity = suggestion
+
+dotnet_naming_rule.private_const_fields_should_be_pascal_case.symbols = private_const_fields
+dotnet_naming_rule.private_const_fields_should_be_pascal_case.style = pascal_case_no_prefix
+dotnet_naming_rule.private_const_fields_should_be_pascal_case.severity = suggestion
+
+# Evaluated after the two rules above, so a private field that is also
+# static/const is already matched by one of them; this catches everything
+# else private (i.e. the instance fields).
+dotnet_naming_rule.private_instance_fields_should_be_camel_case.symbols = private_instance_fields
+dotnet_naming_rule.private_instance_fields_should_be_camel_case.style = camel_case_underscore_prefix
+dotnet_naming_rule.private_instance_fields_should_be_camel_case.severity = suggestion
+
+# csproj/sln/json/config files: observed 2-space indent throughout.
+[*.{csproj,sln,json,config}]
+indent_size = 2
