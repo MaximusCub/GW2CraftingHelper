@@ -291,7 +291,6 @@ namespace GW2CraftingHelper.Harness
                     new PlanSolver(),
                     new ItemMetadataService(itemApi, itemNameSeed),
                     vendorStore,
-                    resolver: null,
                     reducer: new InventoryReducer(),
                     accountRecipeClient: null,
                     currencyMetadataService: null,

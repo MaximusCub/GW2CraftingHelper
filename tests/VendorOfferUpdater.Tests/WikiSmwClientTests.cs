@@ -140,8 +140,9 @@ namespace VendorOfferUpdater.Tests
         {
             var (client, handler, httpClient) = CreateClient();
             using var _ = httpClient;
-            // No dailyCap/weeklyCap passed - WikiJsonBuilder writes the real SMW
-            // empty-array shape ("no cap" is an empty array, never a missing key).
+            // No dailyCap/weeklyCap/seasonalCap passed - WikiJsonBuilder writes the
+            // real SMW empty-array shape ("no cap" is an empty array, never a
+            // missing key).
             string json = new WikiJsonBuilder()
                 .AddResult("NPC#vendor1", gameId: 100, vendor: "Candy Corn Vendor")
                 .Build();
@@ -152,12 +153,13 @@ namespace VendorOfferUpdater.Tests
                 "[[Sells item::+]]", FastOptions());
 
             Assert.Single(results);
-            // Must be null (uncapped), never 0 - PlanSolver.FinalizeVendorBatches
+            // Must be null (uncapped), never 0 - VendorBatchSolver.FinalizeVendorBatches
             // treats HasValue && Value > 0 as "has a real cap", so a wrongly-mapped
             // 0 would be silently ignored, while a wrongly-mapped null-that-should-
             // be-a-real-value would silently mask a real cap.
             Assert.Null(results[0].DailyCap);
             Assert.Null(results[0].WeeklyCap);
+            Assert.Null(results[0].SeasonalCap);
         }
 
         [Fact]
@@ -177,6 +179,59 @@ namespace VendorOfferUpdater.Tests
             Assert.Single(results);
             Assert.Equal(5, results[0].DailyCap);
             Assert.Null(results[0].WeeklyCap);
+        }
+
+        // Astral Acclaim package (KNOWN-ISSUES #28): "Has seasonal purchase
+        // cap" is a distinct SMW property from daily/weekly - live-confirmed
+        // exclusively on the Wizard's Vault family of pages.
+
+        [Fact]
+        public async Task PopulatedSeasonalCap_ParsedOntoResult()
+        {
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
+            string json = new WikiJsonBuilder()
+                .AddResult("Wizard's Vault#vendor28",
+                    gameId: 19675,
+                    vendor: "Wizard's Vault",
+                    seasonalCap: 20)
+                .Build();
+
+            handler.Enqueue(json);
+
+            var (results, _) = await client.QueryVendorItemsAsync(
+                "[[Sells item::+]]", FastOptions());
+
+            Assert.Single(results);
+            Assert.Equal(20, results[0].SeasonalCap);
+            // Only seasonalCap was set - daily/weekly must stay null, not 0.
+            Assert.Null(results[0].DailyCap);
+            Assert.Null(results[0].WeeklyCap);
+        }
+
+        [Fact]
+        public async Task SeasonalCapAlongsideOtherCaps_AllParsedIndependently()
+        {
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
+            string json = new WikiJsonBuilder()
+                .AddResult("NPC#vendor1",
+                    gameId: 100,
+                    vendor: "Vendor",
+                    dailyCap: 5,
+                    weeklyCap: 1,
+                    seasonalCap: 20)
+                .Build();
+
+            handler.Enqueue(json);
+
+            var (results, _) = await client.QueryVendorItemsAsync(
+                "[[Sells item::+]]", FastOptions());
+
+            Assert.Single(results);
+            Assert.Equal(5, results[0].DailyCap);
+            Assert.Equal(1, results[0].WeeklyCap);
+            Assert.Equal(20, results[0].SeasonalCap);
         }
 
         [Fact]

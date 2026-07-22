@@ -92,6 +92,7 @@ DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
    - `Located in` — location pages
    - `Has daily purchase cap` - daily purchase limit (absent = uncapped)
    - `Has weekly purchase cap` - weekly purchase limit (absent = uncapped)
+   - `Has seasonal purchase cap` - Wizard's Vault seasonal purchase limit (absent = uncapped or not a Vault offer)
 
 ## Rate Limiting
 
@@ -116,7 +117,7 @@ DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
         { "type": "Currency", "id": 1, "count": 100 }
       ],
       "merchantName": "Miyani"
-      // "locations", "dailyCap", "weeklyCap" omitted when null
+      // "locations", "dailyCap", "weeklyCap", "seasonalCap" omitted when null
     }
   ]
 }
@@ -139,6 +140,9 @@ Offers are deduplicated by `offerId` and sorted alphabetically. Null fields are 
 - **Wiki updates** when the community documents new or corrected vendor data
 - **Periodically** (e.g. quarterly) to pick up gradual wiki improvements
 - After modifying the VendorOfferUpdater tool itself, to verify output correctness
+- **Each Wizard's Vault season** - the live "Wizard's Vault" page's current-season
+  stock/prices/caps can change at a season boundary. See "Wizard's Vault Rotation"
+  below for the scoped refresh command.
 - **After adding new printouts/fields to `WikiSmwClient`** - Re-running Pass 2 alone
   (`--resolve-item-currencies-only`) against `ref/wiki_vendor_cache.json` reuses the
   old cached `WikiVendorResult` shape and will silently omit the new fields forever;
@@ -148,3 +152,74 @@ Offers are deduplicated by `offerId` and sorted alphabetically. Null fields are 
   needing to delete `ref/wiki_vendor_cache.json` first. Deleting the cache first is only
   needed if a page must be dropped from the cache entirely (e.g. it no longer resolves
   on the wiki) rather than refreshed.
+
+## Wizard's Vault Rotation
+
+The Wizard's Vault (Astral Acclaim) reward store spans three distinct wiki
+pages, all captured by our scrape under three distinct `merchantName` values.
+The naming itself already tells you which "kind" of page an offer came from -
+no separate field is needed to distinguish them:
+
+| `merchantName` | What it is | Rotation behavior |
+|---|---|---|
+| `Wizard's Vault` | The **current season's** live store. | Overwritten each season - prices/caps/stock for THIS page can change at a season boundary. This is the page that carries `seasonalCap` for capped rows (e.g. Mystic Coin 60/season, Mystic Clover 20/season). |
+| `Wizard's Vault/Historical Astral Rewards` | Wiki-maintained archive of **past seasons'** rotated rewards (mostly one-off cosmetics/unlocks that have since left the live page). | Grows over time; a row appearing here does not mean it's currently purchasable. |
+| `Wizard's Vault/Legacy Rewards` | Cosmetics that rotated out of the live store into a permanent "Legacy" tab. | Grows over time; separate from the seasonal-cap system entirely (no `seasonalCap` values observed on this page). |
+
+**Confirmed live (2026-07-22):** `Has seasonal purchase cap` is used
+*exclusively* by pages under this `merchantName` prefix wiki-wide - but
+only TWO of the three pages actually carry it: a `[[Has seasonal
+purchase cap::+]]` probe with no vendor filter returned 29 rows total,
+split between `Wizard's Vault` and `.../Historical Astral Rewards` only
+(zero on `.../Legacy Rewards`, consistent with that page's "separate
+from the seasonal-cap system entirely" note in the table above). No
+other vendor on the wiki uses this property, so those 29 rows are the
+complete set that exists to seed.
+
+**Known wiki-documentation quirk (Bag of Coins tiering):** the two-tier
+"Bag of Coins (1 Gold)" item is represented as two *separate* wiki item
+pages/game-IDs, not one row with two prices. As of this writing, only the
+discount tier ("Bag of Coins (1 Gold) (limited)", 8 AA, seasonal cap 100)
+appears as a `{{vendor table row}}` on the live `Wizard's Vault` page; the
+continuation tier ("Bag of Coins (1 Gold) (unlimited)", 35 AA, uncapped) is
+currently only machine-readable via the `Wizard's Vault/Historical Astral
+Rewards` page's subobjects, even though it is still a live, purchasable deal
+in-game. Both rows are seeded (from their respective pages) so this doesn't
+lose data, but a from-scratch reader expecting the "unlimited" tier to be
+tagged with the live merchant name will not find it there - this is a wiki
+editorial gap, not a scraper bug. See `docs/research/aa-tier-findings.md` for
+the full investigation.
+
+**To refresh Wizard's Vault data for a new season** (scoped, keeps the diff
+reviewable - mirrors the `--query`/`--merge-into` pattern from KNOWN-ISSUES.md
+item 24's Homestead Refinement seeding):
+
+```bash
+dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj -- \
+  --query "[[Has vendor::~Wizard's Vault*]]" \
+  --merge-into ref/vendor_offers.json \
+  ref/vendor_offers.json
+```
+
+`~Wizard's Vault*` is a prefix wildcard match on `Has vendor` that covers all
+three page names above and nothing else (verified: `Wizard's
+Gobbler`/`Portable Wizard's Tower Exchange`, which share the "Wizard's" word
+but not the "Wizard's Vault" prefix, are not matched), and leaves every
+other merchant's offers byte-for-byte unchanged - but matching the wildcard
+pattern is not the same as coming back with rows to merge. The 2026-07-22
+seeding pass's run of this exact command only actually returned/replaced
+offers for `Wizard's Vault` and `.../Historical Astral Rewards`;
+`.../Legacy Rewards` came back with no rows that run and its existing
+offers passed through untouched (see KNOWN-ISSUES.md item 33). Do not
+assume this command refreshes all three merchants every time it is run -
+check which merchant names actually changed in the resulting diff.
+
+**Stale-offer sweep status:** no automated stale-offer detector exists for
+Wizard's Vault specifically (the general sweep is manual - see
+KNOWN-ISSUES.md item 28). If/when that tooling is built, the `merchantName`
+convention above ("Wizard's Vault" = current, `.../Historical Astral Rewards`
+= archived, `.../Legacy Rewards` = rotated-out cosmetics) is sufficient to
+tell current-season offers apart from historical ones without any new code -
+a sweep should only ever treat `Wizard's Vault` (current) rows as
+"unexpectedly missing => investigate," never the historical/legacy pages,
+which are expected to retain old rows indefinitely.

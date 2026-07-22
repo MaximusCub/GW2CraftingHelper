@@ -272,7 +272,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- M37 (KNOWN-ISSUES #24): shipped Homestead Refinement tier
-        // data invariant. PlanSolver.EvaluateVendorOffers admits any offer
+        // data invariant. VendorBatchSolver.EvaluateVendorOffers admits any offer
         // whose HomesteadTier is null at every configured tier setting -
         // correct for the 21 one-time "Upgrade" purchase rows the same
         // three merchant pages also sell, but WRONG for a material-
@@ -323,7 +323,7 @@ namespace GW2CraftingHelper.Tests.Services
                         offer.HomesteadTier.HasValue,
                         $"Homestead Refinement material-conversion offer '{offer.OfferId}' " +
                         $"(output item {offer.OutputItemId}) has a null HomesteadTier. " +
-                        "PlanSolver.EvaluateVendorOffers admits a null-tier offer at every " +
+                        "VendorBatchSolver.EvaluateVendorOffers admits a null-tier offer at every " +
                         "configured tier by design (that is correct for the 21 one-time " +
                         "Upgrade-purchase rows, not for a material conversion row), so this " +
                         "would silently reintroduce the always-max-tier defect PR #57 fixed.");
@@ -359,7 +359,12 @@ namespace GW2CraftingHelper.Tests.Services
                 var dataset = _loader.Load(stream);
 
                 Assert.Equal(1, dataset.SchemaVersion);
-                Assert.Equal(53529, dataset.Offers.Count);
+                // Astral Acclaim package (KNOWN-ISSUES #28): a scoped
+                // Wizard's Vault re-scrape (--query + --merge-into) net
+                // added 7 offers (100 removed/replaced, 107 added) while
+                // seeding SeasonalCap - see the package's commit for the
+                // full accounting.
+                Assert.Equal(53536, dataset.Offers.Count);
 
                 Assert.All(dataset.Offers, o =>
                 {
@@ -414,6 +419,42 @@ namespace GW2CraftingHelper.Tests.Services
             using (var badStream = new MemoryStream(Encoding.UTF8.GetBytes("not valid json")))
             {
                 store.LoadBaseline(badStream); // no-op onError default - must not throw
+            }
+        }
+
+        // Astral Acclaim package (KNOWN-ISSUES #33): pins SeasonalCap for
+        // the two task-named Wizard's Vault rows, mirroring the guard
+        // docs/research/m37-r4-vendor-caps.md section 4f recommended for
+        // the analogous daily/weekly case (item 28's Candy-Corn-Ecto
+        // WeeklyCap pin). The count assertion above only catches a row
+        // being added/removed, not its SeasonalCap value silently
+        // changing or dropping to null on a future scoped re-scrape - the
+        // exact class of bug this same package's own Lesser Essence of
+        // Gold gap proved possible for one row. Keyed by stable OfferId
+        // per this file's established convention.
+        [Fact]
+        public void ShippedSeedFile_WizardsVaultSeasonalCaps_MysticCloverAndMysticCoin()
+        {
+            string path = FindRepoFile(Path.Combine("ref", "vendor_offers.json"));
+            Assert.False(
+                string.IsNullOrEmpty(path),
+                "Could not locate ref/vendor_offers.json by walking up from the test assembly's directory.");
+
+            using (var stream = File.OpenRead(path))
+            {
+                var dataset = _loader.Load(stream);
+
+                var mysticClover = dataset.Offers.Single(o =>
+                    o.OfferId == "a30ae3708b74c8c4675f733cd5f0abe6737683eaf8fe5740ebba3bbc9c3c3ec7");
+                Assert.Equal(19675, mysticClover.OutputItemId);
+                Assert.Equal("Wizard's Vault", mysticClover.MerchantName);
+                Assert.Equal(20, mysticClover.SeasonalCap);
+
+                var mysticCoin = dataset.Offers.Single(o =>
+                    o.OfferId == "e1721409d2879cf8bc6063fb449e21a5fbbf1649ad1d2ea84a3d679903c3b8ef");
+                Assert.Equal(19976, mysticCoin.OutputItemId);
+                Assert.Equal("Wizard's Vault", mysticCoin.MerchantName);
+                Assert.Equal(60, mysticCoin.SeasonalCap);
             }
         }
 

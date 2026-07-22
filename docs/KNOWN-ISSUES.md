@@ -1415,7 +1415,7 @@ re-fetched live from the app bundle 2026-07-21 since the earlier M34
 report referenced above was lost). Mechanism:
 - Extracted the M20 single-item per-item arithmetic (over-production
   bump, sell-price lookup, own-materials opportunity cost) out of
-  `CraftingPlanPipeline.ApplySellSideEconomics` into two pure helpers -
+  `SellSideEconomics.ApplySellSideEconomics` into two pure helpers -
   `ComputePerItemEconomics` (one requested root's own
   SellableQuantity/NetSaleValue/TargetUnitSellPrice/ItemCraftCost -
   correction, M37 item 26 fix-pass: the `PerItemEconomics` struct has no
@@ -1431,7 +1431,7 @@ report referenced above was lost). Mechanism:
   `MultiItemPlanTests.GenerateStructuredAsync_SingleEntryList_MatchesLegacySingleItemCall`
   assertion comparing every economics field between the direct
   single-item call and the list-of-one entry point.
-- New `CraftingPlanPipeline.ApplyBatchSellSideEconomics`: calls
+- New `SellSideEconomics.ApplyBatchSellSideEconomics`: calls
   `ComputePerItemEconomics` once per requested root (paired by index
   with the wrapper recipe's own `Ingredients`, both built in request
   order by `RecipeService.BuildMultiItemTreeAsync`), then sums the
@@ -2243,7 +2243,199 @@ future cleanup wave - not suppressed and not fixed in this change:
 None of this is a behavior change - severity stays warning, never error, per
 WP-02's design; only the suppression list and this doc entry changed.
 
-## 33. M39 module log system: WP-16/WP-17 subsumption + JSONL/rotation rationale (FIXED in M39)
+## 33. Astral Acclaim package: Wizard's Vault seasonal purchase cap seeding (P2 tooling + data; P3 rotation docs) (2026-07-22)
+Follow-up to item 28's DEFERRED note on "Has seasonal purchase cap" - the
+wiki's fifth cap-related SMW property (alongside daily/weekly/character/
+total), confirmed real and populated in M37 but left unseeded because no
+consuming model existed. This package seeds it end to end for the one
+place it is actually used (see below) while explicitly deferring runtime
+consumption to a later package.
+
+Tooling (additive only, mirrors the daily/weekly cap plumbing from item
+28 exactly): `WikiSmwClient.PrintoutSuffix` gained `|?Has seasonal
+purchase cap`; `WikiVendorResult`/`VendorOffer` (both the tool's and the
+runtime `Models/VendorOffer.cs` copy) gained a nullable `SeasonalCap`
+int, same empty-array-means-null parsing as daily/weekly; `ConvertToOffer`
+threads it through; both `VendorOfferHasher.ComputeOfferId` copies (tool
+and runtime) gained a `seasonalCap` parameter appended AFTER
+`homesteadTier` (not between it and `weeklyCap`) specifically so every
+pre-existing positional caller - including ones already passing
+`homesteadTier` - keeps meaning exactly what it meant before. Per item
+28's own established precedent, this is NOT a backward-compatible-hash
+change: any offer's `OfferId` changes the first time it is recomputed
+with this code, whether or not its own seasonal cap is null. New tests
+mirror the existing daily/weekly cases in `WikiSmwClientTests`,
+`ConvertToOfferTests`, and both `VendorOfferHasherTests` copies. Checked
+for a Wave A WP-19 cross-suite parity fixture per the task brief - none
+exists yet (WP-19 has not landed in this repo as of this package), so
+nothing needed updating there.
+
+**Runtime consumption deliberately NOT wired** - `TimegatedCapType` (see
+`Models/TimegatedItem.cs`) still has only `Daily`/`Weekly`, and
+`PlanSolver`/`FinalizeVendorBatches` were not touched. A Wizard's Vault
+offer's `SeasonalCap` is seeded for future use but produces no
+`TimegatedItem`/notice today. Adding `TimegatedCapType.Seasonal` and
+wiring it through the solver's notice machinery is a later package (M38
+WP-15 must land first, per the orchestrating session's explicit
+constraint).
+
+**Data seeding (scoped, reviewable)**: used the `--query`/`--merge-into`
+mechanism item 24 established, scoped to `[[Has vendor::~Wizard's
+Vault*]]` - a prefix wildcard that structurally matches all three
+Wizard's Vault NPC pages (current, `/Historical Astral Rewards`,
+`/Legacy Rewards`). A live wiki-wide probe (`[[Has seasonal purchase
+cap::+]]`, no vendor filter) confirmed the property itself is actually
+populated on only TWO of those three pages (29 rows total: `Wizard's
+Vault` and `.../Historical Astral Rewards`; zero on `.../Legacy
+Rewards`) - nothing elsewhere on the wiki carries it, so those 29 rows
+are the complete set of what exists to seed. Correspondingly, this
+pass's `--query` run only actually reprocessed the `Wizard's Vault` and
+`.../Historical Astral Rewards` merchants (see Result below); `.../Legacy
+Rewards`, though matched by the wildcard pattern, came back with no rows
+this run, so its 18 pre-existing offers were left untouched and passed
+through byte-identical - confirmed by offerId-set comparison against
+the pre-PR baseline (same 18 offerIds, unchanged), which is meaningful
+because `ComputeOfferId`'s new `seasonalCap` parameter is appended
+unconditionally and would have changed the hash of anything actually
+reprocessed. Why the wildcard query didn't return `.../Legacy Rewards`
+rows this run is not established; recording it here as a known follow-up
+for whoever next refreshes Wizard's Vault data, rather than assuming
+that page's offers are current as of this pass. Found and worked around
+a real tool gap while doing this: a combined `--query`+`--merge-into`
+run only stays scoped for `ref/vendor_offers.json` when
+`ref/wiki_vendor_cache.json` does not
+already contain the full baseline - `Program.cs`'s Step 2 reassigns its
+working `wikiResults` list to the FULL post-merge cache before Step 4
+converts it to offers, so with the real (62,926-row) cache present, a
+"scoped" run actually reconverts and rehashes every cached row (measured:
+52,154 removed / 54,945 added, spanning 2,088 merchants, on a first
+attempt) - the opposite of a reviewable diff. Worked around without
+touching `Program.cs`'s merge logic: ran the scoped query once with
+`ref/wiki_vendor_cache.json` temporarily moved aside (so Step 4 only ever
+saw the 121 freshly-queried WV rows) to get a correctly-scoped
+`ref/vendor_offers.json`, then ran the same query again with the real
+cache restored solely to regenerate a correctly-refreshed
+`ref/wiki_vendor_cache.json` (its own diff is NOT scope-minimal - every
+cached row gains a `SeasonalCap` key from the additive schema change,
+which is expected and harmless for a dev-only cache file), discarding
+that second run's `ref/vendor_offers.json` output. Recording this here
+as a real gap in the tool's `--merge-into` scoping guarantee for any
+future scoped run against a non-trivial existing cache; not fixed in
+`Program.cs` itself since this package's mandate was data + a narrow,
+additive model field only.
+
+Result: `ref/vendor_offers.json` 53,529 -> 53,536 offers (100 offers
+removed/replaced + 107 added, confined to exactly the two touched
+merchant names, `Wizard's Vault` and `Wizard's Vault/Historical Astral
+Rewards` - independently diff-verified by offerId set comparison against
+the pre-existing baseline). 28 of the 29 wiki-wide seasonal-cap rows now
+carry a real `SeasonalCap`, including the two task-named cases: Mystic
+Clover (19675) `seasonalCap=20` at 60 AA, Mystic Coin (19976)
+`seasonalCap=60` at 9 AA, both under merchant `Wizard's Vault`. The one
+gap: `Wizard's Vault#vendor11` (Lesser Essence of Gold, 700 AA,
+wiki-confirmed `seasonalCap=2`) hit a reproducible SMW property-chain
+resolution miss for `Sells item.Has game id` specifically within the
+combined 10-printout query (an isolated single-printout re-query for the
+same subobject resolved it correctly to game id 100233), so
+`ConvertToOffer`'s GameId>0 guard skipped it both times it was
+attempted. Rather than force a game id from the isolated re-query result
+(the two query shapes returning different results for the same live
+data is exactly the kind of gap item 28's own stale-sweep investigation
+found at scale - "~278 were SMW GameId-resolution misses" - not
+something to paper over), the pre-existing capless offer for this exact
+item/cost/merchant was preserved byte-identical rather than silently
+dropped (the touched-merchant remove-then-readd in `MergeIntoBaseline`
+would otherwise have lost it, since the fresh conversion never produced
+a replacement row for it). It will pick up its seasonal cap on a future
+re-scrape if the SMW resolution succeeds then. No cap value was invented
+for it.
+
+**Tier findings** (report-only, no code change - full investigation in
+`docs/research/aa-tier-findings.md`): confirmed the maintainer's premise
+that Bag of Coins (1 Gold) is the one genuinely tiered Wizard's Vault
+item. The wiki represents the two tiers as two entirely separate item
+pages/game ids, each its own independent vendor-table row - NOT one row
+with two prices: `Bag of Coins (1 Gold) (limited)` (game id 100878, 8 AA,
+`seasonalCap=100`, on the live `Wizard's Vault` page) and
+`Bag of Coins (1 Gold) (unlimited)` (game id 100595, 35 AA, uncapped,
+machine-readable only via the `/Historical Astral Rewards` page as of
+this writing - a wiki editorial gap, not a scraper bug, since the
+continuation tier is still live/purchasable in-game). The tier-1
+quantity limit is queryable via the ordinary `Has seasonal purchase cap`
+property, no separate mechanism. No model/solver change is needed to
+represent tiering: both rows are already independent `VendorOffer`s, and
+`PlanSolver`'s existing cheapest-offer selection already prefers the
+discount tier for free, the same way it already handles any other
+multi-vendor price competition.
+
+**P3 (Wizard's Vault rotation, docs-only)**: `tools/VendorOfferUpdater/
+README.md` gained a "Wizard's Vault Rotation" section documenting the
+season-boundary refresh reality and the exact scoped refresh command. No
+new code guard was added for distinguishing current-season vs
+historical/legacy offers - the existing `merchantName` convention
+(`Wizard's Vault` = current, `.../Historical Astral Rewards` = archived,
+`.../Legacy Rewards` = rotated-out cosmetics) already carries this
+distinction with zero new infrastructure, so adding a redundant field or
+helper would have been speculative. The general automated stale-offer
+sweep remains manual per item 28 (no tool exists); the README notes that
+any future sweep should only ever treat `Wizard's Vault` rows as
+"unexpectedly missing => investigate."
+
+DEFERRED note (item 28, "Character/total/seasonal purchase caps") is now
+partially superseded: `Has seasonal purchase cap` is seeded for Wizard's
+Vault as described above. `Has character purchase cap` and `Has total
+purchase cap` remain fully unseeded and unmodeled - the module still has
+no account/character concept at all - left for a future milestone's own
+design pass, unchanged from item 28's original note.
+
+## 34. Dead live-wiki vendor-offer resolver removed (M38 WP-10)
+`Services/VendorOfferResolver.cs` (a rate-limited, retrying, concurrency-
+bounded live wiki-lookup client), `Services/IWikiVendorClient.cs`,
+`Services/WikiLookupOptions.cs`, and `Models/ResolveResult.cs` - plus their
+sole test file (`VendorOfferResolverTests.cs`) and test double
+(`InMemoryWikiVendorClient.cs`) - have been deleted. This subsystem
+implemented an earlier, pre-seed-era design (resolve missing vendor offers
+live from the wiki at plan-generation time) that was superseded by the
+static seed-store path (`VendorOfferLoader`/`VendorOfferStore`, populated
+offline by `tools/VendorOfferUpdater`) and never wired into production:
+`Module.cs` always constructed `CraftingPlanPipeline` with `resolver: null`
+(confirmed before deletion: `grep -rn "new VendorOfferResolver"` outside
+`tests/` returned zero hits anywhere in the repo, and `IWikiVendorClient`
+had no production implementer), so the `_resolver`-guarded branches in
+`CraftingPlanPipeline`'s three `Generate*Async` methods were unreachable by
+construction. The `resolver` constructor parameter, `_resolver` field, and
+the three dead `if (_resolver != null && _vendorOfferStore != null)` guard
+blocks (each wrapping a "Resolve missing vendor offers" pipeline step that
+could never run) were removed along with the always-empty step itself; the
+adjacent "Query vendor offers" step absorbs its old step number in each of
+the three methods. This also removes the always-null seam's timing-log
+entry and progress message ("Resolve vendor offers" / "Resolving vendor
+offers..."), the one intentional observable-output change this deletion
+makes - the three tests asserting the pipeline's phase sequence
+(`CraftingPlanPipelineTests`, `ZojjasClaymoreValidationTests`) were updated
+to match. M37's homestead work had added a guard comment inside
+`VendorOfferResolver.ConvertToVendorOffer` (never invent a `HomesteadTier`
+for a wiki-scraped row); nothing outside the deleted files referenced any
+of this subsystem's types except a one-line mention in `TempDirectory.cs`'s
+doc comment (updated) and historical, point-in-time research/archive docs
+(`docs/research/m37-r4-vendor-caps.md`, `docs/research/m37-r5-audits.md`,
+`docs/archive/plans/2026-02-15/milestones-phase-b.md`) left as-is since they
+correctly describe the state of the world when they were written.
+
+Dissent (recorded per the M38 plan's reviewer gate): the architecture
+analyst argued for keep-and-comment instead - retain the seam as a
+documented, intentional always-null dependency rather than delete it,
+since it also removed the suite's single largest runtime cost (real
+`Task.Delay` retry/backoff waits in `VendorOfferResolverTests` were ~32% of
+total wall time; the module test suite's measured `dotnet test` duration
+dropped from 5s to well under 1s after this change with an identical
+0-failed/0-skipped count minus the 10 deleted tests). The simplify and
+csharp analysts both independently confirmed the subsystem is runtime-dead.
+Deletion is a clean `git revert` away if a live-wiki resolve mode is ever
+wanted again - the revert restores the seam, its tests, and the guard
+branches exactly as they were.
+
+## 35. M39 module log system: WP-16/WP-17 subsumption + JSONL/rotation rationale (FIXED in M39)
 Two bookkeeping gaps a code-review finding on the M39 log-system PR caught:
 the PR fully implements m38-cleanup-plan.md's WP-16 and WP-17 (confirmed via
 diff), but neither that plan nor this file recorded the subsumption, so a
@@ -2410,13 +2602,14 @@ them.
   Homestead recipes and unrelated vendor page changes beyond the
   stale-offer-sweep scope. Discarded uncommitted; recorded here as a
   candidate for a future dedicated "missing offers" pass.
-- Character/total/seasonal purchase caps (#28): the wiki's "Has
-  character purchase cap", "Has total purchase cap", and "Has seasonal
-  purchase cap" SMW properties are real and populated (confirmed in
-  M37) but were deliberately not seeded - the module has no model field
-  or consuming logic for them (TimegatedCapType is Daily/Weekly only)
-  and no account/character concept at all. Left for a future
-  milestone's own design pass.
+- Character/total purchase caps (#28): the wiki's "Has character
+  purchase cap" and "Has total purchase cap" SMW properties are real and
+  populated (confirmed in M37) but remain deliberately unseeded - the
+  module has no account/character concept at all. Left for a future
+  milestone's own design pass. ("Has seasonal purchase cap" is no longer
+  in this bucket - seeded for Wizard's Vault by item 33; its runtime
+  consumption is what's still deferred there, pending
+  `TimegatedCapType.Seasonal` / M38 WP-15.)
 - Homestead `HomesteadUnlocked` master gate (#24): gw2e has no "do you
   even own Homestead" gate at all; this module echoes that (no gate),
   matching v1's fixed design decision. A prior research draft flagged a

@@ -88,6 +88,7 @@
     <Compile Include="Models\CraftingPlan.cs" />
     <Compile Include="Models\TimegatedItem.cs" />
     <Compile Include="Services\PlanSolver.cs" />
+    <Compile Include="Services\VendorBatchSolver.cs" />
     <Compile Include="Services\StatusUpdateGuard.cs" />
     <Compile Include="Services\SnapshotEpochGuard.cs" />
     <Compile Include="Services\SnapshotCommitGate.cs" />
@@ -105,6 +106,7 @@
     <Compile Include="Services\AcquisitionHintService.cs" />
     <Compile Include="Services\CraftingTreeBuilder.cs" />
     <Compile Include="Services\CraftingPlanPipeline.cs" />
+    <Compile Include="Services\SellSideEconomics.cs" />
     <Compile Include="Services\Gw2RecipeApiClient.cs" />
     <Compile Include="Services\Gw2PriceApiClient.cs" />
     <Compile Include="Services\Gw2ItemApiClient.cs" />
@@ -133,10 +135,6 @@
     <Compile Include="Services\VendorOfferHasher.cs" />
     <Compile Include="Services\VendorOfferLoader.cs" />
     <Compile Include="Services\VendorOfferStore.cs" />
-    <Compile Include="Services\IWikiVendorClient.cs" />
-    <Compile Include="Services\WikiLookupOptions.cs" />
-    <Compile Include="Models\ResolveResult.cs" />
-    <Compile Include="Services\VendorOfferResolver.cs" />
     <Compile Include="Models\MaterialSourceAllocation.cs" />
     <Compile Include="Models\UsedMaterial.cs" />
     <Compile Include="Models\ReducedTreeResult.cs" />

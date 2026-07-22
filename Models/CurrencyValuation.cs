@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Models
     /// currencies the user explicitly priced here are usable for cost
     /// comparison. Currencies with no entry remain unvalued, and vendor
     /// offers charging them stay fallback-tier only (see
-    /// PlanSolver.EvaluateVendorOffers).
+    /// VendorBatchSolver.EvaluateVendorOffers).
     /// </summary>
     public class CurrencyValuation
     {
