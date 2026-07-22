@@ -12,12 +12,17 @@ namespace MysticForgeSeeder
     {
         public int? Index { get; set; }
         public int Quantity { get; set; }
-        public string Name { get; set; }
+
+        // Always set at construction (ParseIngredientRecord's one object
+        // initializer, guarded by an IsNullOrEmpty check just before it).
+        public string Name { get; set; } = string.Empty;
     }
 
     public class WikiRecipeEntry
     {
-        public string OutputName { get; set; }
+        // Always set at construction (ParseRecipeResult's one object
+        // initializer, guarded by an IsNullOrEmpty check just before it).
+        public string OutputName { get; set; } = string.Empty;
         public int OutputQuantity { get; set; } = 1;
         public List<WikiIngredientEntry> Ingredients { get; set; } = new();
     }
@@ -233,7 +238,7 @@ namespace MysticForgeSeeder
             return result;
         }
 
-        private WikiRecipeEntry ParseRecipeResult(string pageName, JsonElement element)
+        private WikiRecipeEntry? ParseRecipeResult(string pageName, JsonElement element)
         {
             if (!element.TryGetProperty("printouts", out var printouts))
             {
@@ -241,7 +246,7 @@ namespace MysticForgeSeeder
             }
 
             // Output name: Has canonical name[0], fallback fulltext with #recipe suffix stripped
-            string outputName = null;
+            string? outputName = null;
             if (printouts.TryGetProperty("Has canonical name", out var canonicalArr) &&
                 canonicalArr.GetArrayLength() > 0)
             {
@@ -306,10 +311,10 @@ namespace MysticForgeSeeder
             };
         }
 
-        private static WikiIngredientEntry ParseIngredientRecord(JsonElement record)
+        private static WikiIngredientEntry? ParseIngredientRecord(JsonElement record)
         {
             // Name: Has ingredient name.item[0].fulltext
-            string name = null;
+            string? name = null;
             if (record.TryGetProperty("Has ingredient name", out var nameObj) &&
                 nameObj.TryGetProperty("item", out var nameItems) &&
                 nameItems.GetArrayLength() > 0)

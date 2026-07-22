@@ -336,13 +336,13 @@ namespace MysticForgeSeeder
         private static void TrackCanonicalName(
             Dictionary<string, string> canonicalNames, string name)
         {
-            string trimmed = name?.Trim();
+            string? trimmed = name?.Trim();
             if (string.IsNullOrEmpty(trimmed))
             {
                 return;
             }
 
-            if (canonicalNames.TryGetValue(trimmed, out string existing))
+            if (canonicalNames.TryGetValue(trimmed, out string? existing))
             {
                 // Case-insensitive match exists; log if cases differ
                 if (!string.Equals(existing, trimmed, StringComparison.Ordinal))
@@ -477,7 +477,7 @@ namespace MysticForgeSeeder
 
         private static string FindRepoRoot()
         {
-            string dir = AppContext.BaseDirectory;
+            string? dir = AppContext.BaseDirectory;
             while (dir != null)
             {
                 if (Directory.Exists(Path.Combine(dir, ".git")))
@@ -494,8 +494,10 @@ namespace MysticForgeSeeder
     {
         public int OutputItemId { get; set; }
         public int OutputItemCount { get; set; }
-        public string OutputName { get; set; }
-        public List<RecipeIngredient> Ingredients { get; set; }
+
+        // Always set at construction (Step 4's one object initializer).
+        public string OutputName { get; set; } = string.Empty;
+        public List<RecipeIngredient> Ingredients { get; set; } = new();
     }
 
     internal class RecipeIngredient
