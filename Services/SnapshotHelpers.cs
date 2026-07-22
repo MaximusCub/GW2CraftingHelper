@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using GW2CraftingHelper.Models;
 using Newtonsoft.Json;
 
@@ -19,38 +18,6 @@ namespace GW2CraftingHelper.Services
             int silver = (copper % 10000) / 100;
             int cop = copper % 100;
             return $"Coin: {gold}g {silver}s {cop}c";
-        }
-
-        /// <summary>
-        /// Groups items by ItemId, summing their counts. Source is set to "Total".
-        /// Null inputs return an empty list. Null entries are ignored.
-        /// </summary>
-        internal static List<SnapshotItemEntry> AggregateItems(IEnumerable<SnapshotItemEntry> items)
-        {
-            if (items == null) return new List<SnapshotItemEntry>();
-
-            return items
-                .Where(i => i != null)
-                .GroupBy(i => i.ItemId)
-                .Select(g =>
-                {
-                    // Prefer a non-empty name if available; otherwise fall back to the first entry's name.
-                    string name = g.Select(x => x.Name).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n))
-                                  ?? g.First().Name;
-
-                    string iconUrl = g.Select(x => x.IconUrl).FirstOrDefault(u => !string.IsNullOrWhiteSpace(u))
-                                     ?? g.First().IconUrl;
-
-                    return new SnapshotItemEntry
-                    {
-                        ItemId = g.Key,
-                        Name = name,
-                        IconUrl = iconUrl,
-                        Count = g.Sum(i => i.Count),
-                        Source = "Total"
-                    };
-                })
-                .ToList();
         }
 
         /// <summary>
