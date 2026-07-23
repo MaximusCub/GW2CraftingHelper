@@ -40,7 +40,9 @@ namespace GW2CraftingHelper.Views.Rendering
     /// time of the WP-23 pilot. WP-23b resolved this: GetPillColors moved to
     /// Views/Rendering/PillColors.cs (kept separate from
     /// ShoppingListSectionRenderer because CraftingPlanView.RenderDecisionPills
-    /// also calls it), and ShoppingSourceTag moved directly into
+    /// also called it at the time - WP-25 later moved RenderDecisionPills
+    /// itself onto TreeSectionController, see that entry below), and
+    /// ShoppingSourceTag moved directly into
     /// ShoppingListSectionRenderer (it had exactly one call site). Neither
     /// bumped a CraftingPlanView private to internal - both moves preserve
     /// the forward-only Views/Rendering -> CraftingPlanView direction the

@@ -2753,7 +2753,9 @@ namespace GW2CraftingHelper.Views
         // above). GetPillColors, which CreateShoppingRow used for its
         // source-tag panel colors, moved to Views/Rendering/PillColors.cs
         // instead (see that file's doc comment) because RenderDecisionPills
-        // below still needs it too.
+        // also needed it at the time (WP-25 later moved RenderDecisionPills
+        // itself onto TreeSectionController - see the "8. Tree rendering"
+        // region below).
 
         // --- Crafting Steps section ---
         //

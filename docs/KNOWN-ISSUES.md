@@ -3270,11 +3270,14 @@ The M38 plan marked WP-26 cut-first. Orchestrator decision: CUT. Rationale:
 (1) the single riskiest change in the repo with purely organizational payoff;
 (2) the frame-timing/subscription-order guarantees it would relocate are
 asserted by construction, not tests, so a regression would only surface live;
-(3) WP-21/WP-23a-d/WP-25 already bring CraftingPlanView well under the plan
-size target; (4) the machinery is fully region-mapped with KNOWN-ISSUES
-anchors (#12/#13/#14/#19/#23) and navigable in place; (5) the acceptance gate
-would require a human drag-resize pass (synthetic drags proven unreliable),
-a disproportionate verification cost for a move-only change. The
+(3) WP-21/WP-23a-d/WP-25 already cut CraftingPlanView from 4802 lines
+(plan-authoring baseline) to 2802 lines measured post-WP-25 (down from 3558
+pre-WP-25) - real progress, but still 802 lines (40%) over the plan's own
+explicit 2000-line target, not under it; (4) the machinery is fully
+region-mapped with KNOWN-ISSUES anchors (#12/#13/#14/#19/#23) and navigable
+in place; (5) the acceptance gate would require a human drag-resize pass
+(synthetic drags proven unreliable), a disproportionate verification cost
+for a move-only change. The
 ReplayRelayout SuspendLayout/ResumeLayout MEASURE-FIRST item existed to
 precede WP-26 and downgrades to an optional Nice-to-Have perf close-out.
 
