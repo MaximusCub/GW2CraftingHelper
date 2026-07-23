@@ -24,7 +24,7 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Views
 {
-    public class CraftingPlanView
+    public class CraftingPlanView : ISectionRelayoutSink
     {
         #region General: shared layout constants, colors, top-region geometry & dependencies
 
@@ -256,6 +256,28 @@ namespace GW2CraftingHelper.Views
         // fixed-height row cannot re-trigger convergence).
         private readonly List<Action<int>> _relayoutActions = new List<Action<int>>();
         private readonly List<Action<int>> _reellipsisActions = new List<Action<int>>();
+
+        // M38 WP-23 (m38-a1-architecture.md S3b-T2 pilot): ISectionRelayoutSink
+        // implementation. Explicit-interface (not public) so extracted
+        // section renderers can register through the seam without this
+        // widening CraftingPlanView's public surface. Both members are a
+        // direct pass-through to the two lists immediately above - same
+        // list, same append order - so every invariant that reads those
+        // lists (CreateCollapsibleSection's DEBUG must-register check,
+        // ReplayRelayout's DEBUG scroll-neutral assert, ReplayRelayout/
+        // RunReellipsis's own foreach) sees a sink-registered closure
+        // exactly as it would have seen one added inline. Zero semantic
+        // change - see ISectionRelayoutSink's doc comment for the full
+        // rationale.
+        void ISectionRelayoutSink.AddRelayout(Action<int> closure)
+        {
+            _relayoutActions.Add(closure);
+        }
+
+        void ISectionRelayoutSink.AddReellipsis(Action<int> closure)
+        {
+            _reellipsisActions.Add(closure);
+        }
 
         // Trailing debounce for the resize-settle re-ellipsis pass. Every
         // relayout tick already runs synchronously in OnPanelResized (no

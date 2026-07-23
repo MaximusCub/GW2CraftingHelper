@@ -122,6 +122,7 @@
     <Compile Include="Views\Rendering\IconControls.cs" />
     <Compile Include="Views\Rendering\LabelHelpers.cs" />
     <Compile Include="Views\Rendering\CoinCurrencyRenderer.cs" />
+    <Compile Include="Views\Rendering\ISectionRelayoutSink.cs" />
     <Compile Include="Views\ModalDialog.cs" />
     <Compile Include="Views\LogTabContent.cs" />
     <Compile Include="Views\SettingsTabContent.cs" />
