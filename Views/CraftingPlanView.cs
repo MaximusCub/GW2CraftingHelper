@@ -24,7 +24,7 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Views
 {
-    public class CraftingPlanView
+    public class CraftingPlanView : ISectionRelayoutSink
     {
         #region General: shared layout constants, colors, top-region geometry & dependencies
 
@@ -256,6 +256,28 @@ namespace GW2CraftingHelper.Views
         // fixed-height row cannot re-trigger convergence).
         private readonly List<Action<int>> _relayoutActions = new List<Action<int>>();
         private readonly List<Action<int>> _reellipsisActions = new List<Action<int>>();
+
+        // M38 WP-23 (m38-a1-architecture.md S3b-T2 pilot): ISectionRelayoutSink
+        // implementation. Explicit-interface (not public) so extracted
+        // section renderers can register through the seam without this
+        // widening CraftingPlanView's public surface. Both members are a
+        // direct pass-through to the two lists immediately above - same
+        // list, same append order - so every invariant that reads those
+        // lists (CreateCollapsibleSection's DEBUG must-register check,
+        // ReplayRelayout's DEBUG scroll-neutral assert, ReplayRelayout/
+        // RunReellipsis's own foreach) sees a sink-registered closure
+        // exactly as it would have seen one added inline. Zero semantic
+        // change - see ISectionRelayoutSink's doc comment for the full
+        // rationale.
+        void ISectionRelayoutSink.AddRelayout(Action<int> closure)
+        {
+            _relayoutActions.Add(closure);
+        }
+
+        void ISectionRelayoutSink.AddReellipsis(Action<int> closure)
+        {
+            _reellipsisActions.Add(closure);
+        }
 
         // Trailing debounce for the resize-settle re-ellipsis pass. Every
         // relayout tick already runs synchronously in OnPanelResized (no
@@ -2620,7 +2642,12 @@ namespace GW2CraftingHelper.Views
                     CreateCraftingStepsBody(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.RequiredDisciplines:
-                    CreateDisciplinesBody(section, contentFlow, panelWidth);
+                    // M38 WP-23: row rendering moved to
+                    // Views/Rendering/DisciplinesSectionRenderer; the shared
+                    // c-table header stays here (see that class's doc
+                    // comment - it is also used by CreateRecipesBody below).
+                    CreateCTableHeaderRow(contentFlow, panelWidth, "Discipline", 8, "Level");
+                    new DisciplinesSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.RequiredRecipes:
                     CreateRecipesBody(section, contentFlow, panelWidth);
@@ -3124,48 +3151,6 @@ namespace GW2CraftingHelper.Views
             {
                 rowPanel.Size = new Point(w, PlanContentHeightMath.CTableHeaderRowHeight);
                 rightLabelControl.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, rightLabelControl.Width), 5);
-            });
-        }
-
-        private void CreateDisciplinesBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
-        {
-            CreateCTableHeaderRow(contentFlow, panelWidth, "Discipline", 8, "Level");
-            for (int i = 0; i < section.Rows.Count; i++)
-            {
-                CreateDisciplineRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
-            }
-        }
-
-        private void CreateDisciplineRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
-        {
-            const int rowHeight = PlanContentHeightMath.DisciplineRowHeight;
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
-            var font = GameService.Content.DefaultFont14;
-
-            new Label()
-            {
-                Text = row.Label ?? "", Font = font,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(8, 7), Parent = rowPanel
-            };
-            var levelLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
-
-            // M36b: bottomClearance 1 - DisciplineRowHeight (32) is
-            // VULNERABLE to the Container.Paint round-trip defect (see
-            // LabelHelpers.CreateRowDivider's doc comment), same ~10.2% vanish rate as
-            // the 44px rows; the M36b investigation confirmed this via
-            // simulation but omitted it from its fix list by oversight.
-            // No icon in this row (two DefaultFont14 labels at y=7 only),
-            // so there is no icon-clearance side effect to worry about -
-            // the new divider top (rowHeight - 3 = 29) sits well clear of
-            // the text baseline.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
-
-            _relayoutActions.Add(w =>
-            {
-                rowPanel.Size = new Point(w, rowHeight);
-                levelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, levelLabel.Width), 7);
-                if (divider != null) divider.Size = new Point(w, 2);
             });
         }
 
