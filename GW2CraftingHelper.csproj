@@ -132,6 +132,8 @@
     <Compile Include="Views\Rendering\CraftStepsSectionRenderer.cs" />
     <Compile Include="Views\Rendering\RecipesSectionRenderer.cs" />
     <Compile Include="Views\Rendering\SummarySectionRenderer.cs" />
+    <Compile Include="Views\Rendering\IconNameRowHelpers.cs" />
+    <Compile Include="Views\Rendering\RowRelayoutHelpers.cs" />
     <Compile Include="Views\ModalDialog.cs" />
     <Compile Include="Views\LogTabContent.cs" />
     <Compile Include="Views\SettingsTabContent.cs" />

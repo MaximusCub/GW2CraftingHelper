@@ -29,6 +29,17 @@ namespace GW2CraftingHelper.Views.Rendering
     // Views/Rendering/CTableHeaderRenderer's doc comment for the full
     // resolution); CraftingPlanView.CreateCollapsibleSection no longer
     // references the c-table header for either section.
+    //
+    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateDisciplineRow's
+    // divider+relayout tail now goes through RowRelayoutHelpers.FinishRow -
+    // the shared "row panel resize + extra reposition + divider resize"
+    // shape confirmed identical across all five extracted renderers' row
+    // builders (see that class's doc comment). This row has no icon and no
+    // name column at all (just two plain DefaultFont14 labels), so it does
+    // not match IconNameRowHelpers (the other WP-24 helper) and stays
+    // hand-rolled there - see IconNameRowHelpers' own doc comment. Geometry
+    // unchanged - see the WP-24 constant-by-constant table in the PR/commit
+    // body.
     internal sealed class DisciplinesSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -84,13 +95,9 @@ namespace GW2CraftingHelper.Views.Rendering
             // so there is no icon-clearance side effect to worry about -
             // the new divider top (rowHeight - 3 = 29) sits well clear of
             // the text baseline.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
-
-            _sink.AddRelayout(w =>
+            RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 1, _sink, w =>
             {
-                rowPanel.Size = new Point(w, rowHeight);
                 levelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, levelLabel.Width), 7);
-                if (divider != null) divider.Size = new Point(w, 2);
             });
         }
     }
