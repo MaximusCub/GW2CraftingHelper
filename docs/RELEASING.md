@@ -152,7 +152,13 @@ copied into `$(OutDir)ref` or zipped into the `.bhm` any more, regardless of
 whether a developer's working copy has them sitting on disk from running
 `tools/VendorOfferUpdater`. Building from an active `VendorOfferUpdater`
 development workspace is no longer a concern for this specific gap; a
-clean checkout is no longer required to get a cache-free `.bhm`.
+clean checkout is no longer required to get a cache-free `.bhm`. However,
+because the pack target's staging-dir copy zips whatever is already sitting
+in `$(OutDir)` rather than only the files this target itself just copied,
+a release `.bhm` must still be built after clearing `bin/` and `obj/` -
+otherwise a stale, pre-exclusion copy of a cache file left over from an
+earlier incremental build can be re-zipped into the output regardless of
+the `Exclude` list above.
 
 ## What a real release process would still need
 
