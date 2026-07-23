@@ -49,6 +49,23 @@ namespace GW2CraftingHelper.Views.Rendering
     /// helper should follow the same precedent: extract the helper to its own
     /// Views/Rendering class (or into the section renderer itself, if it has
     /// exactly one call site) rather than reaching back into CraftingPlanView.
+    ///
+    /// M38 WP-23c (Crafting Steps + Required Recipes) hit two more forks of
+    /// this same shape, both resolved the same way: CreateTextRow (needed by
+    /// the extracted CraftingSteps body's TimegatedNotice branch, but also
+    /// still called by CraftingPlanView's own default-fallback section case
+    /// and CreateSummarySectionBody) moved to Views/Rendering/TextRowRenderer;
+    /// CreateCTableHeaderRow (needed by both Required Disciplines and
+    /// Required Recipes, the WP-23 pilot's own documented fork) moved to
+    /// Views/Rendering/CTableHeaderRenderer once BOTH its callers became
+    /// extracted section renderers, removing CraftingPlanView's remaining
+    /// c-table-header knowledge entirely rather than leaving it as a third
+    /// forward-only exception. Both new classes take this interface as a
+    /// plain method parameter (not a constructor-injected field like the
+    /// section renderers use) since neither is itself a section renderer -
+    /// they are shared row-construction helpers with multiple callers,
+    /// analogous to PillColors/RarityColors, that also need to register a
+    /// relayout closure the way a section renderer's own row builders do.
     /// </summary>
     internal interface ISectionRelayoutSink
     {
