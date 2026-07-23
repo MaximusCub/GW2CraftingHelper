@@ -5,6 +5,11 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
+    /// <summary>
+    /// See docs/ARCHITECTURE.md section 8 (solver decision rules: TP-buy
+    /// baseline, strict-cheaper craft/vendor comparisons, Mystic Clover EV
+    /// pricing, force-craft) for the durable rationale (M38 WP-27).
+    /// </summary>
     public class PlanSolver
     {
         // WP-15 (architecture S4a): the vendor-batching sub-engine (batch

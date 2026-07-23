@@ -67,6 +67,9 @@ namespace GW2CraftingHelper.Views.Rendering
     // ResetForNewPlan(result) - the two reset shapes are semantically
     // different (per-render-pass vs. per-generation - see each method's
     // own doc comment) so they stay two methods, not one.
+    //
+    // See docs/ARCHITECTURE.md section 5 (M38 WP-27) for the state-ownership
+    // rationale and the WP-26 scroll/resize/wheel controller cut decision.
     internal sealed class TreeSectionController
     {
         private readonly ISectionRelayoutSink _sink;

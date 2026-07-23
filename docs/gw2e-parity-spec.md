@@ -21,10 +21,11 @@ Research-only. Sources are gw2efficiency's open-source libraries (`recipe-calcul
 `gw2efficiency.com/views/_directives/componentTree.html`,
 `gw2efficiency.com/scripts/application.js`) fetched read-only for UI-behavior
 confirmation (no gw2efficiency API calls are made by the module itself; this is
-dev-time research only, per project rule). All local copies are in
-`/tmp/claude-1000/-mnt-c-Dev-Blish-GW2CraftingHelper/7d28d1df-8314-4c69-80a1-4637669c5aa7/scratchpad/src/`
-and `/tmp/claude-1000/-mnt-c-Dev-Blish-GW2CraftingHelper/7d28d1df-8314-4c69-80a1-4637669c5aa7/scratchpad/`
-(`calculator_view.html`, `componentTree.html`, `application.js`) for re-inspection.
+dev-time research only, per project rule). Local copies used during this
+research (`calculator_view.html`, `componentTree.html`, `application.js`, and
+the fetched library sources) lived in a session-scoped scratch directory that
+is not part of this repo and no longer exists; see the Appendix below for
+exactly which files were fetched from where, for re-fetching if needed.
 
 Repo commits fetched:
 - `gw2efficiency/recipe-calculation` @ `ea10eb833a89d335eabf834e16040f23fb98d387` (current master)
@@ -693,22 +694,30 @@ double-counted per-branch).
 
 ---
 
-## Appendix: fetched artifacts (for re-inspection)
+## Appendix: fetched artifacts (for re-fetching if needed)
 
-- `.../scratchpad/src/recipe-calculation/` - full `src/` + relevant `tests/` of
-  `recipe-calculation@master` (`ea10eb8`).
-- `.../scratchpad/src/recipe-nesting/` - `src/index.ts`, `src/api.d.ts`, README of
-  `recipe-nesting@master` (`bd5082d`).
-- `.../scratchpad/src/tradingpost-fees/`, `.../scratchpad/src/item-value/` - fee/value
-  helper packages, context only.
-- `.../scratchpad/vendorItems_historical.ts` - `vendorItems.ts` @ commit `72d90c74`
-  (last populated version before removal).
-- `.../scratchpad/calculator_view.html` - live `views/Crafting/calculator.html` template.
-- `.../scratchpad/componentTree.html` - live `views/_directives/componentTree.html`
-  template (the per-node pill markup quoted throughout Section 1/Section 4/Section 5/Section 6).
-- `.../scratchpad/application.js` - the live 4.2MB minified app bundle (searched via
-  `python3`/regex for the default-state block, price-map builder, cost-breakdown formula,
-  and tree bulk-action functions quoted above; kept for further greps if needed).
+None of the files below are committed to this repo (the fetches were
+dev-time research, not build inputs); this list records exactly what was
+fetched and from where so the research is reproducible.
+
+- Full `src/` + relevant `tests/` of `gw2efficiency/recipe-calculation@master`
+  (`ea10eb8`), fetched from `raw.githubusercontent.com`.
+- `src/index.ts`, `src/api.d.ts`, and the README of
+  `gw2efficiency/recipe-nesting@master` (`bd5082d`), fetched from
+  `raw.githubusercontent.com`.
+- `gw2efficiency/tradingpost-fees` and `gw2efficiency/item-value` (fee/value
+  helper packages), fetched for context only.
+- `vendorItems.ts` @ commit `72d90c74` (last populated version before
+  removal), fetched from `raw.githubusercontent.com`.
+- The live `views/Crafting/calculator.html` Angular template, fetched from
+  `gw2efficiency.com`.
+- The live `views/_directives/componentTree.html` template (the per-node
+  pill markup quoted throughout Section 1/Section 4/Section 5/Section 6),
+  fetched from `gw2efficiency.com`.
+- The live, minified `application.js` app bundle (~4.2MB), fetched from
+  `gw2efficiency.com` and searched via regex for the default-state block,
+  price-map builder, cost-breakdown formula, and tree bulk-action functions
+  quoted above.
 
 ## Known gaps / caveats
 

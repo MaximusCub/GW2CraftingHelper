@@ -93,6 +93,7 @@ namespace GW2CraftingHelper.Views.Rendering
     /// longer inside CraftingPlanView to read the field directly. Kept
     /// read-only and additive to AddRelayout/AddReellipsis rather than
     /// widening either of those - this is observation, not registration.
+    /// <para>See docs/ARCHITECTURE.md section 5 (M38 WP-27).</para>
     /// </summary>
     internal interface ISectionRelayoutSink
     {

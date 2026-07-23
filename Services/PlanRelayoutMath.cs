@@ -12,6 +12,7 @@ namespace GW2CraftingHelper.Services
     /// of truth" shape for the remaining width-dependent geometry m2's
     /// resize-path research identified (tree column anchors, cost-tile
     /// geometry, generic centering/right-alignment/name-column budgeting).
+    /// <para>See docs/ARCHITECTURE.md section 4 (M38 WP-27).</para>
     /// </summary>
     public static class PlanRelayoutMath
     {

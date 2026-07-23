@@ -23,6 +23,7 @@ namespace GW2CraftingHelper.Services
     /// assembly) still needs to declare fields/locals of these types -
     /// still no wider than the original private scope from outside this
     /// assembly.
+    /// <para>See docs/ARCHITECTURE.md section 7 (M38 WP-27).</para>
     /// </summary>
     public class VendorBatchSolver
     {
