@@ -2633,7 +2633,9 @@ namespace GW2CraftingHelper.Views
                     CreateSummarySectionBody(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.UsedMaterials:
-                    CreateUsedMaterialsBody(section, contentFlow, panelWidth);
+                    // M38 WP-23b: row rendering moved to
+                    // Views/Rendering/UsedMaterialsSectionRenderer.
+                    new UsedMaterialsSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.ShoppingList:
                     CreateShoppingListBody(section, contentFlow, panelWidth);
@@ -2685,94 +2687,10 @@ namespace GW2CraftingHelper.Views
         #region 7. Section builders (continued)
 
         // --- Used Materials section ---
-
-        private void CreateUsedMaterialsBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
-        {
-            for (int i = 0; i < section.Rows.Count; i++)
-            {
-                CreateUsedMaterialRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
-            }
-        }
-
-        private void CreateUsedMaterialRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
-        {
-            const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
-
-            // M36: y=0 (was 1) - the 34px icon frame previously left only
-            // 1px of clearance above rowHeight (36), which was exactly
-            // enough for the old 1px divider but would overlap the new 2px
-            // divider's top pixel by 1 row. Moving the icon up by 1 makes
-            // frame height (34) + divider height (2) exactly fill rowHeight
-            // with no overlap.
-            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
-
-            const int nameX = 50;
-            int qtyRightEdge = panelWidth - 8;
-            var font = GameService.Content.DefaultFont14;
-
-            string qtyText = $"{row.Quantity}x";
-            int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
-            int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(qtyRightEdge, qtyWidth, 12, nameX);
-
-            string fullName = row.Label ?? "";
-            string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
-            var nameLabel = new Label()
-            {
-                Text = displayName,
-                Font = font,
-                TextColor = RarityColors.GetRarityNameColor(row.Rarity),
-                ShowShadow = true,
-                ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(nameX, 9),
-                Parent = rowPanel
-            };
-            if (displayName != fullName)
-            {
-                rowPanel.BasicTooltipText = fullName;
-            }
-
-            var qtyLabel = new Label()
-            {
-                Text = qtyText,
-                Font = font,
-                TextColor = new Color(200, 200, 200),
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(qtyRightEdge - qtyWidth, 9),
-                Parent = rowPanel
-            };
-
-            // M36b: bottomClearance 0 - UsedMaterialRowHeight (36) is
-            // immune to the Container.Paint round-trip defect (see
-            // LabelHelpers.CreateRowDivider's doc comment) and its icon frame is
-            // flush-fit with zero slack; giving it clearance it doesn't
-            // need would reintroduce the icon/divider overlap M36 fixed.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 0);
-
-            // M33 C2b: qty label position is a pure reposition (qtyWidth is
-            // font-only); the name is left untouched during drag ticks and
-            // only re-ellipsized at settle (RunReellipsis) to avoid a
-            // MeasureString call per row per tick.
-            _relayoutActions.Add(w =>
-            {
-                rowPanel.Size = new Point(w, rowHeight);
-                qtyLabel.Location = new Point(w - 8 - qtyWidth, 9);
-                if (divider != null) divider.Size = new Point(w, 2);
-            });
-            _reellipsisActions.Add(w =>
-            {
-                int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(w - 8, qtyWidth, 12, nameX);
-                string newDisplayName = LabelHelpers.EllipsizeToWidth(font, fullName, newMaxWidth);
-                if (nameLabel.Text != newDisplayName)
-                {
-                    nameLabel.Text = newDisplayName;
-                    rowPanel.BasicTooltipText = newDisplayName != fullName ? fullName : null;
-                }
-            });
-        }
+        //
+        // M38 WP-23b: row rendering moved to
+        // Views/Rendering/UsedMaterialsSectionRenderer (see the
+        // RequiredDisciplines-style call in CreateCollapsibleSection above).
 
         // --- Shopping List section ---
 
