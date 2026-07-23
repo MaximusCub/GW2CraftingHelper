@@ -1,0 +1,3451 @@
+# Development History: Fix-Pass Diary
+
+This is the full, verbatim historical fix-pass diary for this module's UI
+layer and solver: milestone-by-milestone bug reports, root-cause
+investigations, live-verification transcripts, and dated gate PASS
+records, from the M30 backlog through the end of M38. It was split out of
+`docs/KNOWN-ISSUES.md` during M38 WP-27 to keep the public issue tracker
+short; nothing below was reworded or summarized away in that split - this
+is the same text that used to be `docs/KNOWN-ISSUES.md`, verbatim, minus
+one deletion documented below.
+
+**If you're looking for current open issues, start at
+[`docs/KNOWN-ISSUES.md`](../KNOWN-ISSUES.md) instead** - it holds the
+numbered-item catalog (under the same item numbers cited by `KNOWN-ISSUES
+#N` comments throughout the `.cs` source) with a short resolution summary
+per item, plus the current DEFERRED backlog. Every numbered item's *full*
+investigation - hypotheses, instrumentation, root cause, live-verification
+transcripts - is here, under that same number.
+
+`docs/ARCHITECTURE.md` is the third document in this set: it distills the
+durable "why" for the handful of mechanisms this diary produced (scroll
+preserve/restore, the resize relayout registry, the wheel-delta
+sanitizer, and so on) without the full investigation narrative.
+
+**What was removed in the WP-27 split:** two "Handoff notes for the
+implementing session" sections (originally after the "Carried follow-up
+resolved: caret glyphs" entry, and at the very end of the file) were
+deleted, not relocated. Both were session-continuity notes for an AI
+coding agent picking up the next unit of work - personal `C:\Dev\...`
+filesystem paths, desktop-automation screen coordinates and input-routing
+protocol, and orchestration/subagent notes - with no reader value once
+that work concluded. Everything else below, including every dated gate
+PASS record and its own inline path citations (e.g. capture file
+locations), is preserved exactly as written.
+
+---
+
+# Known Issues Backlog (logged 2026-07-20, user hands-on session post-M29; updated post-M30)
+
+User-reported issues from exploring the merged M23-M29 build, addressed in
+milestone M30. Items 1-7 plus three additional issues found during the M30
+wave (9-11) are fixed below with resolution notes. Item 8 remains open as a
+data-work item. Original hypotheses are kept for context; they were not all
+correct - see the resolution note on each item for what actually shipped.
+
+## 1. Pill toggle STILL resets scroll position (FIXED in M30)
+Clicking a decision pill resets the viewport to top despite M23's
+PreserveScrollAcross wrapping ApplyOverridesAndResolve.
+Hypothesis: the M24 rewrite changed content composition (cost tiles,
+reordered sections) so the multi-frame restore's height-convergence
+window (10 frames) may be too short, or a new rerender path bypasses the
+wrapper, or the generation-guard supersedes the restore before it
+settles. Reproduce with a tall Exordium plan; instrument
+RestoreScrollOffset attempts vs convergence.
+Fixed in M30: the M23 restore loop never actually spanned multiple real
+frames - GameService.Overlay.QueueMainThreadUpdate, when re-queued from
+inside its own callback, drains in the same frame instead of waiting for
+the next Update() tick. Restore, guard, and resize debounce are now
+driven by a per-frame FrameTicker control; the restore contests
+Blish's reset-to-zero while yielding to genuine nonzero user scrolls.
+
+## 2. Resize-drag flicker + transient tree collapse (FIXED in M30)
+Dragging the bottom-right resize control redraws content every drag tick;
+during the drag the recipe tree's INTERNAL expansion state renders
+collapsed, then correctly reverts to the persisted expansion state once
+the mouse settles (before mouseup). Top-level section open/closed state
+is unaffected.
+Hypothesis: OnPanelResized full-rerenders on every width change during
+the drag (no debounce); intermediate renders read default depth<2
+expansion before _nodeExpansion is applied... but _nodeExpansion IS
+consulted at render - more likely lazily-built deep nodes render
+collapsed until rebuilt. Fix direction: debounce re-render to drag
+settle (e.g. 150ms after last resize event), and/or stop full
+dispose+rebuild on resize (relayout in place).
+Fixed in M30: resize was doing a full dispose+rebuild on every drag
+tick; replaced with a 150ms trailing debounce (FrameTicker-driven) with
+live width sizing during the drag and a single settle rebuild after.
+
+## 3. Total Cost section: currency icons missing (FIXED in M30)
+Currency cost rows are text-only ("50x Spirit Shards"). Add currency
+icons (GW2 API /v2/currencies provides icon URLs; render-service
+pipeline already exists for items). Respect coin invariant conventions.
+Fixed in M30: currency rows now render icons sourced from /v2/currencies
+through the existing item render pipeline.
+
+## 4. Insufficient padding between major sections (FIXED in M30)
+Total Cost / Recipe Tree / Shopping List etc. need more vertical
+breathing room between sections.
+Fixed in M30: increased vertical spacing between major sections.
+
+## 5. Recipe Tree container does not contract after collapse (FIXED in M30)
+Collapsing the Recipe Tree section (or large subtrees) leaves a large
+whitespace gap before Shopping List. The M9 collapse-reflow class of bug
+resurfacing in the M24 layout - likely the tree's outer FlowPanel
+height not shrinking (AutoSize only grows? stale Height on collapsed
+child containers?).
+Fixed in M30: collapsed tree containers now contract correctly; no
+stale whitespace gap remains before Shopping List.
+
+## 6. Shopping list Amount/Each/Total columns too tight (FIXED in M30)
+Increase inter-column whitespace (the M24 review fixed overlap;
+readability spacing still insufficient).
+Fixed in M30: added inter-column whitespace to the Amount/Each/Total
+columns.
+
+## 7. Horizontal dividers render at inconsistent brightness (FIXED in M30)
+Row divider lines vary in visible contrast row-to-row; some vanish into
+the background texture. Hypothesis: low-alpha divider color composites
+against the varying parchment texture. Fix: higher-contrast consistent
+divider (opaque dark line, or two-tone 1px light-over-dark), verify over
+both light and dark texture regions via captures.
+Fixed in M30: dividers now use a consistent higher-contrast color,
+verified legible over both light and dark parchment texture regions.
+
+## 8. Ball of Dark Energy (71994) - unpriceable, needs acquisition hint (FIXED in M32)
+Fixed in M32: curated wiki-verified seed (ref/acquisition_hints_seed.json,
+5 entries: Ball of Dark Energy plus the four HoT map-completion Gifts
+feeding Gift of Maguuma) rendered as tooltips on unknown-source tree
+pills and shopping rows; the misleading "Only available source" tooltip
+on true-unknown pills now falls back to "No known acquisition source".
+No pricing invented. Live-verified via tooltip capture. Follow-up: a
+dev-time seeder tool (wiki fetch -> seed JSON) when the list grows past
+hand-curation; same tooling family as the collections/achievements
+pillar. Note: hovering must target row whitespace - name labels capture
+the mouse and suppress the row tooltip (pre-existing Blish behavior).
+
+## 9. Rarity text unreadable over parchment texture (FIXED in M30)
+Legendary rarity text measured luminance ~52 against the parchment
+background, effectively unreadable.
+Fixed in M30: rarity colors brightened with a dim floor lift, and label
+shadows added for contrast over the texture.
+
+## 10. Window content region overshot the opaque background texture (FIXED in M30)
+contentRegion extended 11px past the texture's opaque area, and the
+texture itself fades over its last ~15 rows, risking bleed-through at
+the window edge.
+Fixed in M30: window is now 684 high with 26px total margin; verified
+no bleed-through against the texture.
+
+## 11. Decision pill labels unreadable against same-hue backdrop (FIXED in M30)
+Pill labels were drawn in the pill's own border color over a same-hue
+backdrop, making the text nearly invisible.
+Fixed in M30: pill labels now render in white.
+
+## Carried follow-ups (from M24-M29 PRs)
+- Caret glyphs: settle ASCII v/> headers vs unicode tree triangles after
+  an in-game check of which renders reliably
+- Remaining parity pillars: Mystic Clover EV (blocked on probability
+  data - seeder first), vendor cap data scraping, phase-2
+  owned-materials-as-competing-source, localization. Multi-item plans
+  landed in M35 (see that section below) - last item removed from this
+  line.
+- Blish HUD has no SynchronizationContext: async continuations in
+  TriggerGenerate resume off the main thread and mutate UI controls -
+  latent cross-thread hazard, audit all await points that touch controls.
+- InvalidateUpToContentPanel bubbles a full content-panel re-measure on
+  every tree toggle - fine at current sizes, revisit if large-tree
+  toggle jank appears.
+- Resize debounce settle-path verified by code review + the FrameTicker
+  mechanism proven live for scroll restore; a positive in-game
+  observation of the single settle rebuild is still pending (synthetic
+  input could not catch the TabbedWindow2 resize grip).
+- Scroll verify's reset-vs-user discriminator (M33 C2a superseded the
+  M30-era guard): the verify window is now only 2-3 real frames and
+  suppresses its own zero-reassert whenever a wheel event landed in the
+  last 250ms, so a user who just wheeled to exactly the top is not
+  bounced at all. A non-wheel-driven arrival at exactly zero (e.g. a
+  script/automation setting VerticalScrollOffset directly) within that
+  short window could still be bounced up to 4 times before the cap gives
+  up contesting it (accepted tradeoff; revisit only if reported).
+- Currency rows now use API names from /v2/currencies (may differ
+  slightly from the old hardcoded fallbacks, e.g. singular forms);
+  Gw2Constants remains the offline fallback.
+
+---
+
+# M33 Backlog: Exordium Full-Parity Wave (logged 2026-07-20, post-M32 hands-on)
+
+User-reported issues from live testing of the merged M30-M32 build, plus a
+milestone directive. GOAL: full behavioral parity with the gw2efficiency
+crafting calculator for an Exordium plan, every node. Hypotheses below are
+from the orchestrating session - instrument/verify before trusting.
+
+## THE METHOD (user directive - governs all items below)
+Research how gw2efficiency.com/crafting/calculator handles Exordium
+ITEM BY ITEM (research-only at dev time; the module must NEVER call
+gw2efficiency at runtime). For each node document: which sources gw2e
+shows, which price basis it uses, craft/buy defaults, how it displays
+vendor/currency costs, and how it handles unpriceable items. Make the
+module ECHO that behavior rather than inventing an approach. New
+dev-time seeders (vendor pricing, Mystic Forge recipes) are welcome;
+they must write static seed JSON, never scrape at runtime.
+
+## 12. Fast wheel-up scroll: net-downward stutter (REOPENED 2026-07-21; root-caused and FIXED in M36, live-verified)
+Rapid successive wheel-up events make the viewport scroll up then jump
+back down further than it went up - net downward movement with an
+upward stutter. Hypothesis: scroll guard/restore machinery (or some
+per-frame interaction with Blish's Panel wheel handling) contesting
+rapid user input. Reproduce with the proven instrument-first loop
+(synthetic rapid wheel-up while a guard window could be live and while
+idle) before designing a fix.
+Fixed in M33 (C2a): a live instrumented capture (c12-baseline-analysis,
+2026-07-20) confirmed the root cause - the old restore Tick's
+divergence check required contentHeight to be unchanged frame-to-frame
+before it could trust the scrollbar's live value over its own target,
+and nested AutoSize convergence kept contentHeight fluctuating for
+several real frames after every rebuild, so a wheel notch landing in
+that window was silently overwritten. Container heights (section
+bodies, recipe-tree child containers) are now finalized synchronously
+at build time via PlanContentHeightMath, removing the fluctuating-height
+window entirely. On top of that, the post-restore verify window now
+yields immediately on any observed wheel event (no heightUnchanged
+precondition), so a user's wheel input during a live restore/verify
+window is never contested.
+VERIFICATION STATE: the above is confirmed against the c12-baseline-
+analysis (2026-07-20) live instrumented capture of the OLD code, plus
+Blish-free unit tests of the pure math helpers (PlanContentHeightMath,
+ScrollMath) and a green build against the vendored Blish HUD v1.3.0
+source. LIVE-VERIFIED 2026-07-20 (instrumented desktop capture of THIS
+code): a wheel-up event landing INSIDE a live verify window (verifyLive
+=True in the trace) triggered an immediate "verify exit
+reason=wheel-observed" with no contested write, and a fast wheel-up
+burst then descended monotonically to exactly 0.0000 and stayed there
+- no zero-reassert bounce at top. Idle fast bursts remain clean.
+(Note: Blish's own per-frame wheel coalescing still drops ~40% of
+notches in very fast bursts - stock library behavior, scrolls shorter
+than intended but never backwards. SUPERSEDED 2026-07-21: that
+"never backwards" characterization held for the specific burst captured
+in this 2026-07-20 session but is not the general case - see the
+REOPENED record below for a real vendor bug that does make specific
+coalesced multi-notch up-bursts scroll backwards, not just shorter.)
+(M33 fix-pass note: an earlier revision of this fix also suppressed the
+zero-reassert contest whenever a wheel event had landed within the last
+250ms of wall clock, intending to protect a user who "just wheeled to
+exactly the top." That suppression was removed - it could only ever
+trigger for a wheel that predated the restore window arming, in which
+case the saved scroll offset reflects the user's real, non-top
+position, and suppressing the reassert would abandon restoring it,
+reintroducing the #14 top-jump. The genuine "wheeled to exactly top"
+case never reaches the verify window at all: PreserveScrollAcross skips
+the restore/verify entirely when the saved offset is already 0.)
+
+REOPENED 2026-07-21 (live user report, after the M33 machinery-side fixes
+above and the intervening M34/M35 milestones): the user reported the
+original symptom again - fast wheel-up flicks still net downward. An
+instrumented [scrolldiag] capture of the user's own physical mouse over
+the live Blish-on-Paint session EXONERATED the M33 restore/verify
+machinery itself: zero writer interference (no SyncRestore/Verify/
+ResizePreserve writes) anywhere near the wheel events in question - the
+machinery this milestone's fixes targeted was never the cause of the
+reopened report. The trace instead revealed a real bug in the vendored
+library: fast multi-notch wheel-UP flicks arrive at the content panel's
+MouseWheelScrolled with corrupted raw deltas, exactly (N*120) - 65536 for
+the coalesced up-notch count N=2..8 (measured histogram: N=2 -> -65296,
+N=3 -> -65176, N=4 -> -65056, N=5 -> -64936, N=6 -> -64816, N=7 -> -64696,
+N=8 -> -64576; 47 occurrences), and Blish's own Scrollbar scrolls ONE STEP
+DOWN for each such event (it looks only at Math.Sign of the corrupted,
+negative-looking delta, never the magnitude). Fast multi-notch DOWN
+flicks coalesce cleanly (-240..-840, no corruption); single notches both
+directions are clean. Net effect: every fast pair of up-notches produced
+a down-step, reproducing the original report exactly.
+
+ROOT CAUSE (confirmed by decompiling the shipped BlishHUD v1.3.0 "Blish
+HUD.exe" with ilspycmd, cross-checked against a clone of the matching
+public source): Blish_HUD.Input.MouseEventArgs.WheelDelta extracts a
+Win32 low-level mouse hook's signed 16-bit wheel delta as unsigned, then
+tries to recover the sign by subtracting 65536 whenever the unsigned
+value exceeds SystemInformation.MouseWheelScrollDelta (120) - a threshold
+that only correctly discriminates a SINGLE notch's two directions. A
+coalesced 2+ up-notch event (unsigned 240, 360, ...) is well above 120
+and gets "corrected" anyway even though it was never actually a wrapped
+negative value, turning e.g. a legitimate +240 into 240 - 65536 = -65296.
+See Services/WheelDeltaSanitizer.cs's class doc comment for the full
+derivation, including why single notches and coalesced down-flicks are
+unaffected.
+VERDICT - NOT DebugHelper-only: both Blish_HUD.Input.WinApiMouseHookManager
+(the normal path used when directly attached to a running, focused GW2
+client) and DebugHelperMouseHookManager (used under this dev machine's
+dummy-window mode) construct MouseEventArgs from the identical raw
+mouseData field and feed it through the SAME buggy WheelDelta getter -
+InputService's ApplicationSettings.Instance.DebugEnabled only chooses
+which hook manager supplies that field, not how it gets interpreted. A
+real GW2-attached player fast-flicking the wheel upward is exposed to the
+identical corruption; this is not a dummy-window/dev-tooling artifact.
+
+Fixed module-side (M36) via a new Services/WheelDeltaSanitizer.cs (pure,
+Blish-free, exhaustively unit-tested against the full histogram above
+plus boundary values, including lattice-edge tests at the documented
+N=46/N=47 threshold boundary) that classifies a raw delta as
+wrapped-positive whenever raw <= -60000 (a threshold with a wide safety
+margin from every plausible genuine delta - see the class doc comment
+for the derivation) and recovers the intended positive delta.
+CraftingPlanView's OnContentWheelObserved (already unconditionally
+subscribed to _contentPanel.MouseWheelScrolled since M33 C2a) now, on a
+wrapped event, cancels Blish's own not-yet-applied single-step-down
+Glide tween (GameService.Animation.Tweener.TargetCancel) before it can
+land, then writes the position N clean up-notches would have produced
+instead, computed in the same pixel space Blish's own per-notch step
+operates in (new ScrollMath.ApplyPixelDelta) so a corrected fast flick
+composes exactly like N clean single notches rather than a differently-
+scaled jump. [scrolldiag] gated logging (writer=WheelWrapFix) records
+every correction (rawIn, intendedDelta, before, after); the sanitizer
+classification itself is unconditional and zero-allocation.
+
+MECHANISM (M36 fix-pass, re-verified against decompiled Glide rather
+than assumed): a review of this fix theorized TargetCancel was a no-op
+here, on the premise that Glide defers a new Tween's by-target
+dictionary registration to the NEXT Tweener.Update() call - decompiling
+Glide.Tween.TweenerImpl.Tween<T>() from the shipped Blish HUD.exe
+disproved that premise: Tween<T>() enqueues the new tween to its
+private toAdd queue AND calls its own AddAndRemove() synchronously,
+before returning - registering the tween in the by-target
+ConcurrentDictionary in the SAME call, not deferred. So by the time this
+handler runs (subscribed after Blish's own Scrollbar, confirmed by
+construction - _contentPanel's Scrollbar is created via its CanScroll
+property setter inside the same object-initializer statement that
+constructs _contentPanel, strictly before this view's own
+MouseWheelScrolled subscription line runs), Blish's wrong tween is
+already registered, and TargetCancel finds and neutralizes it
+synchronously (Tween.Cancel nulls its var/lerper slot, so even an
+Update() before its removal from the list skips writing ScrollDistance
+entirely) - not "canceled a frame late". The cancel-then-direct-write
+shape is therefore kept as-is rather than replaced with a counter-tween
+or a one-frame-deferred correction (both considered and rejected - see
+CraftingPlanView.ApplyWheelWrapCorrection's own doc comment for the full
+decompiled-evidence walkthrough). A bounded, one-shot defensive
+re-assert (StartWheelWrapVerify: at most 2 real frames, re-asserts once
+if ScrollDistance has drifted from the corrected target and no newer
+wheel event has landed, [scrolldiag] writer=WheelWrapFix/reassert) was
+added regardless, as insurance against a future Blish/Glide vendor
+change - not because this mechanism is expected to fail.
+Also fixed in the same pass: MouseWheelScrollLines == -1 (Windows' "one
+screen at a time" setting) would otherwise flip this correction's sign;
+WheelDeltaSanitizer.SanitizeScrollLines substitutes Windows' documented
+default of 3 lines whenever the OS-reported value is not a usable
+positive count (Blish's own HandleWheelScroll has the identical defect
+under that setting and cannot be fixed here, so direction-correctness is
+chosen over exact step-size parity for that one OS setting value).
+
+VERIFICATION STATE: root cause confirmed against the live 2026-07-21
+instrumented user trace and independently cross-verified by decompiling
+the shipped BlishHUD v1.3.0 binary (Blish_HUD.Input.MouseEventArgs.
+WheelDelta, Blish_HUD.Controls.Scrollbar.HandleWheelScroll/ScrollAnimated,
+Blish_HUD.InputService's hook-manager selection, and - this fix-pass -
+Glide.Tween.TweenerImpl.Tween<T>()/AddAndRemove() for the TargetCancel
+timing question above). Fix confirmed by a green build and the full
+Blish-free unit test suite (WheelDeltaSanitizerTests covers the entire
+measured histogram, boundary values, the N=46/N=47 lattice edge, and
+SanitizeScrollLines; ScrollMathTests covers the pixel-delta arithmetic,
+including that a single multi-notch correction composes identically to N
+single-notch steps). LIVE-VERIFIED 2026-07-21 (instrumented desktop
+capture of THIS fix on the merged build): synthetic single-event
+multi-notch up-deltas (+240 and +360, which Blish's WheelDelta getter
+wraps to -65296/-65176 exactly as in the user's original trace) each
+produced a [scrolldiag] writer=WheelWrapFix correction with the right
+intendedDelta and moved the bar UP by exactly N clean notches
+(0.1261->0.1031 for 2 notches, 0.1031->0.0688 for 3) - no down-step,
+no snap-back on subsequent frames, and the defensive re-assert never
+needed to fire (empirically confirming the synchronous-registration
+TargetCancel mechanism the fix-pass decompilation predicted).
+
+## 13. Resize UX rework: live reflow, no settle stutter (FIXED in M33, live-verified end-state; drag-tick perf live-verified 2026-07-21)
+The 150ms debounce-only approach is REJECTED by user feedback: content
+must reflow smoothly WHILE dragging, not lag until the mouse holds
+still. Additionally the settle rebuild itself is visibly ugly: stray
+horizontal divider lines flash and the view visibly reconstructs from a
+collapsed state (nested AutoSize convergence made visible). Direction:
+in-place width relayout of EXISTING controls during drag (update
+widths/x-positions; no dispose+rebuild), making the settle rebuild
+unnecessary or invisible. This is the previously-rejected "option b" -
+now required; design it to avoid drift between build and relayout paths.
+Fixed in M33 (C2b): the 150ms dispose+rebuild (ResizeDebounceStep calling
+PreserveScrollAcross(() => RenderPlan(...))) is gone entirely. Every
+CreateX... builder now also registers a small closure (a per-render
+List<Action<int>> relayout registry, lifecycle mirrors the tree's own
+per-render node-state list) that repositions/resizes its EXISTING
+controls for a new panelWidth; OnPanelResized replays the full registry
+synchronously on every real drag tick - live reflow while dragging, no
+debounce wait. This was provable safe specifically because of the M33
+C2a height work already on this branch: since every row/container height
+is finalized synchronously at build time (PlanContentHeightMath) rather
+than left to Blish's multi-frame AutoSize convergence, a pure width/X
+write on a fixed-height row cannot re-trigger that convergence window -
+the exact "blind-overwrite window" and paint-at-scroll-0 mechanism the
+#12/#14 baseline capture (c12-baseline-analysis, 2026-07-20) measured
+only ever opens when a rebuild changes content height. A relayout that
+never touches Height therefore cannot open it, so the settle rebuild's
+flash/divider-glitch/scroll-contest triad simply has no trigger left -
+confirmed by construction, not raced against. The one remaining
+text-measurement cost (the 3 EllipsizeToWidth call sites - Used
+Materials, Shopping List, and Tree row names) is deferred to a short
+trailing settle pass (same FrameTicker debounce mechanism, repurposed)
+that only reassigns Label.Text/tooltip on existing labels - still no
+rebuild, no height change, no scroll disturbance. Width-dependent
+arithmetic (tree column anchors, cost-tile geometry, header centering,
+name-column budgeting) was extracted into a new Blish-free
+Services/PlanRelayoutMath.cs (unit tested), mirroring ShoppingColumnMath,
+so the build path and every relayout/re-ellipsis closure share one
+source of truth and cannot drift apart. A DEBUG-only check asserts no
+relayout closure ever moves the scrollbar, and a DEBUG-only log fires if
+a section renders rows but registers no relayout closure, so a future
+section type that forgets to wire this up fails loud instead of
+silently freezing at build-time width on later resizes.
+VERIFICATION STATE: the visible-glitch elimination above (no dispose+
+rebuild, no scroll disturbance) is confirmed by construction against
+the M33 C2a height work plus Blish-free unit tests of
+Services/PlanRelayoutMath.cs, and a green build. LIVE-VERIFIED
+2026-07-20 (desktop screenshot loop, real Exordium plan ~8.6k px
+content): a synthetic grip drag resized the window and the end-state
+layout was fully correct at both the narrower and re-widened widths
+(header centering, right-anchored cost columns, pills, buttons), with
+zero scrollbar writes during width reflow and label ellipsis correctly
+restored at settle. In particular, ReplayRelayout replays the full
+relayout closure registry synchronously on every real drag frame
+(previously: once, 150ms after the drag settled) - a genuine change in
+perf character versus the pre-M33 debounce-only approach. The
+SuspendLayout/ResumeLayout batching is a real, reasoned mitigation (see
+ReplayRelayout's doc comment).
+LIVE-VERIFIED 2026-07-21: the user confirmed the live drag feel is
+smooth ("genuinely works well") across a drag session on a ~9,400px
+multi-item plan (Exordium + Gift of Fortune) that replayed the relayout
+registry 435 ticks over the course of the drag (M36 fix-pass, NICETOHAVE
+a: this is the exact same drag-session capture #19's "435
+writer=ResizePreserve writes" count below comes from - one drag, one
+relayout-registry-replay-per-tick mechanism, counted from two angles),
+with no felt lag or stutter on real hardware. This closes the drag-tick
+perf caveat by direct user experience rather than by profiling - no
+profiler numbers were captured, so a future report of stutter on a much
+larger plan or a lower-end machine should still be taken seriously and
+re-measured properly rather than dismissed against this note.
+
+## 14. Pill-click viewport flash (jump to top and back) (FIXED in M33, live-verified)
+Clicking a TP/VENDOR override pill visibly flashes the view to the top
+for an instant before the scroll restore re-asserts. The restore
+converges but applies a frame+ late. Direction: apply the saved scroll
+ratio synchronously inside PreserveScrollAcross immediately after the
+rebuild (before first paint), with the FrameTicker loop only defending
+convergence afterward - target: zero visible movement.
+Fixed in M33 (C2a): PreserveScrollAcross now writes the restore ratio to
+the scrollbar synchronously immediately after the rebuild returns, using
+container heights that are already finalized (not still collapsed at
+Height=0 awaiting AutoSize convergence) - nothing paints between the
+rebuild and the correct restore write landing, so there is no wrong
+position left for the user to see. A short (2-3 real frame) FrameTicker
+verify still runs afterward, but only to contest Blish's own single
+expected post-rebuild scrollbar reset, not to converge toward a still-
+moving target.
+VERIFICATION STATE: confirmed by construction against the M33 C2a
+height work (the c12-baseline-analysis trace was captured against the
+OLD code) plus Blish-free unit tests of the pure math helpers and a
+green build. LIVE-VERIFIED 2026-07-20 (two independent instrumented
+pill-click captures of THIS code): [scrolldiag] shows writer=SyncRestore
+writing the correct ratio synchronously with content height already
+final (no convergence drift), exactly one same-frame Verify/zeroReassert
+contest of Blish's single expected reset, and "verify exit reason=stable"
+at realFrame 2; pre/post screenshots are pixel-identical in viewport
+position, including across an override that changed content height
+(absolute pixel offset correctly preserved). Baseline for comparison:
+the OLD code showed 4+ frames of contested writes with drifting ratio.
+
+## 15. Shopping tag text contrast (VENDOR / SALVAGE / UNKNOWN)
+The grey shopping-list source tags have poor text-vs-fill contrast.
+Tag text should be near-white / light grey (match the M30 #11 pill-label
+fix, which only covered tree pills, not shopping tags).
+
+## 16. Vendor-source items show no price
+Vendor-decision rows (e.g. Vision Crystal, Philosopher's Stone, Mystic
+Clover) render empty Each/Total cells. Show the actual vendor cost,
+including non-coin currency costs with currency icons (pipeline for
+icons exists since M30 #3). Echo gw2e's display for the same nodes.
+
+## 17. Seed data gaps: false UNKNOWNs in the Exordium tree (FIXED in M33)
+Original hypothesis was wrong on 3 of its 4 points, confirmed by wiki
+research and an offline Harness dump. Gift of Exordium, Gift of Metal, and
+Gift of the Mists were already correctly seeded (recipes -1337, 6074,
+-1005) before this milestone - they rendered UNKNOWN because
+PlanSolver.Evaluate stopped evaluating a recipe's ingredients on the first
+unpriceable sibling, so every later sibling never got a decision at all
+(fixed in the M33 solver-parity rewrite, not a seed gap). Mystic Runestone
+was never priced in Spirit Shards; it is a 1-gold coin purchase from
+Miyani, already correctly seeded. The self-referential Obsidian Shard
+recipe (id -496: 1 Obsidian Shard + 1 Mystic Coin + 1 Pile of Putrid
+Essence + 1 Mini Risen Priest of Balthazar -> 3 Obsidian Shards) is
+genuine wiki-documented game data (a real, obscure festival-junk-to-shard
+Mystic Forge combo), not a scraper artifact - the solver's per-path
+visiting-set cycle guard already handles it safely, and the same is true
+of the ~98 similar self-referential salvage-trophy tier-up recipes found
+elsewhere in the seed (their large propagated quantities are correct,
+wiki-scale arithmetic, not a bug). The one real gap: Mystic Clover
+(19675) had no Mystic Forge recipe seeded at all despite being needed 77x
+by Mystic Tribute - added this milestone (recipe -1591: 1 Obsidian Shard +
+1 Mystic Coin + 1 Glob of Ectoplasm + 6 Philosopher's Stone, EV-priced at
+the wiki-documented 0.31 success rate from a 40k-sample community study).
+Also added: 20 missing item names (Mystic Runestone, Tribute to the
+Exitare, Mystic Clover, and 17 others an offline Harness dump showed
+rendering "Unknown Item") and one acquisition hint - Gift of Battle, whose
+only vendor-purchase path (Battle Master, 500 Badges of Honor) was removed
+in the Spring 2016 Quarterly Update per a fresh wiki check; it is WvW
+reward-track only now. Gift of Glory and Gift of War were also checked
+against this same "believed no-source" pattern and are NOT genuine gaps -
+both have a real, already-seeded Miyani vendor purchase priced in
+currently-tradable materials (Shard of Glory / Memory of Battle), just
+unresolvable in the offline Harness (no live TP data there); no hint was
+added for either, since one would be actively misleading. Verified via the
+Harness's new --dump-tree flag: Exordium, Gift of Exordium, Mystic Tribute,
+Gift of Maguuma Mastery, Gift of Condensed Magic/Might, and Mystic Clover
+all now resolve to a real Craft/Vendor decision instead of Unknown.
+Follow-up: ref/vendor_offers.json still carries a stale "Battle Master,
+500 Badges of Honor" offer for Gift of Battle scraped from the wiki's
+historical (removed) vendor section, which currently masks the new hint
+above (item 8's precedent shows the acquisition-hint system only applies
+to genuinely Unknown nodes) - worth a future VendorOfferUpdater cleanup
+pass, out of scope for this seed-data milestone.
+
+**Follow-up resolved (M33 Wave B polish, 2026-07-20):** the stale
+Battle Master / 500 Badges of Honor offer was removed from
+ref/vendor_offers.json after two independent wiki re-checks confirmed
+the purchase path was removed in the Spring 2016 Quarterly Update. Gift
+of Battle now correctly resolves Unknown with its WVW acquisition-hint
+badge visible instead of a bogus BuyFromVendor decision (confirmed via
+a rebuilt offline Harness --dump-tree run). The same pass also named the
+remaining ~26 base-tier materials (ores, dust, leather, venom sacs, Tiny
+Claw, etc.) that still rendered "Unknown Item" in the Harness dump.
+
+## 18. Multi-source decision display is inconsistent
+Glob of Ectoplasm shows a VENDOR pill while its pricing uses TP. Items
+available from multiple sources should expose all sources with the
+selected one highlighted (gw2e-style), and the displayed decision MUST
+match the price basis actually used by the solver. Audit the
+decision-to-pill mapping for every source combination.
+
+## 19. Resize-drag scroll reset on height change (FIXED in M33 C2c)
+Live-verified regression from M33 C2b's live in-place relayout: any window
+resize drag that changes the content panel's VIEWPORT HEIGHT (dragging the
+bottom edge or a corner) reset scroll to the top, with no [scrolldiag]
+writes during the drag at all. Mechanism: the settle rebuild C2b removed
+used to run inside PreserveScrollAcross, so scroll was restored as a side
+effect of that wrapper; the new live-reflow path never rebuilds, so
+nothing contested Blish's own Scrollbar.RecalculateLayout, which zeroes
+ScrollDistance whenever _scrollbarPercent (viewportHeight/contentHeight)
+changes - which a height-changing drag does on every tick. Width-only
+reflow was and remains unaffected (verified live: no scroll disturbance).
+Confirmed by decompiling packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe
+(Blish_HUD.Controls.Scrollbar/Panel): the reset is NOT synchronous inside
+the Height setter - the nested scrollbar Height write that Panel's own
+"Height" PropertyChanged handler triggers runs before Panel.RecalculateLayout
+has refreshed ContentRegion, so it reads a still-stale ratio and sees no
+change; the real reset comes from Scrollbar.DoUpdate's unconditional
+per-frame Invalidate(), which by then sees the refreshed ContentRegion and
+lands the reset a real frame (or two) after the resize tick - the same
+delayed-reset window StartScrollVerify already exists to contest for
+rebuilds (item #14).
+Fixed in M33 (C2c): OnPanelResized now captures the content panel's
+absolute scroll offset in pixels before its Height changes on every
+resize tick, and - only when the tick actually changed content-panel
+height - re-applies it synchronously afterward via the new
+PreserveScrollAcrossResize (same ScrollMath.RatioForOffset conversion
+ApplySavedScrollSynchronously already uses for rebuilds), logged as
+[scrolldiag] writer=ResizePreserve. A second, less obvious fix was needed
+for the write itself to actually stick: on a pure height-only tick
+(dragging just the bottom edge, no width change) nothing else touches the
+scrollbar first, so Scrollbar's own cached percent is still stale when
+PreserveScrollAcrossResize runs; writing ScrollDistance directly would
+itself trigger the vendor's RecalculateLayout for the first time against
+the now-fresh ContentRegion, which would detect the change and reset back
+to 0 synchronously, undoing the write within the same statement. The fix
+calls scrollbar.RecalculateLayout() directly first (bypassing Control's
+once-per-LayoutState UpdateLayout guard) to force that stale-to-fresh
+transition - and its harmless, invisible-since-synchronous reset - to
+happen under this method's control, so the restore write immediately
+after is the one that lands. A rebuild does not need this extra step:
+PreserveScrollAcross's mutate() already churns through many of the
+content panel's own direct children, each reaching
+Panel.UpdateContentRegionBounds and forcing the same transition
+organically before ApplySavedScrollSynchronously ever writes.
+This keeps every tick visually correct without a per-tick verify ticker
+(which would spam a new FrameTicker on every drag frame); a single
+bounded verify window is
+instead armed once, at drag settle (reusing the existing
+ResizeDebounceStep/StartScrollVerify machinery unmodified), to contest
+the one trailing later-frame reset the vendor source shows can still land
+after the drag's last tick. The settle ticker itself - previously
+scheduled only when width changed - is now also scheduled on a
+height-only change (e.g. dragging just the bottom edge): that drag shape
+previously got no settle handling of any kind, which would have starved
+even the per-tick write of its trailing verify. A rebuild
+(PreserveScrollAcross) clears any pending resize-verify up front, since
+it disposes and recreates the very content the pending verify would
+otherwise be measured against.
+VERIFICATION STATE: confirmed by construction against the decompiled
+vendor Scrollbar/Panel source and the existing ScrollMath unit coverage,
+plus a green build and full test suite. LIVE-VERIFIED 2026-07-21 by the
+user's own manual resize drags with ScrollDiagnosticsEnabled: 435
+writer=ResizePreserve writes captured; on every height-changing tick the
+vendor's own reset zeroed the bar (before=0.0000) and ResizePreserve
+synchronously re-applied the constant absolute pixel offset
+(savedOffset=1529 held across newHeight 678->794, with the ratio
+adapting 0.1758->0.1782 as the viewport height changed) - drag-settle
+verify exited reason=stable at realFrame=1.
+(2026-07-20 desktop session note: six synthetic grip-drag attempts
+across two fresh launches failed to re-catch the TabbedWindow2 resize
+grip after this fix landed - the one successful synthetic catch of the
+session predates the fix, which is why the live check above needed a
+human drag rather than the screenshot-loop's synthetic input. The
+primitives the fix reuses - pixel-offset capture, ScrollMath.
+RatioForOffset, synchronous write, StartScrollVerify - are each
+live-verified under item #14's captures.)
+
+## 20. M34: gw2efficiency owned-materials parity + correctness fixes
+
+Follow-on milestone after M33's KNOWN-ISSUES 12-18 closure (master
+`e486f86`, 636 tests). Two research reports
+(`m34-r2-gw2e-owned-materials.md`, `m34-r3-gw2e-caps-and-misc.md`) and two
+live-oddity root-cause investigations (`m34-m1-owned-materials-map.md`,
+`m34-m2-live-oddities.md`) preceded implementation. 723 tests green at
+milestone end.
+
+### 20.1 Correctness fix: Obsidian Shard 179x showed Total 186, not 180 (M34-B1 #1)
+
+Real bug, reproduced bit-for-bit via the offline Harness (`--profile 2
+--dump-tree`). Obsidian Shard (item 19925) is needed via five separate tree
+occurrences (a self-referential Mystic Forge recipe re-expands it once per
+branch - three duplicated Vision Crystal branches at qty 4 each, plus two
+direct Mystic Clover-chain branches at qty 83 and 84). The winning vendor
+offer is a 3-for-3-Laurels bulk purchase. `PlanSolver` computed
+`unitsNeeded = ceil(node.Quantity / offer.OutputCount)` **once per
+occurrence** and summed the already-rounded results:
+`ceil(4/3)+ceil(4/3)+ceil(4/3)+ceil(83/3)+ceil(84/3) = 2+2+2+28+28 = 62`
+purchases x 3 = **186 Laurels** - a real 6-Laurel (+3.3%) overcount versus
+the correct aggregate-first answer, `ceil(179/3)*3 = 180`. This directly
+contradicted gw2efficiency's own documented convention
+(`craftingSteps.ts`: batch counts are ceil'd only after all same-id steps
+across the whole tree are merged). Fixed by tracking each item's winning
+vendor offer batch shape across every occurrence and re-deriving the merged
+step's true cost from AGGREGATE demand with a single ceil
+(`PlanSolver.FinalizeVendorBatches`); occurrences that genuinely picked
+different offers are left as the sum of their own already-correct
+per-occurrence costs rather than forced through one offer's batch shape.
+The identical per-node `unitsNeeded` scaling also applies to a bulk offer's
+coin cost, so any item needed via 2+ tree occurrences and priced via a
+same-offer bulk vendor purchase was equally exposed, not just this one
+Obsidian Shard repro.
+
+Secondary, independent issue noted but only partially addressed: even at
+the correct 180 total, a truncating-average "Each" price for a
+batch-purchased currency row (`180/179` still truncates to a
+non-representative "1") is inherently a poor fit - gw2e's own shopping list
+never shows a per-unit currency price at all. M34-B1 #2 changed the Each
+cell to resolve the WINNING OFFER's own true per-batch rate
+(`PlanStep.VendorOfferOutputCount`/`VendorOfferCurrencyCostLinesPerBatch`)
+instead of the old truncated total/quantity average, rendering a literal
+"N for M" bundle label when that rate is fractional, and omitting the Each
+cell entirely (never a guessed rate) when a merged row's occurrences used
+more than one distinct offer.
+
+### 20.2 Cap-parity change: vendor purchase caps no longer hard-exclude an offer (M34-B1 #3)
+
+`m34-r3-gw2e-caps-and-misc.md` verdict: gw2efficiency's daily/weekly
+purchase caps are informational display only (a post-solve "this'll take
+you N days" banner) - they never re-route the solver, exclude an offer, or
+change a craft/buy decision. Our solver's pre-M34 `EvaluateVendorOffers`
+did the opposite: once a node's own occurrence-local quantity exceeded a
+cap, it silently excluded that vendor offer from evaluation entirely, which
+would (the moment any cap data is ever seeded - today 0 of 53,530 wiki
+offers carry cap data, so this was previously inert) make the solver pick a
+different, possibly worse, path than gw2e for the same node. Fixed to match
+upstream: caps no longer gate offer evaluation; cap-exceeding merged demand
+now surfaces as a `CraftingPlan.TimegatedItems` entry, rendered as a plain
+informational row in the Crafting Steps section instead of silently
+re-routing the plan.
+
+### 20.3 Status race: stale "Building final result..." status line (M34-B1 #4)
+
+Root-caused via `m34-m2-live-oddities.md`: a generation's own trailing
+progress tick (routed through `Progress<T>`'s default
+`SynchronizationContext`, two ThreadPool hops) and that same generation's
+completion write (an inlined task continuation, effectively one hop) race
+for Blish's `QueueMainThreadUpdate` queue with no FIFO guarantee between
+them. In practice the completion write ("Plan generated...") reliably
+drained first, so the late-arriving trailing tick overwrote it right back
+with the stale "Building final result..." text - and nothing wrote to the
+status label again for that generation. The pre-existing `myGen ==
+_generateSequence` guard could not catch this: both callbacks belong to the
+SAME generation, so the guard (designed to reject a superseded generation's
+stale callback) passed for both. Fixed with a per-generation
+`_statusClosedForCurrentGeneration` flag, set the instant a generation
+writes its own completion/error status; the progress-tick callback now
+checks this flag too (via the new, pure `StatusUpdateGuard.ShouldApply`)
+before every `SetStatus` call, closing the race at drain time regardless of
+which callback happens to actually drain first.
+
+### 20.4 Owned-materials parity scope (M34-B2a + M34-B2b)
+
+Two research reports (`m34-r2-gw2e-owned-materials.md`,
+`m34-m1-owned-materials-map.md`) found gw2efficiency's owned-materials
+model diverges from ours in several ways; M34-B2a/B2b closed the ones in
+scope:
+
+- **Per-node owned attribution** (B2a #1): a new `CraftingTreeNode.
+  OwnedQuantityUsed` field (threaded from a new `ReducedTreeResult.
+  OwnedQuantityUsedByNode` side channel, keyed by stable `NodeId`) makes a
+  PARTIALLY-owned node representable for the first time - previously only
+  fully-owned nodes (reduced to `Decision.Have`) were visible at all, and a
+  node whose item id recurred elsewhere in the tree had no way to attribute
+  "how much did THIS node use" (the old `UsedMaterials` list is aggregated
+  by item id only).
+- **Primary-option-only pool consumption** (B2a #2): `InventoryReducer`
+  previously walked EVERY `RecipeOption` on a node when consuming owned
+  stock, letting an alternate recipe the solver would never choose drain
+  the shared pool meant for a real branch. Now only the primary
+  (first-listed) option recurses with consumption; every option's
+  ingredient quantities are still rescaled so the solver's cost comparison
+  across options stays correct.
+- **"Value Own Materials" force-buy pre-pass** (B2a #3): gw2e's
+  `valueOwnItems` setting is a genuine pre-pass that force-excludes craft
+  from nodes where buying beats a 15%-discounted craft cost
+  (`buyPrice < craftDecisionPrice * 0.85`) - our prior `OwnMaterialsMode.
+  Valued` only adjusted a downstream profit number and had ZERO effect on
+  which items got crafted (a real parity gap, since the target item in
+  this project's Exordium-precursor use case is always account-bound and
+  therefore never has the sell price the old profit adjustment needed
+  anyway). `OwnedMaterialsForceBuyPrePass` now applies gw2e's exact rule
+  against a genuine zero-owned baseline solve, and `ModuleSettings.
+  ValueOwnMaterials` defaults to `true` (matching gw2e) with its first
+  Settings-tab checkbox. Deliberately narrower than gw2e's always-on gate:
+  it only activates when a real snapshot is actually driving reduction, so
+  the new default doesn't surprise a user who has never enabled "Use Own
+  Materials" with newly forced-buy decisions.
+- **Owned currency is display-only, never fed back into the tree** (B2a
+  #4 + B2b): matching gw2e's own two-tier design (item ownership is a real
+  structural input to the algorithm; currency ownership is a cosmetic
+  annotation plus a downstream summary-only netting, Section 4 of the r2
+  report), `AccountCurrencyIndex` wraps the wallet snapshot the same way
+  `AccountItemIndex` wraps owned items, but is consulted ONLY after solving
+  - `CraftingPlanResult`/`PlanSolveContext.OwnedCurrencyAmounts` are
+  populated strictly from the plan's already-final currency totals, never
+  read by `InventoryReducer` or `PlanSolver`. A regression test proves
+  decisions/costs are identical with and without wallet data. B2b then
+  surfaced this previously-plumbed-but-unrendered data: the Total Cost
+  section's currency rows and the Shopping List's vendor currency cells now
+  show an "(X owned, Y needed)" annotation when wallet data is present
+  (Total Cost inline; Shopping List as a tooltip, to avoid new row-height
+  layout math for a cosmetic-only addition) - byte-identical to before when
+  no wallet snapshot exists.
+- **"Using N owned materials" pill** (B2b): `DecisionPillPlanner` now
+  emits a non-interactive `PillKind.OwnedInfo` pill ("USING N OWNED")
+  alongside a node's normal CRAFT/TP/VENDOR/UNKNOWN pill whenever
+  `OwnedQuantityUsed > 0`, matching gw2e's own
+  `usedQuantity < totalQuantity` condition. A fully-owned node (collapsed
+  to the single `HAVE` pill) deliberately keeps that existing plain
+  treatment rather than also showing the annotation - a scope decision, not
+  an oversight (gw2e's own live tree does not collapse a fully-owned node
+  to a single pill the way this module's M28 UI simplification does, so
+  there is no exact upstream precedent to follow for this specific
+  combination).
+- **"Ignore" pill** (B2b): gw2e's per-item "treat this as fully in-hand
+  tree-wide" override is implemented as a NEW per-solve `ignoredItemIds`
+  parameter threaded through `PlanSolver.Solve`/`Evaluate`/`Collect`
+  (keyed by ItemId, not NodeId, matching gw2e's "every occurrence of that
+  item id" semantics) and `CraftingPlanPipeline.ResolveWithOverrides` -
+  reusing the same local-resolve machinery M21's craft/buy pill clicks use,
+  with the ignored-id set held as view-session state
+  (`CraftingPlanView._ignoredItemIds`) alongside, but independent of,
+  `_nodeOverrides` (neither "Best Path" nor "Craft All"/"Buy All" clears
+  it, matching gw2e's own documented "bulk actions are unrelated to
+  ownership" behavior). An ignored item contributes zero cost, generates no
+  crafting step or shopping row, and its own recipe's ingredients are never
+  evaluated (matching gw2e's "an un-crafted branch never asks for its
+  ingredients" rule) - `CraftingTreeBuilder` collapses it to the same
+  `Decision.Have` display a genuinely-owned node gets, but sets a new
+  `CraftingTreeNode.IsIgnored` flag so the pill layer keeps showing an
+  active, clickable "IGNORED" toggle (distinct from a naturally-owned
+  node's plain, non-interactive `HAVE` pill) for un-ignoring.
+  **Conservative reading recorded per the milestone brief**: gw2e's own
+  Ignore mechanism works INDIRECTLY, by injecting a synthetic
+  `source: "Ignored"` entry into the owned-materials accounting layer and
+  letting the existing `calculateTreeQuantity`/`calculateTreePrices` re-run
+  naturally re-derive zero cost and zero-quantity cascading through
+  descendants; this module's `InventoryReducer`-based reduction already ran
+  once, before `PlanSolveContext.Tree` was even captured, and re-running it
+  locally (no network calls, per the existing local-resolve contract) is
+  out of reach of the current architecture (`m34-m1-owned-materials-map.md`
+  Section 5 explicitly flags this as needing "a new mechanism"). The
+  chosen, narrower-but-correct substitute: zero the ignored node's OWN cost
+  contribution directly at solve time (matching gw2e's END STATE for that
+  node - Section 2.1's "owned units are free, full stop" - and Section
+  5.2's "no crafting step for zero demand") without attempting to cascade
+  zero-quantity scaling down through an ignored node's own descendants the
+  way gw2e's real quantity-computation pass does (out of scope; those
+  descendants simply are never visited at all here, rather than being
+  visited-but-showing-zero, since the ignored node's own recipe traversal
+  is skipped entirely). Scoped to Item nodes only (no Currency-Ignore
+  support, since gw2e's Currency-Ignore path funnels through the wallet
+  accounting layer this module doesn't have wired into the tree at all -
+  see the B2a #4 note above).
+- **Known, deliberately out-of-scope gaps** (flagged, not fixed this
+  milestone): the multi-recipe-option pool-consumption risk (m1 report
+  Section 6.2 point 5 in the r2 report / Section 1 point 5 of the m1 map)
+  is explicitly NOT the same bug as B2a #2 above (that fix was
+  primary-option-ONLY consumption in `InventoryReducer`; `PlanSolver.
+  Evaluate` itself still walks every recipe option for cost-comparison
+  purposes, which is safe there since it is read-only); achievement-bit
+  ingredient de-duplication (r2 report Section 1.5) has no equivalent in
+  this module at all - niche (only matters for the small set of GW2
+  recipes with a one-time achievement-reward ingredient reused across
+  multiple tree branches) and out of scope for this pass.
+
+**VERIFICATION STATE**: all of the above is confirmed by a green build and
+the full 723-test suite (real production code paths - `PlanSolver`,
+`CraftingTreeBuilder`, `CraftingPlanPipeline`, `DecisionPillPlanner`,
+`CurrencyDisplayResolver`, `PlanViewModelBuilder`), plus the Obsidian Shard
+180-vs-186 numbers reproduced bit-for-bit against the real Exordium tree
+via the offline Harness (`m34-m2-live-oddities.md`). **Not yet re-confirmed
+by a live in-game desktop check** (screenshot loop) for any of the M34-B1/
+B2a/B2b visual changes - the pill layout in particular (a node can now show
+up to 5 pills: one of CRAFT/TP/VENDOR/HAVE/UNKNOWN, an optional
+"USING N OWNED", and an "IGNORE"/"IGNORED" toggle) has an acknowledged,
+unverified overflow risk on a deeply-nested, narrow-panel tree row (the
+M33 m1 map's own "up to six pills" ceiling note) - treat a fresh
+pill-overflow or clipped-pill report as expected-until-checked rather than
+a regression.
+
+## 21. M35: gw2efficiency parity - multi-item plans
+
+Final major gw2efficiency parity pillar (see the "Remaining parity
+pillars" line above). Preceded by a research report
+(`m34-r1-gw2e-multiitem.md`) documenting gw2e's exact mechanism: the
+Calculator's `e.recipes` array (N `{id, amount}` rows, add/remove/reorder,
+one shared settings panel for the whole batch) is wrapped, at Generate
+time, under a single synthetic fake parent node (`id: false`, name
+`"Multiple recipes"`, `multipleRecipeTree: true`, `quantity: 1`,
+`output: 1`, `components` = the N real item trees each carrying its own
+requested amount as its own `quantity`) and fed through the SAME
+single-root `cheapestTree` solver unmodified; the fake node is never
+rendered (`componentTree.html`'s own `ng-if`), so the Recipe Tree section
+shows what looks like N independent top-level trees; Shopping List/
+Crafting Steps/Required Disciplines/Required Recipes are generic per-id
+tree walkers with no multi-item-specific code at all, so they merge
+automatically; Cost Breakdown drops its per-item "(per item)" sub-lines
+and adds a "Profit numbers are the sum of all crafted recipes" banner.
+
+### 21.1 B1: synthetic wrapper pipeline (Services layer)
+
+`RecipeService.BuildMultiItemTreeAsync` builds each requested item's own
+tree via the existing single-item `BuildTreeAsync` path, then wraps 2+ of
+them under a synthetic root `RecipeNode` using new
+`Gw2Constants.MultiItemWrapperItemId`/`MultiItemWrapperRecipeId` sentinels
+(`int.MinValue` - real GW2 ids are always positive, so these can never
+collide with a genuine tree item/recipe). A single-entry request returns
+that item's own tree UNWRAPPED - gw2e's own `if (r.length===1) return
+r[0]` short-circuit, verbatim. `PlanSolver.Collect`/`CraftingTreeBuilder`
+hide the wrapper's own throwaway "craft" decision and sentinel id
+everywhere (no step, no craft-order entry, no vendor-batch entry, no
+metadata fetch ever targets it) - mirrors `componentTree.html`'s own
+`ng-if="!component.multipleRecipeTree"`. `CraftingPlanPipeline` gains a
+`GenerateStructuredAsync(IReadOnlyList<PlanRequestItem>, ...)` overload
+that delegates straight to the existing single-item method for exactly one
+item (byte-identical output, confirmed by a regression test asserting the
+two paths produce identical `CraftingTree`/steps/disciplines/recipes down
+to every field), and to a new `GenerateStructuredMultiAsync` for 2+ -
+which mirrors the single-item pipeline step for step (force-buy pre-pass,
+inventory reduction, solve, vendor-batch finalization) with the wrapper
+tree standing in for a single item's tree throughout, so M34's merge-then-
+ceil correctness fix (`FinalizeVendorBatches`) and the force-buy pre-pass/
+Ignore-pill overrides apply across ALL requested items' shared materials
+for free, not just within one item's own tree (regression-tested: two
+items each needing 2 of a bulk-vendor-only shared material, `ceil(2/5)+
+ceil(2/5) = 2` purchases solved independently vs. `ceil(4/5) = 1` purchase
+solved as a merged batch - the merged answer is what the pipeline
+produces). Sell-side economics (profit/net-sale-value) are deliberately
+left unset for a multi-item batch - see 21.3's divergence note.
+
+### 21.2 B2: multi-row UI (Views layer)
+
+- **Input strip**: the single search-box+qty strip becomes a vertical list
+  of item rows (`CraftingPlanView._itemRows`, one `ItemRowState` per row -
+  search box, qty box, Remove button), echoing gw2e's own `e.recipes`
+  ng-repeat. A Remove button only renders once 2+ rows exist
+  (`ItemRowRequestBuilder.CanRemoveRow` - gw2e's own
+  `ng-if="recipes.length > 1"`), and an Add button sits on the trailing
+  edge of the LAST row only (rather than gw2e's own separate "Add another
+  item" link row) - a deliberate simplification that keeps the single-row
+  case's row height/position byte-identical to pre-M35
+  (`ComputeTopRegionLayout`'s own doc comment proves the N==1 formula
+  reproduces the old fixed Y-offset constants exactly). Reordering rows
+  (gw2e's `moveRecipe` up/down arrows) is NOT implemented - out of scope
+  for this milestone (see the divergences below).
+- **Tree render**: N top-level trees stacked in the Recipe Tree section's
+  single shared content FlowPanel, wrapper hidden - falls out almost for
+  free, since each requested item's own root `CraftingTreeNode` already
+  IS a full icon/name/quantity/pill/cost row (the same shape a single-item
+  plan's tree root always was), so `CreateTreeSection` simply loops
+  `RenderTreeNode` once per root instead of once total, with a thin visual
+  divider (`PlanContentHeightMath.MultiRootDividerHeight`) between
+  consecutive roots only (never for a single root). Total Cost/Cost
+  Breakdown adds a plain-text "Totals above are the sum of all crafted
+  recipes in this batch." row (`PlanRowType.MultiItemNote`) only in multi
+  mode - reworded from gw2e's own "Profit numbers are..." banner since this
+  module does not yet compute multi-item sell-side profit at all (see
+  21.3). Section machinery itself (Total Cost, Shopping List, Crafting
+  Steps, Required Disciplines/Recipes) needed ZERO section-builder changes
+  beyond the note row - they already operate on `CraftingPlanResult`'s
+  already-merged `Plan.Steps`/`UsedMaterials`/`RequiredDisciplines`/
+  `RequiredRecipes`, which the B1 pipeline populates correctly for a batch
+  the same way it always has for one item.
+- **M33/M34 contracts preserved**: `PlanContentHeightMath` gained
+  `MultiRootTreeFlowHeight`/`MultiRootDividerHeight` (a one-root list is
+  proven byte-identical to the pre-M35 single-tree height via a dedicated
+  test) and a `MultiItemNote` branch in `SummaryBodyHeight`; the new
+  divider Panel registers a width-only relayout closure like every other
+  chrome element in the file; `DecisionPillPlanner`/pill click handling is
+  completely untouched (each root node is walked by the same
+  `RenderTreeNode` recursion as before, so USING N OWNED/IGNORE keep
+  working per-node exactly as before); `PreserveScrollAcross`/
+  `PreserveScrollAcrossResize` wrap the batch render and the row Add/Remove
+  reflow respectively (the latter also arms the settle-time scroll-verify
+  directly, since a discrete one-shot row-count change - unlike a
+  continuous resize drag - never generates the further ticks
+  `ResizeSettleStep`'s own debounce relies on); the status pipeline is
+  unchanged (`TriggerGenerate`'s existing per-generation `myGen`/
+  `_statusClosedForCurrentGeneration` guard already covers a batch
+  generation the same way it covered one item, since nothing about the
+  guard is item-count-specific).
+
+### 21.3 Known divergences from gw2e's own multi-item UX
+
+- **No row reordering** (gw2e's `moveRecipe` up/down arrows): not
+  implemented. B2's own task scope named only "search box, qty, remove
+  button" for each row; reordering was judged non-essential polish and
+  left out to keep the milestone bounded.
+- **No URL/file persistence of the row list**: gw2e's own multi-item state
+  lives entirely in a shareable URL (`?item=...` / `/crafting/calculator/
+  <encoded>`), which has no analog in a Blish HUD module (no address bar).
+  The row list instead persists as in-memory session state
+  (`CraftingPlanView._itemRows`) across tab switches within the same
+  Blish HUD session, exactly like `_nodeOverrides`/`_ignoredItemIds`
+  already did - lost on module reload/game restart, matching how every
+  other piece of this view's session state already behaves.
+- **No multi-item sell-side economics**: gw2e's own multi-item Cost
+  Breakdown drops the per-item view and sums profit across every selected
+  item, plus exposes a multi-item-only "sell excess crafted components for
+  profit" rollup. Neither is implemented - `CraftingPlanResult.
+  SellableQuantity`/`NetSaleValue`/`CraftingProfit`/
+  `MaterialOpportunityCost` stay at their type defaults for a multi-item
+  result (`GenerateStructuredMultiAsync`'s own doc comment), since "what
+  would selling N independently-selected items net" has no obvious
+  single-number generalization the way it does for one target item. The
+  new Cost Breakdown note is worded around this (see 21.2) rather than
+  echoing gw2e's "Profit numbers..." text verbatim, since this module
+  currently shows no profit figure at all in multi mode to be "the sum
+  of." A future milestone could add a batch-level profit rollup.
+  FIXED in M37 - see item #25 below for the full mechanism and
+  divergence record; the per-root "sell excess crafted components for
+  profit" pill (gw2e's `showprofit` per-node display) remains out of
+  scope, and the `MultiItemNote` text now describes the real batch
+  rollup instead of the placeholder wording described above (NOT
+  gw2e's own banner text verbatim - see #25's divergence record for
+  why).
+
+**VERIFICATION STATE**: build green, full test suite green (Blish-free
+production-path tests: `ItemRowRequestBuilderTests` for the row-list pure
+logic, `PlanViewModelBuilderTests` for the per-root viewmodel mapping/
+title/note-row gating, `PlanContentHeightMathTests` for the multi-root
+height arithmetic including the byte-identical-at-N==1 proof, plus the
+existing B1 `MultiItemPlanTests`/`PlanSolverTests`/`RecipeServiceTests`
+coverage of the wrapper pipeline itself). **Not yet verified by a live
+in-game desktop check** (screenshot loop) - the multi-row input strip's
+visual layout (row spacing, Add/Remove button placement, the tree
+section's inter-root divider) and the dynamic top-strip reflow when adding
+a second/third row are reasoned from the same explicit-height math this
+file already relies on elsewhere, but have not been visually confirmed
+against a running Blish HUD instance. Treat a fresh multi-row layout
+report as expected-until-checked rather than an automatic regression.
+LIVE-VERIFIED 2026-07-21 (desktop screenshot loop on merged master,
+Exordium + Gift of Fortune batch): multi-row input strip (add/remove
+rows, dynamic top-strip reflow), batch generation, "Exordium and 1
+other" title, merged Total Cost (Laurels 264 = both items' merged
+demand), the sum-of-all-crafted-recipes note, both root trees stacked
+above one merged 77/78-item Shopping List, and multi-source pill
+highlighting all render correctly. The M34 additions were verified in
+the same session: status line completes ("Plan generated - <time>",
+never stuck), Exordium's Laurel total shows the merged-ceil 180 (the
+old 186 overcount is gone on live data), and the IGNORE pill round-trips
+correctly with proper tree-wide economics (ignoring Pile of Crystalline
+Dust flipped every T6 promotion to craft and re-priced the batch;
+un-ignoring restored the original plan exactly). Scroll restore stayed
+zero-flash under the multi-root tree during ignore re-solves
+([scrolldiag]: SyncRestore + single same-frame contest + stable at
+realFrame 2). Still unverified live: USING N OWNED pill and
+owned-currency annotations (need an account snapshot with relevant
+stock - covered by unit tests), KNOWN-ISSUES #19's resize-preserve
+(needs a human drag), drag-tick relayout perf on a fully-expanded tree.
+
+## 22. Ignore-pill click sets status to "Best path restored" (cosmetic) (FIXED in M37)
+Observed live 2026-07-21: clicking an IGNORE/IGNORED pill re-solves
+correctly but writes the status line "Best path restored" - the label
+belongs to the Best Path preset, not the ignore toggle. Pick a neutral
+re-solve status ("Decisions updated" family) for ignore clicks.
+FIXED in M37: root cause was CraftingPlanView.ApplyOverridesAndResolve
+choosing the status text from `_nodeOverrides.Count == 0` as a proxy for
+"the Best Path preset fired", instead of from which control actually
+fired the re-solve. Every trigger that funnels through that one shared
+method (Best Path, Craft All, Buy All, per-node craft/tp/vendor pill
+cycling, and the ignore toggle) inherited the same ternary, so the
+ignore toggle - which never touches `_nodeOverrides` at all - hit the
+`== 0` branch and printed the Best Path preset's own label. Fixed by
+threading an explicit `isBestPathPreset` flag from the one call site
+that is actually the Best Path preset (bestPathButton.Click) through to
+a new pure `StatusText.ForOverrideResolve(isBestPathPreset,
+overrideCount)` helper (Services layer, Blish-free, unit-tested); every
+other call site keeps its implicit `false` default and gets the neutral
+"Decisions updated (N override(s))" text regardless of count. See #27
+for the full trigger sweep this also covers (Craft All/Buy All could hit
+the identical mislabel in the edge case where their preset legitimately
+resolves to zero overrides).
+
+## 23. Horizontal dividers appear/disappear with scroll position (FIXED in M36; see M36b follow-up below for 44px/32px rows)
+User report: the same rows' divider lines are present at one scroll
+offset and gone at another - not a contrast problem (that was #7, fixed
+in M30), a presence/absence flicker as the list scrolls.
+ROOT CAUSE: Blish applies the GW2 UI-size setting as a real GPU scale
+matrix (GraphicsService.UIScaleTransform = Matrix.CreateScale(
+UIScaleMultiplier)), not an integer-pixel-snapped one - confirmed by
+decompiling the shipped BlishHUD v1.3.0 binary. The default "Normal" GW2
+UI size scales by 0.897 (GetScaleRatio case 1), so a divider Panel
+declared 1px tall in logical UI space rasterizes to 0.897 PHYSICAL
+pixels. Guaranteed physical coverage is floor(0.897) = 0: depending on
+where the divider's scaled top/bottom edges land relative to the
+physical scanline grid, it can cover zero physical rows and vanish
+entirely, or one and render fine - a function of the divider's absolute
+screen Y (row position + scroll offset), which changes continuously as
+the user scrolls. Scroll offset itself is an integer in logical space;
+the non-integer scale is what turns a 1px integer height into
+fractional physical coverage. #7's fix (higher-contrast divider color)
+addressed a real but different symptom of this SAME underlying
+mechanism - a low-alpha divider composited against a varying texture is
+also inconsistent contrast, but #7 never widened the divider's height,
+so the zero-coverage vanishing case it did not address remained latent
+and is what this user report caught.
+FIX (M36): every divider in CraftingPlanView widened from 1px to 2px -
+CreateRowDivider (the shared helper behind Used Materials, Shopping
+List, Crafting Steps, Required Disciplines, and Required Recipes row
+dividers) and the per-section headerDivider under each collapsible
+section's title row. floor(2 * 0.897) = floor(1.794) = 1 guarantees at
+least one covered physical scanline at ANY scroll offset, eliminating
+the zero-coverage case. Both are bottom-anchored inside their existing
+bounds (row divider: Location.Y = rowHeight - 2; header divider:
+Location.Y = 28 inside the 30px header panel, was 29) rather than
+grown past them, so PlanContentHeightMath's row-count-based section
+height arithmetic (verified against this change) needed no adjustment -
+the divider has always lived inside rowHeight, not on top of it. Two
+row types (Used Materials, Shopping List; both rowHeight 36 with a 34px
+icon frame starting at y=1) had only 1px of clearance below their icon,
+exactly enough for the old 1px divider but not the new 2px one; their
+icon's y was nudged from 1 to 0 so icon height (34) + divider height (2)
+exactly fill rowHeight with no overlap. NOT touched: the two existing
+2px separators (title-row and section-header-row separators, already
+wide enough), the transparent multi-root rootDivider (M35, a 12px gap
+panel, not a hairline), and the Recipe Tree (uses indent guidelines
+instead of row dividers by design - no change applicable).
+
+CORRECTION (M36 fix-pass): the verification note below originally
+claimed "the rest had several pixels of existing headroom" for every row
+type not listed above. That was wrong for the Required Recipes section's
+no-sublabel row: RecipeRowHeightNoSublabel (32) plus its 34px icon frame
+at y=1 already overflowed the row by 3px BEFORE this divider change
+(icon bottom = 35 against a 32px row), and the divider width increase
+made the shortfall 1px worse (34 + 2 = 36 needed, only 32 available) - a
+real, pre-existing overflow this fix's own verification pass missed, not
+a case with headroom to spare. Fixed as its own item this same
+fix-pass: RecipeRowHeightNoSublabel raised to 36 (icon y nudged to 0,
+exact fit, mirroring the Used Materials/Shopping List pattern above) -
+see PlanContentHeightMath.RecipeRowHeightNoSublabel and
+Views/Rendering/RecipesSectionRenderer.CreateRecipeRow (M38 WP-23c moved
+this out of CraftingPlanView).
+
+VERIFICATION STATE: code-verified - the 0.897 scale factor and the GPU
+matrix mechanism were confirmed against a decompile of the shipped
+BlishHUD v1.3.0 binary (GraphicsService.GetScaleRatio /
+UIScaleTransform); the row/header geometry changes were verified by
+reading every affected call site to confirm rowHeight/headerPanel
+containment and check for icon/label crowding (the Required Recipes
+no-sublabel row needed a coherent adjustment per the correction above,
+in addition to the two rows originally noted; every other row type has
+several pixels of genuine existing headroom, re-checked this pass). The
+header divider's own clearance (Location.Y = 28 inside the 30px
+headerPanel, under a DefaultFont18 section title at y=4) was reasoned
+from bounding-box containment only - actual glyph ascent/descent metrics
+for DefaultFont18 were not measured, so whether 28 (down from 29) reads
+as visually tighter under real glyphs is unverified; treat a future
+title/divider crowding report as expected-until-checked rather than a
+surprise regression. Build and full test suite green. LIVE-VERIFIED
+2026-07-21 (desktop screenshot loop on the merged build): the Shopping
+List captured at three successive one-notch scroll offsets shows a
+visible divider between EVERY adjacent row pair at every offset - the
+same rows that previously lost their divider at unlucky positions keep
+it across all sampled offsets. Header divider and section-title glyph
+clearance looked normal in the same captures (no crowding observed),
+though no glyph-metric measurement was taken.
+**CORRECTION (M36b, see follow-up below):** the "LIVE-VERIFIED" claim
+above is downgraded from unqualified to **36px sections verified;
+44px/32px rows were still vulnerable** - the capture above only ever
+sampled the Shopping List, whose rowHeight (36) is mathematically
+immune to the defect regardless of this fix. It never exercised the
+Required Recipes/Disciplines/Crafting Steps row heights (44px/32px),
+which a follow-up investigation proved were still broken. Recorded
+here as an honest correction rather than silently edited away.
+
+## Follow-up to #23 (M36b): 44px/32px rows still vulnerable after M36
+User re-reported divider misses in Required Recipes on the merged M36
+build. Live pixel-scans (idle desktop, two successive scroll captures
+one wheel notch apart) proved the misses are position-dependent
+single-boundary vanishes that move with scroll phase, not a fixed
+row/content correlation: one capture showed exactly one missing
+divider boundary; the next capture (content shifted ~1 logical pixel)
+showed that boundary restored but two DIFFERENT boundaries missing.
+Measured environment UI scale for this test setup was 0.81 (Small),
+correcting the earlier 0.897 (Normal) assumption used throughout #23's
+original analysis and fix.
+ROOT CAUSE: a second, independent scissor round trip that #23's M36
+analysis did not model. `rowPanel` is itself a Blish `Container`, and
+every `Container.Paint()` unscales the physical scissor it was just
+given back to logical space before re-intersecting and re-scaling it
+for its own children (`Container.cs:377-381`, `Control.cs:1176-1177`
+in the decompiled Blish HUD v1.3.0 binary) - a SECOND floor/ceil step
+on top of the one #23 modeled for the divider's own quad-vs-scissor
+math. This second round trip can shrink the clip rectangle reaching
+the divider by exactly 1 logical pixel, always at the row's bottom
+edge, which for `rowHeight` = 44 (Crafting Steps, Recipe rows with a
+sublabel) and 32 (Required Disciplines) reliably deletes the divider
+entirely (0 physical scanlines) at ~10.2% of scroll phases at the
+default scale - matching the "one boundary here, different boundaries
+there, one notch later" live evidence exactly. `rowHeight` = 36 (Used
+Materials, Shopping List, Recipe rows with no sublabel) is immune by
+construction at every GW2 UI Size scale tested, which is why M36's own
+Shopping List verification pass came back clean - it happened to
+sample the one row height that was never broken.
+FIX (M36b): `CreateRowDivider` gained a `bottomClearance` parameter -
+1 extra logical pixel of gap between the divider and `rowHeight` for
+the vulnerable 44px/32px row types (`CreateCraftStepRow`,
+`CreateRecipeRow`'s sublabel branch, `CreateDisciplineRow`), 0
+(unchanged) for the immune 36px row types. Proven immune by
+simulation across every `rowHeight` value in the file and all four GW2
+UI Size scale factors (0.81/0.897/1.0/1.103), not just the default -
+see `CreateRowDivider`'s doc comment in Views/Rendering/LabelHelpers.cs
+(M38 WP-21 - moved out of CraftingPlanView.cs, byte-identical) for the
+full derivation. Required Disciplines was not part of the user's
+report but was confirmed mathematically identical exposure (~10.2%
+vanish rate) and free of any icon-clearance side effect (that row has
+no icon, just two `DefaultFont14` labels well clear of the new divider
+position) - fixed proactively rather than left latent.
+The section headerDivider (H=30, built inline in CreateSectionHeader,
+not via CreateRowDivider) shares the same Container.Paint exposure -
+simulation shows it is immune at the default 0.897 scale but vulnerable
+(~16-17%) at the "Small" 0.81 scale, which is the scale actually
+measured in this session's live pixel-scans - so it received the same
+1px bottom clearance (y 28 -> 27) in the same wave.
+VERIFICATION STATE: LIVE-VERIFIED 2026-07-21 (post-fix desktop
+pixel-scans on the m36b build, automated scanner measuring divider
+scanline positions against expected row boundaries): Required Recipes
+scanned at FIVE distinct scroll offsets - including the exact viewport
+from the user's bug report (the Gift of Dust/Claws/Scales/Bones/Fangs
+block) - with uniform 35-36px physical pitches and ZERO missing
+boundaries (pre-fix scans of the same section showed 1-2 missing
+boundaries per viewport that moved with scroll phase); Crafting Steps
+scanned clean at two offsets; Shopping List (immune 36px class)
+previously verified at three offsets. Required Disciplines (32px,
+3 text-only rows, same shared-helper fix, simulation-proven) was not
+individually pixel-scanned in this M36b pass (corrected below: item 30's
+M37 live desktop session DID scan Required Disciplines directly, closing
+this gap - this line is kept for the pass's own contemporaneous record).
+WP-21 MOVE VERIFICATION STATE (2026-07-22): a line-by-line diff of the
+pre-move `CraftingPlanView.cs` method body against the post-move
+`Views/Rendering/*.cs` body was run for every Tier-1 primitive moved in
+that batch. `CreateRowDivider` (this divider's math/bottomClearance
+constants), `CreateRightAlignedLabel`, `EllipsizeToWidth`, both
+`GetRarityBorderColor`/`GetRarityNameColor` tables, `CreateRarityFramedIcon`/
+`CreateItemIcon`, `FormatCoinText`, and the full coin/currency segment
+build/layout/reposition/measure set in `CoinCurrencyRenderer` are
+confirmed byte-identical to the pre-move source, modulo only the
+`private`->`internal` accessibility keyword (where a cross-class call
+now requires it) and qualifying a call to a sibling that moved to a
+different class (e.g. `CreateItemIcon` -> `IconControls.CreateItemIcon`)
+- zero logic or constant changes. `CreateSmallTag` is the one exception:
+it is NOT byte-identical - its border/fill colors are now caller-supplied
+parameters instead of an internal `GetPillColors` call, a deliberate
+signature change already reasoned through and reviewed in 5c56b2a (the
+reverse-dependency fix), not a verbatim move; that commit's own
+same-colors/same-output argument is asserted, not diff-verified, for
+this one method. TWO of the moved segment-width primitives -
+`CoinCurrencyRenderer.TotalCoinSegmentsWidth`/`TotalCurrencySegmentsWidth`
+- take only plain data structs (no XNA/Blish types) and are pure
+arithmetic; per the WP-21 Approach line's "add a Blish-free unit test
+where segment-width arithmetic can be made XNA-free" instruction, that
+arithmetic (plus the `CoinSegmentSpec`/`CurrencySegmentSpec` structs and
+the `CoinIconSize`/`CoinLabelIconGap`/`CoinSegmentGap` constants it is
+built from) is now extracted verbatim into `Services/CoinSegmentMath.cs`
+(mirroring the existing `ShoppingColumnMath` pattern) and covered by
+`tests/GW2CraftingHelper.Tests/Services/CoinSegmentMathTests.cs`
+(zero/single/multi-segment cases against the real constants, plus a
+case pinning the gap arithmetic exactly and a cross-check that the coin
+and currency formulas agree for equivalent input), mirroring
+`ShoppingColumnMathTests`. An earlier findings-fix pass on this branch
+instead added a test file under `tests/.../Views/Rendering/` that
+called `CoinCurrencyRenderer` (Blish-bound) directly - that would have
+violated the repo invariant that tests must never reference UI code;
+that file has been removed and replaced by the Services-based
+extraction above. All of the above (the diff evidence and the new
+Services tests) is static, by-construction evidence only - it does NOT
+substitute for this package's `needsVisualLoop` gate
+(m38-cleanup-plan.md WP-21 Verify line / EXECUTION PREAMBLE item 8: a
+live Blish-over-Paint screenshot/pixel-scan pass on the Exordium
+`--profile 2` reference plan comparing coin/currency cells, rarity icon
+frames, and row dividers before/after the branch, at multiple scroll
+offsets).
+
+CURRENT STATE (2026-07-22): pre-merge live visual verification
+(Blish-over-Paint screenshot loop on an Exordium plan: coin/currency
+cells, rarity icon frames, row dividers at multiple scroll offsets) is
+being run by the orchestrating session, in parallel with this
+findings-fix pass, on the desktop session holding the user's direct
+automation authorization. Result recorded here and in the PR before
+merge: PASS (orchestrator, 2026-07-22, live Blish-over-Paint session on
+the branch build, captures wp21_02/04/05 in C:/Dev/Blish/preflight/captures):
+Total Cost coin tiles and all 7 currency rows render icons-right-of-numbers
+in correct metal/currency coloring; tree rows show correct rarity name
+colors and rarity icon frames with right-aligned coin columns; Shopping
+List coin columns, currency cells (incl. the merged-ceil 180 Obsidian
+Shard laurel cell), and source tags render identically to the M37
+reference captures; scan_dividers.py at two scroll offsets shows uniform
+29/30 pitches with zero missing boundaries. No visual deltas beyond live
+price drift.
+
+## WP-22: MainView coin panel repointed to shared CoinCurrencyRenderer (M38)
+Architecture report S6 flagged `Views/MainView.cs`'s private
+`GetCoinColor`/`AddCoinSegment` as the second independent encoding of the
+coin invariant, byte-identical to the copies `CraftingPlanView` carried
+before WP-21 extracted its own coin/currency rendering into
+`Views/Rendering/CoinCurrencyRenderer.cs`. Both methods are deleted;
+`UpdateCoinDisplay` (the sole call site - confirmed by a full-file grep,
+no other MainView method touched coin rendering) now builds its own
+3-element `CoinSegmentMath.CoinSegmentSpec` list (still always exactly
+gold/silver/copper via plain `ToString()` - no leading-zero-unit
+omission, no zero-padding once a higher unit precedes: this formatting
+is an unchanged MainView behavior, not touched by this package) via
+`CoinCurrencyRenderer.AddSegmentSpec` (bumped `private` -> `internal` for
+this reuse - a normal forward MainView -> Views/Rendering consumer
+dependency, not the same precedent as the WP-21-prep `GetPillColors`
+bump, which was later reverted back to `private` specifically to avoid a
+reverse `Views/Rendering` -> `CraftingPlanView` edge; see the note at
+`CoinCurrencyRenderer.AddSegmentSpec`) and hands it to
+`LayoutCoinSegments` with `startX = 0` (left-anchored, MainView's
+existing panel layout).
+ANCHORING: no new parameter was needed on `CoinCurrencyRenderer`.
+`LayoutCoinSegments` already takes a caller-supplied `startX` and lays
+out left-to-right from it - it is anchor-neutral by construction. Only
+the higher-level *right-aligned* convenience wrappers
+(`RenderValueCellRightAligned`/`LayoutValueSegmentsRightAligned`/
+`MeasureValueWidth`, built for CraftingPlanView's mixed coin+currency
+value cells with an unpriced-dash fallback) are direction-locked, and
+MainView's coin-only wallet total never needs those (no currency
+amounts, never genuinely "unpriced"). CraftingPlanView's call sites are
+therefore completely untouched by this package.
+DIFF EVIDENCE: `GetCoinColor` is whitespace-insensitively byte-identical
+to `CoinCurrencyRenderer`'s own private `GetCoinColor` (`diff -Bw`
+confirmed) - deleting MainView's copy and letting `LayoutCoinSegments`'s
+internal call to the shared one replace it is a pure no-op on coloring.
+`AddCoinSegment`'s per-segment geometry (icon size 20, label-to-icon gap
+2, inter-segment gap 6; label then icon to its right at
+`x + textWidth + gap`; next segment starts at
+`x + textWidth + gap + iconSize + segmentGap`) matches
+`CoinSegmentMath.CoinIconSize`/`CoinLabelIconGap`/`CoinSegmentGap` and
+`LayoutCoinSegments`'s loop body constant-for-constant; the one
+structural difference is that the old code measured each label's width
+AFTER Blish created it (`label.Width`, `AutoSizeWidth = true`) while
+`LayoutCoinSegments` uses a pre-computed `BitmapFont.MeasureString`
+width (`CoinSegmentSpec.TextWidth`, via the now-shared `AddSegmentSpec`)
+BEFORE creating the label - the same pre-measure-then-render split every
+other coin/value cell in the app already relies on (M33 C2b) and
+already visual-gate-proven in WP-21; not independently re-verified here
+beyond that existing trust.
+NOT-FULLY-PROVEN CAVEAT (flagged, not swept under the diff evidence
+above): the coin Label's font becomes the explicit
+`GameService.Content.DefaultFont14` that `AddSegmentSpec`/
+`LayoutCoinSegments` require for `MeasureString` - the old code never
+set `Label.Font` at all and relied on Blish's own implicit default. This
+sandbox has no live Blish process to read that default from, so whether
+it equals `DefaultFont14` (the font every other coin/value display in
+the app already uses explicitly) is asserted, not measured, here; this
+is exactly the kind of view-only risk the live visual gate below exists
+to catch, in the same spirit as this file's own "capture Blish's own
+real default rather than guessing" convention (see MainView's
+`_defaultStatusColor` field).
+VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped;
+unchanged from the pre-WP-22 floor - this view has no automated test
+net, so green tests prove only that nothing else broke, not that the
+rendering is correct). Live pre-merge visual verification (Blish-over-
+Paint screenshot/pixel-scan loop) on both the Snapshot tab's coin panel
+(this package's change, including the DefaultFont14 caveat above) and
+the Crafting Plan tab's coin/currency cells (confirming
+CraftingPlanView's untouched call sites still render correctly) is being
+run by the orchestrating session per the M38 plan's `needsVisualLoop`
+gate. Result recorded here and in the PR before merge:
+PASS (orchestrator, 2026-07-22, live branch-build session, capture
+wp22_02_snap.png vs pre-change wp21_06_snap.png): the left-anchored
+Snapshot-tab coin row renders pixel-consistently through the shared
+renderer (identical number colors, icon-right placement, spacing), and
+the explicit DefaultFont14 assignment produces glyphs indistinguishable
+from the old implicit default - the flagged font risk is resolved as a
+no-op. Item rows, filters, and staleness label unchanged.
+
+## WP-23 (pilot): ISectionRelayoutSink + DisciplinesSectionRenderer (M38)
+Architecture report S3b-T2 proposes a small seam so section builders can
+move out of `CraftingPlanView` while preserving the M33 C2b relayout
+registry contract (#13/#19): `interface ISectionRelayoutSink { AddRelayout;
+AddReellipsis; }`. This package is the pilot increment - `Required
+Disciplines`, the smallest section (~40 lines), chosen first per the
+plan's "smallest first" sequencing.
+SCOPE: `Views/Rendering/ISectionRelayoutSink.cs` (new) - two members only,
+both a direct pass-through to `CraftingPlanView`'s existing
+`_relayoutActions`/`_reellipsisActions` lists via explicit interface
+implementation (not public - does not widen the view's public surface).
+`Views/Rendering/DisciplinesSectionRenderer.cs` (new) - `CreateDisciplinesBody`'s
+row loop (renamed `Render`) and `CreateDisciplineRow` moved verbatim; the
+one edit inside the moved bodies is `_relayoutActions.Add(...)` ->
+`_sink.AddRelayout(...)`. `CreateCTableHeaderRow` (the shared "Discipline"/
+"Level" column header, also used by the not-yet-extracted Required Recipes
+section) stays in `CraftingPlanView` by design - extracting it now would
+either widen this pilot's scope to Recipes or leave Recipes calling into a
+class named for Disciplines; `CraftingPlanView` calls it directly
+immediately before constructing the renderer (see the `RequiredDisciplines`
+case in `CreateCollapsibleSection`). `CreateRowDivider`'s divider math
+(DO-NOT-TOUCH #6) is called unchanged through `LabelHelpers`, itself
+untouched by this package.
+DIFF EVIDENCE: a whitespace-insensitive (`diff -w`) comparison of the
+pre-move `CreateDisciplineRow` body against the moved copy in
+`DisciplinesSectionRenderer` shows the row geometry, the divider call and
+its M36b bottom-clearance comment, and the closure body are byte-for-byte
+unchanged; the only textual difference is the one intentional line
+(`_relayoutActions.Add` -> `_sink.AddRelayout`) plus added doc comments.
+INVARIANT TRACE (not just asserted - read end-to-end): `DisciplinesSectionRenderer`
+is constructed as `new DisciplinesSectionRenderer(this)` from
+`CraftingPlanView`, so `_sink` at the call site inside `CreateDisciplineRow`
+is the view itself; `ISectionRelayoutSink.AddRelayout` on `CraftingPlanView`
+resolves to `_relayoutActions.Add(closure)` - the exact same list object
+`ReplayRelayout` iterates and that `CreateCollapsibleSection`'s DEBUG
+must-register check counts before/after the section body runs. A section
+extracted this way that forgot to call `AddRelayout` would trip the
+existing "registered no relayout closures" warning exactly as an inline
+builder that forgot `_relayoutActions.Add` always did - the check's input
+(list contents) is identical regardless of which code path appended to it.
+FORWARD NOTE (Shopping List extraction is not a drop-in repeat of this
+pilot): `ISectionRelayoutSink`'s doc comment originally claimed a future
+icon/coin-carrying section renderer (Used Materials, Shopping List,
+Crafting Steps) could adopt this seam unchanged. Verified true for Used
+Materials (`CreateUsedMaterialRow`) and Crafting Steps
+(`CreateCraftStepRow`) - both depend only on the already-extracted
+IconControls/RarityColors/LabelHelpers/PlanRelayoutMath statics this pilot
+also uses. NOT true for Shopping List: `CreateShoppingRow` also calls
+`GetPillColors(PillKind.Locked, false, ...)` (private static on
+`CraftingPlanView`, for its source-tag panel colors) and the private
+static helper `ShoppingSourceTag(row)`. Neither is part of
+`ISectionRelayoutSink` nor among the WP-21 Tier-1 statics reachable
+directly from `Views/Rendering`. Whoever picks up
+`ShoppingListSectionRenderer` will need to relocate/expose those two
+helpers as a deliberate design decision - extract them to a
+Rendering-namespace class analogous to WP-21's Tier-1 extraction - rather
+than bumping `GetPillColors` `private` -> `internal` again, which would
+reintroduce the reverse `Views/Rendering` -> `CraftingPlanView` dependency
+edge the WP-21-findings fix (commit 5c56b2a) already reverted once for
+exactly this reason. This is scope for that future package, not this one.
+VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped -
+unchanged from the pre-WP-23 floor; this view has no automated test net,
+so green tests prove only that nothing else broke, not that the rendering
+or resize behavior is correct). Live pre-merge visual verification (Blish-
+over-Paint screenshot/pixel-scan loop) on the Crafting Plan tab's Required
+Disciplines section - row render, divider scan, drag-resize reflow, and
+confirmation that no DEBUG "registered no relayout closures" warning fires
+- is being run by the orchestrating session per the M38 plan's
+`needsVisualLoop` gate (this package is invariant-adjacent per WP-23's
+risk rating: medium-high). Result recorded here and in the PR before merge:
+PASS (orchestrator, 2026-07-22, live branch-build session, captures
+wp23_04/05 in C:/Dev/Blish/preflight/captures): the extracted
+DisciplinesSectionRenderer produced a correct live section - this run's
+plan needed FOUR disciplines (Armorsmith 450 / Jeweler 225 / MysticForge
+0 / Weaponsmith 500; live prices pulled Jeweler in, exercising a row
+count the M37 pass never saw) - with exactly three between-row dividers
+at uniform pitch 26 (32px rows at 0.81 scale) plus the section header
+divider at BOTH sampled scroll offsets, zero missing boundaries, and the
+column-header/last-row no-divider design intact. Blish log shows zero
+DEBUG no-closure warnings after generation (sink-routed registration
+works). Resize-reflow caveat, per the KNOWN-ISSUES #19 precedent: one
+synthetic grip drag did not catch (window rect unchanged - the grip has
+resisted synthetic input since M33), so width-reflow through the
+sink-registered closures rests on the reviewer's static trace (same list
+object, same replay, DEBUG scroll-neutral assert armed) rather than a
+fresh live drag; a future human drag remains the gold-standard check.
+
+## WP-23b: UsedMaterialsSectionRenderer + ShoppingListSectionRenderer (M38)
+Continuation of the WP-23 pilot's ISectionRelayoutSink seam: the Used
+Materials and Shopping List sections, the next two candidates per the
+plan's sequencing.
+SCOPE: `Views/Rendering/UsedMaterialsSectionRenderer.cs` (new) -
+`CreateUsedMaterialsBody` (renamed `Render`) and `CreateUsedMaterialRow`
+moved verbatim; the only edits inside the moved bodies are
+`_relayoutActions.Add(...)` -> `_sink.AddRelayout(...)` and
+`_reellipsisActions.Add(...)` -> `_sink.AddReellipsis(...)`. Per the WP-23
+pilot's FORWARD NOTE this section depended only on the already-extracted
+IconControls/RarityColors/LabelHelpers/PlanRelayoutMath statics the pilot
+also used, so no further dependency work was needed here - confirmed true.
+`Views/Rendering/ShoppingListSectionRenderer.cs` (new) -
+`CreateShoppingListBody` (renamed `Render`), `CreateShoppingListHeaderRow`,
+`ShoppingSourceTag`, and `CreateShoppingRow` moved verbatim; same two sink
+substitutions as above, plus `GetPillColors(...)` ->
+`PillColors.GetPillColors(...)` (see next paragraph).
+GETPILLCOLORS RESOLUTION (the WP-23 pilot's documented challenge): the
+pilot flagged that `CreateShoppingRow` calls `CraftingPlanView`'s private
+static `GetPillColors(PillKind, bool, out Color, out Color)` and warned
+against bumping it `private` -> `internal` on `CraftingPlanView` again (the
+WP-21 findings fix, commit 5c56b2a, already reverted exactly that kind of
+reverse `Views/Rendering` -> `CraftingPlanView` edge once). Before moving
+anything, every `GetPillColors` call site in `CraftingPlanView` was
+grepped: two, not one - `CreateShoppingRow` (moving) AND
+`RenderDecisionPills` (the recipe tree's decision pills, NOT part of this
+package's scope, staying in `CraftingPlanView`). Because a second,
+non-extracted caller depends on it, `GetPillColors` could not simply move
+into `ShoppingListSectionRenderer` the way `ShoppingSourceTag` did
+(`ShoppingSourceTag` has exactly one call site, so it moved directly into
+`ShoppingListSectionRenderer` with zero further decisions - confirmed by a
+zero-diff `diff -w` against the pre-move body). Resolution taken: extract
+`GetPillColors` to its own `Views/Rendering/PillColors.cs`, `private
+static` -> `internal static`, no logic change (the same treatment WP-21's
+Tier-1 pass gave `RarityColors`/`LabelHelpers`), and repoint both call
+sites to it - `ShoppingListSectionRenderer.CreateShoppingRow` calls
+`PillColors.GetPillColors` directly, and `CraftingPlanView.RenderDecisionPills`
+now also calls `PillColors.GetPillColors` instead of a local private
+method. This is the forward direction only: `CraftingPlanView` ->
+`Views/Rendering`, identical in kind to its existing
+`RarityColors.GetRarityBorderColor` calls - no edge back from
+`Views/Rendering` into `CraftingPlanView` was introduced anywhere in this
+package.
+DIFF EVIDENCE: whitespace-insensitive (`diff -w`) comparisons of every
+moved method against its pre-move body confirm move-only extraction with
+no unintended edits: `CreateUsedMaterialRow` differs only in the two sink
+calls; `CreateShoppingListHeaderRow` differs only in the one sink call;
+`ShoppingSourceTag` has ZERO diff (byte-for-byte move); `CreateShoppingRow`
+differs only in the two sink calls plus the one `PillColors.` qualifier;
+`GetPillColors` differs only in its `private` -> `internal` access
+modifier. The `CreateUsedMaterialsBody` -> `Render` and
+`CreateShoppingListBody` -> `Render` wrapper methods differ only in name
+(and access modifier `private` -> `internal`), matching the pilot's own
+`CreateDisciplinesBody` -> `Render` rename.
+INVARIANT TRACE: both renderers are constructed as
+`new UsedMaterialsSectionRenderer(this)` / `new ShoppingListSectionRenderer(this)`
+from `CraftingPlanView.CreateCollapsibleSection`, exactly mirroring the
+pilot's `new DisciplinesSectionRenderer(this)` call - `_sink` at every
+call site inside the moved row builders resolves to the view itself, so
+`ISectionRelayoutSink.AddRelayout`/`AddReellipsis` route to the same
+`_relayoutActions`/`_reellipsisActions` lists `ReplayRelayout`/
+`RunReellipsis` iterate and the same lists `CreateCollapsibleSection`'s
+DEBUG must-register check counts before/after each section body runs.
+`ShoppingListSectionRenderer.Render` always registers at least the header
+row's relayout closure regardless of `section.Rows.Count`, exactly as
+`CreateShoppingListBody` always did before the move - the DEBUG check's
+behavior for an empty Shopping List is unchanged.
+DO-NOT-TOUCH compliance: `PlanContentHeightMath`, `PlanRelayoutMath`, and
+`ShoppingColumnMath` (all three referenced by the moved Shopping List body)
+stay in `Services/`, called exactly as before, not moved or edited.
+`LabelHelpers.CreateRowDivider`'s divider math and its M36b bottom-
+clearance calls move with the row bodies unchanged (bottomClearance 0 for
+both UsedMaterialRowHeight and ShoppingRowHeight, per the existing
+comments moved alongside them verbatim).
+VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped -
+unchanged from the pre-WP-23b floor; this view has no automated test net,
+so green tests prove only that nothing else broke, not that the rendering
+or resize behavior is correct). Live pre-merge visual verification (Blish-
+over-Paint screenshot/pixel-scan loop) on the Crafting Plan tab's Used
+Materials and Shopping List sections - both sections render, divider
+scans, and a Shopping List row's source-tag tooltip/pill check - is being
+run by the orchestrating session per the M38 plan's `needsVisualLoop` gate
+(this package is invariant-adjacent per the same risk rating as the WP-23
+pilot). Result recorded here and in the PR before merge:
+PASS (orchestrator, 2026-07-22, live branch-build session, captures
+wp23b_06/07): Used Materials (4) rendered via UsedMaterialsSectionRenderer
+with the synthetic-snapshot consumptions exactly matching the M37
+reference (Augur's Stone 1x / Mystic Clover 30x / Stabilizing Matrix 30x /
+Mystic Runestone 100x, correct rarity colors and right-aligned counts);
+Shopping List (76) rendered via ShoppingListSectionRenderer with VENDOR
+tags, coin columns, currency cells (Tribute to the Exitare 20x/4000x with
+icons) and the M34 "N for M" bundle label ("1 for 10" on 1082x
+Philosopher's Stone) all correct; the M34 owned-currency tooltip renders
+through the extracted code ("Unbound Magic: 0 owned, 4000 needed");
+divider scan across both sections shows uniform 29/30 pitches with gaps
+only at the by-design isLast/section-seam boundaries
+
+## WP-23c: CraftStepsSectionRenderer + RecipesSectionRenderer (M38)
+Continuation of the WP-23 pilot's ISectionRelayoutSink seam: the Crafting
+Steps and Required Recipes sections, the last two body builders on the
+plan's sequencing.
+SCOPE: `Views/Rendering/CraftStepsSectionRenderer.cs` (new) -
+`CreateCraftingStepsBody` (renamed `Render`) and `CreateCraftStepRow` moved
+verbatim; the moved body's TimegatedNotice branch (the M34 warn-only
+vendor-cap notice, carrying the M37 Seasonal wording from PR #81) and
+`CreateCraftStepRow`'s step-number badge move with it. The only edits
+inside the moved bodies are `_relayoutActions.Add(...)` ->
+`_sink.AddRelayout(...)` and `CreateTextRow(...)` ->
+`TextRowRenderer.CreateTextRow(..., _sink)` (see next paragraph).
+`Views/Rendering/RecipesSectionRenderer.cs` (new) - `CreateRecipesBody`
+(renamed `Render`) and `CreateRecipeRow` moved verbatim, including BOTH row
+heights (`RecipeRowHeightWithSublabel` 44px, `RecipeRowHeightNoSublabel`
+36px per the M36 fix-pass correction) and the Auto-learned/Learned/Missing!
+status-tag coloring; same `_relayoutActions.Add(...)` ->
+`_sink.AddRelayout(...)` substitution, plus `CreateCTableHeaderRow(...)` ->
+`CTableHeaderRenderer.CreateCTableHeaderRow(..., _sink)` (see the
+CTABLEHEADERROW paragraph below).
+CREATETEXTROW RESOLUTION (a GetPillColors-shaped fork, same precedent):
+`CreateCraftingStepsBody`'s TimegatedNotice branch calls
+`CraftingPlanView`'s private `CreateTextRow(string, FlowPanel, int)`.
+Grepped every call site before moving anything: three, not one - the
+TimegatedNotice branch (moving), the default fallback case in
+`CreateCollapsibleSection` (staying - a section type with no dedicated body
+builder), and `CreateSummarySectionBody`'s `noteRows` loop (staying -
+Summary is out of this package's scope). Because two non-extracted callers
+remain, `CreateTextRow` could not move into `CraftStepsSectionRenderer` the
+way a single-call-site helper would (c.f. `ShoppingSourceTag`, WP-23b).
+Resolution: extracted to its own `Views/Rendering/TextRowRenderer.cs`,
+`private` -> `internal static`, with an added `ISectionRelayoutSink sink`
+parameter (the row's own relayout registration moved inside the shared
+method rather than being left as a fourth line duplicated at every call
+site). All three call sites - `CraftStepsSectionRenderer`'s TimegatedNotice
+branch (passes `_sink`) and `CraftingPlanView`'s two remaining call sites
+(each passes `this`) - now call `TextRowRenderer.CreateTextRow` directly.
+CTABLEHEADERROW RESOLUTION (the WP-23 pilot's own documented fork, now
+closeable): the pilot deliberately left `CreateCTableHeaderRow` in
+`CraftingPlanView`, calling it directly immediately before constructing
+`DisciplinesSectionRenderer`, because its only other caller (Required
+Recipes' `CreateRecipesBody`) was not yet extracted - moving it then would
+have either widened the pilot's scope to Recipes or left Recipes calling
+into a class named for Disciplines. This package extracts Required Recipes
+too, so BOTH callers are now extracted section renderers; per this
+package's brief ("unless BOTH remaining users are now extracted and moving
+it is the strictly cleaner forward-edge"), `CreateCTableHeaderRow` moved to
+`Views/Rendering/CTableHeaderRenderer.cs` (`private` -> `internal static`,
+plus the same added `sink` parameter as `TextRowRenderer`), and BOTH
+`DisciplinesSectionRenderer.Render` and `RecipesSectionRenderer.Render` now
+call it directly as their own first step - mirroring how
+`ShoppingListSectionRenderer` already owns `CreateShoppingListHeaderRow`
+(WP-23b) instead of relying on `CraftingPlanView` to call it first.
+`CraftingPlanView.CreateCollapsibleSection`'s `RequiredDisciplines` case
+lost its separate header-row call (now just constructs the renderer, like
+every other section); `RequiredRecipes` never had a separate one to lose.
+`DisciplinesSectionRenderer.cs` (WP-23 pilot, already merged via PR #89)
+was edited for this - its `Render` method and class doc comment updated to
+match; `CreateDisciplineRow` itself is untouched (confirmed by `diff -w`
+against the pre-WP-23c copy: the only differences are the doc comment and
+the one added `CTableHeaderRenderer.CreateCTableHeaderRow(...)` call at the
+top of `Render`).
+DIFF EVIDENCE: whitespace-insensitive (`diff -w`) comparisons of every
+moved method against its pre-move body in the origin/master copy of
+`CraftingPlanView.cs` confirm move-only extraction: `CreateCraftStepRow`
+differs only in the one sink substitution; `CreateCraftingStepsBody` (now
+`Render`) differs only in its rename and the `TextRowRenderer.`-qualified
+call; `CreateRecipeRow` differs only in the one sink substitution plus the
+added attribution comment; `CreateRecipesBody` (now `Render`) differs only
+in its rename and the `CTableHeaderRenderer.`-qualified call;
+`CreateCTableHeaderRow` and `CreateTextRow` each differ only in their
+`private` -> `internal static` signature (plus the added `sink` parameter)
+and the one sink substitution inside.
+INVARIANT TRACE: both renderers are constructed as
+`new CraftStepsSectionRenderer(this)` / `new RecipesSectionRenderer(this)`
+from `CraftingPlanView.CreateCollapsibleSection`, exactly mirroring every
+prior section renderer - `_sink` at every call site inside the moved row
+builders (including the two new shared helpers, which receive the same
+`_sink` reference as a parameter rather than a stored field) resolves to
+the view itself, so `ISectionRelayoutSink.AddRelayout` routes to the same
+`_relayoutActions` list `ReplayRelayout` iterates and
+`CreateCollapsibleSection`'s DEBUG must-register check counts before/after
+each section body runs. Moving `CreateCTableHeaderRow`'s registration
+inside `Render()` (rather than a separate call preceding renderer
+construction) does not change when it registers relative to the switch
+case - both still happen synchronously inside the same `case` block, so
+the DEBUG check's before/after count is identical to the pre-WP-23c
+ordering.
+DO-NOT-TOUCH compliance: `PlanContentHeightMath` (including
+`RecipeRowHeightNoSublabel` = 36 / `RecipeRowHeightWithSublabel` = 44, the
+M36 correction) and `PlanRelayoutMath` stay in `Services/`, called exactly
+as before, not moved or edited. `LabelHelpers.CreateRowDivider`'s divider
+math and its per-branch M36b bottom-clearance calls (1 for
+`CraftStepRowHeight`/`RecipeRowHeightWithSublabel`, 0 for
+`RecipeRowHeightNoSublabel`) move with the row bodies unchanged, per the
+comments moved alongside them verbatim.
+VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped -
+unchanged from the pre-WP-23c floor; this view has no automated test net,
+so green tests prove only that nothing else broke, not that the rendering
+or resize behavior is correct). Live pre-merge visual verification (Blish-
+over-Paint screenshot/pixel-scan loop) on the Crafting Plan tab's Crafting
+Steps and Required Recipes sections - both sections render, a
+TimegatedNotice row (if the live plan produces one), the two Required
+Recipes row heights (with and without a sublabel), the Auto-learned/
+Learned/Missing! status-tag colors, divider scans on both sections, and
+confirmation that no DEBUG "registered no relayout closures" warning fires
+- is being run by the orchestrating session per the M38 plan's
+`needsVisualLoop` gate (this package is invariant-adjacent per the same
+risk rating as WP-23/WP-23b). Result recorded here and in the PR before
+merge: PASS (orchestrator, 2026-07-23, live branch-build session under the
+hardened desktop protocol, captures wp23c_04/05/06/08): Required Recipes
+renders via RecipesSectionRenderer (both row heights, sublabels,
+Learned/Auto-learned tags) and Crafting Steps via CraftStepsSectionRenderer
+(step numbers 1-47, rarity colors, discipline sublabels) with divider
+scans uniform 35/36 at two offsets each - the only gaps decode to the
+by-design isLast/section-seam boundaries; the timegated notice row renders
+through the extracted code ("Glob of Ectoplasm is timegated - Weekly
+limit: 1 (plan needs 105)"); zero relayout DEBUG warnings in the Blish
+log. Note: this run's step quantities differ from prior references (e.g.
+200x Shard of Exitare vs 100x) with the qty box verified at 1 - live
+price-driven route variance in the solve, not a rendering defect (this
+branch's diff is Views-only; solver bits identical to master)
+
+## WP-23d + WP-24: SummarySectionRenderer + IconNameRowHelpers/RowRelayoutHelpers (M38)
+Two packages landed together on the same branch: WP-23d closes the last
+open fork from the WP-23/WP-23b/WP-23c section-renderer extractions (the
+Summary/Total Cost section); WP-24 (m38-a2-simplify.md finding #3) factors
+the two repeated row-builder shapes that finding identified ACROSS the now-
+fully-extracted renderers.
+
+WP-23d SCOPE: `Views/Rendering/SummarySectionRenderer.cs` (new) -
+`CreateSummarySectionBody` (renamed `Render`, matching every other section
+renderer's entry point), `CreateCostTileRow` (plus its `CostTileHandle`
+relayout cache and `TileCaptionFor` label-shortening helper), and
+`CreateCurrencyRow` (plus its `CurrencyRowHeight`/`CurrencyIconSize`
+constants) all moved verbatim. The only edits inside the moved bodies are
+`_relayoutActions.Add(...)` -> `_sink.AddRelayout(...)` (in
+`CreateCostTileRow`/`CreateCurrencyRow`) and `CreateTextRow(..., this)` ->
+`TextRowRenderer.CreateTextRow(..., _sink)` (in the renamed `Render`'s
+`noteRows` loop, the M35 `MultiItemNote` banner row). This closes the fork
+`TextRowRenderer`'s own doc comment (WP-23c) and this file's line-1483-ish
+narrative above named explicitly: `CreateSummarySectionBody`'s `noteRows`
+loop was the one call site WP-23c deliberately left in `CraftingPlanView`
+"because Summary is not part of this package's scope" - it is now, so it
+moved too. `TextRowRenderer.CreateTextRow` has exactly one remaining call
+site left inside `CraftingPlanView` itself (the default fallback case in
+`CreateCollapsibleSection`) plus the two now living in extracted section
+renderers (`CraftStepsSectionRenderer`'s TimegatedNotice branch,
+`SummarySectionRenderer`'s `noteRows` loop) - both `TextRowRenderer.cs` and
+`ISectionRelayoutSink.cs`'s doc comments were updated to record this.
+DIFF EVIDENCE (WP-23d): whitespace-insensitive (`diff -w`) comparisons of
+every moved method/type against its pre-move body in the origin/master
+(PR #91, `49e3d30`) copy of `CraftingPlanView.cs`: `CostTileHandle`,
+`TileCaptionFor`, and the `CurrencyRowHeight`/`CurrencyIconSize` constant
+pair are byte-identical; `CreateCostTileRow` and `CreateCurrencyRow` each
+differ only in the one sink substitution; `Render` (renamed from
+`CreateSummarySectionBody`) differs only in its rename/access-modifier
+change and the one `_sink`-qualified `TextRowRenderer.CreateTextRow` call.
+
+WP-24 SCOPE: two new shared helpers, `Views/Rendering/RowRelayoutHelpers.cs`
+(`FinishRow`) and `Views/Rendering/IconNameRowHelpers.cs`
+(`CreateIconAndEllipsizedName` + `ReellipsizeName`), adopted ONLY where the
+existing row shape matched exactly (constants compared first, per this
+package's own brief - "a forced fit that changes pixel geometry is worse
+than duplication"):
+- `RowRelayoutHelpers.FinishRow` (the "row panel resize + one row-specific
+  extra reposition + divider resize" `AddRelayout` closure) was adopted by
+  ALL FIVE extracted row builders - `CraftStepsSectionRenderer.
+  CreateCraftStepRow`, `DisciplinesSectionRenderer.CreateDisciplineRow`,
+  `RecipesSectionRenderer.CreateRecipeRow`,
+  `ShoppingListSectionRenderer.CreateShoppingRow`, and
+  `UsedMaterialsSectionRenderer.CreateUsedMaterialRow` - confirmed identical
+  in shape and order of operations across all five (rowPanel resize first,
+  then the row's own reposition work, then divider resize; the divider
+  creation call `LabelHelpers.CreateRowDivider(rowPanel, panelWidth,
+  rowHeight, bottomClearance)` unchanged, same `bottomClearance` value per
+  row as before: 1/1/(hasSublabel?1:0)/0/0 respectively). NOT adopted by
+  `SummarySectionRenderer.CreateCostTileRow`/`CreateCurrencyRow` - neither
+  builds a `LabelHelpers.CreateRowDivider` at all (no list-style rows in
+  Summary), so there is no divider half of the shape to share.
+- `IconNameRowHelpers` (the "rarity-framed icon + ellipsized, rarity-
+  colored, drop-shadowed name label, re-ellipsized at settle" shape) was
+  adopted by exactly the two rows that share it byte-for-byte:
+  `UsedMaterialsSectionRenderer.CreateUsedMaterialRow` and
+  `ShoppingListSectionRenderer.CreateShoppingRow` - both call
+  `PlanRelayoutMath.NameMaxWidthBeforeColumn` with the same gap constant
+  (12) and the same `nameX` (50), place the icon at the same (8, 0), and
+  the name label at the same (nameX, 9). NOT adopted by
+  `CraftStepsSectionRenderer.CreateCraftStepRow` (name built via cumulative
+  cursor-x label concatenation, no width cap or ellipsis at all),
+  `DisciplinesSectionRenderer.CreateDisciplineRow` (no icon, no name column,
+  just two plain labels), or `RecipesSectionRenderer.CreateRecipeRow` (name
+  label has no width cap/ellipsis either, plus an optional sublabel line
+  BELOW the name and an icon y that varies with `hasSublabel`) - each
+  excluded row's doc comment records the specific mismatch that ruled it
+  out, per this package's "any row whose geometry differs stays hand-rolled
+  with a comment" instruction.
+CONSTANT-BY-CONSTANT TABLE (WP-24 pixel-identity evidence):
+  RowRelayoutHelpers.FinishRow adoption - rowHeight and bottomClearance
+  arguments passed to `LabelHelpers.CreateRowDivider` are UNCHANGED at every
+  one of the five call sites (CraftStepRowHeight/1, DisciplineRowHeight/1,
+  RecipeRowHeightWithSublabel-or-NoSublabel/(hasSublabel?1:0),
+  ShoppingRowHeight/0, UsedMaterialRowHeight/0); the AddRelayout closure's
+  three-step order (rowPanel resize, extra reposition, divider resize) is
+  preserved verbatim at all five (ShoppingRow's `ShoppingColumnMath.
+  ComputeEdges` call was already independent of the rowPanel-resize
+  statement - no data dependency crosses that reordering, so moving it
+  inside the extra-reposition delegate is a no-op for output).
+  IconNameRowHelpers adoption - icon (x=8, y=0, size=32, border=1 defaults
+  matching `IconControls.CreateRarityFramedIcon`'s own defaults), nameX=50,
+  nameY=9, NameMaxWidthBeforeColumn gap=12, font=DefaultFont14, and the
+  rarity-colored/drop-shadowed label styling are IDENTICAL between the two
+  adopting rows' before/after bodies; the only per-row difference (both
+  before and after extraction) is the `rightEdge` value fed into
+  `NameMaxWidthBeforeColumn` - a fixed `panelWidth - 8` for Used Materials
+  vs. the dynamic `ShoppingColumnMath`-derived `edges.QtyRightEdge` for
+  Shopping List, exactly as before. The pre-extraction
+  `if (displayName != fullName)`/`if (nameLabel.Text != newDisplayName)`
+  truncation-tooltip gates are preserved via the logically-equivalent
+  `nameHandle.NameLabel.Text != fullName` (build-time, evaluated
+  immediately after construction, before any relayout closure can run) and
+  `IconNameRowHelpers.ReellipsizeName`'s own internal compare-and-
+  conditionally-assign (settle-time).
+DO-NOT-TOUCH compliance: `git diff --stat` against origin/master confirms
+zero changes to `Services/PlanContentHeightMath.cs`,
+`Services/PlanRelayoutMath.cs`, and `Views/Rendering/LabelHelpers.cs`
+(the divider math and its M36b bottom-clearance calls) - both packages
+call into all three exactly as before, never edited. The M35 `MultiItemNote`
+row and the M37 batch-economics cost tiles (Total/Own materials/Sell
+value/Profit, all rendered through the same generic per-`CoinTotal`-row
+tile band `CreateCostTileRow` already handled - see
+`docs/research/m37-r2-batch-economics.md` Section 3.6/4.3) move
+byte-identically inside `SummarySectionRenderer`; `CreateCostTileRow`'s
+`PlanRelayoutMath.ComputeCostTileGeometry` call (build AND relayout
+closure) is untouched, verbatim.
+KNOWN FOLLOW-UP (not fixed here, out of this package's own scope per the
+WP-23c/`bfee069` precedent of flagging-not-fixing pre-existing staleness
+outside the current package's own moved symbols): `Services/
+PlanRelayoutMath.cs`'s `ComputeCostTileGeometry` doc comment still reads
+"Mirrors CraftingPlanView.CreateCostTileRow's own arithmetic exactly" -
+stale as of this package's own move (now
+`Views/Rendering/SummarySectionRenderer.CreateCostTileRow`), but left
+unedited because `PlanRelayoutMath.cs` is this package's own explicit
+DO-NOT-TOUCH file; a future doc-comment-only pass (mirroring `bfee069`'s
+precedent of touching a DO-NOT-TOUCH file's comments without touching its
+arithmetic) can repoint it.
+VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped -
+unchanged from the pre-WP-23d floor; this view has no automated test net,
+so green tests prove only that nothing else broke, not that the rendering
+or resize behavior is correct). Live pre-merge visual verification (Blish-
+over-Paint screenshot/pixel-scan loop) on the Crafting Plan tab's Summary/
+Total Cost section (cost tiles, currency rows, MultiItemNote banner where
+applicable) and a spot-check of the five WP-24-refactored sections (Used
+Materials, Shopping List, Crafting Steps, Required Disciplines, Required
+Recipes) for divider/icon/name-ellipsis regressions is being run by the
+orchestrating session per the M38 plan's `needsVisualLoop` gate (this
+package is invariant-adjacent per the same risk rating as WP-23/WP-23b/
+WP-23c). Result: PASS (orchestrator, 2026-07-23, live branch-build
+session under the hardened desktop protocol, captures wp23d_02/03/04/05/
+08/09/10/15/17/22 in C:/Dev/Blish/preflight/captures):
+- Summary/Total Cost via SummarySectionRenderer in all three shapes: (a)
+  single-item Exordium - Total tile + all 7 currency rows, layout-identical
+  to the WP-21 merged-master reference (wp21_02_top.png), only live-price
+  deltas; (b) own-materials re-solve - two-tile band (Total 2092g / Own
+  materials 6g85s95c) and the owned/needed annotation format live against
+  the synthetic snapshot ("292x Spirit Shard (50 owned, 242 needed)");
+  (c) 2-item batch Exordium + Orichalcum Ingot - "Exordium and 1 other"
+  title, three-tile band exercising the TileCaptionFor "Loss if sold"
+  variant (Total 2455g12s12c / Sell value 2s43c / Loss if sold 21c), and
+  the M35 MultiItemNote banner rendering through the sink-substituted
+  TextRowRenderer.CreateTextRow path.
+- All five WP-24-refactored sections spot-checked live: Used Materials
+  (the 4 synthetic-snapshot rows, icon+name+qty geometry), Shopping List
+  (two offsets; source tags, "1 for 10" bundle rate, multi-currency and
+  em-dash cells, UNKNOWN badges), Crafting Steps (steps 1-10 and 33-46;
+  numbers, rarity colors, discipline sublabels; ecto weekly timegated
+  notice row), Required Disciplines (column headers + rows at 26px pitch),
+  Required Recipes (sublabel rows, Learned/Auto-learned tags, two offsets).
+- scan_dividers.py at 2+ offsets per section class: uniform 29/30 (36px
+  rows), 35/36 (44px), 26 (32px disciplines); every gap decodes to the
+  by-design isLast/section-seam/column-header boundaries.
+- Zero "registered no relayout" DEBUG warnings and zero WARN/ERROR lines
+  across both session logs.
+- Bonus evidence: a real human window resize mid-session fired
+  writer=ResizePreserve with verify exit reason=stable on the branch
+  build - live proof the relayout registry replays correctly through the
+  extracted renderers; scroll position was also preserved across a live
+  regenerate.
+- Session note: the user briefly used the desktop mid-gate; two transient
+  UI oddities observed in that window (input-strip checkbox visual reset,
+  cleared search text) are attributed to that manual interaction, not the
+  branch (the strip is untouched by this diff); the gate was completed on
+  a fresh launch afterward.
+
+## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
+ASCII carets ("v" / ">" section headers) rendered reliably in every
+capture across three desktop sessions and two machines' font stacks
+this milestone cycle; the unicode-triangle alternative is unnecessary.
+Settled: keep ASCII carets.
+
+---
+
+# M37 Backlog: Post-Parity Wave (logged 2026-07-21, user directives after M33-M36)
+
+User directives from the 2026-07-21 session, issued after full Exordium
+behavioral parity (M33-M36, master 812d0f0, 812 tests, PRs #44-#51).
+Localization is explicitly DEFERRED to the long-term backlog (user: "not
+core functionality"); upstream Blish HUD issue posts are explicitly
+SKIPPED (the v1.3.0 wheel-delta bug is already fixed on their unreleased
+dev branch; our module-side sanitizer stays until a fixed release ships,
+then can be retired at leisure). All eight items in this backlog (24-31)
+are now closed as of the 2026-07-22 live desktop session, which also
+verified items 29 and 30 live for the first time (see the "M37
+desktop-wave observations" section below).
+
+## THE METHOD (still governs items 24-26)
+Research how gw2efficiency handles each behavior FIRST (dev-time only -
+the module never calls gw2e or the wiki at runtime), document it, then
+echo it. NOTE FOR THE IMPLEMENTING SESSION: the prior session's research
+reports lived in a transient scratchpad and are GONE. Committed
+references that survive: docs/gw2e-parity-spec.md (normative algorithm
+spec), the resolution records in items 12-23 above, and project memory.
+gw2e sources remain publicly fetchable (recipe-calculation/recipe-nesting
+on GitHub; the live app bundle at gw2efficiency.com; the custom-recipes
+repo is GONE from GitHub - recover via Wayback Machine if needed).
+
+## 24. Homestead refinement handling (parity gap) (FIXED in M37)
+gw2e's solver models Janthir Wilds homestead refinements - its
+cheapestTree has homestead-refinement merchant-name matching (observed
+in the M34 research of cheapestTree.ts). We model nothing. Refinement
+tiers are NOT in the official API, so a manual user setting is required
+(old critique item, pre-M18). Research first: exact gw2e mechanism
+(how refinement conversions are modeled as merchant recipes, the user
+toggle and its default, daily caps, which material families) plus wiki
+ground truth for the conversions (rates, daily limits, unlock state).
+Then: wiki-verified static seed for the conversions, a Settings toggle,
+solver participation mirroring gw2e, display. No invented data.
+
+FIXED in M37 (research: docs/research/m37-r1-homestead.md, live-verified
+`cheapestTree.ts` mechanism plus complete wiki conversion tables for all
+three stations). This item combined a modeling gap ("we model nothing")
+with a real, independently-confirmed LIVE DEFECT: the module's seed
+already carried all 236 wiki-scraped Homestead Refinement offer rows
+(all three tiers, unconditionally, no `Tier` field existed on
+`VendorOffer` at all), so `EvaluateVendorOffers` had no way to prefer a
+cheaper/worse tier and always silently picked whichever tier priced
+lowest - almost always the highest tier, since it needs the least raw
+input per unit output. In effect the module behaved as if every account
+owned every efficiency upgrade on every station, the opposite of gw2e's
+own conservative tier-0 default, with no way to turn it off. This was
+not merely "we don't model homestead" - the module already modeled it,
+silently and wrongly.
+
+Mechanism:
+- New `Models/HomesteadEfficiencyTiers.cs`: a per-material (Fiber/Metal/
+  Wood) integer tier 0/1/2 configuration, mirroring gw2e's own
+  `cheapestTree.ts` `userEfficiencyTiers` parameter exactly (same three
+  item ids, same 0/1/2 range, same default). **Default tier 0 for every
+  material** - this is not an invented default; it is gw2e's own
+  hardcoded default AND its own documented no-API-key fallback (the
+  research report's Section 1.3), and it is the only default consistent
+  with this repo's "never invent an assumed ownership/progression state"
+  posture (the exact opposite of the pre-fix live-defect behavior, which
+  effectively assumed maximum ownership).
+- `Models/VendorOffer.cs` gains a nullable `HomesteadTier` field
+  (additive; null for every non-Homestead offer). Tagging mechanism
+  (the task's Route A/Route B fork): a live SMW `ask` probe against
+  Homestead Refinement-Metal Forge confirmed the wiki's `{{vendor table
+  row|requirement=...}}` parameter IS exposed as a queryable "Has
+  requirement" property (empty for tier-0 rows; literal text `"one
+  [[Homestead Upgrade: ...]]"` / `"two [[Homestead Upgrade: ...]]"` for
+  tier-1/tier-2), so Route A was taken: `tools/VendorOfferUpdater`'s
+  `WikiSmwClient` now scrapes it, and the new `HomesteadTierResolver`
+  (pure, unit-tested) interprets it - but ONLY for offers whose own
+  `OutputItemId` is one of the three known refined materials (a review
+  finding: the same three merchant pages also sell unrelated rows -
+  each station's own one-time efficiency/capacity Upgrade-purchase
+  items - under the byte-identical merchant name, since the wiki's
+  "Has vendor" property is hardcoded to the page name for every row
+  regardless of subsection; without this guard those 21 rows would have
+  been mistagged tier 0). All 237 tagged/verified rows were regenerated
+  via a `--query` scoped to just the three station pages and a new
+  `--merge-into` mode (`Program.MergeIntoBaseline`, unit-tested) that
+  replaces ONLY the merchants a scoped query actually covered in the
+  full baseline, leaving all other 53,292 offers byte-for-byte
+  unchanged (independently diff-verified before promoting the file).
+  236 -> 237 rows recovers one previously-silently-dropped row: Farm's
+  Potato conversion is a documented, wiki-confirmed real game anomaly
+  (tier-1 is NOT discounted from tier-0 - both are "8 Potato -> 1
+  Fiber"), so before this milestone's tier-aware `VendorOfferHasher` and
+  Requirement-text-aware raw-scrape dedup key existed, the tier-0 and
+  tier-1 subobjects collided (byte-identical content) and one was
+  silently dropped - a real but functionally inert gap (tier-1's rate
+  was identical to tier-0's anyway), now fixed as a side effect.
+- `VendorOfferHasher.ComputeOfferId` folds `HomesteadTier` into the
+  content-derived `OfferId` via a new optional trailing parameter -
+  "optional" only means a caller need not pass it (it defaults to
+  null); it does NOT mean the resulting hash matches what the same
+  inputs hashed to before this parameter existed. The function
+  unconditionally appends a `;homesteadTier=<value-or-"null">` segment
+  for every call, so any offer's hash changes the moment it is
+  recomputed, regardless of whether its own tier is null. Churn in the
+  committed `ref/vendor_offers.json` is confined to the 237
+  Homestead-Refinement-merchant rows - 216 now tier-tagged rows plus 21
+  untagged one-time "Upgrade" purchase rows under the same three
+  merchant names (content-identical, but with a new offerId - e.g.
+  outputItemId 102415 "Homestead Upgrade: Ore Trade Efficiency" moves
+  from `04ff9e53...39d` to `4cc0d33b...ed9`) - independently
+  diff-verified against the pre-M37 baseline. That narrow blast radius
+  is a property of `--merge-into` copying every untouched baseline
+  object through byte-for-byte, NOT a property of the hash function
+  being backward-compatible for omitted-parameter callers in general:
+  a future full (non-scoped) regeneration would change every offerId
+  in the file, not just Homestead's.
+- `PlanSolver.EvaluateVendorOffers` gains the actual fix: before an
+  offer is considered comparable or fallback, a Homestead-tagged offer
+  whose tier exceeds the configured tier for its output material is
+  skipped entirely. Keyed on the offer's own `OutputItemId` (not a
+  merchant-name substring check at this hot-path call site) because
+  `HomesteadTier` is only ever non-null on rows the seeding pass already
+  confirmed matched gw2e's own `merchant.name.includes('Homestead
+  Refinement')` shape - re-checking the string on every offer/every
+  solve would be redundant work in a loop that already runs per vendor
+  offer per tree node (performance-sensitive path, per this repo's
+  review checklist). `HomesteadEfficiencyTiers`/the tier setting threads
+  through `PlanSolver.Solve` -> `CraftingPlanPipeline` -> `Module.cs` the
+  identical way `CurrencyValuation` already does (optional trailing
+  parameter, snapshotted onto `PlanSolveContext.HomesteadTiers` at
+  generation time, reused as-is by `ResolveWithOverrides`) - every
+  existing call site is unaffected (byte-identical, confirmed by the
+  full pre-existing test suite passing unmodified plus a live-verified
+  Exordium `--dump-tree` diff, see Verification below).
+- Three new `ModuleSettings` entries (`HomesteadFiberTier`/
+  `HomesteadMetalTier`/`HomesteadWoodTier`, plain `SettingEntry<int>`,
+  default 0) and a new "Homestead Refinement" Settings-tab section
+  (three TextBox+Save rows, following the exact same pattern the
+  Currency Valuations section already uses - a 3-valued integer needs
+  validation before persisting, unlike `ValueOwnMaterials`' plain
+  immediate-apply Checkbox). Labels name the material family and
+  station only ("Fiber (Farm)", "Metal (Metal Forge)", "Wood (Lumber
+  Mill)") - no raw item/vendor ids are ever displayed (repo invariant).
+- Cap data: PR #55's fresh wiki cap re-scrape had already populated
+  `WeeklyCap` on the Homestead rows (100/week per Farm row, 250/week per
+  Metal Forge/Lumber Mill row) - confirmed present after this
+  milestone's own re-scrape too, so no additional cap seeding was
+  needed. Documented divergence: these are the wiki's own literal
+  per-row SMW values, not the TRUE cap - the real weekly cap is per-
+  STATION (200 base, rising to 800 fully upgraded) shared across every
+  input-material choice at that station, while our cap machinery is
+  per-offer/per-merged-step. This is a conservative, documented
+  approximation carried over from #28's own warn-only design - it never
+  gates the solve, only produces an informational notice, and using the
+  wiki's own already-scraped per-row number (rather than inventing a
+  reconciled per-station figure) keeps faith with "no invented data."
+- Homestead-specific cap-notice gap (KNOWN-ISSUES #25's own Section 3.3,
+  the "Conflict-suppression" gap): `PlanSolver.FinalizeVendorBatches`
+  suppresses its cap-exceeded notice entirely whenever two tree
+  occurrences of the same output picked different specific offers
+  (`Conflict == true`) - the NORMAL Homestead case, since a plan needing
+  many units of one refined material is very likely to satisfy
+  different occurrences via different specific input-material rows. A
+  fix was attempted this milestone: `VendorBatchState` would additionally
+  ratchet a separate, coarser `CapConflict` flag comparing only the raw
+  `(DailyCap, WeeklyCap)` tuple across occurrences, independent of full
+  offer-shape agreement, on the theory that every Homestead offer for a
+  given output+station shares the identical station-wide cap even when
+  the specific input material differs. Adversarial review found that
+  theory false and REVERTED the fix, deferring per the research report's
+  own Section 4.5 "regression-test + defer" recommendation instead: the
+  cap data note directly above already documents that the shared number
+  is the wiki's own per-row SMW template parameter, not the confirmed
+  per-station aggregate, so two occurrences agreeing on that raw number
+  does not mean they agree on a real shared limit worth summing against.
+  Because every row within one station shares that same wiki-scraped
+  number, the summing branch fired for the ordinary Homestead case (many
+  crop/ore offers resolving one output), not a rare edge case, producing
+  false-positive "exceeds weekly cap" notices for totals that may not
+  exceed the real (unseeded) per-station aggregate at all. `Conflict`
+  alone continues to suppress the notice, as it did before this
+  milestone; two regression tests document the suppression for both the
+  same-cap and different-cap shapes rather than leaving it to bit-rot.
+
+Deferred (recorded, not implemented):
+- **HomesteadUnlocked master gate**: gw2e has NO "do you even own
+  Homestead" gate anywhere in its algorithm (confirmed by the research
+  report's exhaustive source read) - it always offers the tier-0 rate to
+  every account, unconditionally. Per this milestone's fixed design
+  decision, this module echoes that exactly (no master gate in code).
+  A prior draft of the research report recommended adding one anyway
+  (default off, hiding every Homestead-tagged offer until the user
+  opts in) on the grounds that this module runs in-client for players
+  who may have never touched Janthir Wilds, unlike a browser tool
+  typically used by already-progressed players. Recorded here as a
+  deliberate, confirmed-with-the-orchestrator divergence option for a
+  future milestone, not implemented - v1 ships pure parity (tier 0
+  default, no gate), which is already a large correctness improvement
+  over the pre-fix unconditional-best-tier live defect.
+- **Black Market path** (300 purchases of 25/week per station, coin-only,
+  escalating price, no efficiency-tier interaction at all): confirmed
+  entirely unseeded before AND after this milestone (the live re-scrape
+  used for tier tagging skipped all Black Market rows - they failed
+  wiki game-id resolution, 30 rows across the three stations, and were
+  never present in the pre-M37 baseline either). Out of scope per the
+  fixed design decision; a future milestone could seed these as plain
+  vendor offers (`HomesteadTier = null`, tier-independent) once the
+  game-id resolution gap is separately investigated.
+
+Verification: `PlanSolverTests` (real production `Solve()` path) cover
+default-tier exclusion, tier-1/tier-2 admission, per-material
+independence, non-Homestead-offer non-interference, and the documented
+mixed-offer-cap-notice suppression for both the same-cap and
+different-cap shapes: `HomesteadOffer_DefaultTierZero_ExcludesHigherTierOffers`,
+`HomesteadOffer_TierTwoConfigured_AdmitsCheaperHigherTierOffer`,
+`HomesteadOffer_TierOneConfigured_AdmitsTierOneButNotTierTwo`,
+`HomesteadTierConfigured_ForDifferentMaterial_DoesNotAffectThisOne`,
+`NonHomesteadVendorOffer_UnaffectedByHomesteadTierSetting`,
+`MixedOfferSameWeeklyCap_NoticeStillSuppressed_DocumentedLimitation`,
+`MixedOfferDifferentWeeklyCap_NoticeStillSuppressed_DocumentedLimitation`.
+`ExordiumStyleTree_NoHomesteadOffersReachable_ByteIdenticalAtAnyTier`
+mirrors the research report's own BFS-verified finding (Exordium's tree
+reaches zero Homestead materials) with a synthetic tree.
+`CraftingPlanPipelineTests` confirm `PlanSolveContext.HomesteadTiers` is
+snapshotted at generation time and reused by `ResolveWithOverrides`
+exactly like `CurrencyValuation`. LIVE-VERIFIED 2026-07-21 via the
+offline Harness's new `--homestead-tier` flag against the real seed data
+(`--profile 3`, Klobjarne Geirr, item 103815, real network prices via
+`--live` since the offline harness has no TP prices for the raw ore/crop
+inputs Homestead offers cost - matching the same documented limitation
+KNOWN-ISSUES #17 already noted for other vendor-priced items): at tier 0
+the three materials priced at unit=128c (Metal)/142c (Fiber)/84c (Wood);
+at tier 2, unit=32c/35c/21c - roughly a 4x reduction per material,
+matching the conversion tables' "half the input per tier, twice at
+tier 2 for the doubling materials" shape. The reduction propagated
+correctly through the full tree: Gift of Embracing Refuge's subtree
+cost fell from 646750c to 580375c, Gift of the Homesteader's from
+6035038c to 5968663c, and Klobjarne Geirr's own root subtree cost from
+17782176c to 17715901c (a small, expected discrepancy between the two
+top-level deltas is attributable to live TP price movement between the
+two separate live API calls, not a solver artifact). Exordium
+(`--profile 2 --dump-tree`) confirmed byte-identical with and without
+`--homestead-tier`, matching the report's own BFS finding that Exordium
+has zero Homestead reachability. The full 870-test GW2CraftingHelper.Tests
+suite and 107-test VendorOfferUpdater.Tests suite pass unmodified plus
+the new tests above.
+
+M37 follow-up (delta-audit MustFix, tests-only): the shipped-data and
+runtime invariants this fix depends on are now pinned by
+`ShippedSeedFile_HomesteadRefinementMaterialRows_AllHaveNonNullTierInRange`
+(`VendorOfferStoreTests`, real `ref/vendor_offers.json`) and
+`NullHomesteadTier_OnMaterialOutput_IsAdmittedRegardlessOfConfiguredTier`
+(`PlanSolverTests`).
+
+## 25. Multi-item sell-side economics (parity gap, deliberate M35 gap) (FIXED in M37)
+M35 left SellableQuantity/NetSaleValue/CraftingProfit unset for batches
+(documented in GenerateStructuredMultiAsync). gw2e's multi mode shows a
+Cost Breakdown that sums Cost/Savings/Profit across items, a "Profit
+numbers are the sum of all crafted recipes" banner, and a
+sell-excess-crafted-components-for-profit rollup exposed ONLY when
+multipleRecipeTree is true (observed in the M34 research of the app
+bundle). Research the exact semantics from the live bundle (what counts
+as excess, the 0.85 fee basis, tradability gating per item, display
+layout), then implement for MultiItemRoots batches. Single-item
+economics (M20) must be byte-identical after.
+
+FIXED in M37 (research: docs/research/m37-r2-batch-economics.md,
+re-fetched live from the app bundle 2026-07-21 since the earlier M34
+report referenced above was lost). Mechanism:
+- Extracted the M20 single-item per-item arithmetic (over-production
+  bump, sell-price lookup, own-materials opportunity cost) out of
+  `SellSideEconomics.ApplySellSideEconomics` into two pure helpers -
+  `ComputePerItemEconomics` (one requested root's own
+  SellableQuantity/NetSaleValue/TargetUnitSellPrice/ItemCraftCost -
+  correction, M37 item 26 fix-pass: the `PerItemEconomics` struct has no
+  `IsCraft` field, and never did; NetSaleValue/TargetUnitSellPrice are
+  gated purely on live-sell-price presence, `prices[itemId].SellInstant
+  > 0`, not a craft-vs-buy flag)
+  and `ComputeMaterialOpportunityCost` (the batch-merged UsedMaterials
+  sum). `ApplySellSideEconomics` itself is a pure extraction - same
+  fields, same order, same arithmetic - proved byte-identical by the
+  full pre-existing single-item economics test suite
+  (`CraftingPlanPipelineTests`' `Structured_*`/`ResolveWithOverrides_*`
+  hand-computed-value tests) passing unmodified, plus a new
+  `MultiItemPlanTests.GenerateStructuredAsync_SingleEntryList_MatchesLegacySingleItemCall`
+  assertion comparing every economics field between the direct
+  single-item call and the list-of-one entry point.
+- New `SellSideEconomics.ApplyBatchSellSideEconomics`: calls
+  `ComputePerItemEconomics` once per requested root (paired by index
+  with the wrapper recipe's own `Ingredients`, both built in request
+  order by `RecipeService.BuildMultiItemTreeAsync`), then sums the
+  qualifying roots' SellableQuantity/NetSaleValue into the batch
+  totals and `NetSaleValue - ItemCraftCost` (each root's own
+  post-correction `SolverDecision.TotalCost` - see the isolated-root-
+  cost note below) into CraftingProfit, minus the batch's single
+  MaterialOpportunityCost. Wired into both
+  `GenerateStructuredMultiAsync` (fresh generation) and
+  `ResolveWithOverrides`'s wrapper-context branch (so an override/
+  Ignore re-solve of a batch keeps the rollup live, mirroring how every
+  other part of a re-solve already behaves).
+- Bonus fix found in review: `ApplyBatchSellSideEconomics` also now sets
+  `result.PriceBasis` unconditionally (mirroring the single-item
+  method), which fixes a latent M35 gap - NOTHING ever set
+  `CraftingPlanResult.PriceBasis` for a multi-item batch before this
+  change (`PlanResultBuilder.Build` never touches it, and
+  `GenerateStructuredMultiAsync` never called `ApplySellSideEconomics`,
+  the only other place that did), so it silently stayed at the enum
+  default (`PriceBasis.InstantBuy`) regardless of the actual basis used
+  to solve the plan - a batch generated with the module's own default
+  (`BuyOrder`) never showed the "Total (buy-order prices)" label
+  suffix. Regression-tested:
+  `GenerateStructuredAsync_MultiItem_PriceBasisIsSetEvenWithNoQualifyingRoots`.
+- MaterialOpportunityCost is unaffected by the per-root filter below -
+  it stays a single sum over the batch's already-merged UsedMaterials
+  list (unchanged from M35), set whenever Valued mode produced any
+  usedMaterials at all, even if zero roots qualify for the sell/profit
+  rollup.
+
+Divergences from gw2e (recorded M34-style, per this file's convention):
+- **DIVERGED** (review fix - see "Review fix" note below): gw2e's
+  rollup sums only roots whose committed decision is `craft === true`,
+  filtering out any requested item the solver decided to buy. This
+  module's requested roots CAN resolve to a buy decision
+  (`PlanSolver.Evaluate` has no root-only special case - proven live by
+  `GenerateStructuredAsync_MultiItem_PerRootDecision_MatchesStandaloneSingleItemSolve`,
+  M35), but the batch rollup deliberately does NOT add gw2e's
+  craft-only filter, per the research report's own explicit
+  recommendation (Section 4.1.1): a bought-but-tradable root still
+  contributes its own SellableQuantity/NetSaleValue/CraftingProfit,
+  matching this module's own already-shipped single-item
+  `ApplySellSideEconomics` semantics (which has never filtered by
+  craft-vs-buy - a flip/arbitrage number is still meaningful) and what
+  a user would see running each item through the module one at a time
+  and adding the numbers up by hand - see
+  `GenerateStructuredAsync_MultiItem_OneRootBoughtButTradable_IncludedInSum`.
+- **DIVERGED**: gw2e's rollup still includes an untradable CRAFTED
+  root as a hidden `-cost` drag (Section 1.4 of the research report -
+  the per-node "Crafting Profit" pill would never show this item at
+  all, since it is gated on `tradable`, but the top rollup silently
+  absorbs its full craft cost as a loss anyway - an upstream quirk,
+  not a design). This module excludes such a root entirely instead
+  (contributes 0, not a penalty) - both its revenue AND its own craft
+  cost drop out together, matching this module's own single-item
+  `NetSaleValue` convention (null/absent rather than a hidden
+  negative) - see
+  `GenerateStructuredAsync_MultiItem_OneRootUntradable_ExcludedFromSumNotNegative`.
+- **DIVERGED**: single profit basis (SellInstant/buy-order, the M20
+  module convention) instead of gw2e's `profit_buy`/`profit_sell` dual
+  buy-order/sell-listing variants - this module has never shown a
+  second sell-listing figure, and the batch rollup stays consistent
+  with the single-item row rather than doubling the Total Cost
+  section's row count.
+- gw2e's per-node "Crafting Profit" pill (shown only on the N
+  top-level item roots of a batch, gated on `showprofit`/`craft`/
+  `tradable` together - research report Section 1.3a) is explicitly
+  OUT OF SCOPE for this fix, as directed - only the aggregate rollup
+  rows are added. A future milestone could add per-root pills.
+- gw2e's unrelated `excessiveComponents`/`step.excessAmount` feature
+  ("sell excess crafted components for profit" - the bulk-crafting-
+  granularity warning, not `craftedComponentsBreakdown`) remains
+  unimplemented; the research report explicitly found no code path
+  connecting the two upstream features despite similar-sounding names.
+
+Documented nuance (review fix): `MaterialOpportunityCost` is a single
+sum over the batch's whole merged `UsedMaterials` list, computed
+independently of the per-root filter above - inventory reduction walks
+the ENTIRE unreduced wrapper tree before `PlanSolver` ever decides Buy
+vs Craft per root, so a root that ends up bought can still have owned
+ingredient stock recorded as "used" against its own never-crafted
+subtree, and that forgone value is deducted from the batch's
+`CraftingProfit` regardless of whether that root's own economics are
+otherwise included in the sum. This matches the single-item path's own
+pre-existing behavior exactly (`ApplySellSideEconomics`' own
+`MaterialOpportunityCost` is likewise never gated on the target's own
+craft/buy decision) - see
+`GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostIsWholeTreeSum`.
+
+Isolated per-root craft cost: `Services/PlanSolver.cs`'s
+`SolverDecision.TotalCost`, read via
+`solveResult.Decisions[itemRoot.NodeId].TotalCost` - the same
+post-correction (after `AllocateVendorNodeCosts`/`RecomputeCraftCosts`)
+real-coin figure `CraftingTreeBuilder` already copies onto
+`CraftingTreeNode.SubtreeCost` for that node's own pill display. Using
+it (rather than `Plan.TotalCoinCost`, the whole batch's cost) is what
+lets a shared-material batch attribute cost proportionally to each
+root instead of double-counting or dropping the shared portion -
+regression-tested (review fix) by
+`GenerateStructuredAsync_TwoItems_SharedBulkVendorMaterial_BothTradable_CraftingProfitUsesRealNonDuplicatedSharedCost`,
+which exercises this attribution across two roots that BOTH qualify
+for the sell/profit rollup and share a merged vendor-bulk purchase (the
+earlier `..._SingleCeilAcrossBoth` test above has no TP price on either
+finished item, so it never reached this summing code at all).
+
+Display: the Total Cost/Cost Breakdown section's existing `CoinTotal`
+row machinery (`CreateCostTileRow`) already handles an arbitrary
+simultaneous tile count generically (M33), so no View changes were
+needed - only `PlanViewModelBuilder.BuildSummarySection`'s row
+wording, gated on `isMultiItem`: "Sell value (batch total, after 15%
+TP fees)" and "Profit if sold"/"Loss if sold" with a "(batch total)"
+qualifier (concatenated before any existing "(coin costs only)"
+qualifier), dropping the single-item "Nx overproduction" quantity
+qualifier (no single requested quantity to compare a batch sum
+against). The `MultiItemNote` row is gated on the SAME
+`result.NetSaleValue.HasValue` condition as the Sell value/Profit rows
+above it (mirroring gw2e's own shared `ng-show` condition, research
+report Section 1.3b) - review fix: the first version of this milestone
+gated the note on `isMultiItem` alone, so it could render next to zero
+profit numbers whenever a batch had no qualifying root. Its wording is
+"Sell value and profit are the sum across every requested item that
+has a live Trading Post sell price." - NOT gw2e's own verbatim banner
+text ("...sum of all crafted recipes"), because (review fix) the batch
+rollup has no craft-vs-buy filter at all (divergence item 1, above), so
+"crafted recipes" would be inaccurate. Single-item mode's summary
+rows/labels are unchanged (verified by the full pre-existing
+`PlanViewModelBuilderTests` single-item economics suite passing
+unmodified).
+
+Review fix (post-merge adversarial review): the version of this
+milestone first merged had three defects since corrected: (1) the
+craft-only filter above was a real, unauthorized divergence from the
+research report's explicit 4.1.1 recommendation, mislabeled as an
+"echo"; (2) the `MultiItemNote` row's gating and wording (previous
+paragraph); (3) two of the milestone's own regression tests
+(`GenerateStructuredAsync_MultiItem_PriceBasisIsSetEvenWithNoQualifyingRoots`,
+which reused a fixture where both roots actually qualified, and the
+tests renamed above) did not exercise the branches their names/doc
+comments claimed to cover. All three are fixed as described in this
+section; the divergences list and test names above reflect the
+corrected, current state.
+
+VERIFICATION STATE: build green, full test suite green (830 tests -
+Blish-free, real production-path tests throughout:
+`MultiItemPlanTests` for the pipeline aggregation/re-solve-recompute
+behavior including the no-craft-filter and untradable-exclusion
+divergences plus the shared-vendor-cost and Valued-mode-mixed-batch
+interactions, `PlanViewModelBuilderTests` for the batch row
+wording/note text and its gating, `PlanContentHeightMathTests` for the
+first-time-at-4-tiles multi-item height case). Not yet verified by a
+live in-game desktop check - a fresh batch generation with a mix of
+crafted/bought and tradable/untradable requested items should be
+screenshot-loop verified before this is treated as visually confirmed,
+matching this file's existing convention for other M35/M37 UI changes.
+
+LIVE-VERIFIED 2026-07-22 (see the "M37 desktop-wave observations
+(2026-07-22)" section below, note (d)): both gating states confirmed on
+the merged M37 build - an all-bound batch (Exordium + Gift of Fortune)
+correctly showed no tiles/banner, per the NetSaleValue.HasValue gate;
+a mixed batch (Exordium + Orichalcum Ingot) rendered all four tiles,
+including "Sell value 2s37c" and "Loss if sold", plus the banner row.
+
+## 26. Achievement-bit ingredient dedup (parity micro-gap) (FIXED in M37)
+gw2e ships ~274 achievement-discipline custom recipes (achievement_id,
+ingredients mirroring collection requirements) and de-duplicates
+achievement-bit ingredients across the tree (flagged in M34 research as
+a known absent behavior in our module; zero Exordium impact - pick a
+real affected item for verification, e.g. a legendary with an
+achievement-gated collection component). Research exact dedup semantics
+from gw2e sources first; echo. Small.
+
+FIXED in M37 (research: docs/research/m37-r3-achievement-dedup.md,
+independently verified). The research corrected the backlog's own
+example guess: recipe-level `achievement_id` (the ~274-recipe
+population above) is NOT what the dedup mechanism reads at all -
+gw2efficiency's actual `ignoredBitItemIds` mechanism keys on
+INGREDIENT-level `achievement_bit`, present on only 7 recovered custom
+recipes (the WvW "Infinite [siege weapon] Blueprint" achievement
+rewards). None of gw2e's genuine legendary/collection recipes use
+`achievement_bit` at all. Mechanism (ported 1:1 from gw2e's own
+`initialTreeChecks`/`calculateTreeQuantity`, ground-truth-tested via the
+upstream unit test quoted in the report):
+- Walk the whole tree once, classifying every non-Currency item id into
+  "seen via an achievement-bit ingredient" and/or "seen via a plain
+  ingredient" (the same id can be both). Any id seen BOTH ways has every
+  one of its achievement-bit occurrences zeroed, tree-wide - even the
+  first one encountered. An id seen only via achievement-bit occurrences
+  keeps its first (DFS) occurrence and zeroes every later one. An
+  ordinary duplicate item id with no achievement_bit at all is never
+  touched (PlanSolver's own per-stepKey aggregation already handles
+  that, unrelated to this mechanism).
+- New `Services/AchievementBitDedupPrePass.cs` (pure, Blish-free)
+  implements this, wired into `CraftingPlanPipeline` unconditionally
+  (no settings toggle - pure correctness, not user policy) right after
+  the tree is built and before inventory reduction/Solve, in both
+  tree-building entry points (single- and multi-item
+  `GenerateStructuredAsync`). A third call site, the legacy test-only
+  `GenerateAsync`, carried the same wiring until it was deleted in M38
+  WP-14 as test-only dead code (no production callers). Architectural
+  departure from upstream, deliberate (Section 4.2 of the report):
+  since this module bakes each `RecipeNode`'s absolute `Quantity` once
+  at tree-build time (unlike gw2e's per-edge-ratio design), a zeroed
+  duplicate occurrence also has its own `Recipes` cleared - mirroring
+  `InventoryReducer.ReduceNode`'s identical treatment of a genuinely
+  fully-owned node - so `PlanSolver.Evaluate` has no craft path left
+  to consider for it and the ordinary zero-quantity Buy/Have collapse
+  takes over cleanly.
+  Runs exactly once, never re-run across local override/Ignore
+  re-solves - deliberately narrower than gw2e's own `updateTree.ts`
+  (which restarts its "first occurrence wins" bookkeeping from an empty,
+  un-pre-seeded array on every interaction, a real upstream fragility
+  the report flags in Section 1.5) - strictly safer than upstream, not a
+  parity gap.
+- Additive-only schema: `RawIngredient.AchievementId`/`AchievementBit`
+  (nullable), `RawRecipe.AchievementId` (nullable, informational only -
+  not read by the dedup mechanism, added now per the report's own
+  Section 6 open question to avoid a second migration later), and the
+  same two nullable fields plus a new `RecipeNode.IsAchievementBitDeduped`
+  bool, propagated through `RecipeService.BuildNodeAsync` and preserved
+  across `InventoryReducer.CloneNode` (same bug class as the M33 Finding
+  2 `ExpectedOutputCount`-drop fix - any field not explicitly copied
+  there is silently lost on every Reduce() clone). All 14,736 existing
+  seed rows parse and behave byte-identically (regression-tested).
+- Display: `CraftingTreeNode.IsAchievementBitDeduped` mirrors the
+  `IsIgnored` precedent, set in `CraftingTreeBuilder.BuildNode`'s
+  existing `Quantity == 0` early return. `DecisionPillPlanner` renders a
+  single non-interactive "COUNTED ELSEWHERE" pill (new `PillKind.
+  AchievementBitDeduped`) that REPLACES the plain HAVE pill entirely
+  (unlike Ignore, which appends alongside HAVE) - nothing here is
+  actually owned, so showing HAVE would be misleading.
+- Fix-pass finding (verified, not assumed, per the milestone brief's own
+  instruction): the report's claim that a zeroed node's cost/steps
+  "falls out free" through the existing zero-quantity path was traced
+  by hand and found FALSE in one case - when a deduped occurrence's
+  forced-degraded Source (Buy/Vendor/Unknown, since its Recipes are
+  cleared) does not match its "kept" counterpart's own Source/stepKey
+  (e.g. the kept occurrence crafts while the deduped one can only buy),
+  the two never merge via `PlanSolver.Collect`'s per-stepKey aggregation
+  and the deduped occurrence leaves a standalone "buy/craft 0 units, 0
+  cost" ghost row in `Plan.Steps`. Fixed with a new general guard in
+  `PlanSolver.Collect` (any `Quantity == 0` "Item" node returns
+  immediately, mirroring `CraftingTreeBuilder`'s own precedent) - this
+  was already a latent, previously-untested gap for the pre-existing
+  genuinely-owned case too (a fully-owned ingredient nested under a
+  chosen Craft parent), not something new introduced by this feature;
+  fixing it generally was simpler and safer than special-casing only for
+  achievement-bit dedup. Regression-tested (`PlanSolverTests`,
+  mismatched- and matching-stepKey scenarios) and confirmed to change
+  nothing for the full pre-existing 845-test baseline.
+- Seed addition (wiki/API-verified, provenance recorded in the seed
+  commit message): the Infinite Trebuchet Blueprint achievement recipe
+  (item 103980, achievement 8493, recipe id -1592) plus its 3
+  Merchant-discipline sub-recipes (items 103886/103834/103974, recipe
+  ids -1593/-1594/-1595) in `ref/recipes_seed.json`, with matching
+  `ref/recipe_search_seed.json` search-index entries (a pure-append diff
+  in both files, sorted-position-correct in the search index) - without
+  these, the achievement recipe is unreachable in production regardless
+  of the code fix, since it has no equivalent in the real official GW2
+  API at all. Item 103801 (Proof of Siege Expertise, bit 2) correctly
+  gets an empty search entry and no recipe - it has no acquisition path
+  of any kind per the recovered gw2efficiency data, so it renders
+  Unknown, which is correct, not a gap.
+- Tests: `AchievementBitDedupPrePassTests` (ports gw2e's own
+  ground-truth unit test scenarios 1:1 - bit-and-normal coexistence
+  zeroing ALL bit occurrences, bit-only first-occurrence-keeps
+  semantics, ordinary duplicates unaffected, Currency/multi-item-
+  wrapper exclusion, multi-recipe-option isolation - see "Fix-pass
+  update 3" below), `CraftingTreeBuilderTests`/
+  `DecisionPillPlannerTests` (the new flag/pill), `RecipeServiceTests`/
+  `InventoryReducerTests` (field propagation and clone preservation),
+  `PlanSolverTests` (the ghost-row fix), and one full end-to-end
+  `MultiItemPlanTests` case reproducing the report's exact repro
+  (Blueprint + a direct second request for one of its own bit
+  ingredients) through the real `CraftingPlanPipeline` - confirms the
+  shared item's cost is counted once (200 total), not twice (300, the
+  pre-fix expectation).
+
+Fix-pass update (adversarial review finding, addressed): the paragraph
+above originally shipped as an accepted, unfixed display nuance -
+"Achievement"/"Merchant" leaking into the Required Disciplines list as
+if they were real, levelable GW2 crafting disciplines. Re-reviewed and
+fixed: `PlanResultBuilder` now filters "Achievement"/"Merchant" out of
+Required Disciplines specifically (`NonCraftingDisciplines`), so a
+solved plan that crafts the Blueprint or a Merchant sub-recipe no longer
+shows a misleading "Achievement (0)"/"Merchant (0)" entry there.
+`RequiredRecipes`' own per-recipe `Disciplines` field is left untouched
+(still shows "Achievement"/"Merchant" for that specific recipe row -
+accurate, informational metadata about its real source, matching
+gw2efficiency's own custom-recipes tagging convention). `MysticForge`
+intentionally stays visible in Required Disciplines - unrelated,
+pre-existing, out-of-scope behavior. Same fix-pass also replaced
+`PlanResultBuilder`'s `IsMissing` check (previously a bare
+`recipeId < 0` sign check, which the achievement/merchant recipes'
+adjacent negative id range made unsound - see the id-collision finding
+below) with a check on the recipe's own declared Disciplines
+(`InherentlyAvailableDisciplines`), so Mystic Forge/Achievement/Merchant
+recipes are all still correctly reported as never "missing" for the
+right reason instead of by sign-check coincidence.
+
+Fix-pass update 2 (adversarial review finding, addressed): the new
+achievement/merchant recipe ids (-1592..-1595) share the same contiguous
+negative-id block `ref/mystic_forge_recipes.json` uses for real Mystic
+Forge recipes (up to -1591), adjacent rather than disjoint.
+`CompositeRecipeApiClient.GetRecipeAsync` previously routed ANY negative
+id straight to `MysticForgeRecipeData` and returned null without ever
+trying primary if unrecognized - on a cold seed-cache miss this would
+NRE inside `RecipeService.BuildNodeAsync` (`raw.ExpectedOutputCount`)
+for these recipes. Fixed to a real membership check (falls through to
+primary when `MysticForgeRecipeData.GetRecipe` returns null), same
+principle as the `PlanResultBuilder` fix above.
+
+Fix-pass update 3 (adversarial review finding, addressed):
+`AchievementBitDedupPrePass` previously walked EVERY `RecipeOption` on a
+node (not just the one `PlanSolver` would end up choosing) for both
+classification and zeroing. Since this module's `RecipeNode` can carry
+multiple mutually-exclusive alternate `RecipeOption`s for the same node
+(unlike gw2e's single-recipe-per-node tree), this could zero an
+achievement-bit occurrence living only in a never-chosen sibling option
+- or, worse, the only real occurrence on the actually-solved path -
+purely because that sibling was visited first, letting `PlanSolver`
+pick an artificially-cheapened, objectively worse option. Not reachable
+with the currently-shipped 7 real achievement-bit recipes (each is
+single-option) but latent for any future addition. Fixed to only
+descend through each node's primary option (`node.Recipes[0]`),
+mirroring `InventoryReducer.ReduceNode`'s own existing precedent for the
+identical ambiguity. Regression-tested in
+`AchievementBitDedupPrePassTests` (unit-level: the other option's
+occurrence is left untouched) and end-to-end (a `PlanSolver.Solve` case
+locking in that the honest, cheaper option is still chosen).
+
+VERIFICATION STATE: confirmed by a green build and the full test suite
+(real production-path tests throughout: `RecipeService`,
+`InventoryReducer`, `PlanSolver`, `CraftingTreeBuilder`,
+`DecisionPillPlanner`, `CraftingPlanPipeline`/`MultiItemPlanTests`,
+`PlanResultBuilder`, `CompositeRecipeApiClient`,
+`AchievementBitDedupPrePass`), plus a new `RecipeCacheSerializer`
+test (`RecipeCacheSerializerTests`, mirroring
+`AcquisitionHintServiceTests`' `FindRepoFile` pattern) that loads the
+real `ref/recipes_seed.json`/`ref/recipe_search_seed.json` from disk
+through the production deserialization path on every run, replacing the
+prior "run then discarded, not committed" manual check. Not yet
+live-verified in-game (no in-game achievement-bit scenario was
+screenshot-loop checked this milestone) - a fresh capture of a WvW
+Infinite Trebuchet Blueprint plan alongside a direct Pile of Recycled
+Trebuchets request would be the natural follow-up, matching this file's
+existing convention for other M35/M37 UI changes.
+
+## 27. Ignore-pill click status label (FIXED in M37, closes #22)
+Item #22 above: clicking IGNORE/IGNORED re-solves correctly but writes
+"Best path restored" - a preset label, not an ignore label. Use the
+neutral "Decisions updated" status family. Trivial; close #22 when done.
+FIXED in M37: see #22's resolution note for the mechanism. Full sweep of
+every user-triggered re-solve entry point that shares
+ApplyOverridesAndResolve, and the status text each now writes:
+  - Best Path preset (bestPathButton.Click) -> "Best path restored"
+    (the only trigger that legitimately gets this label; passes
+    isBestPathPreset: true explicitly).
+  - Craft All preset (craftAllButton.Click -> ApplyPreset) ->
+    "Decisions updated (N override(s))".
+  - Buy All preset (buyAllButton.Click -> ApplyPreset) ->
+    "Decisions updated (N override(s))".
+  - Per-node craft/tp/vendor pill cycling (the `interactive` pill
+    branch) -> "Decisions updated (N override(s))" (unchanged; this
+    site was never mislabeled since a pill click always adds at least
+    one override).
+  - Ignore/un-ignore toggle (the `ignoreInteractive` pill branch) ->
+    "Decisions updated (N override(s))" (the reported defect; N reflects
+    unrelated per-node overrides, not the ignore set, since ignore state
+    lives in a separate `_ignoredItemIds` set).
+Same-class sibling bug also fixed by this change: Craft All/Buy All
+could hit the identical "Best path restored" mislabel in the edge case
+where CraftingPlanPipeline.BuildPresetOverrides legitimately returns an
+empty override map (e.g. a tree with no craftable nodes for Craft All,
+or none priced on the TP for Buy All) - previously indistinguishable
+from the Best Path preset's own zero-overrides state. Now decoupled
+entirely: only an explicit isBestPathPreset: true reaches the Best Path
+text, regardless of resulting count.
+Not a Blish-free seam originally (the ternary lived inline in the
+CraftingPlanView method), but the module already has an established
+Services-layer pure-helper pattern for status strings (StatusText.
+Normalize, used by MainView); StatusText.ForOverrideResolve extends
+that existing seam rather than inventing a new one, and is covered by
+StatusTextTests (Blish-free, per repo invariants).
+
+## 28. Vendor cap data seeding + stale-offer sweep (PARTIAL - core FIXED in M37; gaps deferred, see DEFERRED below)
+M34 shipped gw2e-parity warn-only cap machinery (TimegatedItems +
+Crafting Steps notice) but 0 of ~53,530 seeded offers carry
+DailyCap/WeeklyCap values, so it is inert. Extend tools/VendorOfferUpdater
+to fetch purchase-cap data from the wiki (research whether SMW exposes
+caps as queryable properties; else targeted parsing), seed caps
+(mind VendorOfferHasher: content-derived offerIds change when the offer
+payload changes - check hasher scope + tests), and run a stale-offer
+detection pass (wiki-verify current availability; precedent: the Gift
+of Battle offer removed in M33 Wave B was wiki-confirmed discontinued
+in 2016). Scope guard: prioritize offers actually reachable from seeded
+recipe trees before attempting all 53k. Known concrete case to verify:
+the "Candy Corn Vendor (Weekly)" Ecto offers carry no caps despite the
+name (M34 research).
+
+FIXED in M37 (cap seeding): WikiSmwClient's PrintoutSuffix extended with
+two new SMW printouts (Has daily purchase cap, Has weekly purchase cap);
+ConvertToOffer now threads the parsed values into both VendorOfferHasher
+and the emitted VendorOffer instead of a hardcoded null,null. A full
+fresh two-pass re-scrape (63,055-row ref/wiki_vendor_cache.json, 819 rows
+carry a real cap) seeded 689 of the 53,530 baseline offers with a real
+DailyCap/WeeklyCap (0 lost a cap, 0 changed between two different real
+values). VendorOfferHasher.OfferId churn was verified confined exactly to
+those 689 offers in both directions (no offer changed its id without a
+cap change, and vice versa), so the merge-by-OfferId contract in
+VendorOfferStore is unaffected. Verified concrete case: the three "Candy
+Corn Vendor (Weekly)" Glob of Ectoplasm offers (cost 1 Gibbering Skull /
+1 Tyria's Best Nougat Center / 1 High-Quality Plastic Fangs) now carry
+WeeklyCap=1, cross-checked three independent ways (SMW ask query, raw
+wikitext `{{vendor table row|...|per week=1}}`, and the rendered page's
+"Limit" column) - see docs/research/m37-r4-vendor-caps.md Section 2b for
+the full triangulation. Has character purchase cap, Has total purchase
+cap, and Has seasonal purchase cap are real, populated SMW properties
+(confirmed) but were deliberately NOT seeded this milestone - the module
+has no model field or consuming logic for them (TimegatedCapType is
+Daily/Weekly only) and no account/character concept at all, so seeded
+values would have nowhere to go; left for a future milestone's own
+design pass.
+
+FIXED in M37 (stale-offer sweep, reachable-only): computed the reachable
+offer set as every vendor offer whose output item appears as an
+ingredient of some ref/recipes_seed.json recipe (5,487 of the 53,530
+baseline offers, ~10.2%, matching M34's projection) and swept only that
+set, per this item's scope guard. An initial automated pass (identity
+diff of the reachable set against stage 2's fresh 63,055-row wiki cache)
+produced 394 raw candidates, but investigation showed that signal alone
+is unreliable: ~278 were SMW GameId-resolution misses (the item is still
+listed, e.g. Tycho's Leather Bag/Crude Salvage Kit, but that pass's fetch
+failed to resolve a game id for the row) and most of the remainder were
+large-vendor-page row-capture gaps in the same fresh scrape (Tycho, Brass
+Nettlemoor, Chef Kaga, and Traveling Elonian Trader were all directly
+re-verified live and are still selling the "missing" items at the same
+cost). After filtering those out and re-checking every remaining
+candidate against a fresh, independent full per-merchant SMW query, only
+23 of 394 stayed unmatched. Two-route wiki verification (a live SMW ask
+re-query plus the vendor's dedicated /Historical wiki subpage, which
+records the exact game-update patch note for each removed row) confirmed
+exactly 2 offers as genuinely discontinued and removed them:
+  - Memory of Battle (outputItemId 71581) from Dugan, cost 75 Badge of
+    Honor + 100 WvW Skirmish Claim Ticket + 1 Emblem of the Avenger -
+    removed per the April 16, 2024 game update (Dugan/Historical), and
+    independently confirmed as the only [[Sells item::Memory of
+    Battle]] SMW match anywhere on the current wiki (i.e. the wiki
+    itself has no live replacement source). Safe to remove: Memory of
+    Battle is Trading-Post-tradable (checked via /v2/commerce/prices),
+    so no recipe needing it regresses to a false Unknown node (the
+    item 17 precedent's exact regression check).
+  - Shield Generator Blueprint (outputItemId 76483) from Dugan, cost 1
+    Emblem of the Avenger + 10 Shield Generator Blueprint + 10 WvW
+    Skirmish Claim Ticket - removed per the November 19, 2024 game
+    update (Dugan/Historical). Safe to remove: the item retains 18
+    other live vendor offers in the seed.
+ref/vendor_offers.json now carries 53,528 offers (5,485 reachable,
+~10.2% - down from 5,487 pre-sweep since both removed offers were
+themselves reachable). The remaining 21 of the 23 unmatched candidates
+were investigated and deferred (documented here rather than removed,
+per this item's two-independent-checks bar):
+  - 18 offers naming "Skirmish Supervisor", "Lionguard (Skirmish
+    Merchant)", or "Mercenary (Skirmish Merchant)" as the merchant
+    (Mist Pendant, Mist Band (Infused), Obsidian Shard, Ascended
+    Salvage Kit, Mists-Charged Jade Band (Infused), Pile of Soybeans):
+    all three wiki pages were restructured into /Armor, /Weapons,
+    /Others subpages; the items are still sold in-game under the split
+    pages (confirmed live). This is a missing-offer/rename gap for a
+    future re-scrape to follow, not a stale offer - NOT removed.
+  - 2 Brass Nettlemoor offers (Healing Signet, Plague Signet): the
+    wiki's own item pages gained a "(ring)" disambiguation suffix
+    (avoiding a name clash with same-named skills); the items, ids, and
+    costs are unchanged and still correctly seeded - NOT removed, no
+    action needed.
+  - 1 "Merchant (Untamed Crags)" offer (Hydrocatalytic Reagent, 50
+    Research Note): that exact vendor page no longer resolves on the
+    wiki (no page, no redirect), while the underlying item+cost is
+    still valid via dozens of other crafting-material vendors - deferred
+    pending further research into whether the page was renamed or the
+    original scrape mislabeled the vendor.
+A --detect-stale updater mode (per the design sketched in
+docs/research/m37-r4-vendor-caps.md Section 4e) was evaluated and
+deliberately skipped: the investigation above showed a naive automated
+diff is dominated by false positives (394 raw candidates, 2 survived
+two-route verification) driven by scraper coverage gaps and wiki page
+renames that need human judgment to tell apart from genuine removals.
+Shipping that as unattended tooling now would risk encouraging
+unverified mass removals later; the manual method is documented in the
+research report instead. Also out of scope for this pass and left
+uncommitted/discarded: the incidental ~5,400-offer wiki-drift superset
+(new Homestead recipes, unrelated vendor page changes) that a full
+from-scratch re-scrape also picked up alongside the cap data - adopting
+it wholesale was out of this item's stale-offer-sweep scope and is
+recorded as a candidate for a future "missing offers" pass instead.
+
+## 29. Owned-materials UI live verification (VERIFIED in M37, live desktop session 2026-07-22)
+USING-N-OWNED pills, owned-currency annotations, and the owned/needed
+shopping splits (M34 B2b) are unit-tested but have never been SEEN
+rendering. Method (no real API key needed): write a synthetic
+AccountSnapshot into the ISOLATED preflight settings data dir
+(C:\Dev\Blish\blish-preflight-settings\data - real SnapshotStore
+format; never touch the user's real Blish config) with Exordium-relevant
+stock (e.g. Mystic Coins, Elder Wood Logs, T6 mats, wallet Spirit
+Shards), enable Use Own Materials, generate Exordium, verify via the
+screenshot loop: partial-owned pills, full-owned HAVE, currency
+owned/needed annotations, and that totals shrink accordingly.
+
+VERIFIED in M37 (live desktop session 2026-07-22, screenshot loop on the
+merged M37 build over the isolated preflight profile; captures in
+C:\Dev\Blish\preflight\captures\m37_*.png). Actual snapshot written per
+this item's own method: 4 items (Augur's Stone, Mystic Clover,
+Stabilizing Matrix, Mystic Runestone) plus 50 Spirit Shards in the
+wallet, in the isolated preflight data dir - a narrower stock list than
+the "e.g." example above, but exercising the identical partial-owned/
+full-owned/currency-annotation paths. Baseline Exordium (no owned
+materials) totaled 2463g75s81c; the owned pass totaled 2099g64s02c, and
+a new "Own materials" column showing 6g89s26c appeared - totals shrink
+accordingly, as this item required. Tree pills: "47x Mystic Clover
+CRAFT|VENDOR|USING 30 OWNED" at depth 2 (quantity correctly reduced from
+item 17's baseline 77x to 47x for 30 owned; the Mystic Clover EV subtree
+re-scaled with it - ceil(47/0.31)*6 = 152 attempts * 6 Philosopher's
+Stone = 912 Philosopher's Stones, arithmetic confirmed by hand against
+item 17's own formula); "45x Stabilizing Matrix TP|USING 30 OWNED" at
+depth 4 (75 - 30 = 45); Mystic Runestone collapsed to the plain,
+non-interactive HAVE pill on full ownership, matching item 20.4's B2b
+design decision (a fully-owned node does not also show USING N OWNED);
+"1x Bloodstone Shard VENDOR 200 [Spirit Shards icon]" forced to its
+single available source, unaffected by ownership. Total Cost showed the
+plan-wide currency annotation "309x Spirit Shard (50 owned, 259
+needed)"; the Shopping List's Bloodstone row tooltip showed "Spirit
+Shard: 50 owned, 150 needed" - a different number by design, since the
+Shopping List annotation nets per-row while Total Cost nets plan-wide
+(item 20.4's "Total Cost inline; Shopping List as a tooltip" split) -
+both scopes are internally consistent on their own terms, not a bug.
+Used Materials (4) listed exactly Augur's Stone 1x / Mystic Clover 30x /
+Stabilizing Matrix 30x / Mystic Runestone 100x, which also verifies
+Augur's Stone's own HAVE status through its consumption row (the
+mechanism itself was already proven directly on Mystic Runestone above).
+Crafting Steps correctly showed "Craft 47x Mystic Clover". Every number
+differs from this item's own "e.g." prep-checklist estimate exactly per
+its own live-prices caveat (Trading Post prices move between sessions,
+the same caveat this file already documents elsewhere, e.g. item 24's
+Verification section) - every mechanism claim (partial-owned pill,
+full-owned collapse, forced single-source, plan-wide vs. row-scoped
+currency netting, Used Materials attribution) held.
+
+## 30. Required Disciplines divider pixel-scan (VERIFIED in M37, live desktop session 2026-07-22)
+The M36b clearance fix covered 32px discipline rows via the shared
+helper (simulation-proven) but that section was never individually
+pixel-scanned - it is short and sits somewhere above Required Recipes
+(the M36b session never located it on screen). Locate it, scan at 2+
+scroll offsets with the committed scanner
+(C:\Dev\Blish\preflight\scan_dividers.py - methodology and verdict
+reading documented in the script header; environment UI scale is 0.81
+so 32px rows pitch at ~25.9px).
+
+VERIFIED in M37 (live desktop session 2026-07-22, scan_dividers.py
+against the fully-expanded Exordium plan, content height 27,684px,
+environment UI scale 0.81). Required Disciplines (32px rows) located and
+scanned at TWO scroll offsets: between-row dividers present at both,
+physical pitch 26px (= 32 * 0.81, matching this item's own ~25.9px
+prediction). Required Recipes (44px sublabel rows) scanned at two
+offsets, uniform 35/36px pitch - consistent with item 23's own
+five-offset scan of the same section. Crafting Steps (44px) scanned at
+two offsets, uniform 35/36px - also consistent with item 23. Shopping
+List (36px) scanned at two offsets, uniform 29/30px, with one 27+31px
+pair that is a grouping artifact summing to two normal pitches (58px ~=
+two of 29/30), not a missing boundary - the same immune 36px class item
+23 already established. Used Materials (36px) scanned at one offset,
+clean - same immune class as Shopping List. Section header dividers
+(H=30, item 23's inline-built divider) were detected, grouped by
+brightness into ~130/180 clusters (both valid divider signatures),
+wherever a section header appeared in a captured frame this session.
+Important clarification discovered during this scan and verified against
+code: the last row of every section deliberately has no divider (the
+`isLast ? null : CreateRowDivider(...)` pattern) and column-header rows
+never had one either - scanner "missing boundary" readings at those
+positions are by-design absences, not defects.
+
+## 31. Concurrency and degradation audits (verification debt) (FIXED in M37)
+Three never-formally-swept reviews, each producing classified findings
+(fix Critical/MustFix per the repo review loop):
+(a) Cross-thread await audit: every await continuation that touches
+Blish controls must marshal via the M31 primitives
+(MainThreadMarshal/generation guards). New async paths were added in
+M33-M36 (currency icon arrival, wheel correction, resize preserve,
+multi-item generate) - audit ALL await points in Views/ + Module.cs +
+pipeline callbacks that mutate controls.
+(b) Offline/API-down degradation: behavior when each /v2 endpoint
+(prices, items, currencies, recipes, account) fails or times out -
+status surfacing, partial renders, retry paths, no crashes/hangs.
+(c) Price-cache thread-safety: the M26 TTL cache + locks under
+concurrent generate/re-solve/refresh.
+
+FIXED in M37 (audits: docs/research/m37-r5-audits.md, all three
+inventories + classified findings recorded verbatim, attributed).
+9 confirmed findings across the three audits (0 refuted - every
+blocking finding was independently adversarially re-walked against the
+real code before being fixed here), plus 2 nice-to-have findings (one
+fixed, one deferred to M38).
+
+Audit (a) cross-thread await - verdict: control/view-state marshaling is
+broadly correct and the M31/M34 primitives are applied consistently
+everywhere except two guard-shaped gaps.
+- 31a-F1 (MustFix): Module.FetchAndSaveSnapshotAsync's post-await commit
+  had no epoch/generation guard, so a Clear Cache click racing an
+  in-flight background refresh could resurrect the just-cleared snapshot
+  once the refresh's ThreadPool continuation landed after the clear
+  (token cancellation alone cannot close this - by the time Cancel()
+  fires the network response may already have landed, and there is no
+  cancellation checkpoint left on the way back to the commit). Fixed
+  with a new `Services/SnapshotEpochGuard.cs` (pure, StatusUpdateGuard-
+  shaped: `ShouldCommit(myEpoch, currentEpoch)`) plus a `volatile int
+  _snapshotEpoch` bumped only by ClearCache; the post-await commit
+  captures its epoch before the fetch starts and checks it after, and
+  discards (returns null, no-op) on a mismatch instead of touching
+  `_currentSnapshot`/`_pendingSnapshot`/`_snapshotDirty`/the on-disk
+  file.
+- 31a-F2 (MustFix): CraftingPlanView.TriggerGenerate bumped
+  `_generateSequence` before its empty-request early-return, so a no-op
+  validation failure could still invalidate a genuinely in-flight
+  generation's guarded button re-enable, permanently stuck-disabling
+  Generate. Fixed by moving the sequence bump (and the
+  `_statusClosedForCurrentGeneration` reset) to after the early-return;
+  button enable/disable semantics for real generations are unchanged.
+- 31a-F3 (NiceToHave, fixed): `_refreshInProgress` is written from a
+  ThreadPool continuation and read on the main thread with no memory
+  barrier. Marked `volatile` (cheapest correct primitive) - the same
+  treatment given to the new `_snapshotEpoch` field above, for the
+  identical cross-thread-visibility reason.
+
+Audit (b) offline/API-down degradation - verdict: one Critical (silent
+account-snapshot corruption on refresh failure) plus five MustFix
+findings; the currency-metadata path, the unused wiki/vendor-offer path,
+and the UI-thread status-surfacing primitives were already solid and
+needed no changes.
+- F1 (Critical): Gw2AccountSnapshotService.FetchSnapshotAsync
+  self-caught every independent Account.* sub-fetch and always returned
+  a fully-formed, freshly-timestamped AccountSnapshot even when every
+  fetch failed - silently overwriting a good cached snapshot with an
+  empty one and resetting the staleness clock, so "Use Owned Materials"
+  would silently price everything as unowned with zero error indication
+  anywhere in the module's UI. Fixed: FetchSnapshotAsync now tallies
+  failures across its 5 independent top-level sources (wallet, bank,
+  shared inventory, materials, character list) and throws a new
+  `SnapshotFetchFailedException` on ANY failure - partial or total -
+  instead of ever returning a snapshot with holes. Conservative
+  persistence rule, documented on the exception class itself: a partial
+  failure is treated exactly like a total one for persistence purposes
+  (never committed, not even with holes) so it can never silently
+  masquerade as a full snapshot; Module.cs's existing generic-Exception
+  catch already keeps the prior good snapshot in place and surfaces
+  "Refresh failed" (distinct from "Updated") with no new status plumbing
+  needed.
+- F2 (MustFix): TradingPostService.GetPricesAsync's batch loop had no
+  per-batch try/catch, so one bad batch (e.g. a 504 on an oversized
+  request) aborted the entire price fetch - and with it the whole plan
+  generation - discarding already-fetched batches, the recipe tree, and
+  vendor resolution. Fixed to degrade per-batch to missing ids
+  (unpriceable holes, an already-supported downstream state), re-thrown
+  only if EVERY batch failed - a genuine total outage still surfaces as
+  an error, preserving the existing "Generate retry succeeds after a
+  504" behavior this file already documents.
+- F3 (MustFix): ItemMetadataService.GetMetadataAsync's first-wave batch
+  loop was unguarded (unlike its own retry-wave loop directly below,
+  which already catches per-batch), so a hard-failing batch aborted the
+  whole call one loop iteration too early. Fixed with the identical
+  per-batch try/catch + total-failure-only-throw shape as F2, mirroring
+  the retry wave's own established pattern.
+- F4 (MustFix): CraftingPlanPipeline's two GetLearnedRecipeIdsAsync call
+  sites (single- and multi-item paths) were unguarded, unlike the
+  currencyTask fetch a few lines above in the same method, discarding an
+  otherwise fully-priced plan on any transient /v2/account/recipes
+  failure. Fixed with the same try/catch-degrades-to-null shape as the
+  currencyTask precedent; PlanResultBuilder already treats a null
+  learnedRecipeIds as a supported "unknown known-recipe status" state.
+- F5 (MustFix): Gw2RecipeApiClient used HttpClient.GetStringAsync(url) -
+  the classic overload with no CancellationToken parameter on this
+  project's net472 target - silently making its own `ct` parameter a
+  no-op for every recipe search/detail call, and never special-cased 404
+  the way its siblings do. Fixed to GetAsync(url, ct) + explicit status
+  handling (matching Gw2PriceApiClient/Gw2ItemApiClient's own pattern),
+  including 404 -> empty-list (search) / null (detail). Fix-pass finding
+  (adversarial review, addressed): the new null-on-404 return from
+  GetRecipeAsync was not yet safe to consume - RecipeService.BuildNodeAsync
+  would NRE dereferencing a null recipe, and persisting a null recipe
+  into the overlay cache store would crash its own serializer
+  (`RecipeCacheSerializer.SerializeRecipes` does
+  `recipes.Values.OrderBy(r => r.Id)`, which throws on any null entry),
+  silently breaking recipe-cache persistence for the rest of the module
+  session (the exception is swallowed by the store's own catch-all, but
+  the poisoned entry is never removed, so every later Flush fails the
+  same way). Both fixed: BuildNodeAsync now skips a null recipe option
+  instead of crafting an option from it, and GetRecipeCachedAsync no
+  longer persists a null result to the cache store (the in-memory
+  negative-cache for the session is unaffected, so a genuinely-missing
+  id still avoids repeat round-trips).
+- F6 (MustFix): RefreshSnapshotInBackgroundAsync/UserRefreshAsync gate on
+  one shared `_refreshInProgress` flag while
+  Gw2AccountSnapshotService.FetchSnapshotAsync performs 9+ independent
+  sequential network calls with no overall time budget - a full outage
+  could stack several ~100s per-call timeouts into many minutes with no
+  way for the user's own "Refresh Now" to cancel or accelerate it. Fixed
+  with a 60s overall timeout wrapping the whole fetch
+  (`Module.SnapshotFetchTimeout`, mirroring CurrencyMetadataService's own
+  internal-timeout pattern) - an internal timeout surfaces as "Refresh
+  failed" (not silently swallowed as a cancellation); genuine caller
+  cancellation is unaffected. The "manual refresh cancels background"
+  idea from the finding's own suggested fix was left out of scope this
+  milestone - it would need the same epoch-guard machinery as 31a-F1 to
+  be correct, adding real complexity for what the finding itself flagged
+  as optional.
+
+Audit (c) price-cache thread-safety - verdict: the M26 TTL cache's lock
+discipline around the dictionary itself was already sound (no tearing,
+no enumeration-during-mutation, no re-entrancy-while-locked, no
+mid-solve inconsistency, no disposal crash) - the one real gap was a
+stampede, not data corruption.
+- 31c-1 (MustFix): GetPricesAsync's check-then-act (TTL check, then an
+  unlocked network fetch, then an insert-under-lock) had no in-flight
+  tracking, so two overlapping GenerateStructuredAsync calls (e.g.
+  Generate + a same-plan "Use Own Materials" toggle-confirm, neither of
+  which mutually excludes the other) could each independently observe
+  the same stale/missing ids and issue duplicate /v2/commerce/prices
+  batches. Fixed: TradingPostService now tracks each call's own fetch in
+  a `Dictionary<int, Task> _inFlight` under the existing `_cacheLock`
+  (deciding which ids are fresh/in-flight/uncovered and registering this
+  call's own fetch happen in one atomic lock acquisition - splitting that
+  into two lock statements would reopen a duplicate-fetch window between
+  two overlapping callers' decide phases; the lock is never held across
+  an await). A second overlapping caller joins the first caller's fetch
+  instead of starting its own; a caller whose entire request is
+  satisfied purely by joining also correctly sees a thrown error if that
+  joined fetch fails totally (not just a caller with its own failed
+  batch). TTL semantics are byte-identical for the single-caller case
+  (same batch order/count/timing as before - batches are still fetched
+  strictly sequentially per call). Combined in the same method with F2's
+  per-batch degradation, since both touch GetPricesAsync's fetch loop.
+- 31c-2 (NiceToHave, DEFERRED to M38): `_cache` has no eviction policy -
+  every item id ever priced during the module's process lifetime stays
+  resident forever (refreshed in place on next access, never removed).
+  Bounded and unlikely to matter at current GW2 item-id cardinality;
+  accepted as an M38 candidate (a periodic sweep evicting entries older
+  than a multiple of CacheTtl, or a simple LRU/size cap) rather than
+  built speculatively this milestone.
+
+Tests: `SnapshotEpochGuardTests` (pure guard logic, mirroring
+`StatusUpdateGuardTests`), `TradingPostServiceTests` (+5: single-flight
+coalescing, overlapping-id coalescing, one-batch-fails degradation,
+all-batches-fail throw, a joining-only caller also seeing a total
+failure), `ItemMetadataServiceTests` (+2: first-wave batch failure
+healed by the retry wave, first-wave total failure throws),
+`CraftingPlanPipelineTests` (+1: a failed learned-recipe fetch degrades
+to null without aborting the plan), `Gw2RecipeApiClientHttpTests` (new
+file, 8 tests: 200/404/500 for both endpoints plus a genuine
+cancellation-propagation proof for each, mirroring the established
+`Gw2ApiClient404Tests`/`CurrencyMetadataServiceTests` StubHandler
+pattern), `SnapshotFetchFailedExceptionTests` (message construction -
+`Gw2AccountSnapshotService` itself is Blish/Gw2Sharp-coupled and cannot
+be exercised per the repo's tests-must-never-reference-Blish-HUD
+invariant; its non-persistence behavior is verified by construction
+instead, documented in that test file), `RecipeServiceTests` (+1,
+fix-pass finding: a 404'd recipe option is skipped and does not poison
+the persistent overlay cache, exercised against a real
+`OverlayRecipeCacheStore` backed by a temp directory per the repo's
+real-storage-testing convention). Module.cs/CraftingPlanView.cs's own
+fixes are Blish-coupled and verified by construction + code comments
+rather than a fake seam, per repo convention (no Module.cs/
+CraftingPlanView.cs unit tests exist or were added). 876 tests total (up
+from 854), 0 Blish HUD/Gw2Sharp references added to tests.
+
+Note: m37-homestead's diff (a separate in-flight worktree, out of scope
+for these three audits) gets its own small delta-audit before the
+desktop wave - the orchestrator handles scheduling that, not this
+session.
+
+## 32. StyleCop analyzer debt: SA1101/SA1200 suppressed, smaller rules tracked (M38 WP-02)
+A code-review finding on the WP-02 ruleset (473a9e9) caught that its stated
+purpose - "suppresses only the rules that actively fight this codebase's
+documented, deliberate house style; everything else stays at default severity
+so drift gets caught for free" - was false for the two highest-volume
+default-severity rules, and that the commit's own claim to have "reported
+separately" the resulting pre-existing-violation counts pointed at nothing
+(this entry is that report). A forced-recompile diagnostic build (`dotnet
+build GW2CraftingHelper.csproj -p:Platform=x64 -t:Rebuild`) measured:
+
+- SA1101 (prefix local calls with this): 1467 warnings across 46 of 118
+  compiled files. No call site anywhere in the codebase uses this-
+  qualification, so the rule was fighting an established convention, not
+  catching drift against one.
+- SA1200 (using directive must appear within the namespace): 364 warnings
+  across 93 of 118 files (79%). Usings are placed outside the namespace
+  everywhere, the opposite of what the rule wants.
+
+Together these two rules were 61% (1831/2978) of every warning the ruleset
+produced on a clean build - loud enough to bury the 39% that is real,
+actionable drift. Both are now suppressed in `GW2CraftingHelper.ruleset` with
+the same style of inline rationale as the pre-existing SA1309 suppression,
+for the same reason: they contradict the codebase's actual, near-universal
+convention rather than catching drift against it.
+
+The remaining default-severity rules with a non-trivial pre-existing
+footprint (measured on the same rebuild; left enabled per WP-02's original
+scope, which only committed to preserving SA1500/one-statement-per-line/
+using-order at default severity) are recorded here as candidates for a
+future cleanup wave - not suppressed and not fixed in this change:
+
+- SA1413 (trailing comma in multi-line initializers): 253 warnings / 45 files.
+- SA1516 (blank line required between members): 174 warnings / 49 files.
+- SA1503 (braces should not be omitted): 123 warnings / 20 files.
+
+None of this is a behavior change - severity stays warning, never error, per
+WP-02's design; only the suppression list and this doc entry changed.
+
+## 33. Astral Acclaim package: Wizard's Vault seasonal purchase cap seeding (P2 tooling + data; P3 rotation docs) (2026-07-22)
+Follow-up to item 28's DEFERRED note on "Has seasonal purchase cap" - the
+wiki's fifth cap-related SMW property (alongside daily/weekly/character/
+total), confirmed real and populated in M37 but left unseeded because no
+consuming model existed. This package seeds it end to end for the one
+place it is actually used (see below) while explicitly deferring runtime
+consumption to a later package.
+
+Tooling (additive only, mirrors the daily/weekly cap plumbing from item
+28 exactly): `WikiSmwClient.PrintoutSuffix` gained `|?Has seasonal
+purchase cap`; `WikiVendorResult`/`VendorOffer` (both the tool's and the
+runtime `Models/VendorOffer.cs` copy) gained a nullable `SeasonalCap`
+int, same empty-array-means-null parsing as daily/weekly; `ConvertToOffer`
+threads it through; both `VendorOfferHasher.ComputeOfferId` copies (tool
+and runtime) gained a `seasonalCap` parameter appended AFTER
+`homesteadTier` (not between it and `weeklyCap`) specifically so every
+pre-existing positional caller - including ones already passing
+`homesteadTier` - keeps meaning exactly what it meant before. Per item
+28's own established precedent, this is NOT a backward-compatible-hash
+change: any offer's `OfferId` changes the first time it is recomputed
+with this code, whether or not its own seasonal cap is null. New tests
+mirror the existing daily/weekly cases in `WikiSmwClientTests`,
+`ConvertToOfferTests`, and both `VendorOfferHasherTests` copies. Checked
+for a Wave A WP-19 cross-suite parity fixture per the task brief - none
+exists yet (WP-19 has not landed in this repo as of this package), so
+nothing needed updating there.
+
+**Runtime consumption deliberately NOT wired** - `TimegatedCapType` (see
+`Models/TimegatedItem.cs`) still has only `Daily`/`Weekly`, and
+`PlanSolver`/`FinalizeVendorBatches` were not touched. A Wizard's Vault
+offer's `SeasonalCap` is seeded for future use but produces no
+`TimegatedItem`/notice today. Adding `TimegatedCapType.Seasonal` and
+wiring it through the solver's notice machinery is a later package (M38
+WP-15 must land first, per the orchestrating session's explicit
+constraint).
+
+**Data seeding (scoped, reviewable)**: used the `--query`/`--merge-into`
+mechanism item 24 established, scoped to `[[Has vendor::~Wizard's
+Vault*]]` - a prefix wildcard that structurally matches all three
+Wizard's Vault NPC pages (current, `/Historical Astral Rewards`,
+`/Legacy Rewards`). A live wiki-wide probe (`[[Has seasonal purchase
+cap::+]]`, no vendor filter) confirmed the property itself is actually
+populated on only TWO of those three pages (29 rows total: `Wizard's
+Vault` and `.../Historical Astral Rewards`; zero on `.../Legacy
+Rewards`) - nothing elsewhere on the wiki carries it, so those 29 rows
+are the complete set of what exists to seed. Correspondingly, this
+pass's `--query` run only actually reprocessed the `Wizard's Vault` and
+`.../Historical Astral Rewards` merchants (see Result below); `.../Legacy
+Rewards`, though matched by the wildcard pattern, came back with no rows
+this run, so its 18 pre-existing offers were left untouched and passed
+through byte-identical - confirmed by offerId-set comparison against
+the pre-PR baseline (same 18 offerIds, unchanged), which is meaningful
+because `ComputeOfferId`'s new `seasonalCap` parameter is appended
+unconditionally and would have changed the hash of anything actually
+reprocessed. Why the wildcard query didn't return `.../Legacy Rewards`
+rows this run is not established; recording it here as a known follow-up
+for whoever next refreshes Wizard's Vault data, rather than assuming
+that page's offers are current as of this pass. Found and worked around
+a real tool gap while doing this: a combined `--query`+`--merge-into`
+run only stays scoped for `ref/vendor_offers.json` when
+`ref/wiki_vendor_cache.json` does not
+already contain the full baseline - `Program.cs`'s Step 2 reassigns its
+working `wikiResults` list to the FULL post-merge cache before Step 4
+converts it to offers, so with the real (62,926-row) cache present, a
+"scoped" run actually reconverts and rehashes every cached row (measured:
+52,154 removed / 54,945 added, spanning 2,088 merchants, on a first
+attempt) - the opposite of a reviewable diff. Worked around without
+touching `Program.cs`'s merge logic: ran the scoped query once with
+`ref/wiki_vendor_cache.json` temporarily moved aside (so Step 4 only ever
+saw the 121 freshly-queried WV rows) to get a correctly-scoped
+`ref/vendor_offers.json`, then ran the same query again with the real
+cache restored solely to regenerate a correctly-refreshed
+`ref/wiki_vendor_cache.json` (its own diff is NOT scope-minimal - every
+cached row gains a `SeasonalCap` key from the additive schema change,
+which is expected and harmless for a dev-only cache file), discarding
+that second run's `ref/vendor_offers.json` output. Recording this here
+as a real gap in the tool's `--merge-into` scoping guarantee for any
+future scoped run against a non-trivial existing cache; not fixed in
+`Program.cs` itself since this package's mandate was data + a narrow,
+additive model field only.
+
+Result: `ref/vendor_offers.json` 53,529 -> 53,536 offers (100 offers
+removed/replaced + 107 added, confined to exactly the two touched
+merchant names, `Wizard's Vault` and `Wizard's Vault/Historical Astral
+Rewards` - independently diff-verified by offerId set comparison against
+the pre-existing baseline). 28 of the 29 wiki-wide seasonal-cap rows now
+carry a real `SeasonalCap`, including the two task-named cases: Mystic
+Clover (19675) `seasonalCap=20` at 60 AA, Mystic Coin (19976)
+`seasonalCap=60` at 9 AA, both under merchant `Wizard's Vault`. The one
+gap: `Wizard's Vault#vendor11` (Lesser Essence of Gold, 700 AA,
+wiki-confirmed `seasonalCap=2`) hit a reproducible SMW property-chain
+resolution miss for `Sells item.Has game id` specifically within the
+combined 10-printout query (an isolated single-printout re-query for the
+same subobject resolved it correctly to game id 100233), so
+`ConvertToOffer`'s GameId>0 guard skipped it both times it was
+attempted. Rather than force a game id from the isolated re-query result
+(the two query shapes returning different results for the same live
+data is exactly the kind of gap item 28's own stale-sweep investigation
+found at scale - "~278 were SMW GameId-resolution misses" - not
+something to paper over), the pre-existing capless offer for this exact
+item/cost/merchant was preserved byte-identical rather than silently
+dropped (the touched-merchant remove-then-readd in `MergeIntoBaseline`
+would otherwise have lost it, since the fresh conversion never produced
+a replacement row for it). It will pick up its seasonal cap on a future
+re-scrape if the SMW resolution succeeds then. No cap value was invented
+for it.
+
+**Tier findings** (report-only, no code change - full investigation in
+`docs/research/aa-tier-findings.md`): confirmed the maintainer's premise
+that Bag of Coins (1 Gold) is the one genuinely tiered Wizard's Vault
+item. The wiki represents the two tiers as two entirely separate item
+pages/game ids, each its own independent vendor-table row - NOT one row
+with two prices: `Bag of Coins (1 Gold) (limited)` (game id 100878, 8 AA,
+`seasonalCap=100`, on the live `Wizard's Vault` page) and
+`Bag of Coins (1 Gold) (unlimited)` (game id 100595, 35 AA, uncapped,
+machine-readable only via the `/Historical Astral Rewards` page as of
+this writing - a wiki editorial gap, not a scraper bug, since the
+continuation tier is still live/purchasable in-game). The tier-1
+quantity limit is queryable via the ordinary `Has seasonal purchase cap`
+property, no separate mechanism. No model/solver change is needed to
+represent tiering: both rows are already independent `VendorOffer`s, and
+`PlanSolver`'s existing cheapest-offer selection already prefers the
+discount tier for free, the same way it already handles any other
+multi-vendor price competition.
+
+**P3 (Wizard's Vault rotation, docs-only)**: `tools/VendorOfferUpdater/
+README.md` gained a "Wizard's Vault Rotation" section documenting the
+season-boundary refresh reality and the exact scoped refresh command. No
+new code guard was added for distinguishing current-season vs
+historical/legacy offers - the existing `merchantName` convention
+(`Wizard's Vault` = current, `.../Historical Astral Rewards` = archived,
+`.../Legacy Rewards` = rotated-out cosmetics) already carries this
+distinction with zero new infrastructure, so adding a redundant field or
+helper would have been speculative. The general automated stale-offer
+sweep remains manual per item 28 (no tool exists); the README notes that
+any future sweep should only ever treat `Wizard's Vault` rows as
+"unexpectedly missing => investigate."
+
+DEFERRED note (item 28, "Character/total/seasonal purchase caps") is now
+partially superseded: `Has seasonal purchase cap` is seeded for Wizard's
+Vault as described above. `Has character purchase cap` and `Has total
+purchase cap` remain fully unseeded and unmodeled - the module still has
+no account/character concept at all - left for a future milestone's own
+design pass, unchanged from item 28's original note.
+
+**Runtime consumption wired (follow-up package, AA P2 runtime half)**: the
+"deliberately NOT wired" note above is now superseded. `TimegatedCapType`
+(`Models/TimegatedItem.cs`) gained a `Seasonal` member, and
+`VendorBatchSolver.FinalizeVendorBatches` now checks `SeasonalCap`
+independently of Daily/Weekly (not folded into the same "pick one" cap
+variable), so an offer carrying both a Seasonal cap and a Daily/Weekly cap
+surfaces BOTH notices when both are exceeded - mirroring the existing
+Daily/Weekly warn-only semantics exactly (never gates or reroutes the
+solve; an explicit 0 still means uncapped). `PlanViewModelBuilder`'s
+notice wording gained a third branch: `"{Item} is timegated - Season
+limit: N (plan needs M)"` (the noun "Season", matching gw2e's own
+Wizard's Vault wording, not the adjective "Seasonal"). Covered in
+`PlanSolverTests` (exceeds cap, within cap, zero-cap-is-uncapped,
+Seasonal+Weekly both-reported, and a cap-never-changes-decisions
+regression guard - including one case through the real currency-
+valuation comparable-tier path, since live Wizard's Vault offers are
+priced in unvalued Astral Acclaim and are only ever selected when the
+user supplies a `CurrencyValuation` for it) and `PlanViewModelBuilderTests`
+(Season wording). No seed data changes.
+
+## 34. Dead live-wiki vendor-offer resolver removed (M38 WP-10)
+`Services/VendorOfferResolver.cs` (a rate-limited, retrying, concurrency-
+bounded live wiki-lookup client), `Services/IWikiVendorClient.cs`,
+`Services/WikiLookupOptions.cs`, and `Models/ResolveResult.cs` - plus their
+sole test file (`VendorOfferResolverTests.cs`) and test double
+(`InMemoryWikiVendorClient.cs`) - have been deleted. This subsystem
+implemented an earlier, pre-seed-era design (resolve missing vendor offers
+live from the wiki at plan-generation time) that was superseded by the
+static seed-store path (`VendorOfferLoader`/`VendorOfferStore`, populated
+offline by `tools/VendorOfferUpdater`) and never wired into production:
+`Module.cs` always constructed `CraftingPlanPipeline` with `resolver: null`
+(confirmed before deletion: `grep -rn "new VendorOfferResolver"` outside
+`tests/` returned zero hits anywhere in the repo, and `IWikiVendorClient`
+had no production implementer), so the `_resolver`-guarded branches in
+`CraftingPlanPipeline`'s three `Generate*Async` methods were unreachable by
+construction. The `resolver` constructor parameter, `_resolver` field, and
+the three dead `if (_resolver != null && _vendorOfferStore != null)` guard
+blocks (each wrapping a "Resolve missing vendor offers" pipeline step that
+could never run) were removed along with the always-empty step itself; the
+adjacent "Query vendor offers" step absorbs its old step number in each of
+the three methods. This also removes the always-null seam's timing-log
+entry and progress message ("Resolve vendor offers" / "Resolving vendor
+offers..."), the one intentional observable-output change this deletion
+makes - the three tests asserting the pipeline's phase sequence
+(`CraftingPlanPipelineTests`, `ZojjasClaymoreValidationTests`) were updated
+to match. M37's homestead work had added a guard comment inside
+`VendorOfferResolver.ConvertToVendorOffer` (never invent a `HomesteadTier`
+for a wiki-scraped row); nothing outside the deleted files referenced any
+of this subsystem's types except a one-line mention in `TempDirectory.cs`'s
+doc comment (updated) and historical, point-in-time research/archive docs
+(`docs/research/m37-r4-vendor-caps.md`, `docs/research/m37-r5-audits.md`,
+`docs/archive/plans/2026-02-15/milestones-phase-b.md`) left as-is since they
+correctly describe the state of the world when they were written.
+
+Dissent (recorded per the M38 plan's reviewer gate): the architecture
+analyst argued for keep-and-comment instead - retain the seam as a
+documented, intentional always-null dependency rather than delete it,
+since it also removed the suite's single largest runtime cost (real
+`Task.Delay` retry/backoff waits in `VendorOfferResolverTests` were ~32% of
+total wall time; the module test suite's measured `dotnet test` duration
+dropped from 5s to well under 1s after this change with an identical
+0-failed/0-skipped count minus the 10 deleted tests). The simplify and
+csharp analysts both independently confirmed the subsystem is runtime-dead.
+Deletion is a clean `git revert` away if a live-wiki resolve mode is ever
+wanted again - the revert restores the seam, its tests, and the guard
+branches exactly as they were.
+
+## 35. M39 module log system: WP-16/WP-17 subsumption + JSONL/rotation rationale (FIXED in M39)
+Two bookkeeping gaps a code-review finding on the M39 log-system PR caught:
+the PR fully implements m38-cleanup-plan.md's WP-16 and WP-17 (confirmed via
+diff), but neither that plan nor this file recorded the subsumption, so a
+concurrent branch or a future session reading the plan could duplicate the
+work; separately, the log-system design proposal itself asked whichever PR
+implemented it to record its own "why JSONL, why these caps" rationale here,
+which had not been done anywhere in the diff either. This entry closes both.
+
+**WP-16 (M38 Wave D) - CLOSED.** An `onError` callback was added to every
+store's constructor, wired (in Module.cs) to append a Warn entry to the new
+ModuleLog instead of the previous silent `Debug.WriteLine`:
+- `SnapshotStore` (also switched its own `Save` to the atomic
+  `.tmp` + `File.Replace` pattern `StatusStore`/`VendorOfferStore` already
+  used, closing a separate pre-existing gap the same proposal flagged).
+- `StatusStore`
+- `VendorOfferStore`
+- `Services/Recipes/OverlayRecipeCacheStore`
+
+**WP-17 (M38 Wave D) - CLOSED.** All six bare `catch` blocks in Module.cs
+were converted to `catch (Exception ex)` with a matching ModuleLog/Logger
+call (the recipe-seed and recipe-seed-manifest sites' own doc comments
+record why those two stay deliberately silent beyond that logging - a
+missing seed file is an expected, already-handled fallback, not a failure).
+`Module.Unload`
+now also calls `CraftingPlanView.StopLiveTickers()` to cancel the
+scroll-verify/resize-debounce/wheel-wrap-verify FrameTickers, which are
+parented to the SpriteScreen rather than the view's own control tree and so
+would otherwise keep running past module unload.
+
+**JSONL vs. one big JSON array (d2-log-system.md Section 4.1).** Every other
+persisted store (`SnapshotStore`/`StatusStore`/`VendorOfferStore`) uses the
+project's usual single-JSON-object-rewritten-atomically shape. The log store
+deliberately does not: a log is fundamentally append-heavy (potentially many
+writes per session, vs. one rewrite per store per session for the others),
+and a crash mid-write to one big JSON array can corrupt the entire file,
+whereas a crash mid-append to newline-delimited JSON (JSONL) loses at most
+the last, already-tolerated-as-partial line (`ModuleLogStore.ReadAll` skips
+a malformed trailing line rather than aborting the read). Property names on
+the wire are also short (`t`/`lvl`/`tag`/`msg`) rather than descriptive,
+specifically because this file is written far more often than any other
+persisted file in the module, so every byte compounds across the retention
+window.
+
+**Size and age rotation caps (d2-log-system.md Section 4.2/Section 6).** Two
+independent, independently-configurable caps, both defaulting to a
+deliberately conservative value:
+- Size (`LogMaxSizeBytes`, default 2 MB): checked on every file-sink append;
+  once exceeded, the oldest ~25% of lines (by count) are dropped and the
+  file rewritten atomically. Framed in the design as "a hard backstop even
+  if a user forgets diagnostics is on, not just a soft preference" - the
+  goal is to make it structurally impossible for this feature to become the
+  "endless crap on disk" problem it was commissioned to prevent, without
+  requiring the user to remember to turn diagnostics back off.
+- Age (`LogRetentionDays`, default 14): enforced once per session
+  (`Module.Initialize`, before the ring is seeded from disk) rather than on
+  every write, since age-based pruning does not need per-write cost.
+
+Both are user-configurable from the Settings tab (1-1000 MB / 1-365 days,
+enforced by `SettingsInputParser`) and are now additionally clamped at their
+Module.cs/SettingsTabContent consumption sites (`ModuleSettings.
+GetClampedLogMaxSizeBytes`/`GetClampedLogRetentionDays`) against a
+hand-edited, out-of-range persisted settings value silently disabling either
+cap for a whole session - the same defense-in-depth precedent
+`GetHomesteadEfficiencyTiers`'s own `ClampTier` already established for a
+different setting.
+
+Also fixed in the same pass (a related, not-yet-filed threading defect the
+same review found): `ModuleLog.Write` used to perform the file-sink append
+and, when the size cap tripped, the resulting full read+rewrite trim
+synchronously on whichever thread called it - including the main/UI thread,
+since the high-volume `[scrolldiag]` Debug channel (see #12/#14 above) calls
+`Write` from inside `CraftingPlanView`'s frame-timing-sensitive scroll-verify
+loop. The file sink now goes through a single-consumer background flush
+queue (order-preserving) so `Write`, `Version`, and `Snapshot` can never
+block behind file IO regardless of the caller's thread.
+
+## M37 desktop-wave observations (2026-07-22)
+Open notes from the live desktop session that verified items 29 and 30
+above (screenshot loop on the merged M37 build over the isolated
+preflight profile). Expected-until-checked style, per this file's own
+convention - not new backlog items in their own right.
+
+(a) Snapshot tab shows "No snapshot available. Click Refresh Now." for a
+DISK-RESTORED snapshot until a live API refresh runs: MainView is
+constructed before Module.LoadAsync calls SnapshotStore.LoadLatest, and
+SetSnapshot only fires from the pending-refresh drain - the generate
+path correctly uses _currentSnapshot (proven by this session's own
+owned-materials run, item 29 above), so this is cosmetic display
+staleness only. M38 cleanup candidate.
+
+FIXED in M38: Module.LoadAsync now routes a successfully loaded disk
+snapshot through the same _pendingSnapshot/_snapshotDirty drain the
+network-refresh path already used, committed through the same
+SnapshotCommitGate epoch check FetchAndSaveSnapshotAsync uses - a Clear
+Cache racing the disk load discards it exactly like it already did for a
+racing network fetch (KNOWN-ISSUES 31a-F1), so no interleaving was
+introduced. The Snapshot tab now shows a disk-restored snapshot
+immediately, without waiting for a live refresh.
+
+(b) A single wheel event carrying a multi-notch delta (raw -1440, sent by
+an automation tool as one mouse_event) is observed by [scrolldiag] but
+produces no scroll movement, while discrete -120 events step normally.
+Distinct from the M36 wheel-wrap bug (negative deltas are clean here);
+appears to be stock Blish sign-only single-step handling where the step
+did not land. Automation guidance: use discrete per-notch events. Low
+priority; not obviously user-reachable with real hardware.
+
+(c) The item 26 verification seed (Infinite Trebuchet Blueprint, 103980)
+is NOT surfaced by the item-search suggestions, so the COUNTED ELSEWHERE
+pill has not yet been SEEN rendering live (the behavior and the pill are
+already unit-tested through the real pipeline per item 26's own
+resolution note; the search-provider filter criteria for
+achievement-discipline recipes were not investigated this session).
+Follow-up: either make the seeded blueprint searchable or verify the
+pill via a Harness-driven render if desired.
+
+(d) BONUS live verifications landed this session, beyond items 29/30's
+own scope: the vendor purchase-cap notice rendered for the first time
+ever - "Glob of Ectoplasm is timegated - Weekly limit: 1 (plan needs
+86)" (item 28's seeded Candy Corn Weekly cap flowing correctly through
+the M34 warn-only machinery, live, for the first time; this particular
+plan's occurrences did not trigger item 24's separately-documented
+Conflict-suppression limitation, which remains an accepted, unfixed
+gap for the conflicting-offers case per item 24's own regression tests -
+not something this observation resolves or contradicts); item 25's
+batch economics verified in BOTH gating states
+(all-bound batch Exordium+Gift of Fortune -> no tiles/banner, correct per
+the NetSaleValue.HasValue gate; mixed batch Exordium+Orichalcum Ingot ->
+four tiles including "Sell value 2s37c" and "Loss if sold" plus the
+banner row); item 27's "Decisions updated (0 override(s))" status
+confirmed live on an ignore round-trip that also re-verified tree-wide
+ignore economics (4000x Unbound Magic row disappearing/reappearing,
+totals 2099g<->1930g exact); item 24's Settings-tab Homestead Refinement
+section renders with per-material tier inputs defaulting 0 and no
+internal ids. These are recorded here rather than reopening items 24/25/
+27/28, whose own mechanism resolutions already stand - this is
+additional live confirmation layered on top, not a correction to any of
+them.
+
+## DEFERRED (recorded, not M37 scope)
+- Localization (en/de/fr/es via API lang param): user-deferred backlog,
+  "not core functionality". Full-milestone scale when picked up.
+- Upstream Blish HUD issue/PR for the wheel-delta wrap: REMOVED from the
+  backlog entirely by user decision (2026-07-22) - no upstream posts are
+  planned. The module-side sanitizer stays until a fixed Blish release
+  ships, then can be retired at leisure.
+- Ignore-pill cascade semantics + own-materials gating divergences
+  (#20.4): revisit only on user feedback.
+- Multi-item row reordering (gw2e moveRecipe): out of scope per M35.
+- Skirmish Merchant-family wiki page split (#28, 18 offers): Skirmish
+  Supervisor / Lionguard (Skirmish Merchant) / Mercenary (Skirmish
+  Merchant) wiki pages were restructured into /Armor, /Weapons, /Others
+  subpages; the items are still sold in-game under the split pages, but
+  the seed's merchant-page linkage is now stale-shaped. Missing-offer/
+  rename gap for a future re-scrape to follow up; not removed.
+- "Merchant (Untamed Crags)" vendor-page-name mismatch (#28, 1 offer):
+  the Hydrocatalytic Reagent / 50 Research Note offer's exact vendor
+  page no longer resolves on the wiki (no page, no redirect), while the
+  item and cost remain valid via other crafting-material vendors.
+  Deferred pending research into whether the page was renamed or the
+  original scrape mislabeled the vendor.
+- Wiki-drift missing-offers superset (#28, ~5,400 offers): M37's full
+  from-scratch re-scrape (for cap seeding) incidentally picked up new
+  Homestead recipes and unrelated vendor page changes beyond the
+  stale-offer-sweep scope. Discarded uncommitted; recorded here as a
+  candidate for a future dedicated "missing offers" pass.
+- Character/total purchase caps (#28): the wiki's "Has character
+  purchase cap" and "Has total purchase cap" SMW properties are real and
+  populated (confirmed in M37) but remain deliberately unseeded - the
+  module has no account/character concept at all. Left for a future
+  milestone's own design pass. ("Has seasonal purchase cap" is no longer
+  in this bucket - seeded for Wizard's Vault by item 33; its runtime
+  consumption is what's still deferred there, pending
+  `TimegatedCapType.Seasonal` / M38 WP-15.)
+- Homestead `HomesteadUnlocked` master gate (#24): gw2e has no "do you
+  even own Homestead" gate at all; this module echoes that (no gate),
+  matching v1's fixed design decision. A prior research draft flagged a
+  divergence option (default-off master gate, since this module runs
+  in-client for players who may never have touched Janthir Wilds) -
+  recorded as a future confirm-with-maintainer option, not implemented.
+- Homestead Black Market path (#24): 300 purchases of 25/week per
+  station, coin-only, tier-independent - confirmed still entirely
+  unseeded (the live re-scrape used for tier tagging failed wiki
+  game-id resolution for all 30 Black Market rows across the three
+  stations). A future milestone could seed these as plain vendor
+  offers once that resolution gap is separately investigated.
+
+## WP-26 (scroll/resize/wheel controller move): CUT (M38 scope decision, 2026-07-23)
+The M38 plan marked WP-26 cut-first. Orchestrator decision: CUT. Rationale:
+(1) the single riskiest change in the repo with purely organizational payoff;
+(2) the frame-timing/subscription-order guarantees it would relocate are
+asserted by construction, not tests, so a regression would only surface live;
+(3) WP-21/WP-23a-d/WP-25 already cut CraftingPlanView from 4802 lines
+(plan-authoring baseline) to 2802 lines measured post-WP-25 (down from 3558
+pre-WP-25) - real progress, but still 802 lines (40%) over the plan's own
+explicit 2000-line target, not under it; (4) the machinery is fully
+region-mapped with KNOWN-ISSUES anchors (#12/#13/#14/#19/#23) and navigable
+in place; (5) the acceptance gate would require a human drag-resize pass
+(synthetic drags proven unreliable), a disproportionate verification cost
+for a move-only change. The
+ReplayRelayout SuspendLayout/ResumeLayout MEASURE-FIRST item existed to
+precede WP-26 and downgrades to an optional Nice-to-Have perf close-out.
+
+## WP-25: Recipe Tree section + override loop extracted to TreeSectionController (M38)
+SCOPE: `Views/Rendering/TreeSectionController.cs` (new) - `TreeNodeState`,
+`CreateTreeSection`, `RenderTreeNode`, `RefreshTreeContainerHeights`,
+`UpdateTreeRowTooltip`, `ApplyPreset`, `ApplyOverridesAndResolve`,
+`RenderDecisionPills`, and the `_nodeOverrides`/`_ignoredItemIds`/
+`_nodeExpansion`/`_lastResult`/`_treeNodeStates`/`_treeRoots`/`_treeFlow`
+fields all moved verbatim out of `CraftingPlanView`'s "8. Tree rendering"
+regions and its former "9. Decision pills" region. Unlike WP-23/WP-23b/
+WP-23c/WP-23d/WP-24's stateless per-render renderers, this component owns
+application state that must survive local re-solves (a pill click never
+rebuilds `_nodeOverrides`/`_ignoredItemIds`/`_nodeExpansion`), so it is
+constructed ONCE (in `CraftingPlanView`'s own constructor) and held as a
+persistent `_treeController` field, not freshly instantiated per render
+like the six earlier renderers.
+
+COLLABORATOR DELEGATES: because this controller does more than register
+relayout closures, its constructor takes several plain delegates beyond
+`ISectionRelayoutSink` and the `resolveOverridesSync` func the view already
+received: `preserveScrollAcross` (bound to `PreserveScrollAcross` -
+DO-NOT-TOUCH #3, untouched, still lives on `CraftingPlanView`, only invoked
+through the delegate), `setStatus` (bound to `SetStatus`), `renderPlan`
+(bound to `RenderPlan`, for the override-resolve full rebuild),
+`getCurrentPanelWidth` (bound to `GetCurrentPanelWidth`),
+`getCurrentPlan`/`setCurrentPlan` (small lambdas over the view's
+`_currentPlan` field - no existing accessor method to bind),
+`setLastDebugLog` (same, over `_lastDebugLog`), and `createSectionHeader`
+(a lambda wrapping the view's private `CreateSectionHeader`, unpacking its
+private `SectionHeaderHandle` return into a plain `(Panel, Label,
+FlowPanel)` ValueTuple so that private nested type's own accessibility
+never needs to change).
+
+NON-MOVE EDITS (every one, per the package's own review requirement):
+1. `ISectionRelayoutSink` gained a read-only `RelayoutCount` member.
+   `CreateTreeSection`'s DEBUG must-register assert used to read
+   `_relayoutActions.Count` directly (a `CraftingPlanView` private field);
+   every earlier extracted renderer's equivalent assert stayed inside
+   `CraftingPlanView.CreateCollapsibleSection` (which still has direct
+   field access), so this is the first extraction that needed the count
+   exposed through the seam itself.
+2. `RenderTreeNode`'s cost-cell currency lookup
+   (`_currentPlan?.CurrencyMetadata`) now calls the injected
+   `getCurrentPlan()` delegate - identical value at every call site, since
+   `_currentPlan` is always already set to the exact view model this
+   render pass is building before `RenderPlan` (and therefore
+   `CreateTreeSection`) ever runs.
+3. `CraftingPlanView.RenderPlan`'s top-of-method reset
+   (`_treeNodeStates.Clear(); _treeRoots = null; _treeFlow = null;`)
+   became `_treeController.ResetTreeRenderState()`; `TriggerGenerate`'s
+   fresh-generation reset (`_nodeOverrides.Clear(); _ignoredItemIds.Clear();
+   _nodeExpansion.Clear(); _lastResult = result;`) became
+   `_treeController.ResetForNewPlan(result)`. Two methods, not one,
+   because the reset shapes differ: the first runs on EVERY `RenderPlan`
+   call (fresh Generate and override-resolve re-renders both go through
+   it); the second runs only once per genuinely new Generate.
+4. `CreateTreeSection`'s `CreateSectionHeader(..., suppressToggle: () =>
+   pressStartedOnButton)` named argument became a positional argument
+   against the injected `Func<...>` delegate (a bare `Func` has no
+   parameter names of its own to match against) - same value passed,
+   compile-only necessity.
+
+DIFF EVIDENCE: whitespace-insensitive (`diff -w -B`) comparison of every
+moved member (`TreeNodeState`, the `_nodeOverrides`/`_ignoredItemIds`/
+`_nodeExpansion` field group, `_treeNodeStates`/`_treeRoots`/`_treeFlow`,
+`CreateTreeSection`, `ApplyPreset`, `ApplyOverridesAndResolve`, the tree
+layout constants, `RefreshTreeContainerHeights`, `RenderTreeNode`,
+`UpdateTreeRowTooltip`, `RenderDecisionPills`) against its pre-move body in
+the origin/master (PR #93, `fa8b677`) copy of `CraftingPlanView.cs`: every
+field declaration and its doc comment is byte-identical; `TreeNodeState`
+and `UpdateTreeRowTooltip` are byte-identical (neither touches any
+moved-out-of-scope view state); every other moved method differs only in
+the specific substitutions enumerated above (this-> `_sink`,
+`PreserveScrollAcross`/`SetStatus`/`RenderPlan`/`GetCurrentPanelWidth` ->
+their delegate equivalents, `_currentPlan` -> `_getCurrentPlan()`,
+`_lastDebugLog =`/`_currentPlan =` -> the `_setLastDebugLog`/
+`_setCurrentPlan` delegate calls) plus the added "Moved verbatim from
+CraftingPlanView.X" doc comments - no other line differs. A full
+state-ownership table (field -> old home -> new home -> current
+reader/writer) accompanies the PR/session record.
+
+DO-NOT-TOUCH compliance: `git diff --stat` against origin/master confirms
+zero changes to `Services/PlanContentHeightMath.cs`,
+`Services/PlanRelayoutMath.cs`, and `Views/Rendering/LabelHelpers.cs`;
+`StatusUpdateGuard`/`MainThreadMarshal`/`FrameTicker`/`WheelDeltaSanitizer`
+are not referenced by `TreeSectionController` at all. `PreserveScrollAcross`
+(DO-NOT-TOUCH #3) is untouched on `CraftingPlanView` - only invoked through
+the new delegate, same body, same call sites' relative order (Best
+Path/Craft All/Buy All all funnel through `ApplyOverridesAndResolve`'s
+single `_preserveScrollAcross(() => _renderPlan(vm))`; Expand All/Collapse
+All/the row toggle handler each wrap their own mutation in
+`_preserveScrollAcross(...)` exactly as before).
+
+WP-26 scope: see the CUT record above, appended to this file on this same
+branch per the M38 plan's own cut-first flag.
+
+VERIFICATION STATE: suites green - `GW2CraftingHelper.Tests` 1101/1101 (0
+failed, 0 skipped, matching the pre-change floor exactly);
+`VendorOfferUpdater.Tests` 135/135 (0 failed, 0 skipped). Build: `dotnet
+build GW2CraftingHelper.csproj -p:Platform=x64` - 0 errors. This view has
+no automated test net, so green tests prove only that nothing else broke -
+not that tree rendering or the override loop behave correctly. Live
+pre-merge visual verification (pill-click override round-trip, Ignore-pill
+round-trip and its subtree-skip economics, Best Path preset, Expand/Collapse
+persistence) is required per this package's `needsVisualLoop` gate (risk:
+high, per the plan's own WP-25 rationale - this is the one component that
+owns application state, not just presentation).
+Result: PASS (orchestrator, 2026-07-23, live branch-build session under
+the hardened desktop protocol, captures wp25_01/05/06/07/08/09/10/11 in
+C:/Dev/Blish/preflight/captures, fresh Exordium plan):
+- Tree render via TreeSectionController pixel-consistent with the
+  pre-move captures (rarity colors, decision/ignore pills, right-aligned
+  coin columns, preset button row).
+- Ignore-pill round-trip: IGNORE on 100x Shard of Exitare -> status
+  "Decisions updated (0 override(s))" (ignore correctly not counted as an
+  override), pills flip to HAVE + IGNORED, Total 2461g48s11c ->
+  2287g08s11c, the subtree's 4000x Unbound Magic currency row disappears
+  (tree-wide economics recomputed); un-ignore restores every value
+  byte-exactly (Total, currency rows, per-node costs).
+- Buy All preset: "Decisions updated (5086 override(s))", Total ->
+  2593g41s09c with per-node re-routes (optimal <= buy-all as required).
+- Best Path preset: distinct "Best path restored" status label (the
+  explicit isBestPathPreset flag, M37 item 27), Total and all per-node
+  costs byte-exact back to the original solve.
+- Expand All / Collapse All: collapse to root reflows the section
+  synchronously (Shopping List pulls up, no height gap); expand restores
+  the full tree incl. deep nodes.
+- Single-node pill-click override: Mystic Curio (multi-source row showing
+  CRAFT selected + TP + IGNORE side by side) clicked to TP -> "Decisions
+  updated (1 override(s))", TP pill selected/green, CRAFT deselected, and
+  the 1s per-100 cost delta propagates up the ancestor chain (Curio
+  38g40s -> 38g41s, Shard 87g20s -> 87g21s, Total 2461g48s -> 2461g49s) -
+  also confirming the solver's original craft choice was strictly cheaper.
+  Craft-only rows (Shard of Exitare, Deldrimor Steel Greatsword Hilt)
+  correctly no-op when their already-selected CRAFT pill is clicked.
+- Zero "registered no relayout" DEBUG warnings and zero WARN/ERROR lines
+  in the session log.
+- Bonus packaging data point (WP-27): this branch's worktree post-dates
+  PR #92's untracking of the dev-only ref/ caches, so its .bhm is 6.0MB
+  vs the prior 7.2MB and the module loaded and ran the full interaction
+  gate without them - confirming the caches are not needed at runtime.
+
