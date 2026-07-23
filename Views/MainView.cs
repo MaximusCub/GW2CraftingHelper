@@ -819,8 +819,11 @@ namespace GW2CraftingHelper.Views
         // formatting choice is unchanged from before this package,
         // deliberately, per the M38 plan's behavior-preservation-by-
         // default rule) via the shared CoinCurrencyRenderer.AddSegmentSpec
-        // (bumped private -> internal for this reuse, mirroring the WP-21-
-        // prep GetPillColors bump) and hands it to LayoutCoinSegments with
+        // (bumped private -> internal for this reuse - a normal forward
+        // MainView -> Views/Rendering consumer dependency; see the note at
+        // CoinCurrencyRenderer.AddSegmentSpec for why this is not the same
+        // precedent as the reverted GetPillColors bump) and hands it to
+        // LayoutCoinSegments with
         // startX = 0 (left-anchored) instead of the right-anchored
         // RenderValueCellRightAligned/MeasureValueWidth entry points
         // CraftingPlanView's mixed coin+currency value cells use - those

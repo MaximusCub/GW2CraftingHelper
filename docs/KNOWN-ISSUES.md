@@ -1204,8 +1204,12 @@ gold/silver/copper via plain `ToString()` - no leading-zero-unit
 omission, no zero-padding once a higher unit precedes: this formatting
 is an unchanged MainView behavior, not touched by this package) via
 `CoinCurrencyRenderer.AddSegmentSpec` (bumped `private` -> `internal` for
-this reuse, mirroring the WP-21-prep `GetPillColors` bump) and hands it
-to `LayoutCoinSegments` with `startX = 0` (left-anchored, MainView's
+this reuse - a normal forward MainView -> Views/Rendering consumer
+dependency, not the same precedent as the WP-21-prep `GetPillColors`
+bump, which was later reverted back to `private` specifically to avoid a
+reverse `Views/Rendering` -> `CraftingPlanView` edge; see the note at
+`CoinCurrencyRenderer.AddSegmentSpec`) and hands it to
+`LayoutCoinSegments` with `startX = 0` (left-anchored, MainView's
 existing panel layout).
 ANCHORING: no new parameter was needed on `CoinCurrencyRenderer`.
 `LayoutCoinSegments` already takes a caller-supplied `startX` and lays

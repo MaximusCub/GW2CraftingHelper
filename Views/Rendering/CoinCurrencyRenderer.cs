@@ -70,12 +70,22 @@ namespace GW2CraftingHelper.Views.Rendering
             return segments;
         }
 
-        // private -> internal (M38 WP-22, mirroring the WP-21-prep
-        // GetPillColors bump): MainView needs to build its own 3-segment
-        // gold/silver/copper spec list (its own show-all/no-padding
-        // formatting - a deliberate MainView behavior, out of this
+        // private -> internal (M38 WP-22): MainView needs to build its own
+        // 3-segment gold/silver/copper spec list (its own show-all/no-
+        // padding formatting - a deliberate MainView behavior, out of this
         // package's scope to change) without duplicating this measure-
         // and-wrap one-liner.
+        // NOTE: this is NOT the same precedent as the WP-21-prep
+        // GetPillColors private -> internal bump. That bump was reverted
+        // back to private (commit 5c56b2a) specifically to stop
+        // Views/Rendering from depending back on CraftingPlanView and keep
+        // Views/Rendering a true leaf layer; CraftingPlanView.GetPillColors
+        // is private static again on current master. This bump is
+        // different in kind: MainView -> Views/Rendering is a normal
+        // forward consumer dependency (a leaf class exposing a helper to a
+        // caller), not a reverse edge back into CraftingPlanView. Do not
+        // cite this as precedent for adding a reverse
+        // Views/Rendering -> CraftingPlanView dependency.
         internal static void AddSegmentSpec(List<CoinSegmentMath.CoinSegmentSpec> segments, BitmapFont font, int assetId, string text)
         {
             int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
