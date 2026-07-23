@@ -79,6 +79,7 @@ namespace GW2CraftingHelper.Services
     /// value is always 120; it is not user-configurable the way
     /// MouseWheelScrollLines is). Hardcoding 120 here is therefore a
     /// deliberate simplification, not a live-setting oversight.
+    /// <para>See docs/ARCHITECTURE.md section 2 (M38 WP-27).</para>
     /// </summary>
     public static class WheelDeltaSanitizer
     {

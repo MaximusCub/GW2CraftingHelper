@@ -26,6 +26,7 @@ namespace GW2CraftingHelper.Services
     /// race regardless of drain order. See
     /// CraftingPlanView.TriggerGenerate's statusProgress callback and its
     /// success/error MainThreadMarshal.Run callbacks.
+    /// <para>See docs/ARCHITECTURE.md section 6 (M38 WP-27).</para>
     /// </summary>
     public static class StatusUpdateGuard
     {

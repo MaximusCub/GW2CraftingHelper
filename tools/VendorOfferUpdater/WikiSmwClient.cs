@@ -13,6 +13,9 @@ namespace VendorOfferUpdater
     /// <summary>
     /// Queries the GW2 Wiki Semantic MediaWiki API for vendor offer data.
     /// Uses the action=ask endpoint with vendor-related properties.
+    /// See docs/ARCHITECTURE.md section 9 in the main module repo (data
+    /// pipeline: seeds, wiki scrapes, dev-only caches) for how this tool's
+    /// output feeds the shipped module (M38 WP-27).
     /// </summary>
     public class WikiSmwClient
     {

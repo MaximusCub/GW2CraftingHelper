@@ -22,6 +22,7 @@ namespace GW2CraftingHelper.Services
     /// AutoSize-replacement containers explicitly and to size the
     /// individual row Panels it creates, so the two paths cannot drift
     /// apart - mirrors ShoppingColumnMath's "one source of truth" shape.
+    /// <para>See docs/ARCHITECTURE.md section 4 (M38 WP-27).</para>
     /// </summary>
     public static class PlanContentHeightMath
     {

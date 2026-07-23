@@ -5,6 +5,11 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
+    /// <summary>
+    /// See docs/ARCHITECTURE.md section 9 (data pipeline: seeds, wiki
+    /// scrapes, dev-only caches) for where this fits in the offline
+    /// seed-generation pipeline (M38 WP-27).
+    /// </summary>
     public class VendorOfferLoader
     {
         private static readonly JsonSerializerOptions Options = new JsonSerializerOptions

@@ -20,6 +20,9 @@ using System.Threading.Tasks;
 // recommends, mirroring its 11-responsibility map. SA1124 exists to stop
 // regions hiding code from review, not to block a documented, plan-mandated
 // mapping pass; scoped to this file only, not the shared ruleset.
+// See docs/ARCHITECTURE.md sections 1, 3, and 5 for the durable rationale
+// behind this file's FrameTicker/scroll preserve-restore-verify machinery
+// and the M38 section-renderer decomposition (M38 WP-27).
 #pragma warning disable SA1124 // Do not use regions
 
 namespace GW2CraftingHelper.Views
