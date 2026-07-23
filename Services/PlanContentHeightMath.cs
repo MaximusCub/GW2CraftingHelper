@@ -39,7 +39,8 @@ namespace GW2CraftingHelper.Services
         // 34px rarity-framed icon (at y=1, then y=0 after this fix)
         // overflowing this row's own height - pre-existing negative
         // headroom made worse when M36 widened row dividers from 1px to
-        // 2px (see CraftingPlanView.CreateRecipeRow's own doc comment).
+        // 2px (see Views/Rendering/RecipesSectionRenderer.CreateRecipeRow's
+        // own doc comment - M38 WP-23c moved this out of CraftingPlanView).
         // 36 = 34px icon (y=0) + 2px divider, an exact, non-overlapping
         // fit, mirroring UsedMaterialRowHeight/ShoppingRowHeight's already-
         // correct 36.
@@ -86,11 +87,13 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// M34-B1 #3: a Crafting Steps section can now mix numbered
-        /// CraftStep rows (CraftStepRowHeight, via CreateCraftStepRow) with
+        /// CraftStep rows (CraftStepRowHeight, via
+        /// Views/Rendering/CraftStepsSectionRenderer.CreateCraftStepRow) with
         /// plain TimegatedNotice info rows (FallbackTextRowHeight, via the
-        /// shared CreateTextRow helper - see CraftingPlanView.
-        /// CreateCraftingStepsBody), so height is summed per-row rather than
-        /// assumed uniform.
+        /// shared Views/Rendering/TextRowRenderer.CreateTextRow helper - see
+        /// Views/Rendering/CraftStepsSectionRenderer.Render, M38 WP-23c:
+        /// renamed from CraftingPlanView.CreateCraftingStepsBody during the
+        /// move), so height is summed per-row rather than assumed uniform.
         /// </summary>
         private static int CraftingStepsBodyHeight(IReadOnlyList<PlanRowViewModel> rows)
         {
