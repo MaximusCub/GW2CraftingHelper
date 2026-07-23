@@ -122,8 +122,3 @@ dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj
 ## License
 
 [MIT](LICENSE)
-
-<!-- Author/byline: GitHub handle MaximusCub per manifest.json/repo ownership.
-     Display byline (real name vs handle) is unconfirmed pending the
-     maintainer's preference - do not assume "Lachlan Mulcahy" or any other
-     name belongs here without their sign-off. -->
