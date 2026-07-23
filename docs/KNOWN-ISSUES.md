@@ -1440,7 +1440,18 @@ scans, and a Shopping List row's source-tag tooltip/pill check - is being
 run by the orchestrating session per the M38 plan's `needsVisualLoop` gate
 (this package is invariant-adjacent per the same risk rating as the WP-23
 pilot). Result recorded here and in the PR before merge:
-[PENDING - the orchestrator fills in PASS/FAIL]
+PASS (orchestrator, 2026-07-22, live branch-build session, captures
+wp23b_06/07): Used Materials (4) rendered via UsedMaterialsSectionRenderer
+with the synthetic-snapshot consumptions exactly matching the M37
+reference (Augur's Stone 1x / Mystic Clover 30x / Stabilizing Matrix 30x /
+Mystic Runestone 100x, correct rarity colors and right-aligned counts);
+Shopping List (76) rendered via ShoppingListSectionRenderer with VENDOR
+tags, coin columns, currency cells (Tribute to the Exitare 20x/4000x with
+icons) and the M34 "N for M" bundle label ("1 for 10" on 1082x
+Philosopher's Stone) all correct; the M34 owned-currency tooltip renders
+through the extracted code ("Unbound Magic: 0 owned, 4000 needed");
+divider scan across both sections shows uniform 29/30 pitches with gaps
+only at the by-design isLast/section-seam boundaries
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
