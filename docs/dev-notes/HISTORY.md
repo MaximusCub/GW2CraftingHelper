@@ -26,12 +26,15 @@ sanitizer, and so on) without the full investigation narrative.
 implementing session" sections (originally after the "Carried follow-up
 resolved: caret glyphs" entry, and at the very end of the file) were
 deleted, not relocated. Both were session-continuity notes for an AI
-coding agent picking up the next unit of work - personal `C:\Dev\...`
-filesystem paths, desktop-automation screen coordinates and input-routing
+coding agent picking up the next unit of work - personal filesystem
+paths, desktop-automation screen coordinates and input-routing
 protocol, and orchestration/subagent notes - with no reader value once
 that work concluded. Everything else below, including every dated gate
-PASS record and its own inline path citations (e.g. capture file
-locations), is preserved exactly as written.
+PASS record, its capture IDs, and its verdict text, is preserved exactly
+as written; the handful of inline citations of the maintainer's personal
+development-machine directory paths were replaced with generic
+directory descriptions so no personal filesystem path remains in this
+public file - no other wording was touched.
 
 ---
 
@@ -1221,7 +1224,7 @@ being run by the orchestrating session, in parallel with this
 findings-fix pass, on the desktop session holding the user's direct
 automation authorization. Result recorded here and in the PR before
 merge: PASS (orchestrator, 2026-07-22, live Blish-over-Paint session on
-the branch build, captures wp21_02/04/05 in C:/Dev/Blish/preflight/captures):
+the branch build, captures wp21_02/04/05 in the local preflight captures directory):
 Total Cost coin tiles and all 7 currency rows render icons-right-of-numbers
 in correct metal/currency coloring; tree rows show correct rarity name
 colors and rarity icon frames with right-aligned coin columns; Shopping
@@ -1380,7 +1383,7 @@ confirmation that no DEBUG "registered no relayout closures" warning fires
 `needsVisualLoop` gate (this package is invariant-adjacent per WP-23's
 risk rating: medium-high). Result recorded here and in the PR before merge:
 PASS (orchestrator, 2026-07-22, live branch-build session, captures
-wp23_04/05 in C:/Dev/Blish/preflight/captures): the extracted
+wp23_04/05 in the local preflight captures directory): the extracted
 DisciplinesSectionRenderer produced a correct live section - this run's
 plan needed FOUR disciplines (Armorsmith 450 / Jeweler 225 / MysticForge
 0 / Weaponsmith 500; live prices pulled Jeweler in, exercising a row
@@ -1752,7 +1755,7 @@ orchestrating session per the M38 plan's `needsVisualLoop` gate (this
 package is invariant-adjacent per the same risk rating as WP-23/WP-23b/
 WP-23c). Result: PASS (orchestrator, 2026-07-23, live branch-build
 session under the hardened desktop protocol, captures wp23d_02/03/04/05/
-08/09/10/15/17/22 in C:/Dev/Blish/preflight/captures):
+08/09/10/15/17/22 in the local preflight captures directory):
 - Summary/Total Cost via SummarySectionRenderer in all three shapes: (a)
   single-item Exordium - Total tile + all 7 currency rows, layout-identical
   to the WP-21 merged-master reference (wp21_02_top.png), only live-price
@@ -2579,16 +2582,16 @@ USING-N-OWNED pills, owned-currency annotations, and the owned/needed
 shopping splits (M34 B2b) are unit-tested but have never been SEEN
 rendering. Method (no real API key needed): write a synthetic
 AccountSnapshot into the ISOLATED preflight settings data dir
-(C:\Dev\Blish\blish-preflight-settings\data - real SnapshotStore
-format; never touch the user's real Blish config) with Exordium-relevant
+(a dedicated local directory holding real SnapshotStore-format data;
+never touch the user's real Blish config) with Exordium-relevant
 stock (e.g. Mystic Coins, Elder Wood Logs, T6 mats, wallet Spirit
 Shards), enable Use Own Materials, generate Exordium, verify via the
 screenshot loop: partial-owned pills, full-owned HAVE, currency
 owned/needed annotations, and that totals shrink accordingly.
 
 VERIFIED in M37 (live desktop session 2026-07-22, screenshot loop on the
-merged M37 build over the isolated preflight profile; captures in
-C:\Dev\Blish\preflight\captures\m37_*.png). Actual snapshot written per
+merged M37 build over the isolated preflight profile; captures named
+m37_*.png in the local preflight captures directory). Actual snapshot written per
 this item's own method: 4 items (Augur's Stone, Mystic Clover,
 Stabilizing Matrix, Mystic Runestone) plus 50 Spirit Shards in the
 wallet, in the isolated preflight data dir - a narrower stock list than
@@ -2631,7 +2634,7 @@ helper (simulation-proven) but that section was never individually
 pixel-scanned - it is short and sits somewhere above Required Recipes
 (the M36b session never located it on screen). Locate it, scan at 2+
 scroll offsets with the committed scanner
-(C:\Dev\Blish\preflight\scan_dividers.py - methodology and verdict
+(scan_dividers.py - methodology and verdict
 reading documented in the script header; environment UI scale is 0.81
 so 32px rows pitch at ~25.9px).
 
@@ -3416,7 +3419,7 @@ high, per the plan's own WP-25 rationale - this is the one component that
 owns application state, not just presentation).
 Result: PASS (orchestrator, 2026-07-23, live branch-build session under
 the hardened desktop protocol, captures wp25_01/05/06/07/08/09/10/11 in
-C:/Dev/Blish/preflight/captures, fresh Exordium plan):
+the local preflight captures directory, fresh Exordium plan):
 - Tree render via TreeSectionController pixel-consistent with the
   pre-move captures (rarity colors, decision/ignore pills, right-aligned
   coin columns, preset button row).

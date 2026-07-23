@@ -59,8 +59,8 @@ Ignore controls, and the Total Cost breakdown:
 
 ![Crafting plan recipe tree with decision pills](docs/images/plan-recipe-tree.png)
 
-Used Materials and Shopping List sections with owned-materials reduction
-applied (item names tinted to show sourcing) and vendor-tagged shopping rows:
+Used Materials and Shopping List sections (item names colored by GW2
+rarity) with vendor-tagged shopping rows:
 
 ![Used Materials and Shopping List with owned materials](docs/images/plan-owned-materials.png)
 

@@ -32,7 +32,7 @@ and `CONTRIBUTING.md` for build/test/style basics.
 - `FrameTicker` (a private nested `Control` in
   `Views/CraftingPlanView.cs`) - drives a callback once per real engine
   frame via `Control.DoUpdate`, for work that must span multiple frames
-  (scroll restore/verify, resize-settle debounce).
+  (scroll verify, resize-settle debounce, wheel-wrap correction verify).
 
 **Why:** Blish HUD's XNA host installs no `SynchronizationContext`, so an
 `await` continuation resumes on a ThreadPool thread by default; any code
@@ -48,8 +48,11 @@ documented to fire at most once per real frame, which `QueueMainThreadUpdate`
 cannot guarantee under re-entrant re-queuing.
 
 **Where:** `Views/MainThreadMarshal.cs`; `FrameTicker` in
-`Views/CraftingPlanView.cs` (three instances are used: scroll restore,
-scroll verify, resize-settle debounce).
+`Views/CraftingPlanView.cs` has three live instances: `_scrollVerifyTicker`
+(scroll verify), `_resizeDebounceTicker` (resize-settle debounce), and
+`_wheelWrapVerifyTicker` (wheel-wrap correction verify, driving
+`ApplyWheelWrapCorrection` - see section 2). Scroll restore itself is
+applied synchronously, not via a ticker - see section 3.
 
 **Full history:** KNOWN-ISSUES items 1, 12, 13 (`docs/dev-notes/HISTORY.md`
 after the WP-27 split).
