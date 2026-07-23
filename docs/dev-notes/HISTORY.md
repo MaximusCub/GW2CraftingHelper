@@ -5,9 +5,10 @@ layer and solver: milestone-by-milestone bug reports, root-cause
 investigations, live-verification transcripts, and dated gate PASS
 records, from the M30 backlog through the end of M38. It was split out of
 `docs/KNOWN-ISSUES.md` during M38 WP-27 to keep the public issue tracker
-short; nothing below was reworded or summarized away in that split - this
-is the same text that used to be `docs/KNOWN-ISSUES.md`, verbatim, minus
-one deletion documented below.
+short; nothing below was summarized away in that split - this is the
+same text that used to be `docs/KNOWN-ISSUES.md`, verbatim, minus the
+handoff-notes deletion and the personal-path-citation rewording, both
+documented below.
 
 **If you're looking for current open issues, start at
 [`docs/KNOWN-ISSUES.md`](../KNOWN-ISSUES.md) instead** - it holds the

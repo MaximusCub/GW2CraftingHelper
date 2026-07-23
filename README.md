@@ -62,7 +62,7 @@ Ignore controls, and the Total Cost breakdown:
 Used Materials and Shopping List sections (item names colored by GW2
 rarity) with vendor-tagged shopping rows:
 
-![Used Materials and Shopping List with owned materials](docs/images/plan-owned-materials.png)
+![Used Materials and Shopping List sections with vendor-tagged shopping rows](docs/images/plan-owned-materials.png)
 
 ## Tabs
 
