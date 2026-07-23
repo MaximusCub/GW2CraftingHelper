@@ -327,6 +327,39 @@
     <Error Condition="!Exists('packages\MonoGame.Framework.WindowsDX.3.8.0.1641\build\MonoGame.Framework.WindowsDX.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\MonoGame.Framework.WindowsDX.3.8.0.1641\build\MonoGame.Framework.WindowsDX.targets'))" />
   </Target>
   <Import Project="packages\BlishHUD.1.3.0\build\BlishHUD.targets" Condition="Exists('packages\BlishHUD.1.3.0\build\BlishHUD.targets')" />
+  <!--
+    Override of BuildBlishHUDModule from the imported BlishHUD.targets above.
+    packages\ is NuGet-restored and gitignored, so it cannot carry a real fix;
+    this redefinition (same name, declared after the import, so it wins) is
+    identical to the original except the RefFiles Include below gains an
+    Exclude for the two dev-only, git-untracked VendorOfferUpdater caches so
+    they never end up in the shipped .bhm. See docs/RELEASING.md.
+  -->
+  <Target Name="BuildBlishHUDModule" AfterTargets="Build">
+    <!-- Remove existing bhm file -->
+    <Delete Files="$(BlishHUDModuleFilePath)" />
+
+    <!-- Copy manifest.json -->
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(OutDir)" />
+
+    <!-- Copy ref files -->
+    <ItemGroup>
+      <RefFiles Include="$(ProjectDir)ref\**" Exclude="$(ProjectDir)ref\wiki_vendor_cache.json;$(ProjectDir)ref\item_id_cache.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(RefFiles)" DestinationFolder="$(OutDir)ref\%(RecursiveDir)" />
+
+    <!-- Copy the whole output dir to a temporary subfolder so we can zip it without issues -->
+    <ItemGroup>
+      <OutFiles Include="$(OutDir)**" />
+    </ItemGroup>
+    <Copy SourceFiles="@(OutFiles)" DestinationFolder="$(BlishHUDModuleTempPath)\%(RecursiveDir)" />
+
+    <!-- Zip subfolder -->
+    <ZipDirectory SourceDirectory="$(BlishHUDModuleTempPath)" DestinationFile="$(BlishHUDModuleFilePath)" Overwrite="true" />
+
+    <!-- Remove the temporary subfolder -->
+    <RemoveDir Directories="$(BlishHUDModuleTempPath)" />
+  </Target>
   <ProjectExtensions>
     <VisualStudio>
       <UserProperties manifest_1json__JsonSchema="" />

@@ -9,9 +9,7 @@ with the tools already in the repo.
 
 ## How a `.bhm` is actually produced
 
-A `.bhm` file is not produced by any custom step in this repo's own
-`GW2CraftingHelper.csproj` - there is no hand-written pack/zip target here.
-It comes entirely from the `BlishHUD` NuGet package's own build logic,
+A `.bhm` file comes from the `BlishHUD` NuGet package's own build logic,
 imported via:
 
 ```
@@ -20,9 +18,13 @@ imported via:
 
 That imported `BlishHUD.targets` file (installed under
 `packages/BlishHUD.1.3.0/build/BlishHUD.targets` once NuGet packages are
-restored) runs automatically **on every build**, via an
-`AfterTargets="Build"` target named `BuildBlishHUDModule`. It does exactly
-this, unconditionally:
+restored) defines an `AfterTargets="Build"` target named
+`BuildBlishHUDModule` that runs automatically **on every build**. As of
+M38/WP-29, `GW2CraftingHelper.csproj` redeclares that same-named target
+after the import (the one and only hand-written pack/zip logic in this
+repo's own csproj) so its own version wins, purely to add a two-file
+`Exclude` - see the addendum below. Otherwise it does exactly this,
+unconditionally:
 
 1. Copies `manifest.json` into the build output directory (`$(OutDir)`).
 2. Copies the **entire** `ref/` folder (recursively, everything under it)
@@ -65,13 +67,14 @@ produced by the build above shows it contains, under `ref/`:
   of the uncontrolled `wiki_vendor_cache.json` inclusion is smaller than
   its raw file size suggests (~1.1 MB, not ~19.6 MB, of actual `.bhm`
   bytes) - but it is still bytes a player downloads and Blish HUD extracts
-  for a file with zero runtime consumer in the shipped module. This is a
-  real packaging gap, not a csproj/manifest problem - fixing it would mean
-  moving those two files out of `ref/` (or out of the repo working tree
-  entirely) rather than editing `GW2CraftingHelper.csproj` or
-  `manifest.json`. No such move was made as part of this change; it is
-  called out here as a finding for the
-  maintainer to act on separately.
+  for a file with zero runtime consumer in the shipped module. This was a
+  real packaging gap at the time this finding was recorded. **Update
+  (M38/WP-29): fixed.** `GW2CraftingHelper.csproj` now overrides the
+  imported `BuildBlishHUDModule` target with an `Exclude` on its `ref/**`
+  copy for `ref/wiki_vendor_cache.json` and `ref/item_id_cache.json`, so
+  neither file is ever copied into the output directory or the `.bhm`,
+  regardless of whether they exist in the working copy. See the addendum
+  below for details.
 
 ## `manifest.json` fields
 
@@ -113,7 +116,7 @@ listing for this module. The only way to run it today is:
 There is no documented, supported path for a non-developer to install this
 module without building it from source.
 
-## Addendum: build from a clean checkout until the csproj exclusion lands
+## Addendum: the ref/ cache-file packaging gap (fixed, M38/WP-29)
 
 The "Measured finding" above establishes that the `BuildBlishHUDModule`
 target copies all of `ref/` into the `.bhm` regardless of `<Content
@@ -140,15 +143,16 @@ decision-pill overrides, Ignore toggle, presets) with no missing-file
 errors or behavior difference, confirming these two files have no runtime
 consumer in the shipped module at all.
 
-**Recommendation:** until a real fix lands (see the csproj-exclusion gap
-in the list below), build any release `.bhm` from a fresh clone or a
-working copy you have confirmed does not contain
-`ref/wiki_vendor_cache.json`/`ref/item_id_cache.json`, rather than from an
-active `VendorOfferUpdater` development workspace. This is a process
-recommendation only - **no `GW2CraftingHelper.csproj` change was made as
-part of this addendum**; a real fix (e.g. an MSBuild `Exclude` on the
-`BuildBlishHUDModule` target's copy, or moving these two files out of
-`ref/` entirely) remains the follow-up item already listed below.
+**Fixed (M38/WP-29):** the csproj exclusion described as a follow-up item
+above has landed. `GW2CraftingHelper.csproj` now redeclares the imported
+`BuildBlishHUDModule` target (same name, declared after the `BlishHUD.targets`
+import, so it wins) with an `Exclude` added to the `ref/**` copy for
+`ref/wiki_vendor_cache.json` and `ref/item_id_cache.json`. Neither file is
+copied into `$(OutDir)ref` or zipped into the `.bhm` any more, regardless of
+whether a developer's working copy has them sitting on disk from running
+`tools/VendorOfferUpdater`. Building from an active `VendorOfferUpdater`
+development workspace is no longer a concern for this specific gap; a
+clean checkout is no longer required to get a cache-free `.bhm`.
 
 ## What a real release process would still need
 
@@ -158,13 +162,8 @@ committed-to future work:
 - A tagged release + CI job that builds Release/x64 and attaches the
   resulting `.bhm` as a GitHub Release asset.
 - A convention for bumping `manifest.json`'s `version` per release.
-- A decision on the `ref/wiki_vendor_cache.json` / `ref/item_id_cache.json`
-  packaging gap described above (as of this M38/WP-28 change, both files
-  have been untracked and added to `.gitignore` going forward; the
-  `.bhm` packaging behavior itself - the `BuildBlishHUDModule` target
-  copying all of `ref/` wholesale - is unchanged and still needs a real
-  fix, such as moving these files out of `ref/` entirely, if the gap is to
-  be closed for good).
+- ~~A decision on the `ref/wiki_vendor_cache.json` / `ref/item_id_cache.json`
+  packaging gap~~ - resolved as of M38/WP-29; see the addendum above.
 - The two stale `v1.0.0`/`v2.0.0` tags inherited from the original
   `blish-hud/ModuleTemplate` fork (both point at the same 2020 template
   commit, unrelated to this module's actual history) have already been

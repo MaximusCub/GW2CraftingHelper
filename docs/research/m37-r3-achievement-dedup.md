@@ -634,7 +634,7 @@ source if the module ever adds achievement-recipe support (Section 4).
 
 ### 3.1 Seed data - zero achievement analog anywhere
 
-MEASURED (`ref/` directory, `/mnt/c/Dev/Blish/GW2CraftingHelper/ref/`):
+MEASURED (`ref/` directory):
 `acquisition_hints_seed.json`, `item_id_cache.json`, `item_name_seed.json`,
 `mf_item_id_cache.json`, `mystic_forge_recipes.json`,
 `recipe_search_seed.json`, `recipe_seed_manifest.json`,
