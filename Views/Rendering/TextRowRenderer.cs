@@ -16,14 +16,23 @@ namespace GW2CraftingHelper.Views.Rendering
     // now inside CraftStepsSectionRenderer), the default fallback case in
     // CreateCollapsibleSection (staying in the view - a section type with no
     // dedicated body builder), and CreateSummarySectionBody's noteRows loop
-    // (staying in the view - Summary is not part of this package's scope).
-    // Because two non-extracted callers remain, CreateTextRow could not
-    // simply move into CraftStepsSectionRenderer the way a single-call-site
-    // helper would; extracted here instead, exactly mirroring the
-    // GetPillColors -> PillColors.cs resolution: CraftingPlanView's two
-    // remaining call sites now call TextRowRenderer.CreateTextRow directly
-    // (forward Views/Rendering call, never the reverse edge the WP-21
-    // findings fix, commit 5c56b2a, already reverted once).
+    // (staying in the view at the time - Summary was not part of this
+    // package's scope). Because two non-extracted callers remained,
+    // CreateTextRow could not simply move into CraftStepsSectionRenderer the
+    // way a single-call-site helper would; extracted here instead, exactly
+    // mirroring the GetPillColors -> PillColors.cs resolution: all three call
+    // sites now call TextRowRenderer.CreateTextRow directly (forward
+    // Views/Rendering call, never the reverse edge the WP-21 findings fix,
+    // commit 5c56b2a, already reverted once).
+    //
+    // M38 WP-23d closed the CreateSummarySectionBody fork above: the
+    // Summary section (including its noteRows loop) moved out of
+    // CraftingPlanView too, into Views/Rendering/SummarySectionRenderer,
+    // which now calls CreateTextRow with its own injected sink. That leaves
+    // exactly ONE call site still living inside CraftingPlanView itself -
+    // CreateCollapsibleSection's default fallback case - plus the two now
+    // living in extracted section renderers (CraftStepsSectionRenderer's
+    // TimegatedNotice branch, SummarySectionRenderer's noteRows loop).
     internal static class TextRowRenderer
     {
         internal static void CreateTextRow(string text, FlowPanel parent, int panelWidth, ISectionRelayoutSink sink)

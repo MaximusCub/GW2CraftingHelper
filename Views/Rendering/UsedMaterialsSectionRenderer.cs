@@ -21,6 +21,17 @@ namespace GW2CraftingHelper.Views.Rendering
     // only on the already-extracted IconControls/RarityColors/LabelHelpers/
     // PlanRelayoutMath statics the pilot also used, so this section needed
     // no further dependency resolution.
+    //
+    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateUsedMaterialRow's
+    // icon+ellipsized-name construction and its divider+relayout tail now
+    // go through the two shared row-shape helpers - IconNameRowHelpers
+    // (build via CreateIconAndEllipsizedName, re-ellipsize via
+    // ReellipsizeName) and RowRelayoutHelpers.FinishRow - both extracted
+    // from this row and ShoppingListSectionRenderer.CreateShoppingRow, the
+    // only two rows across the extracted renderers that actually share the
+    // ellipsis shape (see IconNameRowHelpers' own doc comment for why
+    // Crafting Steps/Disciplines/Recipes rows do not). Geometry unchanged -
+    // see the WP-24 constant-by-constant table in the PR/commit body.
     internal sealed class UsedMaterialsSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -49,21 +60,13 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // Moved verbatim from CraftingPlanView.CreateUsedMaterialRow. Only
-        // change: _relayoutActions.Add(...) -> _sink.AddRelayout(...) and
-        // _reellipsisActions.Add(...) -> _sink.AddReellipsis(...).
+        // Moved verbatim from CraftingPlanView.CreateUsedMaterialRow, then
+        // WP-24-refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
+        // the class doc comment above) - same geometry, same constants.
         private void CreateUsedMaterialRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
-
-            // M36: y=0 (was 1) - the 34px icon frame previously left only
-            // 1px of clearance above rowHeight (36), which was exactly
-            // enough for the old 1px divider but would overlap the new 2px
-            // divider's top pixel by 1 row. Moving the icon up by 1 makes
-            // frame height (34) + divider height (2) exactly fill rowHeight
-            // with no overlap.
-            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
 
             const int nameX = 50;
             int qtyRightEdge = panelWidth - 8;
@@ -71,23 +74,17 @@ namespace GW2CraftingHelper.Views.Rendering
 
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
-            int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(qtyRightEdge, qtyWidth, 12, nameX);
 
+            // M36: icon y=0 (was 1) - the 34px icon frame previously left
+            // only 1px of clearance above rowHeight (36), which was exactly
+            // enough for the old 1px divider but would overlap the new 2px
+            // divider's top pixel by 1 row. Moving the icon up by 1 makes
+            // frame height (34) + divider height (2) exactly fill rowHeight
+            // with no overlap.
             string fullName = row.Label ?? "";
-            string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
-            var nameLabel = new Label()
-            {
-                Text = displayName,
-                Font = font,
-                TextColor = RarityColors.GetRarityNameColor(row.Rarity),
-                ShowShadow = true,
-                ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(nameX, 9),
-                Parent = rowPanel
-            };
-            if (displayName != fullName)
+            var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
+                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, qtyRightEdge, qtyWidth, 12, nameX, 9);
+            if (nameHandle.NameLabel.Text != fullName)
             {
                 rowPanel.BasicTooltipText = fullName;
             }
@@ -103,31 +100,25 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = rowPanel
             };
 
+            // M33 C2b: qty label position is a pure reposition (qtyWidth is
+            // font-only); the name is left untouched during drag ticks and
+            // only re-ellipsized at settle (RunReellipsis) to avoid a
+            // MeasureString call per row per tick.
+            //
             // M36b: bottomClearance 0 - UsedMaterialRowHeight (36) is
             // immune to the Container.Paint round-trip defect (see
             // LabelHelpers.CreateRowDivider's doc comment) and its icon frame is
             // flush-fit with zero slack; giving it clearance it doesn't
             // need would reintroduce the icon/divider overlap M36 fixed.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 0);
-
-            // M33 C2b: qty label position is a pure reposition (qtyWidth is
-            // font-only); the name is left untouched during drag ticks and
-            // only re-ellipsized at settle (RunReellipsis) to avoid a
-            // MeasureString call per row per tick.
-            _sink.AddRelayout(w =>
+            RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 0, _sink, w =>
             {
-                rowPanel.Size = new Point(w, rowHeight);
                 qtyLabel.Location = new Point(w - 8 - qtyWidth, 9);
-                if (divider != null) divider.Size = new Point(w, 2);
             });
             _sink.AddReellipsis(w =>
             {
-                int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(w - 8, qtyWidth, 12, nameX);
-                string newDisplayName = LabelHelpers.EllipsizeToWidth(font, fullName, newMaxWidth);
-                if (nameLabel.Text != newDisplayName)
+                if (IconNameRowHelpers.ReellipsizeName(nameHandle, font, w - 8, qtyWidth, 12))
                 {
-                    nameLabel.Text = newDisplayName;
-                    rowPanel.BasicTooltipText = newDisplayName != fullName ? fullName : null;
+                    rowPanel.BasicTooltipText = nameHandle.NameLabel.Text != fullName ? fullName : null;
                 }
             });
         }

@@ -66,6 +66,19 @@ namespace GW2CraftingHelper.Views.Rendering
     /// they are shared row-construction helpers with multiple callers,
     /// analogous to PillColors/RarityColors, that also need to register a
     /// relayout closure the way a section renderer's own row builders do.
+    ///
+    /// M38 WP-24 (m38-a2-simplify.md finding #3) added two more sink-as-
+    /// plain-parameter shared helpers on this same pattern, this time
+    /// factoring duplication BETWEEN already-extracted section renderers'
+    /// row builders rather than resolving a stay-in-the-view fork:
+    /// RowRelayoutHelpers.FinishRow (the "row panel resize + per-row extra
+    /// reposition + divider resize" AddRelayout closure every row builder
+    /// across Crafting Steps/Disciplines/Recipes/Shopping List/Used
+    /// Materials repeated identically) and IconNameRowHelpers (the "icon +
+    /// ellipsized name label, re-ellipsized at settle" shape Used
+    /// Materials' and Shopping List's rows shared exactly, confirmed by
+    /// constant-by-constant comparison - see each helper's own doc comment
+    /// for what it does and does not cover).
     /// </summary>
     internal interface ISectionRelayoutSink
     {

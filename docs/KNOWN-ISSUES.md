@@ -1577,6 +1577,177 @@ log. Note: this run's step quantities differ from prior references (e.g.
 price-driven route variance in the solve, not a rendering defect (this
 branch's diff is Views-only; solver bits identical to master)
 
+## WP-23d + WP-24: SummarySectionRenderer + IconNameRowHelpers/RowRelayoutHelpers (M38)
+Two packages landed together on the same branch: WP-23d closes the last
+open fork from the WP-23/WP-23b/WP-23c section-renderer extractions (the
+Summary/Total Cost section); WP-24 (m38-a2-simplify.md finding #3) factors
+the two repeated row-builder shapes that finding identified ACROSS the now-
+fully-extracted renderers.
+
+WP-23d SCOPE: `Views/Rendering/SummarySectionRenderer.cs` (new) -
+`CreateSummarySectionBody` (renamed `Render`, matching every other section
+renderer's entry point), `CreateCostTileRow` (plus its `CostTileHandle`
+relayout cache and `TileCaptionFor` label-shortening helper), and
+`CreateCurrencyRow` (plus its `CurrencyRowHeight`/`CurrencyIconSize`
+constants) all moved verbatim. The only edits inside the moved bodies are
+`_relayoutActions.Add(...)` -> `_sink.AddRelayout(...)` (in
+`CreateCostTileRow`/`CreateCurrencyRow`) and `CreateTextRow(..., this)` ->
+`TextRowRenderer.CreateTextRow(..., _sink)` (in the renamed `Render`'s
+`noteRows` loop, the M35 `MultiItemNote` banner row). This closes the fork
+`TextRowRenderer`'s own doc comment (WP-23c) and this file's line-1483-ish
+narrative above named explicitly: `CreateSummarySectionBody`'s `noteRows`
+loop was the one call site WP-23c deliberately left in `CraftingPlanView`
+"because Summary is not part of this package's scope" - it is now, so it
+moved too. `TextRowRenderer.CreateTextRow` has exactly one remaining call
+site left inside `CraftingPlanView` itself (the default fallback case in
+`CreateCollapsibleSection`) plus the two now living in extracted section
+renderers (`CraftStepsSectionRenderer`'s TimegatedNotice branch,
+`SummarySectionRenderer`'s `noteRows` loop) - both `TextRowRenderer.cs` and
+`ISectionRelayoutSink.cs`'s doc comments were updated to record this.
+DIFF EVIDENCE (WP-23d): whitespace-insensitive (`diff -w`) comparisons of
+every moved method/type against its pre-move body in the origin/master
+(PR #91, `49e3d30`) copy of `CraftingPlanView.cs`: `CostTileHandle`,
+`TileCaptionFor`, and the `CurrencyRowHeight`/`CurrencyIconSize` constant
+pair are byte-identical; `CreateCostTileRow` and `CreateCurrencyRow` each
+differ only in the one sink substitution; `Render` (renamed from
+`CreateSummarySectionBody`) differs only in its rename/access-modifier
+change and the one `_sink`-qualified `TextRowRenderer.CreateTextRow` call.
+
+WP-24 SCOPE: two new shared helpers, `Views/Rendering/RowRelayoutHelpers.cs`
+(`FinishRow`) and `Views/Rendering/IconNameRowHelpers.cs`
+(`CreateIconAndEllipsizedName` + `ReellipsizeName`), adopted ONLY where the
+existing row shape matched exactly (constants compared first, per this
+package's own brief - "a forced fit that changes pixel geometry is worse
+than duplication"):
+- `RowRelayoutHelpers.FinishRow` (the "row panel resize + one row-specific
+  extra reposition + divider resize" `AddRelayout` closure) was adopted by
+  ALL FIVE extracted row builders - `CraftStepsSectionRenderer.
+  CreateCraftStepRow`, `DisciplinesSectionRenderer.CreateDisciplineRow`,
+  `RecipesSectionRenderer.CreateRecipeRow`,
+  `ShoppingListSectionRenderer.CreateShoppingRow`, and
+  `UsedMaterialsSectionRenderer.CreateUsedMaterialRow` - confirmed identical
+  in shape and order of operations across all five (rowPanel resize first,
+  then the row's own reposition work, then divider resize; the divider
+  creation call `LabelHelpers.CreateRowDivider(rowPanel, panelWidth,
+  rowHeight, bottomClearance)` unchanged, same `bottomClearance` value per
+  row as before: 1/1/(hasSublabel?1:0)/0/0 respectively). NOT adopted by
+  `SummarySectionRenderer.CreateCostTileRow`/`CreateCurrencyRow` - neither
+  builds a `LabelHelpers.CreateRowDivider` at all (no list-style rows in
+  Summary), so there is no divider half of the shape to share.
+- `IconNameRowHelpers` (the "rarity-framed icon + ellipsized, rarity-
+  colored, drop-shadowed name label, re-ellipsized at settle" shape) was
+  adopted by exactly the two rows that share it byte-for-byte:
+  `UsedMaterialsSectionRenderer.CreateUsedMaterialRow` and
+  `ShoppingListSectionRenderer.CreateShoppingRow` - both call
+  `PlanRelayoutMath.NameMaxWidthBeforeColumn` with the same gap constant
+  (12) and the same `nameX` (50), place the icon at the same (8, 0), and
+  the name label at the same (nameX, 9). NOT adopted by
+  `CraftStepsSectionRenderer.CreateCraftStepRow` (name built via cumulative
+  cursor-x label concatenation, no width cap or ellipsis at all),
+  `DisciplinesSectionRenderer.CreateDisciplineRow` (no icon, no name column,
+  just two plain labels), or `RecipesSectionRenderer.CreateRecipeRow` (name
+  label has no width cap/ellipsis either, plus an optional sublabel line
+  BELOW the name and an icon y that varies with `hasSublabel`) - each
+  excluded row's doc comment records the specific mismatch that ruled it
+  out, per this package's "any row whose geometry differs stays hand-rolled
+  with a comment" instruction.
+CONSTANT-BY-CONSTANT TABLE (WP-24 pixel-identity evidence):
+  RowRelayoutHelpers.FinishRow adoption - rowHeight and bottomClearance
+  arguments passed to `LabelHelpers.CreateRowDivider` are UNCHANGED at every
+  one of the five call sites (CraftStepRowHeight/1, DisciplineRowHeight/1,
+  RecipeRowHeightWithSublabel-or-NoSublabel/(hasSublabel?1:0),
+  ShoppingRowHeight/0, UsedMaterialRowHeight/0); the AddRelayout closure's
+  three-step order (rowPanel resize, extra reposition, divider resize) is
+  preserved verbatim at all five (ShoppingRow's `ShoppingColumnMath.
+  ComputeEdges` call was already independent of the rowPanel-resize
+  statement - no data dependency crosses that reordering, so moving it
+  inside the extra-reposition delegate is a no-op for output).
+  IconNameRowHelpers adoption - icon (x=8, y=0, size=32, border=1 defaults
+  matching `IconControls.CreateRarityFramedIcon`'s own defaults), nameX=50,
+  nameY=9, NameMaxWidthBeforeColumn gap=12, font=DefaultFont14, and the
+  rarity-colored/drop-shadowed label styling are IDENTICAL between the two
+  adopting rows' before/after bodies; the only per-row difference (both
+  before and after extraction) is the `rightEdge` value fed into
+  `NameMaxWidthBeforeColumn` - a fixed `panelWidth - 8` for Used Materials
+  vs. the dynamic `ShoppingColumnMath`-derived `edges.QtyRightEdge` for
+  Shopping List, exactly as before. The pre-extraction
+  `if (displayName != fullName)`/`if (nameLabel.Text != newDisplayName)`
+  truncation-tooltip gates are preserved via the logically-equivalent
+  `nameHandle.NameLabel.Text != fullName` (build-time, evaluated
+  immediately after construction, before any relayout closure can run) and
+  `IconNameRowHelpers.ReellipsizeName`'s own internal compare-and-
+  conditionally-assign (settle-time).
+DO-NOT-TOUCH compliance: `git diff --stat` against origin/master confirms
+zero changes to `Services/PlanContentHeightMath.cs`,
+`Services/PlanRelayoutMath.cs`, and `Views/Rendering/LabelHelpers.cs`
+(the divider math and its M36b bottom-clearance calls) - both packages
+call into all three exactly as before, never edited. The M35 `MultiItemNote`
+row and the M37 batch-economics cost tiles (Total/Own materials/Sell
+value/Profit, all rendered through the same generic per-`CoinTotal`-row
+tile band `CreateCostTileRow` already handled - see
+`docs/research/m37-r2-batch-economics.md` Section 3.6/4.3) move
+byte-identically inside `SummarySectionRenderer`; `CreateCostTileRow`'s
+`PlanRelayoutMath.ComputeCostTileGeometry` call (build AND relayout
+closure) is untouched, verbatim.
+KNOWN FOLLOW-UP (not fixed here, out of this package's own scope per the
+WP-23c/`bfee069` precedent of flagging-not-fixing pre-existing staleness
+outside the current package's own moved symbols): `Services/
+PlanRelayoutMath.cs`'s `ComputeCostTileGeometry` doc comment still reads
+"Mirrors CraftingPlanView.CreateCostTileRow's own arithmetic exactly" -
+stale as of this package's own move (now
+`Views/Rendering/SummarySectionRenderer.CreateCostTileRow`), but left
+unedited because `PlanRelayoutMath.cs` is this package's own explicit
+DO-NOT-TOUCH file; a future doc-comment-only pass (mirroring `bfee069`'s
+precedent of touching a DO-NOT-TOUCH file's comments without touching its
+arithmetic) can repoint it.
+VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped -
+unchanged from the pre-WP-23d floor; this view has no automated test net,
+so green tests prove only that nothing else broke, not that the rendering
+or resize behavior is correct). Live pre-merge visual verification (Blish-
+over-Paint screenshot/pixel-scan loop) on the Crafting Plan tab's Summary/
+Total Cost section (cost tiles, currency rows, MultiItemNote banner where
+applicable) and a spot-check of the five WP-24-refactored sections (Used
+Materials, Shopping List, Crafting Steps, Required Disciplines, Required
+Recipes) for divider/icon/name-ellipsis regressions is being run by the
+orchestrating session per the M38 plan's `needsVisualLoop` gate (this
+package is invariant-adjacent per the same risk rating as WP-23/WP-23b/
+WP-23c). Result: PASS (orchestrator, 2026-07-23, live branch-build
+session under the hardened desktop protocol, captures wp23d_02/03/04/05/
+08/09/10/15/17/22 in C:/Dev/Blish/preflight/captures):
+- Summary/Total Cost via SummarySectionRenderer in all three shapes: (a)
+  single-item Exordium - Total tile + all 7 currency rows, layout-identical
+  to the WP-21 merged-master reference (wp21_02_top.png), only live-price
+  deltas; (b) own-materials re-solve - two-tile band (Total 2092g / Own
+  materials 6g85s95c) and the owned/needed annotation format live against
+  the synthetic snapshot ("292x Spirit Shard (50 owned, 242 needed)");
+  (c) 2-item batch Exordium + Orichalcum Ingot - "Exordium and 1 other"
+  title, three-tile band exercising the TileCaptionFor "Loss if sold"
+  variant (Total 2455g12s12c / Sell value 2s43c / Loss if sold 21c), and
+  the M35 MultiItemNote banner rendering through the sink-substituted
+  TextRowRenderer.CreateTextRow path.
+- All five WP-24-refactored sections spot-checked live: Used Materials
+  (the 4 synthetic-snapshot rows, icon+name+qty geometry), Shopping List
+  (two offsets; source tags, "1 for 10" bundle rate, multi-currency and
+  em-dash cells, UNKNOWN badges), Crafting Steps (steps 1-10 and 33-46;
+  numbers, rarity colors, discipline sublabels; ecto weekly timegated
+  notice row), Required Disciplines (column headers + rows at 26px pitch),
+  Required Recipes (sublabel rows, Learned/Auto-learned tags, two offsets).
+- scan_dividers.py at 2+ offsets per section class: uniform 29/30 (36px
+  rows), 35/36 (44px), 26 (32px disciplines); every gap decodes to the
+  by-design isLast/section-seam/column-header boundaries.
+- Zero "registered no relayout" DEBUG warnings and zero WARN/ERROR lines
+  across both session logs.
+- Bonus evidence: a real human window resize mid-session fired
+  writer=ResizePreserve with verify exit reason=stable on the branch
+  build - live proof the relayout registry replays correctly through the
+  extracted renderers; scroll position was also preserved across a live
+  regenerate.
+- Session note: the user briefly used the desktop mid-gate; two transient
+  UI oddities observed in that window (input-strip checkbox visual reset,
+  cleared search text) are attributed to that manual interaction, not the
+  branch (the strip is untouched by this diff); the gate was completed on
+  a fresh launch afterward.
+
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
 capture across three desktop sessions and two machines' font stacks

@@ -30,6 +30,23 @@ namespace GW2CraftingHelper.Views.Rendering
     // renderers, this renderer's Render() calls CTableHeaderRenderer
     // directly, exactly as DisciplinesSectionRenderer now does, rather than
     // relying on CraftingPlanView to call it first.
+    //
+    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateRecipeRow's
+    // divider+relayout tail now goes through RowRelayoutHelpers.FinishRow -
+    // the shared "row panel resize + extra reposition + divider resize"
+    // shape confirmed identical across all five extracted renderers' row
+    // builders (see that class's doc comment). This row's name label is
+    // NOT run through IconNameRowHelpers (the other WP-24 helper): it has
+    // no width cap or ellipsis at all (row.Label renders in full,
+    // regardless of length), an optional sublabel line BELOW the name
+    // rather than a same-line secondary label, and an icon y that varies
+    // with hasSublabel - a genuinely different shape from the two
+    // ellipsized-name rows IconNameRowHelpers actually covers; forcing it
+    // through that helper would mean either inventing ellipsis this row
+    // never had or dropping its sublabel line, both real behavior changes,
+    // so it stays hand-rolled - see IconNameRowHelpers' own doc comment.
+    // Geometry unchanged - see the WP-24 constant-by-constant table in the
+    // PR/commit body.
     internal sealed class RecipesSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -141,16 +158,12 @@ namespace GW2CraftingHelper.Views.Rendering
             // no-sublabel branch (36px, RecipeRowHeightNoSublabel) is
             // immune and flush-fit with zero slack (M36); giving it
             // clearance it doesn't need would reintroduce that overlap.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, hasSublabel ? 1 : 0);
-
-            _sink.AddRelayout(w =>
+            RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, hasSublabel ? 1 : 0, _sink, w =>
             {
-                rowPanel.Size = new Point(w, rowHeight);
                 if (statusLabel != null)
                 {
                     statusLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, statusLabel.Width), hasSublabel ? 10 : 8);
                 }
-                if (divider != null) divider.Size = new Point(w, 2);
             });
         }
     }

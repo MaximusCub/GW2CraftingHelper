@@ -30,6 +30,18 @@ namespace GW2CraftingHelper.Views.Rendering
     // CreateCraftingStepsBody's TimegatedNotice branch called
     // CraftingPlanView's private CreateTextRow, resolved via TextRowRenderer
     // as described above.
+    //
+    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateCraftStepRow's
+    // divider+relayout tail now goes through RowRelayoutHelpers.FinishRow -
+    // the shared "row panel resize + extra reposition + divider resize"
+    // shape confirmed identical across all five extracted renderers' row
+    // builders (see that class's doc comment). This row's name/qty labels
+    // are NOT run through IconNameRowHelpers (the other WP-24 helper): they
+    // are built via cumulative cursor-x concatenation ("Craft " + "{n}x " +
+    // name) with no width cap or ellipsis at all, a genuinely different
+    // shape from the ellipsized-name-at-a-fixed-column rows - see
+    // IconNameRowHelpers' own doc comment. Geometry unchanged - see the
+    // WP-24 constant-by-constant table in the PR/commit body.
     internal sealed class CraftStepsSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -154,20 +166,17 @@ namespace GW2CraftingHelper.Views.Rendering
             // (iconY 5 + 34 = 39) sits 2px clear of the new divider top
             // (rowHeight-3 = 41), so the 1px shift is free of
             // icon-clearance side effects.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
-
+            //
             // M33 C2b: name/qty labels sit at a fixed x (font-only, not
             // width-dependent - textX never depended on panelWidth); only
             // the row width, its divider, and the right-aligned sublabel
             // need to move.
-            _sink.AddRelayout(w =>
+            RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 1, _sink, w =>
             {
-                rowPanel.Size = new Point(w, rowHeight);
                 if (sublabelLabel != null)
                 {
                     sublabelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, sublabelLabel.Width), 16);
                 }
-                if (divider != null) divider.Size = new Point(w, 2);
             });
         }
     }

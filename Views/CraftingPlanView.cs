@@ -2631,7 +2631,10 @@ namespace GW2CraftingHelper.Views
             switch (section.SectionType)
             {
                 case PlanSectionType.Summary:
-                    CreateSummarySectionBody(section, contentFlow, panelWidth);
+                    // M38 WP-23d: row rendering (the cost-tile row, the
+                    // MultiItemNote banner, and the per-currency rows) moved
+                    // to Views/Rendering/SummarySectionRenderer.
+                    new SummarySectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.UsedMaterials:
                     // M38 WP-23b: row rendering moved to
@@ -2670,10 +2673,11 @@ namespace GW2CraftingHelper.Views
                     // without a dedicated body builder - never leave a
                     // section silently empty. M38 WP-23c: CreateTextRow
                     // moved to Views/Rendering/TextRowRenderer (see that
-                    // class's doc comment - it has two call sites still
-                    // living in CraftingPlanView, this one and
-                    // CreateSummarySectionBody's noteRows loop, so it could
-                    // not move wholesale into a single extracted renderer).
+                    // class's doc comment). This is now the only remaining
+                    // call site inside CraftingPlanView itself - the
+                    // Summary section's noteRows loop (the other call site
+                    // WP-23c left in place) moved out too, into
+                    // Views/Rendering/SummarySectionRenderer, in WP-23d.
                     foreach (var row in section.Rows)
                     {
                         TextRowRenderer.CreateTextRow(row.Label, contentFlow, panelWidth, this);
@@ -2735,207 +2739,13 @@ namespace GW2CraftingHelper.Views
         // Views/Rendering/CTableHeaderRenderer in WP-23c once both callers
         // were extracted section renderers - see that class's doc comment.
 
-        /// <summary>
-        /// gw2e's cost-breakdown: a centered row of equal-width stat tiles,
-        /// one per CoinTotal row (Total, Sell value, Profit/Loss - up to the
-        /// spec's 5 when all are applicable). Non-coin rows (currency costs)
-        /// are handled separately as full-width rows underneath.
-        /// </summary>
-        /// <summary>
-        /// One tile's already-created controls, cached for relayout - m2
-        /// 3.5's [FANOUT] case: unlike a single-anchor row, every tile's
-        /// caption AND coin segments are independently re-centered inside
-        /// their own tileWidth-wide slice on every drag tick.
-        /// </summary>
-        private sealed class CostTileHandle
-        {
-            public Label CaptionLabel;
-            public CoinCurrencyRenderer.SegmentLayoutHandle Segments;
-        }
-
-        private void CreateCostTileRow(List<PlanRowViewModel> coinRows, FlowPanel parent, int panelWidth)
-        {
-            int tileCount = coinRows.Count;
-            if (tileCount == 0) return;
-
-            const int rowHeight = PlanContentHeightMath.CostTileRowHeight;
-            const int totalMargin = 40;
-            const int minTileWidth = 80;
-            var geometry = PlanRelayoutMath.ComputeCostTileGeometry(panelWidth, tileCount, totalMargin, minTileWidth);
-
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, rowHeight),
-                Parent = parent
-            };
-
-            var captionFont = GameService.Content.DefaultFont12;
-            var amountFont = GameService.Content.DefaultFont16;
-            var captionColor = new Color(153, 153, 153);
-
-            var tiles = new List<CostTileHandle>(tileCount);
-            for (int i = 0; i < tileCount; i++)
-            {
-                int tileX = geometry.StartX + i * geometry.TileWidth;
-                var row = coinRows[i];
-
-                string caption = TileCaptionFor(row.Label);
-                int captionWidth = (int)System.Math.Ceiling(captionFont.MeasureString(caption).Width);
-                var captionLabel = new Label()
-                {
-                    Text = caption,
-                    Font = captionFont,
-                    TextColor = captionColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(tileX + PlanRelayoutMath.CenterX(geometry.TileWidth, captionWidth), 6),
-                    Parent = rowPanel
-                };
-
-                var segments = CoinCurrencyRenderer.BuildCoinSegments(row.CoinValue, amountFont);
-                int segmentsWidth = CoinCurrencyRenderer.TotalCoinSegmentsWidth(segments);
-                int coinStartX = tileX + PlanRelayoutMath.CenterX(geometry.TileWidth, segmentsWidth);
-                var segmentHandle = CoinCurrencyRenderer.LayoutCoinSegments(rowPanel, segments, coinStartX, 30, amountFont);
-
-                tiles.Add(new CostTileHandle { CaptionLabel = captionLabel, Segments = segmentHandle });
-            }
-
-            // M33 C2b [FANOUT]: every tile's caption + coin segments are
-            // font-only (invariant to panelWidth) - only tileWidth/startX
-            // and each tile's own centering offset move. No MeasureString.
-            _relayoutActions.Add(w =>
-            {
-                rowPanel.Size = new Point(w, rowHeight);
-                var g = PlanRelayoutMath.ComputeCostTileGeometry(w, tileCount, totalMargin, minTileWidth);
-                for (int i = 0; i < tiles.Count; i++)
-                {
-                    int tileX = g.StartX + i * g.TileWidth;
-                    var tile = tiles[i];
-
-                    tile.CaptionLabel.Location = new Point(tileX + PlanRelayoutMath.CenterX(g.TileWidth, tile.CaptionLabel.Width), 6);
-
-                    int segmentsWidth = ShoppingColumnMath.SegmentRunWidth(tile.Segments.TextWidths, CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinLabelIconGap, CoinSegmentMath.CoinSegmentGap);
-                    int coinStartX = tileX + PlanRelayoutMath.CenterX(g.TileWidth, segmentsWidth);
-                    CoinCurrencyRenderer.RepositionSegments(tile.Segments, coinStartX, 30);
-                }
-            });
-        }
-
-        /// <summary>
-        /// Strips the parenthetical qualifier off a Summary row label
-        /// ("Sell value (5x, after 15% TP fees)" -> "Sell value") so tile
-        /// captions stay short, like gw2e's "Buy price" / "Sell price".
-        /// </summary>
-        private static string TileCaptionFor(string rowLabel)
-        {
-            if (string.IsNullOrEmpty(rowLabel)) return "";
-            int parenIdx = rowLabel.IndexOf('(');
-            return (parenIdx > 0 ? rowLabel.Substring(0, parenIdx) : rowLabel).Trim();
-        }
-
-        private void CreateSummarySectionBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
-        {
-            var coinRows = new List<PlanRowViewModel>();
-            var otherRows = new List<PlanRowViewModel>();
-            var noteRows = new List<PlanRowViewModel>();
-            foreach (var row in section.Rows)
-            {
-                if (row.RowType == PlanRowType.CoinTotal) coinRows.Add(row);
-                // M35 (gw2efficiency parity - multi-item plans): the
-                // multi-item batch note is a plain text row, not a
-                // CurrencyCost row - must not fall into the CreateCurrencyRow
-                // branch below (which assumes an icon/quantity that a note
-                // row never has).
-                else if (row.RowType == PlanRowType.MultiItemNote) noteRows.Add(row);
-                else otherRows.Add(row);
-            }
-
-            if (coinRows.Count > 0)
-            {
-                CreateCostTileRow(coinRows, contentFlow, panelWidth);
-            }
-
-            // The only other row type in this section is CurrencyCost.
-            foreach (var row in otherRows)
-            {
-                CreateCurrencyRow(row, contentFlow, panelWidth);
-            }
-
-            foreach (var row in noteRows)
-            {
-                // M38 WP-23c: CreateTextRow moved to
-                // Views/Rendering/TextRowRenderer (see that class's doc
-                // comment - it has two call sites still living in
-                // CraftingPlanView, this one and the default fallback case
-                // in CreateCollapsibleSection, so it could not move
-                // wholesale into a single extracted renderer).
-                TextRowRenderer.CreateTextRow(row.Label, contentFlow, panelWidth, this);
-            }
-        }
-
-        // Sized between the tree/row item-icon (32px) and the coin-segment
-        // icon (20px) since it sits inside a plain 28px text row; reuses
-        // CoinSegmentMath.CoinLabelIconGap (M38 WP-21 findings fix: moved out of
-        // CoinCurrencyRenderer) for the text-to-icon gap so both follow the
-        // same "number/text first, gap, icon" convention.
-        private const int CurrencyRowHeight = PlanContentHeightMath.CurrencyRowHeight;
-        private const int CurrencyIconSize = 18;
-
-        /// <summary>
-        /// CurrencyCost row: identical "  {label}" text to CreateTextRow,
-        /// plus the currency's icon immediately to its right when known.
-        /// IconUrl null (no data available - service not wired up, fetch
-        /// not yet complete, or the currency was absent from the API
-        /// response) renders exactly like CreateTextRow - never a
-        /// placeholder guess for a missing icon. When CurrencyOwnedQuantity
-        /// is set (M34-B2b, wallet data present), an "(X owned, Y needed)"
-        /// annotation follows the icon - gw2e's ownedCurrencies/
-        /// shoppingCurrencies split (r2 report Section 4.3), cosmetic only.
-        /// </summary>
-        private void CreateCurrencyRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, CurrencyRowHeight),
-                Parent = parent
-            };
-            var label = new Label()
-            {
-                Text = "  " + row.Label,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(8, 4),
-                Parent = rowPanel
-            };
-
-            int cursorX = 8 + label.Width;
-            if (!string.IsNullOrEmpty(row.IconUrl))
-            {
-                int iconX = cursorX + CoinSegmentMath.CoinLabelIconGap;
-                int iconY = (CurrencyRowHeight - CurrencyIconSize) / 2;
-                IconControls.CreateItemIcon(rowPanel, row.IconUrl, iconX, iconY, CurrencyIconSize);
-                cursorX = iconX + CurrencyIconSize;
-            }
-
-            if (row.CurrencyOwnedQuantity.HasValue)
-            {
-                int needed = row.Quantity - row.CurrencyOwnedQuantity.Value;
-                new Label()
-                {
-                    Text = $"({row.CurrencyOwnedQuantity.Value} owned, {needed} needed)",
-                    TextColor = new Color(153, 153, 153),
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(cursorX + CoinSegmentMath.CoinLabelIconGap, 4),
-                    Parent = rowPanel
-                };
-            }
-
-            // Not width-dependent beyond the row's own cosmetic width (m2
-            // 3.6): label/icon/owned-annotation sit at a fixed left-anchored
-            // x regardless of panelWidth.
-            _relayoutActions.Add(w => rowPanel.Size = new Point(w, CurrencyRowHeight));
-        }
+        // --- Summary / Total Cost section ---
+        //
+        // M38 WP-23d: row rendering (the cost-tile row and its
+        // CostTileHandle/TileCaptionFor helpers, the M35 MultiItemNote
+        // banner row, and the per-currency CreateCurrencyRow rows) moved to
+        // Views/Rendering/SummarySectionRenderer (see the
+        // RequiredDisciplines-style call in CreateCollapsibleSection above).
 
         #endregion // 7. Section builders (continued)
 

@@ -37,6 +37,20 @@ namespace GW2CraftingHelper.Views.Rendering
     // RenderDecisionPills now forwards to it - a forward
     // CraftingPlanView -> Views/Rendering call, never the reverse edge the
     // WP-21 findings fix (commit 5c56b2a) already reverted once.
+    //
+    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateShoppingRow's
+    // icon+ellipsized-name construction and its divider+relayout tail now
+    // go through the two shared row-shape helpers - IconNameRowHelpers
+    // (build via CreateIconAndEllipsizedName, re-ellipsize via
+    // ReellipsizeName) and RowRelayoutHelpers.FinishRow - both extracted
+    // from this row and UsedMaterialsSectionRenderer.CreateUsedMaterialRow,
+    // the only two rows across the extracted renderers that actually share
+    // the ellipsis shape (see IconNameRowHelpers' own doc comment for why).
+    // Everything this row does AFTER the name label - the tooltip-parts
+    // build, the source-tag Panel, the qty label, the Each/Total coin cells -
+    // is unchanged, still hand-rolled here (it does not match either shared
+    // shape). Geometry unchanged - see the WP-24 constant-by-constant table
+    // in the PR/commit body.
     internal sealed class ShoppingListSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -161,10 +175,9 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // Moved verbatim from CraftingPlanView.CreateShoppingRow. Changes:
-        // _relayoutActions.Add(...) -> _sink.AddRelayout(...);
-        // _reellipsisActions.Add(...) -> _sink.AddReellipsis(...);
-        // GetPillColors(...) -> PillColors.GetPillColors(...).
+        // Moved verbatim from CraftingPlanView.CreateShoppingRow, then
+        // WP-24-refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
+        // the class doc comment above) - same geometry, same constants.
         private void CreateShoppingRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges,
             int maxEachWidth, int maxTotalWidth, bool isLast)
@@ -172,35 +185,22 @@ namespace GW2CraftingHelper.Views.Rendering
             const int rowHeight = PlanContentHeightMath.ShoppingRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            // M36: y=0 (was 1) - see the identical note in
-            // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
-            // shape, same 1px shortfall against the new 2px divider.
-            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
-
             const int nameX = 50;
             var font = GameService.Content.DefaultFont14;
 
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
-            int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(edges.QtyRightEdge, qtyWidth, 12, nameX);
 
+            // M36: icon y=0 (was 1) - see the identical note in
+            // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
+            // shape, same 1px shortfall against the new 2px divider.
             string fullName = row.Label ?? "";
             string hintText = row.HintText;
-            string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
-            var nameLabel = new Label()
-            {
-                Text = displayName,
-                Font = font,
-                TextColor = RarityColors.GetRarityNameColor(row.Rarity),
-                ShowShadow = true,
-                ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(nameX, 9),
-                Parent = rowPanel
-            };
+            var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
+                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, edges.QtyRightEdge, qtyWidth, 12, nameX, 9);
+            var nameLabel = nameHandle.NameLabel;
             var tooltipParts = new List<string>();
-            if (displayName != fullName)
+            if (nameLabel.Text != fullName)
             {
                 tooltipParts.Add(fullName);
             }
@@ -256,36 +256,30 @@ namespace GW2CraftingHelper.Views.Rendering
             var eachCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
             var totalCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
 
-            // M36b: bottomClearance 0 - ShoppingRowHeight (36) is immune to
-            // the Container.Paint round-trip defect (see LabelHelpers.CreateRowDivider's
-            // doc comment) and its icon frame is flush-fit with zero
-            // slack; see the identical note in CreateUsedMaterialRow.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 0);
-
             // M33 C2b: qty + Each/Total cells reposition every drag tick
             // (no MeasureString - CoinCurrencyRenderer.RepositionValueCellRightAligned uses only
             // cached segment text widths). The name label and its source
             // tag are untouched here; both depend on ellipsis truncation
             // and only update at settle (RunReellipsis) below.
-            _sink.AddRelayout(w =>
+            //
+            // M36b: bottomClearance 0 - ShoppingRowHeight (36) is immune to
+            // the Container.Paint round-trip defect (see LabelHelpers.CreateRowDivider's
+            // doc comment) and its icon frame is flush-fit with zero
+            // slack; see the identical note in CreateUsedMaterialRow.
+            RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 0, _sink, w =>
             {
                 var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
-                rowPanel.Size = new Point(w, rowHeight);
                 qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
                 CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
                 CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
-                if (divider != null) divider.Size = new Point(w, 2);
             });
             _sink.AddReellipsis(w =>
             {
                 var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
-                int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(e.QtyRightEdge, qtyWidth, 12, nameX);
-                string newDisplayName = LabelHelpers.EllipsizeToWidth(font, fullName, newMaxWidth);
-                if (nameLabel.Text != newDisplayName)
+                if (IconNameRowHelpers.ReellipsizeName(nameHandle, font, e.QtyRightEdge, qtyWidth, 12))
                 {
-                    nameLabel.Text = newDisplayName;
                     var parts = new List<string>();
-                    if (newDisplayName != fullName) parts.Add(fullName);
+                    if (nameLabel.Text != fullName) parts.Add(fullName);
                     if (!string.IsNullOrEmpty(hintText)) parts.Add(hintText);
                     rowPanel.BasicTooltipText = parts.Count > 0 ? string.Join("\n", parts) : null;
                 }
