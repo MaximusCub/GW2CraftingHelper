@@ -1309,6 +1309,26 @@ extracted this way that forgot to call `AddRelayout` would trip the
 existing "registered no relayout closures" warning exactly as an inline
 builder that forgot `_relayoutActions.Add` always did - the check's input
 (list contents) is identical regardless of which code path appended to it.
+FORWARD NOTE (Shopping List extraction is not a drop-in repeat of this
+pilot): `ISectionRelayoutSink`'s doc comment originally claimed a future
+icon/coin-carrying section renderer (Used Materials, Shopping List,
+Crafting Steps) could adopt this seam unchanged. Verified true for Used
+Materials (`CreateUsedMaterialRow`) and Crafting Steps
+(`CreateCraftStepRow`) - both depend only on the already-extracted
+IconControls/RarityColors/LabelHelpers/PlanRelayoutMath statics this pilot
+also uses. NOT true for Shopping List: `CreateShoppingRow` also calls
+`GetPillColors(PillKind.Locked, false, ...)` (private static on
+`CraftingPlanView`, for its source-tag panel colors) and the private
+static helper `ShoppingSourceTag(row)`. Neither is part of
+`ISectionRelayoutSink` nor among the WP-21 Tier-1 statics reachable
+directly from `Views/Rendering`. Whoever picks up
+`ShoppingListSectionRenderer` will need to relocate/expose those two
+helpers as a deliberate design decision - extract them to a
+Rendering-namespace class analogous to WP-21's Tier-1 extraction - rather
+than bumping `GetPillColors` `private` -> `internal` again, which would
+reintroduce the reverse `Views/Rendering` -> `CraftingPlanView` dependency
+edge the WP-21-findings fix (commit 5c56b2a) already reverted once for
+exactly this reason. This is scope for that future package, not this one.
 VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped -
 unchanged from the pre-WP-23 floor; this view has no automated test net,
 so green tests prove only that nothing else broke, not that the rendering
