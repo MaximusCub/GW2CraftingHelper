@@ -55,8 +55,9 @@ namespace GW2CraftingHelper.Views
         // border edges) of IconControls.CreateRarityFramedIcon's DEFAULT frame (32px
         // icon + 1px border each side - see that method's own default
         // parameters). Named so the row-height-vs-icon-frame arithmetic
-        // comments this pass touches (CreateRecipeRow) reference one
-        // source of truth instead of re-hardcoding "34" independently of
+        // comments this pass touches (CreateRecipeRow, M38 WP-23c: now
+        // Views/Rendering/RecipesSectionRenderer.CreateRecipeRow) reference
+        // one source of truth instead of re-hardcoding "34" independently of
         // IconControls.CreateRarityFramedIcon's actual defaults.
         private const int RarityFramedIconOuterSize = 34;
 
@@ -2643,26 +2644,39 @@ namespace GW2CraftingHelper.Views
                     new ShoppingListSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.CraftingSteps:
-                    CreateCraftingStepsBody(section, contentFlow, panelWidth);
+                    // M38 WP-23c: row rendering (including the TimegatedNotice
+                    // informational rows) moved to
+                    // Views/Rendering/CraftStepsSectionRenderer.
+                    new CraftStepsSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.RequiredDisciplines:
-                    // M38 WP-23: row rendering moved to
-                    // Views/Rendering/DisciplinesSectionRenderer; the shared
-                    // c-table header stays here (see that class's doc
-                    // comment - it is also used by CreateRecipesBody below).
-                    CreateCTableHeaderRow(contentFlow, panelWidth, "Discipline", 8, "Level");
+                    // M38 WP-23/WP-23c: row rendering moved to
+                    // Views/Rendering/DisciplinesSectionRenderer, which now
+                    // also owns its own c-table header call (WP-23c moved
+                    // CreateCTableHeaderRow out of CraftingPlanView once
+                    // Required Recipes below was extracted too - see
+                    // DisciplinesSectionRenderer's doc comment).
                     new DisciplinesSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.RequiredRecipes:
-                    CreateRecipesBody(section, contentFlow, panelWidth);
+                    // M38 WP-23c: row rendering (both the 44px with-sublabel
+                    // and 36px no-sublabel row heights) and the c-table
+                    // header call moved to
+                    // Views/Rendering/RecipesSectionRenderer.
+                    new RecipesSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 default:
                     // Defensive fallback for a future section type added
                     // without a dedicated body builder - never leave a
-                    // section silently empty.
+                    // section silently empty. M38 WP-23c: CreateTextRow
+                    // moved to Views/Rendering/TextRowRenderer (see that
+                    // class's doc comment - it has two call sites still
+                    // living in CraftingPlanView, this one and
+                    // CreateSummarySectionBody's noteRows loop, so it could
+                    // not move wholesale into a single extracted renderer).
                     foreach (var row in section.Rows)
                     {
-                        CreateTextRow(row.Label, contentFlow, panelWidth);
+                        TextRowRenderer.CreateTextRow(row.Label, contentFlow, panelWidth, this);
                     }
                     break;
             }
@@ -2705,251 +2719,21 @@ namespace GW2CraftingHelper.Views
         // below still needs it too.
 
         // --- Crafting Steps section ---
-
-        private void CreateCraftingStepsBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
-        {
-            // M34-B1 #3: a TimegatedNotice row (vendor-cap informational
-            // line) is a plain text row, not a numbered craft step - render
-            // it via the same generic CreateTextRow pattern every other
-            // section's fallback rows use, and don't consume a step number
-            // for it (stepNumber only advances for real CraftStep rows).
-            int stepNumber = 1;
-            for (int i = 0; i < section.Rows.Count; i++)
-            {
-                var row = section.Rows[i];
-                bool isLast = i == section.Rows.Count - 1;
-                if (row.RowType == PlanRowType.TimegatedNotice)
-                {
-                    CreateTextRow(row.Label, contentFlow, panelWidth);
-                }
-                else
-                {
-                    CreateCraftStepRow(row, stepNumber++, contentFlow, panelWidth, isLast);
-                }
-            }
-        }
-
-        private void CreateCraftStepRow(
-            PlanRowViewModel row, int stepNumber, FlowPanel parent, int panelWidth, bool isLast)
-        {
-            const int rowHeight = PlanContentHeightMath.CraftStepRowHeight;
-            const int badgeSize = 36;
-            const int badgeX = 8;
-            const int badgeY = 4;
-            const int iconX = 52;
-            const int textX = 94; // iconX(52) + frame(34) + gap(8)
-
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
-
-            new Panel()
-            {
-                Size = new Point(badgeSize, badgeSize),
-                Location = new Point(badgeX, badgeY),
-                BackgroundColor = Color.White * 0.08f,
-                Parent = rowPanel
-            };
-            string numberText = stepNumber.ToString();
-            var numberFont = GameService.Content.DefaultFont18;
-            var numberMeasure = numberFont.MeasureString(numberText);
-            int numberWidth = (int)System.Math.Ceiling(numberMeasure.Width);
-            int numberHeight = (int)System.Math.Ceiling(numberMeasure.Height);
-            new Label()
-            {
-                Text = numberText,
-                Font = numberFont,
-                TextColor = Color.White,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(badgeX + (badgeSize - numberWidth) / 2, badgeY + (badgeSize - numberHeight) / 2),
-                Parent = rowPanel
-            };
-
-            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, iconX, 5);
-
-            var textFont = GameService.Content.DefaultFont16;
-            var greyColor = new Color(170, 170, 170);
-            int x = textX;
-
-            var craftLabel = new Label()
-            {
-                Text = "Craft ", Font = textFont, TextColor = greyColor,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(x, 13), Parent = rowPanel
-            };
-            x += craftLabel.Width;
-
-            var qtyLabel = new Label()
-            {
-                Text = $"{row.Quantity}x ", Font = textFont, TextColor = greyColor,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(x, 13), Parent = rowPanel
-            };
-            x += qtyLabel.Width;
-
-            new Label()
-            {
-                Text = row.Label ?? "", Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
-                ShowShadow = true, ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(x, 13), Parent = rowPanel
-            };
-
-            Label sublabelLabel = null;
-            if (!string.IsNullOrEmpty(row.Sublabel))
-            {
-                sublabelLabel = LabelHelpers.CreateRightAlignedLabel(
-                    rowPanel, row.Sublabel, GameService.Content.DefaultFont12,
-                    new Color(153, 153, 153), panelWidth - 8, 16);
-            }
-
-            // M36b: bottomClearance 1 - CraftStepRowHeight (44) is
-            // VULNERABLE to the Container.Paint round-trip defect (see
-            // LabelHelpers.CreateRowDivider's doc comment): its icon frame bottom
-            // (iconY 5 + 34 = 39) sits 2px clear of the new divider top
-            // (rowHeight-3 = 41), so the 1px shift is free of
-            // icon-clearance side effects.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
-
-            // M33 C2b: name/qty labels sit at a fixed x (font-only, not
-            // width-dependent - textX never depended on panelWidth); only
-            // the row width, its divider, and the right-aligned sublabel
-            // need to move.
-            _relayoutActions.Add(w =>
-            {
-                rowPanel.Size = new Point(w, rowHeight);
-                if (sublabelLabel != null)
-                {
-                    sublabelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, sublabelLabel.Width), 16);
-                }
-                if (divider != null) divider.Size = new Point(w, 2);
-            });
-        }
+        //
+        // M38 WP-23c: row rendering (including the TimegatedNotice
+        // informational rows and the step-number badge) moved to
+        // Views/Rendering/CraftStepsSectionRenderer (see the
+        // RequiredDisciplines-style call in CreateCollapsibleSection above).
 
         // --- Required Disciplines / Required Recipes sections (c-table) ---
-
-        private void CreateCTableHeaderRow(
-            FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, PlanContentHeightMath.CTableHeaderRowHeight),
-                BackgroundColor = new Color(35, 35, 35),
-                Parent = parent
-            };
-            var font = GameService.Content.DefaultFont14;
-            new Label()
-            {
-                Text = leftLabel, Font = font, TextColor = Color.White,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(leftX, 5), Parent = rowPanel
-            };
-            var rightLabelControl = LabelHelpers.CreateRightAlignedLabel(rowPanel, rightLabel, font, Color.White, panelWidth - 8, 5);
-
-            _relayoutActions.Add(w =>
-            {
-                rowPanel.Size = new Point(w, PlanContentHeightMath.CTableHeaderRowHeight);
-                rightLabelControl.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, rightLabelControl.Width), 5);
-            });
-        }
-
-        private void CreateRecipesBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
-        {
-            CreateCTableHeaderRow(contentFlow, panelWidth, "Recipe", 50, "Status");
-            for (int i = 0; i < section.Rows.Count; i++)
-            {
-                CreateRecipeRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
-            }
-        }
-
-        // M36 fix-pass (MUSTFIX-3): the no-sublabel branch's rowHeight (32)
-        // left the RarityFramedIconOuterSize (34) icon frame at y=1
-        // overflowing rowHeight by 3px even BEFORE the M36 divider-width
-        // change (icon bottom = 1 + 34 = 35, rowHeight = 32) - pre-existing
-        // negative headroom, not "several pixels of headroom" as
-        // KNOWN-ISSUES #23 previously (incorrectly) claimed for this row,
-        // and made 1px worse once that row's divider grew from 1px to 2px
-        // (needed 34 + 2 = 36 to sit flush, still only had 32). Fixed
-        // coherently, mirroring the Used Materials/Shopping List pattern
-        // already on this branch: RecipeRowHeightNoSublabel raised to 36
-        // (icon at y=0, 34 tall, + the 2px divider = exact fit, zero
-        // overlap) and this branch's icon y nudged from 1 to 0 to match.
-        // The WithSublabel branch (44) already had ample headroom and is
-        // unchanged.
-        private void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
-        {
-            bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
-            int rowHeight = hasSublabel
-                ? PlanContentHeightMath.RecipeRowHeightWithSublabel
-                : PlanContentHeightMath.RecipeRowHeightNoSublabel;
-
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
-
-            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, hasSublabel ? 1 : 0);
-
-            var font = GameService.Content.DefaultFont14;
-            int nameY = hasSublabel ? 4 : 8;
-            new Label()
-            {
-                Text = row.Label ?? "",
-                Font = font,
-                TextColor = RarityColors.GetRarityNameColor(row.Rarity),
-                ShowShadow = true,
-                ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(50, nameY),
-                Parent = rowPanel
-            };
-
-            if (hasSublabel)
-            {
-                new Label()
-                {
-                    Text = row.Sublabel,
-                    Font = GameService.Content.DefaultFont12,
-                    TextColor = new Color(170, 170, 170),
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(50, 22),
-                    Parent = rowPanel
-                };
-            }
-
-            Label statusLabel = null;
-            if (!string.IsNullOrEmpty(row.StatusTag))
-            {
-                Color statusColor = Color.White;
-                if (row.StatusTag == "Missing!")
-                {
-                    statusColor = new Color(255, 100, 100);
-                }
-                else if (row.StatusTag == "Auto-learned")
-                {
-                    statusColor = new Color(150, 200, 150);
-                }
-                statusLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.StatusTag, font, statusColor, panelWidth - 8, hasSublabel ? 10 : 8);
-            }
-
-            // M36b: bottomClearance depends on which rowHeight this branch
-            // used. hasSublabel (44px, RecipeRowHeightWithSublabel) is
-            // VULNERABLE to the Container.Paint round-trip defect (see
-            // LabelHelpers.CreateRowDivider's doc comment) - icon frame bottom (1 + 34 =
-            // 35) leaves ample headroom below rowHeight-3 (41). The
-            // no-sublabel branch (36px, RecipeRowHeightNoSublabel) is
-            // immune and flush-fit with zero slack (M36); giving it
-            // clearance it doesn't need would reintroduce that overlap.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, hasSublabel ? 1 : 0);
-
-            _relayoutActions.Add(w =>
-            {
-                rowPanel.Size = new Point(w, rowHeight);
-                if (statusLabel != null)
-                {
-                    statusLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, statusLabel.Width), hasSublabel ? 10 : 8);
-                }
-                if (divider != null) divider.Size = new Point(w, 2);
-            });
-        }
+        //
+        // M38 WP-23/WP-23c: Required Disciplines' row rendering moved to
+        // Views/Rendering/DisciplinesSectionRenderer (WP-23 pilot); Required
+        // Recipes' row rendering (both row heights) moved to
+        // Views/Rendering/RecipesSectionRenderer (WP-23c). The shared
+        // c-table header (CreateCTableHeaderRow) moved to
+        // Views/Rendering/CTableHeaderRenderer in WP-23c once both callers
+        // were extracted section renderers - see that class's doc comment.
 
         /// <summary>
         /// gw2e's cost-breakdown: a centered row of equal-width stat tiles,
@@ -3079,29 +2863,14 @@ namespace GW2CraftingHelper.Views
 
             foreach (var row in noteRows)
             {
-                CreateTextRow(row.Label, contentFlow, panelWidth);
+                // M38 WP-23c: CreateTextRow moved to
+                // Views/Rendering/TextRowRenderer (see that class's doc
+                // comment - it has two call sites still living in
+                // CraftingPlanView, this one and the default fallback case
+                // in CreateCollapsibleSection, so it could not move
+                // wholesale into a single extracted renderer).
+                TextRowRenderer.CreateTextRow(row.Label, contentFlow, panelWidth, this);
             }
-        }
-
-        private void CreateTextRow(string text, FlowPanel parent, int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
-                Parent = parent
-            };
-            new Label()
-            {
-                Text = "  " + text,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(8, 4),
-                Parent = rowPanel
-            };
-
-            // Not width-dependent beyond the row's own cosmetic width (fixed
-            // left-anchored text, m2 3.6's "no relayout needed" case).
-            _relayoutActions.Add(w => rowPanel.Size = new Point(w, PlanContentHeightMath.FallbackTextRowHeight));
         }
 
         // Sized between the tree/row item-icon (32px) and the coin-segment

@@ -17,14 +17,18 @@ namespace GW2CraftingHelper.Views.Rendering
     // ISectionRelayoutSink.AddRelayout, which is a semantics-preserving
     // pass-through (see ISectionRelayoutSink's doc comment).
     //
-    // The "Discipline"/"Level" column header (CreateCTableHeaderRow) stays
-    // in CraftingPlanView for this pilot - it is shared chrome with the
-    // not-yet-extracted Required Recipes section (CreateRecipesBody calls
-    // the same method for its "Recipe"/"Status" header), and moving it here
-    // would either widen this PR's scope to Recipes too or leave Recipes
-    // calling into a class named for Disciplines. CraftingPlanView calls
-    // CreateCTableHeaderRow immediately before constructing this renderer;
-    // see the RequiredDisciplines case in CreateCollapsibleSection.
+    // The "Discipline"/"Level" column header (CreateCTableHeaderRow) stayed
+    // in CraftingPlanView for this pilot - it was shared chrome with the
+    // not-yet-extracted Required Recipes section (CreateRecipesBody called
+    // the same method for its "Recipe"/"Status" header), and moving it then
+    // would have either widened this pilot's scope to Recipes too or left
+    // Recipes calling into a class named for Disciplines. M38 WP-23c
+    // extracted Required Recipes too, so both callers are now extracted
+    // section renderers - the stay-in-the-view rationale no longer applies.
+    // The header call moved into this class's Render() below (see
+    // Views/Rendering/CTableHeaderRenderer's doc comment for the full
+    // resolution); CraftingPlanView.CreateCollapsibleSection no longer
+    // references the c-table header for either section.
     internal sealed class DisciplinesSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -43,11 +47,12 @@ namespace GW2CraftingHelper.Views.Rendering
 
         /// <summary>
         /// Moved verbatim from CraftingPlanView.CreateDisciplinesBody's row
-        /// loop (the header-row call that used to precede it stays in the
-        /// view - see the class doc comment above).
+        /// loop, plus the CreateCTableHeaderRow call this renderer now owns
+        /// directly (M38 WP-23c - see the class doc comment above).
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
+            CTableHeaderRenderer.CreateCTableHeaderRow(contentFlow, panelWidth, "Discipline", 8, "Level", _sink);
             for (int i = 0; i < section.Rows.Count; i++)
             {
                 CreateDisciplineRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
