@@ -31,18 +31,24 @@ namespace GW2CraftingHelper.Views.Rendering
     /// this pilot (Required Disciplines) never calls it. Verified true for
     /// Used Materials (CreateUsedMaterialRow) and Crafting Steps
     /// (CreateCraftStepRow): both depend only on the same already-extracted
-    /// Views/Rendering statics this pilot uses. NOT true for Shopping List:
-    /// CreateShoppingRow also needs CraftingPlanView's private static
+    /// Views/Rendering statics this pilot uses. Shopping List's
+    /// CreateShoppingRow was the one case that did NOT already satisfy that:
+    /// it also needed CraftingPlanView's private static
     /// GetPillColors(PillKind, bool, out Color, out Color) (for its
     /// source-tag panel colors) and the private static helper
-    /// ShoppingSourceTag(row) - neither is reachable from Views/Rendering
-    /// today. Relocating those is its own deliberate design decision
-    /// (extract to a Rendering-namespace class analogous to WP-21's Tier-1
-    /// extraction, not another private-to-internal bump reintroducing the
-    /// reverse Views/Rendering -> CraftingPlanView edge that the WP-21
-    /// findings fix already reverted once - see docs/KNOWN-ISSUES.md's
-    /// WP-23 entry) and must not be improvised mid-PR when a
-    /// ShoppingListSectionRenderer package is picked up.
+    /// ShoppingSourceTag(row), neither reachable from Views/Rendering at the
+    /// time of the WP-23 pilot. WP-23b resolved this: GetPillColors moved to
+    /// Views/Rendering/PillColors.cs (kept separate from
+    /// ShoppingListSectionRenderer because CraftingPlanView.RenderDecisionPills
+    /// also calls it), and ShoppingSourceTag moved directly into
+    /// ShoppingListSectionRenderer (it had exactly one call site). Neither
+    /// bumped a CraftingPlanView private to internal - both moves preserve
+    /// the forward-only Views/Rendering -> CraftingPlanView direction the
+    /// WP-21 findings fix established (see docs/KNOWN-ISSUES.md's WP-23
+    /// entry). A future section renderer that needs a CraftingPlanView-private
+    /// helper should follow the same precedent: extract the helper to its own
+    /// Views/Rendering class (or into the section renderer itself, if it has
+    /// exactly one call site) rather than reaching back into CraftingPlanView.
     /// </summary>
     internal interface ISectionRelayoutSink
     {

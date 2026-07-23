@@ -1356,6 +1356,103 @@ sink-registered closures rests on the reviewer's static trace (same list
 object, same replay, DEBUG scroll-neutral assert armed) rather than a
 fresh live drag; a future human drag remains the gold-standard check.
 
+## WP-23b: UsedMaterialsSectionRenderer + ShoppingListSectionRenderer (M38)
+Continuation of the WP-23 pilot's ISectionRelayoutSink seam: the Used
+Materials and Shopping List sections, the next two candidates per the
+plan's sequencing.
+SCOPE: `Views/Rendering/UsedMaterialsSectionRenderer.cs` (new) -
+`CreateUsedMaterialsBody` (renamed `Render`) and `CreateUsedMaterialRow`
+moved verbatim; the only edits inside the moved bodies are
+`_relayoutActions.Add(...)` -> `_sink.AddRelayout(...)` and
+`_reellipsisActions.Add(...)` -> `_sink.AddReellipsis(...)`. Per the WP-23
+pilot's FORWARD NOTE this section depended only on the already-extracted
+IconControls/RarityColors/LabelHelpers/PlanRelayoutMath statics the pilot
+also used, so no further dependency work was needed here - confirmed true.
+`Views/Rendering/ShoppingListSectionRenderer.cs` (new) -
+`CreateShoppingListBody` (renamed `Render`), `CreateShoppingListHeaderRow`,
+`ShoppingSourceTag`, and `CreateShoppingRow` moved verbatim; same two sink
+substitutions as above, plus `GetPillColors(...)` ->
+`PillColors.GetPillColors(...)` (see next paragraph).
+GETPILLCOLORS RESOLUTION (the WP-23 pilot's documented challenge): the
+pilot flagged that `CreateShoppingRow` calls `CraftingPlanView`'s private
+static `GetPillColors(PillKind, bool, out Color, out Color)` and warned
+against bumping it `private` -> `internal` on `CraftingPlanView` again (the
+WP-21 findings fix, commit 5c56b2a, already reverted exactly that kind of
+reverse `Views/Rendering` -> `CraftingPlanView` edge once). Before moving
+anything, every `GetPillColors` call site in `CraftingPlanView` was
+grepped: two, not one - `CreateShoppingRow` (moving) AND
+`RenderDecisionPills` (the recipe tree's decision pills, NOT part of this
+package's scope, staying in `CraftingPlanView`). Because a second,
+non-extracted caller depends on it, `GetPillColors` could not simply move
+into `ShoppingListSectionRenderer` the way `ShoppingSourceTag` did
+(`ShoppingSourceTag` has exactly one call site, so it moved directly into
+`ShoppingListSectionRenderer` with zero further decisions - confirmed by a
+zero-diff `diff -w` against the pre-move body). Resolution taken: extract
+`GetPillColors` to its own `Views/Rendering/PillColors.cs`, `private
+static` -> `internal static`, no logic change (the same treatment WP-21's
+Tier-1 pass gave `RarityColors`/`LabelHelpers`), and repoint both call
+sites to it - `ShoppingListSectionRenderer.CreateShoppingRow` calls
+`PillColors.GetPillColors` directly, and `CraftingPlanView.RenderDecisionPills`
+now also calls `PillColors.GetPillColors` instead of a local private
+method. This is the forward direction only: `CraftingPlanView` ->
+`Views/Rendering`, identical in kind to its existing
+`RarityColors.GetRarityBorderColor` calls - no edge back from
+`Views/Rendering` into `CraftingPlanView` was introduced anywhere in this
+package.
+DIFF EVIDENCE: whitespace-insensitive (`diff -w`) comparisons of every
+moved method against its pre-move body confirm move-only extraction with
+no unintended edits: `CreateUsedMaterialRow` differs only in the two sink
+calls; `CreateShoppingListHeaderRow` differs only in the one sink call;
+`ShoppingSourceTag` has ZERO diff (byte-for-byte move); `CreateShoppingRow`
+differs only in the two sink calls plus the one `PillColors.` qualifier;
+`GetPillColors` differs only in its `private` -> `internal` access
+modifier. The `CreateUsedMaterialsBody` -> `Render` and
+`CreateShoppingListBody` -> `Render` wrapper methods differ only in name
+(and access modifier `private` -> `internal`), matching the pilot's own
+`CreateDisciplinesBody` -> `Render` rename.
+INVARIANT TRACE: both renderers are constructed as
+`new UsedMaterialsSectionRenderer(this)` / `new ShoppingListSectionRenderer(this)`
+from `CraftingPlanView.CreateCollapsibleSection`, exactly mirroring the
+pilot's `new DisciplinesSectionRenderer(this)` call - `_sink` at every
+call site inside the moved row builders resolves to the view itself, so
+`ISectionRelayoutSink.AddRelayout`/`AddReellipsis` route to the same
+`_relayoutActions`/`_reellipsisActions` lists `ReplayRelayout`/
+`RunReellipsis` iterate and the same lists `CreateCollapsibleSection`'s
+DEBUG must-register check counts before/after each section body runs.
+`ShoppingListSectionRenderer.Render` always registers at least the header
+row's relayout closure regardless of `section.Rows.Count`, exactly as
+`CreateShoppingListBody` always did before the move - the DEBUG check's
+behavior for an empty Shopping List is unchanged.
+DO-NOT-TOUCH compliance: `PlanContentHeightMath`, `PlanRelayoutMath`, and
+`ShoppingColumnMath` (all three referenced by the moved Shopping List body)
+stay in `Services/`, called exactly as before, not moved or edited.
+`LabelHelpers.CreateRowDivider`'s divider math and its M36b bottom-
+clearance calls move with the row bodies unchanged (bottomClearance 0 for
+both UsedMaterialRowHeight and ShoppingRowHeight, per the existing
+comments moved alongside them verbatim).
+VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped -
+unchanged from the pre-WP-23b floor; this view has no automated test net,
+so green tests prove only that nothing else broke, not that the rendering
+or resize behavior is correct). Live pre-merge visual verification (Blish-
+over-Paint screenshot/pixel-scan loop) on the Crafting Plan tab's Used
+Materials and Shopping List sections - both sections render, divider
+scans, and a Shopping List row's source-tag tooltip/pill check - is being
+run by the orchestrating session per the M38 plan's `needsVisualLoop` gate
+(this package is invariant-adjacent per the same risk rating as the WP-23
+pilot). Result recorded here and in the PR before merge:
+PASS (orchestrator, 2026-07-22, live branch-build session, captures
+wp23b_06/07): Used Materials (4) rendered via UsedMaterialsSectionRenderer
+with the synthetic-snapshot consumptions exactly matching the M37
+reference (Augur's Stone 1x / Mystic Clover 30x / Stabilizing Matrix 30x /
+Mystic Runestone 100x, correct rarity colors and right-aligned counts);
+Shopping List (76) rendered via ShoppingListSectionRenderer with VENDOR
+tags, coin columns, currency cells (Tribute to the Exitare 20x/4000x with
+icons) and the M34 "N for M" bundle label ("1 for 10" on 1082x
+Philosopher's Stone) all correct; the M34 owned-currency tooltip renders
+through the extracted code ("Unbound Magic: 0 owned, 4000 needed");
+divider scan across both sections shows uniform 29/30 pitches with gaps
+only at the by-design isLast/section-seam boundaries
+
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
 capture across three desktop sessions and two machines' font stacks
