@@ -40,7 +40,9 @@ namespace GW2CraftingHelper.Views.Rendering
     /// time of the WP-23 pilot. WP-23b resolved this: GetPillColors moved to
     /// Views/Rendering/PillColors.cs (kept separate from
     /// ShoppingListSectionRenderer because CraftingPlanView.RenderDecisionPills
-    /// also calls it), and ShoppingSourceTag moved directly into
+    /// also called it at the time - WP-25 later moved RenderDecisionPills
+    /// itself onto TreeSectionController, see that entry below), and
+    /// ShoppingSourceTag moved directly into
     /// ShoppingListSectionRenderer (it had exactly one call site). Neither
     /// bumped a CraftingPlanView private to internal - both moves preserve
     /// the forward-only Views/Rendering -> CraftingPlanView direction the
@@ -79,6 +81,18 @@ namespace GW2CraftingHelper.Views.Rendering
     /// Materials' and Shopping List's rows shared exactly, confirmed by
     /// constant-by-constant comparison - see each helper's own doc comment
     /// for what it does and does not cover).
+    ///
+    /// M38 WP-25 (TreeSectionController) added RelayoutCount: a read-only
+    /// view of how many relayout closures are registered so far. Every
+    /// earlier extracted renderer's own DEBUG must-register assert
+    /// (CraftingPlanView.CreateCollapsibleSection's before/after count)
+    /// stays in CraftingPlanView itself, which already has direct field
+    /// access to _relayoutActions - this member exists only because
+    /// TreeSectionController.CreateTreeSection has the SAME assert
+    /// (moved verbatim from CraftingPlanView.CreateTreeSection) but is no
+    /// longer inside CraftingPlanView to read the field directly. Kept
+    /// read-only and additive to AddRelayout/AddReellipsis rather than
+    /// widening either of those - this is observation, not registration.
     /// </summary>
     internal interface ISectionRelayoutSink
     {
@@ -104,5 +118,13 @@ namespace GW2CraftingHelper.Views.Rendering
         /// not require a breaking interface change to adopt the sink.
         /// </summary>
         void AddReellipsis(Action<int> closure);
+
+        /// <summary>
+        /// M38 WP-25: how many relayout closures are registered right now -
+        /// see the interface doc comment above for why this exists (a
+        /// DEBUG-only must-register assert moved out of CraftingPlanView
+        /// alongside TreeSectionController).
+        /// </summary>
+        int RelayoutCount { get; }
     }
 }
