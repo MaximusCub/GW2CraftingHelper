@@ -1563,7 +1563,19 @@ confirmation that no DEBUG "registered no relayout closures" warning fires
 - is being run by the orchestrating session per the M38 plan's
 `needsVisualLoop` gate (this package is invariant-adjacent per the same
 risk rating as WP-23/WP-23b). Result recorded here and in the PR before
-merge: [PENDING - the orchestrator fills in PASS/FAIL]
+merge: PASS (orchestrator, 2026-07-23, live branch-build session under the
+hardened desktop protocol, captures wp23c_04/05/06/08): Required Recipes
+renders via RecipesSectionRenderer (both row heights, sublabels,
+Learned/Auto-learned tags) and Crafting Steps via CraftStepsSectionRenderer
+(step numbers 1-47, rarity colors, discipline sublabels) with divider
+scans uniform 35/36 at two offsets each - the only gaps decode to the
+by-design isLast/section-seam boundaries; the timegated notice row renders
+through the extracted code ("Glob of Ectoplasm is timegated - Weekly
+limit: 1 (plan needs 105)"); zero relayout DEBUG warnings in the Blish
+log. Note: this run's step quantities differ from prior references (e.g.
+200x Shard of Exitare vs 100x) with the qty box verified at 1 - live
+price-driven route variance in the solve, not a rendering defect (this
+branch's diff is Views-only; solver bits identical to master)
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
