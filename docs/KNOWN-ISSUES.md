@@ -1453,6 +1453,117 @@ through the extracted code ("Unbound Magic: 0 owned, 4000 needed");
 divider scan across both sections shows uniform 29/30 pitches with gaps
 only at the by-design isLast/section-seam boundaries
 
+## WP-23c: CraftStepsSectionRenderer + RecipesSectionRenderer (M38)
+Continuation of the WP-23 pilot's ISectionRelayoutSink seam: the Crafting
+Steps and Required Recipes sections, the last two body builders on the
+plan's sequencing.
+SCOPE: `Views/Rendering/CraftStepsSectionRenderer.cs` (new) -
+`CreateCraftingStepsBody` (renamed `Render`) and `CreateCraftStepRow` moved
+verbatim; the moved body's TimegatedNotice branch (the M34 warn-only
+vendor-cap notice, carrying the M37 Seasonal wording from PR #81) and
+`CreateCraftStepRow`'s step-number badge move with it. The only edits
+inside the moved bodies are `_relayoutActions.Add(...)` ->
+`_sink.AddRelayout(...)` and `CreateTextRow(...)` ->
+`TextRowRenderer.CreateTextRow(..., _sink)` (see next paragraph).
+`Views/Rendering/RecipesSectionRenderer.cs` (new) - `CreateRecipesBody`
+(renamed `Render`) and `CreateRecipeRow` moved verbatim, including BOTH row
+heights (`RecipeRowHeightWithSublabel` 44px, `RecipeRowHeightNoSublabel`
+36px per the M36 fix-pass correction) and the Auto-learned/Learned/Missing!
+status-tag coloring; same `_relayoutActions.Add(...)` ->
+`_sink.AddRelayout(...)` substitution, plus `CreateCTableHeaderRow(...)` ->
+`CTableHeaderRenderer.CreateCTableHeaderRow(..., _sink)` (see the
+CTABLEHEADERROW paragraph below).
+CREATETEXTROW RESOLUTION (a GetPillColors-shaped fork, same precedent):
+`CreateCraftingStepsBody`'s TimegatedNotice branch calls
+`CraftingPlanView`'s private `CreateTextRow(string, FlowPanel, int)`.
+Grepped every call site before moving anything: three, not one - the
+TimegatedNotice branch (moving), the default fallback case in
+`CreateCollapsibleSection` (staying - a section type with no dedicated body
+builder), and `CreateSummarySectionBody`'s `noteRows` loop (staying -
+Summary is out of this package's scope). Because two non-extracted callers
+remain, `CreateTextRow` could not move into `CraftStepsSectionRenderer` the
+way a single-call-site helper would (c.f. `ShoppingSourceTag`, WP-23b).
+Resolution: extracted to its own `Views/Rendering/TextRowRenderer.cs`,
+`private` -> `internal static`, with an added `ISectionRelayoutSink sink`
+parameter (the row's own relayout registration moved inside the shared
+method rather than being left as a fourth line duplicated at every call
+site). All three call sites - `CraftStepsSectionRenderer`'s TimegatedNotice
+branch (passes `_sink`) and `CraftingPlanView`'s two remaining call sites
+(each passes `this`) - now call `TextRowRenderer.CreateTextRow` directly.
+CTABLEHEADERROW RESOLUTION (the WP-23 pilot's own documented fork, now
+closeable): the pilot deliberately left `CreateCTableHeaderRow` in
+`CraftingPlanView`, calling it directly immediately before constructing
+`DisciplinesSectionRenderer`, because its only other caller (Required
+Recipes' `CreateRecipesBody`) was not yet extracted - moving it then would
+have either widened the pilot's scope to Recipes or left Recipes calling
+into a class named for Disciplines. This package extracts Required Recipes
+too, so BOTH callers are now extracted section renderers; per this
+package's brief ("unless BOTH remaining users are now extracted and moving
+it is the strictly cleaner forward-edge"), `CreateCTableHeaderRow` moved to
+`Views/Rendering/CTableHeaderRenderer.cs` (`private` -> `internal static`,
+plus the same added `sink` parameter as `TextRowRenderer`), and BOTH
+`DisciplinesSectionRenderer.Render` and `RecipesSectionRenderer.Render` now
+call it directly as their own first step - mirroring how
+`ShoppingListSectionRenderer` already owns `CreateShoppingListHeaderRow`
+(WP-23b) instead of relying on `CraftingPlanView` to call it first.
+`CraftingPlanView.CreateCollapsibleSection`'s `RequiredDisciplines` case
+lost its separate header-row call (now just constructs the renderer, like
+every other section); `RequiredRecipes` never had a separate one to lose.
+`DisciplinesSectionRenderer.cs` (WP-23 pilot, already merged via PR #89)
+was edited for this - its `Render` method and class doc comment updated to
+match; `CreateDisciplineRow` itself is untouched (confirmed by `diff -w`
+against the pre-WP-23c copy: the only differences are the doc comment and
+the one added `CTableHeaderRenderer.CreateCTableHeaderRow(...)` call at the
+top of `Render`).
+DIFF EVIDENCE: whitespace-insensitive (`diff -w`) comparisons of every
+moved method against its pre-move body in the origin/master copy of
+`CraftingPlanView.cs` confirm move-only extraction: `CreateCraftStepRow`
+differs only in the one sink substitution; `CreateCraftingStepsBody` (now
+`Render`) differs only in its rename and the `TextRowRenderer.`-qualified
+call; `CreateRecipeRow` differs only in the one sink substitution plus the
+added attribution comment; `CreateRecipesBody` (now `Render`) differs only
+in its rename and the `CTableHeaderRenderer.`-qualified call;
+`CreateCTableHeaderRow` and `CreateTextRow` each differ only in their
+`private` -> `internal static` signature (plus the added `sink` parameter)
+and the one sink substitution inside.
+INVARIANT TRACE: both renderers are constructed as
+`new CraftStepsSectionRenderer(this)` / `new RecipesSectionRenderer(this)`
+from `CraftingPlanView.CreateCollapsibleSection`, exactly mirroring every
+prior section renderer - `_sink` at every call site inside the moved row
+builders (including the two new shared helpers, which receive the same
+`_sink` reference as a parameter rather than a stored field) resolves to
+the view itself, so `ISectionRelayoutSink.AddRelayout` routes to the same
+`_relayoutActions` list `ReplayRelayout` iterates and
+`CreateCollapsibleSection`'s DEBUG must-register check counts before/after
+each section body runs. Moving `CreateCTableHeaderRow`'s registration
+inside `Render()` (rather than a separate call preceding renderer
+construction) does not change when it registers relative to the switch
+case - both still happen synchronously inside the same `case` block, so
+the DEBUG check's before/after count is identical to the pre-WP-23c
+ordering.
+DO-NOT-TOUCH compliance: `PlanContentHeightMath` (including
+`RecipeRowHeightNoSublabel` = 36 / `RecipeRowHeightWithSublabel` = 44, the
+M36 correction) and `PlanRelayoutMath` stay in `Services/`, called exactly
+as before, not moved or edited. `LabelHelpers.CreateRowDivider`'s divider
+math and its per-branch M36b bottom-clearance calls (1 for
+`CraftStepRowHeight`/`RecipeRowHeightWithSublabel`, 0 for
+`RecipeRowHeightNoSublabel`) move with the row bodies unchanged, per the
+comments moved alongside them verbatim.
+VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped -
+unchanged from the pre-WP-23c floor; this view has no automated test net,
+so green tests prove only that nothing else broke, not that the rendering
+or resize behavior is correct). Live pre-merge visual verification (Blish-
+over-Paint screenshot/pixel-scan loop) on the Crafting Plan tab's Crafting
+Steps and Required Recipes sections - both sections render, a
+TimegatedNotice row (if the live plan produces one), the two Required
+Recipes row heights (with and without a sublabel), the Auto-learned/
+Learned/Missing! status-tag colors, divider scans on both sections, and
+confirmation that no DEBUG "registered no relayout closures" warning fires
+- is being run by the orchestrating session per the M38 plan's
+`needsVisualLoop` gate (this package is invariant-adjacent per the same
+risk rating as WP-23/WP-23b). Result recorded here and in the PR before
+merge: [PENDING - the orchestrator fills in PASS/FAIL]
+
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
 capture across three desktop sessions and two machines' font stacks
