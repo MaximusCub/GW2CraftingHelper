@@ -113,6 +113,43 @@ listing for this module. The only way to run it today is:
 There is no documented, supported path for a non-developer to install this
 module without building it from source.
 
+## Addendum: build from a clean checkout until the csproj exclusion lands
+
+The "Measured finding" above establishes that the `BuildBlishHUDModule`
+target copies all of `ref/` into the `.bhm` regardless of `<Content
+Include>` wiring, and that `ref/wiki_vendor_cache.json`/
+`ref/item_id_cache.json` were untracked and gitignored (PR #92) precisely
+because of this. Untracking them only closes the gap for a **clean
+checkout** - a `git clone` never has them, so its `.bhm` never contains
+them. It does **not** retroactively remove them from a developer's
+existing working copy: anyone who ran `tools/VendorOfferUpdater` before
+PR #92 (or has run it since, since the tool still writes those files
+locally as its own working cache) still has both files sitting in `ref/`
+on disk, gitignored or not, and a build from that same working copy still
+picks them up via the wholesale `ref/` copy and ships them - gitignore
+only controls what `git` tracks, not what MSBuild's `CopyToOutputDirectory`
+-equivalent packaging step reads off disk.
+
+This was directly measured on the M38 WP-25 branch (recorded in
+`docs/dev-notes/HISTORY.md` under the WP-25 entry, 2026-07-23): a worktree
+created **after** PR #92 (so never had the caches materialize at all)
+produced a `.bhm` of 6.0 MB, versus 7.2 MB from an equivalent build on a
+working copy that still had them - and the smaller, cache-free build
+loaded and ran the module's full interaction surface (recipe tree render,
+decision-pill overrides, Ignore toggle, presets) with no missing-file
+errors or behavior difference, confirming these two files have no runtime
+consumer in the shipped module at all.
+
+**Recommendation:** until a real fix lands (see the csproj-exclusion gap
+in the list below), build any release `.bhm` from a fresh clone or a
+working copy you have confirmed does not contain
+`ref/wiki_vendor_cache.json`/`ref/item_id_cache.json`, rather than from an
+active `VendorOfferUpdater` development workspace. This is a process
+recommendation only - **no `GW2CraftingHelper.csproj` change was made as
+part of this addendum**; a real fix (e.g. an MSBuild `Exclude` on the
+`BuildBlishHUDModule` target's copy, or moving these two files out of
+`ref/` entirely) remains the follow-up item already listed below.
+
 ## What a real release process would still need
 
 None of the following exist today; they are listed as concrete gaps, not
