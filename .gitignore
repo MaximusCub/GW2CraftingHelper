@@ -370,3 +370,9 @@ packages/
 
 # MysticForgeSeeder intermediate cache
 ref/mf_item_id_cache.json
+
+# Agent-session scratch directories (PR body staging, work-package
+# verification captures) - generic by design so they don't silently
+# recur if an automated session creates one inside the repo tree.
+.tmp-pr/
+wp*-check/
