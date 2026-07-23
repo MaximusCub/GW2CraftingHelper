@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GW2CraftingHelper.Harness",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GW2CraftingHelper.RecipeSeeder", "tools\GW2CraftingHelper.RecipeSeeder\GW2CraftingHelper.RecipeSeeder.csproj", "{A1B2C3D4-5678-9012-3456-789012345678}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MysticForgeSeeder", "tools\MysticForgeSeeder\MysticForgeSeeder.csproj", "{EE57408C-A82D-4F51-B3A3-AC15D4627766}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -100,6 +102,18 @@ Global
 		{A1B2C3D4-5678-9012-3456-789012345678}.Release|x64.Build.0 = Release|Any CPU
 		{A1B2C3D4-5678-9012-3456-789012345678}.Release|x86.ActiveCfg = Release|Any CPU
 		{A1B2C3D4-5678-9012-3456-789012345678}.Release|x86.Build.0 = Release|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Debug|x64.Build.0 = Debug|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Debug|x86.Build.0 = Debug|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Release|x64.ActiveCfg = Release|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Release|x64.Build.0 = Release|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Release|x86.ActiveCfg = Release|Any CPU
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -109,6 +123,7 @@ Global
 		{C883AE5B-0DF6-4199-BB20-8DB5287BDA3B} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{39EBF52C-44AD-4B86-8953-B945FFD24297} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 		{A1B2C3D4-5678-9012-3456-789012345678} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
+		{EE57408C-A82D-4F51-B3A3-AC15D4627766} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {94774E8F-CBB1-4CC2-A4F9-606CEF73C97D}
