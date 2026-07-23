@@ -1269,6 +1269,58 @@ the explicit DefaultFont14 assignment produces glyphs indistinguishable
 from the old implicit default - the flagged font risk is resolved as a
 no-op. Item rows, filters, and staleness label unchanged.
 
+## WP-23 (pilot): ISectionRelayoutSink + DisciplinesSectionRenderer (M38)
+Architecture report S3b-T2 proposes a small seam so section builders can
+move out of `CraftingPlanView` while preserving the M33 C2b relayout
+registry contract (#13/#19): `interface ISectionRelayoutSink { AddRelayout;
+AddReellipsis; }`. This package is the pilot increment - `Required
+Disciplines`, the smallest section (~40 lines), chosen first per the
+plan's "smallest first" sequencing.
+SCOPE: `Views/Rendering/ISectionRelayoutSink.cs` (new) - two members only,
+both a direct pass-through to `CraftingPlanView`'s existing
+`_relayoutActions`/`_reellipsisActions` lists via explicit interface
+implementation (not public - does not widen the view's public surface).
+`Views/Rendering/DisciplinesSectionRenderer.cs` (new) - `CreateDisciplinesBody`'s
+row loop (renamed `Render`) and `CreateDisciplineRow` moved verbatim; the
+one edit inside the moved bodies is `_relayoutActions.Add(...)` ->
+`_sink.AddRelayout(...)`. `CreateCTableHeaderRow` (the shared "Discipline"/
+"Level" column header, also used by the not-yet-extracted Required Recipes
+section) stays in `CraftingPlanView` by design - extracting it now would
+either widen this pilot's scope to Recipes or leave Recipes calling into a
+class named for Disciplines; `CraftingPlanView` calls it directly
+immediately before constructing the renderer (see the `RequiredDisciplines`
+case in `CreateCollapsibleSection`). `CreateRowDivider`'s divider math
+(DO-NOT-TOUCH #6) is called unchanged through `LabelHelpers`, itself
+untouched by this package.
+DIFF EVIDENCE: a whitespace-insensitive (`diff -w`) comparison of the
+pre-move `CreateDisciplineRow` body against the moved copy in
+`DisciplinesSectionRenderer` shows the row geometry, the divider call and
+its M36b bottom-clearance comment, and the closure body are byte-for-byte
+unchanged; the only textual difference is the one intentional line
+(`_relayoutActions.Add` -> `_sink.AddRelayout`) plus added doc comments.
+INVARIANT TRACE (not just asserted - read end-to-end): `DisciplinesSectionRenderer`
+is constructed as `new DisciplinesSectionRenderer(this)` from
+`CraftingPlanView`, so `_sink` at the call site inside `CreateDisciplineRow`
+is the view itself; `ISectionRelayoutSink.AddRelayout` on `CraftingPlanView`
+resolves to `_relayoutActions.Add(closure)` - the exact same list object
+`ReplayRelayout` iterates and that `CreateCollapsibleSection`'s DEBUG
+must-register check counts before/after the section body runs. A section
+extracted this way that forgot to call `AddRelayout` would trip the
+existing "registered no relayout closures" warning exactly as an inline
+builder that forgot `_relayoutActions.Add` always did - the check's input
+(list contents) is identical regardless of which code path appended to it.
+VERIFICATION STATE: suites green (1101/1101, 0 failed, 0 skipped -
+unchanged from the pre-WP-23 floor; this view has no automated test net,
+so green tests prove only that nothing else broke, not that the rendering
+or resize behavior is correct). Live pre-merge visual verification (Blish-
+over-Paint screenshot/pixel-scan loop) on the Crafting Plan tab's Required
+Disciplines section - row render, divider scan, drag-resize reflow, and
+confirmation that no DEBUG "registered no relayout closures" warning fires
+- is being run by the orchestrating session per the M38 plan's
+`needsVisualLoop` gate (this package is invariant-adjacent per WP-23's
+risk rating: medium-high). Result recorded here and in the PR before merge:
+[PENDING - the orchestrator fills in PASS/FAIL].
+
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
 capture across three desktop sessions and two machines' font stacks
