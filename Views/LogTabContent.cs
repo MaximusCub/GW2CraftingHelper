@@ -68,6 +68,34 @@ namespace GW2CraftingHelper.Views
         // RebuildRows.
         private bool _hasRenderedAnyRow;
 
+        // True once Build's own initial RebuildRows call (see the bottom
+        // of Build) has finished. Guards PollForUpdates against a real
+        // race: per docs/ARCHITECTURE.md Section 1, Blish HUD's own
+        // WindowBase2.ShowView runs a tab's Build() via
+        // View.DoLoad().ContinueWith(...) - with no SynchronizationContext
+        // installed, that continuation resumes on a ThreadPool thread, not
+        // the main/game thread. Module.Update() starts calling
+        // PollForUpdates() on the main thread as soon as SelectedTab flips
+        // to the Log tab, which happens synchronously and BEFORE that
+        // ThreadPool-scheduled Build() has necessarily run. Without this
+        // guard, PollForUpdates() could invoke RebuildRows() concurrently
+        // with Build()'s own tail RebuildRows() call, on the SAME
+        // freshly-created _contentPanel: RebuildRows() disposes-then-adds
+        // in separate, unsynchronized steps, so if both calls' dispose
+        // steps run before either call's add step, BOTH survive - this
+        // produced two stacked "No log entries yet." placeholders,
+        // confirmed live 2026-07-23 (capture m38f_03_tab3.png). Set only
+        // once, as the last statement in Build(), after its own
+        // RebuildRows() call has already fully populated the panel.
+        // volatile: this field is genuinely read and written from two
+        // different threads (the ThreadPool thread driving Build(), and
+        // the main/game thread driving PollForUpdates()) - without it,
+        // nothing prevents the JIT/CPU from reordering the write to true
+        // ahead of the panel-populating writes that precede it in Build(),
+        // or from caching a stale false/true read across PollForUpdates()
+        // calls on the polling thread.
+        private volatile bool _buildComplete;
+
         // FIFO of every currently-displayed "real" row (never the
         // empty-state Label), oldest-first, each tagged with the absolute
         // ring index it was rendered from. AppendNewRows enqueues onto the
@@ -182,6 +210,12 @@ namespace GW2CraftingHelper.Views
             };
 
             RebuildRows();
+
+            // Must be the LAST statement in Build() - see _buildComplete's
+            // own doc comment for why PollForUpdates needs this to stay
+            // false for Build()'s entire duration, not just after this
+            // method's own RebuildRows() call above.
+            _buildComplete = true;
         }
 
         private void PositionToolbarButtons(int w)
@@ -197,7 +231,10 @@ namespace GW2CraftingHelper.Views
         /// Section 4.3's refresh design, on top of the TabChanged-driven
         /// <see cref="Refresh"/> below. An unchecked Follow freezes the
         /// current view exactly like a paused `tail -f`, even though new
-        /// entries keep arriving in the ring underneath it.
+        /// entries keep arriving in the ring underneath it. Also a no-op
+        /// until <see cref="_buildComplete"/> is set - see that field's own
+        /// doc comment for the ThreadPool-vs-game-thread race this guards
+        /// against.
         /// <para>
         /// When Follow IS checked and new entries arrived, this uses the
         /// incremental <see cref="AppendNewRows"/> path (d2 Section 4.3:
@@ -214,6 +251,18 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         public void PollForUpdates()
         {
+            if (!_buildComplete)
+            {
+                // Build() (possibly still running on the ThreadPool thread
+                // that drove it - see _buildComplete's doc comment) has
+                // not finished populating _contentPanel yet. Racing
+                // RebuildRows()/AppendNewRows() against Build()'s own
+                // still-in-flight RebuildRows() call is exactly what
+                // produced the doubled empty-state placeholder; skip this
+                // poll entirely and let Build() finish on its own.
+                return;
+            }
+
             if (!IsLive)
             {
                 return;
