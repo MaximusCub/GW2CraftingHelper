@@ -1261,7 +1261,13 @@ the Crafting Plan tab's coin/currency cells (confirming
 CraftingPlanView's untouched call sites still render correctly) is being
 run by the orchestrating session per the M38 plan's `needsVisualLoop`
 gate. Result recorded here and in the PR before merge:
-[PENDING - the orchestrator fills in PASS/FAIL].
+PASS (orchestrator, 2026-07-22, live branch-build session, capture
+wp22_02_snap.png vs pre-change wp21_06_snap.png): the left-anchored
+Snapshot-tab coin row renders pixel-consistently through the shared
+renderer (identical number colors, icon-right placement, spacing), and
+the explicit DefaultFont14 assignment produces glyphs indistinguishable
+from the old implicit default - the flagged font risk is resolved as a
+no-op. Item rows, filters, and staleness label unchanged.
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
