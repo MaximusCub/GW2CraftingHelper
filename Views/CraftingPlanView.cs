@@ -2638,7 +2638,9 @@ namespace GW2CraftingHelper.Views
                     new UsedMaterialsSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.ShoppingList:
-                    CreateShoppingListBody(section, contentFlow, panelWidth);
+                    // M38 WP-23b: row rendering moved to
+                    // Views/Rendering/ShoppingListSectionRenderer.
+                    new ShoppingListSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.CraftingSteps:
                     CreateCraftingStepsBody(section, contentFlow, panelWidth);
@@ -2693,236 +2695,14 @@ namespace GW2CraftingHelper.Views
         // RequiredDisciplines-style call in CreateCollapsibleSection above).
 
         // --- Shopping List section ---
-
-        // Right-aligned price columns for the shopping list's Each and
-        // Total prices: both anchor to a fixed right edge and grow
-        // LEFTWARD, so a gold-value amount in either column can never grow
-        // into the other's space. Previously each column reserved a fixed
-        // width (150/90) regardless of content; a 3+ digit gold value in
-        // Each or Total could still exceed its fixed band and bleed into
-        // the Amount column to its left. Column widths are now derived from
-        // the actual widest rendered value per column, clamped to those
-        // same fixed minimums so short/low-value lists don't look cramped -
-        // see ShoppingColumnMath (Blish-free, unit-tested arithmetic).
-        private void CreateShoppingListBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
-        {
-            var coinFont = GameService.Content.DefaultFont14;
-
-            // Pre-scan: widest actual coin+currency value width per column
-            // this render (CoinCurrencyRenderer.MeasureValueWidth accounts for a currency-only
-            // or mixed row's icon(s) too, not just coin - KNOWN-ISSUES
-            // #16). One pass over the section's rows (shopping lists run to
-            // maybe 50-60 rows in practice) - negligible next to the
-            // per-row control creation this method already does.
-            int maxEachWidth = 0;
-            int maxTotalWidth = 0;
-            foreach (var row in section.Rows)
-            {
-                int eachW = CoinCurrencyRenderer.MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
-                if (eachW > maxEachWidth) maxEachWidth = eachW;
-
-                int totalW = CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, row.CurrencyCosts, coinFont);
-                if (totalW > maxTotalWidth) maxTotalWidth = totalW;
-            }
-
-            int totalRightEdge = panelWidth - 8;
-            var edges = ShoppingColumnMath.ComputeEdges(totalRightEdge, maxEachWidth, maxTotalWidth);
-
-            // Both the header and every data row are handed this SAME
-            // ColumnEdges instance (for the build), and the same cached
-            // maxEachWidth/maxTotalWidth (for their relayout closures) - a
-            // relayout tick re-invokes ShoppingColumnMath.ComputeEdges with
-            // the new panelWidth but these SAME data-derived maxima (M33
-            // C2b: the pre-scan above depends only on row data, never on
-            // panelWidth, so it does not need to re-run on resize at all).
-            CreateShoppingListHeaderRow(contentFlow, panelWidth, edges, maxEachWidth, maxTotalWidth);
-            for (int i = 0; i < section.Rows.Count; i++)
-            {
-                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, edges, maxEachWidth, maxTotalWidth, i == section.Rows.Count - 1);
-            }
-        }
-
-        private void CreateShoppingListHeaderRow(
-            FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges, int maxEachWidth, int maxTotalWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, PlanContentHeightMath.ShoppingHeaderRowHeight),
-                Parent = parent
-            };
-            var font = GameService.Content.DefaultFont12;
-            var color = new Color(153, 153, 153);
-
-            new Label()
-            {
-                Text = "Item", Font = font, TextColor = color,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(50, 4), Parent = rowPanel
-            };
-            var amountLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Amount", font, color, edges.QtyRightEdge, 4);
-            var eachLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
-            var totalLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Total", font, color, edges.TotalRightEdge, 4);
-
-            // M33 C2b: header column labels are font-only (fixed text) -
-            // pure reposition on every drag tick, recomputing edges from
-            // the SAME cached maxEachWidth/maxTotalWidth ComputeEdges was
-            // built with (ShoppingColumnMath is the single source of truth
-            // both paths call).
-            _relayoutActions.Add(w =>
-            {
-                rowPanel.Size = new Point(w, PlanContentHeightMath.ShoppingHeaderRowHeight);
-                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
-                amountLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), 4);
-                eachLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), 4);
-                totalLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), 4);
-            });
-        }
-
-        private static string ShoppingSourceTag(PlanRowViewModel row)
-        {
-            switch (row.RowType)
-            {
-                case PlanRowType.ShoppingVendor: return "VENDOR";
-                case PlanRowType.ShoppingCurrency: return "CURRENCY";
-                case PlanRowType.ShoppingUnknown:
-                    // Prefer the seeded wiki hint's badge (e.g. "SALVAGE",
-                    // "EXPLORE") when one exists - "UNKNOWN" remains the
-                    // fallback for no-source items with no seeded hint.
-                    return !string.IsNullOrEmpty(row.BadgeText) ? row.BadgeText : "UNKNOWN";
-                default: return null; // ShoppingBuy: plain TP purchase, no tag needed
-            }
-        }
-
-        private void CreateShoppingRow(
-            PlanRowViewModel row, FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges,
-            int maxEachWidth, int maxTotalWidth, bool isLast)
-        {
-            const int rowHeight = PlanContentHeightMath.ShoppingRowHeight;
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
-
-            // M36: y=0 (was 1) - see the identical note in
-            // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
-            // shape, same 1px shortfall against the new 2px divider.
-            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
-
-            const int nameX = 50;
-            var font = GameService.Content.DefaultFont14;
-
-            string qtyText = $"{row.Quantity}x";
-            int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
-            int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(edges.QtyRightEdge, qtyWidth, 12, nameX);
-
-            string fullName = row.Label ?? "";
-            string hintText = row.HintText;
-            string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
-            var nameLabel = new Label()
-            {
-                Text = displayName,
-                Font = font,
-                TextColor = RarityColors.GetRarityNameColor(row.Rarity),
-                ShowShadow = true,
-                ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(nameX, 9),
-                Parent = rowPanel
-            };
-            var tooltipParts = new List<string>();
-            if (displayName != fullName)
-            {
-                tooltipParts.Add(fullName);
-            }
-            if (!string.IsNullOrEmpty(hintText))
-            {
-                tooltipParts.Add(hintText);
-            }
-            // M34-B2b: owned/needed split for this row's currency cost(s),
-            // cosmetic-only tooltip (avoids new inline layout math for a
-            // fixed-height shopping row - see PlanContentHeightMath).
-            if (row.CurrencyCosts != null)
-            {
-                foreach (var cc in row.CurrencyCosts)
-                {
-                    if (cc.OwnedQuantity.HasValue)
-                    {
-                        long needed = cc.Amount - cc.OwnedQuantity.Value;
-                        tooltipParts.Add($"{cc.Name}: {cc.OwnedQuantity.Value} owned, {needed} needed");
-                    }
-                }
-            }
-            if (tooltipParts.Count > 0)
-            {
-                rowPanel.BasicTooltipText = string.Join("\n", tooltipParts);
-            }
-
-            string sourceTag = ShoppingSourceTag(row);
-            Panel tagPanel = null;
-            if (!string.IsNullOrEmpty(sourceTag))
-            {
-                GetPillColors(PillKind.Locked, false, out Color tagBorder, out Color tagFill);
-                tagPanel = LabelHelpers.CreateSmallTag(
-                    rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9, tagBorder, tagFill);
-            }
-
-            var qtyLabel = new Label()
-            {
-                Text = qtyText,
-                Font = font,
-                TextColor = new Color(200, 200, 200),
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(edges.QtyRightEdge - qtyWidth, 9),
-                Parent = rowPanel
-            };
-
-            // Each/Total cells: coin-only rows render exactly as before;
-            // a row priced wholly or partly in a non-coin currency (e.g. a
-            // vendor offer paid in spirit shards) renders currency segments
-            // alongside/instead of coin; a row with neither (genuinely
-            // unpriceable - gw2e: "Not sold or crafted") renders a dash,
-            // never a blank cell (KNOWN-ISSUES #16).
-            var eachCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
-            var totalCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
-
-            // M36b: bottomClearance 0 - ShoppingRowHeight (36) is immune to
-            // the Container.Paint round-trip defect (see LabelHelpers.CreateRowDivider's
-            // doc comment) and its icon frame is flush-fit with zero
-            // slack; see the identical note in CreateUsedMaterialRow.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 0);
-
-            // M33 C2b: qty + Each/Total cells reposition every drag tick
-            // (no MeasureString - CoinCurrencyRenderer.RepositionValueCellRightAligned uses only
-            // cached segment text widths). The name label and its source
-            // tag are untouched here; both depend on ellipsis truncation
-            // and only update at settle (RunReellipsis) below.
-            _relayoutActions.Add(w =>
-            {
-                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
-                rowPanel.Size = new Point(w, rowHeight);
-                qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
-                CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
-                CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
-                if (divider != null) divider.Size = new Point(w, 2);
-            });
-            _reellipsisActions.Add(w =>
-            {
-                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
-                int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(e.QtyRightEdge, qtyWidth, 12, nameX);
-                string newDisplayName = LabelHelpers.EllipsizeToWidth(font, fullName, newMaxWidth);
-                if (nameLabel.Text != newDisplayName)
-                {
-                    nameLabel.Text = newDisplayName;
-                    var parts = new List<string>();
-                    if (newDisplayName != fullName) parts.Add(fullName);
-                    if (!string.IsNullOrEmpty(hintText)) parts.Add(hintText);
-                    rowPanel.BasicTooltipText = parts.Count > 0 ? string.Join("\n", parts) : null;
-                }
-                if (tagPanel != null)
-                {
-                    tagPanel.Location = new Point(nameX + nameLabel.Width + 8, 9);
-                }
-            });
-        }
+        //
+        // M38 WP-23b: row rendering, header row, and the ShoppingSourceTag
+        // helper moved to Views/Rendering/ShoppingListSectionRenderer (see
+        // the RequiredDisciplines-style call in CreateCollapsibleSection
+        // above). GetPillColors, which CreateShoppingRow used for its
+        // source-tag panel colors, moved to Views/Rendering/PillColors.cs
+        // instead (see that file's doc comment) because RenderDecisionPills
+        // below still needs it too.
 
         // --- Crafting Steps section ---
 
@@ -4042,56 +3822,11 @@ namespace GW2CraftingHelper.Views
         // tested (DecisionPillPlannerTests) - so only the actual
         // Panel/Label rendering below stays view-only.
 
-        /// <summary>
-        /// isIgnoreActive is only meaningful for PillKind.Ignore (whether
-        /// THIS specific Ignore pill is the active/"IGNORED" state, i.e.
-        /// node.IsIgnored) - ignored for every other kind.
-        /// </summary>
-        private static void GetPillColors(PillKind kind, bool isIgnoreActive, out Color border, out Color fill)
-        {
-            switch (kind)
-            {
-                case PillKind.Selected:
-                    border = new Color(45, 197, 14); // #2DC50E
-                    fill = border * 0.15f;
-                    break;
-                case PillKind.Have:
-                    border = new Color(113, 113, 255); // #7171FF
-                    fill = border * 0.15f;
-                    break;
-                case PillKind.Available:
-                    border = new Color(138, 138, 138); // #8A8A8A
-                    fill = Color.Transparent;
-                    break;
-                case PillKind.OwnedInfo:
-                    // Muted gold, distinct from every other pill hue -
-                    // informational only, never confused with a selectable
-                    // source (M34-B2b).
-                    border = new Color(201, 162, 39); // #C9A227
-                    fill = border * 0.15f;
-                    break;
-                case PillKind.Ignore:
-                    // Amber when active ("IGNORED", currently toggled on);
-                    // plain clickable grey (matching Available) otherwise -
-                    // never Selected's green, to avoid reading as "the
-                    // chosen acquisition source" (M34-B2b).
-                    border = isIgnoreActive ? new Color(229, 168, 60) : new Color(138, 138, 138); // #E5A83C / #8A8A8A
-                    fill = isIgnoreActive ? border * 0.15f : Color.Transparent;
-                    break;
-                case PillKind.AchievementBitDeduped:
-                    // Muted violet - distinct from Have's blue and
-                    // OwnedInfo's gold: nothing here is actually owned, just
-                    // already required elsewhere (M37, KNOWN-ISSUES #26).
-                    border = new Color(155, 118, 219); // #9B76DB
-                    fill = border * 0.15f;
-                    break;
-                case PillKind.Locked:
-                default:
-                    border = new Color(107, 107, 107); // #6B6B6B
-                    fill = Color.Black * 0.3f;
-                    break;
-            }
-        }
+        // M38 WP-23b: GetPillColors moved to Views/Rendering/PillColors.cs
+        // (see that file's doc comment) - this method also serves
+        // RenderDecisionPills below, so it could not move alongside the
+        // Shopping List section's source-tag panel, its other caller.
+        // RenderDecisionPills now calls PillColors.GetPillColors.
 
         /// <summary>
         /// Renders the pill column and returns the created pill panels so
@@ -4135,7 +3870,7 @@ namespace GW2CraftingHelper.Views
                 int pillWidth = pillWidths[specIndex];
                 int textWidth = pillWidth - 12;
 
-                GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
+                PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
                 // White, not borderColor: Selected/Available fills expose the
                 // border hue behind the label, so border-colored text has zero
                 // contrast against its own backdrop (M30 #11).
