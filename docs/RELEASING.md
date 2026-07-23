@@ -122,11 +122,17 @@ committed-to future work:
   resulting `.bhm` as a GitHub Release asset.
 - A convention for bumping `manifest.json`'s `version` per release.
 - A decision on the `ref/wiki_vendor_cache.json` / `ref/item_id_cache.json`
-  packaging gap described above.
-- Retiring the two stale `v1.0.0`/`v2.0.0` tags inherited from the original
+  packaging gap described above (as of this M38/WP-28 change, both files
+  have been untracked and added to `.gitignore` going forward; the
+  `.bhm` packaging behavior itself - the `BuildBlishHUDModule` target
+  copying all of `ref/` wholesale - is unchanged and still needs a real
+  fix, such as moving these files out of `ref/` entirely, if the gap is to
+  be closed for good).
+- The two stale `v1.0.0`/`v2.0.0` tags inherited from the original
   `blish-hud/ModuleTemplate` fork (both point at the same 2020 template
-  commit, unrelated to this module's actual history) before any real
-  version tag sequence starts. Deleting a remote tag is a disruptive,
-  history-visible operation and is intentionally not performed as part of
-  this change - see the note left for the maintainer/release process in
-  the accompanying pull request.
+  commit, unrelated to this module's actual history) have already been
+  removed from the GitHub remote (verified via `gh api
+  repos/<owner>/<repo>/tags` returning `[]`). Local clones and worktrees
+  predating that deletion may still carry the stale local refs; run
+  `git tag -d v1.0.0 v2.0.0` in any such clone to prune them before
+  starting a real version tag sequence.

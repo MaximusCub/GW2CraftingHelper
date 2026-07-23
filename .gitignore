@@ -371,8 +371,10 @@ packages/
 # MysticForgeSeeder intermediate cache
 ref/mf_item_id_cache.json
 
-# Agent-session scratch directories (PR body staging, work-package
-# verification captures) - generic by design so they don't silently
-# recur if an automated session creates one inside the repo tree.
-.tmp-pr/
-wp*-check/
+# VendorOfferUpdater intermediate caches - developer-side inputs to
+# tools/VendorOfferUpdater only. Not wired into GW2CraftingHelper.csproj
+# via <Content Include>, but BlishHUD.targets copies the entire ref/
+# directory into the packed .bhm regardless, so they must stay out of the
+# repo tree to stay out of the shipped module (see docs/RELEASING.md).
+ref/wiki_vendor_cache.json
+ref/item_id_cache.json

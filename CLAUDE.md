@@ -345,7 +345,8 @@ Do NOT include inline diffs, file dumps, or large pasted code blocks.
 
 ## Intermediate / Cache Files
 
-- Intermediate caches (e.g., `wiki_vendor_cache.json`, build artifacts) must NOT be committed unless explicitly requested.
+- Intermediate caches (e.g., `wiki_vendor_cache.json`, `item_id_cache.json`, build artifacts) must NOT be committed unless explicitly requested.
+- `ref/wiki_vendor_cache.json` and `ref/item_id_cache.json` were previously tracked in git history; they have been untracked and added to `.gitignore` (M38/WP-28) to match this rule going forward. They remain required on disk as developer-side inputs to `tools/VendorOfferUpdater` - do not delete them locally, just keep them out of git.
 - If such files exist in the working tree, exclude them and mention them in the summary.
 
 ---
