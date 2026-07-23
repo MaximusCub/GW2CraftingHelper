@@ -1339,7 +1339,22 @@ confirmation that no DEBUG "registered no relayout closures" warning fires
 - is being run by the orchestrating session per the M38 plan's
 `needsVisualLoop` gate (this package is invariant-adjacent per WP-23's
 risk rating: medium-high). Result recorded here and in the PR before merge:
-[PENDING - the orchestrator fills in PASS/FAIL].
+PASS (orchestrator, 2026-07-22, live branch-build session, captures
+wp23_04/05 in C:/Dev/Blish/preflight/captures): the extracted
+DisciplinesSectionRenderer produced a correct live section - this run's
+plan needed FOUR disciplines (Armorsmith 450 / Jeweler 225 / MysticForge
+0 / Weaponsmith 500; live prices pulled Jeweler in, exercising a row
+count the M37 pass never saw) - with exactly three between-row dividers
+at uniform pitch 26 (32px rows at 0.81 scale) plus the section header
+divider at BOTH sampled scroll offsets, zero missing boundaries, and the
+column-header/last-row no-divider design intact. Blish log shows zero
+DEBUG no-closure warnings after generation (sink-routed registration
+works). Resize-reflow caveat, per the KNOWN-ISSUES #19 precedent: one
+synthetic grip drag did not catch (window rect unchanged - the grip has
+resisted synthetic input since M33), so width-reflow through the
+sink-registered closures rests on the reviewer's static trace (same list
+object, same replay, DEBUG scroll-neutral assert armed) rather than a
+fresh live drag; a future human drag remains the gold-standard check.
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
