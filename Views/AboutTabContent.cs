@@ -372,15 +372,6 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        // AUTHOR NOTE (M39 task): the maintainer has not supplied a public
-        // author/byline. This renders whatever the manifest already
-        // contains - Author if set, else the Contributors list joined - and
-        // changes nothing about manifest identity. Today's manifest.json
-        // has no top-level "author", only contributors: [{ name:
-        // "MaximusCub" }], so this currently resolves to "MaximusCub". Which
-        // name is ultimately authoritative is WP-28's call (d1 Feature 2,
-        // Open Question 5), not this tab's - flagged in this milestone's PR
-        // as still awaiting the maintainer.
         private static string ResolveAuthorDisplay(ModuleContributor author, List<ModuleContributor> contributors)
         {
             if (author != null && !string.IsNullOrWhiteSpace(author.Name))
