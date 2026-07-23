@@ -3,8 +3,9 @@
 Dev-time research only. gw2efficiency is never called at runtime by the
 module (project HARD RULE); this report documents upstream behavior so the
 module's own logic can echo it. Fetched live 2026-07-21 via direct `curl`
-(network egress confirmed available in this environment) into
-`/tmp/claude-1000/-mnt-c-Dev-Blish-GW2CraftingHelper/7e605a97-4f25-4ee2-b443-727d2541bf48/scratchpad/`:
+(network egress confirmed available in this environment) into a
+session-scoped scratch directory (not part of this repo, and no longer
+available):
 
 - `application.js` (4,220,941 bytes) - live minified webpack bundle, from
   `https://gw2efficiency.com/scripts/application.js?cb=1783715316`.
