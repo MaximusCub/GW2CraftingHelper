@@ -298,45 +298,66 @@ out-of-range persisted values).
 
 ## DEFERRED (recorded, not implemented)
 
+Carried over verbatim from the original backlog (full context:
+`dev-notes/HISTORY.md`), plus two additional still-open items folded in
+from items 31 and 32 below (marked as such) so this list covers every
+genuinely open item, not just the ones originally filed under a
+"DEFERRED" heading.
+
 - Localization (en/de/fr/es via API lang param): user-deferred backlog,
   "not core functionality". Full-milestone scale when picked up.
-- Upstream Blish HUD issue/PR for the wheel-delta wrap bug: not planned.
-  The module-side `WheelDeltaSanitizer` stays until a fixed Blish HUD
-  release ships, then can be retired at leisure.
+- Upstream Blish HUD issue/PR for the wheel-delta wrap: REMOVED from the
+  backlog entirely by user decision (2026-07-22) - no upstream posts are
+  planned. The module-side sanitizer stays until a fixed Blish release
+  ships, then can be retired at leisure.
 - Ignore-pill cascade semantics + own-materials gating divergences
   (#20.4): revisit only on user feedback.
-- Multi-item row reordering (gw2e `moveRecipe`): out of scope per M35.
-- Skirmish Merchant-family wiki page split (#28, 18 offers): three wiki
-  pages were restructured into `/Armor`, `/Weapons`, `/Others` subpages;
-  the items are still sold in-game under the split pages. Missing-offer/
+- Multi-item row reordering (gw2e moveRecipe): out of scope per M35.
+- Skirmish Merchant-family wiki page split (#28, 18 offers): Skirmish
+  Supervisor / Lionguard (Skirmish Merchant) / Mercenary (Skirmish
+  Merchant) wiki pages were restructured into /Armor, /Weapons, /Others
+  subpages; the items are still sold in-game under the split pages, but
+  the seed's merchant-page linkage is now stale-shaped. Missing-offer/
   rename gap for a future re-scrape to follow up; not removed.
 - "Merchant (Untamed Crags)" vendor-page-name mismatch (#28, 1 offer):
-  that exact vendor page no longer resolves on the wiki, while the item
-  and cost remain valid via other crafting-material vendors. Deferred
-  pending research into whether the page was renamed or the original
-  scrape mislabeled the vendor.
-- Wiki-drift missing-offers superset (#28, ~5,400 offers): a full
+  the Hydrocatalytic Reagent / 50 Research Note offer's exact vendor
+  page no longer resolves on the wiki (no page, no redirect), while the
+  item and cost remain valid via other crafting-material vendors.
+  Deferred pending research into whether the page was renamed or the
+  original scrape mislabeled the vendor.
+- Wiki-drift missing-offers superset (#28, ~5,400 offers): M37's full
   from-scratch re-scrape (for cap seeding) incidentally picked up new
   Homestead recipes and unrelated vendor page changes beyond the
-  stale-offer-sweep's own scope. Discarded uncommitted; recorded here as a
+  stale-offer-sweep scope. Discarded uncommitted; recorded here as a
   candidate for a future dedicated "missing offers" pass.
-- Character/total purchase caps (#28): real, wiki-populated SMW
-  properties, but deliberately unseeded - the module has no account/
-  character concept at all. Left for a future milestone's own design pass.
+- Character/total purchase caps (#28): the wiki's "Has character
+  purchase cap" and "Has total purchase cap" SMW properties are real and
+  populated (confirmed in M37) but remain deliberately unseeded - the
+  module has no account/character concept at all. Left for a future
+  milestone's own design pass. ("Has seasonal purchase cap" is no longer
+  in this bucket - seeded for Wizard's Vault by item 33, and item 33's
+  own later entry records that its runtime consumption was also wired up
+  via `TimegatedCapType.Seasonal`, so nothing about seasonal caps remains
+  deferred; this parenthetical is corrected from the original record,
+  which predated that wiring.)
 - Homestead `HomesteadUnlocked` master gate (#24): gw2e has no "do you
-  even own Homestead" gate at all; this module echoes that (no gate). A
-  prior research draft flagged a divergence option (default-off master
-  gate) as a future confirm-with-maintainer option, not implemented.
-- Homestead Black Market path (#24): 300 purchases of 25/week per station,
-  coin-only, tier-independent - confirmed still entirely unseeded (wiki
-  game-id resolution failed for all 30 Black Market rows). A future
-  milestone could seed these as plain vendor offers once that resolution
-  gap is separately investigated.
-- Price-cache eviction policy (#31c-2, NiceToHave): `TradingPostService`'s
-  price cache has no eviction - every item id ever priced during the
-  module's process lifetime stays resident (refreshed in place, never
-  removed). Bounded and unlikely to matter at current GW2 item-id
-  cardinality; a periodic sweep or LRU/size cap remains a future
-  candidate.
-- StyleCop SA1413/SA1516/SA1503 (#32): left at default severity with a
-  non-trivial pre-existing footprint; a future cleanup wave candidate.
+  even own Homestead" gate at all; this module echoes that (no gate),
+  matching v1's fixed design decision. A prior research draft flagged a
+  divergence option (default-off master gate, since this module runs
+  in-client for players who may never have touched Janthir Wilds) -
+  recorded as a future confirm-with-maintainer option, not implemented.
+- Homestead Black Market path (#24): 300 purchases of 25/week per
+  station, coin-only, tier-independent - confirmed still entirely
+  unseeded (the live re-scrape used for tier tagging failed wiki
+  game-id resolution for all 30 Black Market rows across the three
+  stations). A future milestone could seed these as plain vendor
+  offers once that resolution gap is separately investigated.
+- **(folded in from item 31c-2, NiceToHave)** Price-cache eviction
+  policy: `TradingPostService`'s price cache has no eviction - every item
+  id ever priced during the module's process lifetime stays resident
+  (refreshed in place, never removed). Bounded and unlikely to matter at
+  current GW2 item-id cardinality; a periodic sweep or LRU/size cap
+  remains a future candidate.
+- **(folded in from item 32)** StyleCop SA1413/SA1516/SA1503: left at
+  default severity with a non-trivial pre-existing footprint (253/174/123
+  warnings respectively); a future cleanup wave candidate.
