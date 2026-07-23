@@ -424,7 +424,7 @@ manual). Recommended minimal automation, scoped to the ~5,487 reachable offers
 
 ## 5. Sources
 
-- Local, read directly this session (all under `/mnt/c/Dev/Blish/GW2CraftingHelper`,
+- Local, read directly this session (all under the repo root,
   main worktree only - `.claude/worktrees/*` copies ignored as stale/foreign):
   `docs/gw2e-parity-spec.md`, `docs/KNOWN-ISSUES.md` (items 17, 28), `Models/VendorOffer.cs`,
   `Models/CraftingPlan.cs`, `Models/TimegatedItem.cs`, `Services/VendorOfferHasher.cs`,

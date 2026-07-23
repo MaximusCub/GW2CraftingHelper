@@ -148,10 +148,9 @@ generate/re-solve/refresh (`Services/TradingPostService.cs`).
 
 **Findings: 1 confirmed (MustFix), 0 refuted, 1 nice-to-have.**
 
-> SCOPE: audited only the main tree at /mnt/c/Dev/Blish/GW2CraftingHelper
-> (master, PRs #53-#56 merged). The m37-homestead worktree
-> (/mnt/c/Dev/Blish/wt-m37-homestead) was not read or touched - explicitly
-> out of scope per instructions. No files were modified; this is a
+> SCOPE: audited only the main tree at the repo root
+> (master, PRs #53-#56 merged). A homestead worktree was not read or
+> touched - explicitly out of scope per instructions. No files were modified; this is a
 > read-only sweep. Re-swept once after the first pass (initial pass found
 > the cache internals individually lock-safe; re-sweep against the actual
 > concurrent CALLERS in Module.cs/CraftingPlanView.cs/CraftingPlanPipeline.cs
