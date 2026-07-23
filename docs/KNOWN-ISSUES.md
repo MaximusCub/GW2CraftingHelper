@@ -3265,6 +3265,126 @@ them.
   stations). A future milestone could seed these as plain vendor
   offers once that resolution gap is separately investigated.
 
+## WP-26 (scroll/resize/wheel controller move): CUT (M38 scope decision, 2026-07-23)
+The M38 plan marked WP-26 cut-first. Orchestrator decision: CUT. Rationale:
+(1) the single riskiest change in the repo with purely organizational payoff;
+(2) the frame-timing/subscription-order guarantees it would relocate are
+asserted by construction, not tests, so a regression would only surface live;
+(3) WP-21/WP-23a-d/WP-25 already bring CraftingPlanView well under the plan
+size target; (4) the machinery is fully region-mapped with KNOWN-ISSUES
+anchors (#12/#13/#14/#19/#23) and navigable in place; (5) the acceptance gate
+would require a human drag-resize pass (synthetic drags proven unreliable),
+a disproportionate verification cost for a move-only change. The
+ReplayRelayout SuspendLayout/ResumeLayout MEASURE-FIRST item existed to
+precede WP-26 and downgrades to an optional Nice-to-Have perf close-out.
+
+## WP-25: Recipe Tree section + override loop extracted to TreeSectionController (M38)
+SCOPE: `Views/Rendering/TreeSectionController.cs` (new) - `TreeNodeState`,
+`CreateTreeSection`, `RenderTreeNode`, `RefreshTreeContainerHeights`,
+`UpdateTreeRowTooltip`, `ApplyPreset`, `ApplyOverridesAndResolve`,
+`RenderDecisionPills`, and the `_nodeOverrides`/`_ignoredItemIds`/
+`_nodeExpansion`/`_lastResult`/`_treeNodeStates`/`_treeRoots`/`_treeFlow`
+fields all moved verbatim out of `CraftingPlanView`'s "8. Tree rendering"
+regions and its former "9. Decision pills" region. Unlike WP-23/WP-23b/
+WP-23c/WP-23d/WP-24's stateless per-render renderers, this component owns
+application state that must survive local re-solves (a pill click never
+rebuilds `_nodeOverrides`/`_ignoredItemIds`/`_nodeExpansion`), so it is
+constructed ONCE (in `CraftingPlanView`'s own constructor) and held as a
+persistent `_treeController` field, not freshly instantiated per render
+like the six earlier renderers.
+
+COLLABORATOR DELEGATES: because this controller does more than register
+relayout closures, its constructor takes several plain delegates beyond
+`ISectionRelayoutSink` and the `resolveOverridesSync` func the view already
+received: `preserveScrollAcross` (bound to `PreserveScrollAcross` -
+DO-NOT-TOUCH #3, untouched, still lives on `CraftingPlanView`, only invoked
+through the delegate), `setStatus` (bound to `SetStatus`), `renderPlan`
+(bound to `RenderPlan`, for the override-resolve full rebuild),
+`getCurrentPanelWidth` (bound to `GetCurrentPanelWidth`),
+`getCurrentPlan`/`setCurrentPlan` (small lambdas over the view's
+`_currentPlan` field - no existing accessor method to bind),
+`setLastDebugLog` (same, over `_lastDebugLog`), and `createSectionHeader`
+(a lambda wrapping the view's private `CreateSectionHeader`, unpacking its
+private `SectionHeaderHandle` return into a plain `(Panel, Label,
+FlowPanel)` ValueTuple so that private nested type's own accessibility
+never needs to change).
+
+NON-MOVE EDITS (every one, per the package's own review requirement):
+1. `ISectionRelayoutSink` gained a read-only `RelayoutCount` member.
+   `CreateTreeSection`'s DEBUG must-register assert used to read
+   `_relayoutActions.Count` directly (a `CraftingPlanView` private field);
+   every earlier extracted renderer's equivalent assert stayed inside
+   `CraftingPlanView.CreateCollapsibleSection` (which still has direct
+   field access), so this is the first extraction that needed the count
+   exposed through the seam itself.
+2. `RenderTreeNode`'s cost-cell currency lookup
+   (`_currentPlan?.CurrencyMetadata`) now calls the injected
+   `getCurrentPlan()` delegate - identical value at every call site, since
+   `_currentPlan` is always already set to the exact view model this
+   render pass is building before `RenderPlan` (and therefore
+   `CreateTreeSection`) ever runs.
+3. `CraftingPlanView.RenderPlan`'s top-of-method reset
+   (`_treeNodeStates.Clear(); _treeRoots = null; _treeFlow = null;`)
+   became `_treeController.ResetTreeRenderState()`; `TriggerGenerate`'s
+   fresh-generation reset (`_nodeOverrides.Clear(); _ignoredItemIds.Clear();
+   _nodeExpansion.Clear(); _lastResult = result;`) became
+   `_treeController.ResetForNewPlan(result)`. Two methods, not one,
+   because the reset shapes differ: the first runs on EVERY `RenderPlan`
+   call (fresh Generate and override-resolve re-renders both go through
+   it); the second runs only once per genuinely new Generate.
+4. `CreateTreeSection`'s `CreateSectionHeader(..., suppressToggle: () =>
+   pressStartedOnButton)` named argument became a positional argument
+   against the injected `Func<...>` delegate (a bare `Func` has no
+   parameter names of its own to match against) - same value passed,
+   compile-only necessity.
+
+DIFF EVIDENCE: whitespace-insensitive (`diff -w -B`) comparison of every
+moved member (`TreeNodeState`, the `_nodeOverrides`/`_ignoredItemIds`/
+`_nodeExpansion` field group, `_treeNodeStates`/`_treeRoots`/`_treeFlow`,
+`CreateTreeSection`, `ApplyPreset`, `ApplyOverridesAndResolve`, the tree
+layout constants, `RefreshTreeContainerHeights`, `RenderTreeNode`,
+`UpdateTreeRowTooltip`, `RenderDecisionPills`) against its pre-move body in
+the origin/master (PR #93, `fa8b677`) copy of `CraftingPlanView.cs`: every
+field declaration and its doc comment is byte-identical; `TreeNodeState`
+and `UpdateTreeRowTooltip` are byte-identical (neither touches any
+moved-out-of-scope view state); every other moved method differs only in
+the specific substitutions enumerated above (this-> `_sink`,
+`PreserveScrollAcross`/`SetStatus`/`RenderPlan`/`GetCurrentPanelWidth` ->
+their delegate equivalents, `_currentPlan` -> `_getCurrentPlan()`,
+`_lastDebugLog =`/`_currentPlan =` -> the `_setLastDebugLog`/
+`_setCurrentPlan` delegate calls) plus the added "Moved verbatim from
+CraftingPlanView.X" doc comments - no other line differs. A full
+state-ownership table (field -> old home -> new home -> current
+reader/writer) accompanies the PR/session record.
+
+DO-NOT-TOUCH compliance: `git diff --stat` against origin/master confirms
+zero changes to `Services/PlanContentHeightMath.cs`,
+`Services/PlanRelayoutMath.cs`, and `Views/Rendering/LabelHelpers.cs`;
+`StatusUpdateGuard`/`MainThreadMarshal`/`FrameTicker`/`WheelDeltaSanitizer`
+are not referenced by `TreeSectionController` at all. `PreserveScrollAcross`
+(DO-NOT-TOUCH #3) is untouched on `CraftingPlanView` - only invoked through
+the new delegate, same body, same call sites' relative order (Best
+Path/Craft All/Buy All all funnel through `ApplyOverridesAndResolve`'s
+single `_preserveScrollAcross(() => _renderPlan(vm))`; Expand All/Collapse
+All/the row toggle handler each wrap their own mutation in
+`_preserveScrollAcross(...)` exactly as before).
+
+WP-26 scope: see the CUT record above, appended to this file on this same
+branch per the M38 plan's own cut-first flag.
+
+VERIFICATION STATE: suites green - `GW2CraftingHelper.Tests` 1101/1101 (0
+failed, 0 skipped, matching the pre-change floor exactly);
+`VendorOfferUpdater.Tests` 135/135 (0 failed, 0 skipped). Build: `dotnet
+build GW2CraftingHelper.csproj -p:Platform=x64` - 0 errors. This view has
+no automated test net, so green tests prove only that nothing else broke -
+not that tree rendering or the override loop behave correctly. Live
+pre-merge visual verification (pill-click override round-trip, Ignore-pill
+round-trip and its subtree-skip economics, Best Path preset, Expand/Collapse
+persistence) is required per this package's `needsVisualLoop` gate (risk:
+high, per the plan's own WP-25 rationale - this is the one component that
+owns application state, not just presentation).
+Result: [PENDING - the orchestrator fills in PASS/FAIL]
+
 ## Handoff notes for the implementing session
 - Project memory holds everything: parity goal + full M33-M36 record
   (root causes, primitives: FrameTicker, MainThreadMarshal,
