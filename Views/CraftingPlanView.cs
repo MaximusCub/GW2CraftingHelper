@@ -2643,7 +2643,10 @@ namespace GW2CraftingHelper.Views
                     new ShoppingListSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.CraftingSteps:
-                    CreateCraftingStepsBody(section, contentFlow, panelWidth);
+                    // M38 WP-23c: row rendering (including the TimegatedNotice
+                    // informational rows) moved to
+                    // Views/Rendering/CraftStepsSectionRenderer.
+                    new CraftStepsSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.RequiredDisciplines:
                     // M38 WP-23: row rendering moved to
@@ -2659,10 +2662,15 @@ namespace GW2CraftingHelper.Views
                 default:
                     // Defensive fallback for a future section type added
                     // without a dedicated body builder - never leave a
-                    // section silently empty.
+                    // section silently empty. M38 WP-23c: CreateTextRow
+                    // moved to Views/Rendering/TextRowRenderer (see that
+                    // class's doc comment - it has two call sites still
+                    // living in CraftingPlanView, this one and
+                    // CreateSummarySectionBody's noteRows loop, so it could
+                    // not move wholesale into a single extracted renderer).
                     foreach (var row in section.Rows)
                     {
-                        CreateTextRow(row.Label, contentFlow, panelWidth);
+                        TextRowRenderer.CreateTextRow(row.Label, contentFlow, panelWidth, this);
                     }
                     break;
             }
@@ -2705,125 +2713,11 @@ namespace GW2CraftingHelper.Views
         // below still needs it too.
 
         // --- Crafting Steps section ---
-
-        private void CreateCraftingStepsBody(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
-        {
-            // M34-B1 #3: a TimegatedNotice row (vendor-cap informational
-            // line) is a plain text row, not a numbered craft step - render
-            // it via the same generic CreateTextRow pattern every other
-            // section's fallback rows use, and don't consume a step number
-            // for it (stepNumber only advances for real CraftStep rows).
-            int stepNumber = 1;
-            for (int i = 0; i < section.Rows.Count; i++)
-            {
-                var row = section.Rows[i];
-                bool isLast = i == section.Rows.Count - 1;
-                if (row.RowType == PlanRowType.TimegatedNotice)
-                {
-                    CreateTextRow(row.Label, contentFlow, panelWidth);
-                }
-                else
-                {
-                    CreateCraftStepRow(row, stepNumber++, contentFlow, panelWidth, isLast);
-                }
-            }
-        }
-
-        private void CreateCraftStepRow(
-            PlanRowViewModel row, int stepNumber, FlowPanel parent, int panelWidth, bool isLast)
-        {
-            const int rowHeight = PlanContentHeightMath.CraftStepRowHeight;
-            const int badgeSize = 36;
-            const int badgeX = 8;
-            const int badgeY = 4;
-            const int iconX = 52;
-            const int textX = 94; // iconX(52) + frame(34) + gap(8)
-
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
-
-            new Panel()
-            {
-                Size = new Point(badgeSize, badgeSize),
-                Location = new Point(badgeX, badgeY),
-                BackgroundColor = Color.White * 0.08f,
-                Parent = rowPanel
-            };
-            string numberText = stepNumber.ToString();
-            var numberFont = GameService.Content.DefaultFont18;
-            var numberMeasure = numberFont.MeasureString(numberText);
-            int numberWidth = (int)System.Math.Ceiling(numberMeasure.Width);
-            int numberHeight = (int)System.Math.Ceiling(numberMeasure.Height);
-            new Label()
-            {
-                Text = numberText,
-                Font = numberFont,
-                TextColor = Color.White,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(badgeX + (badgeSize - numberWidth) / 2, badgeY + (badgeSize - numberHeight) / 2),
-                Parent = rowPanel
-            };
-
-            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, iconX, 5);
-
-            var textFont = GameService.Content.DefaultFont16;
-            var greyColor = new Color(170, 170, 170);
-            int x = textX;
-
-            var craftLabel = new Label()
-            {
-                Text = "Craft ", Font = textFont, TextColor = greyColor,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(x, 13), Parent = rowPanel
-            };
-            x += craftLabel.Width;
-
-            var qtyLabel = new Label()
-            {
-                Text = $"{row.Quantity}x ", Font = textFont, TextColor = greyColor,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(x, 13), Parent = rowPanel
-            };
-            x += qtyLabel.Width;
-
-            new Label()
-            {
-                Text = row.Label ?? "", Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
-                ShowShadow = true, ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(x, 13), Parent = rowPanel
-            };
-
-            Label sublabelLabel = null;
-            if (!string.IsNullOrEmpty(row.Sublabel))
-            {
-                sublabelLabel = LabelHelpers.CreateRightAlignedLabel(
-                    rowPanel, row.Sublabel, GameService.Content.DefaultFont12,
-                    new Color(153, 153, 153), panelWidth - 8, 16);
-            }
-
-            // M36b: bottomClearance 1 - CraftStepRowHeight (44) is
-            // VULNERABLE to the Container.Paint round-trip defect (see
-            // LabelHelpers.CreateRowDivider's doc comment): its icon frame bottom
-            // (iconY 5 + 34 = 39) sits 2px clear of the new divider top
-            // (rowHeight-3 = 41), so the 1px shift is free of
-            // icon-clearance side effects.
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, 1);
-
-            // M33 C2b: name/qty labels sit at a fixed x (font-only, not
-            // width-dependent - textX never depended on panelWidth); only
-            // the row width, its divider, and the right-aligned sublabel
-            // need to move.
-            _relayoutActions.Add(w =>
-            {
-                rowPanel.Size = new Point(w, rowHeight);
-                if (sublabelLabel != null)
-                {
-                    sublabelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, sublabelLabel.Width), 16);
-                }
-                if (divider != null) divider.Size = new Point(w, 2);
-            });
-        }
+        //
+        // M38 WP-23c: row rendering (including the TimegatedNotice
+        // informational rows and the step-number badge) moved to
+        // Views/Rendering/CraftStepsSectionRenderer (see the
+        // RequiredDisciplines-style call in CreateCollapsibleSection above).
 
         // --- Required Disciplines / Required Recipes sections (c-table) ---
 
@@ -3079,29 +2973,14 @@ namespace GW2CraftingHelper.Views
 
             foreach (var row in noteRows)
             {
-                CreateTextRow(row.Label, contentFlow, panelWidth);
+                // M38 WP-23c: CreateTextRow moved to
+                // Views/Rendering/TextRowRenderer (see that class's doc
+                // comment - it has two call sites still living in
+                // CraftingPlanView, this one and the default fallback case
+                // in CreateCollapsibleSection, so it could not move
+                // wholesale into a single extracted renderer).
+                TextRowRenderer.CreateTextRow(row.Label, contentFlow, panelWidth, this);
             }
-        }
-
-        private void CreateTextRow(string text, FlowPanel parent, int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
-                Parent = parent
-            };
-            new Label()
-            {
-                Text = "  " + text,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(8, 4),
-                Parent = rowPanel
-            };
-
-            // Not width-dependent beyond the row's own cosmetic width (fixed
-            // left-anchored text, m2 3.6's "no relayout needed" case).
-            _relayoutActions.Add(w => rowPanel.Size = new Point(w, PlanContentHeightMath.FallbackTextRowHeight));
         }
 
         // Sized between the tree/row item-icon (32px) and the coin-segment
