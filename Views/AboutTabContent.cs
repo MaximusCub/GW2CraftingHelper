@@ -79,6 +79,7 @@ namespace GW2CraftingHelper.Views
         private const int RightEdgePadding = 20;
         private const int RowHeight = 30;
         private const int InfoRowHeight = 20;
+        private const int InfoLineBottomPadding = 4;
         private const int SpacerHeight = 10;
         private const int HeaderRowHeight = 44;
         private const int NameColumnX = 16;
@@ -193,23 +194,46 @@ namespace GW2CraftingHelper.Views
             };
         }
 
+        // The manifest "description" can run well past a single ~800px-wide
+        // line at this tab's default font (unlike the short string this
+        // method was originally sized for), so it needs to wrap. The wrap
+        // is done ourselves via Blish HUD's own DrawUtil.WrapText (rather
+        // than the Label control's own WrapText property) because Label's
+        // wrap width is pinned from whatever Size the control already has
+        // at its very first internal layout pass - a pass that fires as
+        // soon as any AutoSize flag is applied in an object initializer,
+        // which happens before a later Width assignment in that same
+        // initializer would ever take effect. Pre-wrapping with embedded
+        // "\n"s and letting the Label AutoSizeWidth/AutoSizeHeight to the
+        // already-wrapped result sidesteps that ordering trap entirely.
+        // The row panel is then sized to the label's resulting (possibly
+        // multi-line) height so wrapped text is never clipped and later
+        // rows are pushed down instead of overlapping it.
         private void AddInfoLine(string text, int panelWidth)
         {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, InfoRowHeight),
-                Parent = _rootPanel
-            };
+            var font = GameService.Content.DefaultFont14;
+            int maxTextWidth = Math.Max(1, panelWidth - NameColumnX - RightEdgePadding);
+            string wrappedText = DrawUtil.WrapText(font, text, maxTextWidth);
 
-            new Label()
+            var label = new Label()
             {
-                Text = text,
+                Text = wrappedText,
+                Font = font,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
-                Location = new Point(NameColumnX, 2),
-                Parent = rowPanel
+                Location = new Point(NameColumnX, 2)
             };
+
+            int rowHeight = Math.Max(InfoRowHeight, label.Height + InfoLineBottomPadding);
+
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, rowHeight),
+                Parent = _rootPanel
+            };
+
+            label.Parent = rowPanel;
         }
 
         private void AddSpacer(int panelWidth)
