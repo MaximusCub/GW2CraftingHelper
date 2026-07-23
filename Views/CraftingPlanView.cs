@@ -111,7 +111,10 @@ namespace GW2CraftingHelper.Views
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
 
         private PlanViewModel _currentPlan;
-        private CraftingPlanResult _lastResult;
+
+        // M38 WP-25: _lastResult moved onto _treeController (the override
+        // loop's own solve-context baseline) - see TreeSectionController's
+        // class doc comment.
         private DateTime _planGeneratedAt;
         private bool _useOwnMaterials;
         // M33 spec item 8 (r1 section 2.1): gw2efficiency's own default is
@@ -181,23 +184,20 @@ namespace GW2CraftingHelper.Views
 
         #region 8. Tree rendering (state)
 
-        // Per-node user decision overrides (keyed by solver NodeId) and
-        // explicit tree expansion state; both survive local re-solves and
-        // reset on a fresh Generate.
-        private readonly Dictionary<int, AcquisitionSource> _nodeOverrides =
-            new Dictionary<int, AcquisitionSource>();
+        // M38 WP-25 (m38-a1-architecture.md S3b-T2): the tree section
+        // renderer AND its interactive override loop - previously
+        // _nodeOverrides/_ignoredItemIds/_nodeExpansion/_lastResult plus
+        // CreateTreeSection/RenderTreeNode/RefreshTreeContainerHeights/
+        // UpdateTreeRowTooltip/ApplyPreset/ApplyOverridesAndResolve/
+        // RenderDecisionPills - moved onto TreeSectionController, a single
+        // persistent instance (constructed once below, in the ctor, since
+        // its state must survive across every RenderPlan call - unlike the
+        // stateless WP-23/WP-23b/WP-23c/WP-23d section renderers, which are
+        // freshly constructed per CreateCollapsibleSection call). See that
+        // class's own doc comment for the full field/method inventory and
+        // every non-move edit.
+        private readonly TreeSectionController _treeController;
 
-        // Item ids manually marked "Ignore" this session (M34-B2b, gw2e
-        // parity) - keyed by ItemId (not NodeId), matching gw2e's own
-        // "Ignore marks every occurrence of that item id, tree-wide"
-        // semantics (see PlanSolver.Solve's ignoredItemIds parameter).
-        // Independent of _nodeOverrides: neither "Best Path" nor "Craft
-        // All"/"Buy All" clears this (gw2e's bulk actions are documented as
-        // unrelated to ownership - r2 report Section 3.3); it is only ever
-        // toggled per item id (the pill click) or on a fresh Generate.
-        private readonly HashSet<int> _ignoredItemIds = new HashSet<int>();
-        private readonly Dictionary<int, bool> _nodeExpansion =
-            new Dictionary<int, bool>();
         #endregion // 8. Tree rendering (state)
 
         #region 7. Section builders (state: section expand/collapse)
@@ -279,6 +279,10 @@ namespace GW2CraftingHelper.Views
         {
             _reellipsisActions.Add(closure);
         }
+
+        // M38 WP-25: added alongside TreeSectionController - see
+        // ISectionRelayoutSink.RelayoutCount's own doc comment for why.
+        int ISectionRelayoutSink.RelayoutCount => _relayoutActions.Count;
 
         // Trailing debounce for the resize-settle re-ellipsis pass. Every
         // relayout tick already runs synchronously in OnPanelResized (no
@@ -506,6 +510,33 @@ namespace GW2CraftingHelper.Views
             _itemSearchProvider = itemSearchProvider;
             _settings = settings;
             _resolveOverridesSync = resolveOverridesSync;
+
+            // M38 WP-25: wires TreeSectionController's collaborator
+            // delegates. PreserveScrollAcross/SetStatus/RenderPlan/
+            // GetCurrentPanelWidth are bound as plain method groups (this
+            // constructor has access to its own private members regardless
+            // of the delegate variable's declared type elsewhere); the
+            // remaining three are small adapters over state that has no
+            // existing method to bind: _currentPlan's get/set, _lastDebugLog's
+            // set, and CreateSectionHeader's private SectionHeaderHandle
+            // return unpacked into a plain ValueTuple so the private nested
+            // type itself never needs to become visible outside this class.
+            _treeController = new TreeSectionController(
+                this,
+                _resolveOverridesSync,
+                _vmBuilder,
+                PreserveScrollAcross,
+                SetStatus,
+                RenderPlan,
+                GetCurrentPanelWidth,
+                () => _currentPlan,
+                vm => _currentPlan = vm,
+                log => _lastDebugLog = log,
+                (title, sectionKey, panelWidth, defaultExpanded, suppressToggle) =>
+                {
+                    var header = CreateSectionHeader(title, sectionKey, panelWidth, defaultExpanded, suppressToggle);
+                    return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
+                });
         }
 
         public void SetStatus(string status)
@@ -2141,11 +2172,13 @@ namespace GW2CraftingHelper.Views
                     // Plain-state writes happen before any control mutation
                     // so a disposed-control bail below can never strand this
                     // generation's state half-applied.
-                    _nodeOverrides.Clear();
-                    _ignoredItemIds.Clear();
-                    _nodeExpansion.Clear();
+                    // M38 WP-25: the per-generation override/ignore/
+                    // expansion reset plus adopting `result` as the
+                    // override loop's new baseline now lives on
+                    // _treeController - see TreeSectionController.
+                    // ResetForNewPlan's own doc comment.
+                    _treeController.ResetForNewPlan(result);
                     _sectionExpansion.Clear();
-                    _lastResult = result;
                     _lastDebugLog = result.DebugLog;
                     _currentPlan = vm;
                     _planGeneratedAt = DateTime.Now;
@@ -2240,9 +2273,9 @@ namespace GW2CraftingHelper.Views
 
             // Drop tree states up front so a plan without a tree section
             // does not retain disposed controls from the previous render.
-            _treeNodeStates.Clear();
-            _treeRoots = null;
-            _treeFlow = null;
+            // M38 WP-25: moved onto _treeController.ResetTreeRenderState -
+            // see that method's own doc comment.
+            _treeController.ResetTreeRenderState();
 
             // M33 C2b: the relayout/re-ellipsis registries are rebuilt from
             // scratch alongside every other per-render state above - same
@@ -2303,7 +2336,7 @@ namespace GW2CraftingHelper.Views
                 : (vm.TreeRoot != null ? new List<CraftingTreeNode> { vm.TreeRoot } : null);
             if (treeRoots != null)
             {
-                CreateTreeSection(treeRoots, panelWidth);
+                _treeController.CreateTreeSection(treeRoots, panelWidth);
             }
 
             foreach (var section in vm.Sections)
@@ -2751,807 +2784,18 @@ namespace GW2CraftingHelper.Views
 
         #region 8. Tree rendering (continued)
 
-        // --- Recipe tree section ---
-
-        private class TreeNodeState
-        {
-            public bool ChildrenBuilt;
-            public bool IsExpanded;
-            public FlowPanel ChildContainer;
-            public Label ArrowLabel;
-            public CraftingTreeNode Node;
-            public int Depth;
-
-            // M33 C2b: PanelWidth removed - a captured build-time width
-            // would go stale once resize no longer triggers a full rebuild
-            // (see GetCurrentPanelWidth, which every remaining reader of
-            // "current tree width" uses instead).
-
-            // Whether lazily-built children (built on first expand) should
-            // render dimmed - computed once from this node's own dimmed
-            // state and decision, so it stays correct however many frames
-            // later the user actually expands the node.
-            public bool ChildDimmed;
-        }
-
-        // States for the current render pass; rebuilt with the tree itself.
-        private readonly List<TreeNodeState> _treeNodeStates = new List<TreeNodeState>();
-
-        // Root nodes + top-level content FlowPanel for the current render's
-        // Recipe Tree section (null when the plan has no tree). Held so
-        // RefreshTreeContainerHeights - called from the tree row toggle
-        // handler deep inside RenderTreeNode's recursion, as well as from
-        // CreateTreeSection itself - can recompute treeFlow's own explicit
-        // Height without threading both through every recursive call. M35
-        // (gw2efficiency parity - multi-item plans): a single-item plan
-        // still populates this with exactly one root, so every consumer
-        // below is unchanged in that case (see MultiRootTreeFlowHeight's
-        // own doc comment for the "N==1 is byte-identical" guarantee).
-        private List<CraftingTreeNode> _treeRoots;
-        private FlowPanel _treeFlow;
-
-        /// <summary>
-        /// Renders the Recipe Tree section's single shared content
-        /// FlowPanel: one root per requested item, stacked - N top-level
-        /// trees for a multi-item batch (the synthetic wrapper root never
-        /// surfacing - see CraftingPlanResult.MultiItemRoots' own doc
-        /// comment), or the familiar single tree when treeRoots has one
-        /// element. Each root node already carries its own full icon/name/
-        /// quantity/pill/cost row (RenderTreeNode), so no separate
-        /// per-root header row is needed - gw2e's own "N independent
-        /// top-level recipe trees" look falls out for free.
-        /// </summary>
-        private void CreateTreeSection(IReadOnlyList<CraftingTreeNode> treeRoots, int panelWidth)
-        {
-            _treeNodeStates.Clear();
-
-            // The header's Click-to-toggle is wired inside CreateSectionHeader
-            // before these buttons exist; suppressToggle captures them by
-            // reference and reads their (assigned-below) MouseOver lazily,
-            // at click time - not at subscription time.
-            StandardButton expandAllButton = null;
-            StandardButton collapseAllButton = null;
-            StandardButton bestPathButton = null;
-            StandardButton craftAllButton = null;
-            StandardButton buyAllButton = null;
-
-            // Guard uses PRESS-time hover state: with a release-time check,
-            // pressing on the header background and releasing over a button
-            // dropped the click entirely (neither toggle nor button fired).
-            bool pressStartedOnButton = false;
-
-            var header = CreateSectionHeader(
-                "Recipe Tree", PlanSectionType.RecipeTree, panelWidth, true,
-                suppressToggle: () => pressStartedOnButton);
-            var headerPanel = header.HeaderPanel;
-            var treeFlow = header.ContentFlow;
-            _treeRoots = treeRoots as List<CraftingTreeNode> ?? new List<CraftingTreeNode>(treeRoots);
-            _treeFlow = treeFlow;
-
-            // Header-row buttons, right-to-left per the spec's fixed
-            // offsets-from-the-right layout: Collapse All, Expand All, then
-            // the presets (Buy All / Craft All / Best Path) continuing
-            // leftward with 4px gaps so they never collide with the title.
-            int cursorX = panelWidth;
-            var headerButtons = new List<(StandardButton Button, int Width)>(5);
-            StandardButton PlaceButtonRight(string text, int width)
-            {
-                cursorX -= width;
-                var button = new StandardButton()
-                {
-                    Text = text,
-                    Size = new Point(width, 24),
-                    Location = new Point(cursorX, 3),
-                    Parent = headerPanel
-                };
-                headerButtons.Add((button, width));
-                cursorX -= 4;
-                return button;
-            }
-
-            collapseAllButton = PlaceButtonRight("Collapse All", 96);
-            expandAllButton = PlaceButtonRight("Expand All", 92);
-            buyAllButton = PlaceButtonRight("Buy All", 70);
-            craftAllButton = PlaceButtonRight("Craft All", 76);
-            bestPathButton = PlaceButtonRight("Best Path", 80);
-
-            // M33 C2b: right-to-left button placement is font-only (fixed
-            // widths) - pure reposition on every drag tick, same order as
-            // PlaceButtonRight built them so the right-to-left offsets
-            // reproduce identically.
-            _relayoutActions.Add(w =>
-            {
-                int x = w;
-                foreach (var (button, width) in headerButtons)
-                {
-                    x -= width;
-                    button.Location = new Point(x, 3);
-                    x -= 4;
-                }
-            });
-
-#if DEBUG
-            int relayoutCountBeforeTree = _relayoutActions.Count;
-#endif
-            // M35 (gw2efficiency parity - multi-item plans): a thin gap
-            // between consecutive roots so N stacked full item trees read
-            // as N distinct blocks (PlanContentHeightMath.
-            // MultiRootDividerHeight) - never inserted for a single root,
-            // which keeps that case's rendered rows byte-identical to
-            // pre-M35.
-            for (int i = 0; i < _treeRoots.Count; i++)
-            {
-                if (i > 0)
-                {
-                    var rootDivider = new Panel()
-                    {
-                        Size = new Point(panelWidth, PlanContentHeightMath.MultiRootDividerHeight),
-                        Parent = treeFlow
-                    };
-                    _relayoutActions.Add(w => rootDivider.Size = new Point(w, PlanContentHeightMath.MultiRootDividerHeight));
-                }
-                RenderTreeNode(_treeRoots[i], treeFlow, panelWidth, 0, dimmed: false);
-            }
-#if DEBUG
-            // M33 C2b (m2 risk 3): every RenderTreeNode call registers its
-            // own relayout closure (see the field comment on
-            // _relayoutActions) - a single root node still yields at least
-            // one. Zero growth here would mean that mechanism itself
-            // silently broke.
-            if (_relayoutActions.Count == relayoutCountBeforeTree)
-            {
-                Logger.Warn("M33 C2b: Recipe Tree root rendered but registered no relayout closures - it will not track live window resize.");
-            }
-#endif
-
-            // M33 C2a (directive A): every container this initial build
-            // populated (treeFlow plus every childFlow created for a
-            // default-expanded node) still reads its construction-time
-            // Size.Y of 0 at this point - one synchronous pass now finalizes
-            // every one of them from the same PlanContentHeightMath
-            // arithmetic the rows above were just laid out with, before
-            // this method returns to RenderPlan/PreserveScrollAcross.
-            RefreshTreeContainerHeights();
-
-            // Decision presets: clear overrides / force craft-everywhere /
-            // force buy-everywhere (feasibility respected by the solver).
-            bestPathButton.Click += (_, __) =>
-            {
-                if (_nodeOverrides.Count == 0) return;
-                _nodeOverrides.Clear();
-                ApplyOverridesAndResolve(isBestPathPreset: true);
-            };
-            craftAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.Craft);
-            buyAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.BuyFromTp);
-
-            expandAllButton.Click += (_, __) => PreserveScrollAcross(() =>
-            {
-                // Building children appends to _treeNodeStates; index loop
-                // deliberately walks the growing list.
-                for (int i = 0; i < _treeNodeStates.Count; i++)
-                {
-                    var s = _treeNodeStates[i];
-                    if (!s.ChildrenBuilt)
-                    {
-                        foreach (var child in s.Node.Children)
-                        {
-                            RenderTreeNode(child, s.ChildContainer, GetCurrentPanelWidth(), s.Depth + 1, s.ChildDimmed);
-                        }
-                        s.ChildrenBuilt = true;
-                    }
-                    s.IsExpanded = true;
-                    _nodeExpansion[s.Node.NodeId] = true;
-                    s.ChildContainer.Visible = true;
-                    s.ArrowLabel.Text = "\u25BC";
-                }
-                RefreshTreeContainerHeights();
-            });
-
-            collapseAllButton.Click += (_, __) => PreserveScrollAcross(() =>
-            {
-                foreach (var s in _treeNodeStates)
-                {
-                    s.IsExpanded = false;
-                    _nodeExpansion[s.Node.NodeId] = false;
-                    s.ChildContainer.Visible = false;
-                    s.ArrowLabel.Text = "\u25B6";
-                }
-                RefreshTreeContainerHeights();
-            });
-
-            headerPanel.LeftMouseButtonPressed += (_, __) =>
-            {
-                pressStartedOnButton =
-                    expandAllButton.MouseOver || collapseAllButton.MouseOver ||
-                    bestPathButton.MouseOver || craftAllButton.MouseOver ||
-                    buyAllButton.MouseOver;
-            };
-        }
-
-        private void ApplyPreset(AcquisitionSource source)
-        {
-            if (_lastResult?.SolveContext == null) return;
-            _nodeOverrides.Clear();
-            // Walk the full solver tree (not the display tree, which hides
-            // children under bought nodes) so one click reaches every level.
-            var preset = CraftingPlanPipeline.BuildPresetOverrides(
-                _lastResult.SolveContext, source);
-            foreach (var kvp in preset)
-            {
-                _nodeOverrides[kvp.Key] = kvp.Value;
-            }
-            ApplyOverridesAndResolve();
-        }
-
-        // M37 (KNOWN-ISSUES #22/#27): isBestPathPreset must come from which
-        // control fired this call, not be inferred from the resulting
-        // _nodeOverrides count - see StatusText.ForOverrideResolve for why.
-        private void ApplyOverridesAndResolve(bool isBestPathPreset = false)
-        {
-            if (_lastResult?.SolveContext == null || _resolveOverridesSync == null)
-            {
-                return;
-            }
-
-            try
-            {
-                var result = _resolveOverridesSync(_lastResult.SolveContext, _nodeOverrides, _ignoredItemIds);
-                _lastResult = result;
-                _lastDebugLog = result.DebugLog;
-                var vm = _vmBuilder.Build(result);
-                _currentPlan = vm;
-                PreserveScrollAcross(() => RenderPlan(vm));
-                SetStatus(StatusText.ForOverrideResolve(isBestPathPreset, _nodeOverrides.Count));
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn(ex, "Override re-solve failed");
-                SetStatus($"Error: {ex.Message}");
-            }
-        }
-
-        // Fixed tree-row column grid (spec: "the key gw2e table look" - every
-        // row aligns regardless of depth). Right-anchored columns (pills,
-        // cost) sit at the same x on every row; only the left side (caret,
-        // icon, name) shifts with indent.
-        private const int TreeIndentPer = 24;
-        private const int TreeCaretColWidth = 18;
-        private const int TreeIconSize = 32;
-        private const int TreeIconBorder = 1;
-        private const int TreeIconFrameSize = TreeIconSize + TreeIconBorder * 2;
-        private const int TreeNameGap = 6;
-        private const int TreeRowHeight = PlanContentHeightMath.TreeRowHeight;
-        private const int TreePillColumnWidth = 240;
-        private const int TreeCostColumnWidth = 150;
-        private const int TreeRightMargin = 8;
-
-        /// <summary>
-        /// M33 C2a (directive A): recomputes and re-assigns the explicit
-        /// Height of every tree childFlow container plus the top-level
-        /// treeFlow, from the SAME PlanContentHeightMath arithmetic used to
-        /// build the rows in the first place. Replaces the old
-        /// InvalidateUpToContentPanel, which only repositioned siblings and
-        /// relied on Blish's AutoSize convergence (one nested level per real
-        /// frame) to eventually grow/shrink ancestor containers to match -
-        /// the direct cause of #12/#14's multi-frame windows. Setting each
-        /// container's Size fires its own Resized event, which FlowPanel
-        /// already wires to reflow its own parent's sibling positions (see
-        /// ChangedChildOnResized in the vendored FlowPanel source) - so this
-        /// call alone both resizes and repositions every affected row,
-        /// synchronously, with no separate Invalidate() needed.
-        /// Recomputes every node currently in _treeNodeStates rather than
-        /// walking only the toggled node's ancestor chain: each computation
-        /// is a pure function of that node's own structure + the shared
-        /// _nodeExpansion map, independent of any other container's current
-        /// state, so recomputing a few unaffected containers alongside the
-        /// affected ones is harmless - and this only runs once per user
-        /// toggle, never per frame, so the extra work is not a hot-path
-        /// concern.
-        /// </summary>
-        private void RefreshTreeContainerHeights()
-        {
-            int panelWidth = GetCurrentPanelWidth();
-            foreach (var state in _treeNodeStates)
-            {
-                state.ChildContainer.Size = new Point(
-                    panelWidth,
-                    PlanContentHeightMath.ChildrenHeight(
-                        state.Node.Children, state.Depth + 1, state.ChildDimmed, _nodeExpansion));
-            }
-
-            if (_treeRoots != null && _treeRoots.Count > 0 && _treeFlow != null)
-            {
-                _treeFlow.Size = new Point(
-                    panelWidth, PlanContentHeightMath.MultiRootTreeFlowHeight(_treeRoots, _nodeExpansion));
-            }
-        }
-
-        private void RenderTreeNode(CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, bool dimmed)
-        {
-            int indent = depth * TreeIndentPer;
-            bool hasChildren = node.Children.Count > 0;
-
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, TreeRowHeight),
-                BackgroundColor = Color.Transparent,
-                Parent = parent
-            };
-
-            // Hover wash (pattern per SuggestionPanel row highlighting).
-            // Color.White * 0.07f premultiplies alpha; a raw
-            // Color(255,255,255,18) renders as near-opaque white in XNA's
-            // premultiplied pipeline (verified via screenshot loop).
-            rowPanel.MouseEntered += (_, __) =>
-            {
-                rowPanel.BackgroundColor = Color.White * 0.07f;
-            };
-            rowPanel.MouseLeft += (_, __) =>
-            {
-                rowPanel.BackgroundColor = Color.Transparent;
-            };
-
-            // Caret column: fixed width even for leaf rows (no children ->
-            // no glyph, but the icon column still starts at the same x as
-            // every sibling), so caret state is scannable at a glance.
-            // Reference-branch nodes (dimmed - see the childDimmed comment
-            // below) always start collapsed regardless of depth, so a bought
-            // node's "what it would cost to craft instead" subtree does not
-            // visually explode the plan the moment its parent expands.
-            // Non-reference nodes keep the existing depth<2 default. Calls
-            // PlanContentHeightMath.IsNodeExpanded (not a hand-duplicated
-            // ternary) so this decision and RefreshTreeContainerHeights'
-            // height arithmetic share one formula and cannot silently
-            // desync - see that method's doc comment.
-            bool isExpanded = PlanContentHeightMath.IsNodeExpanded(node.NodeId, depth, dimmed, _nodeExpansion);
-            Label arrowLabel = null;
-            if (hasChildren)
-            {
-                Color arrowColor = dimmed ? Color.White * 0.35f : Color.White;
-                arrowLabel = new Label()
-                {
-                    Text = isExpanded ? "\u25BC" : "\u25B6",
-                    TextColor = arrowColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(indent, 12),
-                    Parent = rowPanel
-                };
-            }
-
-            // Icon column: rarity-framed, dimmed reference branches get a
-            // neutral frame plus a dark scrim over the icon itself (Blish
-            // panels have no tint/filter property, so a translucent black
-            // overlay approximates gw2e's grayscale+opacity filter).
-            int iconX = indent + TreeCaretColWidth;
-            Color frameColor = dimmed ? new Color(60, 60, 60) : RarityColors.GetRarityBorderColor(node.Rarity);
-            IconControls.CreateRarityFramedIcon(rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
-            if (dimmed)
-            {
-                new Panel()
-                {
-                    Size = new Point(TreeIconSize, TreeIconSize),
-                    Location = new Point(iconX + TreeIconBorder, 3 + TreeIconBorder),
-                    BackgroundColor = Color.Black * 0.5f,
-                    Parent = rowPanel
-                };
-            }
-
-            // Name column: fixed x regardless of depth's remaining width;
-            // clipped with an ellipsis against the pill column so long names
-            // never collide with the fixed-position columns to its right.
-            // M33 C2b: pillColX/costRightEdge/nameMaxWidth now come from
-            // PlanRelayoutMath.ComputeTreeColumnEdges - the SAME pure
-            // function the relayout/re-ellipsis closures below call, so the
-            // build and every later resize tick can never disagree about
-            // these columns.
-            int nameX = indent + TreeCaretColWidth + TreeIconFrameSize + TreeNameGap;
-
-            var nameFont = GameService.Content.DefaultFont14;
-            string qtyPrefix = node.Quantity > 0 ? $"{node.Quantity}x " : "";
-            int qtyWidth = qtyPrefix.Length > 0
-                ? (int)System.Math.Ceiling(nameFont.MeasureString(qtyPrefix).Width)
-                : 0;
-
-            var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
-                panelWidth, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
-            int pillColX = edges.PillColX;
-            int costRightEdge = edges.CostRightEdge;
-
-            string fullName = node.Name ?? "";
-            string displayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
-
-            Color qtyColor = new Color(170, 170, 170);
-            Color nameColor = RarityColors.GetRarityNameColor(node.Rarity);
-            if (dimmed)
-            {
-                qtyColor *= 0.45f;
-                // Lift dark hues toward readable before dimming (premultiplied-
-                // correct: Lerp opaque colors first, then apply alpha via *).
-                nameColor = Color.Lerp(nameColor, Color.White, 0.30f) * 0.50f;
-            }
-
-            if (qtyPrefix.Length > 0)
-            {
-                new Label()
-                {
-                    Text = qtyPrefix,
-                    Font = nameFont,
-                    TextColor = qtyColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(nameX, 12),
-                    Parent = rowPanel
-                };
-            }
-            var nameLabel = new Label()
-            {
-                Text = displayName,
-                Font = nameFont,
-                TextColor = nameColor,
-                ShowShadow = true,
-                ShadowColor = dimmed ? Color.Black * 0.4f : Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(nameX + qtyWidth, 12),
-                Parent = rowPanel
-            };
-
-            // M33 C2b: extraTooltipLines never depends on panelWidth (unit
-            // price / acquisition hint text is fixed), so it is computed
-            // once and reused verbatim by the settle re-ellipsis pass -
-            // only the "is the name actually truncated" line needs to be
-            // reconsidered when nameMaxWidth changes.
-            var extraTooltipLines = new List<string>();
-            if (node.UnitCost.HasValue && node.Quantity > 1 &&
-                (node.Decision == CraftingDecision.BuyFromTp ||
-                 node.Decision == CraftingDecision.BuyFromVendor))
-            {
-                extraTooltipLines.Add("Unit price: " + CoinCurrencyRenderer.FormatCoinText(node.UnitCost.Value));
-            }
-            if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
-            {
-                extraTooltipLines.Add(node.AcquisitionHint);
-            }
-            UpdateTreeRowTooltip(rowPanel, displayName, fullName, extraTooltipLines);
-
-            // Decision pill column: one pill per feasible source (direct
-            // selection - click sets the override and re-solves), or a
-            // single locked/HAVE/CURRENCY pill when there is no choice.
-            var pillPanels = RenderDecisionPills(rowPanel, node, pillColX, 10, dimmed);
-
-            // Cost column: right-aligned so coin amounts line up vertically
-            // across every row regardless of digit count. Only rendered
-            // when this node has a real committed decision with a cost
-            // figure at all (SubtreeCost.HasValue) - HAVE/CURRENCY/UNKNOWN
-            // nodes carry no SubtreeCost and keep the column blank exactly
-            // as before (their own pill already communicates "no price").
-            // Within that: a BuyFromVendor node priced wholly or partly in
-            // a non-coin currency renders currency segments alongside/
-            // instead of coin (sibling site to the shopping list's #16
-            // fix, same CoinCurrencyRenderer.RenderValueCellRightAligned entry point); a
-            // decision whose real cost is genuinely zero-and-uncosted
-            // renders a dash instead of an invented "0".
-            CoinCurrencyRenderer.ValueCellHandle costCell = null;
-            if (node.SubtreeCost.HasValue)
-            {
-                var costFont = GameService.Content.DefaultFont14;
-                var currencyAmounts = CurrencyDisplayResolver.ResolveAmounts(
-                    node.VendorCurrencyCosts, _currentPlan?.CurrencyMetadata);
-                costCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
-                    rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
-            }
-
-            // Child container. Children of a non-Craft decision are gw2e's
-            // ".not-crafted" informational reference branch (what it would
-            // cost to craft instead) - dimmed, and the flag does not stack
-            // on already-dimmed branches.
-            FlowPanel childFlow = null;
-            if (hasChildren)
-            {
-                bool childDimmed = dimmed || node.Decision != CraftingDecision.Craft;
-
-                // M33 C2a (directive A): Standard (explicit) height, same
-                // as the section header's contentFlow - see that
-                // construction site's comment. Starts at 0; the caller that
-                // ultimately owns this build pass (CreateTreeSection's
-                // initial call, or a toggle handler below) finalizes the
-                // real height via RefreshTreeContainerHeights before
-                // control returns to PreserveScrollAcross's caller.
-                childFlow = new FlowPanel()
-                {
-                    Size = new Point(panelWidth, 0),
-                    FlowDirection = ControlFlowDirection.SingleTopToBottom,
-                    Parent = parent
-                };
-
-                var state = new TreeNodeState
-                {
-                    Node = node,
-                    Depth = depth,
-                    ChildContainer = childFlow,
-                    ArrowLabel = arrowLabel,
-                    ChildDimmed = childDimmed
-                };
-                _treeNodeStates.Add(state);
-                if (isExpanded)
-                {
-                    foreach (var child in node.Children)
-                    {
-                        RenderTreeNode(child, childFlow, panelWidth, depth + 1, childDimmed);
-                    }
-                    state.ChildrenBuilt = true;
-                    state.IsExpanded = true;
-                    childFlow.Visible = true;
-                }
-                else
-                {
-                    state.IsExpanded = false;
-                    childFlow.Visible = false;
-                }
-
-                EventHandler<MouseEventArgs> toggleHandler = (_, __) =>
-                {
-                    // Pills have their own click actions; do not also treat
-                    // a pill click as an expand/collapse toggle.
-                    foreach (var pill in pillPanels)
-                    {
-                        if (pill.MouseOver)
-                        {
-                            return;
-                        }
-                    }
-                    PreserveScrollAcross(() =>
-                    {
-                        if (!state.ChildrenBuilt)
-                        {
-                            // M33 C2b: read the LIVE width rather than the
-                            // (possibly long-stale, since resize no longer
-                            // triggers a rebuild) width this node itself was
-                            // built at - see GetCurrentPanelWidth.
-                            int currentWidth = GetCurrentPanelWidth();
-                            foreach (var child in state.Node.Children)
-                            {
-                                RenderTreeNode(
-                                    child, state.ChildContainer, currentWidth, state.Depth + 1, state.ChildDimmed);
-                            }
-                            state.ChildrenBuilt = true;
-                        }
-                        state.IsExpanded = !state.IsExpanded;
-                        _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
-                        state.ChildContainer.Visible = state.IsExpanded;
-                        state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
-                        RefreshTreeContainerHeights();
-                    });
-                };
-                rowPanel.Click += toggleHandler;
-            }
-
-            // M33 C2b: pills/cost cell reposition every drag tick (no
-            // MeasureString - pill widths are already-known control Width,
-            // CoinCurrencyRenderer.RepositionValueCellRightAligned uses only cached segment text
-            // widths); childFlow's width tracks panelWidth with its Height
-            // preserved exactly (never perturbs scroll - M33 C2a already
-            // made every row/container height explicit). The name label is
-            // untouched here; it only re-ellipsizes at settle below.
-            _relayoutActions.Add(w =>
-            {
-                rowPanel.Size = new Point(w, TreeRowHeight);
-                var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
-
-                if (pillPanels.Count > 0)
-                {
-                    int x = e.PillColX;
-                    foreach (var pill in pillPanels)
-                    {
-                        pill.Location = new Point(x, 10);
-                        x += pill.Width + 6;
-                    }
-                }
-                if (costCell != null)
-                {
-                    CoinCurrencyRenderer.RepositionValueCellRightAligned(costCell, e.CostRightEdge, 12);
-                }
-                if (childFlow != null)
-                {
-                    childFlow.Size = new Point(w, childFlow.Height);
-                }
-            });
-            _reellipsisActions.Add(w =>
-            {
-                var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
-                string newDisplayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
-                if (nameLabel.Text != newDisplayName)
-                {
-                    nameLabel.Text = newDisplayName;
-                    UpdateTreeRowTooltip(rowPanel, newDisplayName, fullName, extraTooltipLines);
-                }
-            });
-        }
-
-        /// <summary>
-        /// Rebuilds a tree row's tooltip from its (possibly re-ellipsized)
-        /// display name plus its width-invariant extra lines - shared by
-        /// RenderTreeNode's initial build and its settle re-ellipsis
-        /// closure so the two can never disagree about tooltip content.
-        /// </summary>
-        private static void UpdateTreeRowTooltip(
-            Panel rowPanel, string displayName, string fullName, List<string> extraLines)
-        {
-            var parts = new List<string>();
-            if (displayName != fullName)
-            {
-                parts.Add(fullName);
-            }
-            parts.AddRange(extraLines);
-            rowPanel.BasicTooltipText = parts.Count > 0 ? string.Join("\n", parts) : null;
-        }
+        // M38 WP-25 (m38-a1-architecture.md S3b-T2): the Recipe Tree
+        // section renderer (TreeNodeState, CreateTreeSection,
+        // RenderTreeNode, RefreshTreeContainerHeights,
+        // UpdateTreeRowTooltip), the interactive override loop
+        // (ApplyPreset, ApplyOverridesAndResolve), and the Decision Pills
+        // renderer (RenderDecisionPills - formerly its own "9. Decision
+        // pills" region, folded into this one since both regions moved
+        // together) all moved onto Views/Rendering/TreeSectionController -
+        // see that class's own doc comment for the full inventory and
+        // every non-move edit.
 
         #endregion // 8. Tree rendering (continued)
-
-        #region 9. Decision pills
-
-        // --- Decision pills ---
-        //
-        // PillKind/PillSpec/BuildPillSpecs (the decision -> pill mapping,
-        // gw2e's multi-pill model, KNOWN-ISSUES #18) live in
-        // Services/DecisionPillPlanner.cs - Blish-free and directly unit
-        // tested (DecisionPillPlannerTests) - so only the actual
-        // Panel/Label rendering below stays view-only.
-
-        // M38 WP-23b: GetPillColors moved to Views/Rendering/PillColors.cs
-        // (see that file's doc comment) - this method also serves
-        // RenderDecisionPills below, so it could not move alongside the
-        // Shopping List section's source-tag panel, its other caller.
-        // RenderDecisionPills now calls PillColors.GetPillColors.
-
-        /// <summary>
-        /// Renders the pill column and returns the created pill panels so
-        /// the row's expand/collapse click handler can exclude them from
-        /// its own hit-test (a pill click is a decision, not a toggle).
-        ///
-        /// M34 fix (MustFix review finding): TreePillColumnWidth (240px) is
-        /// a fixed budget, but DecisionPillPlanner.AppendOwnershipPills now
-        /// unconditionally adds an "IGNORE" pill (plus "USING N OWNED" when
-        /// applicable) to every ordinary node, on top of its 1-3 source
-        /// pills - realistic combinations regularly exceed 240px. Rather
-        /// than let trailing pills render on top of the right-aligned cost
-        /// column (this row has no wrap/second-line support - TreeRowHeight
-        /// is a fixed per-row height shared by every layout/scroll-height
-        /// calculation in this file), only as many pills as
-        /// PlanRelayoutMath.ComputeVisiblePillCount says fit are rendered -
-        /// see that method's doc comment for why this naturally drops the
-        /// lower-priority (OwnedInfo/Ignore) pills first while always
-        /// keeping at least the first (most important) pill.
-        /// </summary>
-        private List<Panel> RenderDecisionPills(
-            Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
-        {
-            var specs = DecisionPillPlanner.BuildPillSpecs(node);
-            var font = GameService.Content.DefaultFont12;
-            var pillPanels = new List<Panel>(specs.Count);
-            int x = pillColX;
-
-            var pillWidths = new List<int>(specs.Count);
-            foreach (var spec in specs)
-            {
-                int measuredWidth = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width) + 12;
-                pillWidths.Add(measuredWidth);
-            }
-            int maxRightEdge = pillColX + TreePillColumnWidth - 4;
-            int visibleCount = PlanRelayoutMath.ComputeVisiblePillCount(pillWidths, 6, pillColX, maxRightEdge);
-
-            for (int specIndex = 0; specIndex < visibleCount; specIndex++)
-            {
-                var spec = specs[specIndex];
-                int pillWidth = pillWidths[specIndex];
-                int textWidth = pillWidth - 12;
-
-                PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
-                // White, not borderColor: Selected/Available fills expose the
-                // border hue behind the label, so border-colored text has zero
-                // contrast against its own backdrop (M30 #11).
-                Color textColor = Color.White;
-                if (dimmed)
-                {
-                    borderColor *= 0.35f;
-                    fillColor *= 0.35f;
-                    textColor *= 0.35f;
-                }
-
-                // Border simulated as an outer colored panel with a 1px-inset
-                // fill panel - same nesting technique as IconControls.CreateRarityFramedIcon.
-                var outer = new Panel()
-                {
-                    Size = new Point(pillWidth, 20),
-                    Location = new Point(x, pillY),
-                    BackgroundColor = borderColor,
-                    Parent = rowPanel
-                };
-                var inner = new Panel()
-                {
-                    Size = new Point(pillWidth - 2, 18),
-                    Location = new Point(1, 1),
-                    BackgroundColor = fillColor,
-                    Parent = outer
-                };
-                new Label()
-                {
-                    Text = spec.Text,
-                    Font = font,
-                    TextColor = textColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point((pillWidth - 2 - textWidth) / 2, 2),
-                    Parent = inner
-                };
-
-                bool interactive = !dimmed && spec.Source.HasValue && _resolveOverridesSync != null;
-                bool ignoreInteractive = !dimmed && spec.Kind == PillKind.Ignore && _resolveOverridesSync != null;
-                if (interactive)
-                {
-                    outer.BasicTooltipText = $"Switch to {spec.Text}";
-                    var source = spec.Source.Value;
-                    outer.Click += (_, __) =>
-                    {
-                        _nodeOverrides[node.NodeId] = source;
-                        ApplyOverridesAndResolve();
-                    };
-                    Color restingBorder = borderColor;
-                    outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
-                    outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
-                }
-                else if (ignoreInteractive)
-                {
-                    // M34-B2b: toggles this ITEM id (not just this node) in
-                    // or out of _ignoredItemIds, matching gw2e's own
-                    // tree-wide-by-item-id "Ignore" semantics.
-                    outer.BasicTooltipText = node.IsIgnored
-                        ? "Stop treating this item as fully in-hand"
-                        : "Treat this item as fully in-hand (ignore its owned-stock requirement)";
-                    int itemId = node.ItemId;
-                    outer.Click += (_, __) =>
-                    {
-                        if (!_ignoredItemIds.Remove(itemId))
-                        {
-                            _ignoredItemIds.Add(itemId);
-                        }
-                        ApplyOverridesAndResolve();
-                    };
-                    Color restingBorder = borderColor;
-                    outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
-                    outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
-                }
-                else if (spec.Kind == PillKind.Locked)
-                {
-                    // The UNKNOWN pill (node.Decision == Unknown - no
-                    // feasible source at all) is a different situation from
-                    // every other locked pill (exactly one feasible source,
-                    // just not a choice): "Only available source" is
-                    // misleading there since there IS no available source.
-                    // Prefer the seeded wiki hint when one exists.
-                    if (node.Decision == CraftingDecision.Unknown)
-                    {
-                        outer.BasicTooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
-                            ? node.AcquisitionHint
-                            : "No known acquisition source";
-                    }
-                    else
-                    {
-                        outer.BasicTooltipText = "Only available source";
-                    }
-                }
-
-                pillPanels.Add(outer);
-                x += pillWidth + 6;
-            }
-
-            return pillPanels;
-        }
-
-        #endregion // 9. Decision pills
     }
 }
 
