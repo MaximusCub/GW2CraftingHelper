@@ -1034,7 +1034,8 @@ a case with headroom to spare. Fixed as its own item this same
 fix-pass: RecipeRowHeightNoSublabel raised to 36 (icon y nudged to 0,
 exact fit, mirroring the Used Materials/Shopping List pattern above) -
 see PlanContentHeightMath.RecipeRowHeightNoSublabel and
-CraftingPlanView.CreateRecipeRow.
+Views/Rendering/RecipesSectionRenderer.CreateRecipeRow (M38 WP-23c moved
+this out of CraftingPlanView).
 
 VERIFICATION STATE: code-verified - the 0.897 scale factor and the GPU
 matrix mechanism were confirmed against a decompile of the shipped
