@@ -3386,7 +3386,40 @@ round-trip and its subtree-skip economics, Best Path preset, Expand/Collapse
 persistence) is required per this package's `needsVisualLoop` gate (risk:
 high, per the plan's own WP-25 rationale - this is the one component that
 owns application state, not just presentation).
-Result: [PENDING - the orchestrator fills in PASS/FAIL]
+Result: PASS (orchestrator, 2026-07-23, live branch-build session under
+the hardened desktop protocol, captures wp25_01/05/06/07/08/09/10/11 in
+C:/Dev/Blish/preflight/captures, fresh Exordium plan):
+- Tree render via TreeSectionController pixel-consistent with the
+  pre-move captures (rarity colors, decision/ignore pills, right-aligned
+  coin columns, preset button row).
+- Ignore-pill round-trip: IGNORE on 100x Shard of Exitare -> status
+  "Decisions updated (0 override(s))" (ignore correctly not counted as an
+  override), pills flip to HAVE + IGNORED, Total 2461g48s11c ->
+  2287g08s11c, the subtree's 4000x Unbound Magic currency row disappears
+  (tree-wide economics recomputed); un-ignore restores every value
+  byte-exactly (Total, currency rows, per-node costs).
+- Buy All preset: "Decisions updated (5086 override(s))", Total ->
+  2593g41s09c with per-node re-routes (optimal <= buy-all as required).
+- Best Path preset: distinct "Best path restored" status label (the
+  explicit isBestPathPreset flag, M37 item 27), Total and all per-node
+  costs byte-exact back to the original solve.
+- Expand All / Collapse All: collapse to root reflows the section
+  synchronously (Shopping List pulls up, no height gap); expand restores
+  the full tree incl. deep nodes.
+- Single-node pill-click override: Mystic Curio (multi-source row showing
+  CRAFT selected + TP + IGNORE side by side) clicked to TP -> "Decisions
+  updated (1 override(s))", TP pill selected/green, CRAFT deselected, and
+  the 1s per-100 cost delta propagates up the ancestor chain (Curio
+  38g40s -> 38g41s, Shard 87g20s -> 87g21s, Total 2461g48s -> 2461g49s) -
+  also confirming the solver's original craft choice was strictly cheaper.
+  Craft-only rows (Shard of Exitare, Deldrimor Steel Greatsword Hilt)
+  correctly no-op when their already-selected CRAFT pill is clicked.
+- Zero "registered no relayout" DEBUG warnings and zero WARN/ERROR lines
+  in the session log.
+- Bonus packaging data point (WP-27): this branch's worktree post-dates
+  PR #92's untracking of the dev-only ref/ caches, so its .bhm is 6.0MB
+  vs the prior 7.2MB and the module loaded and ran the full interaction
+  gate without them - confirming the caches are not needed at runtime.
 
 ## Handoff notes for the implementing session
 - Project memory holds everything: parity goal + full M33-M36 record
