@@ -1711,7 +1711,42 @@ Materials, Shopping List, Crafting Steps, Required Disciplines, Required
 Recipes) for divider/icon/name-ellipsis regressions is being run by the
 orchestrating session per the M38 plan's `needsVisualLoop` gate (this
 package is invariant-adjacent per the same risk rating as WP-23/WP-23b/
-WP-23c). Result: [PENDING - the orchestrator fills in PASS/FAIL]
+WP-23c). Result: PASS (orchestrator, 2026-07-23, live branch-build
+session under the hardened desktop protocol, captures wp23d_02/03/04/05/
+08/09/10/15/17/22 in C:/Dev/Blish/preflight/captures):
+- Summary/Total Cost via SummarySectionRenderer in all three shapes: (a)
+  single-item Exordium - Total tile + all 7 currency rows, layout-identical
+  to the WP-21 merged-master reference (wp21_02_top.png), only live-price
+  deltas; (b) own-materials re-solve - two-tile band (Total 2092g / Own
+  materials 6g85s95c) and the owned/needed annotation format live against
+  the synthetic snapshot ("292x Spirit Shard (50 owned, 242 needed)");
+  (c) 2-item batch Exordium + Orichalcum Ingot - "Exordium and 1 other"
+  title, three-tile band exercising the TileCaptionFor "Loss if sold"
+  variant (Total 2455g12s12c / Sell value 2s43c / Loss if sold 21c), and
+  the M35 MultiItemNote banner rendering through the sink-substituted
+  TextRowRenderer.CreateTextRow path.
+- All five WP-24-refactored sections spot-checked live: Used Materials
+  (the 4 synthetic-snapshot rows, icon+name+qty geometry), Shopping List
+  (two offsets; source tags, "1 for 10" bundle rate, multi-currency and
+  em-dash cells, UNKNOWN badges), Crafting Steps (steps 1-10 and 33-46;
+  numbers, rarity colors, discipline sublabels; ecto weekly timegated
+  notice row), Required Disciplines (column headers + rows at 26px pitch),
+  Required Recipes (sublabel rows, Learned/Auto-learned tags, two offsets).
+- scan_dividers.py at 2+ offsets per section class: uniform 29/30 (36px
+  rows), 35/36 (44px), 26 (32px disciplines); every gap decodes to the
+  by-design isLast/section-seam/column-header boundaries.
+- Zero "registered no relayout" DEBUG warnings and zero WARN/ERROR lines
+  across both session logs.
+- Bonus evidence: a real human window resize mid-session fired
+  writer=ResizePreserve with verify exit reason=stable on the branch
+  build - live proof the relayout registry replays correctly through the
+  extracted renderers; scroll position was also preserved across a live
+  regenerate.
+- Session note: the user briefly used the desktop mid-gate; two transient
+  UI oddities observed in that window (input-strip checkbox visual reset,
+  cleared search text) are attributed to that manual interaction, not the
+  branch (the strip is untouched by this diff); the gate was completed on
+  a fresh launch afterward.
 
 ## Carried follow-up resolved: caret glyphs (settled 2026-07-21)
 ASCII carets ("v" / ">" section headers) rendered reliably in every
