@@ -332,8 +332,9 @@
     packages\ is NuGet-restored and gitignored, so it cannot carry a real fix;
     this redefinition (same name, declared after the import, so it wins) is
     identical to the original except the RefFiles Include below gains an
-    Exclude for the two dev-only, git-untracked VendorOfferUpdater caches so
-    they never end up in the shipped .bhm. See docs/RELEASING.md.
+    Exclude for the three dev-only, git-untracked caches (two from
+    VendorOfferUpdater, one from MysticForgeSeeder) so they never end up in
+    the shipped .bhm. See docs/RELEASING.md.
   -->
   <Target Name="BuildBlishHUDModule" AfterTargets="Build">
     <!-- Remove existing bhm file -->
@@ -344,7 +345,7 @@
 
     <!-- Copy ref files -->
     <ItemGroup>
-      <RefFiles Include="$(ProjectDir)ref\**" Exclude="$(ProjectDir)ref\wiki_vendor_cache.json;$(ProjectDir)ref\item_id_cache.json" />
+      <RefFiles Include="$(ProjectDir)ref\**" Exclude="$(ProjectDir)ref\wiki_vendor_cache.json;$(ProjectDir)ref\item_id_cache.json;$(ProjectDir)ref\mf_item_id_cache.json" />
     </ItemGroup>
     <Copy SourceFiles="@(RefFiles)" DestinationFolder="$(OutDir)ref\%(RecursiveDir)" />
 
