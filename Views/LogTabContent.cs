@@ -102,16 +102,42 @@ namespace GW2CraftingHelper.Views
         // already), can never execute concurrently with anything: a single
         // thread cannot run two call stacks at the same instant, so the
         // race is impossible BY CONSTRUCTION, not merely guarded. This
-        // field is KEPT (not removed as obsolete) - it still gates both
-        // PollForUpdates() and Refresh() against acting before Build()'s
-        // own queued tail has actually landed, which avoids a wasted,
-        // redundant RebuildRows() pass rather than a crash now - belt-and-
-        // braces, not a safety requirement any more. volatile is REMOVED:
-        // every read and write of this field now happens on the main
-        // thread only (Build()'s write runs inside the MainThreadMarshal.
-        // Run callback), so there is no remaining cross-thread visibility
-        // concern for volatile to address, and keeping it would misleadingly
-        // suggest this field is still accessed from more than one thread.
+        // field is KEPT (not removed as obsolete) - it still gates
+        // PollForUpdates(), Refresh(), the level dropdown/search box
+        // ValueChanged/TextChanged handlers, and ClearView() against acting
+        // before Build()'s own queued tail has actually landed, which
+        // avoids a wasted, redundant RebuildRows() pass rather than a crash
+        // now - belt-and-braces, not a safety requirement any more.
+        // volatile is REMOVED: every read and write of this field now
+        // happens on the main thread only (Build()'s write runs inside the
+        // MainThreadMarshal.Run callback), so there is no remaining
+        // cross-thread visibility concern for volatile to address, and
+        // keeping it would misleadingly suggest this field is still
+        // accessed from more than one thread.
+        // </para>
+        // <para>
+        // PRECISE INVARIANT (the claim this fix actually establishes, not a
+        // broader one): <see cref="_renderedRows"/>, <see
+        // cref="_lastSeenVersion"/>, <see cref="_hasRenderedAnyRow"/>,
+        // <see cref="_clearedBeforeVersion"/>, this field, and
+        // _contentPanel's Children collection are MAIN-THREAD-ONLY - every
+        // entry point that touches them (Build's marshaled tail,
+        // PollForUpdates, Refresh, the level dropdown/search box handlers
+        // via RebuildRowsIfBuilt, ClearView, and the container Resized
+        // handler) runs on the main thread, and the five of those (every
+        // one except Build's own tail, which IS the thing being awaited)
+        // additionally defer to Build's tail rather than acting while it is
+        // still pending. This is narrower than "every field this class
+        // touches is main-thread-only": the eight control fields (_toolbarPanel,
+        // _levelDropdown, _searchBox, _followCheckbox, _clearViewButton,
+        // _copyButton, _statusLabel, _contentPanel) are still first
+        // PUBLISHED by the rest of Build()'s body on the ThreadPool thread,
+        // same as every Blish view in this module - any main-thread read of
+        // one of them (e.g. CopyToClipboard/SetStatus reading
+        // _statusLabel, which does not touch any of the state above and so
+        // is deliberately NOT gated on this field) must stay behind its
+        // existing null guard (IsLive, _searchBox?, _statusLabel == null)
+        // rather than assume the field is already non-null.
         // </para>
         private bool _buildComplete;
 
@@ -163,7 +189,7 @@ namespace GW2CraftingHelper.Views
             _levelDropdown.Items.Add("Info+");
             _levelDropdown.Items.Add("Debug+");
             _levelDropdown.SelectedItem = "Info+"; // d2 Section 3 default
-            _levelDropdown.ValueChanged += (_, __) => RebuildRows();
+            _levelDropdown.ValueChanged += (_, __) => RebuildRowsIfBuilt();
 
             _searchBox = new TextBox
             {
@@ -172,7 +198,7 @@ namespace GW2CraftingHelper.Views
                 PlaceholderText = "Search...",
                 Parent = _toolbarPanel
             };
-            _searchBox.TextChanged += (_, __) => RebuildRows();
+            _searchBox.TextChanged += (_, __) => RebuildRowsIfBuilt();
 
             _followCheckbox = new Checkbox
             {
@@ -237,10 +263,20 @@ namespace GW2CraftingHelper.Views
             // concurrently Enqueue-ing into _renderedRows corrupted its
             // internal array and crashed with "Destination array was not
             // long enough" inside Queue<T>.SetCapacity. Marshaling this
-            // tail onto the main thread makes RebuildRows() and
-            // _buildComplete main-thread-only everywhere they are touched
-            // (here, PollForUpdates, Refresh) - the race is impossible BY
-            // CONSTRUCTION, not merely guarded.
+            // tail onto the main thread, together with the _buildComplete
+            // gate now on every other RebuildRows() entry point (below in
+            // this file: PollForUpdates, Refresh, the level dropdown/search
+            // box ValueChanged/TextChanged handlers, and ClearView), closes
+            // the race BY CONSTRUCTION: every one of those six call sites
+            // either runs on the main thread and defers to this queued tail
+            // while _buildComplete is false, or IS this queued tail - so no
+            // two of them can ever execute concurrently with each other.
+            // This does NOT make every field this class touches main-
+            // thread-only - see the correctness-invariant note on
+            // _buildComplete's own doc comment for the narrower, precise
+            // claim (the row-rendering state only) and what is deliberately
+            // left OUTSIDE it (the eight control fields Build() publishes
+            // below, on this same ThreadPool thread).
             MainThreadMarshal.Run(() =>
             {
                 // The view may already have been torn down by the time this
@@ -379,10 +415,36 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private bool IsLive => _contentPanel != null && _contentPanel.Parent != null;
 
+        /// <summary>
+        /// Guarded entry point shared by the level dropdown's ValueChanged
+        /// and the search box's TextChanged handlers (and, via
+        /// <see cref="ClearView"/>, the Clear-view button) - the single
+        /// source of truth for the <see cref="_buildComplete"/> gate so all
+        /// three stay in sync with each other and with PollForUpdates/
+        /// Refresh's own checks. Without this gate, one of these handlers
+        /// firing while Build()'s body is still constructing the rest of
+        /// the toolbar (mid-body, on the ThreadPool thread) would call
+        /// RebuildRows() against whatever _contentPanel currently is,
+        /// instead of leaving that render to Build()'s own marshaled tail -
+        /// see _buildComplete's own doc comment for the full invariant.
+        /// </summary>
+        private void RebuildRowsIfBuilt()
+        {
+            if (_buildComplete)
+            {
+                RebuildRows();
+            }
+        }
+
         private void ClearView()
         {
+            // The version write always takes effect immediately, even if
+            // Build's own tail has not landed yet (see RebuildRowsIfBuilt
+            // above) - it is a plain field write, not a control mutation,
+            // so a pre-build Clear still hides everything before this point
+            // once Build's tail does its own initial RebuildRows() pass.
             _clearedBeforeVersion = _log.Version;
-            RebuildRows();
+            RebuildRowsIfBuilt();
         }
 
         private void CopyToClipboard()

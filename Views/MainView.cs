@@ -177,10 +177,13 @@ namespace GW2CraftingHelper.Views
             // _contentPanel/_searchBox this timer was armed against are
             // about to be replaced) - mirrors CraftingPlanView's own "top
             // of Build() cancels leftover tickers from the previous cycle"
-            // convention (StopLiveTickers).
-            _searchDebounceCts?.Cancel();
-            _searchDebounceCts?.Dispose();
-            _searchDebounceCts = null;
+            // convention (StopLiveTickers). The actual cancel-and-clear is
+            // deferred to the marshaled tail below, NOT done here - see
+            // that block's own comment for why: this method's own body
+            // runs on a ThreadPool thread (same as every Build()), and
+            // RebuildContent()/ScheduleSearchRebuild() touch this same
+            // _searchDebounceCts field on the main thread, so cancelling it
+            // here would race them.
 
             int w = buildPanel.ContentRegion.Width;
 
@@ -471,16 +474,46 @@ namespace GW2CraftingHelper.Views
             // thread, two threads would mutate the same Children collections
             // concurrently, the same shape that corrupted LogTabContent's
             // _renderedRows Queue<T>. Marshaling this tail onto the main
-            // thread makes every mutation path (this call, and every
-            // Update()-driven SetSnapshot/SetStatus call) main-thread-only,
-            // so they can never execute concurrently with each other - the
-            // race is impossible BY CONSTRUCTION, matching LogTabContent's
-            // fix. UpdateCoinDisplay is called here (rather than earlier,
-            // right after _coinPanel is created) so all three calls that
-            // race against SetSnapshot/SetStatus's own tail land in the same
-            // queued callback.
+            // thread serializes it against every Update()-driven
+            // SetSnapshot/SetStatus call, so those two specific paths can
+            // never execute concurrently with each other - that race is
+            // impossible BY CONSTRUCTION, matching LogTabContent's fix.
+            // UpdateCoinDisplay is called here (rather than earlier, right
+            // after _coinPanel is created) so all three calls that race
+            // against SetSnapshot/SetStatus's own tail land in the same
+            // queued callback. The top-of-Build _searchDebounceCts
+            // cancel-and-clear (see this method's earlier comment) is ALSO
+            // done here, for the same reason - RebuildContent() and
+            // ScheduleSearchRebuild() write that field on the main thread
+            // too, so a ThreadPool-thread write to it would be a fourth,
+            // separate race on top of the three above.
+            // <para>
+            // This does NOT make every MainView mutation path main-thread-
+            // only - unlike the state above, the panel/control fields
+            // themselves (_headerPanel, _contentPanel, _coinPanel,
+            // _searchBox, the checkboxes, etc.) are still first published
+            // by the REST of Build()'s body on this same ThreadPool thread,
+            // same as LogTabContent's eight control fields. This file's own
+            // Clear Cache/Refresh Now/checkbox/dropdown click handlers are
+            // wired up mid-body and become clickable the instant each
+            // control is parented, so they can run on the main thread while
+            // Build() is still constructing later controls; that is only
+            // survivable because every one of those handlers' downstream
+            // calls (UpdateCoinDisplay, ApplyStatusDisplay, RebuildContent)
+            // already null-guards the field it touches. Pre-existing
+            // pattern, not changed by this fix.
+            // </para>
             MainThreadMarshal.Run(() =>
             {
+                // Supersedes any debounce armed by a previous visit to this
+                // tab - see the top-of-Build comment for why this cannot run
+                // there instead. Deliberately BEFORE the liveness guard
+                // below, so a stale debounce is still cancelled even if the
+                // view was torn down before this queued callback ran -
+                // otherwise it would sit un-cancelled until some future
+                // Build() cycle's own tail happens to run.
+                CancelSearchDebounce();
+
                 // The view may already have been torn down by the time this
                 // queued callback runs (tab switched away again, module
                 // unloaded) - a disposed control's Parent is nulled on
@@ -548,12 +581,29 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ScheduleSearchRebuild()
         {
-            _searchDebounceCts?.Cancel();
-            _searchDebounceCts?.Dispose();
+            CancelSearchDebounce();
             var cts = new CancellationTokenSource();
             _searchDebounceCts = cts;
 
             RunSearchDebounceAsync(cts.Token);
+        }
+
+        /// <summary>
+        /// Cancels and disposes any in-flight <see cref="_searchDebounceCts"/>
+        /// and clears the field - the single source of truth for that
+        /// three-step sequence, shared by <see cref="ScheduleSearchRebuild"/>
+        /// (which immediately arms a fresh one afterward), <see
+        /// cref="RebuildContent"/>, and <c>Build</c>'s marshaled tail. All
+        /// three call sites are main-thread-only - see <see
+        /// cref="_searchDebounceCts"/>'s own field doc comment and
+        /// <c>Build</c>'s comment for why this must never be called from
+        /// <c>Build</c>'s own ThreadPool-thread body.
+        /// </summary>
+        private void CancelSearchDebounce()
+        {
+            _searchDebounceCts?.Cancel();
+            _searchDebounceCts?.Dispose();
+            _searchDebounceCts = null;
         }
 
         /// <summary>
@@ -602,9 +652,7 @@ namespace GW2CraftingHelper.Views
             // dropdown click, or the debounced search callback itself)
             // supersedes any older still-pending debounced rebuild - avoids
             // a redundant extra rebuild landing a moment after this one.
-            _searchDebounceCts?.Cancel();
-            _searchDebounceCts?.Dispose();
-            _searchDebounceCts = null;
+            CancelSearchDebounce();
 
             foreach (var child in _contentPanel.Children.ToArray())
             {

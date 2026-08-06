@@ -54,8 +54,36 @@ cannot guarantee under re-entrant re-queuing.
 `ApplyWheelWrapCorrection` - see section 2). Scroll restore itself is
 applied synchronously, not via a ticker - see section 3.
 
-**Full history:** KNOWN-ISSUES items 1, 12, 13 (`docs/dev-notes/HISTORY.md`
-after the WP-27 split).
+**Verified: `Build()` itself also runs off the main thread.** Every one of
+this module's `_mainWindow.Tabs` entries (`LogTabContent`, `MainView`,
+`SettingsTabContent`, `AboutTabContent`, `CraftingPlanView`, and the Plan
+History/Crafting Ranker placeholders - see Module.cs's `Initialize()`) is
+wrapped in `Views/ViewAdapter.cs`, whose `Build(Container)` override is
+called by Blish HUD's own view-loading pipeline, not by this module. Decompiling
+the shipped Blish HUD v1.3.0 binary (`Blish HUD.exe`, via `ilspycmd`)
+confirms the exact call chain and why it lands on a ThreadPool thread:
+`Blish_HUD.Controls.TabbedWindow2.OnTabChanged` (fired from the `SelectedTab`
+setter, synchronously on the main thread on a tab click) calls
+`WindowBase2.ShowView(view)`, which does
+`view.DoLoad(progress).ContinueWith(BuildView)`; `BuildView` calls
+`CurrentView.DoBuild(this)`, and `View<TPresenter>.DoBuild` calls the
+protected `Build(buildPanel)` method every view (including `ViewAdapter`)
+overrides. `View<TPresenter>.DoLoad` is `async Task<bool>` and, for the base
+`Load`/`NullPresenter.DoLoad` implementations this module's views use,
+completes without any genuine `await` suspension - but `Task.ContinueWith`
+called without `TaskContinuationOptions.ExecuteSynchronously` and with no
+ambient `SynchronizationContext` schedules its callback onto
+`TaskScheduler.Default` (the ThreadPool) regardless of whether the antecedent
+task is already complete at the point `ContinueWith` is called. So `Build()`
+reliably runs on a ThreadPool thread, never inline on the main thread that
+triggered the tab switch - the same "no `SynchronizationContext`" constraint
+this section's `MainThreadMarshal` exists for, just reached via Blish HUD's
+own internals instead of this module's own `await`s. (`TabbedWindow2`'s
+`Tabs`/`SelectedTab` machinery is what `Views/ResizableTabbedWindow.cs`, this
+module's `_mainWindow`, derives from.)
+
+**Full history:** KNOWN-ISSUES items 1, 12, 13, 36
+(`docs/dev-notes/HISTORY.md` after the WP-27 split).
 
 ---
 
