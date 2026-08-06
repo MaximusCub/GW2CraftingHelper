@@ -58,12 +58,22 @@ namespace GW2CraftingHelper.Views
         // d1 Feature 2's "Licenses & Attributions" section: the Blish HUD
         // MIT-license credit line. d1 flags this exact wording as MEASURED
         // (verified via WebSearch against Blish HUD's own repo) and
-        // low-risk to ship, unlike the ArenaNet/GW2 disclaimer below, which
-        // stays out pending maintainer sign-off. Kept as its own constant
-        // (not folded into the "Built with:" row) because "Built with:"
-        // reports the live SemVer.Range this module targets - a distinct,
-        // manifest-derived value - while this is fixed attribution text.
+        // low-risk to ship. Kept as its own constant (not folded into the
+        // "Built with:" row) because "Built with:" reports the live
+        // SemVer.Range this module targets - a distinct, manifest-derived
+        // value - while this is fixed attribution text.
         private const string BlishHudCreditLine = "Built on Blish HUD (MIT License) - github.com/blish-hud/Blish-HUD";
+
+        // d1 Feature 2's GW2/ArenaNet fan-content disclaimer. Unlike
+        // BlishHudCreditLine above, this wording previously stayed out of
+        // the build pending maintainer sign-off on the exact required
+        // legal text; the maintainer has since approved this exact wording
+        // for use in the "Licenses & Attributions" section. Ship this
+        // literal string as-is - do not derive it from ModuleDisplayName
+        // or otherwise reword it, since the approval covers this exact
+        // text.
+        private const string ArenaNetDisclaimerText =
+            "GW2 Crafting Helper is a fan-made tool and is not affiliated with, endorsed by, or supported by ArenaNet or NCSOFT. Guild Wars 2 and all associated trademarks are the property of NCSOFT Corporation. All game data comes from the official Guild Wars 2 API.";
 
         // Manual fallback for the "Built with Blish HUD" note, only ever
         // shown if BOTH the live Dependencies read (ReadBlishHudDependencyRange)
@@ -149,17 +159,8 @@ namespace GW2CraftingHelper.Views
             AddValueRow("Credits:", BlishHudCreditLine, panelWidth, copyable: true);
             AddValueRow("Data directory:", string.IsNullOrWhiteSpace(_dataDirectoryPath) ? "Not available" : _dataDirectoryPath, panelWidth, copyable: true);
 
-            // d1 Feature 2's wireframe also proposed a GW2/ArenaNet
-            // fan-content disclaimer line in the same "Licenses &
-            // Attributions" section as the Blish HUD credit above -
-            // deliberately NOT included here. d1's own text flags that
-            // draft wording as an unverified, INFERRED paraphrase,
-            // explicitly "not something to ship as-is" (Open Question 3:
-            // get the exact required wording verified against ArenaNet's
-            // own legal pages first). Per the repo's "do not invent data"
-            // posture, this stays an open item for the maintainer rather
-            // than shipping unverified legal text - see this milestone's
-            // PR notes.
+            AddSpacer(panelWidth);
+            AddLabeledInfoSection("Disclaimer:", ArenaNetDisclaimerText, panelWidth);
         }
 
         private void AddHeaderRow(AboutInfo info, int panelWidth)
@@ -234,6 +235,33 @@ namespace GW2CraftingHelper.Views
             };
 
             label.Parent = rowPanel;
+        }
+
+        // A short row-name label (same Location/style as AddValueRow's
+        // name labels) followed immediately by an AddInfoLine wrapped
+        // paragraph, for multi-line body text that still needs a "Name:"
+        // heading - unlike the top-of-tab Description line (AddInfoLine
+        // called directly, no heading needed since it is self-evidently
+        // the module's own description) or AddValueRow's rows (single-line
+        // values only, never wrapped).
+        private void AddLabeledInfoSection(string label, string text, int panelWidth)
+        {
+            var labelPanel = new Panel()
+            {
+                Size = new Point(panelWidth, InfoRowHeight),
+                Parent = _rootPanel
+            };
+
+            new Label()
+            {
+                Text = label,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(NameColumnX, 2),
+                Parent = labelPanel
+            };
+
+            AddInfoLine(text, panelWidth);
         }
 
         private void AddSpacer(int panelWidth)
