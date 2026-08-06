@@ -49,7 +49,13 @@ namespace GW2CraftingHelper.Views.Rendering
             return frame;
         }
 
-        internal static Panel CreateItemIcon(Panel parent, string iconUrl, int x, int y, int size = 32)
+        // tooltipText (field-test finding B's name-tooltip sweep principle:
+        // anywhere a currency icon shows, its name must be available)
+        // defaults to null - every pre-existing caller (item icons, whose
+        // name already renders as adjacent text) is unaffected; only a new
+        // caller that opts in by passing it gets a hover tooltip.
+        internal static Panel CreateItemIcon(
+            Panel parent, string iconUrl, int x, int y, int size = 32, string tooltipText = null)
         {
             // Missing icon: render a neutral empty-slot square, not the
             // alarming red error texture - a data gap is not a failure.
@@ -60,6 +66,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Size = new Point(size, size),
                     Location = new Point(x, y),
                     BackgroundColor = new Color(45, 45, 45),
+                    BasicTooltipText = tooltipText,
                     Parent = parent
                 };
             }
@@ -69,6 +76,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(size, size),
                 Location = new Point(x, y),
                 BackgroundTexture = GameService.Content.GetRenderServiceTexture(iconUrl),
+                BasicTooltipText = tooltipText,
                 Parent = parent
             };
         }

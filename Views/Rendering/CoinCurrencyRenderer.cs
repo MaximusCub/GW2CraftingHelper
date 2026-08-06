@@ -227,7 +227,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 // render that text verbatim rather than the numeric amount.
                 string text = amount.BundleLabel ?? amount.Amount.ToString();
                 int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
-                segments.Add(new CoinSegmentMath.CurrencySegmentSpec { IconUrl = amount.IconUrl, Text = text, TextWidth = width });
+                segments.Add(new CoinSegmentMath.CurrencySegmentSpec
+                {
+                    IconUrl = amount.IconUrl,
+                    Text = text,
+                    TextWidth = width,
+                    Name = amount.Name
+                });
             }
             return segments;
         }
@@ -268,7 +274,13 @@ namespace GW2CraftingHelper.Views.Rendering
                     Parent = parent
                 };
 
-                var icon = IconControls.CreateItemIcon(parent, seg.IconUrl, x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y, CoinSegmentMath.CoinIconSize);
+                // Field-test finding B: a currency icon carries no visible
+                // name text anywhere in this cell (unlike SummarySectionRenderer.
+                // CreateCurrencyRow, which prints the name as a label before
+                // the icon) - a hover tooltip is the only way to identify it.
+                var icon = IconControls.CreateItemIcon(
+                    parent, seg.IconUrl, x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y,
+                    CoinSegmentMath.CoinIconSize, seg.Name);
 
                 controls[i] = (label, icon);
                 widths[i] = seg.TextWidth;
