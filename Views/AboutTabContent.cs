@@ -75,6 +75,16 @@ namespace GW2CraftingHelper.Views
         private const string ArenaNetDisclaimerText =
             "GW2 Crafting Helper is a fan-made tool and is not affiliated with, endorsed by, or supported by ArenaNet or NCSOFT. Guild Wars 2 and all associated trademarks are the property of NCSOFT Corporation. All game data comes from the official Guild Wars 2 API.";
 
+        // d1 Feature 2's gw2efficiency design-reference credit. Same
+        // approval status as ArenaNetDisclaimerText above: the maintainer
+        // has approved this exact wording for the "Licenses & Attributions"
+        // section. Ship this literal string as-is - do not derive it from
+        // other constants or otherwise reword it, since the approval covers
+        // this exact text (including the Patreon/PayPal URLs, which render
+        // as plain text - no hyperlink control exists in this file).
+        private const string Gw2EfficiencyCreditText =
+            "The crafting logic in this module - how it weighs craft versus buy, prices materials, values Mystic Clovers, and models vendor purchases - is built to follow the publicly observable approach of gw2efficiency (gw2efficiency.com), the Guild Wars 2 companion site created by David Reess (queicherius), Saskia Van Leeuwen, and Ecmel Tugcu, with help from their open-source contributors. Where gw2efficiency has published its methods as open-source code, such as the MIT-licensed recipe-calculation and recipe-nesting libraries, those served as a valuable design reference; this module ships its own independent implementation and never calls gw2efficiency at runtime. gw2efficiency does the hard, ongoing work of keeping tools like this accurate and free for the whole community, so if this module has saved you time or gold, please consider supporting the original team via Patreon (https://www.patreon.com/gw2efficiency) or PayPal (https://paypal.me/devoxa). We are grateful for the trail they blazed.";
+
         // Manual fallback for the "Built with Blish HUD" note, only ever
         // shown if BOTH the live Dependencies read (ReadBlishHudDependencyRange)
         // and the manifest.json fallback read fail to produce a value -
@@ -161,6 +171,9 @@ namespace GW2CraftingHelper.Views
 
             AddSpacer(panelWidth);
             AddLabeledInfoSection("Disclaimer:", ArenaNetDisclaimerText, panelWidth);
+
+            AddSpacer(panelWidth);
+            AddLabeledInfoSection("Credits: gw2efficiency", Gw2EfficiencyCreditText, panelWidth);
         }
 
         private void AddHeaderRow(AboutInfo info, int panelWidth)
