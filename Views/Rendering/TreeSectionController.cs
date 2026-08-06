@@ -1044,19 +1044,30 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.Have)
                 {
-                    tooltipText = "Fully covered by your materials";
+                    // Maintainer's final wording pass (2026-08-06): matches
+                    // the OwnedInfo pill's "Needs N - ..." vocabulary below
+                    // instead of the old bare "Fully covered by your
+                    // materials". For a genuinely-owned Have node, Quantity
+                    // is 0 (the node's whole demand was already subtracted
+                    // during reduction), so OwnedQuantityUsed alone already
+                    // is the original total demand.
+                    tooltipText = $"Needs {node.OwnedQuantityUsed} - all covered by your materials";
                 }
                 else if (spec.Kind == PillKind.OwnedInfo)
                 {
-                    // Field-test finding A's tooltip: spells out what the
-                    // "USING {used} OF {total} OWNED" pill text (see
-                    // DecisionPillPlanner.AppendOwnershipPills) means in
-                    // full sentences, alongside the tree row's own
-                    // remaining-need "Nx" prefix (node.Quantity).
+                    // Field-test finding A's tooltip spelled out what the
+                    // pill text means in full sentences, alongside the tree
+                    // row's own remaining-need "Nx" prefix (node.Quantity);
+                    // the maintainer's final wording pass (2026-08-06, see
+                    // DecisionPillPlanner.AppendOwnershipPills) reworded the
+                    // pill itself to "HAVE {used}/{total} NEEDED" and this
+                    // tooltip to match, without changing what either number
+                    // means - remaining (node.Quantity) is still total minus
+                    // used.
                     int totalDemand = node.OwnedQuantityUsed + node.Quantity;
                     tooltipText =
-                        $"{totalDemand} needed total - {node.OwnedQuantityUsed} covered by your materials, " +
-                        $"{node.Quantity} still to acquire";
+                        $"Needs {totalDemand} total - {node.OwnedQuantityUsed} covered by your materials, " +
+                        $"{node.Quantity} left to acquire";
                 }
                 else if (spec.Kind == PillKind.AchievementBitDeduped)
                 {
