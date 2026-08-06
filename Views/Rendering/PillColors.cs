@@ -34,7 +34,13 @@ namespace GW2CraftingHelper.Views.Rendering
             switch (kind)
             {
                 case PillKind.Selected:
-                    border = new Color(45, 197, 14); // #2DC50E
+                    // Field-test finding C: the original #2DC50E border
+                    // measured 2.31:1 against white, below the 3:1 WCAG
+                    // non-text contrast minimum. Darkened toward #1F8F0C
+                    // (4.21:1) - same hue, same fill*0.15 fill, same white
+                    // label text (M30 #11 decision stands) - only the ring
+                    // itself changed.
+                    border = new Color(31, 143, 12); // #1F8F0C
                     fill = border * 0.15f;
                     break;
                 case PillKind.Have:
@@ -48,16 +54,21 @@ namespace GW2CraftingHelper.Views.Rendering
                 case PillKind.OwnedInfo:
                     // Muted gold, distinct from every other pill hue -
                     // informational only, never confused with a selectable
-                    // source (M34-B2b).
-                    border = new Color(201, 162, 39); // #C9A227
+                    // source (M34-B2b). Field-test finding C: the original
+                    // #C9A227 border measured 2.42:1 against white; darkened
+                    // to #8A6D1F (4.90:1), same hue.
+                    border = new Color(138, 109, 31); // #8A6D1F
                     fill = border * 0.15f;
                     break;
                 case PillKind.Ignore:
                     // Amber when active ("IGNORED", currently toggled on);
                     // plain clickable grey (matching Available) otherwise -
                     // never Selected's green, to avoid reading as "the
-                    // chosen acquisition source" (M34-B2b).
-                    border = isIgnoreActive ? new Color(229, 168, 60) : new Color(138, 138, 138); // #E5A83C / #8A8A8A
+                    // chosen acquisition source" (M34-B2b). Field-test
+                    // finding C: the original active-amber #E5A83C border
+                    // measured 2.10:1 against white; darkened to #9C7327
+                    // (4.29:1), same hue.
+                    border = isIgnoreActive ? new Color(156, 115, 39) : new Color(138, 138, 138); // #9C7327 / #8A8A8A
                     fill = isIgnoreActive ? border * 0.15f : Color.Transparent;
                     break;
                 case PillKind.AchievementBitDeduped:
