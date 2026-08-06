@@ -22,14 +22,14 @@ namespace GW2CraftingHelper.Tests.Services
             CraftingDecision decision,
             bool canCraft = false, bool canBuyTp = false, bool canBuyVendor = false,
             string acquisitionBadge = null, int ownedQuantityUsed = 0, bool isIgnored = false,
-            bool isAchievementBitDeduped = false)
+            bool isAchievementBitDeduped = false, int quantity = 1)
         {
             return new CraftingTreeNode
             {
                 ItemId = 1,
                 NodeId = 1,
                 Name = "Test Item",
-                Quantity = 1,
+                Quantity = quantity,
                 Decision = decision,
                 CanCraft = canCraft,
                 CanBuyTp = canBuyTp,
@@ -320,7 +320,10 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromVendor, vendorPill.Source);
         }
 
-        // --- M34-B2b: "USING N OWNED" annotation ---
+        // --- M34-B2b: "USING N OF M OWNED" annotation (field-test finding
+        // A: widened to show the original total demand, not just the
+        // covered count, alongside the tree row's own remaining-need "Nx"
+        // prefix - see AppendOwnershipPills' doc comment) ---
 
         [Theory]
         [InlineData(CraftingDecision.Craft, true, false, false, "CRAFT")]
@@ -330,14 +333,30 @@ namespace GW2CraftingHelper.Tests.Services
         public void PartialOwnership_AddsOwnedInfoPill_SourcePillUnchanged(
             CraftingDecision decision, bool canCraft, bool canBuyTp, bool canBuyVendor, string expectedSourceText)
         {
+            // node.Quantity defaults to 1 (Node() helper), so total demand
+            // = 4 owned + 1 remaining = 5.
             var node = Node(decision, canCraft, canBuyTp, canBuyVendor, ownedQuantityUsed: 4);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
             Assert.Equal(expectedSourceText, specs[0].Text);
             var ownedPill = specs.Single(s => s.Kind == PillKind.OwnedInfo);
-            Assert.Equal("USING 4 OWNED", ownedPill.Text);
+            Assert.Equal("USING 4 OF 5 OWNED", ownedPill.Text);
             Assert.Null(ownedPill.Source);
             Assert.Contains(specs, s => s.Kind == PillKind.Ignore && s.Text == "IGNORE");
+        }
+
+        [Fact]
+        public void PartialOwnership_TotalDemand_SumsOwnedAndRemainingQuantity()
+        {
+            // Regression guard for the field-test A paradox report itself:
+            // a large remaining need (120) alongside a large owned count
+            // (130) must show the true original total (250), not either
+            // number alone.
+            var node = Node(CraftingDecision.BuyFromTp, canBuyTp: true, ownedQuantityUsed: 130, quantity: 120);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            var ownedPill = specs.Single(s => s.Kind == PillKind.OwnedInfo);
+            Assert.Equal("USING 130 OF 250 OWNED", ownedPill.Text);
         }
 
         [Theory]

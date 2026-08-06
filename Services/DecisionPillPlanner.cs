@@ -10,8 +10,11 @@ namespace GW2CraftingHelper.Services
         Locked,
         Have,
 
-        // Non-interactive "USING N OWNED" annotation (M34-B2b, gw2e's
-        // "Using N owned materials" pill) - informational only, never
+        // Non-interactive "USING N OF M OWNED" annotation (M34-B2b, gw2e's
+        // "Using N owned materials" pill; field-test finding A widened the
+        // text to show the original total demand alongside the owned
+        // count, not just the remaining-need count alone - see
+        // AppendOwnershipPills' doc comment) - informational only, never
         // clickable, coexists alongside whichever source pill(s) this node
         // already has (see BuildPillSpecs).
         OwnedInfo,
@@ -162,22 +165,34 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Appends the two owned-materials pills (M34-B2b) shared by every
         /// non-Have/non-Currency return path in BuildPillSpecs: the
-        /// non-interactive "USING N OWNED" annotation (only when this node's
-        /// own demand was actually partly covered by real inventory - see
-        /// CraftingTreeNode.OwnedQuantityUsed's doc comment) and the
+        /// non-interactive "USING N OF M OWNED" annotation (only when this
+        /// node's own demand was actually partly covered by real inventory -
+        /// see CraftingTreeNode.OwnedQuantityUsed's doc comment) and the
         /// interactive "IGNORE" toggle (offered on every real item node
         /// regardless of ownership, matching gw2e's own always-offered
         /// "Ignore" pill - Section 3.2 of the r2 report). A node this method
         /// is called for is, by construction, never already ignored (an
         /// ignored node's Decision is Have, handled separately above), so
         /// the toggle always starts from its "IGNORE" (not yet active) text.
+        ///
+        /// Field-test finding A: the pill used to read "USING N OWNED"
+        /// showing only the covered count, while node.Quantity (the tree
+        /// row's own "Nx" prefix) already shows the REMAINING need after
+        /// that coverage was subtracted - e.g. "120x ... USING 130 OWNED"
+        /// read as a paradox (130 owned covering only 120 needed?) when the
+        /// true original demand was actually 250. Spelling out the total
+        /// (OwnedQuantityUsed + Quantity, per CraftingTreeNode's own "Quantity
+        /// + OwnedQuantityUsed recovers the node's original pre-reduction
+        /// demand" contract) removes the ambiguity without changing what
+        /// either number means.
         /// </summary>
         private static void AppendOwnershipPills(List<PillSpec> specs, CraftingTreeNode node)
         {
             if (node.OwnedQuantityUsed > 0)
             {
+                int totalDemand = node.OwnedQuantityUsed + node.Quantity;
                 specs.Add(new PillSpec(
-                    $"USING {node.OwnedQuantityUsed} OWNED",
+                    $"USING {node.OwnedQuantityUsed} OF {totalDemand} OWNED",
                     null,
                     PillKind.OwnedInfo));
             }
