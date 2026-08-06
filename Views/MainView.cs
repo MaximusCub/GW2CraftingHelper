@@ -462,7 +462,7 @@ namespace GW2CraftingHelper.Views
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
 
-            // Same hazard class as the LogTabContent field crash (2026-08-06,
+            // Same hazard family as the LogTabContent field crash (2026-08-06,
             // docs/KNOWN-ISSUES.md): Blish HUD runs a tab's Build() via
             // View.DoLoad().ContinueWith(...) on a ThreadPool thread, not the
             // main/game thread (docs/ARCHITECTURE.md Section 1). Unlike
@@ -474,24 +474,49 @@ namespace GW2CraftingHelper.Views
             // even limited to "user is on the Snapshot tab right now". Both
             // paths end up calling UpdateCoinDisplay/ApplyStatusDisplay/
             // RebuildContent, which dispose-then-add into _coinPanel.
-            // Children/_contentPanel.Children - if Update() ever landed
-            // while Build() was still executing this tail on the ThreadPool
-            // thread, two threads would mutate the same Children collections
-            // concurrently, the same shape that corrupted LogTabContent's
-            // _renderedRows Queue<T>. Marshaling this tail onto the main
-            // thread serializes it against every Update()-driven
-            // SetSnapshot/SetStatus call, so those two specific paths can
-            // never execute concurrently with each other - that race is
-            // impossible BY CONSTRUCTION, matching LogTabContent's fix.
+            // Children/_contentPanel.Children.
+            // <para>
+            // NOT the hazard, despite resembling one: Blish's own
+            // Container.Children (ControlCollection&lt;T&gt;) is itself
+            // ReaderWriterLockSlim-guarded on every operation - Add, Remove,
+            // AddRange, and the indexer all EnterWriteLock; Count and the
+            // indexer getter EnterReadLock; GetEnumerator EnterReadLocks and
+            // releases it from its ControlEnumerator's Dispose() -
+            // independently confirmed by decompiling
+            // packages/BlishHUD.1.3.0's Blish HUD.exe with ilspycmd. Unlike
+            // LogTabContent's plain unsynchronized Queue&lt;(long,Label)&gt;,
+            // concurrent Children access cannot corrupt the collection's own
+            // internals.
+            // </para>
+            // <para>
+            // The two hazards marshaling this tail actually closes: (a)
+            // dispose-then-add is a non-atomic COMPOUND sequence - Children's
+            // own lock protects each individual Add/Remove call, but nothing
+            // holds a lock across the whole "dispose every old child, then
+            // add every new one" sequence, so two interleaved
+            // UpdateCoinDisplay/RebuildContent calls can each finish
+            // disposing the OLD children before either adds the NEW ones,
+            // and both survive - duplicated content, the same shape as the
+            // doubled "No log entries yet." placeholders LogTabContent hit
+            // live on 2026-07-23 (see LogTabContent.cs's _buildComplete doc
+            // comment); and (b) the top-of-Build
+            // _searchDebounceCts?.Cancel();?.Dispose(); sequence this branch
+            // moved into this tail used to run directly in Build()'s
+            // ThreadPool-thread body, racing ScheduleSearchRebuild()/
+            // RebuildContent(), which write the same field on the main
+            // thread - CancellationTokenSource.Cancel() calls
+            // ThrowIfDisposed(), so whichever call landed second on the
+            // shared reference could throw ObjectDisposedException.
+            // Marshaling this tail onto the main thread serializes it
+            // against every Update()-driven SetSnapshot/SetStatus call and
+            // every main-thread handler touching the same fields, so
+            // neither hazard can occur - impossible BY CONSTRUCTION, matching
+            // LogTabContent's fix (which closes the DIFFERENT hazard of an
+            // actually-unsynchronized Queue&lt;T&gt;, not a Children race).
+            // </para>
             // UpdateCoinDisplay is called here (rather than earlier, right
-            // after _coinPanel is created) so all three calls that race
-            // against SetSnapshot/SetStatus's own tail land in the same
-            // queued callback. The top-of-Build _searchDebounceCts
-            // cancel-and-clear (see this method's earlier comment) is ALSO
-            // done here, for the same reason - RebuildContent() and
-            // ScheduleSearchRebuild() write that field on the main thread
-            // too, so a ThreadPool-thread write to it would be a fourth,
-            // separate race on top of the three above.
+            // after _coinPanel is created) so all three calls land in the
+            // same queued callback as the _searchDebounceCts cleanup above.
             // <para>
             // This does NOT make every MainView mutation path main-thread-
             // only - unlike the state above, the panel/control fields
@@ -646,15 +671,39 @@ namespace GW2CraftingHelper.Views
             MainThreadMarshal.Run(() =>
             {
                 // A newer keystroke may have canceled this token (the
-                // common case - CancelSearchDebounce() also runs at the top
-                // of every fresh Build(), so a same-tab revisit cancels this
-                // too), or the module may have been unloaded while this was
-                // pending, which is what the Parent-null half of the guard
-                // below actually catches - NOT a plain tab switch-away (see
-                // docs/ARCHITECTURE.md Section 1, "a tab switch detaches, it
-                // does not dispose"): _contentPanel keeps a non-null Parent
-                // in that case, so an uncancelled debounce would still
-                // render, just into a panel the user can no longer see.
+                // common case). Cancellation is NOT synchronous with a
+                // same-tab revisit though: CancelSearchDebounce() runs
+                // inside every fresh Build()'s own MainThreadMarshal tail,
+                // not at the top of Build itself - Build's body executes on
+                // a ThreadPool thread (see Build's top-of-method comment for
+                // why the cancel cannot live there), so a same-tab revisit
+                // cancels this one queued main-thread callback later, not
+                // synchronously with the revisit. A debounce armed on a
+                // previous visit is therefore still live for the window
+                // between Build's ThreadPool-thread body finishing and its
+                // own MainThreadMarshal tail draining: if this callback is
+                // the one that lands in that window, token.
+                // IsCancellationRequested is still false and the guard below
+                // passes, so RebuildContent() runs here using whatever
+                // _contentPanel/_searchBox/_filterDropdown/checkbox values
+                // this instance's fields currently hold - Build assigns
+                // _contentPanel LAST among those (see the field-assignment
+                // order in Build's body), and nothing synchronizes
+                // cross-thread visibility of the individual writes in
+                // between, so in the narrowest case this could even read the
+                // NEW _searchBox/filters against the OLD _contentPanel.
+                // Either way the result is superseded moments later by
+                // Build's own tail calling RebuildContent() again correctly
+                // - a wasted rebuild, not a wrong final state.
+                //
+                // Separately: the module may have been unloaded while this
+                // was pending, which is what the Parent-null half of the
+                // guard below actually catches - NOT a plain tab
+                // switch-away (see docs/ARCHITECTURE.md Section 1, "a tab
+                // switch detaches, it does not dispose"): _contentPanel
+                // keeps a non-null Parent in that case, so an uncancelled
+                // debounce would still render, just into a panel the user
+                // can no longer see.
                 if (token.IsCancellationRequested) return;
                 if (_contentPanel == null || _contentPanel.Parent == null) return;
                 RebuildContent();

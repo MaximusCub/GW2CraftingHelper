@@ -109,6 +109,42 @@ nobody will ever see), not a crash and not a correctness bug - but a call
 site whose comment claims the guard catches that case is asserting something
 false, which is its own defect (KNOWN-ISSUES #36, third fix-loop round).
 
+**Also verified: `Container.Children` is lock-guarded - the hazard a
+marshaled `Build()` tail actually closes is the compound dispose-then-add
+sequence, not `Children` itself.** A tempting shorthand for why a
+dispose-then-add `Build()` tail (`MainView.Build`'s
+`UpdateCoinDisplay`/`ApplyStatusDisplay`/`RebuildContent`,
+`LogTabContent.RebuildRows`) needs marshaling is "two threads would mutate
+the same `Children` collection concurrently, corrupting it" - decompiling
+`Blish_HUD.Controls.ControlCollection<T>` (`packages/BlishHUD.1.3.0/lib/
+net472/Blish HUD.exe`, via `ilspycmd`) shows this is not actually why:
+`ControlCollection<T>` holds a private `ReaderWriterLockSlim _listLock` and
+takes it on every operation - `Add`/`Remove`/`AddRange`/the indexer setter
+all `EnterWriteLock`; `Count`/the indexer getter `EnterReadLock`; and
+`GetEnumerator` `EnterReadLock`s and releases it from its
+`ControlEnumerator`'s `Dispose()`. `Container.AddChild`/`RemoveChild` build
+their `ChildChangedEventArgs` from a `_children.ToList()` snapshot and then
+call the locked `_children.Add`/`_children.Remove`. So concurrent `Children`
+mutation cannot corrupt the collection's own internals the way an
+unsynchronized `Queue<T>` can (LogTabContent's field crash above) - unlike
+that crash, this module has never actually needed to guard against
+`Children` itself being corrupted. The real hazard in a "dispose old
+children, then add new ones" tail is that the sequence is a non-atomic
+COMPOUND operation: `Children`'s own lock protects each individual
+`Add`/`Remove` call, but nothing holds a lock across the whole
+"dispose-every-old-child, then add-every-new-one" sequence, so two
+interleaved rebuilds can each finish disposing before either starts adding,
+and both survive - duplicated content, e.g. the doubled "No log entries
+yet." placeholders `LogTabContent` hit live on 2026-07-23
+(`LogTabContent.cs`'s `_buildComplete` doc comment). Marshaling the whole
+tail onto the main thread still closes this correctly, just for the right
+reason: it prevents two rebuilds from interleaving AT ALL (a single thread
+cannot run two call stacks at the same instant), rather than relying on a
+lock inside `Children` that was never the thing missing. A call site whose
+comment instead claims `Children` itself would have been corrupted is
+asserting something the decompiled source disproves - its own defect
+(KNOWN-ISSUES #36, fourth fix-loop round).
+
 **Full history:** KNOWN-ISSUES items 1, 12, 13, 36
 (`docs/dev-notes/HISTORY.md` after the WP-27 split).
 
