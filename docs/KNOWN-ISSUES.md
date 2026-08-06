@@ -472,7 +472,27 @@ invariant: tests must stay Blish-free) - the fix is proven by construction
 acting before Build's own tail has landed where relevant) plus the live
 orchestrator gate below.
 
-**Live gate:** [PENDING - the orchestrator fills in PASS/FAIL]
+**Live gate:** PASS (orchestrator, 2026-08-06, live branch-build sandbox
+session under the hardened desktop protocol, captures logfix_01_empty.png /
+logfix_02_search.png):
+- Empty-state placeholder renders exactly ONCE on first Log-tab open
+  (the doubled-placeholder interleave shape is gone).
+- Crash-condition recreation: four rounds of Snapshot Refresh Now (each
+  spawning failing-fetch WARN writes from ThreadPool threads - the exact
+  field trigger, InvalidAccessTokenException per source) immediately
+  followed by Log-tab opens plus Snapshot/Log tab churn; Blish alive and
+  Responding=True throughout, zero FATAL lines (the 2026-08-06 field
+  crash reproduced fatally on the FIRST such open on the pre-fix build).
+- Log entries render with level colors; the search box filters live
+  ("material" -> exactly the four matching WARN rows) - also the first
+  live verification of Log search, previously blocked by synthetic-
+  keystroke death in long sessions.
+- MainView search-debounce hazard (the ObjectDisposedException path this
+  branch also closed): typed into the Snapshot search box then immediately
+  churned Snapshot->Log->Snapshot->Log to force Build-tail vs debounce
+  interleaves; no exception, no error lines, process responsive.
+- Blish log sweep: zero FATAL, zero ERROR, zero Unhandled/ObjectDisposed
+  across the session.
 
 ---
 
