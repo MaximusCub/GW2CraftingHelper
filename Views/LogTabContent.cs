@@ -279,10 +279,18 @@ namespace GW2CraftingHelper.Views
             // below, on this same ThreadPool thread).
             MainThreadMarshal.Run(() =>
             {
-                // The view may already have been torn down by the time this
-                // queued callback runs (tab switched away again, module
-                // unloaded) - RebuildRows()'s own IsLive check already
-                // no-ops safely in that case.
+                // If the module has been unloaded since this was queued,
+                // RebuildRows()'s own IsLive check already no-ops safely
+                // (Module.Unload disposes _mainWindow, which nulls every
+                // control's Parent). A plain tab switch-away in the
+                // meantime does NOT trip that guard - Blish's own
+                // WindowBase2.ClearView only detaches (does not dispose)
+                // the outgoing view's top-level panel, so _contentPanel
+                // keeps a non-null Parent - see docs/ARCHITECTURE.md
+                // Section 1 ("a tab switch detaches, it does not dispose").
+                // This tail still renders correctly in that case; the
+                // render just lands in a tree the user can no longer see -
+                // wasted work, not a hazard.
                 RebuildRows();
 
                 // Must run in this SAME queued callback, after
@@ -402,16 +410,23 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// True once <see cref="Build"/> has run and the content panel is
-        /// still attached to a live control tree. A disposed control's
-        /// Parent is nulled on disposal (the same "was this torn down"
-        /// signal MainView.cs's async Refresh Now handler already relies
-        /// on) - guards PollForUpdates/Refresh/RebuildRows against running
-        /// against a panel whose tab was closed (or the whole window
-        /// disposed on Module.Unload) since this instance's Build() ran;
-        /// Module.Update()'s own SelectedTab/_logContent-null checks catch
-        /// the common case, but do not cover the window being disposed
-        /// while SelectedTab still happens to equal the Log tab.
+        /// True once <see cref="Build"/> has run and the content panel has
+        /// not been disposed. A disposed control's Parent is nulled on
+        /// disposal (the same "was this torn down" signal MainView.cs's
+        /// async Refresh Now handler already relies on) - guards
+        /// PollForUpdates/Refresh/RebuildRows against running against a
+        /// panel whose WINDOW was disposed on Module.Unload since this
+        /// instance's Build() ran; Module.Update()'s own SelectedTab/
+        /// _logContent-null checks catch the common case, but do not cover
+        /// the window being disposed while SelectedTab still happens to
+        /// equal the Log tab. This does NOT detect a plain tab
+        /// switch-away, and never has - per docs/ARCHITECTURE.md Section 1
+        /// ("a tab switch detaches, it does not dispose"), Blish's own
+        /// ClearView() only detaches the outgoing view's top-level panel
+        /// rather than disposing it, so _contentPanel keeps a non-null
+        /// Parent (this property stays true) after the user switches away
+        /// from this tab; a caller that still runs in that window reaches
+        /// a real, live-but-unreachable panel, not a null one.
         /// </summary>
         private bool IsLive => _contentPanel != null && _contentPanel.Parent != null;
 

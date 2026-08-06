@@ -280,13 +280,18 @@ namespace GW2CraftingHelper.Views
                     // the main thread.
                     MainThreadMarshal.Run(() =>
                     {
-                        // The view may have been torn down (tab switched
-                        // away, module disabled) while the refresh was in
-                        // flight - a disposed control's Parent is nulled on
-                        // disposal, mirroring CraftingPlanView's
-                        // ResizeDebounceStep check. Persistence above
-                        // already happened regardless, so bailing here
-                        // cannot strand any state.
+                        // The module may have been disabled/unloaded while
+                        // the refresh was in flight - a disposed control's
+                        // Parent is nulled on disposal, mirroring
+                        // CraftingPlanView's ResizeDebounceStep check.
+                        // Persistence above already happened regardless, so
+                        // bailing here cannot strand any state. NOTE: a
+                        // plain tab switch-away does NOT null Parent - see
+                        // docs/ARCHITECTURE.md Section 1 ("a tab switch
+                        // detaches, it does not dispose") - so this guard
+                        // covers module teardown only; a tab-switched-away
+                        // user still gets SetSnapshot/SetStatus run into a
+                        // real, just no-longer-visible, header panel.
                         if (_headerPanel == null || _headerPanel.Parent == null) return;
 
                         if (snapshot != null)
@@ -509,15 +514,22 @@ namespace GW2CraftingHelper.Views
                 // tab - see the top-of-Build comment for why this cannot run
                 // there instead. Deliberately BEFORE the liveness guard
                 // below, so a stale debounce is still cancelled even if the
-                // view was torn down before this queued callback ran -
-                // otherwise it would sit un-cancelled until some future
-                // Build() cycle's own tail happens to run.
+                // module was unloaded (or this tab revisited and rebuilt)
+                // before this queued callback ran - otherwise it would sit
+                // un-cancelled until some future Build() cycle's own tail
+                // happens to run.
                 CancelSearchDebounce();
 
-                // The view may already have been torn down by the time this
-                // queued callback runs (tab switched away again, module
-                // unloaded) - a disposed control's Parent is nulled on
+                // The module may have been unloaded by the time this queued
+                // callback runs - a disposed control's Parent is nulled on
                 // disposal, mirroring this file's own Refresh Now guard.
+                // NOTE: a plain tab switch-away does NOT null Parent - see
+                // docs/ARCHITECTURE.md Section 1 ("a tab switch detaches, it
+                // does not dispose") - so if the user switched away from
+                // this tab before this tail lands, this guard does not trip
+                // and UpdateCoinDisplay/ApplyStatusDisplay/RebuildContent
+                // below still run, just into a real header panel the user
+                // can no longer see. Wasted work, not a hazard.
                 if (_headerPanel == null || _headerPanel.Parent == null) return;
 
                 UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
@@ -633,11 +645,16 @@ namespace GW2CraftingHelper.Views
 
             MainThreadMarshal.Run(() =>
             {
-                // A newer keystroke may have canceled this token, or the
-                // tab/module may have been torn down while this was
-                // pending (Build() tears down and recreates every control
-                // on each tab visit - see the class doc comment) - either
-                // way there is nothing to render into.
+                // A newer keystroke may have canceled this token (the
+                // common case - CancelSearchDebounce() also runs at the top
+                // of every fresh Build(), so a same-tab revisit cancels this
+                // too), or the module may have been unloaded while this was
+                // pending, which is what the Parent-null half of the guard
+                // below actually catches - NOT a plain tab switch-away (see
+                // docs/ARCHITECTURE.md Section 1, "a tab switch detaches, it
+                // does not dispose"): _contentPanel keeps a non-null Parent
+                // in that case, so an uncancelled debounce would still
+                // render, just into a panel the user can no longer see.
                 if (token.IsCancellationRequested) return;
                 if (_contentPanel == null || _contentPanel.Parent == null) return;
                 RebuildContent();

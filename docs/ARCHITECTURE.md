@@ -82,6 +82,33 @@ own internals instead of this module's own `await`s. (`TabbedWindow2`'s
 `Tabs`/`SelectedTab` machinery is what `Views/ResizableTabbedWindow.cs`, this
 module's `_mainWindow`, derives from.)
 
+**Also verified: a tab switch detaches, it does not dispose.** A liveness
+check shaped like `control.Parent != null` (this module's
+`LogTabContent.IsLive`, and the inline `_headerPanel`/`_contentPanel`/
+`_coinPanel`.`Parent == null` guards in `MainView.cs`) only detects that
+`control` has been **disposed** - it does NOT detect that `control`'s tab was
+merely switched away from, even though several of this module's own comments
+previously claimed otherwise. Decompiling `WindowBase2.ShowView`/`ClearView`
+shows `ClearView()` calls `Container.ClearChildren()` on the WINDOW itself
+(`while (_children.Count > 0) { _children[0].Parent = null; }`) - detaching
+only the outgoing view's top-level `ViewAdapter` panel, not anything below
+it - and `CurrentView.DoUnload()`, whose `Unload()` call is a no-op for every
+view in this module (`ViewAdapter` does not override `View<TPresenter>.
+Unload()`). Only `Control.Dispose()` nulls a control's own `Parent`
+(`Parent = null;` inside `Control.Dispose(bool disposing)`), and nothing on
+the tab-switch path calls it - that only happens when `Module.Unload()`
+disposes `_mainWindow`. Net effect: after a plain tab switch, every control
+below the outgoing `ViewAdapter`'s own top-level panel (e.g.
+`LogTabContent._contentPanel`, `MainView._headerPanel`/`_contentPanel`) keeps
+a non-null `Parent`, so a `Parent != null`/`IsLive`-shaped guard does NOT
+trip for that case - only for the module actually being unloaded. A
+`MainThreadMarshal.Run` tail that lands after the user has already switched
+away therefore still executes its render into a detached,
+unreachable-but-not-disposed tree: wasted work (rebuilding rows or content
+nobody will ever see), not a crash and not a correctness bug - but a call
+site whose comment claims the guard catches that case is asserting something
+false, which is its own defect (KNOWN-ISSUES #36, third fix-loop round).
+
 **Full history:** KNOWN-ISSUES items 1, 12, 13, 36
 (`docs/dev-notes/HISTORY.md` after the WP-27 split).
 

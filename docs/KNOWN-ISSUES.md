@@ -385,16 +385,47 @@ a main-thread path also touches):
 | Plan History / Crafting Ranker placeholders (`Module.BuildPlaceholder`) | NO HAZARD - creates one `Label` and returns; nothing else ever references it. |
 | `CraftingPlanView` (Crafting Plan tab) | **HAZARD PRESENT, OUT OF SCOPE** - not modified (scroll/`FrameTicker` machinery is DO-NOT-TOUCH per M38, hardened M31-M36). A first sweep pass incorrectly recorded this row as no live race; a 2026-08-06 review corrected it: `Build()` calls `StopLiveTickers()` (`Views/CraftingPlanView.cs:1511`) on the ThreadPool thread; that method `Cancel()`s -> `Dispose()`s three `SpriteScreen`-parented `FrameTicker` Controls (`_scrollVerifyTicker`, `_resizeDebounceTicker`, `_wheelWrapVerifyTicker`) whose `DoUpdate` runs on the main thread and survives tab switches (they are parented to `GameService.Graphics.SpriteScreen`, not this view's own control tree - by design, per their own field comments), and zeroes `_resizeSettlePending`/`_resizeScrollRestorePending`/`_resizeScrollSavedOffset`/`_lastWheelEventUtc`, which those same main-thread ticker steps read and write. Same hazard class as the two fixed rows above; deferred to a dedicated pass that can safely touch the M31-M36 scroll machinery rather than fixed here. |
 
+A third review round (2026-08-06) found the second round's own fix had left
+behind a documentation defect of the exact class this issue exists to
+prevent: the marshaled tails' and `IsLive`'s doc comments in both files
+claimed the `Parent == null` liveness guard protects against a plain "tab
+switched away" case. Independently re-verified via `ilspycmd` decompilation
+(now recorded permanently in `docs/ARCHITECTURE.md` Section 1, "a tab
+switch detaches, it does not dispose") that this is false:
+`WindowBase2.ClearView` only detaches (`Container.ClearChildren`,
+`Parent = null`, no `Dispose`) the outgoing view's OWN top-level
+`ViewAdapter` panel from the window, and `ViewAdapter` does not override
+`Unload()` - so every control below that top-level panel, including
+`LogTabContent._contentPanel` and `MainView._headerPanel`/`_contentPanel`,
+keeps a non-null `Parent` after a plain tab switch. Only `Control.Dispose()`
+(reached via `Module.Unload()` disposing `_mainWindow`) nulls a control's
+own `Parent`. Practical effect: none of the marshaled tails were ever
+unsafe against a real tab switch - a tail that lands after the user
+switches away simply does slightly more work than necessary (rendering
+into a real, just no-longer-visible, tree instead of a genuinely
+torn-down one), which the comments now say correctly instead of
+certifying a guard against a case it cannot detect. Corrected four call
+sites: `Views/LogTabContent.cs` (`Build()`'s marshaled tail, `IsLive`'s
+doc comment) and `Views/MainView.cs` (the Refresh Now handler's marshaled
+tail, `Build()`'s marshaled tail, `RunSearchDebounceAsync`'s marshaled
+tail) - all now pointing at the single canonical explanation in
+`docs/ARCHITECTURE.md` Section 1 instead of repeating (and having drifted
+from) it independently at each site. No behavior changed; this round is
+comment-only. The class-sweep table above and the `_buildComplete`
+keep-vs-remove decision were both re-checked against the current code
+during this round and still hold as written - no updates needed there.
+
 **Validation:** `dotnet build -p:Platform=x64` - 0 errors. Module test suite
 (`tests/GW2CraftingHelper.Tests`) - 1101/1101 passing. VendorOfferUpdater
-suite (`tests/VendorOfferUpdater.Tests`) - 135/135 passing (both re-measured
-after the 2026-08-06 review-fix pass above; counts unchanged, since that
-pass touches only Blish HUD UI code and documentation, neither of which the
-repo invariants permit test coverage for). `LogTabContent`/`MainView` are
-Blish HUD UI code with no test net (repo invariant: tests must stay
-Blish-free) - the fix is proven by construction (every racing path is now
-provably main-thread-only, and gated against acting before Build's own tail
-has landed where relevant) plus the live orchestrator gate below.
+suite (`tests/VendorOfferUpdater.Tests`) - 135/135 passing (re-measured a
+third time after the 2026-08-06 comment-correction round above; counts
+unchanged, since that round touches only comments and documentation, none
+of which the repo invariants permit or require test coverage for).
+`LogTabContent`/`MainView` are Blish HUD UI code with no test net (repo
+invariant: tests must stay Blish-free) - the fix is proven by construction
+(every racing path is now provably main-thread-only, and gated against
+acting before Build's own tail has landed where relevant) plus the live
+orchestrator gate below.
 
 **Live gate:** [PENDING - the orchestrator fills in PASS/FAIL]
 
