@@ -134,19 +134,64 @@ namespace GW2CraftingHelper.Services
             IReadOnlyList<CostLine> perBatchCostLines,
             IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
         {
-            if (perBatchCostLines == null || perBatchCostLines.Count == 0 || outputCount <= 0)
+            return ResolveDividedAmounts(perBatchCostLines, outputCount, currencyMetadata);
+        }
+
+        /// <summary>
+        /// Approximates a per-unit ("Each") currency amount for a single
+        /// recipe-tree row (TreeSectionController's "Unit price:" tooltip
+        /// line, field-test finding B) from a node's own already-scaled-to-
+        /// Quantity VendorCurrencyCosts. Unlike ResolveUnitAmounts, this is
+        /// NOT the winning offer's true per-batch rate: CraftingTreeNode
+        /// carries no per-offer batch data (OutputCount/
+        /// CurrencyCostLinesPerBatch only exist on PlanStep, threaded there
+        /// by VendorBatchSolver.FinalizeVendorBatches for the MERGED
+        /// shopping list - a later, separate pass a single tree node's
+        /// SolverDecision never goes through), so this divides the node's
+        /// own total by its own Quantity instead. The two happen to agree
+        /// whenever this offer's purchase batches divided evenly into this
+        /// node's Quantity (the common case); when they do not (the total
+        /// already includes rounding up to a whole purchase - see
+        /// VendorBatchSolver.EvaluateVendorOffers' unitsNeeded), this falls
+        /// back to the same "N for M" bundle text as ResolveUnitAmounts
+        /// rather than dividing into a misleading fractional number - see
+        /// that method's own doc comment for why a truncated average is
+        /// avoided in the first place. Display-layer-only: no solver change
+        /// needed to plumb the true batch rate down to this node.
+        /// </summary>
+        public static List<CurrencyAmountViewModel> ResolveTreeNodeUnitAmounts(
+            IReadOnlyList<CostLine> totalCostLines,
+            int quantity,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
+        {
+            return ResolveDividedAmounts(totalCostLines, quantity, currencyMetadata);
+        }
+
+        /// <summary>
+        /// Shared "N for M" divide-with-bundle-fallback arithmetic behind
+        /// both ResolveUnitAmounts (true per-batch rate) and
+        /// ResolveTreeNodeUnitAmounts (total/quantity approximation) - the
+        /// two callers differ only in what costLines/divisor semantically
+        /// represent, never in the math itself.
+        /// </summary>
+        private static List<CurrencyAmountViewModel> ResolveDividedAmounts(
+            IReadOnlyList<CostLine> costLines,
+            int divisor,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
+        {
+            if (costLines == null || costLines.Count == 0 || divisor <= 0)
             {
                 return null;
             }
 
-            var result = new List<CurrencyAmountViewModel>(perBatchCostLines.Count);
-            foreach (var line in perBatchCostLines)
+            var result = new List<CurrencyAmountViewModel>(costLines.Count);
+            foreach (var line in costLines)
             {
-                bool evenly = line.Count % outputCount == 0;
+                bool evenly = line.Count % divisor == 0;
                 result.Add(new CurrencyAmountViewModel
                 {
-                    Amount = evenly ? line.Count / outputCount : 0,
-                    BundleLabel = evenly ? null : $"{line.Count} for {outputCount}",
+                    Amount = evenly ? line.Count / divisor : 0,
+                    BundleLabel = evenly ? null : $"{line.Count} for {divisor}",
                     Name = ResolveName(line.Id, currencyMetadata),
                     IconUrl = ResolveIconUrl(line.Id, currencyMetadata)
                 });

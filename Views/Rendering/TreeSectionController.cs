@@ -658,11 +658,36 @@ namespace GW2CraftingHelper.Views.Rendering
             // only the "is the name actually truncated" line needs to be
             // reconsidered when nameMaxWidth changes.
             var extraTooltipLines = new List<string>();
-            if (node.UnitCost.HasValue && node.Quantity > 1 &&
+            if (node.Quantity > 1 &&
                 (node.Decision == CraftingDecision.BuyFromTp ||
                  node.Decision == CraftingDecision.BuyFromVendor))
             {
-                extraTooltipLines.Add("Unit price: " + CoinCurrencyRenderer.FormatCoinText(node.UnitCost.Value));
+                // Field-test finding B: a pure-currency vendor offer
+                // (spirit shards, karma, ...) has UnitCost == 0 (not null -
+                // see CraftingTreeBuilder.BuildNode), which used to render a
+                // misleading "0g 0s 0c" instead of the real per-unit
+                // currency cost; a mixed coin+currency offer still shows
+                // both lines below. The coin line is suppressed only when
+                // it is genuinely zero AND a currency cost exists to show
+                // instead of it.
+                bool hasCurrencyCosts = node.VendorCurrencyCosts != null && node.VendorCurrencyCosts.Count > 0;
+                if (node.UnitCost.HasValue && !(node.UnitCost.Value == 0 && hasCurrencyCosts))
+                {
+                    extraTooltipLines.Add("Unit price: " + CoinCurrencyRenderer.FormatCoinText(node.UnitCost.Value));
+                }
+                if (node.Decision == CraftingDecision.BuyFromVendor && hasCurrencyCosts)
+                {
+                    var unitCurrencyAmounts = CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(
+                        node.VendorCurrencyCosts, node.Quantity, _getCurrentPlan()?.CurrencyMetadata);
+                    if (unitCurrencyAmounts != null)
+                    {
+                        foreach (var amount in unitCurrencyAmounts)
+                        {
+                            string amountText = amount.BundleLabel ?? amount.Amount.ToString();
+                            extraTooltipLines.Add($"Unit price: {amountText} {amount.Name}");
+                        }
+                    }
+                }
             }
             if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
             {
