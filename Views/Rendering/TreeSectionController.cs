@@ -954,7 +954,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     BackgroundColor = fillColor,
                     Parent = outer
                 };
-                new Label()
+                var label = new Label()
                 {
                     Text = spec.Text,
                     Font = font,
@@ -965,11 +965,25 @@ namespace GW2CraftingHelper.Views.Rendering
                     Parent = inner
                 };
 
+                // Field-test finding D: tooltipText is resolved once below,
+                // then stamped onto outer/inner/label together right before
+                // the loop moves on - the inner fill panel and its label
+                // cover almost the entire pill (outer is only a 1px border
+                // ring once inset by inner's Location), so a tooltip set on
+                // outer alone is swallowed by whichever of inner/label is
+                // actually under the cursor (labels capture mouse - the
+                // same lesson M32 already established for hover/click
+                // targets elsewhere in this file) and the user never sees
+                // it hovering the pill body. Click/MouseEntered/MouseLeft
+                // stay on outer only - unlike tooltip lookup, those already
+                // work correctly today.
+                string tooltipText = null;
+
                 bool interactive = !dimmed && spec.Source.HasValue && _resolveOverridesSync != null;
                 bool ignoreInteractive = !dimmed && spec.Kind == PillKind.Ignore && _resolveOverridesSync != null;
                 if (interactive)
                 {
-                    outer.BasicTooltipText = $"Switch to {spec.Text}";
+                    tooltipText = $"Switch to {spec.Text}";
                     var source = spec.Source.Value;
                     outer.Click += (_, __) =>
                     {
@@ -985,7 +999,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     // M34-B2b: toggles this ITEM id (not just this node) in
                     // or out of _ignoredItemIds, matching gw2e's own
                     // tree-wide-by-item-id "Ignore" semantics.
-                    outer.BasicTooltipText = node.IsIgnored
+                    tooltipText = node.IsIgnored
                         ? "Stop treating this item as fully in-hand"
                         : "Treat this item as fully in-hand (ignore its owned-stock requirement)";
                     int itemId = node.ItemId;
@@ -1011,14 +1025,53 @@ namespace GW2CraftingHelper.Views.Rendering
                     // Prefer the seeded wiki hint when one exists.
                     if (node.Decision == CraftingDecision.Unknown)
                     {
-                        outer.BasicTooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
+                        tooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
                             ? node.AcquisitionHint
                             : "No known acquisition source";
                     }
                     else
                     {
-                        outer.BasicTooltipText = "Only available source";
+                        tooltipText = "Only available source";
                     }
+                }
+                else if (spec.Kind == PillKind.Selected)
+                {
+                    // Field-test finding D: the currently-committed source
+                    // pill (non-interactive - clicking it would be a no-op
+                    // re-solve, see BuildPillSpecs) previously had no
+                    // tooltip at all.
+                    tooltipText = $"Current source: {spec.Text}";
+                }
+                else if (spec.Kind == PillKind.Have)
+                {
+                    tooltipText = "Fully covered by your materials";
+                }
+                else if (spec.Kind == PillKind.OwnedInfo)
+                {
+                    // Field-test finding A's tooltip: spells out what the
+                    // "USING {used} OF {total} OWNED" pill text (see
+                    // DecisionPillPlanner.AppendOwnershipPills) means in
+                    // full sentences, alongside the tree row's own
+                    // remaining-need "Nx" prefix (node.Quantity).
+                    int totalDemand = node.OwnedQuantityUsed + node.Quantity;
+                    tooltipText =
+                        $"{totalDemand} needed total - {node.OwnedQuantityUsed} covered by your materials, " +
+                        $"{node.Quantity} still to acquire";
+                }
+                else if (spec.Kind == PillKind.AchievementBitDeduped)
+                {
+                    // M37, KNOWN-ISSUES #26: explains the "COUNTED
+                    // ELSEWHERE" semantics - nothing here is actually
+                    // owned, this exact occurrence is just already required
+                    // elsewhere in the tree.
+                    tooltipText = "Already counted elsewhere in the tree - this item is obtained once, not needed again here";
+                }
+
+                if (tooltipText != null)
+                {
+                    outer.BasicTooltipText = tooltipText;
+                    inner.BasicTooltipText = tooltipText;
+                    label.BasicTooltipText = tooltipText;
                 }
 
                 pillPanels.Add(outer);
