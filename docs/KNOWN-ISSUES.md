@@ -294,6 +294,206 @@ mid-write corrupt array is not) and its two independent rotation caps
 (2 MB size / 14 day age, both user-configurable and clamped against
 out-of-range persisted values).
 
+### 36. LogTabContent field crash: TabChanged raced Build() on two threads, corrupting a Queue<T> (FIXED, 2026-08-06)
+
+**Field evidence:** a real user install crashed with `System.ArgumentException`
+("Destination array was not long enough") from `Queue<T>.SetCapacity` <-
+`Queue<T>.Enqueue` <- `LogTabContent.RebuildRows()` <- `LogTabContent.Refresh()`
+<- Module.cs's `TabChanged` handler <- `TabbedWindow2.OnTabChanged` <- a
+main-thread mouse click, while ThreadPool-thread WARN writes from failing
+snapshot fetches (invalid API token) were landing in `ModuleLog` throughout
+(`ModuleLog` itself is correctly synchronized - two-lock + `ConcurrentQueue`
+- and was not implicated).
+
+**Root cause:** Blish HUD's own `WindowBase2.ShowView` runs a tab's `Build()`
+via `View.DoLoad().ContinueWith(...)` (docs/ARCHITECTURE.md Section 1) - with
+no `SynchronizationContext` installed and no
+`TaskContinuationOptions.ExecuteSynchronously` passed to `ContinueWith`, that
+continuation is scheduled onto the ThreadPool, not the main/game thread,
+regardless of whether `DoLoad`'s own task has already completed by the time
+`ContinueWith` runs. (This mechanism was re-verified 2026-08-06 during this
+fix-loop by decompiling the shipped Blish HUD v1.3.0 binary with `ilspycmd`
+after a prior pass cited docs/ARCHITECTURE.md Section 1 for it without that
+section actually containing it yet - see Section 1's own "Verified"
+paragraph for the decompiled call chain. The underlying claim held up; only
+the citation target was missing, and is now filled in.) `LogTabContent.
+Build()`'s own tail called `RebuildRows()` directly on that ThreadPool
+thread. Meanwhile, `SelectedTab` flips to the Log tab (and Module.cs's
+`TabChanged` handler fires, synchronously, on the main thread) independently
+of - and not necessarily after - that ThreadPool-scheduled `Build()` call
+completing. `TabChanged` calls `LogTabContent.Refresh()` -> `RebuildRows()`
+against the SAME `LogTabContent` instance whenever `_logContent` is already
+non-null and its `_contentPanel` is already live, which `IsLive` alone does
+not rule out mid-`Build()`. PR #99 (item 35's follow-up polish PR) had added
+a `_buildComplete` latch guarding `PollForUpdates()` against exactly this
+ThreadPool-vs-main-thread shape, on the assumption (recorded in that PR's
+own review) that `TabChanged` could not fire before `_logContent` pointed at
+a fully-built instance - but `Refresh()` itself never checked the latch, and
+the field crash proves that assumption's ordering is timing-dependent and
+CAN interleave. Two threads concurrently calling `Queue<(long,Label)>.
+Enqueue` on the SAME `_renderedRows` field corrupted its internal
+circular-buffer bookkeeping, producing the `Queue<T>.SetCapacity`
+`ArgumentException` on a later `Enqueue`.
+
+**Fix:** `LogTabContent.Build()`'s tail (the `RebuildRows()` call plus the
+`_buildComplete = true` write) is now marshaled onto the main thread via
+`MainThreadMarshal.Run` (`Views/MainThreadMarshal.cs`). `Refresh()`,
+`PollForUpdates()`, the level-dropdown `ValueChanged` handler, the
+search-box `TextChanged` handler, and `ClearView()` all now check
+`_buildComplete` before calling `RebuildRows()` - a first fix pass only
+gated `PollForUpdates()`/`Refresh()` and left the other three ungated (still
+main-thread, so not a crash, but reachable while Build's body is still
+executing and unable to state a real enforced invariant); a review pass on
+2026-08-06 closed that gap. With all six `RebuildRows()` call sites either
+gated on `_buildComplete` or IS the marshaled tail itself, they are
+inherently serialized: a single thread cannot run two call stacks at the
+same instant, so the race is impossible BY CONSTRUCTION, not merely guarded.
+`_buildComplete` is KEPT (not removed as obsolete) - it no longer has a
+cross-thread safety job, but still avoids a wasted, redundant `RebuildRows()`
+pass on any of its five callers if they fire before Build()'s own queued
+tail has landed; its `volatile` qualifier was removed since every read/write
+is now main-thread-only. This does not make every field `LogTabContent`
+touches main-thread-only - the eight control fields (`_toolbarPanel`,
+`_levelDropdown`, `_searchBox`, `_followCheckbox`, `_clearViewButton`,
+`_copyButton`, `_statusLabel`, `_contentPanel`) are still first published by
+the rest of `Build()`'s body on the ThreadPool thread; every main-thread read
+of one of them stays behind its existing null guard (`IsLive`, `_searchBox?`,
+`_statusLabel == null`) rather than assuming it is already non-null - see
+the corrected invariant note on `_buildComplete`'s own doc comment in
+`Views/LogTabContent.cs`.
+
+The same review pass found `MainView.Build()`'s own top-of-body
+cancel-dispose-and-null-out of `_searchDebounceCts` (added by the
+class-sweep fix below) had been left running on the ThreadPool thread
+instead of being marshaled with the rest of Build's tail, while
+`RebuildContent()` and `ScheduleSearchRebuild()` write that same field on
+the main thread - the identical hazard shape one level down, on a field the
+class sweep introduced rather than the original crash. That cleanup now also
+runs inside `MainView.Build()`'s `MainThreadMarshal.Run` tail, ahead of the
+existing liveness guard so a stale debounce is still cancelled even if the
+tab was switched away before the queued callback runs.
+
+**Class sweep** (Blish `Build()`/`DoLoad` continuation mutating UI state that
+a main-thread path also touches):
+
+| View | Result |
+| --- | --- |
+| `LogTabContent` (Log tab) | **HAZARD FIXED** - see above; all six `RebuildRows()` entry points are now either main-thread-and-gated on `_buildComplete` or are the marshaled tail itself. |
+| `MainView` (Snapshot tab) | **HAZARD FIXED** - same PATTERN as `LogTabContent` (an un-marshaled `Build()` tail mutating UI state a main-thread path also touches), but NOT the same underlying mechanism: unlike `LogTabContent`'s plain unsynchronized `Queue<T>`, `Container.Children` is itself `ReaderWriterLockSlim`-guarded and cannot be corrupted by concurrent access (`docs/ARCHITECTURE.md` Section 1's `ControlCollection<T>` finding, fourth round below) - the real hazards here are the non-atomic dispose-then-add compound sequence (duplicated content, same shape as `LogTabContent`'s doubled-placeholder incident) and a `_searchDebounceCts` `ObjectDisposedException` race this branch also closed. Broader than `LogTabContent` in one respect: this instance is never recreated per tab visit (Module.cs builds ONE `MainView` in `Initialize()` and reuses it), and `Module.Update()` calls `SetSnapshot()`/`SetStatus()` on it every tick a background refresh completes, unconditional on which tab is selected. `Build()`'s tail (`UpdateCoinDisplay`/`ApplyStatusDisplay`/`RebuildContent`, plus the `_searchDebounceCts` cleanup - see above) is marshaled onto the main thread via `MainThreadMarshal.Run`, matching every other `RebuildContent`/`ApplyStatusDisplay`/`UpdateCoinDisplay`/`_searchDebounceCts` call site in the file (all already main-thread: user-input handlers, or already-marshaled async continuations). This does not make every field `MainView` touches main-thread-only - its panel/control fields are, like `LogTabContent`'s, still first published by the rest of `Build()`'s body on the ThreadPool thread, and this file's own Clear Cache/Refresh Now/checkbox/dropdown handlers (wired mid-body, so reachable while later controls are still under construction) rely on the same null-guard pattern, not exclusivity. |
+| `SettingsTabContent` (Settings tab) | NO HAZARD - `Build()` re-runs off the main thread on every tab revisit, but nothing outside `Build()` (no `Module.Update()` polling, no `TabChanged` handling) ever touches this class's fields; every other mutation is a button-`Click`/`CheckedChanged` handler, which cannot fire before `Build()` has already finished and the control exists. |
+| `AboutTabContent` (About tab) | NO HAZARD - static, render-once content; nothing outside its own `Build()` touches its fields. |
+| Plan History / Crafting Ranker placeholders (`Module.BuildPlaceholder`) | NO HAZARD - creates one `Label` and returns; nothing else ever references it. |
+| `CraftingPlanView` (Crafting Plan tab) | **HAZARD PRESENT, OUT OF SCOPE** - not modified (scroll/`FrameTicker` machinery is DO-NOT-TOUCH per M38, hardened M31-M36). A first sweep pass incorrectly recorded this row as no live race; a 2026-08-06 review corrected it: `Build()` calls `StopLiveTickers()` (`Views/CraftingPlanView.cs:1511`) on the ThreadPool thread; that method `Cancel()`s -> `Dispose()`s three `SpriteScreen`-parented `FrameTicker` Controls (`_scrollVerifyTicker`, `_resizeDebounceTicker`, `_wheelWrapVerifyTicker`) whose `DoUpdate` runs on the main thread and survives tab switches (they are parented to `GameService.Graphics.SpriteScreen`, not this view's own control tree - by design, per their own field comments), and zeroes `_resizeSettlePending`/`_resizeScrollRestorePending`/`_resizeScrollSavedOffset`/`_lastWheelEventUtc`, which those same main-thread ticker steps read and write. Same hazard class as the two fixed rows above; deferred to a dedicated pass that can safely touch the M31-M36 scroll machinery rather than fixed here. |
+
+A third review round (2026-08-06) found the second round's own fix had left
+behind a documentation defect of the exact class this issue exists to
+prevent: the marshaled tails' and `IsLive`'s doc comments in both files
+claimed the `Parent == null` liveness guard protects against a plain "tab
+switched away" case. Independently re-verified via `ilspycmd` decompilation
+(now recorded permanently in `docs/ARCHITECTURE.md` Section 1, "a tab
+switch detaches, it does not dispose") that this is false:
+`WindowBase2.ClearView` only detaches (`Container.ClearChildren`,
+`Parent = null`, no `Dispose`) the outgoing view's OWN top-level
+`ViewAdapter` panel from the window, and `ViewAdapter` does not override
+`Unload()` - so every control below that top-level panel, including
+`LogTabContent._contentPanel` and `MainView._headerPanel`/`_contentPanel`,
+keeps a non-null `Parent` after a plain tab switch. Only `Control.Dispose()`
+(reached via `Module.Unload()` disposing `_mainWindow`) nulls a control's
+own `Parent`. Practical effect: none of the marshaled tails were ever
+unsafe against a real tab switch - a tail that lands after the user
+switches away simply does slightly more work than necessary (rendering
+into a real, just no-longer-visible, tree instead of a genuinely
+torn-down one), which the comments now say correctly instead of
+certifying a guard against a case it cannot detect. Corrected four call
+sites: `Views/LogTabContent.cs` (`Build()`'s marshaled tail, `IsLive`'s
+doc comment) and `Views/MainView.cs` (the Refresh Now handler's marshaled
+tail, `Build()`'s marshaled tail, `RunSearchDebounceAsync`'s marshaled
+tail) - all now pointing at the single canonical explanation in
+`docs/ARCHITECTURE.md` Section 1 instead of repeating (and having drifted
+from) it independently at each site. No behavior changed; this round is
+comment-only. The class-sweep table above and the `_buildComplete`
+keep-vs-remove decision were both re-checked against the current code
+during this round and still hold as written - no updates needed there.
+
+A fourth review round (2026-08-06) found two more documentation defects of
+the same class, both in `Views/MainView.cs`. First, the justification
+recorded for marshaling `Build()`'s tail claimed "if `Update()` ever landed
+while `Build()` was still executing this tail on the ThreadPool thread, two
+threads would mutate the same `Children` collections concurrently, the same
+shape that corrupted `LogTabContent`'s `_renderedRows` `Queue<T>`".
+Independently re-verified via `ilspycmd` decompilation of the vendored
+`Blish HUD.exe` (now recorded permanently in `docs/ARCHITECTURE.md` Section
+1) that this is false: `Container.Children` (`ControlCollection<T>`) holds
+its own `ReaderWriterLockSlim` and takes it on every operation, so unlike
+`LogTabContent`'s plain `Queue<T>`, concurrent `Children` access cannot
+corrupt the collection's internals - that is precisely why the field crash
+landed in the module's own unsynchronized `Queue<T>` and not in Blish's
+`Children`. The two hazards that DO justify marshaling this tail, neither of
+which the prior comment named, are (a) the compound dispose-then-add
+sequence being non-atomic, so two interleaved rebuilds can each dispose
+before either adds and both survive (the same doubled-placeholder shape
+`LogTabContent` hit live on 2026-07-23), and (b) the top-of-Build
+`_searchDebounceCts?.Cancel();?.Dispose();` this branch moved into the
+marshaled tail used to run directly on the ThreadPool thread, racing
+`ScheduleSearchRebuild()`/`RebuildContent()`'s main-thread writes to the
+same field - `CancellationTokenSource.Cancel()` calls `ThrowIfDisposed()`,
+so whichever call landed second on the shared reference could throw
+`ObjectDisposedException`, a genuine crash path this branch closed without
+previously claiming credit for it. Second, `RunSearchDebounceAsync`'s
+marshaled tail claimed the token "is usually already cancelled" because
+"`CancelSearchDebounce()` also runs at the top of every fresh `Build()`" -
+this branch had itself moved that cancel out of the top of `Build()` and
+into `Build()`'s own marshaled tail (see the third-round fix above), so the
+cancel is no longer synchronous with a same-tab revisit; the comment
+contradicted a change made in the same diff. A debounce armed on a previous
+visit can therefore stay live for the window between `Build`'s ThreadPool
+body finishing and its own tail draining, and could render into whichever
+`_contentPanel` the field currently holds (potentially the outgoing visit's
+panel, since `Build` assigns `_contentPanel` last among the fields
+`RebuildContent` reads) before being superseded moments later by `Build`'s
+own tail - wasted work, not a wrong final state, which the comment now says
+plainly. Both call sites corrected in `Views/MainView.cs`; the
+`ControlCollection<T>` finding added permanently to `docs/ARCHITECTURE.md`
+Section 1, and this table's `MainView` row above corrected to stop
+repeating the disproven "same shape" claim. No behavior
+changed; this round is comment-only. The class-sweep table's other rows and
+the `_buildComplete` keep-vs-remove decision were re-checked against the
+current code during this round and still hold as written.
+
+**Validation:** `dotnet build -p:Platform=x64` - 0 errors. Module test suite
+(`tests/GW2CraftingHelper.Tests`) - 1101/1101 passing. VendorOfferUpdater
+suite (`tests/VendorOfferUpdater.Tests`) - 135/135 passing (re-measured a
+fourth time after the 2026-08-06 comment-correction round above; counts
+unchanged, since that round touches only comments and documentation, none
+of which the repo invariants permit or require test coverage for).
+`LogTabContent`/`MainView` are Blish HUD UI code with no test net (repo
+invariant: tests must stay Blish-free) - the fix is proven by construction
+(every racing path is now provably main-thread-only, and gated against
+acting before Build's own tail has landed where relevant) plus the live
+orchestrator gate below.
+
+**Live gate:** PASS (orchestrator, 2026-08-06, live branch-build sandbox
+session under the hardened desktop protocol, captures logfix_01_empty.png /
+logfix_02_search.png):
+- Empty-state placeholder renders exactly ONCE on first Log-tab open
+  (the doubled-placeholder interleave shape is gone).
+- Crash-condition recreation: four rounds of Snapshot Refresh Now (each
+  spawning failing-fetch WARN writes from ThreadPool threads - the exact
+  field trigger, InvalidAccessTokenException per source) immediately
+  followed by Log-tab opens plus Snapshot/Log tab churn; Blish alive and
+  Responding=True throughout, zero FATAL lines (the 2026-08-06 field
+  crash reproduced fatally on the FIRST such open on the pre-fix build).
+- Log entries render with level colors; the search box filters live
+  ("material" -> exactly the four matching WARN rows) - also the first
+  live verification of Log search, previously blocked by synthetic-
+  keystroke death in long sessions.
+- MainView search-debounce hazard (the ObjectDisposedException path this
+  branch also closed): typed into the Snapshot search box then immediately
+  churned Snapshot->Log->Snapshot->Log to force Build-tail vs debounce
+  interleaves; no exception, no error lines, process responsive.
+- Blish log sweep: zero FATAL, zero ERROR, zero Unhandled/ObjectDisposed
+  across the session.
+
 ---
 
 ## DEFERRED (recorded, not implemented)
