@@ -69,32 +69,51 @@ namespace GW2CraftingHelper.Views
         private bool _hasRenderedAnyRow;
 
         // True once Build's own initial RebuildRows call (see the bottom
-        // of Build) has finished. Guards PollForUpdates against a real
-        // race: per docs/ARCHITECTURE.md Section 1, Blish HUD's own
-        // WindowBase2.ShowView runs a tab's Build() via
-        // View.DoLoad().ContinueWith(...) - with no SynchronizationContext
-        // installed, that continuation resumes on a ThreadPool thread, not
-        // the main/game thread. Module.Update() starts calling
-        // PollForUpdates() on the main thread as soon as SelectedTab flips
-        // to the Log tab, which happens synchronously and BEFORE that
-        // ThreadPool-scheduled Build() has necessarily run. Without this
-        // guard, PollForUpdates() could invoke RebuildRows() concurrently
-        // with Build()'s own tail RebuildRows() call, on the SAME
-        // freshly-created _contentPanel: RebuildRows() disposes-then-adds
-        // in separate, unsynchronized steps, so if both calls' dispose
-        // steps run before either call's add step, BOTH survive - this
-        // produced two stacked "No log entries yet." placeholders,
-        // confirmed live 2026-07-23 (capture m38f_03_tab3.png). Set only
-        // once, as the last statement in Build(), after its own
-        // RebuildRows() call has already fully populated the panel.
-        // volatile: this field is genuinely read and written from two
-        // different threads (the ThreadPool thread driving Build(), and
-        // the main/game thread driving PollForUpdates()) - without it,
-        // nothing prevents the JIT/CPU from reordering the write to true
-        // ahead of the panel-populating writes that precede it in Build(),
-        // or from caching a stale false/true read across PollForUpdates()
-        // calls on the polling thread.
-        private volatile bool _buildComplete;
+        // of Build) has finished. Originally added (PR #99) to guard
+        // PollForUpdates against a real race: per docs/ARCHITECTURE.md
+        // Section 1, Blish HUD's own WindowBase2.ShowView runs a tab's
+        // Build() via View.DoLoad().ContinueWith(...) - with no
+        // SynchronizationContext installed, that continuation resumes on a
+        // ThreadPool thread, not the main/game thread. Without this guard,
+        // PollForUpdates() (main thread, driven by Module.Update() as soon
+        // as SelectedTab flips to the Log tab) could invoke RebuildRows()
+        // concurrently with Build()'s own tail RebuildRows() call, on the
+        // SAME freshly-created _contentPanel - this produced two stacked
+        // "No log entries yet." placeholders, confirmed live 2026-07-23
+        // (capture m38f_03_tab3.png).
+        // <para>
+        // PR #99's review missed a second path to the SAME hazard:
+        // Module.cs's TabChanged handler also calls Refresh() ->
+        // RebuildRows() synchronously on the main thread whenever the Log
+        // tab becomes selected, and Refresh() never checked this latch. A
+        // real user hit this in the field on 2026-08-06 (docs/
+        // KNOWN-ISSUES.md) - Build()'s ThreadPool-thread RebuildRows() call
+        // and TabChanged's main-thread RebuildRows() call landed on the
+        // SAME instance at the same time, and two threads concurrently
+        // Enqueue-ing into _renderedRows corrupted its internal array,
+        // crashing with "Destination array was not long enough" inside
+        // Queue&lt;T&gt;.SetCapacity.
+        // </para>
+        // <para>
+        // Fix: Build()'s own tail (the RebuildRows() call plus the write to
+        // this field) is now marshaled onto the main thread via
+        // MainThreadMarshal.Run (see Build()'s own comment) - so it, along
+        // with PollForUpdates() and Refresh() (both main-thread-only
+        // already), can never execute concurrently with anything: a single
+        // thread cannot run two call stacks at the same instant, so the
+        // race is impossible BY CONSTRUCTION, not merely guarded. This
+        // field is KEPT (not removed as obsolete) - it still gates both
+        // PollForUpdates() and Refresh() against acting before Build()'s
+        // own queued tail has actually landed, which avoids a wasted,
+        // redundant RebuildRows() pass rather than a crash now - belt-and-
+        // braces, not a safety requirement any more. volatile is REMOVED:
+        // every read and write of this field now happens on the main
+        // thread only (Build()'s write runs inside the MainThreadMarshal.
+        // Run callback), so there is no remaining cross-thread visibility
+        // concern for volatile to address, and keeping it would misleadingly
+        // suggest this field is still accessed from more than one thread.
+        // </para>
+        private bool _buildComplete;
 
         // FIFO of every currently-displayed "real" row (never the
         // empty-state Label), oldest-first, each tagged with the absolute
@@ -209,13 +228,33 @@ namespace GW2CraftingHelper.Views
                 PositionToolbarButtons(newWidth);
             };
 
-            RebuildRows();
+            // FIELD CRASH (2026-08-06, docs/KNOWN-ISSUES.md): Build() itself
+            // runs on a ThreadPool thread (see _buildComplete's own doc
+            // comment for the DoLoad().ContinueWith(...) pattern), so
+            // calling RebuildRows() directly here raced against Module.cs's
+            // TabChanged handler calling Refresh() -> RebuildRows() on the
+            // main thread against this SAME instance - two threads
+            // concurrently Enqueue-ing into _renderedRows corrupted its
+            // internal array and crashed with "Destination array was not
+            // long enough" inside Queue<T>.SetCapacity. Marshaling this
+            // tail onto the main thread makes RebuildRows() and
+            // _buildComplete main-thread-only everywhere they are touched
+            // (here, PollForUpdates, Refresh) - the race is impossible BY
+            // CONSTRUCTION, not merely guarded.
+            MainThreadMarshal.Run(() =>
+            {
+                // The view may already have been torn down by the time this
+                // queued callback runs (tab switched away again, module
+                // unloaded) - RebuildRows()'s own IsLive check already
+                // no-ops safely in that case.
+                RebuildRows();
 
-            // Must be the LAST statement in Build() - see _buildComplete's
-            // own doc comment for why PollForUpdates needs this to stay
-            // false for Build()'s entire duration, not just after this
-            // method's own RebuildRows() call above.
-            _buildComplete = true;
+                // Must run in this SAME queued callback, after
+                // RebuildRows() above - see _buildComplete's own doc
+                // comment for why PollForUpdates/Refresh need this to stay
+                // false until Build()'s own first real render has landed.
+                _buildComplete = true;
+            });
         }
 
         private void PositionToolbarButtons(int w)
@@ -233,8 +272,7 @@ namespace GW2CraftingHelper.Views
         /// current view exactly like a paused `tail -f`, even though new
         /// entries keep arriving in the ring underneath it. Also a no-op
         /// until <see cref="_buildComplete"/> is set - see that field's own
-        /// doc comment for the ThreadPool-vs-game-thread race this guards
-        /// against.
+        /// doc comment for what this guards against.
         /// <para>
         /// When Follow IS checked and new entries arrived, this uses the
         /// incremental <see cref="AppendNewRows"/> path (d2 Section 4.3:
@@ -253,13 +291,15 @@ namespace GW2CraftingHelper.Views
         {
             if (!_buildComplete)
             {
-                // Build() (possibly still running on the ThreadPool thread
-                // that drove it - see _buildComplete's doc comment) has
-                // not finished populating _contentPanel yet. Racing
-                // RebuildRows()/AppendNewRows() against Build()'s own
-                // still-in-flight RebuildRows() call is exactly what
-                // produced the doubled empty-state placeholder; skip this
-                // poll entirely and let Build() finish on its own.
+                // Build()'s own initial RebuildRows() (queued via
+                // MainThreadMarshal - see Build()'s tail) has not landed on
+                // the main thread yet, so _contentPanel is not fully
+                // populated. Racing ahead with RebuildRows()/AppendNewRows()
+                // here would be a wasted, redundant pass (originally, before
+                // that queuing, it could also produce the doubled empty-
+                // state placeholder - see _buildComplete's own doc comment);
+                // skip this poll entirely and let Build()'s queued tail
+                // render current reality on its own.
                 return;
             }
 
@@ -294,9 +334,29 @@ namespace GW2CraftingHelper.Views
         /// Called on tab switch (Module.cs's TabChanged handler) regardless
         /// of Follow - re-opening the tab should always show current
         /// reality, not a frozen view from before the tab was last closed.
+        /// Gated on <see cref="_buildComplete"/> exactly like
+        /// <see cref="PollForUpdates"/> - see that field's own doc comment
+        /// for why (the 2026-08-06 field crash was this method racing
+        /// Build()'s tail on two different threads; both are main-thread-
+        /// only now, so the guard here is about avoiding a redundant
+        /// rebuild, not a crash).
         /// </summary>
         public void Refresh()
         {
+            if (!_buildComplete)
+            {
+                // Build()'s own initial RebuildRows() (queued via
+                // MainThreadMarshal - see Build()'s tail) has not landed on
+                // the main thread yet. Both this call and that queued
+                // callback are main-thread-only now, so racing ahead here
+                // could not corrupt anything - but it would still be a
+                // wasted, redundant RebuildRows() pass against state
+                // Build()'s own queued tail is about to overwrite anyway.
+                // Skip and let Build()'s tail render current reality on its
+                // own within the same or next Update() tick.
+                return;
+            }
+
             if (!IsLive)
             {
                 return;
