@@ -616,7 +616,30 @@ namespace GW2CraftingHelper.Services
             }
 
             relevant.Sort();
-            return $"{string.Join(" / ", relevant)} {recipeMinRating}";
+
+            // Field-test finding E: a sole-MysticForge recipe (real
+            // production Mystic Forge recipes always carry
+            // Disciplines = ["MysticForge"] - MysticForgeRecipeData.Load
+            // sets this unconditionally) used to render "MysticForge 0" -
+            // the internal id string verbatim, plus a meaningless rating of
+            // 0 (the forge has no level requirement). The forge is a
+            // facility, not a discipline (PlanResultBuilder.
+            // NonCraftingDisciplines now excludes it from Required
+            // Disciplines entirely - see that field's doc comment), so its
+            // step/recipe sublabel shows the facility's real name with no
+            // level number instead. A recipe combining MysticForge with a
+            // genuine leveled discipline (not seen in real game data today,
+            // but not structurally impossible) still relabels the facility
+            // name and keeps the level number, since the OTHER discipline's
+            // rating remains meaningful information.
+            if (relevant.Count == 1 && relevant[0] == "MysticForge")
+            {
+                return "Mystic Forge";
+            }
+
+            string displayText = string.Join(
+                " / ", relevant.Select(d => d == "MysticForge" ? "Mystic Forge" : d));
+            return $"{displayText} {recipeMinRating}";
         }
     }
 }

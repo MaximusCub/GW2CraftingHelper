@@ -86,6 +86,47 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Armorsmith / Weaponsmith 400", result);
         }
 
+        // --- Field-test finding E: Mystic Forge is a facility, not a
+        // discipline - its sublabel shows the facility name with no level
+        // number instead of the internal "MysticForge 0" id string. ---
+
+        [Fact]
+        public void FormatDisciplineSublabel_SoleMysticForge_ShowsFacilityName_NoLevel()
+        {
+            // planDiscNames never contains "MysticForge" in production
+            // (PlanResultBuilder.NonCraftingDisciplines excludes it from
+            // RequiredDisciplines), which triggers the "no intersection ->
+            // fallback to all recipe disciplines" branch above - this pins
+            // that fallback's MysticForge-only output.
+            var planDiscNames = new HashSet<string> { "Weaponsmith" };
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                new List<string> { "MysticForge" }, 0, planDiscNames);
+
+            Assert.Equal("Mystic Forge", result);
+        }
+
+        [Fact]
+        public void FormatDisciplineSublabel_SoleMysticForge_NullPlanDiscNames_ShowsFacilityName_NoLevel()
+        {
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                new List<string> { "MysticForge" }, 0, null);
+
+            Assert.Equal("Mystic Forge", result);
+        }
+
+        [Fact]
+        public void FormatDisciplineSublabel_MysticForgeWithRealDiscipline_RelabelsButKeepsLevel()
+        {
+            // Not seen in real game data today, but not structurally
+            // impossible - the other discipline's rating is still
+            // meaningful, so the level number stays.
+            var planDiscNames = new HashSet<string> { "MysticForge", "Weaponsmith" };
+            var result = PlanViewModelBuilder.FormatDisciplineSublabel(
+                new List<string> { "MysticForge", "Weaponsmith" }, 400, planDiscNames);
+
+            Assert.Equal("Mystic Forge / Weaponsmith 400", result);
+        }
+
         // --- Recipe sublabel integration ---
 
         [Fact]
@@ -140,6 +181,38 @@ namespace GW2CraftingHelper.Tests.Services
 
             var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
             Assert.Equal("Weaponsmith 400", section.Rows[0].Sublabel);
+        }
+
+        [Fact]
+        public void CraftingSteps_Sublabel_MysticForge_ShowsFacilityNameNoLevel()
+        {
+            // End-to-end: RequiredDisciplines is empty (MysticForge excluded
+            // per PlanResultBuilder.NonCraftingDisciplines - see MakeResult
+            // below simulating that), so BuildPlanDiscNames yields an empty
+            // planDiscNames and FormatDisciplineSublabel's "no filtering"
+            // branch shows the recipe's own MysticForge discipline verbatim
+            // - relabeled, with no level number.
+            var result = MakeResult(
+                requiredDisciplines: new List<RequiredDiscipline>(),
+                requiredRecipes: new List<RequiredRecipe>
+                {
+                    new RequiredRecipe
+                    {
+                        RecipeId = -100,
+                        OutputItemId = 2,
+                        IsAutoLearned = true,
+                        Disciplines = new List<string> { "MysticForge" },
+                        MinRating = 0
+                    }
+                },
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            Assert.Equal("Mystic Forge", section.Rows[0].Sublabel);
         }
     }
 }

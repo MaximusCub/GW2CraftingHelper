@@ -413,15 +413,17 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void RequiredDisciplines_RealMysticForgeDiscipline_StillShown()
+        public void RequiredDisciplines_RealMysticForgeDiscipline_ExcludedAsFacility()
         {
-            // Regression guard for the adversarial-review fix-pass: real
-            // production Mystic Forge recipes always carry
-            // Disciplines = ["MysticForge"] (MysticForgeRecipeData.Load
-            // sets this unconditionally), unlike the empty-Disciplines test
-            // fixture above. Confirms the fix-pass's narrower
-            // NonCraftingDisciplines filter (Achievement/Merchant only)
-            // leaves this pre-existing, out-of-scope behavior unchanged.
+            // Field-test finding E (user-approved, supersedes the M37-era
+            // test this replaces): real production Mystic Forge recipes
+            // always carry Disciplines = ["MysticForge"]
+            // (MysticForgeRecipeData.Load sets this unconditionally),
+            // unlike the empty-Disciplines test fixture above. The forge is
+            // a facility, not a player-levelable discipline, so
+            // NonCraftingDisciplines now excludes it here too (joining
+            // Achievement/Merchant) - RequiredRecipes (the forge is still a
+            // real, always-available crafting step) is unaffected.
             var tree = TreeWithCraftStep(
                 1, -100, 1,
                 new List<string> { "MysticForge" }, 0, new List<string>(),
@@ -440,8 +442,7 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = new Dictionary<int, ItemMetadata>();
             var result = _builder.Build(plan, tree, metadata, null, null);
 
-            Assert.Single(result.RequiredDisciplines);
-            Assert.Equal("MysticForge", result.RequiredDisciplines[0].Discipline);
+            Assert.Empty(result.RequiredDisciplines);
             Assert.Single(result.RequiredRecipes);
             Assert.False(result.RequiredRecipes[0].IsMissing);
         }
