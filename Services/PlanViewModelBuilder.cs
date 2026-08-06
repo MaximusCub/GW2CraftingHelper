@@ -598,25 +598,6 @@ namespace GW2CraftingHelper.Services
                 return "";
             }
 
-            List<string> relevant;
-            if (planDiscNames == null || planDiscNames.Count == 0)
-            {
-                // No filtering - show all recipe disciplines
-                relevant = new List<string>(recipeDisciplines);
-            }
-            else
-            {
-                relevant = recipeDisciplines.Where(d => planDiscNames.Contains(d)).ToList();
-
-                // Fallback: if no intersection, show all recipe disciplines
-                if (relevant.Count == 0)
-                {
-                    relevant = new List<string>(recipeDisciplines);
-                }
-            }
-
-            relevant.Sort();
-
             // Field-test finding E: a sole-MysticForge recipe (real
             // production Mystic Forge recipes always carry
             // Disciplines = ["MysticForge"] - MysticForgeRecipeData.Load
@@ -627,18 +608,64 @@ namespace GW2CraftingHelper.Services
             // NonCraftingDisciplines now excludes it from Required
             // Disciplines entirely - see that field's doc comment), so its
             // step/recipe sublabel shows the facility's real name with no
-            // level number instead. A recipe combining MysticForge with a
-            // genuine leveled discipline (not seen in real game data today,
-            // but not structurally impossible) still relabels the facility
-            // name and keeps the level number, since the OTHER discipline's
-            // rating remains meaningful information.
-            if (relevant.Count == 1 && relevant[0] == "MysticForge")
+            // level number instead.
+            //
+            // Follow-up fix: "MysticForge" is stripped out of planDiscNames
+            // upstream (it is never a member of RequiredDisciplines), so it
+            // can never survive the planDiscNames intersection below on its
+            // own merits. It used to be run through that intersection like
+            // any other discipline anyway, which meant a recipe combining
+            // MysticForge with a genuine leveled discipline (not seen in
+            // real game data today, but not structurally impossible) had
+            // MysticForge silently dropped whenever the real discipline was
+            // present - only the real discipline survived the intersection,
+            // so the facility name never made it back in. Splitting the
+            // MysticForge flag out before filtering, and always
+            // re-prepending it to the display text, means it can no longer
+            // be silently dropped no matter what planDiscNames does or does
+            // not contain - the OTHER discipline's rating remains
+            // meaningful information, so the level number stays too.
+            bool hasMysticForge = recipeDisciplines.Contains("MysticForge");
+            List<string> otherDisciplines = hasMysticForge
+                ? recipeDisciplines.Where(d => d != "MysticForge").ToList()
+                : recipeDisciplines;
+
+            List<string> relevant;
+            if (otherDisciplines.Count == 0)
+            {
+                // Sole facility - nothing else to filter or fall back to.
+                relevant = new List<string>();
+            }
+            else if (planDiscNames == null || planDiscNames.Count == 0)
+            {
+                // No filtering - show all of the recipe's real disciplines
+                relevant = new List<string>(otherDisciplines);
+            }
+            else
+            {
+                relevant = otherDisciplines.Where(d => planDiscNames.Contains(d)).ToList();
+
+                // Fallback: if no intersection, show all recipe disciplines
+                if (relevant.Count == 0)
+                {
+                    relevant = new List<string>(otherDisciplines);
+                }
+            }
+
+            relevant.Sort();
+
+            if (hasMysticForge && relevant.Count == 0)
             {
                 return "Mystic Forge";
             }
 
-            string displayText = string.Join(
-                " / ", relevant.Select(d => d == "MysticForge" ? "Mystic Forge" : d));
+            var displayParts = new List<string>(relevant);
+            if (hasMysticForge)
+            {
+                displayParts.Insert(0, "Mystic Forge");
+            }
+
+            string displayText = string.Join(" / ", displayParts);
             return $"{displayText} {recipeMinRating}";
         }
     }

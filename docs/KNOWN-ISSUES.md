@@ -632,3 +632,46 @@ has no new tests per the Blish-free-tests invariant - covered by the live
 desktop gate instead.
 
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+---
+
+## Field-test UX wave 2: MysticForge sublabel drop fix (2026-08-06)
+
+One pre-investigated display-layer fix, following up on field-test wave
+finding E above. Display-layer only, no InventoryReducer/PlanSolver/
+VendorBatchSolver changes.
+
+**MysticForge silently dropped from a mixed-discipline sublabel.**
+`FormatDisciplineSublabel`'s planDiscNames intersection ran "MysticForge"
+through the same filter as any other discipline, but planDiscNames can
+never contain "MysticForge" in production (`PlanResultBuilder.
+NonCraftingDisciplines` strips it out of every option's Disciplines list
+before `disciplineMap`/`RequiredDisciplines` is built). So a recipe whose
+own Disciplines combined "MysticForge" with a genuine leveled discipline
+(not seen in real game data today, but not structurally impossible) had
+the forge silently dropped from its sublabel - the intersection kept only
+the real discipline, and the sole-MysticForge special case never matched
+because "MysticForge" was no longer present in the filtered list. Fixed by
+splitting the MysticForge flag out of `recipeDisciplines` before the
+planDiscNames intersection runs (so it is never subject to that filter at
+all) and always re-prepending "Mystic Forge" to the display text when the
+flag is set, so it can no longer be silently dropped regardless of what
+planDiscNames does or does not contain. The pre-existing regression test
+for this combined case hand-fed a planDiscNames value the real pipeline
+could never produce (`{"MysticForge", "Weaponsmith"}`), which let it pass
+while validating a codepath no real caller could reach; updated to the
+real production shape (`{"Weaponsmith"}` only) and added a companion
+end-to-end test that goes through the real `BuildPlanDiscNames` path via
+`_builder.Build(result)`, matching the pattern already used by the
+adjacent sole-MysticForge end-to-end test.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors); both test
+suites green - module suite 1115 passed (was 1114; +1 new test,
+`PlanViewModelBuilderSublabelTests.
+CraftingSteps_Sublabel_MysticForgeWithRealDiscipline_RelabelsButKeepsLevel`),
+VendorOfferUpdater.Tests 135 passed (untouched, unaffected). No new Blish
+HUD references in tests; the new test exercises real production code
+(`PlanViewModelBuilder.Build`/`FormatDisciplineSublabel`) with no
+contract-mirror/fake-logic tests.
+
+Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
