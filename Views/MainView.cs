@@ -430,14 +430,16 @@ namespace GW2CraftingHelper.Views
             };
 
             // Coin display panel - see UpdateCoinDisplay's doc comment for
-            // the M38 WP-22 repoint to the shared CoinCurrencyRenderer.
+            // the M38 WP-22 repoint to the shared CoinCurrencyRenderer. The
+            // actual UpdateCoinDisplay call is deferred to the marshaled
+            // tail below (with ApplyStatusDisplay/RebuildContent) - see that
+            // block's own comment for why.
             _coinPanel = new Panel()
             {
                 Size = new Point(w, CoinHeight),
                 Location = new Point(0, CoinRowY),
                 Parent = buildPanel
             };
-            UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
 
             // Scrollable content
             _contentPanel = new FlowPanel()
@@ -452,8 +454,43 @@ namespace GW2CraftingHelper.Views
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
 
-            ApplyStatusDisplay();
-            RebuildContent();
+            // Same hazard class as the LogTabContent field crash (2026-08-06,
+            // docs/KNOWN-ISSUES.md): Blish HUD runs a tab's Build() via
+            // View.DoLoad().ContinueWith(...) on a ThreadPool thread, not the
+            // main/game thread (docs/ARCHITECTURE.md Section 1). Unlike
+            // LogTabContent, this instance is never recreated per tab visit
+            // (Module.cs creates ONE MainView in Initialize() and keeps
+            // reusing it), and Module.Update() calls SetSnapshot()/
+            // SetStatus() on it every tick a background refresh completes -
+            // regardless of which tab is currently selected, so it is not
+            // even limited to "user is on the Snapshot tab right now". Both
+            // paths end up calling UpdateCoinDisplay/ApplyStatusDisplay/
+            // RebuildContent, which dispose-then-add into _coinPanel.
+            // Children/_contentPanel.Children - if Update() ever landed
+            // while Build() was still executing this tail on the ThreadPool
+            // thread, two threads would mutate the same Children collections
+            // concurrently, the same shape that corrupted LogTabContent's
+            // _renderedRows Queue<T>. Marshaling this tail onto the main
+            // thread makes every mutation path (this call, and every
+            // Update()-driven SetSnapshot/SetStatus call) main-thread-only,
+            // so they can never execute concurrently with each other - the
+            // race is impossible BY CONSTRUCTION, matching LogTabContent's
+            // fix. UpdateCoinDisplay is called here (rather than earlier,
+            // right after _coinPanel is created) so all three calls that
+            // race against SetSnapshot/SetStatus's own tail land in the same
+            // queued callback.
+            MainThreadMarshal.Run(() =>
+            {
+                // The view may already have been torn down by the time this
+                // queued callback runs (tab switched away again, module
+                // unloaded) - a disposed control's Parent is nulled on
+                // disposal, mirroring this file's own Refresh Now guard.
+                if (_headerPanel == null || _headerPanel.Parent == null) return;
+
+                UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
+                ApplyStatusDisplay();
+                RebuildContent();
+            });
         }
 
         private void OnPanelResized(object sender, ResizedEventArgs e)
