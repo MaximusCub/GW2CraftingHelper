@@ -153,6 +153,7 @@
     <Compile Include="Services\ModuleLogEntry.cs" />
     <Compile Include="Services\ModuleLog.cs" />
     <Compile Include="Services\ModuleLogStore.cs" />
+    <Compile Include="Services\LogViewFloor.cs" />
     <Compile Include="Models\Gw2Constants.cs" />
     <Compile Include="Models\CostLine.cs" />
     <Compile Include="Models\VendorOffer.cs" />
@@ -176,6 +177,7 @@
     <Compile Include="Services\IAccountRecipeClient.cs" />
     <Compile Include="Models\PlanViewModel.cs" />
     <Compile Include="Services\PlanViewModelBuilder.cs" />
+    <Compile Include="Services\RequiredRecipesVisibility.cs" />
     <Compile Include="Services\Gw2AccountRecipeClient.cs" />
     <Compile Include="Services\IMysticForgeRecipeSource.cs" />
     <Compile Include="Services\FileMysticForgeRecipeSource.cs" />

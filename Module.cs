@@ -61,6 +61,42 @@ namespace GW2CraftingHelper
         private CraftingPlanView _craftingContent;
         private LogTabContent _logContent;
         private Tab _logTab;
+
+        // Wave-3 quick win #4 (2026-08-06 field testing): the Log tab's
+        // "Clear view" floor (the ring version below which entries are
+        // hidden from the CURRENT view only - see LogTabContent's own
+        // _getClearedBeforeVersion/_setClearedBeforeVersion doc comments)
+        // lives HERE, on Module, rather than on LogTabContent itself,
+        // because Blish reconstructs a brand new LogTabContent every time
+        // the Log tab is selected (the tab's own view-factory below calls
+        // "new LogTabContent(...)" on every build, per
+        // docs/ARCHITECTURE.md Section 1's "Build() itself also runs off
+        // the main thread") - a field on that short-lived instance cannot
+        // survive a tab switch away and back, which is exactly the bug a
+        // user hit in the field: a cleared view "resurrected" every time
+        // they reopened the Log tab. This field persists for the whole
+        // module session instead, exactly like _logContent/_logTab
+        // themselves.
+        // <para>
+        // Threading (PR #101 rules): a plain long is enough - no
+        // volatile/Interlocked needed - because every access to this field
+        // is main-thread-only. It is WRITTEN only from the Clear-view
+        // button's Click handler (a genuine Blish input event, always
+        // dispatched on the main thread, same as every other .Click
+        // handler in this codebase used without marshaling). It is READ
+        // only from LogTabContent.GetFilteredEntries (RebuildRows' own
+        // helper) and AppendNewRows, both of which LogTabContent's own
+        // _buildComplete gate already restricts to running main-thread-only
+        // (see that field's doc comment in LogTabContent.cs). The one place this
+        // field IS touched from a ThreadPool thread - the tab's
+        // view-factory closure just below, which runs off the main thread -
+        // only ever PASSES two delegates that close over this field into
+        // LogTabContent's constructor; it never reads or writes the field's
+        // value itself, so that ThreadPool-thread touch is a plain
+        // reference/delegate copy (always atomic), not a field
+        // dereference.
+        // </para>
+        private long _logViewClearedBeforeVersion;
         private SettingsTabContent _settingsContent;
         private AboutTabContent _aboutContent;
 
@@ -450,7 +486,10 @@ namespace GW2CraftingHelper
                 AsyncTexture2D.FromAssetId(156701),
                 () => new ViewAdapter("Log", c =>
                 {
-                    _logContent = new LogTabContent(ModuleLog.Shared);
+                    _logContent = new LogTabContent(
+                        ModuleLog.Shared,
+                        () => _logViewClearedBeforeVersion,
+                        v => _logViewClearedBeforeVersion = v);
                     _logContent.Build(c);
                 }),
                 "Log");

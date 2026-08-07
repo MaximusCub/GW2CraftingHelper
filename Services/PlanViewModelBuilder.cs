@@ -89,10 +89,18 @@ namespace GW2CraftingHelper.Services
                 vm.Sections.Add(BuildDisciplinesSection(result));
             }
 
-            // 5. Required Recipes section (only if non-empty)
+            // 5. Required Recipes section (only if there is at least one
+            // non-Mystic-Forge recipe left to learn once BuildRecipesSection
+            // filters MF-only rows out - wave-3 quick win #2. A plan whose
+            // only "recipes" are Mystic Forge combinations now surfaces no
+            // Required Recipes section at all rather than an empty one.
             if (result.RequiredRecipes != null && result.RequiredRecipes.Count > 0)
             {
-                vm.Sections.Add(BuildRecipesSection(result));
+                var recipesSection = BuildRecipesSection(result);
+                if (recipesSection.Rows.Count > 0)
+                {
+                    vm.Sections.Add(recipesSection);
+                }
             }
 
             // 6. Crafting Steps section (only if non-empty, OR there is a
@@ -487,7 +495,6 @@ namespace GW2CraftingHelper.Services
             var section = new PlanSectionViewModel
             {
                 SectionType = PlanSectionType.RequiredRecipes,
-                Title = $"Required Recipes ({result.RequiredRecipes.Count})",
                 IsDefaultExpanded = true
             };
 
@@ -495,6 +502,34 @@ namespace GW2CraftingHelper.Services
 
             foreach (var recipe in result.RequiredRecipes)
             {
+                // Wave-3 quick win #2 (2026-08-06 field testing, maintainer
+                // direction): a sole-Mystic-Forge recipe has nothing to
+                // learn - the forge combination just exists, there is no
+                // unlock concept (PlanResultBuilder.InherentlyAvailableDisciplines
+                // already always marks it IsMissing = false for the same
+                // reason). Listing it here read as a recipe-unlock task that
+                // does not exist, so it is skipped entirely rather than
+                // shown as an always-"Learned"/"Auto-learned" row. A recipe
+                // that combines MysticForge with a genuine leveled
+                // discipline (not seen in real game data today - see
+                // FormatDisciplineSublabel's own doc comment - but not
+                // structurally impossible) still has a real discipline to
+                // learn, so only a recipe whose ENTIRE Disciplines list is
+                // MysticForge is filtered here.
+                //
+                // This only touches the Required Recipes SECTION's own row
+                // list, built fresh in this loop - the raw
+                // result.RequiredRecipes list itself, and
+                // BuildCraftingStepsSection's per-step sublabel lookup that
+                // reads it above, are both untouched. A Mystic Forge craft
+                // STEP therefore still shows its "Mystic Forge" location
+                // sublabel exactly as PR #102 left it - only this section
+                // drops the row.
+                if (IsMysticForgeOnly(recipe.Disciplines))
+                {
+                    continue;
+                }
+
                 string name = ResolveName(recipe.OutputItemId, result.ItemMetadata);
                 string iconUrl = ResolveIconUrl(recipe.OutputItemId, result.ItemMetadata);
                 string rarity = ResolveRarity(recipe.OutputItemId, result.ItemMetadata);
@@ -531,7 +566,42 @@ namespace GW2CraftingHelper.Services
                 });
             }
 
+            // Title reflects the count AFTER the Mystic-Forge filter above,
+            // not result.RequiredRecipes.Count - keeps the header honest
+            // about what is actually listed below it. CraftingPlanView
+            // (wave-3 quick win #3's "Hide Unlocked Recipes" checkbox)
+            // recomputes its OWN header title at render time from this same
+            // section.Rows.Count plus its live filter state
+            // (RequiredRecipesVisibility.BuildHeaderTitle) rather than
+            // reading this Title verbatim - this value is still the correct
+            // "filter off" baseline for any other consumer (e.g. tests) and
+            // matches every other section's Title convention.
+            section.Title = $"Required Recipes ({section.Rows.Count})";
             return section;
+        }
+
+        // Wave-3 quick win #2: true only when EVERY entry in the recipe's
+        // Disciplines list is "MysticForge" (real production Mystic Forge
+        // recipes always carry exactly Disciplines = ["MysticForge"] -
+        // MysticForgeRecipeData.Load sets this unconditionally, mirrored by
+        // FormatDisciplineSublabel's own hasMysticForge comment above).
+        // Empty/null Disciplines is NOT Mystic-Forge-only (vacuous truth
+        // over an empty list would otherwise wrongly match a recipe with no
+        // discipline data at all).
+        private static bool IsMysticForgeOnly(List<string> disciplines)
+        {
+            if (disciplines == null || disciplines.Count == 0)
+            {
+                return false;
+            }
+            foreach (var discipline in disciplines)
+            {
+                if (discipline != "MysticForge")
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static PlanRowType MapShoppingRowType(AcquisitionSource source)

@@ -118,8 +118,10 @@ namespace GW2CraftingHelper.Views
         // <para>
         // PRECISE INVARIANT (the claim this fix actually establishes, not a
         // broader one): <see cref="_renderedRows"/>, <see
-        // cref="_lastSeenVersion"/>, <see cref="_hasRenderedAnyRow"/>,
-        // <see cref="_clearedBeforeVersion"/>, this field, and
+        // cref="_lastSeenVersion"/>, <see cref="_hasRenderedAnyRow"/>, the
+        // Module-owned "Clear view" floor reached via
+        // <see cref="_getClearedBeforeVersion"/>/
+        // <see cref="_setClearedBeforeVersion"/>, this field, and
         // _contentPanel's Children collection are MAIN-THREAD-ONLY - every
         // entry point that touches them (Build's marshaled tail,
         // PollForUpdates, Refresh, the level dropdown/search box handlers
@@ -154,17 +156,34 @@ namespace GW2CraftingHelper.Views
         // the design doc warned about, not eviction.
         private readonly Queue<(long AbsoluteIndex, Label Control)> _renderedRows = new Queue<(long AbsoluteIndex, Label Control)>();
 
-        // Set by "Clear view" to the ring Version at click time; any entry
-        // whose absolute ring index is before this is hidden from the
-        // CURRENT display only - the ring and the on-disk file are both
-        // untouched (see ModuleLog.Clear / ModuleLogStore.DeleteAll for the
-        // two genuinely destructive operations this deliberately is not -
-        // d2 Section 7's "lifecycle - cleared on what").
-        private long _clearedBeforeVersion;
+        // Wave-3 quick win #4 (2026-08-06 field testing): the "Clear view"
+        // floor used to be a plain instance field here
+        // (_clearedBeforeVersion), which meant it reset to 0 every time
+        // Blish rebuilt this tab - Module.cs's Log tab view-factory
+        // constructs a brand new LogTabContent on every tab visit (see
+        // docs/ARCHITECTURE.md Section 1), so a user's "Clear view" click
+        // silently undid itself the moment they switched tabs and back.
+        // Moved onto Module itself (Module._logViewClearedBeforeVersion -
+        // see that field's own doc comment for the full threading
+        // rationale), accessed here through this getter/setter delegate
+        // pair - mirrors TreeSectionController's own constructor-injected
+        // getter/setter pattern for state that outlives a single render
+        // (CraftingPlanView's _currentPlan get/set pair) rather than
+        // introducing a new holder type. ClearView() calls
+        // _setClearedBeforeVersion; GetFilteredEntries (RebuildRows' own
+        // helper) and AppendNewRows call _getClearedBeforeVersion - both
+        // only from this class's existing main-thread-only entry points
+        // (Build's MainThreadMarshal.Run tail, PollForUpdates, Refresh,
+        // RebuildRowsIfBuilt), so no new threading exposure versus the
+        // field this replaces.
+        private readonly Func<long> _getClearedBeforeVersion;
+        private readonly Action<long> _setClearedBeforeVersion;
 
-        public LogTabContent(ModuleLog log)
+        public LogTabContent(ModuleLog log, Func<long> getClearedBeforeVersion, Action<long> setClearedBeforeVersion)
         {
             _log = log ?? throw new ArgumentNullException(nameof(log));
+            _getClearedBeforeVersion = getClearedBeforeVersion ?? throw new ArgumentNullException(nameof(getClearedBeforeVersion));
+            _setClearedBeforeVersion = setClearedBeforeVersion ?? throw new ArgumentNullException(nameof(setClearedBeforeVersion));
         }
 
         public void Build(Container container)
@@ -213,6 +232,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Clear view",
                 Size = new Point(ButtonWidth, 28),
+                BasicTooltipText = "Hide current entries from this view. New entries still appear; the log file keeps everything.",
                 Parent = _toolbarPanel
             };
             _clearViewButton.Click += (_, __) => ClearView();
@@ -455,10 +475,14 @@ namespace GW2CraftingHelper.Views
         {
             // The version write always takes effect immediately, even if
             // Build's own tail has not landed yet (see RebuildRowsIfBuilt
-            // above) - it is a plain field write, not a control mutation,
+            // above) - it is a plain delegate-backed field write on Module
+            // (see that field's own doc comment), not a control mutation,
             // so a pre-build Clear still hides everything before this point
-            // once Build's tail does its own initial RebuildRows() pass.
-            _clearedBeforeVersion = _log.Version;
+            // once Build's tail does its own initial RebuildRows() pass. It
+            // also now survives THIS instance being torn down and a fresh
+            // LogTabContent being built for the next tab visit - the whole
+            // point of wave-3 quick win #4.
+            _setClearedBeforeVersion(_log.Version);
             RebuildRowsIfBuilt();
         }
 
@@ -609,9 +633,15 @@ namespace GW2CraftingHelper.Views
             string search = _searchBox?.Text?.Trim() ?? string.Empty;
             bool appendedAny = false;
 
+            // Read once rather than per-iteration - the delegate call
+            // itself is cheap, but the floor cannot change mid-loop (this
+            // method is main-thread-only, same call stack throughout), so
+            // there is no reason to re-invoke it every entry.
+            long clearedBeforeVersion = _getClearedBeforeVersion();
+
             for (long absoluteIndex = from; absoluteIndex < version; absoluteIndex++)
             {
-                if (absoluteIndex < _clearedBeforeVersion)
+                if (!LogViewFloor.IsVisible(absoluteIndex, clearedBeforeVersion))
                 {
                     continue;
                 }
@@ -674,11 +704,15 @@ namespace GW2CraftingHelper.Views
             ModuleLogLevel minLevel = MinLevelForFilter();
             string search = _searchBox?.Text?.Trim() ?? string.Empty;
 
+            // Read once rather than per-iteration - see AppendNewRows' own
+            // comment on the identical pattern.
+            long clearedBeforeVersion = _getClearedBeforeVersion();
+
             var filtered = new List<(ModuleLogEntry Entry, string Line, long AbsoluteIndex)>();
             for (int i = 0; i < entries.Count; i++)
             {
                 long absoluteIndex = startIndex + i;
-                if (absoluteIndex < _clearedBeforeVersion)
+                if (!LogViewFloor.IsVisible(absoluteIndex, clearedBeforeVersion))
                 {
                     continue;
                 }
