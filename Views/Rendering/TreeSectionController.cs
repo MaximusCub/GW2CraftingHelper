@@ -658,11 +658,36 @@ namespace GW2CraftingHelper.Views.Rendering
             // only the "is the name actually truncated" line needs to be
             // reconsidered when nameMaxWidth changes.
             var extraTooltipLines = new List<string>();
-            if (node.UnitCost.HasValue && node.Quantity > 1 &&
+            if (node.Quantity > 1 &&
                 (node.Decision == CraftingDecision.BuyFromTp ||
                  node.Decision == CraftingDecision.BuyFromVendor))
             {
-                extraTooltipLines.Add("Unit price: " + CoinCurrencyRenderer.FormatCoinText(node.UnitCost.Value));
+                // Field-test finding B: a pure-currency vendor offer
+                // (spirit shards, karma, ...) has UnitCost == 0 (not null -
+                // see CraftingTreeBuilder.BuildNode), which used to render a
+                // misleading "0g 0s 0c" instead of the real per-unit
+                // currency cost; a mixed coin+currency offer still shows
+                // both lines below. The coin line is suppressed only when
+                // it is genuinely zero AND a currency cost exists to show
+                // instead of it.
+                bool hasCurrencyCosts = node.VendorCurrencyCosts != null && node.VendorCurrencyCosts.Count > 0;
+                if (node.UnitCost.HasValue && !(node.UnitCost.Value == 0 && hasCurrencyCosts))
+                {
+                    extraTooltipLines.Add("Unit price: " + CoinCurrencyRenderer.FormatCoinText(node.UnitCost.Value));
+                }
+                if (node.Decision == CraftingDecision.BuyFromVendor && hasCurrencyCosts)
+                {
+                    var unitCurrencyAmounts = CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(
+                        node.VendorCurrencyCosts, node.Quantity, _getCurrentPlan()?.CurrencyMetadata);
+                    if (unitCurrencyAmounts != null)
+                    {
+                        foreach (var amount in unitCurrencyAmounts)
+                        {
+                            string amountText = amount.BundleLabel ?? amount.Amount.ToString();
+                            extraTooltipLines.Add($"Unit price: {amountText} {amount.Name}");
+                        }
+                    }
+                }
             }
             if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
             {
@@ -929,7 +954,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     BackgroundColor = fillColor,
                     Parent = outer
                 };
-                new Label()
+                var label = new Label()
                 {
                     Text = spec.Text,
                     Font = font,
@@ -940,11 +965,25 @@ namespace GW2CraftingHelper.Views.Rendering
                     Parent = inner
                 };
 
+                // Field-test finding D: tooltipText is resolved once below,
+                // then stamped onto outer/inner/label together right before
+                // the loop moves on - the inner fill panel and its label
+                // cover almost the entire pill (outer is only a 1px border
+                // ring once inset by inner's Location), so a tooltip set on
+                // outer alone is swallowed by whichever of inner/label is
+                // actually under the cursor (labels capture mouse - the
+                // same lesson M32 already established for hover/click
+                // targets elsewhere in this file) and the user never sees
+                // it hovering the pill body. Click/MouseEntered/MouseLeft
+                // stay on outer only - unlike tooltip lookup, those already
+                // work correctly today.
+                string tooltipText = null;
+
                 bool interactive = !dimmed && spec.Source.HasValue && _resolveOverridesSync != null;
                 bool ignoreInteractive = !dimmed && spec.Kind == PillKind.Ignore && _resolveOverridesSync != null;
                 if (interactive)
                 {
-                    outer.BasicTooltipText = $"Switch to {spec.Text}";
+                    tooltipText = $"Switch to {spec.Text}";
                     var source = spec.Source.Value;
                     outer.Click += (_, __) =>
                     {
@@ -960,7 +999,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     // M34-B2b: toggles this ITEM id (not just this node) in
                     // or out of _ignoredItemIds, matching gw2e's own
                     // tree-wide-by-item-id "Ignore" semantics.
-                    outer.BasicTooltipText = node.IsIgnored
+                    tooltipText = node.IsIgnored
                         ? "Stop treating this item as fully in-hand"
                         : "Treat this item as fully in-hand (ignore its owned-stock requirement)";
                     int itemId = node.ItemId;
@@ -986,14 +1025,64 @@ namespace GW2CraftingHelper.Views.Rendering
                     // Prefer the seeded wiki hint when one exists.
                     if (node.Decision == CraftingDecision.Unknown)
                     {
-                        outer.BasicTooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
+                        tooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
                             ? node.AcquisitionHint
                             : "No known acquisition source";
                     }
                     else
                     {
-                        outer.BasicTooltipText = "Only available source";
+                        tooltipText = "Only available source";
                     }
+                }
+                else if (spec.Kind == PillKind.Selected)
+                {
+                    // Field-test finding D: the currently-committed source
+                    // pill (non-interactive - clicking it would be a no-op
+                    // re-solve, see BuildPillSpecs) previously had no
+                    // tooltip at all.
+                    tooltipText = $"Current source: {spec.Text}";
+                }
+                else if (spec.Kind == PillKind.Have)
+                {
+                    // Maintainer's final wording pass (2026-08-06): matches
+                    // the OwnedInfo pill's "Needs N - ..." vocabulary below
+                    // instead of the old bare "Fully covered by your
+                    // materials". For a genuinely-owned Have node, Quantity
+                    // is 0 (the node's whole demand was already subtracted
+                    // during reduction), so OwnedQuantityUsed alone already
+                    // is the original total demand.
+                    tooltipText = $"Needs {node.OwnedQuantityUsed} - all covered by your materials";
+                }
+                else if (spec.Kind == PillKind.OwnedInfo)
+                {
+                    // Field-test finding A's tooltip spelled out what the
+                    // pill text means in full sentences, alongside the tree
+                    // row's own remaining-need "Nx" prefix (node.Quantity);
+                    // the maintainer's final wording pass (2026-08-06, see
+                    // DecisionPillPlanner.AppendOwnershipPills) reworded the
+                    // pill itself to "HAVE {used}/{total} NEEDED" and this
+                    // tooltip to match, without changing what either number
+                    // means - remaining (node.Quantity) is still total minus
+                    // used.
+                    int totalDemand = node.OwnedQuantityUsed + node.Quantity;
+                    tooltipText =
+                        $"Needs {totalDemand} total - {node.OwnedQuantityUsed} covered by your materials, " +
+                        $"{node.Quantity} left to acquire";
+                }
+                else if (spec.Kind == PillKind.AchievementBitDeduped)
+                {
+                    // M37, KNOWN-ISSUES #26: explains the "COUNTED
+                    // ELSEWHERE" semantics - nothing here is actually
+                    // owned, this exact occurrence is just already required
+                    // elsewhere in the tree.
+                    tooltipText = "Already counted elsewhere in the tree - this item is obtained once, not needed again here";
+                }
+
+                if (tooltipText != null)
+                {
+                    outer.BasicTooltipText = tooltipText;
+                    inner.BasicTooltipText = tooltipText;
+                    label.BasicTooltipText = tooltipText;
                 }
 
                 pillPanels.Add(outer);

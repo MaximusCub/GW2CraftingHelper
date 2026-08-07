@@ -336,9 +336,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task MysticForgeDiscipline_AppearsInRequiredDisciplines()
+        public async Task MysticForgeDiscipline_ExcludedFromRequiredDisciplines()
         {
-            // Build a plan that crafts a MF recipe, then check RequiredDisciplines
+            // Field-test finding E (user-approved): the Mystic Forge is a
+            // facility, not a player-levelable discipline, so it must never
+            // appear in RequiredDisciplines - build a plan that crafts a MF
+            // recipe and confirm it stays out.
             var api = new InMemoryRecipeApiClient();
             var mfData = LoadMfData();
             var composite = new CompositeRecipeApiClient(api, mfData);
@@ -375,13 +378,9 @@ namespace GW2CraftingHelper.Tests.Services
                 MysticSalvageKitId, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
 
-            // MysticForge discipline should be required
-            Assert.Contains(result.RequiredDisciplines,
+            // MysticForge is a facility, not a discipline - excluded entirely
+            Assert.DoesNotContain(result.RequiredDisciplines,
                 d => d.Discipline == "MysticForge");
-
-            // The MF discipline should have MinRating = 0
-            var mfDisc = result.RequiredDisciplines.First(d => d.Discipline == "MysticForge");
-            Assert.Equal(0, mfDisc.MinRating);
         }
 
         [Fact]
@@ -583,9 +582,10 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(craftStep);
             Assert.Equal(-4, craftStep.RecipeId);
 
-            // RequiredDisciplines includes MysticForge
-            Assert.Contains(result.RequiredDisciplines,
-                d => d.Discipline == "MysticForge" && d.MinRating == 0);
+            // RequiredDisciplines excludes MysticForge (field-test finding
+            // E: the forge is a facility, not a discipline)
+            Assert.DoesNotContain(result.RequiredDisciplines,
+                d => d.Discipline == "MysticForge");
 
             // RequiredRecipes includes MF recipe -4
             Assert.Contains(result.RequiredRecipes, r => r.RecipeId == -4);

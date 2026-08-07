@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Tests.Services
     /// decision-map.md's decision -> pill table) plus the HAVE/CURRENCY
     /// short-circuits, exercising the real DecisionPillPlanner.BuildPillSpecs
     /// production code - KNOWN-ISSUES #18. Also covers the M34-B2b additions:
-    /// the non-interactive "USING N OWNED" annotation and the interactive
+    /// the non-interactive "HAVE N/M NEEDED" annotation and the interactive
     /// "IGNORE"/"IGNORED" toggle, appended to every non-Have/non-Currency
     /// pill set (and, when active, alongside HAVE too).
     /// </summary>
@@ -22,14 +22,14 @@ namespace GW2CraftingHelper.Tests.Services
             CraftingDecision decision,
             bool canCraft = false, bool canBuyTp = false, bool canBuyVendor = false,
             string acquisitionBadge = null, int ownedQuantityUsed = 0, bool isIgnored = false,
-            bool isAchievementBitDeduped = false)
+            bool isAchievementBitDeduped = false, int quantity = 1)
         {
             return new CraftingTreeNode
             {
                 ItemId = 1,
                 NodeId = 1,
                 Name = "Test Item",
-                Quantity = 1,
+                Quantity = quantity,
                 Decision = decision,
                 CanCraft = canCraft,
                 CanBuyTp = canBuyTp,
@@ -86,7 +86,7 @@ namespace GW2CraftingHelper.Tests.Services
         // OwnedQuantityUsed unconditionally BEFORE its IsIgnored early
         // return (see that class's own doc comment), so the two fields
         // coexist on the same node by construction. BuildPillSpecs' Have
-        // branch never calls AppendOwnershipPills, so the "USING N OWNED"
+        // branch never calls AppendOwnershipPills, so the "HAVE N/M NEEDED"
         // annotation is silently dropped here - a deliberate scope decision
         // (a fully-owned/ignored node keeps the plain HAVE+IGNORED
         // treatment - see PartialOwnership_AddsOwnedInfoPill_SourcePillUnchanged
@@ -320,7 +320,12 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromVendor, vendorPill.Source);
         }
 
-        // --- M34-B2b: "USING N OWNED" annotation ---
+        // --- M34-B2b: "HAVE N/M NEEDED" annotation (field-test finding A:
+        // widened to show the original total demand, not just the covered
+        // count, alongside the tree row's own remaining-need "Nx" prefix;
+        // maintainer's final wording pass (2026-08-06) moved OWNED away
+        // from sitting next to the total - see AppendOwnershipPills' doc
+        // comment) ---
 
         [Theory]
         [InlineData(CraftingDecision.Craft, true, false, false, "CRAFT")]
@@ -330,14 +335,30 @@ namespace GW2CraftingHelper.Tests.Services
         public void PartialOwnership_AddsOwnedInfoPill_SourcePillUnchanged(
             CraftingDecision decision, bool canCraft, bool canBuyTp, bool canBuyVendor, string expectedSourceText)
         {
+            // node.Quantity defaults to 1 (Node() helper), so total demand
+            // = 4 owned + 1 remaining = 5.
             var node = Node(decision, canCraft, canBuyTp, canBuyVendor, ownedQuantityUsed: 4);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
             Assert.Equal(expectedSourceText, specs[0].Text);
             var ownedPill = specs.Single(s => s.Kind == PillKind.OwnedInfo);
-            Assert.Equal("USING 4 OWNED", ownedPill.Text);
+            Assert.Equal("HAVE 4/5 NEEDED", ownedPill.Text);
             Assert.Null(ownedPill.Source);
             Assert.Contains(specs, s => s.Kind == PillKind.Ignore && s.Text == "IGNORE");
+        }
+
+        [Fact]
+        public void PartialOwnership_TotalDemand_SumsOwnedAndRemainingQuantity()
+        {
+            // Regression guard for the field-test A paradox report itself:
+            // a large remaining need (120) alongside a large owned count
+            // (130) must show the true original total (250), not either
+            // number alone.
+            var node = Node(CraftingDecision.BuyFromTp, canBuyTp: true, ownedQuantityUsed: 130, quantity: 120);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            var ownedPill = specs.Single(s => s.Kind == PillKind.OwnedInfo);
+            Assert.Equal("HAVE 130/250 NEEDED", ownedPill.Text);
         }
 
         [Theory]

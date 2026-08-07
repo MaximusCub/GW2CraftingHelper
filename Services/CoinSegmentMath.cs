@@ -38,6 +38,14 @@ namespace GW2CraftingHelper.Services
             public string IconUrl;
             public string Text;
             public int TextWidth;
+
+            // Display name of this currency (field-test finding B's name-
+            // tooltip sweep principle: anywhere a currency icon shows, its
+            // name must be available) - never rendered as text here
+            // (width-neutral), only surfaced via the icon's BasicTooltipText
+            // in LayoutCurrencySegments. Null/empty is handled the same as
+            // every other icon-only cell (no tooltip set at all).
+            public string Name;
         }
 
         public static int TotalCoinSegmentsWidth(List<CoinSegmentSpec> segments)

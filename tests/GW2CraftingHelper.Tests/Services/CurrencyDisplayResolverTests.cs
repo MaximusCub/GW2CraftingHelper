@@ -302,5 +302,96 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Null(CurrencyDisplayResolver.ResolveUnitAmounts(3, new List<CostLine>(), null));
         }
+
+        // --- ResolveTreeNodeUnitAmounts (field-test finding B: recipe-tree
+        // "Unit price:" tooltip for a pure/mixed-currency vendor node) ---
+
+        [Fact]
+        public void ResolveTreeNodeUnitAmounts_EvenDivision_ResolvesWholeNumberAmount_NoBundleLabel()
+        {
+            // 100 total across a Quantity of 2 divides evenly to 50 each.
+            var total = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } };
+
+            var result = CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(total, 2, null);
+
+            Assert.NotNull(result);
+            Assert.Equal(50, result[0].Amount);
+            Assert.Null(result[0].BundleLabel);
+        }
+
+        [Fact]
+        public void ResolveTreeNodeUnitAmounts_UnevenDivision_UsesBundleLabel_NotRoundedAmount()
+        {
+            // 10 total across a Quantity of 3 does not divide evenly - never
+            // invent a rounded per-unit figure (mirrors ResolveUnitAmounts).
+            var total = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 10 } };
+
+            var result = CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(total, 3, null);
+
+            Assert.NotNull(result);
+            Assert.Equal(0, result[0].Amount);
+            Assert.Equal("10 for 3", result[0].BundleLabel);
+        }
+
+        [Fact]
+        public void ResolveTreeNodeUnitAmounts_ResolvesNameAndIcon()
+        {
+            var metadata = new Dictionary<int, CurrencyMetadata>
+            {
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "s.png" }
+            };
+            var total = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } };
+
+            var result = CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(total, 2, metadata);
+
+            Assert.Equal("Spirit Shards", result[0].Name);
+            Assert.Equal("s.png", result[0].IconUrl);
+        }
+
+        [Fact]
+        public void ResolveTreeNodeUnitAmounts_ZeroQuantity_ReturnsNull_NoDivideByZero()
+        {
+            var total = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } };
+
+            Assert.Null(CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(total, 0, null));
+        }
+
+        [Fact]
+        public void ResolveTreeNodeUnitAmounts_NegativeQuantity_ReturnsNull()
+        {
+            var total = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } };
+
+            Assert.Null(CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(total, -1, null));
+        }
+
+        [Fact]
+        public void ResolveTreeNodeUnitAmounts_NullCostLines_ReturnsNull()
+        {
+            Assert.Null(CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(null, 2, null));
+        }
+
+        [Fact]
+        public void ResolveTreeNodeUnitAmounts_EmptyCostLines_ReturnsNull()
+        {
+            Assert.Null(CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(new List<CostLine>(), 2, null));
+        }
+
+        [Fact]
+        public void ResolveTreeNodeUnitAmounts_MultipleLines_ResolvedIndependently()
+        {
+            var total = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = 23, Count = 100 },
+                new CostLine { Type = "Currency", Id = 2, Count = 7 }
+            };
+
+            var result = CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(total, 2, null);
+
+            Assert.Equal(2, result.Count);
+            Assert.Equal(50, result[0].Amount);
+            Assert.Null(result[0].BundleLabel);
+            Assert.Equal(0, result[1].Amount);
+            Assert.Equal("7 for 2", result[1].BundleLabel);
+        }
     }
 }

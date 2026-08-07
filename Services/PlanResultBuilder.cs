@@ -24,12 +24,21 @@ namespace GW2CraftingHelper.Services
         // below so the player is never told to "level" a discipline that
         // does not exist; RequiredRecipes' own per-recipe Disciplines field
         // is left untouched (accurate, informational metadata about that
-        // specific recipe's real source). MysticForge intentionally stays
-        // OUT of this narrower set - it already shows in Required
-        // Disciplines today (pre-existing, out-of-scope behavior) and
-        // gw2efficiency itself surfaces "Mystic Forge" the same way.
+        // specific recipe's real source).
+        //
+        // Field-test finding E (user-approved, supersedes the M37 comment
+        // this replaces): the Mystic Forge is a facility, not a player-
+        // levelable discipline either - it has no rating requirement and
+        // nothing to unlock, so listing it under "Required Disciplines"
+        // read as asking the player to "level" a facility that has no
+        // levels. MysticForge now joins Achievement/Merchant here; its
+        // per-recipe Disciplines field (RequiredRecipes, PlanViewModelBuilder.
+        // FormatDisciplineSublabel) is unaffected, same as Achievement/
+        // Merchant - see that method's own MysticForge special case for how
+        // its sublabel text renders instead ("Mystic Forge" facility name,
+        // no level number).
         private static readonly HashSet<string> NonCraftingDisciplines =
-            new HashSet<string> { "Achievement", "Merchant" };
+            new HashSet<string> { "Achievement", "Merchant", "MysticForge" };
 
         public CraftingPlanResult Build(
             CraftingPlan plan,
