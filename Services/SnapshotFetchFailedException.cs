@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace GW2CraftingHelper.Services
 {
@@ -29,11 +31,31 @@ namespace GW2CraftingHelper.Services
         public int FailedSourceCount { get; }
         public int TotalSourceCount { get; }
 
+        /// <summary>
+        /// The .NET type name (Exception.GetType().Name, e.g.
+        /// "InvalidAccessTokenException") of each individual source failure
+        /// that contributed to FailedSourceCount, in no particular order.
+        /// Deliberately a plain string list, not the exceptions themselves
+        /// or Gw2Sharp's own exception types - this class must stay
+        /// Gw2Sharp/Blish-free (see SnapshotFailureClassifier's doc
+        /// comment) so it can keep being exercised by real unit tests.
+        /// Never null; empty when the caller does not supply per-source
+        /// detail (the pre-existing 2-arg constructor below, kept for its
+        /// original call sites/tests).
+        /// </summary>
+        public IReadOnlyList<string> FailedSourceExceptionTypeNames { get; }
+
         public SnapshotFetchFailedException(int failedSourceCount, int totalSourceCount)
+            : this(failedSourceCount, totalSourceCount, null)
+        {
+        }
+
+        public SnapshotFetchFailedException(int failedSourceCount, int totalSourceCount, IEnumerable<string> failedSourceExceptionTypeNames)
             : base(BuildMessage(failedSourceCount, totalSourceCount))
         {
             FailedSourceCount = failedSourceCount;
             TotalSourceCount = totalSourceCount;
+            FailedSourceExceptionTypeNames = failedSourceExceptionTypeNames?.ToList() ?? new List<string>();
         }
 
         private static string BuildMessage(int failedSourceCount, int totalSourceCount)

@@ -39,5 +39,37 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal("All account data sources failed.", ex.Message);
         }
+
+        // ---- FailedSourceExceptionTypeNames (SnapshotFailureClassifier's
+        // input - field-tested pain, 2026-08-06) ----
+
+        [Fact]
+        public void TwoArgConstructor_FailedSourceExceptionTypeNames_IsEmptyNotNull()
+        {
+            var ex = new SnapshotFetchFailedException(failedSourceCount: 2, totalSourceCount: 5);
+
+            Assert.NotNull(ex.FailedSourceExceptionTypeNames);
+            Assert.Empty(ex.FailedSourceExceptionTypeNames);
+        }
+
+        [Fact]
+        public void ThreeArgConstructor_CapturesFailedSourceExceptionTypeNames()
+        {
+            var ex = new SnapshotFetchFailedException(
+                failedSourceCount: 2,
+                totalSourceCount: 5,
+                failedSourceExceptionTypeNames: new[] { "InvalidAccessTokenException", "TimeoutException" });
+
+            Assert.Equal(new[] { "InvalidAccessTokenException", "TimeoutException" }, ex.FailedSourceExceptionTypeNames);
+        }
+
+        [Fact]
+        public void ThreeArgConstructor_NullTypeNames_IsEmptyNotNull()
+        {
+            var ex = new SnapshotFetchFailedException(failedSourceCount: 2, totalSourceCount: 5, failedSourceExceptionTypeNames: null);
+
+            Assert.NotNull(ex.FailedSourceExceptionTypeNames);
+            Assert.Empty(ex.FailedSourceExceptionTypeNames);
+        }
     }
 }

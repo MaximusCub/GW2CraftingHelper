@@ -97,6 +97,9 @@
     <Compile Include="Services\SnapshotEpochGuard.cs" />
     <Compile Include="Services\SnapshotCommitGate.cs" />
     <Compile Include="Services\SnapshotFetchFailedException.cs" />
+    <Compile Include="Services\SnapshotFailureKind.cs" />
+    <Compile Include="Services\SnapshotFailureClassification.cs" />
+    <Compile Include="Services\SnapshotFailureClassifier.cs" />
     <Compile Include="Services\SolverDecision.cs" />
     <Compile Include="Services\SolveResult.cs" />
     <Compile Include="Models\ItemMetadata.cs" />
