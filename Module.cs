@@ -745,7 +745,20 @@ namespace GW2CraftingHelper
                 Logger.Warn(ex, "Failed to refresh account snapshot");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot", $"Failed to refresh account snapshot: {ex.GetType().Name} - {ex.Message}");
                 Interlocked.Exchange(ref _lastFailedRefreshAttemptTicks, DateTime.UtcNow.Ticks);
-                var status = $"Refresh failed \u2014 {DateTime.Now:t}";
+
+                // KNOWN-ISSUES #37 follow-up: status-text parity with
+                // MainView.RefreshNowAsync's own catch block - this
+                // background/auto-refresh path (module load, every stale-
+                // snapshot Update() tick, OnSubtokenUpdated) can hit the
+                // exact same InvalidAccessTokenException root cause as the
+                // manual Refresh Now button, so it must not fall back to
+                // the old bare, uninformative "Refresh failed" label.
+                // Deliberately does NOT pop ApiAccessDialog here - see
+                // KNOWN-ISSUES #37 follow-up for why unprompted background
+                // popups are a separate, deferred UX call.
+                var classification = SnapshotFailureClassifier.Classify(ex);
+                string cause = StatusText.ForRefreshFailure(classification.Kind, classification.FailedSourceCount, classification.TotalSourceCount);
+                var status = $"{cause} \u2014 {DateTime.Now:t}";
                 SaveStatusThreadSafe(status);
             }
             finally

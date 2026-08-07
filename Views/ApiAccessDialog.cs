@@ -62,6 +62,7 @@ namespace GW2CraftingHelper.Views
 
         private readonly StandardWindow _window;
         private bool _isShowing;
+        private bool _disposed;
         private Action _onRetry;
 
         public ApiAccessDialog()
@@ -77,10 +78,26 @@ namespace GW2CraftingHelper.Views
                 Id = WindowId,
                 TopMost = true
             };
+
+            // Resets _isShowing whenever the window's own Visible=false
+            // transition completes - not just when our own Retry/Close
+            // StandardButton handlers below run. WindowBase2's built-in
+            // title-bar X button and Escape key both call Hide() directly
+            // (CanClose/CanCloseWithEscape default true, never overridden
+            // here), bypassing those handlers entirely - without this,
+            // dismissing the dialog that way would leave _isShowing stuck
+            // true and every later Show() call would silently no-op for
+            // the rest of the session.
+            _window.Hidden += OnWindowHidden;
         }
 
         public void Show(Action onRetry)
         {
+            // Self-defending: a caller's guard over an unrelated object's
+            // field (e.g. MainView's _headerPanel liveness check) is not a
+            // substitute for this dialog checking its own disposal state -
+            // see the class doc comment.
+            if (_disposed) return;
             if (_isShowing) return;
             _isShowing = true;
             _onRetry = onRetry;
@@ -142,14 +159,34 @@ namespace GW2CraftingHelper.Views
 
         public void Hide()
         {
+            if (_disposed) return;
             _isShowing = false;
             _window.Hide();
         }
 
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+
+            _window.Hidden -= OnWindowHidden;
             _window.Hide();
             _window.Dispose();
+        }
+
+        /// <summary>
+        /// Fires whenever the window's own Visible=false transition
+        /// completes, regardless of which path triggered it - our own
+        /// Retry/Close StandardButton handlers (which already set
+        /// _isShowing = false synchronously, so this is a harmless
+        /// no-op re-assignment for those), or WindowBase2's built-in
+        /// title-bar X button/Escape key, which call Hide() directly and
+        /// never touch _isShowing otherwise - see the constructor's own
+        /// comment on why this subscription exists.
+        /// </summary>
+        private void OnWindowHidden(object sender, EventArgs e)
+        {
+            _isShowing = false;
         }
 
         /// <summary>

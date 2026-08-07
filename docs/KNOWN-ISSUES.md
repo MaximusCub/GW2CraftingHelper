@@ -762,3 +762,72 @@ test net (repo invariant: tests must stay Blish-free) - not yet visually
 verified in a live Blish session.
 
 **Live gate:** [PENDING - the orchestrator fills in PASS/FAIL]
+
+---
+
+### 38. Review-pass fixes on item 37: ApiAccessDialog self-defense + background-refresh status parity (2026-08-06)
+
+**Context:** a review of item 37's dialog/classification landing (before
+its own live gate above was exercised) found three gaps in the diff, all
+fixed in this follow-up pass without touching the pure classification
+logic itself.
+
+**Fix 1 (`Views/ApiAccessDialog.cs`):** `Show()` had no defensive check of
+its own for having already been `Dispose()`'d - it relied entirely on
+`Views/MainView.cs`'s `_headerPanel == null || _headerPanel.Parent == null`
+guard, a proxy check over an unrelated, Module-owned object's lifecycle
+that only happened to also protect `ApiAccessDialog` today because
+`Module.Unload()` disposes both back-to-back in one synchronous method -
+coincidence of ordering, not design. `Show()` and `Hide()` now check a new
+private `_disposed` flag (set at the top of `Dispose()`) and return early;
+`Dispose()` itself is now idempotent (a second call is a no-op) rather
+than risking a double-dispose of the underlying `StandardWindow`.
+
+**Fix 2 (`Views/ApiAccessDialog.cs`):** the dialog never reset
+`_isShowing` when dismissed via the window's own built-in title-bar X
+button or Escape key (`CanClose`/`CanCloseWithEscape` both default true
+and were never overridden) - both bypass the Retry/Close `StandardButton`
+click handlers entirely (confirmed by decompiling the shipped Blish HUD
+assembly: `WindowBase2.OnLeftMouseButtonPressed` calls `Hide()` directly
+on an X-button click), so `_isShowing` stayed stuck true and every later
+`Show()` call silently no-op'd for the rest of the session - reproducing
+the exact "no explanation, dead end" pain item 37 exists to fix. The
+constructor now subscribes `_window.Hidden += OnWindowHidden` (a named
+handler, matching `ModalDialog`'s own `OnWindowMoved` idiom; unsubscribed
+in `Dispose()`), which fires whenever the window's Visible=false
+transition completes regardless of which path triggered it.
+
+**Fix 3 (`Module.cs`):** `RefreshSnapshotInBackgroundAsync`'s catch block
+(the auto-refresh path fired on module load, every stale-snapshot
+`Update()` tick, and `OnSubtokenUpdated`) still wrote only the bare
+"Refresh failed - {time}" status, even though it can hit the exact same
+`InvalidAccessTokenException` root cause as the manual Refresh Now
+button - a returning user who alt-tabs to character select while a
+cached snapshot goes stale would silently get the old, uninformative
+message through a path they never clicked anything for. It now calls the
+same `SnapshotFailureClassifier.Classify(ex)` +
+`StatusText.ForRefreshFailure(...)` pair `Views/MainView.cs`'s
+`RefreshNowAsync` already uses, for status-text parity. Deliberately does
+NOT pop `ApiAccessDialog` from this background path: showing a top-level
+window unprompted while the user is off doing something else in-game
+(rather than having just clicked Refresh Now themselves) is a separate,
+more debatable UX call, left open rather than folded into this fix pass.
+
+**Validation:** `dotnet build -p:Platform=x64` - 0 errors. No new
+StyleCop warning categories introduced; the two new early-return guards
+(`if (_disposed) return;`) add two more instances of the file's own
+pre-existing braceless-if style (matching the sibling `if (_isShowing)
+return;` line right next to each), already covered by the SA1503 debt
+item 32 tracks - not a new class of finding. Module test suite
+(`tests/GW2CraftingHelper.Tests`) - 1130/1130 passing, unchanged from
+item 37's count: no pure/Blish-free logic changed in this pass, only its
+call sites (`Module.cs`) and view-layer plumbing (`ApiAccessDialog.cs`),
+both Blish HUD code with no test net under the repo's own Blish-free
+testing invariant - `SnapshotFailureClassifier`/`StatusText` themselves
+remain fully covered by their existing real unit tests, unmodified.
+VendorOfferUpdater suite (`tests/VendorOfferUpdater.Tests`) - 135/135
+passing, unchanged (this pass does not touch that tool). Both floors
+(1101+/135) cleared. `ApiAccessDialog`/`Module.cs` remain untested-by-
+design UI/host code - not yet visually verified in a live Blish session.
+
+**Live gate:** [PENDING - the orchestrator fills in PASS/FAIL]
