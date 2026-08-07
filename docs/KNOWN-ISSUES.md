@@ -631,7 +631,40 @@ TreeSectionController's pill rendering, IconControls, CoinCurrencyRenderer)
 has no new tests per the Blish-free-tests invariant - covered by the live
 desktop gate instead.
 
-Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Live desktop gate: PASS (orchestrator, 2026-08-06, live branch-build
+sandbox session under the hardened desktop protocol, captures uxg_01-11
+in preflight/captures; Exordium plan with the synthetic snapshot, Use Own
+Materials on, tree fully expanded):
+- Finding A + final wording: the partial-coverage pill renders
+  "HAVE 30/75 NEEDED" live (45x Stabilizing Matrix row: needs 75, owns 30)
+  directly above a fully-covered row's plain blue "HAVE" (Mystic
+  Runestone) - the vocabulary alignment reads exactly as the maintainer
+  intended; hover shows the approved tooltip verbatim: "Needs 75 total -
+  30 covered by your materials, 45 left to acquire".
+- Finding B1: hovering a non-coin vendor row's price area shows
+  "Unit price: 92 for 912 Spirit Shard" (Philosopher's Stone; the
+  N-for-M bundle fallback for a non-divisible rate, currency NAME
+  included) - the misleading "0g 0s 0c" is gone. (B2 icon-name tooltips
+  verified by review; the same name-threading resolver is proven live
+  by B1.)
+- Finding C: pill border colors pixel-sampled from captures - selected
+  green renders (30,143,11) vs target #1F8F0C, owned-info gold matches
+  the darkened #8A6D1F range (269 px in-range), ignore-active amber
+  renders (156,115,38) vs target #9C7327. All three darkened borders
+  live; fill technique and white text untouched.
+- Finding D: hovering an UNSELECTED VENDOR pill shows "Switch to VENDOR"
+  with a hover highlight - the previously-swallowed label hover now
+  fires; the OwnedInfo tooltip above proves the previously tooltip-less
+  kinds are covered.
+- Finding E: "Required Disciplines (3)" lists Armorsmith 450 / Jeweler
+  225 / Weaponsmith 500 - MysticForge row GONE, count consistent; recipe
+  sublabels render "Mystic Forge" (space, no level) while real
+  disciplines keep levels ("Gift of Condensed Magic / Mystic Forge" seen
+  alongside "Weaponsmith 400" rows).
+- Ignore round-trip on the new pill layout: IGNORE on the partial-HAVE
+  row -> HAVE + IGNORED (amber), ancestor costs updated; un-ignore
+  restores "TP | HAVE 30/75 NEEDED | IGNORE" and all costs exactly.
+- Session sweep: zero FATAL, zero relayout warnings.
 
 ---
 
@@ -674,4 +707,9 @@ HUD references in tests; the new test exercises real production code
 (`PlanViewModelBuilder.Build`/`FormatDisciplineSublabel`) with no
 contract-mirror/fake-logic tests.
 
-Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Live desktop gate: PASS (orchestrator, 2026-08-06, same session as the
+wave-1 gate above): the corrected sublabel path rendered live - recipes
+whose only source is the forge show "Mystic Forge" with no level, and
+the mixed-discipline safeguard is additionally covered by the end-to-end
+test; no MysticForge row in Required Disciplines (count header (3)
+consistent).
