@@ -761,7 +761,16 @@ entry points); `ApiAccessDialog`/`MainView` are Blish HUD UI code with no
 test net (repo invariant: tests must stay Blish-free) - not yet visually
 verified in a live Blish session.
 
-**Live gate:** [PENDING - the orchestrator fills in PASS/FAIL]
+**Live gate:** PASS (orchestrator, 2026-08-06, live branch-build sandbox
+session, captures pop_01-03 in preflight/captures): Refresh Now with no
+API key raised the classified ApiAccessNotReady dialog - title "GW2 API
+access is not ready", the three maintainer-specified checks rendered
+verbatim (in-world character with the Mumble explanation, key registered
+in Blish, module permission path), Retry re-fired the refresh (status
+timestamp advanced behind the still-open dialog on repeat failure),
+Close dismissed cleanly; the status line shows the classified
+"Refresh failed - GW2 API access not ready - <time>" in place of the
+bare "Refresh Failed". Zero FATAL lines in the session log.
 
 ---
 
@@ -830,4 +839,13 @@ passing, unchanged (this pass does not touch that tool). Both floors
 (1101+/135) cleared. `ApiAccessDialog`/`Module.cs` remain untested-by-
 design UI/host code - not yet visually verified in a live Blish session.
 
-**Live gate:** [PENDING - the orchestrator fills in PASS/FAIL]
+**Live gate:** PASS (orchestrator, 2026-08-06, live branch-build sandbox
+session, captures pop_01-03 in preflight/captures): Refresh Now with no
+API key raised the classified ApiAccessNotReady dialog - title "GW2 API
+access is not ready", the three maintainer-specified checks rendered
+verbatim (in-world character with the Mumble explanation, key registered
+in Blish, module permission path), Retry re-fired the refresh (status
+timestamp advanced behind the still-open dialog on repeat failure),
+Close dismissed cleanly; the status line shows the classified
+"Refresh failed - GW2 API access not ready - <time>" in place of the
+bare "Refresh Failed". Zero FATAL lines in the session log.
