@@ -713,3 +713,52 @@ whose only source is the forge show "Mystic Forge" with no level, and
 the mixed-discipline safeguard is additionally covered by the end-to-end
 test; no MysticForge row in Required Disciplines (count header (3)
 consistent).
+
+### 37. Snapshot refresh failure classification + "GW2 API access is not ready" dialog (2026-08-06)
+
+**Field evidence:** a real user hit the Snapshot tab's Refresh Now while at
+the GW2 CHARACTER SELECT screen (not yet in-world) - Blish only resolves the
+account's Mumble identity, and therefore its API key, once a character is
+loaded into the game world, so every account data source call failed with
+an invalid/missing access token. The tab's only feedback was the bare
+"Refresh Failed - {time}" label, giving no hint that logging into a
+character (not restarting Blish, not re-adding the API key) was the actual
+fix - a full hour lost to this before the cause was found.
+
+**Fix:** `Services/SnapshotFailureKind`/`SnapshotFailureClassification`/
+`SnapshotFailureClassifier` (Blish-free, unit-tested) classify a failed
+refresh into `ApiAccessNotReady` (invalid/missing/under-scoped token -
+matched by exception TYPE NAME string, not a Gw2Sharp `is` check, so the
+classifier itself never needs a Gw2Sharp reference), `NetworkOrApiDown` (a
+total failure with a known transport/5xx cause), `PartialFailure` (some
+sources succeeded), or `Unknown`. `Gw2AccountSnapshotService` (the one file
+allowed to reference Gw2Sharp) now threads each failed source's exception
+type name through `SnapshotFetchFailedException`'s new
+`FailedSourceExceptionTypeNames`. `Views/MainView.cs`'s Refresh Now handler
+(refactored into `RefreshNowAsync()` so both the button and the new
+dialog's Retry button share one code path) shows a new
+`Views/ApiAccessDialog` - the three checks (in-world, API key added, module
+has permission) plus Retry/Close - on `ApiAccessNotReady`, and otherwise
+appends a classified cause to the status label (e.g. "Refresh failed -
+could not reach the GW2 API", "Refresh partially failed - 2 of 5 sources")
+instead of the bare message. `ApiAccessDialog` follows the existing
+`ModalDialog` StandardWindow construction technique but is a separate class
+(different title/buttons/multi-line wrapped content - via
+`DrawUtil.WrapText`, the `AboutTabContent.AddInfoLine` fix pattern - rather
+than a generalization of `ModalDialog`'s single-sentence Confirm/Cancel
+shape) and skips its settings-backed position persistence (a rare
+error-path dialog, always re-centered on `Show()`).
+
+**Validation:** `dotnet build -p:Platform=x64` - 0 errors. Module test
+suite (`tests/GW2CraftingHelper.Tests`) - 1130/1130 passing (up from the
+1101 floor; +29 new tests: 22 in the new `SnapshotFailureClassifierTests`,
++3 `SnapshotFetchFailedExceptionTests`, +4 `StatusTextTests`).
+VendorOfferUpdater suite (`tests/VendorOfferUpdater.Tests`) - 135/135
+passing, unchanged (this branch does not touch that tool). The
+classification decision logic is real-unit-tested end to end (priority
+ordering, all four kinds, both the raw-type-name and `Classify(Exception)`
+entry points); `ApiAccessDialog`/`MainView` are Blish HUD UI code with no
+test net (repo invariant: tests must stay Blish-free) - not yet visually
+verified in a live Blish session.
+
+**Live gate:** [PENDING - the orchestrator fills in PASS/FAIL]
