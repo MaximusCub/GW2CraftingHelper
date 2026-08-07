@@ -119,7 +119,14 @@ namespace GW2CraftingHelper.Views
         // loop's own solve-context baseline) - see TreeSectionController's
         // class doc comment.
         private DateTime _planGeneratedAt;
-        private bool _useOwnMaterials;
+        // Wave-3 quick win #1: defaults to true (checked) for a fresh plan
+        // session, per explicit maintainer direction during 2026-08-06 field
+        // testing - a deliberate divergence from gw2efficiency, whose own
+        // default is unchecked. Purely in-memory session state (never read
+        // from/written to ModuleSettings), so this only changes what a brand
+        // new session starts with; it is reset to this default on every
+        // module reload, same as _itemRows/_priceBasis above.
+        private bool _useOwnMaterials = true;
         // M33 spec item 8 (r1 section 2.1): gw2efficiency's own default is
         // "buy price" (buy orders - patient, usually cheaper), with a
         // per-item fallback to instant-buy only when a listing is missing.
