@@ -56,6 +56,7 @@ namespace GW2CraftingHelper
         private CornerIcon _cornerIcon;
         private ResizableTabbedWindow _mainWindow;
         private ModalDialog _modalDialog;
+        private ApiAccessDialog _apiAccessDialog;
         private MainView _snapshotContent;
         private CraftingPlanView _craftingContent;
         private LogTabContent _logContent;
@@ -330,11 +331,13 @@ namespace GW2CraftingHelper
             }
 
             _modalDialog = new ModalDialog(_settings);
+            _apiAccessDialog = new ApiAccessDialog();
 
             _snapshotContent = new MainView(
                 _currentSnapshot,
                 _lastStatus,
                 UserRefreshAsync,
+                _apiAccessDialog,
                 ClearCache,
                 SaveStatus,
                 SaveStatusThreadSafe
@@ -601,6 +604,7 @@ namespace GW2CraftingHelper
 
             _httpClient?.Dispose();
             _modalDialog?.Dispose();
+            _apiAccessDialog?.Dispose();
             _cornerIcon?.Dispose();
             _mainWindow?.Dispose();
 

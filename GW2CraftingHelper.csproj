@@ -139,6 +139,7 @@
     <Compile Include="Views\Rendering\RowRelayoutHelpers.cs" />
     <Compile Include="Views\Rendering\TreeSectionController.cs" />
     <Compile Include="Views\ModalDialog.cs" />
+    <Compile Include="Views\ApiAccessDialog.cs" />
     <Compile Include="Views\LogTabContent.cs" />
     <Compile Include="Views\SettingsTabContent.cs" />
     <Compile Include="Views\AboutTabContent.cs" />

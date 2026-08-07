@@ -59,6 +59,7 @@ namespace GW2CraftingHelper.Views
 
         private string _initialStatus;
         private readonly Func<Task<AccountSnapshot>> _refreshAsync;
+        private readonly ApiAccessDialog _apiAccessDialog;
         private readonly Action _clearCache;
         private readonly Action<string> _saveStatus;
         private readonly Action<string> _saveStatusThreadSafe;
@@ -135,6 +136,7 @@ namespace GW2CraftingHelper.Views
             AccountSnapshot snapshot,
             string initialStatus,
             Func<Task<AccountSnapshot>> refreshAsync,
+            ApiAccessDialog apiAccessDialog,
             Action clearCache,
             Action<string> saveStatus,
             Action<string> saveStatusThreadSafe)
@@ -149,6 +151,7 @@ namespace GW2CraftingHelper.Views
             _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
             _initialStatus = initialStatus;
             _refreshAsync = refreshAsync;
+            _apiAccessDialog = apiAccessDialog;
             _clearCache = clearCache;
             _saveStatus = saveStatus;
             _saveStatusThreadSafe = saveStatusThreadSafe;
@@ -245,92 +248,7 @@ namespace GW2CraftingHelper.Views
                 _saveStatus(status);
             };
 
-            _refreshButton.Click += async (_, __) =>
-            {
-                if (_refreshAsync == null) return;
-
-                _refreshButton.Enabled = false;
-                _clearButton.Enabled = false;
-                SetStatus("Refreshing...");
-
-                try
-                {
-                    var snapshot = await _refreshAsync();
-                    string status = snapshot != null
-                        ? $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}"
-                        : null;
-
-                    // Persist BEFORE marshaling, while still on this
-                    // continuation thread - StatusStore.Save is blocking
-                    // file I/O and is safe to run off the UI thread.
-                    // _saveStatusThreadSafe (Module.SaveStatusThreadSafe)
-                    // persists via the dirty-flag path rather than
-                    // _saveStatus (Module.SaveStatus), which also calls
-                    // _snapshotContent.SetStatus directly - a control
-                    // mutation that would itself be unsafe to run off-thread
-                    // here.
-                    if (status != null)
-                    {
-                        _saveStatusThreadSafe(status);
-                    }
-
-                    // Blish HUD's XNA host has no SynchronizationContext, so
-                    // this continuation may resume on a ThreadPool thread;
-                    // marshal ONLY the remaining control mutations back to
-                    // the main thread.
-                    MainThreadMarshal.Run(() =>
-                    {
-                        // The module may have been disabled/unloaded while
-                        // the refresh was in flight - a disposed control's
-                        // Parent is nulled on disposal, mirroring
-                        // CraftingPlanView's ResizeDebounceStep check.
-                        // Persistence above already happened regardless, so
-                        // bailing here cannot strand any state. NOTE: a
-                        // plain tab switch-away does NOT null Parent - see
-                        // docs/ARCHITECTURE.md Section 1 ("a tab switch
-                        // detaches, it does not dispose") - so this guard
-                        // covers module teardown only; a tab-switched-away
-                        // user still gets SetSnapshot/SetStatus run into a
-                        // real, just no-longer-visible, header panel.
-                        if (_headerPanel == null || _headerPanel.Parent == null) return;
-
-                        if (snapshot != null)
-                        {
-                            SetSnapshot(snapshot);
-                            SetStatus(status);
-                        }
-                        else
-                        {
-                            SetStatus("Refresh in progress...");
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn(ex, "Refresh Now failed");
-                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot", $"Refresh Now failed: {ex.GetType().Name} - {ex.Message}");
-                    var status = $"Refresh failed \u2014 {DateTime.Now:t}";
-                    _saveStatusThreadSafe(status);
-                    MainThreadMarshal.Run(() =>
-                    {
-                        if (_headerPanel == null || _headerPanel.Parent == null) return;
-                        SetStatus(status);
-                    });
-                }
-                finally
-                {
-                    // Runs later on the main thread once queued - both
-                    // buttons still re-enable on every path (success,
-                    // exception, or cancellation) since finally always
-                    // executes and Run always queues.
-                    MainThreadMarshal.Run(() =>
-                    {
-                        if (_headerPanel == null || _headerPanel.Parent == null) return;
-                        _refreshButton.Enabled = true;
-                        _clearButton.Enabled = true;
-                    });
-                }
-            };
+            _refreshButton.Click += async (_, __) => await RefreshNowAsync();
 
             // Search row: plain TextBox (not SuggestionPanel/
             // AutocompleteTextBox - see class doc comment) + the existing
@@ -576,6 +494,127 @@ namespace GW2CraftingHelper.Views
             _sourceFilterPanel.Size = new Point(w, SourceFilterHeight);
             _coinPanel.Size = new Point(w, CoinHeight);
             _contentPanel.Size = new Point(w, h - TopRegionHeight);
+        }
+
+        /// <summary>
+        /// The Refresh Now button's full click flow - also invoked by the
+        /// ApiAccessDialog's Retry button (field-tested pain, 2026-08-06),
+        /// so this is a method rather than an inline lambda: both entry
+        /// points are Blish UI event handlers (Click, or the dialog's own
+        /// Click-driven Retry callback), so both always start on the main
+        /// thread, matching CraftingPlanView.TriggerGenerate's own doc
+        /// comment on why its own confirm-modal callback needs no extra
+        /// synchronization here.
+        /// <para>
+        /// On failure, classifies the exception via
+        /// SnapshotFailureClassifier (Blish-free, real-unit-tested) and:
+        /// ApiAccessNotReady pops the ApiAccessDialog walkthrough (the
+        /// character-select incident this exists for); every other kind
+        /// just gets a more specific status label than the old bare
+        /// "Refresh failed" - see StatusText.ForRefreshFailure.
+        /// </para>
+        /// </summary>
+        private async Task RefreshNowAsync()
+        {
+            if (_refreshAsync == null) return;
+
+            _refreshButton.Enabled = false;
+            _clearButton.Enabled = false;
+            SetStatus("Refreshing...");
+
+            try
+            {
+                var snapshot = await _refreshAsync();
+                string status = snapshot != null
+                    ? $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}"
+                    : null;
+
+                // Persist BEFORE marshaling, while still on this
+                // continuation thread - StatusStore.Save is blocking
+                // file I/O and is safe to run off the UI thread.
+                // _saveStatusThreadSafe (Module.SaveStatusThreadSafe)
+                // persists via the dirty-flag path rather than
+                // _saveStatus (Module.SaveStatus), which also calls
+                // _snapshotContent.SetStatus directly - a control
+                // mutation that would itself be unsafe to run off-thread
+                // here.
+                if (status != null)
+                {
+                    _saveStatusThreadSafe(status);
+                }
+
+                // Blish HUD's XNA host has no SynchronizationContext, so
+                // this continuation may resume on a ThreadPool thread;
+                // marshal ONLY the remaining control mutations back to
+                // the main thread.
+                MainThreadMarshal.Run(() =>
+                {
+                    // The module may have been disabled/unloaded while
+                    // the refresh was in flight - a disposed control's
+                    // Parent is nulled on disposal, mirroring
+                    // CraftingPlanView's ResizeDebounceStep check.
+                    // Persistence above already happened regardless, so
+                    // bailing here cannot strand any state. NOTE: a
+                    // plain tab switch-away does NOT null Parent - see
+                    // docs/ARCHITECTURE.md Section 1 ("a tab switch
+                    // detaches, it does not dispose") - so this guard
+                    // covers module teardown only; a tab-switched-away
+                    // user still gets SetSnapshot/SetStatus run into a
+                    // real, just no-longer-visible, header panel.
+                    if (_headerPanel == null || _headerPanel.Parent == null) return;
+
+                    if (snapshot != null)
+                    {
+                        SetSnapshot(snapshot);
+                        SetStatus(status);
+                    }
+                    else
+                    {
+                        SetStatus("Refresh in progress...");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Refresh Now failed");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot", $"Refresh Now failed: {ex.GetType().Name} - {ex.Message}");
+
+                var classification = SnapshotFailureClassifier.Classify(ex);
+                string cause = StatusText.ForRefreshFailure(classification.Kind, classification.FailedSourceCount, classification.TotalSourceCount);
+                var status = $"{cause} \u2014 {DateTime.Now:t}";
+                _saveStatusThreadSafe(status);
+                MainThreadMarshal.Run(() =>
+                {
+                    if (_headerPanel == null || _headerPanel.Parent == null) return;
+                    SetStatus(status);
+
+                    // Same guard as every other UI mutation in this tail -
+                    // "safe if the tab was switched away before the failure
+                    // lands" means the module-unload check above, not a
+                    // stricter "only show if still on this tab" rule: the
+                    // dialog is a top-level SpriteScreen-parented window
+                    // (like ModalDialog), independent of tab selection, and
+                    // a user who clicked Refresh Now and tabbed away while
+                    // waiting still wants to know why it failed.
+                    if (classification.Kind == SnapshotFailureKind.ApiAccessNotReady)
+                    {
+                        _apiAccessDialog?.Show(() => { _ = RefreshNowAsync(); });
+                    }
+                });
+            }
+            finally
+            {
+                // Runs later on the main thread once queued - both
+                // buttons still re-enable on every path (success,
+                // exception, or cancellation) since finally always
+                // executes and Run always queues.
+                MainThreadMarshal.Run(() =>
+                {
+                    if (_headerPanel == null || _headerPanel.Parent == null) return;
+                    _refreshButton.Enabled = true;
+                    _clearButton.Enabled = true;
+                });
+            }
         }
 
         /// <summary>

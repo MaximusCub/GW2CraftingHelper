@@ -1,0 +1,182 @@
+using System;
+using System.Linq;
+using Blish_HUD;
+using Blish_HUD.Content;
+using Blish_HUD.Controls;
+using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
+
+namespace GW2CraftingHelper.Views
+{
+    /// <summary>
+    /// The "GW2 API access is not ready" walkthrough dialog for the
+    /// ApiAccessNotReady snapshot-refresh failure kind (field-tested pain,
+    /// 2026-08-06: at CHARACTER SELECT, Blish has not yet resolved the
+    /// game's Mumble identity, so every account data source call fails
+    /// with an invalid/missing API key, and the Snapshot tab's Refresh Now
+    /// used to show only the unhelpful "Refresh Failed - {time}"). Lists
+    /// the three things a user needs to check, then offers Retry/Close.
+    /// <para>
+    /// Follows the same StandardWindow construction technique as the
+    /// existing ModalDialog (a 1x1 pixel background stretched to the
+    /// window's own size, TopMost, a stable Id, Show()/Hide() semantics) -
+    /// but is a SEPARATE class rather than a generalization of ModalDialog
+    /// itself: ModalDialog's shape (one short sentence, fixed "Confirm"
+    /// title, fixed Regenerate/Cancel buttons) does not fit a multi-line
+    /// numbered checklist with a different title and a Retry/Close pair,
+    /// and its message Label is not wrapped at all - fine for its own
+    /// short sentence, but this dialog's checklist items are full
+    /// sentences that need to wrap. Text is pre-wrapped with Blish HUD's
+    /// own DrawUtil.WrapText (the AboutTabContent.AddInfoLine fix pattern,
+    /// 2026-07-23) rather than the Label control's own WrapText property,
+    /// whose wrap width is pinned at the control's first internal layout
+    /// pass - a pass that fires before a later Width assignment in the
+    /// same object initializer would ever take effect (confirmed by
+    /// decompiling the shipped Blish HUD assembly; see that commit's own
+    /// message for the full trace).
+    /// </para>
+    /// <para>
+    /// Deliberately skips ModalDialog's settings-backed drag position
+    /// persistence: this is a rare error-path dialog, not a workflow the
+    /// user repeatedly opens and repositions, so it simply centers on
+    /// every Show() call - no new ModuleSettings entries needed for it.
+    /// </para>
+    /// </summary>
+    public class ApiAccessDialog : IDisposable
+    {
+        private const string WindowId = "GW2CraftingHelper_ApiAccessDialog_7d2c31";
+        private const int WindowWidth = 480;
+        private const int WindowHeight = 300;
+        private const int ContentX = 10;
+        private const int ContentY = 35;
+        private const int ContentWidth = WindowWidth - (2 * ContentX);
+        private const int LineSpacing = 8;
+        private const int ButtonTopMargin = 20;
+
+        private static readonly string[] Checks =
+        {
+            "1. You are logged into a character in the game world (not the character-select screen) - Blish only learns which account is active once you are in-world.",
+            "2. A Guild Wars 2 API key is added in Blish HUD settings.",
+            "3. This module has permission to use the API key (Blish settings > Manage Modules > GW2 Crafting Helper)."
+        };
+
+        private readonly StandardWindow _window;
+        private bool _isShowing;
+        private Action _onRetry;
+
+        public ApiAccessDialog()
+        {
+            _window = new StandardWindow(
+                new AsyncTexture2D(ContentService.Textures.Pixel),
+                new Rectangle(0, 0, WindowWidth, WindowHeight),
+                new Rectangle(ContentX, ContentY, ContentWidth, WindowHeight - ContentY - 10))
+            {
+                BackgroundColor = new Color(30, 30, 30),
+                Parent = GameService.Graphics.SpriteScreen,
+                Title = "GW2 API access is not ready",
+                Id = WindowId,
+                TopMost = true
+            };
+        }
+
+        public void Show(Action onRetry)
+        {
+            if (_isShowing) return;
+            _isShowing = true;
+            _onRetry = onRetry;
+
+            foreach (var child in _window.Children.ToArray())
+            {
+                child.Dispose();
+            }
+
+            var font = GameService.Content.DefaultFont14;
+            int y = 4;
+
+            foreach (var check in Checks)
+            {
+                y = AddWrappedLine(font, check, y);
+            }
+
+            int btnW = 100;
+            int closeW = 70;
+            int btnGap = 16;
+            int totalBtnW = btnW + btnGap + closeW;
+            int btnX = (ContentWidth - totalBtnW) / 2;
+            int btnY = y + ButtonTopMargin;
+
+            var retryBtn = new StandardButton()
+            {
+                Text = "Retry",
+                Size = new Point(btnW, 25),
+                Location = new Point(btnX, btnY),
+                Parent = _window
+            };
+            retryBtn.Click += (_, __) =>
+            {
+                _isShowing = false;
+                _window.Hide();
+                _onRetry?.Invoke();
+            };
+
+            var closeBtn = new StandardButton()
+            {
+                Text = "Close",
+                Size = new Point(closeW, 25),
+                Location = new Point(btnX + btnW + btnGap, btnY),
+                Parent = _window
+            };
+            closeBtn.Click += (_, __) =>
+            {
+                _isShowing = false;
+                _window.Hide();
+            };
+
+            var screen = GameService.Graphics.SpriteScreen;
+            _window.Location = new Point(
+                (screen.Width - _window.Width) / 2,
+                (screen.Height - _window.Height) / 2);
+
+            _window.Show();
+        }
+
+        public void Hide()
+        {
+            _isShowing = false;
+            _window.Hide();
+        }
+
+        public void Dispose()
+        {
+            _window.Hide();
+            _window.Dispose();
+        }
+
+        /// <summary>
+        /// Adds one pre-wrapped, left-aligned Label at the given Y and
+        /// returns the Y for the next line - see the class doc comment for
+        /// why DrawUtil.WrapText is used instead of the Label control's own
+        /// WrapText property. Constructed without a Parent so Height
+        /// reflects only the wrapped text itself, then parented once the
+        /// next line's Y is already computed - mirrors
+        /// AboutTabContent.AddInfoLine's own ordering.
+        /// </summary>
+        private int AddWrappedLine(BitmapFont font, string text, int y)
+        {
+            string wrapped = DrawUtil.WrapText(font, text, ContentWidth);
+
+            var label = new Label()
+            {
+                Text = wrapped,
+                Font = font,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(0, y)
+            };
+
+            int nextY = y + label.Height + LineSpacing;
+            label.Parent = _window;
+            return nextY;
+        }
+    }
+}
