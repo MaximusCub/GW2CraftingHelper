@@ -105,6 +105,44 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Equal("1d ago", StatusText.ForSnapshotAge(TimeSpan.FromDays(1)));
         }
+
+        // ---- ForRefreshFailure (field-tested pain, 2026-08-06: the
+        // Snapshot tab's Refresh Now used to show only bare
+        // "Refresh Failed - {time}" regardless of cause) ----
+
+        [Fact]
+        public void ForRefreshFailure_ApiAccessNotReady_ReturnsAccessNotReadyText()
+        {
+            Assert.Equal(
+                "Refresh failed \u2014 GW2 API access not ready",
+                StatusText.ForRefreshFailure(SnapshotFailureKind.ApiAccessNotReady, failedSourceCount: 5, totalSourceCount: 5));
+        }
+
+        [Fact]
+        public void ForRefreshFailure_NetworkOrApiDown_ReturnsCouldNotReachText()
+        {
+            Assert.Equal(
+                "Refresh failed \u2014 could not reach the GW2 API",
+                StatusText.ForRefreshFailure(SnapshotFailureKind.NetworkOrApiDown, failedSourceCount: 5, totalSourceCount: 5));
+        }
+
+        [Fact]
+        public void ForRefreshFailure_PartialFailure_ReturnsCountText()
+        {
+            Assert.Equal(
+                "Refresh partially failed \u2014 2 of 5 sources",
+                StatusText.ForRefreshFailure(SnapshotFailureKind.PartialFailure, failedSourceCount: 2, totalSourceCount: 5));
+        }
+
+        [Fact]
+        public void ForRefreshFailure_Unknown_ReturnsBareFailedText()
+        {
+            // Matches the pre-existing "Refresh failed - {time}" shape
+            // exactly - callers append the time suffix themselves.
+            Assert.Equal(
+                "Refresh failed",
+                StatusText.ForRefreshFailure(SnapshotFailureKind.Unknown, failedSourceCount: 0, totalSourceCount: 0));
+        }
     }
 
 }

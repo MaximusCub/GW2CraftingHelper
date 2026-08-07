@@ -54,5 +54,33 @@ namespace GW2CraftingHelper.Services
 
             return $"{(int)age.TotalDays}d ago";
         }
+
+        /// <summary>
+        /// Cause text for a failed Refresh Now (Views/MainView.cs), keyed
+        /// by SnapshotFailureClassifier's classification - the field-tested
+        /// fix for the "Refresh Failed" dead end (2026-08-06: at CHARACTER
+        /// SELECT every account data source throws an invalid-token
+        /// exception, and the bare status line gave no hint why). Callers
+        /// append " - {time}" themselves, matching the pre-existing
+        /// "Refresh failed - {time}" shape exactly for the Unknown case
+        /// (nothing more specific to say once no known pattern matched).
+        /// ApiAccessNotReady also drives Views/MainView.cs's walkthrough
+        /// dialog, but still gets its own status text here so the header
+        /// label reads correctly once that dialog is closed.
+        /// </summary>
+        public static string ForRefreshFailure(SnapshotFailureKind kind, int failedSourceCount, int totalSourceCount)
+        {
+            switch (kind)
+            {
+                case SnapshotFailureKind.ApiAccessNotReady:
+                    return "Refresh failed \u2014 GW2 API access not ready";
+                case SnapshotFailureKind.NetworkOrApiDown:
+                    return "Refresh failed \u2014 could not reach the GW2 API";
+                case SnapshotFailureKind.PartialFailure:
+                    return $"Refresh partially failed \u2014 {failedSourceCount} of {totalSourceCount} sources";
+                default:
+                    return "Refresh failed";
+            }
+        }
     }
 }

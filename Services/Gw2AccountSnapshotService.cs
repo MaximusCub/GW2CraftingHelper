@@ -51,6 +51,15 @@ namespace GW2CraftingHelper.Services
             var snapshot = new AccountSnapshot { CapturedAt = DateTime.UtcNow };
             int failedSources = 0;
 
+            // Per-source failure type names for SnapshotFailureClassifier
+            // (KNOWN-ISSUES api-degradation F1 follow-up, field-tested
+            // 2026-08-06): captured here, where real Gw2Sharp exception
+            // types are in scope, as plain type-name strings so the
+            // Blish-free classifier and SnapshotFetchFailedException never
+            // need a Gw2Sharp reference of their own - see
+            // SnapshotFailureClassifier's class doc comment.
+            var failedSourceExceptionTypeNames = new List<string>();
+
             // Wallet (also extracts coins as currency ID 1)
             try
             {
@@ -77,6 +86,7 @@ namespace GW2CraftingHelper.Services
                 Logger.Warn(ex, "Failed to fetch wallet");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch wallet: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
+                failedSourceExceptionTypeNames.Add(ex.GetType().Name);
             }
 
             ct.ThrowIfCancellationRequested();
@@ -101,6 +111,7 @@ namespace GW2CraftingHelper.Services
                 Logger.Warn(ex, "Failed to fetch bank");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch bank: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
+                failedSourceExceptionTypeNames.Add(ex.GetType().Name);
             }
 
             ct.ThrowIfCancellationRequested();
@@ -125,6 +136,7 @@ namespace GW2CraftingHelper.Services
                 Logger.Warn(ex, "Failed to fetch shared inventory");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch shared inventory: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
+                failedSourceExceptionTypeNames.Add(ex.GetType().Name);
             }
 
             ct.ThrowIfCancellationRequested();
@@ -149,6 +161,7 @@ namespace GW2CraftingHelper.Services
                 Logger.Warn(ex, "Failed to fetch material storage");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch material storage: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
+                failedSourceExceptionTypeNames.Add(ex.GetType().Name);
             }
 
             ct.ThrowIfCancellationRequested();
@@ -191,6 +204,7 @@ namespace GW2CraftingHelper.Services
                 Logger.Warn(ex, "Failed to fetch character list");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch character list: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
+                failedSourceExceptionTypeNames.Add(ex.GetType().Name);
             }
 
             // A partial or total failure must never silently masquerade as a
@@ -201,7 +215,7 @@ namespace GW2CraftingHelper.Services
             // conservative-persistence-rule rationale.
             if (failedSources > 0)
             {
-                throw new SnapshotFetchFailedException(failedSources, SourceCount);
+                throw new SnapshotFetchFailedException(failedSources, SourceCount, failedSourceExceptionTypeNames);
             }
 
             // Resolve display names and icon URLs
