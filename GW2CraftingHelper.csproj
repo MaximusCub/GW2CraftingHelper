@@ -153,6 +153,7 @@
     <Compile Include="Services\ModuleLogEntry.cs" />
     <Compile Include="Services\ModuleLog.cs" />
     <Compile Include="Services\ModuleLogStore.cs" />
+    <Compile Include="Services\LogViewFloor.cs" />
     <Compile Include="Models\Gw2Constants.cs" />
     <Compile Include="Models\CostLine.cs" />
     <Compile Include="Models\VendorOffer.cs" />
