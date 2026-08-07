@@ -214,6 +214,19 @@ namespace GW2CraftingHelper.Views
         private readonly Dictionary<PlanSectionType, bool> _sectionExpansion =
             new Dictionary<PlanSectionType, bool>();
 
+        // Wave-3 quick win #3 (2026-08-06 field testing): "Hide Unlocked
+        // Recipes" checkbox in the Required Recipes section header.
+        // Default-checked per session - not persisted in ModuleSettings
+        // (no per-plan-view boolean setting precedent exists there today;
+        // ModuleSettings.ValueOwnMaterials/other entries are all
+        // account-level pricing/display toggles, not per-render filters).
+        // Plain session state exactly like _useOwnMaterials/_priceBasis
+        // above: resets to this default on every module reload.
+        // RequiredRecipesVisibility (Blish-free, Services/) owns the actual
+        // filter predicate/header-text logic so it can be unit-tested; this
+        // field is only the live UI toggle state.
+        private bool _hideUnlockedRecipes = true;
+
         #endregion // 7. Section builders (state: section expand/collapse)
 
         #region 2. Generate orchestration (state, continued)
@@ -2656,6 +2669,19 @@ namespace GW2CraftingHelper.Views
 
         private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
         {
+            // Wave-3 quick win #3: Required Recipes is the only section
+            // whose header needs BOTH a non-static title
+            // (RequiredRecipesVisibility.BuildHeaderTitle) and a
+            // suppressToggle-guarded extra header-row control (the "Hide
+            // Unlocked" checkbox) - handled by its own dedicated method
+            // rather than threading special cases through the shared path
+            // below. See CreateRequiredRecipesSection's own doc comment.
+            if (section.SectionType == PlanSectionType.RequiredRecipes)
+            {
+                CreateRequiredRecipesSection(section, panelWidth);
+                return;
+            }
+
             var header = CreateSectionHeader(section.Title, section.SectionType, panelWidth, section.IsDefaultExpanded);
             var contentFlow = header.ContentFlow;
 
@@ -2704,13 +2730,9 @@ namespace GW2CraftingHelper.Views
                     // DisciplinesSectionRenderer's doc comment).
                     new DisciplinesSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
-                case PlanSectionType.RequiredRecipes:
-                    // M38 WP-23c: row rendering (both the 44px with-sublabel
-                    // and 36px no-sublabel row heights) and the c-table
-                    // header call moved to
-                    // Views/Rendering/RecipesSectionRenderer.
-                    new RecipesSectionRenderer(this).Render(section, contentFlow, panelWidth);
-                    break;
+                // PlanSectionType.RequiredRecipes is handled entirely by
+                // CreateRequiredRecipesSection (early return above) - never
+                // reaches this switch, so no case for it here.
                 default:
                     // Defensive fallback for a future section type added
                     // without a dedicated body builder - never leave a
@@ -2743,6 +2765,112 @@ namespace GW2CraftingHelper.Views
             // function of the same section data just rendered above, so it
             // cannot drift from what was actually built.
             contentFlow.Size = new Point(panelWidth, PlanContentHeightMath.SectionBodyHeight(section.SectionType, section.Rows));
+        }
+
+        /// <summary>
+        /// Wave-3 quick win #3 (2026-08-06 field testing): Required Recipes'
+        /// own CreateCollapsibleSection variant. section.Rows is guaranteed
+        /// non-empty here (PlanViewModelBuilder only adds this section when
+        /// at least one non-Mystic-Forge recipe survives its own filter -
+        /// wave-3 #2), so this method's job is purely the SECOND,
+        /// session-toggleable filter: RequiredRecipesVisibility.ApplyFilter
+        /// hides Learned/Auto-learned rows when _hideUnlockedRecipes is
+        /// checked (the default), and the header title always states the
+        /// TOTAL alongside the visible count so it can never read as
+        /// dishonest about how many recipes the plan actually needs.
+        ///
+        /// The header-row "Hide Unlocked" checkbox mirrors
+        /// TreeSectionController.CreateTreeSection's own header-button
+        /// pattern exactly (the only other place in this file needs a
+        /// suppressToggle-guarded extra control in a section header):
+        /// pressStartedOnCheckbox is declared before CreateSectionHeader
+        /// runs (its click-to-toggle wiring captures the suppressToggle
+        /// closure by reference, reading the checkbox's MouseOver lazily at
+        /// click time, well after the checkbox itself exists below) so a
+        /// click landing on the checkbox never also collapses/expands the
+        /// section.
+        ///
+        /// Toggling the checkbox re-renders through RenderPlan(_currentPlan)
+        /// - the same full rebuild path a pill click's local re-solve and a
+        /// fresh Generate both already use (TreeSectionController's own
+        /// _preserveScrollAcross(() => _renderPlan(vm)) call) - rather than
+        /// inventing a second, parallel relayout mechanism just for this
+        /// section.
+        /// </summary>
+        private void CreateRequiredRecipesSection(PlanSectionViewModel section, int panelWidth)
+        {
+            var visibleRows = RequiredRecipesVisibility.ApplyFilter(section.Rows, _hideUnlockedRecipes);
+            string headerTitle = RequiredRecipesVisibility.BuildHeaderTitle(
+                section.Rows.Count, visibleRows.Count, _hideUnlockedRecipes);
+
+            bool pressStartedOnCheckbox = false;
+            var header = CreateSectionHeader(
+                headerTitle, section.SectionType, panelWidth, section.IsDefaultExpanded,
+                () => pressStartedOnCheckbox);
+            var headerPanel = header.HeaderPanel;
+            var contentFlow = header.ContentFlow;
+
+            const int checkboxWidth = 200;
+            var hideUnlockedCheckbox = new Checkbox()
+            {
+                Text = "Hide Unlocked Recipes",
+                Checked = _hideUnlockedRecipes,
+                Size = new Point(checkboxWidth, 24),
+                Location = new Point(panelWidth - checkboxWidth, 3),
+                Parent = headerPanel,
+                BasicTooltipText = "Hide recipes you already know (Learned/Auto-learned) - show only the ones you are missing."
+            };
+            _relayoutActions.Add(w => hideUnlockedCheckbox.Location = new Point(w - checkboxWidth, 3));
+
+            headerPanel.LeftMouseButtonPressed += (_, __) =>
+            {
+                pressStartedOnCheckbox = hideUnlockedCheckbox.MouseOver;
+            };
+
+            hideUnlockedCheckbox.CheckedChanged += (_, e) =>
+            {
+                _hideUnlockedRecipes = e.Checked;
+                PreserveScrollAcross(() => RenderPlan(_currentPlan));
+            };
+
+#if DEBUG
+            int relayoutCountBeforeBody = _relayoutActions.Count;
+#endif
+
+            if (visibleRows.Count == 0)
+            {
+                // Every recipe is unlocked and the filter is hiding them all -
+                // a friendly single line instead of a c-table header sitting
+                // over an empty body.
+                TextRowRenderer.CreateTextRow(
+                    RequiredRecipesVisibility.AllUnlockedMessage(section.Rows.Count), contentFlow, panelWidth, this);
+            }
+            else
+            {
+                var filteredSection = new PlanSectionViewModel
+                {
+                    SectionType = section.SectionType,
+                    Title = headerTitle,
+                    Rows = visibleRows,
+                    IsDefaultExpanded = section.IsDefaultExpanded
+                };
+                new RecipesSectionRenderer(this).Render(filteredSection, contentFlow, panelWidth);
+            }
+
+#if DEBUG
+            if (_relayoutActions.Count == relayoutCountBeforeBody)
+            {
+                Logger.Warn(
+                    "M33 C2b: section {0} rendered but its body registered no relayout closures - it will not track live window resize. See CreateRequiredRecipesSection.",
+                    section.SectionType);
+            }
+#endif
+
+            contentFlow.Size = new Point(
+                panelWidth,
+                visibleRows.Count == 0
+                    ? PlanContentHeightMath.FallbackTextRowHeight
+                    : PlanContentHeightMath.SectionBodyHeight(section.SectionType, visibleRows));
         }
 
         #endregion // 7. Section builders
