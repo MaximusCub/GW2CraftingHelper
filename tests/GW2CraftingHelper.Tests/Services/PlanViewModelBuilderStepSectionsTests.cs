@@ -277,6 +277,101 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("blade.png", section.Rows[0].IconUrl);
         }
 
+        // --- Wave-3 quick win #2: Mystic Forge rows excluded from the
+        // Required Recipes SECTION (nothing to learn) ---
+
+        [Fact]
+        public void RequiredRecipes_MysticForgeOnly_SectionOmittedEntirely()
+        {
+            // A plan whose only "recipe" is a sole Mystic Forge combination
+            // has nothing to learn at all - the section itself is dropped,
+            // not left present with a "(0)" header and no rows.
+            var result = MakeResult(requiredRecipes: new List<RequiredRecipe>
+            {
+                new RequiredRecipe
+                {
+                    RecipeId = -100,
+                    OutputItemId = 1,
+                    IsAutoLearned = true,
+                    Disciplines = new List<string> { "MysticForge" },
+                    MinRating = 0,
+                    IsMissing = false
+                }
+            });
+            var vm = _builder.Build(result);
+
+            Assert.DoesNotContain(vm.Sections, s => s.SectionType == PlanSectionType.RequiredRecipes);
+        }
+
+        [Fact]
+        public void RequiredRecipes_MixedMysticForgeAndReal_OnlyRealRecipeShownAndCounted()
+        {
+            // One sole-Mystic-Forge recipe alongside one real-discipline
+            // recipe: only the real one survives, and the header count
+            // reflects that post-filter total, not the raw
+            // result.RequiredRecipes.Count of 2.
+            var meta = MetaFor((1, "Forge Trinket", "f.png"), (2, "Blade", "b.png"));
+            var result = MakeResult(
+                metadata: meta,
+                requiredRecipes: new List<RequiredRecipe>
+                {
+                    new RequiredRecipe
+                    {
+                        RecipeId = -100,
+                        OutputItemId = 1,
+                        IsAutoLearned = true,
+                        Disciplines = new List<string> { "MysticForge" },
+                        MinRating = 0,
+                        IsMissing = false
+                    },
+                    new RequiredRecipe
+                    {
+                        RecipeId = 10,
+                        OutputItemId = 2,
+                        IsAutoLearned = false,
+                        Disciplines = new List<string> { "Weaponsmith" },
+                        MinRating = 400,
+                        IsMissing = true
+                    }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredRecipes);
+            Assert.Single(section.Rows);
+            Assert.Equal("Blade", section.Rows[0].Label);
+            Assert.Equal("Required Recipes (1)", section.Title);
+        }
+
+        [Fact]
+        public void RequiredRecipes_MysticForgeWithRealDiscipline_StaysInSection()
+        {
+            // A recipe combining MysticForge with a genuine leveled
+            // discipline still has something real to learn, so it is NOT
+            // filtered - only a recipe whose ENTIRE Disciplines list is
+            // MysticForge is excluded.
+            var meta = MetaFor((2, "Blade", "b.png"));
+            var result = MakeResult(
+                metadata: meta,
+                requiredRecipes: new List<RequiredRecipe>
+                {
+                    new RequiredRecipe
+                    {
+                        RecipeId = 10,
+                        OutputItemId = 2,
+                        IsAutoLearned = false,
+                        Disciplines = new List<string> { "MysticForge", "Weaponsmith" },
+                        MinRating = 400,
+                        IsMissing = true
+                    }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredRecipes);
+            Assert.Single(section.Rows);
+            Assert.Equal("Blade", section.Rows[0].Label);
+            Assert.Equal("Required Recipes (1)", section.Title);
+        }
+
         // --- Section order ---
 
         [Fact]
