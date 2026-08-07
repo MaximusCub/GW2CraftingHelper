@@ -928,4 +928,19 @@ code (`CraftingPlanView`'s checkbox wiring, `LogTabContent`'s
 constructor-injected delegates, `Module`'s tab-factory wiring) has no new
 tests per the Blish-free-tests invariant.
 
-Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Live desktop gate: PASS (orchestrator, 2026-08-06, live branch-build
+sandbox session, captures w3a_01-06 in preflight/captures):
+- Use Own Materials starts CHECKED with zero interaction (fresh module
+  session, capture w3a_01).
+- Required Recipes: header reads "(showing 14 missing of 34)" with Hide
+  Unlocked Recipes CHECKED by default; unfiltering restores all 34 with
+  Auto-learned tags; the pre-wave total for the same plan was 47 - the
+  13 Mystic Forge combos are gone from the section entirely in both
+  filter states; unverifiable-status rows correctly stay visible under
+  the filter (sandbox has no API key, so unlock status is unknowable).
+- Clear view: after clearing, tab-away to Snapshot and back shows the
+  view still cleared ("No entries match the current filter." empty
+  state); a subsequent refresh-failure burst appears ABOVE the floor
+  while cleared entries stay hidden - the floor survives tab rebuilds
+  and does not block new entries.
+- Zero FATAL lines in the session log.
