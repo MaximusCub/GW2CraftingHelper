@@ -95,6 +95,7 @@
     <Compile Include="Services\VendorBatchSolver.cs" />
     <Compile Include="Services\StatusUpdateGuard.cs" />
     <Compile Include="Services\PhaseOrdinalGuard.cs" />
+    <Compile Include="Services\PlanStripStatusBoard.cs" />
     <Compile Include="Services\RequestLabelFormatter.cs" />
     <Compile Include="Services\SnapshotEpochGuard.cs" />
     <Compile Include="Services\SnapshotCommitGate.cs" />
