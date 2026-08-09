@@ -1,0 +1,64 @@
+namespace GW2CraftingHelper.Services
+{
+    /// <summary>
+    /// W3B (generation progress + rich logging): the five coarse,
+    /// user-facing phases of one CraftingPlanPipeline.GenerateStructuredAsync
+    /// run. Deliberately coarser than the pipeline's own internal timingLog
+    /// (~10 detailed steps - see CraftingPlanPipeline.FinishTimingLog),
+    /// which keeps reporting unchanged; this enum exists purely to drive a
+    /// stable, small live indicator (CraftingPlanView's status strip) that
+    /// does not need to parse free-form text to know what stage generation
+    /// is in.
+    /// </summary>
+    public enum PlanPhase
+    {
+        BuildingTree,
+        FetchingPrices,
+        SolvingDecisions,
+        FetchingItemDetails,
+        BuildingDisplay
+    }
+
+    /// <summary>
+    /// One "a new phase has started" notification (W3B). Blish-free (no
+    /// Blish_HUD/Gw2Sharp/Microsoft.Xna usings, matching every other type in
+    /// this namespace - see ModuleLogEntry's own doc comment for why) so
+    /// CraftingPlanPipeline stays independently testable. Reported via an
+    /// optional IProgress&lt;PlanPhaseEvent&gt; callback threaded through
+    /// CraftingPlanPipeline.GenerateStructuredAsync, alongside (not
+    /// replacing) the existing IProgress&lt;PlanStatus&gt; channel
+    /// (Models/PlanStatus.cs) - that channel keeps reporting its own
+    /// finer-grained per-step text completely unchanged. Null callback = no
+    /// behavior change, matching every other optional progress parameter
+    /// this pipeline already has.
+    /// </summary>
+    public class PlanPhaseEvent
+    {
+        public PlanPhase Phase { get; set; }
+
+        /// <summary>Ready-to-render phase label, e.g. "Fetching prices".</summary>
+        public string DisplayName { get; set; }
+
+        /// <summary>
+        /// Items/steps completed so far within this phase, if known. Always
+        /// null in v1 (phase-level granularity only - see this milestone's
+        /// own doc comment on why sub-phase counts are out of scope);
+        /// reserved so a future finer-grained update does not need a new
+        /// wire type.
+        /// </summary>
+        public int? Done { get; set; }
+
+        /// <summary>Item/step count for this phase, if known up front (e.g. items to price). Null when not applicable.</summary>
+        public int? Total { get; set; }
+
+        /// <summary>
+        /// Optional short additional detail, e.g. "may take several
+        /// seconds on first run" on the very first BuildingTree event of a
+        /// cold recipe cache (W3B review-fix - see
+        /// CraftingPlanPipeline.FirstRunTreeHint and
+        /// CraftingPlanView.FormatPhaseText). Null for every phase that has
+        /// none.
+        /// </summary>
+        public string Detail { get; set; }
+    }
+}

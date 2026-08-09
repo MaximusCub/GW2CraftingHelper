@@ -21,6 +21,23 @@ namespace GW2CraftingHelper.Services
         private readonly CurrencyMetadataService _currencyMetadataService;
         private readonly IReadOnlyDictionary<int, AcquisitionHint> _acquisitionHints;
 
+        // W3B: rich per-generation logging sink. Optional constructor
+        // injection (defaults to the app-wide ModuleLog.Shared singleton -
+        // see Module.cs's construction site, which never passes this) so
+        // tests can inject an isolated `new ModuleLog()` instance for
+        // deterministic, non-shared assertions instead of touching Shared -
+        // see ModuleLog's own class doc comment on why Shared is unsuitable
+        // for exact-count/content test assertions.
+        private readonly ModuleLog _moduleLog;
+
+        // W3B review-fix: shared literal for both GenerateStructuredAsync's
+        // single-item Step 1 and GenerateStructuredMultiAsync's Step 1 -
+        // used both as the tree-building PlanPhaseEvent's Detail (surfaced
+        // live in CraftingPlanView.FormatPhaseText) and inside the
+        // existing PlanStatus wording, so the two channels never drift out
+        // of sync with each other.
+        private const string FirstRunTreeHint = "may take several seconds on first run";
+
         public CraftingPlanPipeline(
             RecipeService recipeService,
             TradingPostService tradingPostService,
@@ -30,7 +47,8 @@ namespace GW2CraftingHelper.Services
             InventoryReducer reducer = null,
             IAccountRecipeClient accountRecipeClient = null,
             CurrencyMetadataService currencyMetadataService = null,
-            IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null)
+            IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null,
+            ModuleLog moduleLog = null)
         {
             _recipeService = recipeService;
             _tradingPostService = tradingPostService;
@@ -41,6 +59,7 @@ namespace GW2CraftingHelper.Services
             _accountRecipeClient = accountRecipeClient;
             _currencyMetadataService = currencyMetadataService;
             _acquisitionHints = acquisitionHints;
+            _moduleLog = moduleLog ?? ModuleLog.Shared;
         }
 
         public async Task<CraftingPlanResult> GenerateStructuredAsync(
@@ -55,20 +74,47 @@ namespace GW2CraftingHelper.Services
             OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free,
             // M37 (KNOWN-ISSUES #24, gw2e parity): see ModuleSettings.
             // GetHomesteadEfficiencyTiers/PlanSolveContext.HomesteadTiers.
-            HomesteadEfficiencyTiers homesteadTiers = null)
+            HomesteadEfficiencyTiers homesteadTiers = null,
+            // W3B: live coarse-phase events for CraftingPlanView's status
+            // strip - see PlanPhaseEvent's own doc comment. Optional/
+            // default null so every existing caller (Module.cs, every
+            // pipeline test) is unaffected.
+            IProgress<PlanPhaseEvent> phaseProgress = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
             var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
             var sw = new Stopwatch();
             var timingLog = new List<string>();
+            var phaseTracker = new PhaseTracker(phaseProgress, _moduleLog);
 
             // Step 1: Build recipe tree
+            // W3B review-fix: the "(may take several seconds on first run)"
+            // hint now also rides the phase event's Detail (see
+            // PlanPhaseEvent.Detail and CraftingPlanView.FormatPhaseText),
+            // so it still reaches the live status strip now that the view
+            // passes progress: null below - see FirstRunTreeHint's own
+            // doc comment.
+            phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
-                Message = "Building recipe tree (may take several seconds on first run)..."
+                Message = $"Building recipe tree ({FirstRunTreeHint})..."
             });
+            // W3B review-fix: these two RecipeService diagnostics (this one
+            // and the stale-seed warning below) exist to explain a slow
+            // first run and an out-of-date recipe seed - genuinely useful,
+            // not routine per-step noise, and CraftingPlanView now passes
+            // progress: null (the coarse phase events above replace
+            // PlanStatus's frequent per-step text for the live strip). Also
+            // writing them straight to ModuleLog guarantees they are never
+            // silently lost regardless of whether any IProgress<PlanStatus>
+            // consumer is attached - RecipeService's own statusReported/
+            // staleReported flags already bound this to at most one Info
+            // line each per generation, so this cannot spam the log.
             _recipeService.OnStatusUpdate = msg =>
+            {
                 progress?.Report(new PlanStatus { Message = msg });
+                _moduleLog.Write(ModuleLogLevel.Info, "plan", msg);
+            };
             sw.Restart();
             RecipeNode tree;
             try
@@ -99,6 +145,7 @@ namespace GW2CraftingHelper.Services
             timingLog.Add($"Collect item IDs: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
             // Step 3: Fetch TP prices
+            phaseTracker.Start(PlanPhase.FetchingPrices, "Fetching prices", allItemIds.Count);
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching prices ({allItemIds.Count} items)...",
@@ -139,6 +186,7 @@ namespace GW2CraftingHelper.Services
             }
 
             // Step 6: Inventory reduction
+            phaseTracker.Start(PlanPhase.SolvingDecisions, "Solving decisions", null);
             progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
             sw.Restart();
             RecipeNode treeUsedForSolve = tree;
@@ -211,6 +259,7 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
+            phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching item details ({metadataIds.Count} items)...",
@@ -243,6 +292,7 @@ namespace GW2CraftingHelper.Services
                 await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, ct);
 
             // Step 11: Build structured result
+            phaseTracker.Start(PlanPhase.BuildingDisplay, "Building display", null);
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
             var resultBuilder = new PlanResultBuilder();
@@ -296,6 +346,7 @@ namespace GW2CraftingHelper.Services
             // Prepend timing log to debug entries from PlanResultBuilder -
             // see FinishTimingLog's own doc comment.
             FinishTimingLog(result, timingLog);
+            phaseTracker.Finish();
 
             return result;
         }
@@ -325,7 +376,22 @@ namespace GW2CraftingHelper.Services
             PriceBasis priceBasis = PriceBasis.BuyOrder,
             CurrencyValuation currencyValuation = null,
             OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free,
-            HomesteadEfficiencyTiers homesteadTiers = null)
+            HomesteadEfficiencyTiers homesteadTiers = null,
+            // W3B: live coarse-phase events for CraftingPlanView's status
+            // strip - see the single-item overload's matching parameter
+            // (PlanPhaseEvent's own doc comment). Optional/default null so
+            // every existing caller (Module.cs, every pipeline test) is
+            // unaffected.
+            IProgress<PlanPhaseEvent> phaseProgress = null,
+            // W3B: best-effort "name x quantity[, name x quantity...]"
+            // label for the Info start/finish log lines below (e.g. "Orrax
+            // Manifested x1") - supplied by CraftingPlanView from its own
+            // already-resolved item-row selection, so no extra network
+            // round trip is needed to know item names here. Null/empty
+            // falls back to the pre-W3B "(N items)" wording, e.g. for a
+            // caller that bypasses the view (every pipeline test, a future
+            // non-UI caller).
+            string requestLabel = null)
         {
             // Marked async (rather than returning the branch Tasks directly)
             // so this validation throws INSIDE the returned Task, exactly
@@ -348,9 +414,14 @@ namespace GW2CraftingHelper.Services
             // it does not collide with WP-13's planned extraction of shared
             // helpers across the Generate*Async overloads (tab-roadmap-
             // proposal.md Section 2.3's sequencing note).
+            //
+            // W3B: `label` upgrades the wording from "(N items)" to real
+            // item names whenever the caller supplied requestLabel - see
+            // that parameter's own doc comment for the fallback.
             var sw = Stopwatch.StartNew();
             string itemWord = items.Count == 1 ? "item" : "items";
-            ModuleLog.Shared.Write(ModuleLogLevel.Info, "plan", $"Generation started ({items.Count} {itemWord})");
+            string label = string.IsNullOrEmpty(requestLabel) ? $"{items.Count} {itemWord}" : requestLabel;
+            _moduleLog.Write(ModuleLogLevel.Info, "plan", $"Generating plan for {label}");
 
             try
             {
@@ -360,26 +431,43 @@ namespace GW2CraftingHelper.Services
                     result = await GenerateStructuredAsync(
                         items[0].ItemId, items[0].Quantity, snapshot, ct, progress,
                         activeCharacterName, priceBasis, currencyValuation, ownMaterialsMode,
-                        homesteadTiers);
+                        homesteadTiers, phaseProgress);
                 }
                 else
                 {
                     result = await GenerateStructuredMultiAsync(
                         items, snapshot, ct, progress, activeCharacterName,
-                        priceBasis, currencyValuation, ownMaterialsMode, homesteadTiers);
+                        priceBasis, currencyValuation, ownMaterialsMode, homesteadTiers,
+                        phaseProgress);
                 }
 
-                ModuleLog.Shared.Write(ModuleLogLevel.Info, "plan", $"Generation finished in {sw.ElapsedMilliseconds}ms");
+                // W3B: compact per-phase summary line, derived from the raw
+                // timing lines FinishTimingLog already prepended to
+                // result.DebugLog inside the single/multi method just
+                // called - see PlanPhaseTimingSummary's own doc comment for
+                // why no separate timing plumbing is needed between here
+                // and there. W3B review-fix: sw (this wrapper's own
+                // Stopwatch, running since before the single/multi call)
+                // is now passed through as wallClockMs - the phase-sum-only
+                // "total" this used to log excludes every un-instrumented
+                // gap between steps, so it silently under-reported the
+                // real duration a field tester actually experiences; see
+                // FormatCompactSummary's own doc comment.
+                string phaseSummary = PlanPhaseTimingSummary.FormatCompactSummary(result?.DebugLog, sw.ElapsedMilliseconds);
+                _moduleLog.Write(ModuleLogLevel.Info, "plan",
+                    string.IsNullOrEmpty(phaseSummary)
+                        ? $"Generation finished in {sw.ElapsedMilliseconds}ms"
+                        : $"Plan for {label}: {phaseSummary}");
                 return result;
             }
             catch (OperationCanceledException)
             {
-                ModuleLog.Shared.Write(ModuleLogLevel.Info, "plan", $"Generation cancelled after {sw.ElapsedMilliseconds}ms");
+                _moduleLog.Write(ModuleLogLevel.Info, "plan", $"Generation cancelled after {sw.ElapsedMilliseconds}ms ({label})");
                 throw;
             }
             catch (Exception ex)
             {
-                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan", $"Generation failed after {sw.ElapsedMilliseconds}ms: {ex.GetType().Name} - {ex.Message}");
+                _moduleLog.Write(ModuleLogLevel.Warn, "plan", $"Generation failed after {sw.ElapsedMilliseconds}ms ({label}): {ex.GetType().Name} - {ex.Message}");
                 throw;
             }
         }
@@ -414,21 +502,31 @@ namespace GW2CraftingHelper.Services
             PriceBasis priceBasis,
             CurrencyValuation currencyValuation,
             OwnMaterialsMode ownMaterialsMode,
-            HomesteadEfficiencyTiers homesteadTiers)
+            HomesteadEfficiencyTiers homesteadTiers,
+            // W3B: see the single-item overload's matching parameter.
+            IProgress<PlanPhaseEvent> phaseProgress)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
             var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
             var sw = new Stopwatch();
             var timingLog = new List<string>();
+            var phaseTracker = new PhaseTracker(phaseProgress, _moduleLog);
 
             // Step 1: Build each item's own tree, then wrap them under the
             // synthetic multi-item root (RecipeService.BuildMultiItemTreeAsync).
+            // W3B review-fix: see the single-item overload's matching call
+            // site for why FirstRunTreeHint/OnStatusUpdate's ModuleLog
+            // write were added.
+            phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
-                Message = "Building recipe trees (may take several seconds on first run)..."
+                Message = $"Building recipe trees ({FirstRunTreeHint})..."
             });
             _recipeService.OnStatusUpdate = msg =>
+            {
                 progress?.Report(new PlanStatus { Message = msg });
+                _moduleLog.Write(ModuleLogLevel.Info, "plan", msg);
+            };
             sw.Restart();
             RecipeNode tree;
             try
@@ -460,6 +558,7 @@ namespace GW2CraftingHelper.Services
             timingLog.Add($"Collect item IDs: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
             // Step 3: Fetch TP prices
+            phaseTracker.Start(PlanPhase.FetchingPrices, "Fetching prices", allItemIds.Count);
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching prices ({allItemIds.Count} items)...",
@@ -487,6 +586,7 @@ namespace GW2CraftingHelper.Services
             }
 
             // Step 6: Inventory reduction
+            phaseTracker.Start(PlanPhase.SolvingDecisions, "Solving decisions", null);
             progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
             sw.Restart();
             RecipeNode treeUsedForSolve = tree;
@@ -545,6 +645,7 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
+            phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching item details ({metadataIds.Count} items)...",
@@ -577,6 +678,7 @@ namespace GW2CraftingHelper.Services
                 await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, ct);
 
             // Step 11: Build structured result
+            phaseTracker.Start(PlanPhase.BuildingDisplay, "Building display", null);
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
             var resultBuilder = new PlanResultBuilder();
@@ -623,6 +725,7 @@ namespace GW2CraftingHelper.Services
 
             // See FinishTimingLog's own doc comment.
             FinishTimingLog(result, timingLog);
+            phaseTracker.Finish();
 
             return result;
         }
@@ -1064,6 +1167,124 @@ namespace GW2CraftingHelper.Services
                 {
                     CollectItemIds(ingredient, ids);
                 }
+            }
+        }
+
+        /// <summary>
+        /// W3B (generation progress + rich logging): tracks the 5 coarse,
+        /// user-facing phases of one GenerateStructuredAsync/
+        /// GenerateStructuredMultiAsync run - fires a live PlanPhaseEvent
+        /// when each phase STARTS (for CraftingPlanView's status strip, via
+        /// <see cref="Start"/>) and writes one bounded Debug ModuleLog
+        /// entry (timing + optional count) when each phase COMPLETES,
+        /// detected as either the next phase starting or <see cref="Finish"/>
+        /// being called for the last one. Deliberately separate from
+        /// timingLog (the existing, much finer-grained ~10-step breakdown
+        /// that ends up in CraftingPlanResult.DebugLog via
+        /// FinishTimingLog) - that channel is unchanged; this one exists
+        /// purely to drive a stable, coarse live indicator without a UI
+        /// needing to parse PlanStatus.Message text, and to make the Log
+        /// tab show forward progress DURING a long-running generation
+        /// rather than only a burst of entries once it is already done.
+        /// <para>
+        /// Single-threaded, synchronous use only: constructed fresh per
+        /// GenerateStructuredAsync call (never shared across concurrent
+        /// generations) and driven entirely on whatever thread is running
+        /// that call's own async state machine at each await resumption -
+        /// never accessed concurrently by two threads at once, matching how
+        /// the existing local `timingLog`/`sw` variables in the very same
+        /// methods are already used with no locking.
+        /// </para>
+        /// <para>
+        /// If the generation throws/is cancelled mid-phase, the
+        /// currently-open phase never gets a completion Debug entry (Finish
+        /// is only reached on the success path) - accepted for v1: the
+        /// wrapper's own "Generation cancelled/failed" Info/Warn line
+        /// already reports elapsed time for that case, and an incomplete
+        /// phase leaves no resource to leak (no IDisposable, no external
+        /// handle).
+        /// </para>
+        /// </summary>
+        private sealed class PhaseTracker
+        {
+            private readonly IProgress<PlanPhaseEvent> _phaseProgress;
+            private readonly ModuleLog _moduleLog;
+            private readonly Stopwatch _sw = new Stopwatch();
+            private PlanPhase? _currentPhase;
+            private string _currentDisplayName;
+            private int? _currentTotal;
+
+            public PhaseTracker(IProgress<PlanPhaseEvent> phaseProgress, ModuleLog moduleLog)
+            {
+                _phaseProgress = phaseProgress;
+                _moduleLog = moduleLog;
+            }
+
+            /// <summary>
+            /// Completes whatever phase was previously running (if any -
+            /// writing its Debug entry), then starts and reports the new
+            /// one. <paramref name="total"/> is an item/step count known up
+            /// front (e.g. items to price), or null when not applicable -
+            /// see PlanPhaseEvent.Total's own doc comment.
+            /// <paramref name="detail"/> is an optional short additional
+            /// detail (W3B review-fix: currently only the tree-building
+            /// phase's first-run hint - see PlanPhaseEvent.Detail's own doc
+            /// comment); null for every other call site.
+            /// </summary>
+            public void Start(PlanPhase phase, string displayName, int? total, string detail = null)
+            {
+                CompleteCurrent();
+                _currentPhase = phase;
+                _currentDisplayName = displayName;
+                _currentTotal = total;
+                _sw.Restart();
+                _phaseProgress?.Report(new PlanPhaseEvent
+                {
+                    Phase = phase,
+                    DisplayName = displayName,
+                    Total = total,
+                    Detail = detail
+                });
+            }
+
+            /// <summary>
+            /// Completes the final phase (writing its Debug entry). Safe to
+            /// call even if <see cref="Start"/> was never called (no-op).
+            /// </summary>
+            public void Finish()
+            {
+                CompleteCurrent();
+            }
+
+            // W3B review-fix (doc-only): this Debug line's ms figure is
+            // _sw's elapsed time since THIS phase's own Start() call, up to
+            // whichever comes first of the next phase's Start() or Finish()
+            // - i.e. WALL time between two consecutive Start() calls,
+            // including any un-instrumented gap between the previous
+            // phase's actual work ending and this phase's own work
+            // beginning. That is a DIFFERENT measurement from the Info
+            // "finish" summary line (see PlanPhaseTimingSummary.
+            // FormatCompactSummary), which buckets and sums the finer-
+            // grained raw timingLog entries recorded around each step's own
+            // narrower stopwatched work only, excluding those same gaps -
+            // so the same phase can legitimately show two different
+            // millisecond figures across the Debug and Info log lines; this
+            // Debug figure is the wall-clock one, the Info bucket is the
+            // instrumented-work-only one.
+            private void CompleteCurrent()
+            {
+                if (_currentPhase == null)
+                {
+                    return;
+                }
+
+                _sw.Stop();
+                long ms = _sw.ElapsedMilliseconds;
+                string countSuffix = _currentTotal.HasValue
+                    ? $" ({_currentTotal.Value} items)"
+                    : string.Empty;
+                _moduleLog.Write(ModuleLogLevel.Debug, "plan", $"{_currentDisplayName}: {ms}ms{countSuffix}");
+                _currentPhase = null;
             }
         }
     }

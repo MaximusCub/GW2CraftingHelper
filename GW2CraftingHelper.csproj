@@ -94,6 +94,10 @@
     <Compile Include="Services\PlanSolver.cs" />
     <Compile Include="Services\VendorBatchSolver.cs" />
     <Compile Include="Services\StatusUpdateGuard.cs" />
+    <Compile Include="Services\PhaseOrdinalGuard.cs" />
+    <Compile Include="Services\PlanStripStatusBoard.cs" />
+    <Compile Include="Services\PlanStripTickDecision.cs" />
+    <Compile Include="Services\RequestLabelFormatter.cs" />
     <Compile Include="Services\SnapshotEpochGuard.cs" />
     <Compile Include="Services\SnapshotCommitGate.cs" />
     <Compile Include="Services\SnapshotFetchFailedException.cs" />
@@ -159,6 +163,7 @@
     <Compile Include="Models\VendorOffer.cs" />
     <Compile Include="Models\VendorOfferDataset.cs" />
     <Compile Include="Models\PlanStatus.cs" />
+    <Compile Include="Services\PlanPhaseEvent.cs" />
     <Compile Include="Services\VendorOfferHasher.cs" />
     <Compile Include="Services\VendorOfferLoader.cs" />
     <Compile Include="Services\VendorOfferStore.cs" />
@@ -192,6 +197,7 @@
     <Compile Include="Services\CraftableItemSearchProvider.cs" />
     <Compile Include="Services\ItemSearchProviderFactory.cs" />
     <Compile Include="Services\Diagnostics\PlanTimingAnalyzer.cs" />
+    <Compile Include="Services\Diagnostics\PlanPhaseTimingSummary.cs" />
     <Compile Include="Services\Recipes\IRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\InMemoryRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\RecipeCacheSerializer.cs" />
