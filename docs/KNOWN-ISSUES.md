@@ -1296,4 +1296,22 @@ Validation: `dotnet build -p:Platform=x64` clean (0 errors, 0 warnings from
 any touched file). Module test suite - 1218 passed (was 1210; +8 new: 6
 `PlanStripTickDecisionTests`, 2 added to `PlanStripStatusBoardTests`).
 
-Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Live desktop gate round 2: PASS (2026-08-08, orchestrator session,
+fresh sandbox on the fixed build). All three scenarios verified:
+
+- Normal untouched completion: strip ended at "Plan generated - Aug 8,
+  2026 8:50 PM" (exercises the review-caught critical - the final text
+  flush before the ticker cancel on the ordinary path).
+- Tab switch mid-generation (Plan -> Snapshot -> Plan during a 21s
+  Orrax Manifested generation): the rebuilt view showed the LIVE phase
+  text with the spinner still animating between captures, and on
+  completion the same flipped view transitioned to "Plan generated -
+  Aug 8, 2026 8:53 PM". This is the exact round-1 failure, now fixed.
+- Tab switch after completion: the rebuilt view showed the preserved
+  "Plan generated - Aug 8, 2026 8:51 PM" instead of the pre-existing
+  stale "Ready" quirk.
+
+No exceptions in the Blish log across the session. The round-1 PASS
+items (live phase text, no jitter, rich file + Log-tab logging, plan
+replacement) were implicitly re-exercised across four generations in
+the two sessions and remained correct.
