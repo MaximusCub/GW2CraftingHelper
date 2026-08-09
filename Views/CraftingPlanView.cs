@@ -598,6 +598,56 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        /// <summary>
+        /// W3D (plan persistence across module restarts): applies a plan
+        /// loaded from disk at module load, rendering it INSTANTLY - no
+        /// network call, no re-solve, no auto-anything - see
+        /// Services/PlanStore.cs's own doc comment. Called from
+        /// Module.Update()'s dirty-flag drain (main thread), the same
+        /// "Applying snapshot to view" pattern MainView.SetSnapshot
+        /// mirrors: this runs at most once per module session, always
+        /// before the user can possibly have clicked Generate (nothing
+        /// else sets _currentPlan this early in a fresh module load).
+        /// Mirrors TriggerGenerate's own success-path shape - adopts
+        /// <paramref name="result"/> as the override loop's new baseline
+        /// (_treeController.ResetForNewPlan, so a restored plan's decision
+        /// pills keep re-solving correctly with no network call), resets
+        /// section expansion, rebuilds the view model, and seeds the
+        /// status board with the staleness banner text
+        /// (PlanStripStatusBoard.SeedRestored) so the existing pull-based
+        /// strip renders it with zero new layout.
+        /// <para>
+        /// Render guard mirrors TriggerGenerate's own liveness check: the
+        /// Crafting Plan tab has usually not been Build() yet at this point
+        /// (the common case - a fresh module load, before the user has
+        /// switched to this tab at all), in which case only the state
+        /// fields above are set and Build()'s own
+        /// "if (_currentPlan != null) RenderPlan(_currentPlan)" tail
+        /// renders it on first visit (see Build's own body); if the tab
+        /// instead happens to already be live, this renders into it
+        /// directly rather than waiting for a rebuild that may never come.
+        /// </para>
+        /// </summary>
+        public void ApplyRestoredPlan(CraftingPlanResult result, DateTime generatedAt)
+        {
+            if (result == null) return;
+
+            _treeController.ResetForNewPlan(result);
+            _sectionExpansion.Clear();
+            _lastDebugLog = result.DebugLog;
+            var vm = _vmBuilder.Build(result);
+            _currentPlan = vm;
+            _planGeneratedAt = generatedAt;
+
+            _statusBoard.SeedRestored(
+                $"Generated {generatedAt:MMM d, yyyy h:mm tt} - prices may have changed - Regenerate");
+
+            if (_contentPanel == null || _contentPanel.Parent == null) return;
+
+            _lastRenderedWidth = _contentPanel.Width;
+            RenderPlan(vm);
+        }
+
         #endregion // General: construction & status
 
         #region 3. Scroll preserve/restore/verify (reflection handle + PreserveScrollAcross) - KNOWN-ISSUES #12/#14/#19

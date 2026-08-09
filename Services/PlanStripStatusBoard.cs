@@ -169,6 +169,34 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// W3D (plan persistence across module restarts): seeds this board
+        /// with a restored plan's staleness-banner text at module load,
+        /// before any real Generate has run this session - see
+        /// Views/CraftingPlanView.cs's ApplyRestoredPlan and
+        /// Services/PlanStore.cs's own doc comment. Uses sequence 0, which
+        /// CraftingPlanView's own ++_generateSequence convention can never
+        /// produce (its first real generation is always sequence 1), so a
+        /// genuine Begin(1) always supersedes this seed exactly like it
+        /// would supersede any earlier generation's state - see Begin's own
+        /// doc comment ("always applies... unconditionally"). Deliberately
+        /// bypasses StatusUpdateGuard (unlike Begin/UpdatePhase/Finish
+        /// above): this is not a write racing an in-flight generation, it
+        /// is the board's own one-time initial seed - called at most once
+        /// per module session, before the strip has shown anything else.
+        /// </summary>
+        public void SeedRestored(string finalStatusText)
+        {
+            lock (_lock)
+            {
+                _sequence = 0;
+                _inFlight = false;
+                _phaseOrdinal = -1;
+                _phaseText = null;
+                _finalStatusText = finalStatusText;
+            }
+        }
+
+        /// <summary>
         /// A consistent, immutable snapshot of every field at one instant.
         /// The only way to read this board - never expose the individual
         /// fields separately, or a reader could observe a torn combination
