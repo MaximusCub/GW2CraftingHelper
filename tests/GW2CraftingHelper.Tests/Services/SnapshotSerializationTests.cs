@@ -166,6 +166,60 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("", result.Items[0].IconUrl);
             Assert.Equal("", result.Wallet[0].IconUrl);
         }
+
+        // --- W3C (per-character discipline display): backward compat for
+        // a legacy snapshot.json that predates CharacterDisciplines. ---
+
+        [Fact]
+        public void Deserialize_OldJsonMissingCharacterDisciplines_ReturnsNull()
+        {
+            // Simulate a pre-W3C snapshot.json - no CharacterDisciplines
+            // field at all. Must load cleanly and yield null (the "no data
+            // captured yet" state), never an empty list masquerading as
+            // "captured, nobody has any disciplines" and never a crash.
+            string oldJson = @"{
+                ""CapturedAt"": ""2025-06-15T12:00:00Z"",
+                ""CoinCopper"": 0,
+                ""Items"": [
+                    { ""ItemId"": 1, ""Name"": ""Old Item"", ""Count"": 5, ""Source"": ""Bank"" }
+                ],
+                ""Wallet"": [
+                    { ""CurrencyId"": 2, ""CurrencyName"": ""Karma"", ""Value"": 100 }
+                ]
+            }";
+
+            var result = SnapshotHelpers.DeserializeSnapshot(oldJson);
+
+            Assert.NotNull(result);
+            Assert.Null(result.CharacterDisciplines);
+        }
+
+        [Fact]
+        public void Serialize_Deserialize_CharacterDisciplines_RoundTrips()
+        {
+            var original = new AccountSnapshot
+            {
+                CapturedAt = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc),
+                CoinCopper = 0,
+                Items = new List<SnapshotItemEntry>(),
+                Wallet = new List<SnapshotWalletEntry>(),
+                CharacterDisciplines = new List<SnapshotCharacterDiscipline>
+                {
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Chef", Rating = 300, Active = false }
+                }
+            };
+
+            string json = SnapshotHelpers.SerializeSnapshot(original);
+            var result = SnapshotHelpers.DeserializeSnapshot(json);
+
+            Assert.NotNull(result);
+            Assert.NotNull(result.CharacterDisciplines);
+            Assert.Single(result.CharacterDisciplines);
+            Assert.Equal("Anna", result.CharacterDisciplines[0].CharacterName);
+            Assert.Equal("Chef", result.CharacterDisciplines[0].Discipline);
+            Assert.Equal(300, result.CharacterDisciplines[0].Rating);
+            Assert.False(result.CharacterDisciplines[0].Active);
+        }
     }
 
 }

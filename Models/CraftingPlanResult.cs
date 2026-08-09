@@ -144,5 +144,18 @@ namespace GW2CraftingHelper.Models
         /// populate CraftingTree as before.
         /// </summary>
         public List<CraftingTreeNode> MultiItemRoots { get; set; }
+
+        /// <summary>
+        /// Per-character crafting discipline data captured in the account
+        /// snapshot (W3C - per-character discipline display, gw2efficiency
+        /// parity). A straight passthrough of
+        /// AccountSnapshot.CharacterDisciplines - see that field's own doc
+        /// comment for why null (no snapshot, or a snapshot that predates
+        /// this feature / had a degraded character-crafting fetch) is kept
+        /// distinct from a non-null-but-empty list. Cosmetic display data
+        /// only, read by PlanViewModelBuilder.BuildDisciplinesSection -
+        /// never fed into solving or any total.
+        /// </summary>
+        public IReadOnlyList<SnapshotCharacterDiscipline> CharacterDisciplines { get; set; }
     }
 }

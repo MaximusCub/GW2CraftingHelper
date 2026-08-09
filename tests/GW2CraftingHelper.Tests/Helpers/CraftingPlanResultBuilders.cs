@@ -26,7 +26,8 @@ namespace GW2CraftingHelper.Tests.Helpers
             Dictionary<int, AcquisitionHint> acquisitionHints = null,
             List<TimegatedItem> timegatedItems = null,
             List<PlanRequestItem> requestedItems = null,
-            List<CraftingTreeNode> multiItemRoots = null)
+            List<CraftingTreeNode> multiItemRoots = null,
+            List<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
             return new CraftingPlanResult
             {
@@ -49,7 +50,14 @@ namespace GW2CraftingHelper.Tests.Helpers
                 CurrencyMetadata = currencyMetadata,
                 AcquisitionHints = acquisitionHints,
                 RequestedItems = requestedItems,
-                MultiItemRoots = multiItemRoots
+                MultiItemRoots = multiItemRoots,
+                // W3C: defaults to null (not an empty list) - matches
+                // AccountSnapshot.CharacterDisciplines/CraftingPlanResult.
+                // CharacterDisciplines' own "no data captured" null
+                // convention, so a test that doesn't pass this explicitly
+                // exercises the same "no data" path production code hits
+                // for every pre-W3C/degraded snapshot.
+                CharacterDisciplines = characterDisciplines
             };
         }
 

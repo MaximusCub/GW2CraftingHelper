@@ -440,17 +440,42 @@ namespace GW2CraftingHelper
                     var ownMaterialsMode = _settings.GetOwnMaterialsMode();
                     var homesteadTiers = _settings.GetHomesteadEfficiencyTiers();
 
+                    // W3C review-fix (mustFix): per-character discipline
+                    // data is cosmetic account info (see AccountSnapshot.
+                    // CharacterDisciplines' own doc comment), not part of
+                    // owned-materials reduction - it must not disappear, and
+                    // the discipline the plan REPORTS must not change,
+                    // depending on whether the user has "Use Own Materials"
+                    // on for this one generation. Passing characterDisciplines
+                    // explicitly (rather than relying on the pipeline's
+                    // snapshot?.CharacterDisciplines fallback) means the
+                    // useOwn:false branch below - which still correctly
+                    // passes snapshot: null to disable reduction/the
+                    // force-buy pre-pass/owned-currency annotation, all
+                    // gated on snapshot != null inside the pipeline (see
+                    // CraftingPlanPipeline.GenerateStructuredAsync's own
+                    // snapshot != null checks) - feeds Build()'s
+                    // discipline tiebreak the SAME list useOwn:true does.
+                    // That keeps the reported discipline identical between
+                    // the two modes and stable across a later
+                    // ResolveWithOverrides re-solve (PlanSolveContext.
+                    // CharacterDisciplines is populated from this same
+                    // value at generation time - see CraftingPlanPipeline's
+                    // own SolveContext construction).
                     if (useOwn)
                     {
                         return _craftingPipeline.GenerateStructuredAsync(
                             items, _currentSnapshot, ct, progress,
                             activeChar, priceBasis, currencyValuation, ownMaterialsMode,
-                            homesteadTiers, phaseProgress, requestLabel);
+                            homesteadTiers, phaseProgress, requestLabel,
+                            characterDisciplines: _currentSnapshot?.CharacterDisciplines);
                     }
+
                     return _craftingPipeline.GenerateStructuredAsync(
                         items, null, ct, progress,
                         null, priceBasis, currencyValuation, ownMaterialsMode,
-                        homesteadTiers, phaseProgress, requestLabel);
+                        homesteadTiers, phaseProgress, requestLabel,
+                        characterDisciplines: _currentSnapshot?.CharacterDisciplines);
                 },
                 _modalDialog,
                 _itemSearchProvider,
@@ -751,10 +776,22 @@ namespace GW2CraftingHelper
                 return null;
             }
 
-            Logger.Info("Fetched snapshot CapturedAt={0:o} items={1} wallet={2} coin={3}",
-                snapshot.CapturedAt, snapshot.Items.Count, snapshot.Wallet.Count, snapshot.CoinCopper);
+            // W3C polish (review nice-to-have): CharacterDisciplines is null
+            // only when this snapshot never captured per-character
+            // discipline data at all (a pre-W3C snapshot.json, or a
+            // degraded fetch - see the field's own doc comment on
+            // AccountSnapshot); that must stay distinguishable in the log
+            // from "captured, and it happens to be an empty list" (e.g. a
+            // zero-character account), so the null case gets its own
+            // wording rather than folding into a count of 0.
+            string disciplinesLogText = snapshot.CharacterDisciplines != null
+                ? $"{snapshot.CharacterDisciplines.Count} character disciplines"
+                : "disciplines not captured";
+
+            Logger.Info("Fetched snapshot CapturedAt={0:o} items={1} wallet={2} coin={3}, {4}",
+                snapshot.CapturedAt, snapshot.Items.Count, snapshot.Wallet.Count, snapshot.CoinCopper, disciplinesLogText);
             ModuleLog.Shared.Write(ModuleLogLevel.Info, "snapshot",
-                $"Fetched snapshot CapturedAt={snapshot.CapturedAt:o} items={snapshot.Items.Count} wallet={snapshot.Wallet.Count} coin={snapshot.CoinCopper}");
+                $"Fetched snapshot CapturedAt={snapshot.CapturedAt:o} items={snapshot.Items.Count} wallet={snapshot.Wallet.Count} coin={snapshot.CoinCopper}, {disciplinesLogText}");
 
             return snapshot;
         }

@@ -25,6 +25,25 @@ namespace GW2CraftingHelper.Tests.Models
                 Wallet = new List<SnapshotWalletEntry>
                 {
                     new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 9999 }
+                },
+                // W3C polish (review nice-to-have): this test's name is a
+                // promise ("preserves ALL fields") that CharacterDisciplines
+                // broke when it was added without updating this fixture -
+                // two entries here exercise every field on
+                // SnapshotCharacterDiscipline (CharacterName/Discipline/
+                // Rating/Active), including one Active=true and one
+                // Active=false so the round-trip can't pass by coincidence
+                // of a default value. This is JsonConvert directly (this
+                // file's own established convention), not
+                // SnapshotHelpers.SerializeSnapshot/DeserializeSnapshot -
+                // SnapshotSerializationTests.cs already covers that path's
+                // CharacterDisciplines round-trip and the pre-W3C
+                // missing-field/null-defaulting behavior; this test only
+                // needs to stop lying about which fields it preserves.
+                CharacterDisciplines = new List<SnapshotCharacterDiscipline>
+                {
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true },
+                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Chef", Rating = 400, Active = false }
                 }
             };
 
@@ -43,6 +62,15 @@ namespace GW2CraftingHelper.Tests.Models
             Assert.Equal(original.Wallet[0].CurrencyId, deserialized.Wallet[0].CurrencyId);
             Assert.Equal(original.Wallet[0].CurrencyName, deserialized.Wallet[0].CurrencyName);
             Assert.Equal(original.Wallet[0].Value, deserialized.Wallet[0].Value);
+            Assert.Equal(original.CharacterDisciplines.Count, deserialized.CharacterDisciplines.Count);
+            Assert.Equal(original.CharacterDisciplines[0].CharacterName, deserialized.CharacterDisciplines[0].CharacterName);
+            Assert.Equal(original.CharacterDisciplines[0].Discipline, deserialized.CharacterDisciplines[0].Discipline);
+            Assert.Equal(original.CharacterDisciplines[0].Rating, deserialized.CharacterDisciplines[0].Rating);
+            Assert.Equal(original.CharacterDisciplines[0].Active, deserialized.CharacterDisciplines[0].Active);
+            Assert.Equal(original.CharacterDisciplines[1].CharacterName, deserialized.CharacterDisciplines[1].CharacterName);
+            Assert.Equal(original.CharacterDisciplines[1].Discipline, deserialized.CharacterDisciplines[1].Discipline);
+            Assert.Equal(original.CharacterDisciplines[1].Rating, deserialized.CharacterDisciplines[1].Rating);
+            Assert.Equal(original.CharacterDisciplines[1].Active, deserialized.CharacterDisciplines[1].Active);
         }
 
         [Fact]

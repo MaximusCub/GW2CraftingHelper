@@ -111,5 +111,16 @@ namespace GW2CraftingHelper.Models
         /// applies starting with the next full Generate.
         /// </summary>
         public HomesteadEfficiencyTiers HomesteadTiers { get; set; }
+
+        /// <summary>
+        /// Per-character crafting discipline data snapshotted at GENERATION
+        /// time (W3C - see AccountSnapshot.CharacterDisciplines), for the
+        /// same reason as OwnedCurrencyAmounts above: so a local override
+        /// re-solve (ResolveWithOverrides) can keep populating
+        /// CraftingPlanResult.CharacterDisciplines on every re-solve, not
+        /// just the first generation. Cosmetic display data only; null
+        /// under the same conditions as the source field.
+        /// </summary>
+        public IReadOnlyList<SnapshotCharacterDiscipline> CharacterDisciplines { get; set; }
     }
 }
