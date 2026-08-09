@@ -2232,5 +2232,63 @@ runs exactly once per module session (`Module.LoadAsync`'s single
 `PlanStore.LoadLatest()` call) - not a hot/per-frame path, so its O(graph
 size) walk carries no per-frame or per-click performance cost.
 
+**10. Review-fix pass round 5 (2026-08-09) - 1 Must Fix finding from a
+fifth adversarial code review (the asymmetry that survived round 4's own
+class-level rewrite).**
+
+Round 4's `PlanStructuralValidator` validated
+`CraftingPlanResult.UsedMaterials` (line 141) but not the SEPARATELY
+serialized `PlanSolveContext.UsedMaterials` copy of the same list -
+plain `Newtonsoft.Json` writes no `$ref`, so the two fields are two
+independent arrays on disk even though they point at the same in-memory
+list at generation time. A `plan.json` with a clean
+`Result.UsedMaterials` but a null entry inside
+`Result.SolveContext.UsedMaterials[i]` therefore passed the entire round-4
+walk. `CraftingPlanPipeline.ResolveWithOverrides` (reached from any
+decision-pill click or the Best Path preset, inside
+`TreeSectionController.ApplyOverridesAndResolve`'s try/catch) passes
+`context.UsedMaterials` straight into `PlanResultBuilder.Build`
+(`foreach (var used in usedMaterials) { ... used.ItemId ... }`,
+`Services/PlanResultBuilder.cs:120-122`) and, for a single-item context,
+`SellSideEconomics.ComputeMaterialOpportunityCost`
+(`used.ItemId`/`used.QuantityUsed`, `Services/SellSideEconomics.cs:184-186`)
+- neither with a per-entry null check. Because both sites sit inside that
+guarded re-solve, the practical outcome was a logged "Override re-solve
+failed" and a dead pill rather than a crash, but that is exactly the
+already-covered failure class every other `IsValidSolveContext` check
+exists to close - the class's own doc comment claims every collection
+the re-solve path dereferences is covered, and this one field was simply
+missed.
+
+**Fix.** `PlanStructuralValidator.IsValidSolveContext` gained one more
+check, `NoNullEntries(context.UsedMaterials, "SolveContext.UsedMaterials", ...)`,
+alongside its existing `RequestedItems` check - same helper, same
+"null list is fine (optional field, matches a snapshot-less Generate),
+null entry is not" contract already used for eleven other fields in this
+file, no new abstraction introduced.
+
+New test (`PlanStoreTests.LoadLatest_NullEntryInSolveContextUsedMaterials_ReturnsNullAndLogsWarnExactlyOnce`,
+Blish-free, real `PlanStore` + temp dir): reuses the existing
+`BuildOwnMaterialsPipeline` fixture with `OwnFourOfIngredient()` and
+`OwnMaterialsMode.Valued` (a real pipeline result with a genuinely
+non-empty `UsedMaterials` on BOTH `Result` and `Result.SolveContext`),
+corrupts ONLY the `SolveContext` copy via `JObject` surgery (leaving
+`Result.UsedMaterials` clean, to actually exercise the asymmetry rather
+than a shape the round-4 check already caught), and asserts reject + the
+exact `SolveContext.UsedMaterials[0] is null` reason string + exactly one
+Warn. Every pre-existing `PlanStoreTests` fixture, including the other
+five round-4 rejection tests and the full round-trip/override-round-trip
+tests, continues to pass unmodified.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
+warnings from either touched file). Module test suite green - 1269
+passed (was 1268 before this round-5 pass; +1 new test). No new Blish
+HUD references in tests; the new test exercises real production code
+(`PlanStore`/`PlanStoreHelpers`/`PlanStructuralValidator` via a real
+`CraftingPlanPipeline`-produced fixture), no contract-mirror/fake-logic
+tests, no fake file I/O. Item/currency/vendor IDs remain internal-only.
+Pricing/solve logic itself is untouched - this pass only widens the
+existing round-4 validation gate to cover one more field.
+
 Live desktop gate:
 [PENDING - the orchestrator fills in PASS/FAIL]
