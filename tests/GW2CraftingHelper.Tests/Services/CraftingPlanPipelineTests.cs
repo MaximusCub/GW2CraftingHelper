@@ -808,6 +808,297 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // --- W3B: generation progress + rich logging ---
+
+        [Fact]
+        public async Task GenerateStructuredAsync_ReportsPhaseEventsInOrderWithSanePayloads()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var phaseProgress = new CapturingProgress<PlanPhaseEvent>();
+
+            await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy, phaseProgress: phaseProgress);
+
+            var expectedOrder = new[]
+            {
+                PlanPhase.BuildingTree,
+                PlanPhase.FetchingPrices,
+                PlanPhase.SolvingDecisions,
+                PlanPhase.FetchingItemDetails,
+                PlanPhase.BuildingDisplay
+            };
+
+            Assert.Equal(expectedOrder.Length, phaseProgress.Reports.Count);
+            for (int i = 0; i < expectedOrder.Length; i++)
+            {
+                Assert.Equal(expectedOrder[i], phaseProgress.Reports[i].Phase);
+                Assert.False(string.IsNullOrEmpty(phaseProgress.Reports[i].DisplayName));
+                // Phase-level granularity only in v1 - no per-item Done
+                // count on any event (see PlanPhaseEvent.Done's own doc
+                // comment).
+                Assert.Null(phaseProgress.Reports[i].Done);
+            }
+
+            // FetchingPrices/FetchingItemDetails know an up-front item
+            // count; the other three phases do not.
+            Assert.True(phaseProgress.Reports[1].Total > 0);
+            Assert.True(phaseProgress.Reports[3].Total > 0);
+            Assert.Null(phaseProgress.Reports[0].Total);
+            Assert.Null(phaseProgress.Reports[2].Total);
+            Assert.Null(phaseProgress.Reports[4].Total);
+        }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_NullPhaseProgress_BehavesIdenticallyToOmitted()
+        {
+            var pipeline = BuildEconomicsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var withOmittedParam = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            var withExplicitNull = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,
+                phaseProgress: null);
+
+            Assert.Equal(withOmittedParam.Plan.TotalCoinCost, withExplicitNull.Plan.TotalCoinCost);
+            Assert.Equal(withOmittedParam.Plan.Steps.Count, withExplicitNull.Plan.Steps.Count);
+            Assert.Equal(withOmittedParam.CraftingProfit, withExplicitNull.CraftingProfit);
+            Assert.Equal(withOmittedParam.NetSaleValue, withExplicitNull.NetSaleValue);
+        }
+
+        [Fact]
+        public async Task GenerateStructuredMultiAsync_ReportsPhaseEventsInOrder()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                }
+            });
+            recipeApi.AddSearchResult(2, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 2,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200);
+            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
+            priceApi.AddPrice(4, buyUnitPrice: 20, sellUnitPrice: 200);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target Item A", "targeta.png");
+            itemApi.AddItem(2, "Target Item B", "targetb.png");
+            itemApi.AddItem(3, "Ingredient A", "ingredienta.png");
+            itemApi.AddItem(4, "Ingredient B", "ingredientb.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+
+            var phaseProgress = new CapturingProgress<PlanPhaseEvent>();
+
+            await pipeline.GenerateStructuredAsync(
+                items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,
+                phaseProgress: phaseProgress);
+
+            var expectedOrder = new[]
+            {
+                PlanPhase.BuildingTree,
+                PlanPhase.FetchingPrices,
+                PlanPhase.SolvingDecisions,
+                PlanPhase.FetchingItemDetails,
+                PlanPhase.BuildingDisplay
+            };
+            Assert.Equal(expectedOrder.Length, phaseProgress.Reports.Count);
+            for (int i = 0; i < expectedOrder.Length; i++)
+            {
+                Assert.Equal(expectedOrder[i], phaseProgress.Reports[i].Phase);
+            }
+        }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_List_WritesRichModuleLogEntries_IntoRealTempDirStore()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            using (var tmp = new TempDirectory())
+            {
+                var store = new ModuleLogStore(tmp.Path);
+                // Isolated instance (not ModuleLog.Shared) - see ModuleLog's
+                // own class doc comment on why Shared is unsuitable for
+                // exact-count/content assertions.
+                var log = new ModuleLog();
+                log.Configure(store, maxFileSizeBytes: 0, onStoreError: null);
+                // Debug entries only reach the file sink when this is true
+                // (see ModuleLog.ShouldWriteToFile) - the per-phase Debug
+                // lines this test asserts on need it.
+                log.DiagnosticsEnabled = true;
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    moduleLog: log);
+
+                var items = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } };
+
+                await pipeline.GenerateStructuredAsync(
+                    items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,
+                    requestLabel: "Orrax Manifested x1");
+
+                // The file-sink append happens on a background flush queue
+                // (never on the calling thread) - only guaranteed to have
+                // landed once this returns true.
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                var entries = store.ReadAll();
+
+                // Info on start: real item name + quantity, never an
+                // internal item id.
+                Assert.Contains(entries, e =>
+                    e.Level == ModuleLogLevel.Info && e.Tag == "plan"
+                    && e.Message == "Generating plan for Orrax Manifested x1");
+
+                // Debug: one bounded entry per phase as it completes
+                // (timing + counts where known) - exactly 5, matching
+                // PlanPhase's 5 values, no per-item spam.
+                var phaseDebugEntries = entries
+                    .Where(e => e.Level == ModuleLogLevel.Debug && e.Tag == "plan")
+                    .ToList();
+                Assert.Equal(5, phaseDebugEntries.Count);
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Building recipe tree:") && e.Message.Contains("ms"));
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Fetching prices:") && e.Message.Contains("items"));
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Solving decisions:") && e.Message.Contains("ms"));
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Fetching item details:") && e.Message.Contains("items"));
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Building display:") && e.Message.Contains("ms"));
+
+                // Info on finish: one compact per-phase summary line,
+                // naming the plan by the same label the start line used.
+                Assert.Contains(entries, e =>
+                    e.Level == ModuleLogLevel.Info && e.Tag == "plan"
+                    && e.Message.StartsWith("Plan for Orrax Manifested x1: tree ")
+                    && e.Message.Contains("prices ") && e.Message.Contains("solve ")
+                    && e.Message.Contains("item details ") && e.Message.Contains("display ")
+                    && e.Message.Contains(" - total "));
+
+                // Every entry this run wrote used the "plan" category, per
+                // the milestone's own rich-logging contract.
+                Assert.All(entries, e => Assert.Equal("plan", e.Tag));
+            }
+        }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_List_NoRequestLabel_FallsBackToItemCountWording()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Item", "icon.png");
+
+            using (var tmp = new TempDirectory())
+            {
+                var store = new ModuleLogStore(tmp.Path);
+                var log = new ModuleLog();
+                log.Configure(store, maxFileSizeBytes: 0, onStoreError: null);
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    moduleLog: log);
+
+                var items = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } };
+
+                // No requestLabel supplied - matches every pre-W3B caller
+                // (and any future non-UI caller) that bypasses
+                // CraftingPlanView's item-name resolution.
+                await pipeline.GenerateStructuredAsync(
+                    items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                var entries = store.ReadAll();
+
+                Assert.Contains(entries, e =>
+                    e.Level == ModuleLogLevel.Info && e.Tag == "plan"
+                    && e.Message == "Generating plan for 1 item");
+            }
+        }
+
         // --- Sell-side economics ---
 
         private static CraftingPlanPipeline BuildEconomicsPipeline(
