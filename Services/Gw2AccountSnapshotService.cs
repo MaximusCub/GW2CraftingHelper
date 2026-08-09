@@ -166,46 +166,51 @@ namespace GW2CraftingHelper.Services
 
             ct.ThrowIfCancellationRequested();
 
-            // Character inventories
+            // Character inventories + crafting disciplines
             try
             {
                 var characterNames = await _apiManager.Gw2ApiClient.V2.Characters.IdsAsync(ct);
 
                 // W3C (per-character discipline display): non-null as soon
-                // as the character list itself is obtained, even if it
-                // turns out empty or every character below fails - see
+                // as the character list itself is obtained - see
                 // AccountSnapshot.CharacterDisciplines' own doc comment for
-                // why null vs. empty is a meaningful distinction here.
+                // why null vs. empty is a meaningful distinction here. May
+                // still be reset to null below (see
+                // characterDisciplineDataDegraded) if any single
+                // character's crafting fetch fails - a partial list would
+                // read as an affirmative "not trained on any character"
+                // claim for a discipline this fetch simply never reached
+                // (W3C review-fix, critical: violates "never invent data"
+                // and the W3C spec's own "degraded fetch -> show nothing"
+                // requirement).
                 snapshot.CharacterDisciplines = new List<SnapshotCharacterDiscipline>();
+                bool characterDisciplineDataDegraded = false;
 
                 foreach (var name in characterNames)
                 {
                     ct.ThrowIfCancellationRequested();
+
+                    // Inventory: pre-W3C narrow per-character endpoint,
+                    // unchanged behavior (W3C review-fix, mustFix -
+                    // reverted from the W3C-introduced full-record
+                    // V2.Characters[name].GetAsync, which pulled in learned
+                    // recipes/equipment/build-tab payloads never used here
+                    // and widened this cheap cosmetic feature's failure
+                    // blast radius onto plan-affecting owned-materials
+                    // data). A failure here is tolerated exactly like every
+                    // other per-character inventory failure always has
+                    // been: this character's items are simply missing from
+                    // Items, a conservative under-count (inflates buy
+                    // cost, never fabricates a claim) - it does NOT set
+                    // characterDisciplineDataDegraded, since inventory and
+                    // discipline data are independent signals fetched by
+                    // two separate calls below.
                     try
                     {
-                        // W3C: fetches the character's FULL record
-                        // (V2.Characters[name].GetAsync) rather than the
-                        // narrower .Inventory sub-endpoint this call used
-                        // pre-W3C. The full record's .Bags is byte-
-                        // identical in shape to the narrower endpoint's own
-                        // .Bags (both IReadOnlyList<CharacterInventoryBag>,
-                        // confirmed via Gw2Sharp 1.7.4 reflection), and it
-                        // additionally carries .Crafting - the per-character
-                        // discipline data this package adds (see
-                        // AccountSnapshot.CharacterDisciplines) - so one
-                        // round trip now captures what previously took two.
-                        // Same scopes as before (account, characters, plus
-                        // inventories for a non-null Bags) - no new
-                        // permission requirement. Inventory and crafting
-                        // share this one try/catch: a failure here degrades
-                        // BOTH signals for this one character, same as the
-                        // pre-W3C behavior degraded inventory alone - it
-                        // still never fails the whole snapshot.
-                        var character = await _apiManager.Gw2ApiClient.V2.Characters[name].GetAsync(ct);
-
-                        if (character?.Bags != null)
+                        var inventory = await _apiManager.Gw2ApiClient.V2.Characters[name].Inventory.GetAsync(ct);
+                        if (inventory?.Bags != null)
                         {
-                            foreach (var bag in character.Bags)
+                            foreach (var bag in inventory.Bags)
                             {
                                 if (bag?.Inventory == null) continue;
                                 foreach (var item in bag.Inventory)
@@ -220,10 +225,41 @@ namespace GW2CraftingHelper.Services
                                 }
                             }
                         }
+                    }
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    {
+                        Logger.Warn(ex, "Failed to fetch inventory for character {CharacterName}", name);
+                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch inventory for character {name}: {ex.GetType().Name} - {ex.Message}");
+                    }
 
-                        if (character?.Crafting != null)
+                    ct.ThrowIfCancellationRequested();
+
+                    // Crafting disciplines (W3C): its own small, lean
+                    // endpoint - needs only account+characters scopes (a
+                    // strict subset of Inventory's account+characters+
+                    // inventories above), both already covered by
+                    // RequiredPermissions, so no new permission requirement.
+                    // Unlike Inventory, ANY failure here (exception, or a null
+                    // response with no failure exception - both defensive,
+                    // since IBlobClient<T>.GetAsync should throw rather
+                    // than return null on failure) flips
+                    // characterDisciplineDataDegraded so the WHOLE
+                    // snapshot's CharacterDisciplines is discarded below,
+                    // even the entries already gathered from other,
+                    // successfully-fetched characters - see that flag's
+                    // doc comment above for why a partial list is
+                    // unacceptable here even though it is fine for
+                    // Inventory.
+                    try
+                    {
+                        var crafting = await _apiManager.Gw2ApiClient.V2.Characters[name].Crafting.GetAsync(ct);
+                        if (crafting?.Crafting == null)
                         {
-                            foreach (var cd in character.Crafting)
+                            characterDisciplineDataDegraded = true;
+                        }
+                        else
+                        {
+                            foreach (var cd in crafting.Crafting)
                             {
                                 if (cd == null) continue;
                                 snapshot.CharacterDisciplines.Add(new SnapshotCharacterDiscipline
@@ -246,9 +282,15 @@ namespace GW2CraftingHelper.Services
                     }
                     catch (Exception ex) when (!(ex is OperationCanceledException))
                     {
-                        Logger.Warn(ex, "Failed to fetch data for character {CharacterName}", name);
-                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch data for character {name}: {ex.GetType().Name} - {ex.Message}");
+                        Logger.Warn(ex, "Failed to fetch crafting disciplines for character {CharacterName}", name);
+                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch crafting disciplines for character {name}: {ex.GetType().Name} - {ex.Message}");
+                        characterDisciplineDataDegraded = true;
                     }
+                }
+
+                if (characterDisciplineDataDegraded)
+                {
+                    snapshot.CharacterDisciplines = null;
                 }
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
