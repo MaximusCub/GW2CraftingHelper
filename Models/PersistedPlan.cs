@@ -22,15 +22,35 @@ namespace GW2CraftingHelper.Models
         /// was the purely structural `Result?.Plan != null` check, which a
         /// future rename could still pass while every renamed/removed
         /// member came back silently null - a "partial render" spec item 4
-        /// forbids. A file from before this field existed deserializes
-        /// SchemaVersion as 0 (Newtonsoft's default for a missing int
-        /// property), which never equals CurrentSchemaVersion, so it is
-        /// correctly treated as old-schema too.
+        /// forbids.
+        /// <para>
+        /// Round 2 review-fix (mustFix): <see cref="SchemaVersion"/> has NO
+        /// property initializer (see that property) - the CLR default for
+        /// an unset int is 0, distinct from CurrentSchemaVersion (1) above.
+        /// This is deliberate, not an oversight: Newtonsoft.Json only
+        /// overwrites properties that are actually PRESENT in the source
+        /// JSON, so a `= CurrentSchemaVersion` initializer here would run
+        /// in the object's default constructor and then survive untouched
+        /// for any file whose JSON omits "SchemaVersion" entirely (every
+        /// file written before this field existed) - deserializing it as
+        /// CurrentSchemaVersion, sailing straight through the mismatch
+        /// check below, and rendering whatever members that older schema
+        /// happened to be missing as silently null. Both real construction
+        /// sites (Module.cs's PersistAfterGenerateAsync/
+        /// PersistResolvedPlanInBackground) set SchemaVersion =
+        /// CurrentSchemaVersion explicitly instead, so every file this
+        /// module itself ever writes still carries the current value; only
+        /// a file this code never wrote (missing the field, or carrying an
+        /// explicit old value) deserializes as anything else.
+        /// </para>
         /// </summary>
         public const int CurrentSchemaVersion = 1;
 
-        /// <summary>See <see cref="CurrentSchemaVersion"/>.</summary>
-        public int SchemaVersion { get; set; } = CurrentSchemaVersion;
+        /// <summary>
+        /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why
+        /// this deliberately has NO property initializer.
+        /// </summary>
+        public int SchemaVersion { get; set; }
 
         /// <summary>
         /// When this plan was originally generated (the same value the

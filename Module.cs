@@ -1256,6 +1256,10 @@ namespace GW2CraftingHelper
             // (now-superseded) plan's own overrides happened to be.
             _planStore.Save(new PersistedPlan
             {
+                // Round 2 review-fix (mustFix): set explicitly, not left to
+                // a property initializer - see PersistedPlan.SchemaVersion's
+                // own doc comment for why.
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
                 GeneratedAt = generatedAt,
                 RequestItems = requestItems,
                 UseOwnMaterials = useOwnMaterials,
@@ -1362,6 +1366,10 @@ namespace GW2CraftingHelper
 
             var persisted = new PersistedPlan
             {
+                // Round 2 review-fix (mustFix): set explicitly, not left to
+                // a property initializer - see PersistedPlan.SchemaVersion's
+                // own doc comment for why.
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
                 GeneratedAt = metadata.GeneratedAt,
                 RequestItems = metadata.RequestItems,
                 UseOwnMaterials = metadata.UseOwnMaterials,

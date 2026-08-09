@@ -149,6 +149,14 @@ namespace GW2CraftingHelper.Tests.Services
         {
             return new PersistedPlan
             {
+                // Round 2 review-fix (mustFix): SchemaVersion has no
+                // property initializer any more (see PersistedPlan's own
+                // doc comment) - every real construction site sets it
+                // explicitly, so this fixture-building helper must too or
+                // every test built through it would round-trip as
+                // SchemaVersion 0 and get rejected as old-schema by
+                // PlanStoreHelpers.DeserializePersistedPlan.
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
                 GeneratedAt = generatedAt,
                 RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = quantity } },
                 UseOwnMaterials = useOwn,
@@ -441,23 +449,56 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void Save_Load_DefaultSchemaVersion_MatchesCurrentAndRoundTrips()
+        public void Save_Load_ExplicitCurrentSchemaVersion_RoundTrips()
         {
+            // Round 2 review-fix (mustFix): PersistedPlan.SchemaVersion has
+            // NO property initializer any more - a caller (every real
+            // construction site in Module.cs) must set it explicitly. This
+            // proves the field itself round-trips correctly when set that
+            // way, complementing LoadLatest_MissingSchemaVersionField_
+            // ReturnsNullAndLogsWarn below, which proves the opposite case
+            // (never set at all) is correctly rejected rather than silently
+            // treated as current.
             var plan = new PersistedPlan
             {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
                 GeneratedAt = DateTime.Now,
                 RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 2 } },
                 UseOwnMaterials = false,
                 PriceBasis = PriceBasis.InstantBuy,
                 Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 2 } }
             };
-            Assert.Equal(PersistedPlan.CurrentSchemaVersion, plan.SchemaVersion);
 
             _store.Save(plan);
             var loaded = _store.LoadLatest();
 
             Assert.NotNull(loaded);
             Assert.Equal(PersistedPlan.CurrentSchemaVersion, loaded.SchemaVersion);
+        }
+
+        [Fact]
+        public void LoadLatest_MissingSchemaVersionField_ReturnsNullAndLogsWarn()
+        {
+            // Round 2 review-fix (mustFix): the ONE class of old file that
+            // can actually exist (written before the SchemaVersion field
+            // existed, or by any code that forgets to set it) omits the
+            // member entirely, rather than writing an explicit 0 the way
+            // LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn above
+            // does. Newtonsoft only overwrites properties present in the
+            // JSON, so this is the exact case a `= CurrentSchemaVersion`
+            // property initializer would have let sail through silently -
+            // see PersistedPlan.SchemaVersion's own doc comment.
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath,
+                "{ \"GeneratedAt\": \"2026-08-09T00:00:00\", \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string capturedMessage = null;
+            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.NotNull(capturedMessage);
         }
 
         [Fact]
@@ -474,6 +515,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var plan = new PersistedPlan
             {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
                 GeneratedAt = DateTime.Now,
                 RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 2 } },
                 UseOwnMaterials = false,
@@ -496,6 +538,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var plan = new PersistedPlan
             {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
                 GeneratedAt = DateTime.Now,
                 RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } },
                 UseOwnMaterials = false,
@@ -524,6 +567,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             store.Save(new PersistedPlan
             {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
                 GeneratedAt = DateTime.Now,
                 Result = new CraftingPlanResult { Plan = new CraftingPlan() }
             });
@@ -822,6 +866,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var plan = new PersistedPlan
             {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
                 GeneratedAt = new DateTime(2026, 8, 9, 13, 0, 0, DateTimeKind.Local),
                 RequestItems = items,
                 UseOwnMaterials = false,
