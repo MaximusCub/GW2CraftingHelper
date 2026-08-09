@@ -197,16 +197,41 @@ namespace GW2CraftingHelper.Views
 
         // W3B (generation progress + rich logging): the latest live phase
         // text (e.g. "Fetching prices (418 items)...", no spinner prefix -
-        // see TriggerGenerate's own FormatPhaseText) - written by the
+        // see RenderSpinnerStatus/FormatPhaseText) - written by the
         // phaseProgress callback (marshaled to the main thread, guarded by
         // StatusUpdateGuard exactly like the status label itself always
         // has been) and read by SpinnerTick/RenderSpinnerStatus, which run
         // on entirely separate callback cadences, so this must be an
         // instance field rather than a value either closure could capture
-        // on its own. Reset at the start of every TriggerGenerate call and
-        // by StopLiveTickers, matching every other per-generation status
-        // field in this region.
+        // on its own. Reset at the start of every TriggerGenerate call -
+        // W3B review-fix: deliberately NOT reset by StopLiveTickers any
+        // more (see that method's own doc comment) so a tab switch mid-
+        // generation does not blank the phase text Build() re-renders
+        // below via _generationInFlight.
         private string _currentPhaseText;
+
+        // W3B review-fix (tab-switch strip freeze): the phase ordinal
+        // (int)PlanPhaseEvent.Phase last actually applied to
+        // _currentPhaseText, or -1 once TriggerGenerate resets it for a
+        // new generation. PlanPhase's declaration order is the pipeline's
+        // real emission order (see PhaseOrdinalGuard's own doc comment),
+        // so this also closes the out-of-order-drain race StatusUpdateGuard
+        // alone cannot see: an event whose ordinal is not strictly greater
+        // than this is dropped, never applied. Persists across a Build()
+        // rebuild for the same reason _currentPhaseText does.
+        private int _currentPhaseOrdinal = -1;
+
+        // W3B review-fix (tab-switch strip freeze): true from the moment
+        // TriggerGenerate starts a generation until that SAME generation's
+        // own finally block runs (myGen == _generateSequence there - see
+        // that block's own comment). Since _generateSequence only ever
+        // advances at the start of TriggerGenerate, whenever this is true
+        // the in-flight generation's number IS _generateSequence's current
+        // value - Build() uses exactly that to re-arm the spinner ticker/
+        // phase text after StopLiveTickers cancels the previous ticker,
+        // instead of leaving the strip stuck on "Ready" until the next
+        // phase event (see ArmSpinnerTicker's own doc comment).
+        private bool _generationInFlight;
         private int _spinnerFrameIndex;
         private DateTime _lastSpinnerTickUtc;
         private static readonly char[] SpinnerFrames = { '|', '/', '-', '\\' };
@@ -394,9 +419,11 @@ namespace GW2CraftingHelper.Views
         private FrameTicker _resizeDebounceTicker;
 
         // W3B (generation progress + rich logging): drives the status
-        // strip's rotating spinner glyph during TriggerGenerate - see
-        // TriggerGenerate's own SpinnerTick/RenderSpinnerStatus local
-        // functions and StopLiveTickers below.
+        // strip's rotating spinner glyph during TriggerGenerate - see the
+        // SpinnerTick/RenderSpinnerStatus/ArmSpinnerTicker instance methods
+        // below and StopLiveTickers. W3B review-fix: also re-armed by
+        // Build() when a generation is still in flight across a tab
+        // switch (see ArmSpinnerTicker/_generationInFlight).
         private FrameTicker _spinnerTicker;
 
         #endregion // 6. The FrameTicker control (ticker instance fields) - KNOWN-ISSUES #12/#13
@@ -760,10 +787,10 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Cancels every live FrameTicker (scroll-verify, resize-debounce,
-        /// wheel-wrap-verify) and resets their associated pending state.
-        /// Two callers: the top of every <see cref="Build"/> (a fresh build
-        /// cycle supersedes any ticker from the previous one - unchanged
-        /// behavior, just factored out of that method) and
+        /// wheel-wrap-verify, spinner) and resets their associated pending
+        /// state. Two callers: the top of every <see cref="Build"/> (a
+        /// fresh build cycle supersedes any ticker from the previous one -
+        /// unchanged behavior, just factored out of that method) and
         /// Module.Unload (M39/WP-17: these tickers are parented to the
         /// SpriteScreen, not this view's own control tree - see the ticker
         /// fields' own comments - so nothing else tears them down if the
@@ -771,6 +798,18 @@ namespace GW2CraftingHelper.Views
         /// ticker is mid-flight; each ticker also bails itself out on its
         /// own next frame as a second line of defense, but Unload should
         /// not depend on "one more frame runs after unload" being true).
+        ///
+        /// W3B review-fix: deliberately does NOT reset
+        /// _currentPhaseText/_currentPhaseOrdinal any more. Build() calls
+        /// this at its own top, then (this method having just canceled the
+        /// previous ticker) re-arms a fresh one immediately below when
+        /// _generationInFlight is still true - nulling the phase text here
+        /// would blank the status strip for that still-running generation
+        /// on every tab switch until its next phase event, which for the
+        /// longest phase can be most of the run (the exact freeze this
+        /// review-fix removes). Module.Unload tearing down the whole view
+        /// without clearing them is harmless: a fresh CraftingPlanView
+        /// instance is constructed on the module's next load.
         /// </summary>
         public void StopLiveTickers()
         {
@@ -786,7 +825,6 @@ namespace GW2CraftingHelper.Views
             _resizeScrollRestorePending = false;
             _resizeScrollSavedOffset = 0;
             _lastWheelEventUtc = null;
-            _currentPhaseText = null;
         }
 
         #endregion // 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13, M39/WP-17
@@ -1647,6 +1685,25 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
+            // W3B review-fix (tab-switch strip freeze): StopLiveTickers
+            // just canceled the previous build cycle's spinner ticker
+            // above, and the fresh _statusLabel just created starts on the
+            // hardcoded "Ready" text - both wrong if a generation is
+            // genuinely still running (the user switched tabs mid-
+            // generation and switched back). _generationInFlight is only
+            // true for the generation currently identified by
+            // _generateSequence (see that field's own doc comment), so
+            // re-arming with it here immediately restores the live
+            // spinner + this generation's last-known phase text instead of
+            // leaving the strip stuck on "Ready" until the next phase
+            // event fires (which for the longest phase can be most of the
+            // run). A no-op for the far more common case of no generation
+            // in flight.
+            if (_generationInFlight)
+            {
+                ArmSpinnerTicker(_generateSequence);
+            }
+
             // Static separator between controls and content
             _separator = new Panel()
             {
@@ -2185,6 +2242,8 @@ namespace GW2CraftingHelper.Views
             int myGen = ++_generateSequence;
             _statusClosedForCurrentGeneration = false;
             _currentPhaseText = null;
+            _currentPhaseOrdinal = -1;
+            _generationInFlight = true;
 
             _generateButton.Enabled = false;
             _lastDebugLog = null;
@@ -2196,34 +2255,12 @@ namespace GW2CraftingHelper.Views
             // fine-grained PlanStatus wiring) means a stale tick from a
             // superseded/finished generation can never clobber a newer
             // one's text - see StatusUpdateGuard's own doc comment
-            // (M34-B1 #4).
-            void RenderSpinnerStatus()
-            {
-                if (!StatusUpdateGuard.ShouldApply(myGen, _generateSequence, _statusClosedForCurrentGeneration)) return;
-                string text = string.IsNullOrEmpty(_currentPhaseText) ? "Generating..." : _currentPhaseText;
-                SetStatus($"{SpinnerFrames[_spinnerFrameIndex]} {text}");
-            }
-
-            bool SpinnerTick(GameTime gameTime)
-            {
-                if (myGen != _generateSequence || _statusClosedForCurrentGeneration) return false;
-                if (_contentPanel == null || _contentPanel.Parent == null) return false;
-
-                var now = DateTime.UtcNow;
-                if (now - _lastSpinnerTickUtc >= SpinnerTickInterval)
-                {
-                    _lastSpinnerTickUtc = now;
-                    _spinnerFrameIndex = (_spinnerFrameIndex + 1) % SpinnerFrames.Length;
-                    RenderSpinnerStatus();
-                }
-                return true;
-            }
-
-            _spinnerTicker?.Cancel();
-            _spinnerFrameIndex = 0;
-            _lastSpinnerTickUtc = DateTime.UtcNow;
-            _spinnerTicker = new FrameTicker(SpinnerTick);
-            RenderSpinnerStatus();
+            // (M34-B1 #4). W3B review-fix: RenderSpinnerStatus/SpinnerTick
+            // are now instance methods (parameterized on myGen) rather than
+            // local functions, so Build() can also invoke them (via
+            // ArmSpinnerTicker) to re-arm a generation that outlives a tab
+            // switch - see _generationInFlight's own doc comment.
+            ArmSpinnerTicker(myGen);
 
             if (anyQtyInvalid)
             {
@@ -2246,15 +2283,41 @@ namespace GW2CraftingHelper.Views
             // status label at all (see the `progress: null` argument
             // below) - its frequent, static-feeling per-step text is
             // exactly what this milestone replaces with the spinner +
-            // coarse phase text above.
+            // coarse phase text above. W3B review-fix: passing null here
+            // does NOT silently drop PlanStatus's two genuinely important
+            // diagnostics (the first-run recipe-discovery notice and the
+            // stale-recipe-seed warning) - CraftingPlanPipeline now writes
+            // both straight to ModuleLog regardless of whether a live
+            // PlanStatus consumer is attached (see its OnStatusUpdate
+            // closures), and the tree-building phase's own "(may take
+            // several seconds on first run)" hint now rides PlanPhaseEvent.
+            // Detail into FormatPhaseText instead. Every OTHER PlanStatus
+            // message really is routine per-step text now superseded by
+            // the 5 coarse phase events above, so this remains an
+            // intentional null, not a regression.
+            // W3B review-fix: Progress<T> with no SynchronizationContext
+            // posts every Report through an independent
+            // ThreadPool.QueueUserWorkItem, so two events reported
+            // milliseconds apart (a warm cache, a small plan) can be
+            // marshaled to the main thread out of order. StatusUpdateGuard
+            // alone cannot catch that - both events share this SAME myGen,
+            // so it passes for both - hence the added PhaseOrdinalGuard
+            // check: an event whose phase ordinal is not strictly greater
+            // than the last one actually applied is stale and dropped, so
+            // a late-draining EARLIER phase can never clobber a later
+            // phase's already-displayed text. See PhaseOrdinalGuard's own
+            // doc comment.
             var phaseProgress = new Progress<PlanPhaseEvent>(pe =>
             {
                 if (pe == null) return;
                 MainThreadMarshal.Run(() =>
                 {
                     if (!StatusUpdateGuard.ShouldApply(myGen, _generateSequence, _statusClosedForCurrentGeneration)) return;
+                    int ordinal = (int)pe.Phase;
+                    if (!PhaseOrdinalGuard.ShouldApply(ordinal, _currentPhaseOrdinal)) return;
+                    _currentPhaseOrdinal = ordinal;
                     _currentPhaseText = FormatPhaseText(pe);
-                    RenderSpinnerStatus();
+                    RenderSpinnerStatus(myGen);
                 });
             });
 
@@ -2350,6 +2413,13 @@ namespace GW2CraftingHelper.Views
                 MainThreadMarshal.Run(() =>
                 {
                     if (myGen != _generateSequence) return;
+                    // W3B review-fix: only the generation that matches
+                    // _generateSequence at drain time may clear this - a
+                    // superseded generation's own finally already returned
+                    // above without touching it, leaving the NEWER
+                    // generation's own true (set at ITS TriggerGenerate
+                    // start) intact. See the field's own doc comment.
+                    _generationInFlight = false;
                     // W3B: stop the spinner ticker regardless of panel
                     // liveness below (no live control to leak either way,
                     // but no reason to leave a SpriteScreen-parented ticker
@@ -2363,18 +2433,91 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
+        /// W3B review-fix (tab-switch strip freeze): renders the live
+        /// spinner-glyph + phase-text status for the generation identified
+        /// by <paramref name="myGen"/>. Extracted from TriggerGenerate's
+        /// own local function into an instance method, parameterized on
+        /// myGen instead of capturing it via closure, so Build() can also
+        /// call it (through <see cref="ArmSpinnerTicker"/>) to re-render a
+        /// still-in-flight generation's status after a tab switch rebuilds
+        /// _statusLabel - a plain local function could only ever be
+        /// invoked from inside the very TriggerGenerate call that defined
+        /// it, which is exactly why the strip used to freeze. Guarded by
+        /// the same StatusUpdateGuard check the old local function always
+        /// used (M34-B1 #4): a stale tick from a superseded or already-
+        /// finished generation can never clobber a newer one's text.
+        /// </summary>
+        private void RenderSpinnerStatus(int myGen)
+        {
+            if (!StatusUpdateGuard.ShouldApply(myGen, _generateSequence, _statusClosedForCurrentGeneration)) return;
+            string text = string.IsNullOrEmpty(_currentPhaseText) ? "Generating..." : _currentPhaseText;
+            SetStatus($"{SpinnerFrames[_spinnerFrameIndex]} {text}");
+        }
+
+        /// <summary>
+        /// W3B review-fix: FrameTicker step for generation
+        /// <paramref name="myGen"/> - see RenderSpinnerStatus's own doc
+        /// comment for why this is now an instance method rather than a
+        /// TriggerGenerate-local closure.
+        /// </summary>
+        private bool SpinnerTick(int myGen, GameTime gameTime)
+        {
+            if (myGen != _generateSequence || _statusClosedForCurrentGeneration) return false;
+            if (_contentPanel == null || _contentPanel.Parent == null) return false;
+
+            var now = DateTime.UtcNow;
+            if (now - _lastSpinnerTickUtc >= SpinnerTickInterval)
+            {
+                _lastSpinnerTickUtc = now;
+                _spinnerFrameIndex = (_spinnerFrameIndex + 1) % SpinnerFrames.Length;
+                RenderSpinnerStatus(myGen);
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// W3B review-fix (tab-switch strip freeze): (re-)arms the spinner
+        /// ticker for generation <paramref name="myGen"/> and renders its
+        /// current phase text immediately. Two callers: TriggerGenerate
+        /// itself (myGen == the generation it just started) and Build()
+        /// (myGen == _generateSequence, re-arming a still-in-flight
+        /// generation's ticker after StopLiveTickers canceled the previous
+        /// one earlier in the SAME Build() call - see _generationInFlight's
+        /// own doc comment). Always cancels/replaces whatever ticker is
+        /// already live, matching TriggerGenerate's pre-existing "a fresh
+        /// arm always supersedes" behavior.
+        /// </summary>
+        private void ArmSpinnerTicker(int myGen)
+        {
+            _spinnerTicker?.Cancel();
+            _spinnerFrameIndex = 0;
+            _lastSpinnerTickUtc = DateTime.UtcNow;
+            _spinnerTicker = new FrameTicker(gameTime => SpinnerTick(myGen, gameTime));
+            RenderSpinnerStatus(myGen);
+        }
+
+        /// <summary>
         /// W3B: renders a PlanPhaseEvent as status-strip text, e.g.
         /// "Fetching prices (418 items)..." - no spinner prefix (added by
         /// RenderSpinnerStatus). Falls back to "Generating..." for a null
         /// event or one with no display name, matching the pre-first-event
-        /// text TriggerGenerate already shows.
+        /// text TriggerGenerate already shows. W3B review-fix: when a phase
+        /// carries no item count but does carry Detail (currently only the
+        /// very first "Building recipe tree" event, shown unconditionally
+        /// regardless of whether the cache actually turns out warm or cold -
+        /// see CraftingPlanPipeline.FirstRunTreeHint's call sites), that
+        /// detail is appended instead - this is the pre-W3B "(may take
+        /// several seconds on first run)" hint, otherwise silently lost now
+        /// that CraftingPlanView passes progress: null to the old,
+        /// finer-grained IProgress&lt;PlanStatus&gt; channel (see the
+        /// `progress: null` argument's own comment above).
         /// </summary>
         private static string FormatPhaseText(PlanPhaseEvent pe)
         {
             if (pe == null || string.IsNullOrEmpty(pe.DisplayName)) return "Generating...";
-            return pe.Total.HasValue
-                ? $"{pe.DisplayName} ({pe.Total.Value} items)..."
-                : $"{pe.DisplayName}...";
+            if (pe.Total.HasValue) return $"{pe.DisplayName} ({pe.Total.Value} items)...";
+            if (!string.IsNullOrEmpty(pe.Detail)) return $"{pe.DisplayName} ({pe.Detail})...";
+            return $"{pe.DisplayName}...";
         }
 
         #endregion // 2. Generate orchestration (continued)
