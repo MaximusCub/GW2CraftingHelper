@@ -495,6 +495,158 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(3, withSnapshot.UsedMaterials[0].QuantityUsed);
         }
 
+        // --- W3C review-fix (mustFix): zero prior coverage on the pipeline
+        // wiring that carries AccountSnapshot.CharacterDisciplines through
+        // to CraftingPlanResult/PlanSolveContext and back out again through
+        // a local ResolveWithOverrides re-solve - only the leaf builder
+        // (PlanResultBuilderTests) and the store (SnapshotStoreTests) had
+        // coverage; the snapshot -> result -> re-solve wiring that makes
+        // the feature appear at all was unverified. ---
+
+        [Fact]
+        public async Task GenerateStructuredAsync_WithCharacterDisciplines_CarriesIntoResultAndContext()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var snapshot = new AccountSnapshot
+            {
+                CharacterDisciplines = new List<SnapshotCharacterDiscipline>
+                {
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true }
+                }
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.NotNull(result.CharacterDisciplines);
+            Assert.Single(result.CharacterDisciplines);
+            Assert.Equal("Anna", result.CharacterDisciplines[0].CharacterName);
+            Assert.NotNull(result.SolveContext);
+            Assert.Same(result.CharacterDisciplines, result.SolveContext.CharacterDisciplines);
+        }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_NullSnapshot_CharacterDisciplinesIsNull()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1 - simplest possible leaf-only plan.
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Copper Ore", "copper.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Null(result.CharacterDisciplines);
+            Assert.Null(result.SolveContext.CharacterDisciplines);
+        }
+
+        [Fact]
+        public async Task GenerateStructuredMultiAsync_WithCharacterDisciplines_CarriesIntoResultAndContext()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                }
+            });
+            recipeApi.AddSearchResult(2, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 2,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200);
+            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
+            priceApi.AddPrice(4, buyUnitPrice: 20, sellUnitPrice: 200);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target Item A", "targeta.png");
+            itemApi.AddItem(2, "Target Item B", "targetb.png");
+            itemApi.AddItem(3, "Ingredient A", "ingredienta.png");
+            itemApi.AddItem(4, "Ingredient B", "ingredientb.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var snapshot = new AccountSnapshot
+            {
+                CharacterDisciplines = new List<SnapshotCharacterDiscipline>
+                {
+                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Chef", Rating = 300, Active = false }
+                }
+            };
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(items, snapshot, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.NotNull(result.CharacterDisciplines);
+            Assert.Single(result.CharacterDisciplines);
+            Assert.Equal("Bob", result.CharacterDisciplines[0].CharacterName);
+            Assert.NotNull(result.SolveContext);
+            Assert.Same(result.CharacterDisciplines, result.SolveContext.CharacterDisciplines);
+        }
+
         [Fact]
         public async Task GenerateStructuredAsync_OwnedIntermediate_RemovesCraftStep_And_Discipline()
         {
@@ -1572,6 +1724,64 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(CraftingDecision.BuyFromTp, resolved.CraftingTree.Decision);
             Assert.True(resolved.CraftingTree.CanCraft);
             Assert.True(resolved.CraftingTree.CanBuyTp);
+        }
+
+        // W3C review-fix (mustFix): a local override re-solve must keep
+        // carrying CharacterDisciplines forward from the generation-time
+        // context (see PlanSolveContext.CharacterDisciplines' own doc
+        // comment) - deleting the one-line passthrough in
+        // ResolveWithOverrides still leaves the whole suite green without
+        // this test, since only the leaf builder and the store were
+        // previously covered.
+        [Fact]
+        public async Task ResolveWithOverrides_CarriesCharacterDisciplinesForward()
+        {
+            var pipeline = BuildEconomicsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var snapshot = new AccountSnapshot
+            {
+                CharacterDisciplines = new List<SnapshotCharacterDiscipline>
+                {
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true }
+                }
+            };
+
+            var initial = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(initial.CharacterDisciplines);
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+            };
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
+
+            Assert.Same(initial.CharacterDisciplines, resolved.CharacterDisciplines);
+        }
+
+        // Companion null-snapshot case: a generation with no account data
+        // must keep re-solving to a null CharacterDisciplines, never
+        // fabricate one on a later override.
+        [Fact]
+        public async Task ResolveWithOverrides_NullSnapshot_CharacterDisciplinesStaysNull()
+        {
+            var pipeline = BuildEconomicsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.Null(initial.CharacterDisciplines);
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+            };
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
+
+            Assert.Null(resolved.CharacterDisciplines);
         }
 
         [Fact]

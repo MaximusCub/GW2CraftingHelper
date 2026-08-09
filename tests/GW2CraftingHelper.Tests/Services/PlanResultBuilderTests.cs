@@ -138,6 +138,83 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
         }
 
+        // W3C review-fix (mustFix): the greedy set-cover tiebreak used to
+        // fall straight to alphabetical order whenever no Pass 1/pre-cover
+        // discipline had already been selected - see PlanResultBuilder.
+        // Build's accountDisciplineNames doc comment. A recipe craftable by
+        // Armorsmith/Leatherworker/Tailor with no other craft step in the
+        // plan used to always report "Armorsmith" (alpha-first) regardless
+        // of what the account actually has, misleadingly reading as "you
+        // must level Armorsmith" even for a player who already has Tailor.
+        [Fact]
+        public void RequiredDisciplines_MultiDisciplineRecipe_PrefersAccountDiscipline()
+        {
+            var allowed = new HashSet<string> { "Armorsmith", "Leatherworker", "Tailor" };
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string>(allowed),
+                450, new List<string> { "AutoLearned" },
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                }
+            };
+
+            var characterDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Tailor", Rating = 500, Active = true }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null, characterDisciplines);
+
+            // Tailor is the only allowed discipline the account has - it
+            // must win over the alphabetically-earlier Armorsmith/
+            // Leatherworker even though all three cover the recipe equally.
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Tailor", result.RequiredDisciplines[0].Discipline);
+            Assert.Equal(450, result.RequiredDisciplines[0].MinRating);
+        }
+
+        // Companion to the test above: when characterDisciplines is null
+        // (no snapshot data at all - the pre-existing default for every
+        // other test in this file), the tiebreak must still fall back to
+        // the pre-W3C alphabetical order rather than throwing or behaving
+        // unpredictably - accountDisciplineNames is empty in that case, so
+        // every candidate ties at 0 and alpha decides, same as before W3C.
+        [Fact]
+        public void RequiredDisciplines_MultiDisciplineRecipe_NoCharacterData_FallsBackToAlpha()
+        {
+            var allowed = new HashSet<string> { "Armorsmith", "Leatherworker", "Tailor" };
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string>(allowed),
+                450, new List<string> { "AutoLearned" },
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null, characterDisciplines: null);
+
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Armorsmith", result.RequiredDisciplines[0].Discipline);
+        }
+
         [Fact]
         public void RequiredDisciplines_MultiDisciplineRecipe_PrefersAlreadySelected()
         {
