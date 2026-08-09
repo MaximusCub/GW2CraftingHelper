@@ -1969,5 +1969,81 @@ behavior and test is unchanged) and W3C's per-character discipline
 display (`CharacterDisciplines` still flows through
 `PersistedPlan.Result`/`SolveContext` unchanged).
 
+**7. Review-fix pass round 2 (2026-08-09) - 2 Must Fix findings from a
+second adversarial code review, both fixed.**
+
+- *Must Fix: `SchemaVersion`'s own property initializer defeated the
+  mismatch gate it exists to enforce, and its doc comment's claim about
+  what happens to a pre-field file was false.* `public int SchemaVersion
+  { get; set; } = CurrentSchemaVersion;` runs in the default constructor,
+  and Newtonsoft.Json only overwrites properties actually present in the
+  source JSON - so a file whose JSON omits "SchemaVersion" entirely (the
+  one real class of old file this branch's own dev-iteration history could
+  produce) deserialized as `CurrentSchemaVersion` (1), not the doc
+  comment's claimed 0, sailing straight through `PlanStoreHelpers.
+  DeserializePersistedPlan`'s `plan.SchemaVersion != PersistedPlan.
+  CurrentSchemaVersion` gate and restoring with `NodeOverrides`/
+  `IgnoredItemIds` (or any future renamed/removed member) silently null -
+  exactly the "partial render" spec item 4 forbids. Verified against the
+  project's pinned `Newtonsoft.Json 13.0.1`: missing field deserializes as
+  1 with the initializer in place, an explicit `"SchemaVersion": 0`
+  deserializes as 0 - which is why the pre-existing `LoadLatest_
+  SchemaVersionMismatch_ReturnsNullAndLogsWarn` test (writes an explicit
+  0) never caught this. Fixed: dropped the property initializer -
+  `SchemaVersion` now defaults to the CLR's 0, matching the existing
+  `VendorOfferDataset`/`RecipeCacheSerializer` `SchemaVersion` fields
+  elsewhere in this codebase, which follow the same no-initializer
+  pattern - and both real construction sites
+  (`Module.PersistAfterGenerateAsync`/`PersistResolvedPlanInBackground`)
+  now set `SchemaVersion = PersistedPlan.CurrentSchemaVersion` explicitly.
+  New test `LoadLatest_MissingSchemaVersionField_ReturnsNullAndLogsWarn`
+  writes JSON that omits the member entirely (rather than an explicit 0)
+  and proves it is now correctly rejected; `Save_Load_
+  DefaultSchemaVersion_MatchesCurrentAndRoundTrips` (which had asserted
+  the now-corrected-away "unset in C# equals current" behavior) was
+  renamed to `Save_Load_ExplicitCurrentSchemaVersion_RoundTrips` and now
+  sets the field explicitly, matching every real construction site.
+- *Must Fix: a degraded-but-structurally-valid restored plan could poison
+  the Crafting Plan tab permanently, not just once.* `ApplyRestoredPlan`'s
+  second try/catch (around the live-tab `RenderPlan` call) only logged on
+  failure - `_treeController.ResetForNewPlan(result)`/`RestoreOverrides`,
+  `_currentPlan = vm`, and `_planGeneratedAt` were all already committed
+  before that guarded call, so a `RenderPlan` failure left `_currentPlan`
+  pointing at a vm that had just proven it cannot render. This is
+  reachable with a structurally valid file: `PlanViewModelBuilder` copies
+  the crafting tree by REFERENCE rather than validating it
+  (`TreeRoot = result.CraftingTree`), so a null child inside
+  `CraftingTreeNode.Children` is never touched by the vm build the FIRST
+  try/catch guards - only `RenderPlan`'s own tree recursion dereferences
+  it. `Build()`'s own tail (`if (_currentPlan != null) RenderPlan
+  (_currentPlan)`) has no try/catch of its own, and neither does
+  `ViewAdapter.Build` around it, so the SAME exception would escape into
+  Blish's view construction on every later visit to the tab, not just the
+  one during restore. Fixed: the catch now rolls every piece of state the
+  method committed back to the tab's ordinary empty fresh-start shape
+  (`_treeController.ResetForNewPlan(null)`, `_lastDebugLog = null`,
+  `_currentPlan = null`) before returning, matching spec item 4's "never
+  partially render" for the live-tab path the same way the first
+  try/catch already did for the build-time path. No new automated test:
+  `CraftingPlanView` is Blish HUD UI code (constructs `Blish_HUD.
+  Controls.Panel`/`Label` etc. directly), which this repo's Blish-free
+  test invariant puts out of reach of the xunit suite - round 1's
+  original try/catch fix shipped the same way, without a dedicated test,
+  for the same reason. Verified by code inspection only.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors). Module test
+suite green - 1258 passed (was 1257 before this round-2 pass; +1 new
+test, `LoadLatest_MissingSchemaVersionField_ReturnsNullAndLogsWarn`;
+`Save_Load_DefaultSchemaVersion_MatchesCurrentAndRoundTrips` was renamed
+to `Save_Load_ExplicitCurrentSchemaVersion_RoundTrips`, not counted as
+new). Pre-existing StyleCop analyzer warnings unchanged in nature (not
+re-audited line-by-line, per item 6's own validation note). No new Blish
+HUD references in tests; every changed/new test exercises real
+production code (`PlanStore`/`PlanStoreHelpers` against a real temp
+directory) with no contract-mirror/fake-logic tests. Item/currency/vendor
+IDs remain internal-only. Not regressed: W3B's `PlanStripStatusBoard`
+pull-based status strip and W3C's per-character discipline display
+(neither touched by this pass).
+
 Live desktop gate:
 [PENDING - the orchestrator fills in PASS/FAIL]
