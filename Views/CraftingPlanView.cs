@@ -1719,20 +1719,31 @@ namespace GW2CraftingHelper.Views
             //   nothing yet          -> leave "Ready" as set above.
             // This MUST run after _contentPanel above is reassigned to the
             // new FlowPanel, not before - RenderFromBoard (called
-            // synchronously by ArmSpinnerTicker) bails out whenever
-            // _contentPanel is null or already-disposed (see that method's
-            // own doc comment), and until the reassignment above runs,
-            // _contentPanel still holds the PREVIOUS build cycle's panel,
-            // which ViewAdapter.Build already disposed before invoking this
-            // Build() call at all.
+            // synchronously by ArmSpinnerTicker, and directly below for the
+            // not-in-flight case) bails out whenever _contentPanel is null
+            // or already-disposed (see that method's own doc comment), and
+            // until the reassignment above runs, _contentPanel still holds
+            // the PREVIOUS build cycle's panel, which ViewAdapter.Build
+            // already disposed before invoking this Build() call at all.
+            //
+            // Gate round 2 review-fix: the not-in-flight branch used to
+            // re-derive its own "has a final status -> SetStatus it,
+            // otherwise leave Ready" copy of RenderFromBoard's own ladder
+            // inline here, duplicating the render decision in two places
+            // that could silently drift apart (RenderFromBoard's doc
+            // comment already claimed to be "the ONLY place" that writes a
+            // snapshot into _statusLabel - now actually true). Calling
+            // RenderFromBoard(boardSnapshot) directly covers both the
+            // "finished, has status" and "nothing yet" cases identically to
+            // what this branch computed by hand.
             var boardSnapshot = _statusBoard.Snapshot();
             if (boardSnapshot.InFlight)
             {
                 ArmSpinnerTicker(boardSnapshot.Sequence);
             }
-            else if (!string.IsNullOrEmpty(boardSnapshot.FinalStatusText))
+            else
             {
-                SetStatus(boardSnapshot.FinalStatusText);
+                RenderFromBoard(boardSnapshot);
             }
 
             if (_currentPlan != null)
@@ -2427,15 +2438,34 @@ namespace GW2CraftingHelper.Views
                     // already called _statusBoard.Finish(myGen, ...)
                     // unconditionally, which is the board's own "no longer
                     // in flight" transition (see PlanStripStatusBoard.Finish's
-                    // own doc comment). Cancelling the ticker here is a
-                    // harmless, immediate belt-and-braces stop - the ticker
-                    // would otherwise self-stop on its own very next frame
-                    // once SpinnerTick observes the same Finish() write via
-                    // Snapshot(), so this just avoids that one wasted tick
-                    // regardless of panel liveness below (no live control to
-                    // leak either way, but no reason to leave a
-                    // SpriteScreen-parented ticker running once this
-                    // generation is over).
+                    // own doc comment).
+                    //
+                    // Gate round 2 review-fix (critical): this callback is
+                    // queued via MainThreadMarshal.Run immediately after the
+                    // success/catch callback above (no await between them),
+                    // and GameService.Overlay.QueueMainThreadUpdate drains
+                    // its whole queue in one pass - so both callbacks run
+                    // back-to-back in the SAME drain, with no real engine
+                    // frame (no Control.DoUpdate) able to land between them.
+                    // The line below used to be a bare _spinnerTicker?.Cancel()
+                    // with a comment claiming this "just avoids one wasted
+                    // tick" - that was wrong: Cancel() synchronously
+                    // Dispose()s the ticker (Parent = null, removed from
+                    // SpriteScreen's children) before SpinnerTick ever gets
+                    // a DoUpdate to observe this generation's own Finish()
+                    // write, which was the ONLY remaining renderer of the
+                    // final status text (Finish() itself is a pure state
+                    // write with no render side effect, by design). Net
+                    // effect pre-fix: the strip froze on the last phase
+                    // text + a spinner glyph forever on the ordinary
+                    // no-tab-switch path, never showing "Plan generated -
+                    // <time>" / "Error: ..." until the next Generate or a
+                    // tab flip. Rendering the board's current snapshot here,
+                    // through the same RenderFromBoard every other writer
+                    // funnels through, flushes the final text deterministically
+                    // before the ticker that would otherwise have to do it
+                    // is torn down.
+                    RenderFromBoard(_statusBoard.Snapshot());
                     _spinnerTicker?.Cancel();
                     _spinnerTicker = null;
                     if (_contentPanel == null || _contentPanel.Parent == null) return;
@@ -2496,44 +2526,53 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// W3B gate round 1 fix: FrameTicker step for generation
         /// <paramref name="myGen"/>. Pulls a fresh snapshot from
-        /// _statusBoard every real frame; bails (returns false, which
-        /// <see cref="FrameTicker.DoUpdate"/> treats as "stop and cancel
-        /// me") the moment the board reports either a NEWER generation has
-        /// since begun (Sequence != myGen - this ticker's own generation
-        /// has been superseded) or this generation has finished
-        /// (!InFlight) - in the finished case it renders the final status
-        /// text one last time first, which is what makes "the board
-        /// reports finished -> render final status and stop" true without
-        /// any separate completion-callback write into this control ever
-        /// being needed. The spinner glyph itself only advances (and only
-        /// then re-renders) once per SpinnerTickInterval, not every frame -
-        /// DoUpdate fires ~60x/sec, and writing to an AutoSizeWidth Label's
-        /// Text re-triggers a text measure/layout pass even when the
-        /// string is unchanged, so re-rendering every single frame instead
-        /// of ~7x/sec would be a real, avoidable per-frame cost on the UI
-        /// thread for the entire duration of every generation.
+        /// _statusBoard every real frame and hands it, together with
+        /// <paramref name="myGen"/>, to the pure
+        /// <see cref="PlanStripTickDecision.Decide"/> - the race-sensitive
+        /// "stop, render the spinner, or render the final text and stop"
+        /// decision itself lives there (Blish-free, directly testable), not
+        /// here; this method only carries out whatever it returns and owns
+        /// the spinner-glyph throttling (see below). Gate round 2
+        /// review-fix: extracted out of this method so the "finish landed
+        /// before the first tick" / "finish landed between two ticks"
+        /// orderings can be asserted without any Blish control in the loop
+        /// - see PlanStripTickDecisionTests.
+        /// <see cref="PlanStripTickAction.RenderFinalAndStop"/> is what
+        /// makes "the board reports finished -> render final status and
+        /// stop" true without any separate completion-callback write into
+        /// this control ever being needed. The spinner glyph itself only
+        /// advances (and only then re-renders) once per SpinnerTickInterval,
+        /// not every frame - DoUpdate fires ~60x/sec, and writing to an
+        /// AutoSizeWidth Label's Text re-triggers a text measure/layout
+        /// pass even when the string is unchanged, so re-rendering every
+        /// single frame instead of ~7x/sec would be a real, avoidable
+        /// per-frame cost on the UI thread for the entire duration of every
+        /// generation.
         /// </summary>
         private bool SpinnerTick(int myGen, GameTime gameTime)
         {
             if (_contentPanel == null || _contentPanel.Parent == null) return false;
 
             var snapshot = _statusBoard.Snapshot();
-            if (snapshot.Sequence != myGen) return false;
-
-            if (!snapshot.InFlight)
+            switch (PlanStripTickDecision.Decide(snapshot, myGen))
             {
-                RenderFromBoard(snapshot);
-                return false;
-            }
+                case PlanStripTickAction.RenderFinalAndStop:
+                    RenderFromBoard(snapshot);
+                    return false;
 
-            var now = DateTime.UtcNow;
-            if (now - _lastSpinnerTickUtc >= SpinnerTickInterval)
-            {
-                _lastSpinnerTickUtc = now;
-                _spinnerFrameIndex = (_spinnerFrameIndex + 1) % SpinnerFrames.Length;
-                RenderFromBoard(snapshot);
+                case PlanStripTickAction.RenderSpinner:
+                    var now = DateTime.UtcNow;
+                    if (now - _lastSpinnerTickUtc >= SpinnerTickInterval)
+                    {
+                        _lastSpinnerTickUtc = now;
+                        _spinnerFrameIndex = (_spinnerFrameIndex + 1) % SpinnerFrames.Length;
+                        RenderFromBoard(snapshot);
+                    }
+                    return true;
+
+                default: // Stop (or any future action - fail safe by stopping, never spin forever)
+                    return false;
             }
-            return true;
         }
 
         /// <summary>
