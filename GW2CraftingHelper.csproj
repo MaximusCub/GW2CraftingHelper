@@ -63,6 +63,9 @@
     <Compile Include="Services\SnapshotHelpers.cs" />
     <Compile Include="Services\SnapshotSearchResultBuilder.cs" />
     <Compile Include="Services\SnapshotStore.cs" />
+    <Compile Include="Models\PersistedPlan.cs" />
+    <Compile Include="Services\PlanStore.cs" />
+    <Compile Include="Services\PlanStoreHelpers.cs" />
     <Compile Include="Services\StatusStore.cs" />
     <Compile Include="Services\StatusText.cs" />
     <Compile Include="Models\RecipeNode.cs" />

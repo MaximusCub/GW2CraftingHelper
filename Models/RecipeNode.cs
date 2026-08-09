@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace GW2CraftingHelper.Models
 {
@@ -9,6 +10,15 @@ namespace GW2CraftingHelper.Models
         public int Quantity { get; set; }
         public int NodeId { get; set; }
         public List<RecipeOption> Recipes { get; set; } = new List<RecipeOption>();
+
+        // W3D (plan persistence): computed, not stored - Newtonsoft would
+        // otherwise write this into every persisted plan.json even though
+        // it can never be assigned back on load (no setter). [JsonIgnore]
+        // keeps the on-disk schema to genuine state only; behavior is
+        // unchanged either way (a read-only computed property was always
+        // silently skipped on deserialize, this just also skips it on
+        // serialize).
+        [JsonIgnore]
         public bool IsLeaf => Recipes.Count == 0;
 
         // M37 (KNOWN-ISSUES #26, gw2e parity - achievement-bit ingredient
