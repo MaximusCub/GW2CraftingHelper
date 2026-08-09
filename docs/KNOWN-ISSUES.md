@@ -1794,5 +1794,176 @@ and W3C's per-character discipline display (`CharacterDisciplines` flows
 through `PersistedPlan.Result`/`SolveContext` exactly like every other
 cosmetic field, no special-casing needed).
 
+**6. Review-fix pass (2026-08-09) - 3 Critical + 8 Must Fix findings from
+adversarial code review, all fixed.**
+
+- *Critical: the user's decision-pill overrides were not persisted at
+  all - only the override-updated `Result`.* `PersistedPlan` had no field
+  for `TreeSectionController`'s `_nodeOverrides`/`_ignoredItemIds`, and
+  `ApplyRestoredPlan` called `_treeController.ResetForNewPlan(result)`,
+  which clears both. A restored session's very next pill click would
+  therefore re-solve with only that ONE new override applied, silently
+  discarding every override set before the restart - the exact
+  correctness bar spec item 3 names. Fixed: `PersistedPlan` gained
+  `NodeOverrides`/`IgnoredItemIds`; `Module.cs`'s `resolveOverridesSync`
+  lambda now passes the SAME `overrides`/`ignoredItemIds`
+  `TreeSectionController.ApplyOverridesAndResolve` calls it with straight
+  into `PersistResolvedPlanInBackground` (copied into independent
+  collections synchronously, before any backgrounding - see that
+  method's own doc comment for why); `TreeSectionController` gained
+  `RestoreOverrides`, called from `ApplyRestoredPlan` right after
+  `ResetForNewPlan`. A new `PlanStoreTests` case
+  (`Save_Load_NodeOverridesAndIgnoredItemIds_RoundTripAndDriveIdenticalReResolve`)
+  proves a FURTHER re-solve against the reloaded overrides matches the
+  original.
+- *Critical: `PlanStripStatusBoard.SeedRestored` unconditionally stomped
+  `_sequence`/`_inFlight`, bypassing `StatusUpdateGuard`.* `Module.LoadAsync`
+  arms the restore flag BEFORE awaiting its own network refresh, but
+  Blish HUD does not call a module's `Update()` until `LoadAsync`'s Task
+  fully completes - so a user can open the window and have an entire
+  Generate complete before the restore drain ever runs. Seeding in that
+  window would silently reject every subsequent
+  `UpdatePhase`/`Finish` call for the in-flight/just-finished generation
+  and freeze its spinner - the exact W3B "lost completion status" bug
+  this board exists to prevent. Fixed: `SeedRestored` is now a no-op
+  unless `_sequence == 0 && !_inFlight` (the board's pristine initial
+  state). 4 new `PlanStripStatusBoardTests` cover the seed itself, a real
+  `Begin` superseding it, and both rejection cases (in-flight, already
+  finished).
+- *Critical: the restore drain had no "a real Generate already ran this
+  session" guard, and a narrower residual race in the first fix of this
+  same finding.* `Module.cs`'s restore drain unconditionally overwrote
+  the persisted-metadata fields and called `ApplyRestoredPlan`, whose own
+  doc comment asserted "always before the user can possibly have clicked
+  Generate" - false whenever `LoadAsync` is slow, per the `SeedRestored`
+  finding above. Fixed with a `_generateCompletedThisSession` flag,
+  checked by the drain before applying a restore. The first pass of this
+  fix used a bare `volatile bool`, which closed the multi-second network-
+  refresh window but left a narrow (few-CPU-instruction) TOCTOU race
+  between Update()'s flag check and `PersistAfterGenerateAsync`'s flag
+  set + metadata publish, on two different threads. Closed by moving the
+  compound "check flag, publish restore metadata" (drain side) and "set
+  flag, publish generate metadata" (generate side) sequences under one
+  new `_generateCompletionLock` - scoped to only the cheap field
+  read/write pair on each side, never held across `PlanStore.Save`'s disk
+  I/O or `ApplyRestoredPlan`'s Blish rendering work, so it cannot stall
+  the UI thread or delay `TriggerGenerate`'s own await chain.
+- *Must Fix: `ApplyRestoredPlan` had no try/catch and ran straight out of
+  `Module.Update()`.* `PlanStoreHelpers`' tolerance gate only checks
+  `Result?.Plan`/`SchemaVersion` structurally, so a structurally valid
+  but still-degraded `plan.json` (e.g. a null `Steps`/`UsedMaterials`
+  entry from a future schema change) could throw inside
+  `PlanViewModelBuilder.Build`/`RenderPlan`, taking the whole module's
+  update loop down with it - snapshot drain, log poll, staleness refresh,
+  all of it. Fixed: wrapped in two narrow try/catches (vm build; render),
+  each logging one Warn line via `ModuleLog` instead of throwing. The vm
+  build now happens BEFORE any state field is mutated (matching
+  `TriggerGenerate`'s own established ordering), so a build failure
+  leaves `_currentPlan` untouched - a clean "fresh start" (spec item 4),
+  not a half-applied one.
+- *Must Fix: `PersistAfterGenerateAsync` had no stale-generation guard.*
+  Justified by "a second Generate cannot start while an earlier one's
+  persist is still running" - false once `OnOwnMaterialsToggled`'s
+  modal-confirm path is considered: it fires a second `TriggerGenerate`
+  gated only on `_currentPlan != null`, which W3D now makes true from
+  module load onward (a restored plan), not on the Generate button's own
+  disabled state. Fixed with a new `_persistGenerateSequence` counter,
+  mirroring `CraftingPlanView`'s own `++_generateSequence` convention but
+  scoped to Module's own disk-write decision - stamped synchronously,
+  in lockstep with the view's own counter, immediately before each
+  `generateTask` is created; `PersistAfterGenerateAsync` skips its disk
+  write entirely if a newer call has since started.
+- *Must Fix: every override re-solve re-serialized the FULL
+  `PersistedPlan` graph with `Formatting.Indented`, with no coalescing.*
+  Measured on a synthetic 364-node/400-priced-item tree: 527 KB indented
+  vs. 216 KB compact. Rapid pill clicking (or a Best Path/Craft All/Buy
+  All preset) queued one such multi-hundred-KB serialize+write per click,
+  all serialized behind `PlanStore`'s own internal lock. Fixed:
+  `PlanStoreHelpers.SerializePersistedPlan` switched to
+  `Formatting.None`; `Module.PersistResolvedPlanInBackground` gained a
+  latest-write-wins coalescing worker (`_pendingPlanSaveLock`/
+  `DrainPendingPlanSaves`) - a superseded pending write is dropped before
+  it ever reaches `PlanStore.Save`, self-healing under the same
+  "whichever write lands last wins" contract `PlanStore.Save`'s own lock
+  already establishes.
+- *Must Fix: the round-trip tests never actually exercised the
+  serialization-fidelity risk item 1 investigated.* Every existing
+  `PlanStoreTests` fixture built its pipeline with 4 args (no vendor
+  store, no account recipe client, no snapshot, no non-default
+  `CurrencyValuation`/`HomesteadEfficiencyTiers`), so `LearnedRecipeIds`,
+  `ForceBuyOnlyNodeIds`, `VendorOffers`, `CurrencyValuation`,
+  `HomesteadEfficiencyTiers`, `OwnedCurrencyAmounts`,
+  `CharacterDisciplines`, and `RequestedItems`/`MultiItemRoots` were
+  always null/empty in every round trip. 3 new tests close this: a
+  full-featured single-item fixture exercising every one of those shapes
+  at once with real content (`Save_Load_FullFeaturedFixture_...`), a
+  force-buy-pre-pass fixture proving `ForceBuyOnlyNodeIds` (an `ISet<int>`)
+  round-trips and a manual override still beats it after reload
+  (`Save_Load_ForceBuyOnlyNodeIds_...`), and a genuine multi-item batch
+  proving `ResolveWithOverrides`' OTHER branch
+  (`ApplyBatchSellSideEconomics`, gated on
+  `Tree.Id == MultiItemWrapperItemId`) also round-trips correctly
+  (`Save_Load_MultiItemBatch_...`).
+- *Must Fix: no schema-version field - the only "old-schema" detection
+  was the structural `Result?.Plan != null` check.* Any future
+  rename/removal inside `CraftingPlanResult`/`PlanSolveContext` would
+  produce a file that still passes that check and restores with the
+  changed members silently defaulted to null - a partial render, which
+  spec item 4 forbids. Fixed: `PersistedPlan` gained
+  `SchemaVersion`/`CurrentSchemaVersion` (currently 1), checked
+  alongside the structural gate in
+  `PlanStoreHelpers.DeserializePersistedPlan`. `PriceBasis`/
+  `AcquisitionSource` also gained `[JsonConverter(typeof(StringEnumConverter))]`
+  (matching `ModuleLogEntry`'s own precedent for `ModuleLogLevel`), so a
+  future member reorder can no longer silently remap an already-persisted
+  plan's price basis or a decision's source.
+- *Must Fix: an unguarded cross-thread race on the four persisted-metadata
+  fields.* `PersistAfterGenerateAsync` wrote `GeneratedAt`/`RequestItems`/
+  `UseOwnMaterials`/`PriceBasis` one-at-a-time with no lock from a
+  ThreadPool continuation, while `PersistResolvedPlanInBackground` read
+  all four synchronously on the main thread from a pill click - a pill
+  click's read interleaving between two of the sequential writes could
+  persist a `PersistedPlan` whose `GeneratedAt` no longer matched its
+  `RequestItems`/`UseOwnMaterials`/`PriceBasis`. Fixed by bundling all
+  four into one immutable `PersistedPlanMetadata` object published
+  through a single `volatile` field - object construction always fully
+  completes before the reference is published, so a reader observing a
+  given instance sees all four values as they were at that SAME publish.
+- *Must Fix: `ApplyRestoredPlan` never pushed the seeded staleness banner
+  into an already-live tab.* Its own doc comment claimed the live-tab
+  branch "renders into it directly" - true for `RenderPlan(vm)`, but it
+  never called `RenderFromBoard`, the file's own documented "ONLY place
+  that writes a snapshot into `_statusLabel`". In the (reachable, if
+  narrow) window where the Crafting Plan tab is already built by the time
+  the restore drain runs, the plan content rendered but the required
+  banner text stayed invisible until the user switched tabs away and
+  back. Fixed with a one-line `RenderFromBoard(_statusBoard.Snapshot())`
+  call alongside the seed.
+- *Must Fix: `PlanStripStatusBoardTests` had zero coverage for the new
+  `SeedRestored` method.* Folded into the `SeedRestored` critical fix
+  above (4 new tests) rather than tracked separately.
+
+New tests: `PlanStoreTests` gained 7 (overrides/ignored-item-ids round
+trip + fresh-generate-is-empty, schema-version mismatch + default-matches-
+current, force-buy-pre-pass round trip, the full-featured fixture, the
+multi-item batch). `PlanStripStatusBoardTests` gained 4 (`SeedRestored`
+itself, `Begin` superseding it, both rejection cases). All Blish-free,
+built against real `CraftingPlanPipeline`/`PlanStore`/
+`PlanStripStatusBoard` production code paths - no contract-mirror/
+fake-logic tests, no fake file I/O (`PlanStoreTests` runs against a real
+temp directory throughout, matching the `SnapshotStoreTests` precedent).
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
+warnings from any touched file). Module test suite green - 1257 passed
+(was 1246 before this review-fix pass; +11 new tests, all listed above).
+No new Blish HUD references in tests; every new test exercises real
+production code with no contract-mirror/fake-logic tests. Item/currency/
+vendor IDs remain internal-only. Not regressed: W3B's
+`PlanStripStatusBoard` pull-based status strip (`SeedRestored`'s own
+guard is now stricter, every pre-existing Begin/UpdatePhase/Finish
+behavior and test is unchanged) and W3C's per-character discipline
+display (`CharacterDisciplines` still flows through
+`PersistedPlan.Result`/`SolveContext` unchanged).
+
 Live desktop gate:
 [PENDING - the orchestrator fills in PASS/FAIL]
