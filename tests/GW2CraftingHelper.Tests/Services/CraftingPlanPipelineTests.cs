@@ -647,6 +647,156 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Same(result.CharacterDisciplines, result.SolveContext.CharacterDisciplines);
         }
 
+        // --- W3C review-fix round 2 (mustFix): the explicit
+        // characterDisciplines argument (see GenerateStructuredAsync's own
+        // doc comment on that parameter) must feed PlanResultBuilder.Build's
+        // discipline tiebreak on the list overload's SINGLE-item
+        // short-circuit exactly like a non-null snapshot would - this is
+        // the precise call shape Module.cs's useOwn:false branch uses
+        // (snapshot: null, characterDisciplines: the real account list) to
+        // keep the Required Disciplines row from silently reporting a
+        // discipline the account doesn't have (and then rewriting itself on
+        // the very next local override re-solve, once SolveContext started
+        // carrying the real list forward). ---
+        [Fact]
+        public async Task GenerateStructuredAsync_ListOverload_NullSnapshotWithExplicitCharacterDisciplines_TiebreakPrefersAccountDiscipline()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                // No single craft step elsewhere in the plan to seed a Pass
+                // 1 preference - matches PlanResultBuilderTests.
+                // RequiredDisciplines_MultiDisciplineRecipe_PrefersAccountDiscipline's
+                // own setup, so a bare alphabetical fallback would report
+                // "Armorsmith" here if the tiebreak never saw account data.
+                Disciplines = new List<string> { "Armorsmith", "Leatherworker", "Tailor" },
+                MinRating = 450
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var accountDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Tailor", Rating = 500, Active = true }
+            };
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 }
+            };
+
+            // snapshot: null (as Module.cs passes when "Use Own Materials"
+            // is off) but characterDisciplines explicitly supplied - the
+            // exact shape of the bug this test guards against.
+            var result = await pipeline.GenerateStructuredAsync(
+                items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,
+                characterDisciplines: accountDisciplines);
+
+            Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Tailor", result.RequiredDisciplines[0].Discipline);
+            Assert.Same(accountDisciplines, result.CharacterDisciplines);
+            Assert.Same(accountDisciplines, result.SolveContext.CharacterDisciplines);
+
+            // The bug this guards against: a local override re-solve used
+            // to see a DIFFERENT (newly non-null) CharacterDisciplines than
+            // the initial Build() call did, silently changing the reported
+            // discipline. Since SolveContext already carries the correct
+            // list from generation time, a no-op re-solve must report the
+            // identical discipline, not "discover" Tailor for the first
+            // time here.
+            var resolved = pipeline.ResolveWithOverrides(result.SolveContext, null);
+            Assert.Single(resolved.RequiredDisciplines);
+            Assert.Equal("Tailor", resolved.RequiredDisciplines[0].Discipline);
+        }
+
+        [Fact]
+        public async Task GenerateStructuredMultiAsync_NullSnapshotWithExplicitCharacterDisciplines_TiebreakPrefersAccountDiscipline()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                },
+                Disciplines = new List<string> { "Armorsmith", "Leatherworker", "Tailor" },
+                MinRating = 450
+            });
+            recipeApi.AddSearchResult(2, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 2,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200);
+            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
+            priceApi.AddPrice(4, buyUnitPrice: 20, sellUnitPrice: 200);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target Item A", "targeta.png");
+            itemApi.AddItem(2, "Target Item B", "targetb.png");
+            itemApi.AddItem(3, "Ingredient A", "ingredienta.png");
+            itemApi.AddItem(4, "Ingredient B", "ingredientb.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var accountDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Tailor", Rating = 500, Active = true }
+            };
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(
+                items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,
+                characterDisciplines: accountDisciplines);
+
+            Assert.Contains(result.RequiredDisciplines, d => d.Discipline == "Tailor");
+            Assert.DoesNotContain(result.RequiredDisciplines, d => d.Discipline == "Armorsmith" || d.Discipline == "Leatherworker");
+            Assert.Same(accountDisciplines, result.CharacterDisciplines);
+            Assert.Same(accountDisciplines, result.SolveContext.CharacterDisciplines);
+        }
+
         [Fact]
         public async Task GenerateStructuredAsync_OwnedIntermediate_RemovesCraftStep_And_Discipline()
         {
