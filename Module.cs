@@ -117,6 +117,21 @@ namespace GW2CraftingHelper
 
         private HttpClient _httpClient;
         private CraftingPlanPipeline _craftingPipeline;
+
+        // W3B gate round 1 fix (tab-switch strip freeze/lost completion
+        // status - see docs/KNOWN-ISSUES.md's W3B section and
+        // Services/PlanStripStatusBoard.cs's own doc comment for the full
+        // rationale). Lives here rather than as a CraftingPlanView field so
+        // it survives independently of any single view build cycle, same
+        // module-level-state-outlives-a-view-rebuild precedent as
+        // _logViewClearedBeforeVersion above - unlike that field, this is
+        // a genuinely thread-safe object (constructor-injected once into
+        // CraftingPlanView below, not re-injected per Build() the way
+        // LogTabContent's getter/setter delegates are, since
+        // CraftingPlanView itself is a singleton Module constructs exactly
+        // once - see the field's own doc comment for why a single
+        // reference is enough here).
+        private readonly PlanStripStatusBoard _planStripStatusBoard = new PlanStripStatusBoard();
         private VendorOfferStore _vendorOfferStore;
         private IItemSearchProvider _itemSearchProvider;
         private Texture2D _moduleIconTexture;
@@ -440,6 +455,7 @@ namespace GW2CraftingHelper
                 _modalDialog,
                 _itemSearchProvider,
                 _settings,
+                _planStripStatusBoard,
                 (ctx, overrides, ignoredItemIds) => _craftingPipeline.ResolveWithOverrides(ctx, overrides, ignoredItemIds)
             );
 
