@@ -1638,3 +1638,161 @@ checks, the seeded snapshot rendered correctly on the Snapshot tab, the
 Required Recipes "(showing N missing of M)" header and Hide Unlocked
 default were intact, and craft steps showed "Mystic Forge" as a plain
 location tag with no fake level.
+
+## W3D: Plan persistence across module restarts (2026-08-09)
+
+User-directed, field-test feedback: a generated plan started empty every
+session - the Crafting Plan tab had no memory of the last plan across a
+module close/reopen. Implemented in the isolated `wt-w3d` worktree off
+`master` (`63a4824`) on branch `w3d-plan-persistence`.
+
+**1. Investigation: serialization fidelity (the whole risk of this
+package).** `Models/CraftingPlanResult.cs`/`PlanSolveContext.cs` and the
+crafting-tree node types (`RecipeNode`/`RecipeOption`, `CraftingTreeNode`)
+were audited for reference cycles, interface-typed members, and computed
+state before any store code was written. Findings: `RecipeNode`/
+`RecipeOption`/`CraftingTreeNode` form a pure tree with no parent
+back-pointers anywhere (confirmed by reading every field) - no cycles, so
+no `ReferenceLoopHandling`/`[JsonIgnore]`-plus-fixup-pass is needed for
+this package at all. `PlanSolveContext`'s several
+`IReadOnlyDictionary<TKey,TValue>`/`IReadOnlyList<T>`/`ISet<int>`-typed
+members and its `CurrencyValuation`/`HomesteadEfficiencyTiers` members
+(both immutable, single-constructor, no parameterless constructor,
+constructor parameter names matching their read-only property names only
+case-insensitively - e.g. `copperPerUnit` binds to `CopperPerUnit`) were
+verified to round-trip correctly through plain `Newtonsoft.Json 13.0.1`
+with zero custom converters, via a disposable scratch console project
+(deleted before implementation) proving the exact same shapes round-trip
+byte-for-byte - Json.NET's built-in interface-collection support and
+single-constructor parameter-matching both already handle every shape
+this schema needs. The one genuinely inert member,
+`RecipeNode.IsLeaf` (`Recipes.Count == 0`, get-only), was already silently
+skipped on deserialize (no setter) but was still written into every
+serialized payload; `[JsonIgnore]` added to keep the on-disk schema to
+genuine state only (Models/RecipeNode.cs) - a schema-cleanliness fix, not
+a correctness one. This was proven, not assumed: see item 4's real
+pipeline-backed round-trip tests, which exercise every one of these
+shapes through a real `CraftingPlanPipeline` result rather than a
+hand-built object graph.
+
+**2. `PlanStore` + `PersistedPlan` (`Services/PlanStore.cs`,
+`Services/PlanStoreHelpers.cs`, `Models/PersistedPlan.cs`).** Mirrors
+`SnapshotStore`'s shape exactly (single JSON file in the module's `data/`
+directory, atomic `.tmp`+`Replace`/`Move` write, `onError` callback wired
+to `ModuleLog` at Warn - the same `onStoreError` closure `Module.cs`
+already builds for every other store) with one deliberate divergence: a
+corrupt or too-degraded-to-render file is NOT silently swallowed to null
+the way `SnapshotHelpers.DeserializeSnapshot` is - `PlanStoreHelpers.
+DeserializePersistedPlan` lets a JSON parse failure, or a structurally
+valid document missing `Result`/`Result.Plan`, propagate as a thrown
+exception, which `PlanStore.LoadLatest`'s own try/catch turns into the
+required Warn log line before returning null (spec item 4: "corrupt/
+unreadable/old-schema file = fresh start with one Warn log line" -
+distinct from `SnapshotStore`'s own silent-null precedent for a corrupt
+`snapshot.json`, which this package does not touch). A missing file stays
+silent (ordinary first-run case, not a failure). `PersistedPlan` holds the
+generated-at timestamp, the original request (item ids + quantities +
+"Use Own Materials" + price basis), and the full `CraftingPlanResult`
+(whose own `SolveContext` member already carries everything a local
+`ResolveWithOverrides` re-solve needs - no separate top-level field
+required). `PlanStore.Save` takes an internal lock (unlike every other
+store in this module, which relies on a higher-level in-flight guard -
+see item 3) because it has two genuinely independent callers that can
+race each other.
+
+**3. Persist wiring (`Module.cs`).** After each successful Generate,
+`PersistAfterGenerateAsync` (awaited as part of the `generateAsync`
+delegate `CraftingPlanView` already calls) saves the full result plus a
+fresh timestamp; a cancelled/failed generation propagates its exception
+unchanged and persists nothing. Writes off the UI thread with no extra
+dispatch needed - once the awaited pipeline call completes, this
+continuation already resumes on a ThreadPool thread (no
+`SynchronizationContext` installed - docs/ARCHITECTURE.md section 1), the
+same reasoning `FetchAndSaveSnapshotAsync`'s own post-await
+`_snapshotStore.Save` call already relies on. After each
+`ResolveWithOverrides` (so pill overrides survive a restart too),
+`PersistResolvedPlanInBackground` persists the override-updated result
+"in place" - same `GeneratedAt`/original request as the plan's last full
+Generate (tracked in four `_lastPersistedPlan*` fields, populated by
+either a real Generate or a restored plan - see item 4), only `Result`
+swapped. Unlike the Generate path, `ResolveWithOverrides`' caller runs
+synchronously on the main thread (a pill Click handler chain via
+`TreeSectionController.ApplyOverridesAndResolve`), so this write is
+dispatched via a fire-and-forget `Task.Run` rather than running inline -
+"no file I/O on the UI thread" (docs/ARCHITECTURE.md section 1). No
+generation-sequence guard was needed for the Generate-path write: it is
+proven safe by construction, not merely assumed - `PersistAfterGenerateAsync`
+is now part of the single Task `TriggerGenerate` awaits with
+`_generateButton.Enabled = false` for the whole duration (button
+re-enable only runs in `TriggerGenerate`'s own `finally`, after that
+await completes), so a second Generate cannot start while an earlier
+one's persist is still running.
+
+**4. Restore-on-load (`Module.cs`, `Views/CraftingPlanView.cs`,
+`Services/PlanStripStatusBoard.cs`).** Mirrors the existing "Applying
+snapshot to view" dirty-flag drain shape exactly:
+`LoadAsync` calls `_planStore.LoadLatest()` and, if non-null, sets
+`_pendingPlanRestore`/`_planRestoreDirty`; `Update()` (main thread) drains
+the flag - ahead of the `_refreshInProgress`/`_currentSnapshot` early
+returns, so a fresh account with no snapshot yet still restores its
+persisted plan - populating the same `_lastPersistedPlan*` fields item 3
+reads (so a pill click right after a restore, with no Generate run yet
+this session, still persists correctly) and calling the new
+`CraftingPlanView.ApplyRestoredPlan(result, generatedAt)`. That method
+mirrors `TriggerGenerate`'s own success-path shape: adopts the restored
+result as `TreeSectionController`'s override-loop baseline
+(`ResetForNewPlan`, so a restored plan's decision pills re-solve correctly
+with zero network calls - the correctness bar for this package), rebuilds
+the view model, and seeds the RECOMMENDED banner wiring via a new
+`PlanStripStatusBoard.SeedRestored(text)` method (sequence 0, which
+`CraftingPlanView`'s own `++_generateSequence` convention can never
+produce, so a genuine first Generate always supersedes it) - the existing
+pull-based status strip renders "Generated `<time>` - prices may have
+changed - Regenerate" with zero new layout. Render itself is guarded
+exactly like `TriggerGenerate`'s own liveness check: the tab has usually
+not been `Build()` yet at restore time (the common case), in which case
+only state is set and `Build()`'s own existing
+`if (_currentPlan != null) RenderPlan(_currentPlan)` tail renders it on
+first visit; if the tab is already live, it renders directly instead of
+waiting for a rebuild that may never come. Search box/quantity inputs are
+deliberately left at their session defaults (spec item 5) - no attempt is
+made to reconstruct the typed search text.
+
+**5. Tests (`tests/GW2CraftingHelper.Tests/Services/PlanStoreTests.cs`,
+11 new, Blish-free, real paths).** Mirrors `SnapshotStoreTests`' shape (a
+real `PlanStore` against a real temp directory) but builds its round-trip
+fixtures from a REAL `CraftingPlanPipeline` result (the same
+`InMemoryRecipeApiClient`/`InMemoryPriceApiClient`/`InMemoryItemApiClient`
+fake API clients `CraftingPlanPipelineTests` already uses) rather than a
+hand-built `CraftingPlanResult`, so the serialization-fidelity risk item 1
+investigated is actually exercised, not just asserted. Coverage: the
+reloaded result renders the identical `PlanViewModelBuilder` output as the
+original (byte-for-byte JSON-serialized comparison of both view models);
+`ResolveWithOverrides` on the reloaded `SolveContext` produces identical
+decisions/economics/view-model output to the same override applied to the
+original in-memory context (the W3D spec item 3 correctness bar); an
+override-updated result persists and reloads correctly "in place"; the
+original request (items/quantities/useOwn/priceBasis) and the
+generated-at timestamp round-trip exactly; a missing file returns null
+silently; a truncated/corrupt JSON file and a wrong-schema file (valid
+JSON, no `Result`) both return null with no throw and invoke the `onError`
+callback exactly once; the atomic-write `.tmp` file is never left behind;
+a directory-creation I/O failure invokes `onError` instead of throwing.
+No test references Blish HUD/`Gw2Sharp`; no fake file I/O (`PlanStore`
+runs against a real temp directory throughout).
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
+warnings from any touched file). Module test suite green - 1246 passed
+(was 1235; +11 new `PlanStoreTests`). No new Blish HUD references in
+tests; every new test exercises real production code
+(`CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`,
+`PlanStore`, `PlanViewModelBuilder`) with no contract-mirror/fake-logic
+tests. Item/currency/vendor IDs remain internal-only. Not regressed:
+W3B's `PlanStripStatusBoard` pull-based status strip (only additive
+surface added - `SeedRestored` - every existing method/guard unchanged)
+and W3C's per-character discipline display (`CharacterDisciplines` flows
+through `PersistedPlan.Result`/`SolveContext` exactly like every other
+cosmetic field, no special-casing needed).
+
+Live desktop gate:
+[PENDING - the orchestrator fills in PASS/FAIL]
