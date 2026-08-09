@@ -1315,3 +1315,103 @@ No exceptions in the Blish log across the session. The round-1 PASS
 items (live phase text, no jitter, rich file + Log-tab logging, plan
 replacement) were implicitly re-exercised across four generations in
 the two sessions and remained correct.
+
+## W3C: Per-character discipline display (2026-08-08)
+
+User-directed, field-test feedback (gw2efficiency parity): the Required
+Disciplines section of a generated plan listed each required discipline
+and its minimum rating, but never said WHO on the account could actually
+craft it. Implemented in the isolated `wt-w3c` worktree, STACKED on the
+unmerged `w3b-generation-progress` branch (base commit `1ffaa65`) on
+branch `w3c-character-disciplines`.
+
+**1. Snapshot capture (`Models/SnapshotCharacterDiscipline.cs`,
+`Services/Gw2AccountSnapshotService.cs`).** A new `SnapshotCharacterDiscipline`
+model (`CharacterName`, `Discipline`, `Rating`, `Active`) and a new
+`AccountSnapshot.CharacterDisciplines` list, captured inside the same
+per-character loop that already fetched each character's inventory.
+Round-trip reduction: `Gw2AccountSnapshotService`'s per-character fetch
+switched from the narrow `V2.Characters[name].Inventory.GetAsync` call to
+the fuller `V2.Characters[name].GetAsync`, whose `.Bags` is byte-identical
+in shape to the narrow endpoint's own `.Bags` (confirmed via Gw2Sharp
+1.7.4 reflection) and additionally carries `.Crafting` - one round trip
+per character now captures both signals instead of two, with no new
+permission requirement (Crafting only needs the already-required
+`account`/`characters` scopes). Inventory and crafting share the one
+per-character try/catch, so a single character's fetch failing degrades
+both signals for that character exactly like the pre-W3C code degraded
+inventory alone - it still never fails the whole snapshot (the outer
+character-LIST fetch failing is the only thing that does, unchanged).
+Every learned discipline is captured regardless of `Active` (GW2 only
+allows 2 concurrently active disciplines per character, but a levelled
+rating persists on an inactive one), using `CharacterCraftingDiscipline.
+Discipline.RawValue` (not the Gw2Sharp enum's `.Value`/`.ToEnumString()`)
+so the captured string matches `RequiredDiscipline.Discipline`'s own
+plain-string shape (from `Recipe.Disciplines`) byte-for-byte, including
+for a discipline value the enum does not recognize.
+`AccountSnapshot.CharacterDisciplines` is deliberately NOT defaulted to
+an empty list like `Items`/`Wallet` - null ("never captured": a pre-W3C
+snapshot.json, or a snapshot from before the character-list fetch even
+started) is a distinct, meaningful state from a non-null empty list
+("captured, and it came back empty"), preserved end-to-end through
+`SnapshotStore`'s existing Newtonsoft (de)serialization with zero store
+changes needed.
+
+**2. Display (`Models/CraftingPlanResult.cs`, `Models/PlanSolveContext.cs`,
+`Services/CraftingPlanPipeline.cs`, `Services/PlanViewModelBuilder.cs`,
+`Views/Rendering/DisciplinesSectionRenderer.cs`).** `CraftingPlanResult.
+CharacterDisciplines` is a straight passthrough of the snapshot (same
+"cosmetic, never fed into solving" shape as the existing M34-B2a
+`OwnedCurrencyAmounts` pattern), threaded through both `GenerateStructuredAsync`
+overloads (single- and multi-item) and snapshotted onto `PlanSolveContext`
+so a local `ResolveWithOverrides` re-solve keeps showing it without a
+network round trip. `PlanViewModelBuilder.BuildDisciplinesSection` adds a
+new `PlanRowViewModel.CharacterAvailabilityText` per discipline row via
+`BuildCharacterAvailabilityText`: characters that have the discipline are
+listed highest-rating-first as `"Anna (500), Bob (400)"`; a character
+below the row's required `MinRating` gets the `"Bob (400/450)"` slash-min
+suffix instead of being hidden or miscounted as sufficient; a discipline
+nobody has yields the plain `"Not trained on any character"` string
+(never silently blank); a snapshot with no character-crafting data at all
+(old snapshot / degraded fetch - `CharacterDisciplines` null) yields a
+null `CharacterAvailabilityText`, and the renderer shows nothing extra
+for that row rather than fabricate a claim either way. `DisciplinesSectionRenderer.
+CreateDisciplineRow` renders the non-null text as a secondary
+(`DefaultFont12`, grey) label between the discipline name and the
+right-aligned Level column, ellipsized to whatever room is left via the
+same `LabelHelpers.EllipsizeToWidth` + tooltip-on-truncate convention
+`UsedMaterialsSectionRenderer` already uses, with the full text on hover
+via `BasicTooltipText` when truncated. No new layout machinery: the row
+stays the existing fixed `PlanContentHeightMath.DisciplineRowHeight`
+(32px, untouched), and the new label's X position is fixed at build time
+(it sits after the discipline name, whose text never changes on resize)
+so only a settle-time re-ellipsis (`ISectionRelayoutSink.AddReellipsis`),
+never a reposition, is needed when the panel is resized.
+
+**3. Tests.** `SnapshotStoreTests` gained 2 (a real store, temp-directory
+round trip of populated `CharacterDisciplines`; null `CharacterDisciplines`
+round-trips as null, not an empty list). `SnapshotSerializationTests`
+gained 2 (a legacy snapshot.json missing the field entirely deserializes
+cleanly to null - the "no data captured yet" backward-compat case; a
+populated list round-trips through `SnapshotHelpers.Serialize`/
+`DeserializeSnapshot` byte-for-byte). `PlanViewModelBuilderStepSectionsTests`
+gained 4 against the real `PlanViewModelBuilder`/`CraftingPlanResultBuilders.
+MakeResult` production path: all matching characters meet the required
+rating (ordered highest-first, no slash suffix); one character below the
+required rating (slash-min convention); no character has the discipline
+("Not trained on any character"); and no snapshot character data at all
+(`CharacterAvailabilityText` null, not an empty string). No Blish HUD
+references in any new test; no fake file I/O (`SnapshotStoreTests` uses a
+real `SnapshotStore` against a real temp directory, matching the
+project's existing storage-test convention).
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors); module test
+suite green - 1199 passed (was 1191 at the base commit; +8 new tests,
+all listed in item 3 above). No new Blish HUD references in tests; every
+new test exercises real production code (`SnapshotStore`, `SnapshotHelpers`,
+`PlanViewModelBuilder`) with no contract-mirror/fake-logic tests. Item/
+currency/vendor IDs remain internal-only - only character names and
+discipline names (both already user-facing concepts) appear in the new
+`CharacterAvailabilityText` display strings.
+
+Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
