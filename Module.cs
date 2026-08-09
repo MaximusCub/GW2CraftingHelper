@@ -409,12 +409,7 @@ namespace GW2CraftingHelper
                 // through to the pipeline - see
                 // CraftingPlanPipeline.GenerateStructuredAsync's matching
                 // parameters.
-                // W3C review-fix (mustFix): now `async` (was a direct
-                // Task-returning expression) so the useOwn:false branch
-                // below can await the pipeline call and overlay
-                // CharacterDisciplines back onto the result afterward - see
-                // that branch's own comment for why.
-                async (items, useOwn, priceBasis, ct, progress, phaseProgress, requestLabel) =>
+                (items, useOwn, priceBasis, ct, progress, phaseProgress, requestLabel) =>
                 {
                     string activeChar = null;
                     try
@@ -445,45 +440,42 @@ namespace GW2CraftingHelper
                     var ownMaterialsMode = _settings.GetOwnMaterialsMode();
                     var homesteadTiers = _settings.GetHomesteadEfficiencyTiers();
 
-                    if (useOwn)
-                    {
-                        return await _craftingPipeline.GenerateStructuredAsync(
-                            items, _currentSnapshot, ct, progress,
-                            activeChar, priceBasis, currencyValuation, ownMaterialsMode,
-                            homesteadTiers, phaseProgress, requestLabel);
-                    }
-
-                    var result = await _craftingPipeline.GenerateStructuredAsync(
-                        items, null, ct, progress,
-                        null, priceBasis, currencyValuation, ownMaterialsMode,
-                        homesteadTiers, phaseProgress, requestLabel);
-
                     // W3C review-fix (mustFix): per-character discipline
                     // data is cosmetic account info (see AccountSnapshot.
                     // CharacterDisciplines' own doc comment), not part of
-                    // owned-materials reduction - it must not disappear
-                    // just because the user turned off "Use Own Materials"
-                    // for this one generation. Passing snapshot: null above
-                    // still correctly disables reduction/the force-buy
-                    // pre-pass/owned-currency annotation (all gated on
-                    // snapshot != null inside the pipeline - see
+                    // owned-materials reduction - it must not disappear, and
+                    // the discipline the plan REPORTS must not change,
+                    // depending on whether the user has "Use Own Materials"
+                    // on for this one generation. Passing characterDisciplines
+                    // explicitly (rather than relying on the pipeline's
+                    // snapshot?.CharacterDisciplines fallback) means the
+                    // useOwn:false branch below - which still correctly
+                    // passes snapshot: null to disable reduction/the
+                    // force-buy pre-pass/owned-currency annotation, all
+                    // gated on snapshot != null inside the pipeline (see
                     // CraftingPlanPipeline.GenerateStructuredAsync's own
-                    // snapshot != null checks), so this overlay only
-                    // backfills the one cosmetic field a null snapshot
-                    // would otherwise also null out. SolveContext is a
-                    // mutable class (PlanSolveContext.CharacterDisciplines
-                    // has a public setter) so a later ResolveWithOverrides
-                    // re-solve on this same result keeps carrying it
-                    // forward too.
-                    if (result != null)
+                    // snapshot != null checks) - feeds Build()'s
+                    // discipline tiebreak the SAME list useOwn:true does.
+                    // That keeps the reported discipline identical between
+                    // the two modes and stable across a later
+                    // ResolveWithOverrides re-solve (PlanSolveContext.
+                    // CharacterDisciplines is populated from this same
+                    // value at generation time - see CraftingPlanPipeline's
+                    // own SolveContext construction).
+                    if (useOwn)
                     {
-                        result.CharacterDisciplines = _currentSnapshot?.CharacterDisciplines;
-                        if (result.SolveContext != null)
-                        {
-                            result.SolveContext.CharacterDisciplines = result.CharacterDisciplines;
-                        }
+                        return _craftingPipeline.GenerateStructuredAsync(
+                            items, _currentSnapshot, ct, progress,
+                            activeChar, priceBasis, currencyValuation, ownMaterialsMode,
+                            homesteadTiers, phaseProgress, requestLabel,
+                            characterDisciplines: _currentSnapshot?.CharacterDisciplines);
                     }
-                    return result;
+
+                    return _craftingPipeline.GenerateStructuredAsync(
+                        items, null, ct, progress,
+                        null, priceBasis, currencyValuation, ownMaterialsMode,
+                        homesteadTiers, phaseProgress, requestLabel,
+                        characterDisciplines: _currentSnapshot?.CharacterDisciplines);
                 },
                 _modalDialog,
                 _itemSearchProvider,

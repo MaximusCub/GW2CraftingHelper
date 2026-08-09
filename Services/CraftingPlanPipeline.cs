@@ -79,7 +79,17 @@ namespace GW2CraftingHelper.Services
             // strip - see PlanPhaseEvent's own doc comment. Optional/
             // default null so every existing caller (Module.cs, every
             // pipeline test) is unaffected.
-            IProgress<PlanPhaseEvent> phaseProgress = null)
+            IProgress<PlanPhaseEvent> phaseProgress = null,
+            // W3C review-fix (mustFix): the cosmetic per-character
+            // discipline list, threaded as ITS OWN argument rather than
+            // derived solely from `snapshot`. Module.cs's useOwn:false
+            // branch intentionally passes snapshot: null to disable
+            // reduction/force-buy/owned-currency, but that must NOT also
+            // blank the Required Disciplines tiebreak - see
+            // AccountSnapshot.CharacterDisciplines' doc comment. Default
+            // null preserves every existing caller's behavior unchanged
+            // (falls back to snapshot?.CharacterDisciplines below).
+            IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
             var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
@@ -302,15 +312,21 @@ namespace GW2CraftingHelper.Services
             // decision/total EXCEPT the Build() tiebreak below (see
             // PlanResultBuilder.Build's characterDisciplines doc comment -
             // it can only relabel which equally-good discipline is
-            // reported, never change a decision or a total). snapshot
-            // itself may be null (no account data available), in which
-            // case this stays null too.
-            var characterDisciplines = snapshot?.CharacterDisciplines;
+            // reported, never change a decision or a total).
+            // W3C review-fix (mustFix): prefer the explicit
+            // characterDisciplines argument over snapshot?.CharacterDisciplines
+            // so Build()'s tiebreak sees the SAME list whether or not
+            // `snapshot` itself was nulled out to disable reduction (see
+            // this method's characterDisciplines parameter doc comment).
+            // Falls back to snapshot?.CharacterDisciplines when the caller
+            // did not supply the argument, preserving every pre-existing
+            // caller's behavior.
+            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
             var result = resultBuilder.Build(
-                plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, characterDisciplines);
+                plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
             result.CurrencyMetadata = currencyMetadata;
             result.AcquisitionHints = _acquisitionHints;
-            result.CharacterDisciplines = characterDisciplines;
+            result.CharacterDisciplines = effectiveCharacterDisciplines;
 
             // M34-B2a #4: owned-currency annotation, cosmetic only (see
             // AccountCurrencyIndex's doc comment) - built from the plan's
@@ -404,7 +420,12 @@ namespace GW2CraftingHelper.Services
             // falls back to the pre-W3B "(N items)" wording, e.g. for a
             // caller that bypasses the view (every pipeline test, a future
             // non-UI caller).
-            string requestLabel = null)
+            string requestLabel = null,
+            // W3C review-fix (mustFix): see the single-item overload's
+            // matching parameter doc comment - threaded through to whichever
+            // branch below actually runs (single-item short-circuit or the
+            // genuine multi-item path).
+            IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
             // Marked async (rather than returning the branch Tasks directly)
             // so this validation throws INSIDE the returned Task, exactly
@@ -444,14 +465,14 @@ namespace GW2CraftingHelper.Services
                     result = await GenerateStructuredAsync(
                         items[0].ItemId, items[0].Quantity, snapshot, ct, progress,
                         activeCharacterName, priceBasis, currencyValuation, ownMaterialsMode,
-                        homesteadTiers, phaseProgress);
+                        homesteadTiers, phaseProgress, characterDisciplines: characterDisciplines);
                 }
                 else
                 {
                     result = await GenerateStructuredMultiAsync(
                         items, snapshot, ct, progress, activeCharacterName,
                         priceBasis, currencyValuation, ownMaterialsMode, homesteadTiers,
-                        phaseProgress);
+                        phaseProgress, characterDisciplines: characterDisciplines);
                 }
 
                 // W3B: compact per-phase summary line, derived from the raw
@@ -517,7 +538,10 @@ namespace GW2CraftingHelper.Services
             OwnMaterialsMode ownMaterialsMode,
             HomesteadEfficiencyTiers homesteadTiers,
             // W3B: see the single-item overload's matching parameter.
-            IProgress<PlanPhaseEvent> phaseProgress)
+            IProgress<PlanPhaseEvent> phaseProgress,
+            // W3C review-fix (mustFix): see the single-item overload's
+            // matching parameter doc comment.
+            IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
             var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
@@ -700,13 +724,15 @@ namespace GW2CraftingHelper.Services
             // single-item GenerateStructuredAsync's matching assignment
             // above for the full rationale, including the Build()
             // tiebreak-only use.
-            var characterDisciplines = snapshot?.CharacterDisciplines;
+            // W3C review-fix (mustFix): see the single-item overload's
+            // matching effectiveCharacterDisciplines computation.
+            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
             var result = resultBuilder.Build(
-                plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, characterDisciplines);
+                plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
             result.CurrencyMetadata = currencyMetadata;
             result.AcquisitionHints = _acquisitionHints;
             result.RequestedItems = items;
-            result.CharacterDisciplines = characterDisciplines;
+            result.CharacterDisciplines = effectiveCharacterDisciplines;
 
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
                 BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
