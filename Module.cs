@@ -776,10 +776,22 @@ namespace GW2CraftingHelper
                 return null;
             }
 
-            Logger.Info("Fetched snapshot CapturedAt={0:o} items={1} wallet={2} coin={3}",
-                snapshot.CapturedAt, snapshot.Items.Count, snapshot.Wallet.Count, snapshot.CoinCopper);
+            // W3C polish (review nice-to-have): CharacterDisciplines is null
+            // only when this snapshot never captured per-character
+            // discipline data at all (a pre-W3C snapshot.json, or a
+            // degraded fetch - see the field's own doc comment on
+            // AccountSnapshot); that must stay distinguishable in the log
+            // from "captured, and it happens to be an empty list" (e.g. a
+            // zero-character account), so the null case gets its own
+            // wording rather than folding into a count of 0.
+            string disciplinesLogText = snapshot.CharacterDisciplines != null
+                ? $"{snapshot.CharacterDisciplines.Count} character disciplines"
+                : "disciplines not captured";
+
+            Logger.Info("Fetched snapshot CapturedAt={0:o} items={1} wallet={2} coin={3}, {4}",
+                snapshot.CapturedAt, snapshot.Items.Count, snapshot.Wallet.Count, snapshot.CoinCopper, disciplinesLogText);
             ModuleLog.Shared.Write(ModuleLogLevel.Info, "snapshot",
-                $"Fetched snapshot CapturedAt={snapshot.CapturedAt:o} items={snapshot.Items.Count} wallet={snapshot.Wallet.Count} coin={snapshot.CoinCopper}");
+                $"Fetched snapshot CapturedAt={snapshot.CapturedAt:o} items={snapshot.Items.Count} wallet={snapshot.Wallet.Count} coin={snapshot.CoinCopper}, {disciplinesLogText}");
 
             return snapshot;
         }

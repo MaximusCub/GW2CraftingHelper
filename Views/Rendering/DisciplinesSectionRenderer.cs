@@ -60,15 +60,71 @@ namespace GW2CraftingHelper.Views.Rendering
         /// Moved verbatim from CraftingPlanView.CreateDisciplinesBody's row
         /// loop, plus the CreateCTableHeaderRow call this renderer now owns
         /// directly (M38 WP-23c - see the class doc comment above).
+        ///
+        /// W3C polish (review nice-to-have): the header row used to read
+        /// only "Discipline"/"Level" even though CreateDisciplineRow renders
+        /// a third, per-character-availability label between them. It
+        /// stayed unlabeled at first because that label's X used to be
+        /// per-row (8 + nameLabel.Width + charGap - discipline names range
+        /// from "Chef" to "Leatherworker"), so no single fixed header
+        /// position could honestly line up with every row. Fixed here by
+        /// computing ONE column X for the whole section - 8 + the widest
+        /// discipline name actually in this section's rows + charGap - and
+        /// passing it into CreateDisciplineRow instead of letting each row
+        /// measure its own nameLabel. Every row's charX is now <= that
+        /// fixed X by construction (it IS the max), so this can never make
+        /// a charLabel overlap its own nameLabel; the "Characters" header
+        /// is only added when at least one row actually has availability
+        /// text to show under it (never both null and non-null in the same
+        /// section in practice - see BuildCharacterAvailabilityText's doc
+        /// comment - but this checks all rows rather than assuming that).
+        /// No change to rowHeight, PlanContentHeightMath, or
+        /// PlanRelayoutMath - NameMaxWidthBeforeColumn's existing 20px
+        /// floor still clamps the ellipsis width on narrow panels exactly
+        /// as it did before.
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            CTableHeaderRenderer.CreateCTableHeaderRow(contentFlow, panelWidth, "Discipline", 8, "Level", _sink);
+            var font = GameService.Content.DefaultFont14;
+            int maxNameWidth = 0;
+            bool anyCharacterText = false;
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateDisciplineRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
+                int nameWidth = (int)Math.Ceiling(font.MeasureString(section.Rows[i].Label ?? "").Width);
+                if (nameWidth > maxNameWidth)
+                {
+                    maxNameWidth = nameWidth;
+                }
+
+                if (!string.IsNullOrEmpty(section.Rows[i].CharacterAvailabilityText))
+                {
+                    anyCharacterText = true;
+                }
+            }
+
+            int charX = 8 + maxNameWidth + CharGap;
+
+            if (anyCharacterText)
+            {
+                CTableHeaderRenderer.CreateCTableHeaderRow(contentFlow, panelWidth, "Discipline", 8, "Level", _sink, "Characters", charX);
+            }
+            else
+            {
+                CTableHeaderRenderer.CreateCTableHeaderRow(contentFlow, panelWidth, "Discipline", 8, "Level", _sink);
+            }
+
+            for (int i = 0; i < section.Rows.Count; i++)
+            {
+                CreateDisciplineRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1, charX);
             }
         }
+
+        // W3C polish: shared between Render() (header column X) and
+        // CreateDisciplineRow (per-row charLabel X and its
+        // NameMaxWidthBeforeColumn call) so both always agree on the same
+        // gap. Was a local const in CreateDisciplineRow only, before the
+        // header needed to know it too.
+        private const int CharGap = 12;
 
         // Moved verbatim from CraftingPlanView.CreateDisciplineRow. Only
         // change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
@@ -79,13 +135,24 @@ namespace GW2CraftingHelper.Views.Rendering
         // the two original labels, and the divider/relayout tail are all
         // otherwise untouched (rowHeight stays the fixed
         // PlanContentHeightMath.DisciplineRowHeight - no new layout math).
-        private void CreateDisciplineRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        //
+        // W3C polish (review nice-to-have): charX used to be computed here,
+        // per row, from this row's own nameLabel.Width - which meant it
+        // varied row to row (discipline names range from "Chef" to
+        // "Leatherworker") and could never line up with a single header
+        // label. It is now passed in by Render() as one fixed column X for
+        // the whole section (8 + the widest discipline name actually
+        // present + CharGap), which Render()'s own doc comment covers in
+        // full. Guaranteed >= 8 + nameLabel.Width + CharGap for every row
+        // in this call (charX's max-of-all-rows construction), so charLabel
+        // can never overlap nameLabel here.
+        private void CreateDisciplineRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast, int charX)
         {
             const int rowHeight = PlanContentHeightMath.DisciplineRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
             var font = GameService.Content.DefaultFont14;
 
-            var nameLabel = new Label()
+            new Label()
             {
                 Text = row.Label ?? "", Font = font,
                 AutoSizeWidth = true, AutoSizeHeight = true,
@@ -98,8 +165,9 @@ namespace GW2CraftingHelper.Views.Rendering
             // column, ellipsized to whatever room is left (same
             // EllipsizeToWidth + tooltip-on-truncate convention as
             // UsedMaterialsSectionRenderer.CreateUsedMaterialRow's name
-            // column). charX is fixed at build time (nameLabel's text never
-            // changes on resize, so its width does not either) - only the
+            // column). charX is fixed at build time (the section's set of
+            // discipline names never changes on resize, so the column X
+            // Render() derived from them does not either) - only the
             // AVAILABLE width changes as levelLabel's position shifts with
             // panelWidth, so only a re-ellipsis (text truncation), never a
             // reposition, is needed on resize. Entirely skipped when
@@ -108,13 +176,11 @@ namespace GW2CraftingHelper.Views.Rendering
             // label, no tooltip, no claim either way.
             var charFont = GameService.Content.DefaultFont12;
             var charColor = new Color(170, 170, 170);
-            const int charGap = 12;
-            int charX = 8 + nameLabel.Width + charGap;
             string fullCharText = row.CharacterAvailabilityText;
             Label charLabel = null;
             if (!string.IsNullOrEmpty(fullCharText))
             {
-                int charMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(panelWidth - 8, levelLabel.Width, charGap, charX);
+                int charMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(panelWidth - 8, levelLabel.Width, CharGap, charX);
                 string charDisplayText = LabelHelpers.EllipsizeToWidth(charFont, fullCharText, charMaxWidth);
                 charLabel = new Label()
                 {
@@ -146,7 +212,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 _sink.AddReellipsis(w =>
                 {
-                    int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(w - 8, levelLabel.Width, charGap, charX);
+                    int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(w - 8, levelLabel.Width, CharGap, charX);
                     string newDisplayText = LabelHelpers.EllipsizeToWidth(charFont, fullCharText, newMaxWidth);
                     if (charLabel.Text != newDisplayText)
                     {
