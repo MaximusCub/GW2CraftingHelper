@@ -225,6 +225,41 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// Round-3 review-fix (mustFix): undoes a <see cref="SeedRestored"/>
+        /// call whose downstream render subsequently failed - see
+        /// Views/CraftingPlanView.cs's shared rollback helper, called from
+        /// both RenderPlan call sites that can reach a still-unvalidated
+        /// restored plan (Build()'s own unguarded-until-now render tail,
+        /// and ApplyRestoredPlan's live-tab branch). Only clears
+        /// <c>_finalStatusText</c>, and only while this board still
+        /// reflects nothing but that one seed - the exact same
+        /// "<c>_sequence != 0 || _inFlight</c>" guard <see
+        /// cref="SeedRestored"/> itself uses, for the same reason (see its
+        /// own doc comment): a real Generate that raced in between the
+        /// original seed and the render failure that triggered this
+        /// rollback must never be clobbered by a rollback for a plan that
+        /// generation has already superseded. Returns whether it actually
+        /// cleared anything, so the caller knows whether it is also safe
+        /// to reset the status label's already-painted text back to
+        /// "Ready" - RenderFromBoard is pull-based and never overwrites a
+        /// label with an empty FinalStatusText, so clearing the board
+        /// alone is not enough to un-paint an already-rendered banner, but
+        /// forcing that reset unconditionally would stomp a genuinely
+        /// in-flight generation's live spinner text whenever this method's
+        /// own guard (correctly) no-ops.
+        /// </summary>
+        public bool ClearRestoredSeed()
+        {
+            lock (_lock)
+            {
+                if (_sequence != 0 || _inFlight) return false;
+
+                _finalStatusText = null;
+                return true;
+            }
+        }
+
+        /// <summary>
         /// A consistent, immutable snapshot of every field at one instant.
         /// The only way to read this board - never expose the individual
         /// fields separately, or a reader could observe a torn combination
