@@ -139,6 +139,57 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(capturedMessage);
             Assert.NotNull(capturedException);
         }
+
+        // --- W3C (per-character discipline display): real SnapshotStore
+        // round-trip with the new per-character discipline data. ---
+
+        [Fact]
+        public void Save_Load_RoundTripsCharacterDisciplines()
+        {
+            var snapshot = CreateSnapshot();
+            snapshot.CharacterDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true },
+                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Huntsman", Rating = 400, Active = false },
+                new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 250, Active = true }
+            };
+            _store.Save(snapshot);
+
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded);
+            Assert.NotNull(loaded.CharacterDisciplines);
+            Assert.Equal(3, loaded.CharacterDisciplines.Count);
+
+            var annaWeaponsmith = loaded.CharacterDisciplines.Find(
+                cd => cd.CharacterName == "Anna" && cd.Discipline == "Weaponsmith");
+            Assert.NotNull(annaWeaponsmith);
+            Assert.Equal(500, annaWeaponsmith.Rating);
+            Assert.True(annaWeaponsmith.Active);
+
+            var annaHuntsman = loaded.CharacterDisciplines.Find(
+                cd => cd.CharacterName == "Anna" && cd.Discipline == "Huntsman");
+            Assert.NotNull(annaHuntsman);
+            Assert.Equal(400, annaHuntsman.Rating);
+            Assert.False(annaHuntsman.Active);
+        }
+
+        [Fact]
+        public void Save_Load_NullCharacterDisciplines_RoundTripsAsNull()
+        {
+            // CreateSnapshot() never sets CharacterDisciplines - mirrors a
+            // pre-W3C snapshot object built by code that has not been
+            // updated to populate it (distinct from a post-W3C capture
+            // that legitimately came back empty - see AccountSnapshot.
+            // CharacterDisciplines' own doc comment).
+            var snapshot = CreateSnapshot();
+            _store.Save(snapshot);
+
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded);
+            Assert.Null(loaded.CharacterDisciplines);
+        }
     }
 
 }

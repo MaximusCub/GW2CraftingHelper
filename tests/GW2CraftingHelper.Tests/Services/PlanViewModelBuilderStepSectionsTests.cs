@@ -167,6 +167,83 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(vm.Sections, s => s.SectionType == PlanSectionType.RequiredDisciplines);
         }
 
+        // --- W3C (per-character discipline display, gw2efficiency
+        // parity): character availability text on DisciplineRow rows. ---
+
+        [Fact]
+        public void RequiredDisciplines_AllCharactersSufficient_ListsEachWithRating()
+        {
+            var result = MakeResult(
+                requiredDisciplines: new List<RequiredDiscipline>
+                {
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 }
+                },
+                characterDisciplines: new List<SnapshotCharacterDiscipline>
+                {
+                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 400, Active = true },
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredDisciplines);
+            // Highest rating first, no "/min" suffix - both meet the
+            // required 400.
+            Assert.Equal("Anna (500), Bob (400)", section.Rows[0].CharacterAvailabilityText);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_CharacterBelowRequiredRating_ShowsSlashMinConvention()
+        {
+            var result = MakeResult(
+                requiredDisciplines: new List<RequiredDiscipline>
+                {
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 450 }
+                },
+                characterDisciplines: new List<SnapshotCharacterDiscipline>
+                {
+                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 400, Active = true }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredDisciplines);
+            Assert.Equal("Bob (400/450)", section.Rows[0].CharacterAvailabilityText);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_NoCharacterHasIt_SaysNotTrainedPlainly()
+        {
+            var result = MakeResult(
+                requiredDisciplines: new List<RequiredDiscipline>
+                {
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 }
+                },
+                characterDisciplines: new List<SnapshotCharacterDiscipline>
+                {
+                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Chef", Rating = 400, Active = true }
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredDisciplines);
+            Assert.Equal("Not trained on any character", section.Rows[0].CharacterAvailabilityText);
+        }
+
+        [Fact]
+        public void RequiredDisciplines_NoSnapshotCharacterData_SublabelTextOmitted()
+        {
+            // characterDisciplines left null (default) - the snapshot never
+            // captured this data at all (old snapshot / degraded fetch).
+            // Must show nothing extra, never a fabricated "not trained"
+            // claim.
+            var result = MakeResult(requiredDisciplines: new List<RequiredDiscipline>
+            {
+                new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 }
+            });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredDisciplines);
+            Assert.Null(section.Rows[0].CharacterAvailabilityText);
+        }
+
         // --- Required Recipes ---
 
         [Fact]
