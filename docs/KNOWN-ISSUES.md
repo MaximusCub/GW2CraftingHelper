@@ -1115,4 +1115,39 @@ every new test exercises real production code (`CraftingPlanPipeline`,
 `PlanPhaseTimingSummary`, `PhaseOrdinalGuard`, a real
 `ModuleLog`/`ModuleLogStore`) with no contract-mirror/fake-logic tests.
 
+Live desktop gate round 1 (2026-08-08, orchestrator session) - core
+behaviors PASSED:
+
+- Live phase text with trailing spinner observed in the plan strip
+  across three generations ("Building recipe tree (may take several
+  seconds on first run)..", "Fetching prices (85 items).."), leading
+  text anchored with no proportional-font jitter, spinner glyph
+  advancing between captures.
+- Plan replacement via re-Generate works; on the no-tab-switch path the
+  strip correctly ends at "Plan generated - <time>".
+- Rich logging verified both in data/module_log.jsonl and rendered in
+  the Log tab: "Generating plan for <name> x<qty>" start lines,
+  per-phase finish summaries with counts and wall-clock vs phase-sum
+  totals, and the RecipeService seed notices. NOTE for gate tooling:
+  the old "Generation finished in Xms" wording is replaced - waits must
+  now grep for "Plan for <name>".
+- No exceptions in the Blish log; the Log tab stayed stable throughout.
+
+FAILED scenario - tab switch mid-generation (Must Fix, fix in flight):
+switching Plan -> Snapshot -> Plan while a generation is in flight
+leaves the strip on "Ready" - the live phase text never re-arms on the
+rebuilt view AND the completion status ("Plan generated - <time>") is
+lost (stuck on "Ready" until the next Generate), even though the
+finished plan content itself renders below. Root cause: this module
+REBUILDS tab views as new instances per tab switch (the same lesson
+that produced W3A's module-level Clear-view floor), so the item-1
+re-arm fix's instance fields (`_generationInFlight`,
+`_currentPhaseText`, `_generateSequence`) reset with the new instance,
+and the completion callback's liveness check correctly bails on the
+disposed old panel - nothing carries status to the new instance.
+Threading guards all held (no crash, no corruption). Fix direction:
+hoist the plan strip's generation status to Module level (LogViewFloor
+precedent) so a freshly built view re-arms from module state and
+completion writes are view-instance-independent.
+
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
