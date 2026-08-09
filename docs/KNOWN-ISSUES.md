@@ -1330,19 +1330,26 @@ branch `w3c-character-disciplines`.
 model (`CharacterName`, `Discipline`, `Rating`, `Active`) and a new
 `AccountSnapshot.CharacterDisciplines` list, captured inside the same
 per-character loop that already fetched each character's inventory.
-Round-trip reduction: `Gw2AccountSnapshotService`'s per-character fetch
-switched from the narrow `V2.Characters[name].Inventory.GetAsync` call to
-the fuller `V2.Characters[name].GetAsync`, whose `.Bags` is byte-identical
-in shape to the narrow endpoint's own `.Bags` (confirmed via Gw2Sharp
-1.7.4 reflection) and additionally carries `.Crafting` - one round trip
-per character now captures both signals instead of two, with no new
-permission requirement (Crafting only needs the already-required
-`account`/`characters` scopes). Inventory and crafting share the one
-per-character try/catch, so a single character's fetch failing degrades
-both signals for that character exactly like the pre-W3C code degraded
-inventory alone - it still never fails the whole snapshot (the outer
-character-LIST fetch failing is the only thing that does, unchanged).
-Every learned discipline is captured regardless of `Active` (GW2 only
+Per-character fetch: the existing narrow `V2.Characters[name].Inventory.
+GetAsync` call for items, plus a second, separate `V2.Characters[name].
+Crafting.GetAsync` call for the discipline signal - both need only the
+already-required `account`/`characters`(/`inventories`) scopes, no new
+permission requirement (**review-fix, see item 4**: an initial version
+combined both signals into one round trip via the fuller `V2.Characters
+[name].GetAsync` record; reverted back to two lean endpoints, since the
+full record's extra recipe/equipment/build-tab payload widened this
+cosmetic feature's failure surface onto plan-affecting inventory data).
+Inventory failures are tolerated per-character exactly like the pre-W3C
+code always has (a conservative item under-count, never a false claim);
+a crafting-fetch failure for ANY character instead nulls
+`CharacterDisciplines` for the WHOLE snapshot, discarding entries already
+gathered from other, successfully-fetched characters too - a partial list
+would read as an affirmative "not trained on any character" claim for a
+discipline the fetch simply never reached, exactly the case this
+null-vs-empty distinction exists to prevent (see item 4). The outer
+character-LIST fetch failing is the only thing that fails the whole
+snapshot, unchanged from pre-W3C. Every learned discipline is captured
+regardless of `Active` (GW2 only
 allows 2 concurrently active disciplines per character, but a levelled
 rating persists on an inactive one), using `CharacterCraftingDiscipline.
 Discipline.RawValue` (not the Gw2Sharp enum's `.Value`/`.ToEnumString()`)
@@ -1386,7 +1393,16 @@ stays the existing fixed `PlanContentHeightMath.DisciplineRowHeight`
 (32px, untouched), and the new label's X position is fixed at build time
 (it sits after the discipline name, whose text never changes on resize)
 so only a settle-time re-ellipsis (`ISectionRelayoutSink.AddReellipsis`),
-never a reposition, is needed when the panel is resized.
+never a reposition, is needed when the panel is resized. **Review-fix,
+see item 4:** `Module.cs`'s wiring used to pass a fully-null
+`AccountSnapshot` (not just null owned-materials data) whenever "Use Own
+Materials" was unchecked, silently dropping this whole cosmetic feature
+along with it; and `PlanResultBuilder`'s pre-existing multi-discipline
+greedy-cover tiebreak (unrelated to the passthrough above, but directly
+feeding `BuildCharacterAvailabilityText`'s "not trained" claim) picked
+alphabetically among equally-covering disciplines with no account
+preference, so it could name a discipline the account doesn't have over
+one it does. Both fixed - see item 4 for the full findings.
 
 **3. Tests.** `SnapshotStoreTests` gained 2 (a real store, temp-directory
 round trip of populated `CharacterDisciplines`; null `CharacterDisciplines`
@@ -1405,13 +1421,109 @@ references in any new test; no fake file I/O (`SnapshotStoreTests` uses a
 real `SnapshotStore` against a real temp directory, matching the
 project's existing storage-test convention).
 
+**4. Review-fix pass (this round) - 2 Critical + 3 Must Fix findings from
+adversarial review, all fixed.**
+
+- *Critical: a per-character crafting-fetch failure produced a PARTIAL
+  `CharacterDisciplines` list instead of the "no data" null state.*
+  `Gw2AccountSnapshotService`'s per-character loop only ever counted the
+  character-LIST fetch as a failure; any individual character's data
+  fetch failing was silently skipped with no flag set, so a real,
+  plausible failure mode (list succeeds, some or all per-character
+  detail calls then fail/rate-limit) left `CharacterDisciplines` as a
+  non-null list missing exactly the failed characters' entries -
+  indistinguishable from "captured, and this account genuinely has
+  nobody trained in it." `BuildCharacterAvailabilityText` treats any
+  non-null list as authoritative, so this fabricated an affirmative "Not
+  trained on any character" claim from missing data, violating both the
+  repo's "never invent data" invariant and the W3C spec's own item 4
+  ("degraded fetch -> show nothing"). Fixed: a new
+  `characterDisciplineDataDegraded` flag is set on ANY per-character
+  crafting-fetch exception (or an unexpected null response with no
+  exception); if set after the loop, `snapshot.CharacterDisciplines` is
+  reset to null wholesale, discarding even the entries successfully
+  gathered from other characters - a coarse but honest "we don't have
+  complete data, so make no claim" behavior, matching the null/empty
+  distinction's own binary design.
+- *Must Fix: the single-round-trip full-character-record fetch traded a
+  tiny payload for one of the heaviest v2 endpoints and widened the
+  cosmetic feature's failure blast radius onto plan-affecting inventory
+  data.* `V2.Characters[name].GetAsync` pulls in the character's full
+  learned-recipe id list plus up to 8 equipment/build tabs whenever the
+  (typically granted) `builds` scope is present - none of it used here -
+  adding latency (risking the whole-snapshot 60s budget on larger
+  accounts) and a new deserialization failure surface that, on a hiccup,
+  would drop that character's INVENTORY (which feeds owned-materials
+  reduction) rather than just its cosmetic discipline data. Reverted to
+  two small, independently-caught endpoints: the pre-W3C
+  `V2.Characters[name].Inventory.GetAsync` (unchanged) plus a new
+  `V2.Characters[name].Crafting.GetAsync` for the discipline signal -
+  both need only the already-required `account`/`characters`(/
+  `inventories`) scopes.
+- *Must Fix: the "Use Own Materials" checkbox silently hid this whole
+  cosmetic feature when unchecked.* `Module.cs`'s `generateAsync` lambda
+  passed a fully-null `AccountSnapshot` on the `useOwn: false` branch, so
+  `result.CharacterDisciplines` came back null and every discipline row
+  quietly lost its character text even though the on-disk snapshot had
+  full data - unrelated cosmetic account info should not be gated on the
+  solver's owned-materials toggle. Fixed: the lambda is now `async` and,
+  on that branch, overlays `_currentSnapshot?.CharacterDisciplines` (and
+  the matching `PlanSolveContext.CharacterDisciplines`, which has a
+  public setter) onto the already-generated result after the pipeline
+  call returns - `snapshot: null` still correctly disables owned-materials
+  reduction/the force-buy pre-pass/owned-currency annotation, all
+  independently gated on `snapshot != null` inside the pipeline.
+- *Must Fix: the multi-discipline greedy-cover tiebreak could name a
+  discipline the account doesn't have over one it does.*
+  `PlanResultBuilder`'s pre-existing Pass 2 set-cover loop (unrelated to
+  W3C's own passthrough code, but directly feeding
+  `BuildCharacterAvailabilityText`'s claim) broke coverage-count ties by
+  "prefer already-selected, then alphabetical" - for a recipe craftable
+  by, say, Armorsmith/Leatherworker/Tailor with no other craft step to
+  seed a Pass 1 preference, it always picked "Armorsmith" (alpha-first)
+  regardless of the account, so a player with only Tailor read "Armorsmith
+  - Not trained on any character" and could conclude they needed a second
+  500 discipline they don't. `Build` gained an optional
+  `characterDisciplines` parameter (defaults to null, so every
+  pre-existing test/caller is unaffected) used ONLY to add a third
+  tiebreak tier - "prefer a discipline the account has ANY character
+  trained in" - between "prefer already-selected" and alphabetical; this
+  can only relabel which equally-good discipline is reported, never
+  change which recipes need a discipline, how many are required, or any
+  cost/decision.
+- *Must Fix: zero test coverage on the pipeline wiring that makes the
+  feature appear at all.* Only the leaf builder
+  (`PlanResultBuilderTests`) and the store (`SnapshotStoreTests`/
+  `SnapshotSerializationTests`) had coverage; the three
+  `result.CharacterDisciplines = ...`/`context.CharacterDisciplines`
+  assignments inside `CraftingPlanPipeline` (single-item generate,
+  multi-item generate, `ResolveWithOverrides` carry-forward) were
+  unverified - deleting any one of them still left the full suite green.
+  Five new `CraftingPlanPipelineTests` now cover: single- and multi-item
+  `GenerateStructuredAsync` carrying a populated `CharacterDisciplines`
+  into both `result` and `result.SolveContext`; a null-snapshot
+  generation keeping it null in both places; and `ResolveWithOverrides`
+  carrying it forward across a local re-solve for both the
+  populated and the null case.
+
+New tests: `PlanResultBuilderTests` gained 2 (the account-preference
+tiebreak itself; a companion regression guard proving the pre-W3C
+alphabetical fallback is unchanged when `characterDisciplines` is null/
+omitted). `CraftingPlanPipelineTests` gained 5, listed above. No test
+exercises `Gw2AccountSnapshotService` directly (it references
+`Blish_HUD`/`Gw2Sharp`, out of scope for the Blish-free-tests invariant,
+matching the file's existing zero direct-test-coverage pattern) - the
+per-character degradation fix there is covered by build + code review
+only, same as every other branch in that file.
+
 Validation: `dotnet build -p:Platform=x64` clean (0 errors); module test
-suite green - 1199 passed (was 1191 at the base commit; +8 new tests,
-all listed in item 3 above). No new Blish HUD references in tests; every
-new test exercises real production code (`SnapshotStore`, `SnapshotHelpers`,
-`PlanViewModelBuilder`) with no contract-mirror/fake-logic tests. Item/
-currency/vendor IDs remain internal-only - only character names and
-discipline names (both already user-facing concepts) appear in the new
+suite green - 1206 passed (was 1199 before this review-fix pass; +7 new
+tests, all listed in item 4 above). No new Blish HUD references in
+tests; every new test exercises real production code
+(`CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`,
+`PlanResultBuilder.Build`) with no contract-mirror/fake-logic tests.
+Item/currency/vendor IDs remain internal-only - only character names and
+discipline names (both already user-facing concepts) appear in the
 `CharacterAvailabilityText` display strings.
 
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
