@@ -293,6 +293,83 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Plan generated - Aug 9, 2026 10:35 AM", snapshot.FinalStatusText);
         }
 
+        // --- Round 3 review-fix: ClearRestoredSeed (new public production
+        // surface with zero prior test coverage) ---
+
+        [Fact]
+        public void ClearRestoredSeed_AfterSeedRestored_ClearsFinalStatusTextAndReturnsTrue()
+        {
+            var board = new PlanStripStatusBoard();
+            board.SeedRestored("Generated Aug 9, 2026 10:30 AM - prices may have changed - Regenerate");
+
+            bool cleared = board.ClearRestoredSeed();
+
+            Assert.True(cleared);
+            var snapshot = board.Snapshot();
+            Assert.Equal(0, snapshot.Sequence);
+            Assert.False(snapshot.InFlight);
+            Assert.Null(snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void ClearRestoredSeed_OnVirginBoard_ReturnsTrueAndLeavesStateAtDefaults()
+        {
+            // A restore-render rollback can run even when SeedRestored
+            // itself was never reached (e.g. the vm build in
+            // ApplyRestoredPlan's first try/catch never got this far) -
+            // ClearRestoredSeed must still be a harmless no-op-shaped call
+            // on a board nothing has ever touched, not throw or corrupt
+            // state.
+            var board = new PlanStripStatusBoard();
+
+            bool cleared = board.ClearRestoredSeed();
+
+            Assert.True(cleared);
+            var snapshot = board.Snapshot();
+            Assert.Equal(0, snapshot.Sequence);
+            Assert.False(snapshot.InFlight);
+            Assert.Null(snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void ClearRestoredSeed_WhileGenerationInFlight_ReturnsFalseAndLeavesPhaseTextUntouched()
+        {
+            // The exact race SeedRestored's own guard defends against, on
+            // the rollback side: a real Generate that started after the
+            // seed but before the render failure that triggered this
+            // rollback must never be clobbered by a rollback for a plan
+            // that generation has already superseded.
+            var board = new PlanStripStatusBoard();
+            board.SeedRestored("Generated Aug 9, 2026 10:30 AM - prices may have changed - Regenerate");
+            board.Begin(1);
+            board.UpdatePhase(1, 0, "Building recipe tree...");
+
+            bool cleared = board.ClearRestoredSeed();
+
+            Assert.False(cleared);
+            var snapshot = board.Snapshot();
+            Assert.Equal(1, snapshot.Sequence);
+            Assert.True(snapshot.InFlight);
+            Assert.Equal("Building recipe tree...", snapshot.PhaseText);
+        }
+
+        [Fact]
+        public void ClearRestoredSeed_AfterGenerationAlreadyFinished_ReturnsFalseAndLeavesFinalStatusTextUntouched()
+        {
+            var board = new PlanStripStatusBoard();
+            board.SeedRestored("Generated Aug 9, 2026 10:30 AM - prices may have changed - Regenerate");
+            board.Begin(1);
+            board.Finish(1, "Plan generated - Aug 9, 2026 10:35 AM");
+
+            bool cleared = board.ClearRestoredSeed();
+
+            Assert.False(cleared);
+            var snapshot = board.Snapshot();
+            Assert.Equal(1, snapshot.Sequence);
+            Assert.False(snapshot.InFlight);
+            Assert.Equal("Plan generated - Aug 9, 2026 10:35 AM", snapshot.FinalStatusText);
+        }
+
         [Fact]
         public void Snapshot_UnderConcurrentWriters_NeverThrowsAndEndsConsistent()
         {
