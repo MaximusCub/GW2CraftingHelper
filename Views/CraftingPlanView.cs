@@ -652,6 +652,31 @@ namespace GW2CraftingHelper.Views
         /// whatever it already held (null, on the ordinary restore path) -
         /// a clean "fresh start" (spec item 4), not a half-applied one.
         /// </para>
+        /// <para>
+        /// Round 2 review-fix (mustFix): the SECOND try/catch (around the
+        /// live-tab RenderPlan call below) used to only log on failure,
+        /// leaving _currentPlan/_lastDebugLog/the tree controller's baseline
+        /// already committed to a vm that just proved it cannot render.
+        /// PlanViewModelBuilder copies the crafting tree by REFERENCE
+        /// (TreeRoot = result.CraftingTree) rather than validating it, so a
+        /// null child inside CraftingTreeNode.Children (a structurally
+        /// valid but degraded plan.json - passes PlanStoreHelpers' gate,
+        /// survives the first try/catch's vm build untouched) is only ever
+        /// dereferenced once RenderPlan actually walks the tree here. Left
+        /// uncommitted, that poisoned _currentPlan would still be picked up
+        /// by Build()'s own unguarded "if (_currentPlan != null) RenderPlan
+        /// (_currentPlan)" tail on every subsequent visit to this tab - and
+        /// by extension ViewAdapter.Build, which wraps no try/catch of its
+        /// own around this view's Build() at all - throwing the SAME
+        /// exception again each time, not just once. The catch below rolls
+        /// every piece of state this method committed above back to the
+        /// exact "nothing restored" shape the tab starts in before
+        /// ApplyRestoredPlan ever runs (_treeController.ResetForNewPlan
+        /// (null) undoes ResetForNewPlan(result)+RestoreOverrides together -
+        /// see that method's own doc comment for why null is safe here),
+        /// so a degraded restore falls back to the ordinary empty
+        /// fresh-start state instead of a state that re-throws forever.
+        /// </para>
         /// </summary>
         public void ApplyRestoredPlan(
             CraftingPlanResult result,
@@ -695,6 +720,21 @@ namespace GW2CraftingHelper.Views
             {
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan",
                     $"Failed to render restored plan into the live tab: {ex.GetType().Name} - {ex.Message}");
+
+                // Round 2 review-fix (mustFix): roll back everything this
+                // method committed above (_treeController's overrides/
+                // ignore/expansion baseline, _lastDebugLog, _currentPlan)
+                // so this tab falls back to the same empty fresh-start
+                // shape it would have if the persisted file had failed the
+                // first (vm-build) guard instead - see this method's own
+                // doc comment. Leaving _currentPlan set to the vm that just
+                // failed here would re-throw the SAME exception out of
+                // Build()'s own unguarded RenderPlan tail on every later
+                // visit to this tab, not just this one.
+                _treeController.ResetForNewPlan(null);
+                _sectionExpansion.Clear();
+                _lastDebugLog = null;
+                _currentPlan = null;
             }
         }
 
