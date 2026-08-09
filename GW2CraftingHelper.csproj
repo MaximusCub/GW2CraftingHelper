@@ -159,6 +159,7 @@
     <Compile Include="Models\VendorOffer.cs" />
     <Compile Include="Models\VendorOfferDataset.cs" />
     <Compile Include="Models\PlanStatus.cs" />
+    <Compile Include="Services\PlanPhaseEvent.cs" />
     <Compile Include="Services\VendorOfferHasher.cs" />
     <Compile Include="Services\VendorOfferLoader.cs" />
     <Compile Include="Services\VendorOfferStore.cs" />
@@ -192,6 +193,7 @@
     <Compile Include="Services\CraftableItemSearchProvider.cs" />
     <Compile Include="Services\ItemSearchProviderFactory.cs" />
     <Compile Include="Services\Diagnostics\PlanTimingAnalyzer.cs" />
+    <Compile Include="Services\Diagnostics\PlanPhaseTimingSummary.cs" />
     <Compile Include="Services\Recipes\IRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\InMemoryRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\RecipeCacheSerializer.cs" />
