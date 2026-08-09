@@ -1685,25 +1685,6 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
-            // W3B review-fix (tab-switch strip freeze): StopLiveTickers
-            // just canceled the previous build cycle's spinner ticker
-            // above, and the fresh _statusLabel just created starts on the
-            // hardcoded "Ready" text - both wrong if a generation is
-            // genuinely still running (the user switched tabs mid-
-            // generation and switched back). _generationInFlight is only
-            // true for the generation currently identified by
-            // _generateSequence (see that field's own doc comment), so
-            // re-arming with it here immediately restores the live
-            // spinner + this generation's last-known phase text instead of
-            // leaving the strip stuck on "Ready" until the next phase
-            // event fires (which for the longest phase can be most of the
-            // run). A no-op for the far more common case of no generation
-            // in flight.
-            if (_generationInFlight)
-            {
-                ArmSpinnerTicker(_generateSequence);
-            }
-
             // Static separator between controls and content
             _separator = new Panel()
             {
@@ -1736,6 +1717,35 @@ namespace GW2CraftingHelper.Views
 
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
+
+            // W3B review-fix (tab-switch strip freeze): StopLiveTickers
+            // canceled the previous build cycle's spinner ticker at the top
+            // of this method, and the fresh _statusLabel created above
+            // starts on the hardcoded "Ready" text - both wrong if a
+            // generation is genuinely still running (the user switched tabs
+            // mid-generation and switched back). _generationInFlight is
+            // only true for the generation currently identified by
+            // _generateSequence (see that field's own doc comment), so
+            // re-arming with it here immediately restores the live spinner
+            // + this generation's last-known phase text instead of leaving
+            // the strip stuck on "Ready" until the next phase event fires
+            // (which for the longest phase can be most of the run). A
+            // no-op for the far more common case of no generation in
+            // flight. W3B review-fix (liveness-check ordering): this MUST
+            // run after _contentPanel above is reassigned to the new
+            // FlowPanel, not before - RenderSpinnerStatus (called
+            // synchronously by ArmSpinnerTicker) now bails out whenever
+            // _contentPanel is null or already-disposed (see that method's
+            // own doc comment), and until the reassignment above runs,
+            // _contentPanel still holds the PREVIOUS build cycle's panel,
+            // which ViewAdapter.Build already disposed before invoking this
+            // Build() call at all - arming any earlier would silently skip
+            // the "immediately restores" render this comment promises,
+            // leaving "Ready" showing for one extra spinner-tick interval.
+            if (_generationInFlight)
+            {
+                ArmSpinnerTicker(_generateSequence);
+            }
 
             if (_currentPlan != null)
             {
@@ -2186,6 +2196,12 @@ namespace GW2CraftingHelper.Views
             // just applied once per row instead of once total.
             bool anyQtyInvalid = false;
             var rowInputs = new List<ItemRowRequestBuilder.RowInput>(_itemRows.Count);
+            // W3B review-fix: folded together with the label-part collection
+            // below (previously a separate foreach over the same _itemRows)
+            // now that both need nothing from each other but this loop's own
+            // per-row qty correction - see RequestLabelFormatter's own doc
+            // comment for why the label itself is capped.
+            var labelParts = new List<string>(_itemRows.Count);
             foreach (var row in _itemRows)
             {
                 bool qtyInvalid = !int.TryParse(row.QtyInput?.Text, out int qty) || qty < 1;
@@ -2197,6 +2213,19 @@ namespace GW2CraftingHelper.Views
                 }
                 row.QuantityText = qty.ToString();
                 rowInputs.Add(new ItemRowRequestBuilder.RowInput(row.ItemId, row.QuantityText));
+
+                // W3B: best-effort "name x quantity[, name x quantity...]"
+                // label (e.g. "Orrax Manifested x1") for the pipeline's rich
+                // ModuleLog lines - see
+                // CraftingPlanPipeline.GenerateStructuredAsync's requestLabel
+                // parameter doc comment. Mirrors ItemRowRequestBuilder.
+                // Build's own row.ItemId.HasValue filter so this stays in the
+                // same order/count as requestItems, using the name the
+                // row's own search selection already resolved (no extra
+                // network round trip).
+                if (!row.ItemId.HasValue) continue;
+                string name = string.IsNullOrEmpty(row.ItemName) ? "Unknown Item" : row.ItemName;
+                labelParts.Add($"{name} x{row.QuantityText}");
             }
 
             var requestItems = ItemRowRequestBuilder.Build(rowInputs);
@@ -2215,21 +2244,11 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            // W3B: best-effort "name x quantity[, name x quantity...]" label
-            // (e.g. "Orrax Manifested x1") for the pipeline's rich ModuleLog
-            // lines - see CraftingPlanPipeline.GenerateStructuredAsync's
-            // requestLabel parameter doc comment. Mirrors ItemRowRequestBuilder.
-            // Build's own row.ItemId.HasValue filter so this stays in the
-            // same order/count as requestItems, using the name the row's own
-            // search selection already resolved (no extra network round trip).
-            var labelParts = new List<string>(requestItems.Count);
-            foreach (var row in _itemRows)
-            {
-                if (!row.ItemId.HasValue) continue;
-                string name = string.IsNullOrEmpty(row.ItemName) ? "Unknown Item" : row.ItemName;
-                labelParts.Add($"{name} x{row.QuantityText}");
-            }
-            string requestLabel = string.Join(", ", labelParts);
+            // W3B review-fix: capped to the first 3 names (+ "N more") -
+            // see RequestLabelFormatter's own doc comment for why an
+            // uncapped label is a ModuleLog-line-length hazard on large
+            // plans.
+            string requestLabel = RequestLabelFormatter.Format(labelParts);
 
             // Captured only once we know this call will actually run a
             // generation (past the early-return above). Both entry points
@@ -2445,13 +2464,34 @@ namespace GW2CraftingHelper.Views
         /// it, which is exactly why the strip used to freeze. Guarded by
         /// the same StatusUpdateGuard check the old local function always
         /// used (M34-B1 #4): a stale tick from a superseded or already-
-        /// finished generation can never clobber a newer one's text.
+        /// finished generation can never clobber a newer one's text. W3B
+        /// review-fix: also checks _contentPanel liveness before writing,
+        /// matching the established discipline every other deferred writer
+        /// in this file already follows (see the success/finally
+        /// MainThreadMarshal.Run callbacks above) - without it, a phase
+        /// event or spinner tick marshaled after full teardown (tab
+        /// switched away, module disabled) could still write into a
+        /// disposed _statusLabel, since StatusUpdateGuard alone only checks
+        /// generation identity, not control lifetime.
         /// </summary>
         private void RenderSpinnerStatus(int myGen)
         {
             if (!StatusUpdateGuard.ShouldApply(myGen, _generateSequence, _statusClosedForCurrentGeneration)) return;
+            if (_contentPanel == null || _contentPanel.Parent == null) return;
             string text = string.IsNullOrEmpty(_currentPhaseText) ? "Generating..." : _currentPhaseText;
-            SetStatus($"{SpinnerFrames[_spinnerFrameIndex]} {text}");
+            // W3B review-fix (spinner jitter): the glyph goes at the END of
+            // the string, not the start. SpinnerFrames' proportional-font
+            // glyphs ('|' '/' '-' '\') each have a different advance width;
+            // with the glyph first, every character after it in the same
+            // AutoSizeWidth label shifts horizontally by that width delta
+            // ~7x/sec (SpinnerTickInterval), making the phase text visibly
+            // jitter left-right during generation even though the label's
+            // own Location never changes. Putting the glyph last means the
+            // phase text is always laid out identically from the label's
+            // fixed x=0 origin - only the trailing glyph (and the label's
+            // overall AutoSizeWidth) moves, which reads as a normal spinner
+            // rather than shifting text.
+            SetStatus($"{text} {SpinnerFrames[_spinnerFrameIndex]}");
         }
 
         /// <summary>

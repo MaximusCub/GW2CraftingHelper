@@ -1061,6 +1061,113 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task GenerateStructuredAsync_List_MultiItem_WritesRichModuleLogEntries_IntoRealTempDirStore()
+        {
+            // W3B review-fix: the 1-item rich-ModuleLog test above only
+            // exercises the list overload's single-entry short-circuit (see
+            // GenerateStructuredAsync's own doc comment), which delegates
+            // straight to the untouched single-item overload - this covers
+            // the GENUINE 2+ item multi-item path
+            // (GenerateStructuredMultiAsync) end to end against a real
+            // ModuleLog + ModuleLogStore in a temp dir, mirroring
+            // GenerateStructuredMultiAsync_ReportsPhaseEventsInOrder's own
+            // fakes above.
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                }
+            });
+            recipeApi.AddSearchResult(2, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 2,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200);
+            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
+            priceApi.AddPrice(4, buyUnitPrice: 20, sellUnitPrice: 200);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target Item A", "targeta.png");
+            itemApi.AddItem(2, "Target Item B", "targetb.png");
+            itemApi.AddItem(3, "Ingredient A", "ingredienta.png");
+            itemApi.AddItem(4, "Ingredient B", "ingredientb.png");
+
+            using (var tmp = new TempDirectory())
+            {
+                var store = new ModuleLogStore(tmp.Path);
+                var log = new ModuleLog();
+                log.Configure(store, maxFileSizeBytes: 0, onStoreError: null);
+                log.DiagnosticsEnabled = true;
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    moduleLog: log);
+
+                var items = new List<PlanRequestItem>
+                {
+                    new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                    new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                };
+
+                await pipeline.GenerateStructuredAsync(
+                    items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,
+                    requestLabel: "Target Item A x1, Target Item B x1");
+
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                var entries = store.ReadAll();
+
+                // Info on start: the real multi-item label, never an
+                // internal item id or the "(N items)" fallback wording.
+                Assert.Contains(entries, e =>
+                    e.Level == ModuleLogLevel.Info && e.Tag == "plan"
+                    && e.Message == "Generating plan for Target Item A x1, Target Item B x1");
+
+                // Debug: one bounded entry per phase as it completes -
+                // exactly 5, same as the single-item path, confirming the
+                // multi-item branch drives the SAME PhaseTracker.
+                var phaseDebugEntries = entries
+                    .Where(e => e.Level == ModuleLogLevel.Debug && e.Tag == "plan")
+                    .ToList();
+                Assert.Equal(5, phaseDebugEntries.Count);
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Building recipe tree:") && e.Message.Contains("ms"));
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Fetching prices:") && e.Message.Contains("items"));
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Solving decisions:") && e.Message.Contains("ms"));
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Fetching item details:") && e.Message.Contains("items"));
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Building display:") && e.Message.Contains("ms"));
+
+                // Info on finish: the compact per-phase summary line, named
+                // by the same multi-item label the start line used.
+                Assert.Contains(entries, e =>
+                    e.Level == ModuleLogLevel.Info && e.Tag == "plan"
+                    && e.Message.StartsWith("Plan for Target Item A x1, Target Item B x1: tree ")
+                    && e.Message.Contains("prices ") && e.Message.Contains("solve ")
+                    && e.Message.Contains("item details ") && e.Message.Contains("display ")
+                    && e.Message.Contains(" - total "));
+
+                Assert.All(entries, e => Assert.Equal("plan", e.Tag));
+            }
+        }
+
+        [Fact]
         public async Task GenerateStructuredAsync_List_NoRequestLabel_FallsBackToItemCountWording()
         {
             var recipeApi = new InMemoryRecipeApiClient();

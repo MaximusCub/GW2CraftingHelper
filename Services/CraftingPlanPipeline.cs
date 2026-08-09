@@ -1256,6 +1256,21 @@ namespace GW2CraftingHelper.Services
                 CompleteCurrent();
             }
 
+            // W3B review-fix (doc-only): this Debug line's ms figure is
+            // _sw's elapsed time since THIS phase's own Start() call, up to
+            // whichever comes first of the next phase's Start() or Finish()
+            // - i.e. WALL time between two consecutive Start() calls,
+            // including any un-instrumented gap between the previous
+            // phase's actual work ending and this phase's own work
+            // beginning. That is a DIFFERENT measurement from the Info
+            // "finish" summary line (see PlanPhaseTimingSummary.
+            // FormatCompactSummary), which buckets and sums the finer-
+            // grained raw timingLog entries recorded around each step's own
+            // narrower stopwatched work only, excluding those same gaps -
+            // so the same phase can legitimately show two different
+            // millisecond figures across the Debug and Info log lines; this
+            // Debug figure is the wall-clock one, the Info bucket is the
+            // instrumented-work-only one.
             private void CompleteCurrent()
             {
                 if (_currentPhase == null)
