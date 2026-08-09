@@ -2125,5 +2125,112 @@ status strip (`ClearRestoredSeed` is additive - every pre-existing
 Begin/UpdatePhase/Finish/SeedRestored behavior and test is unchanged) and
 W3C's per-character discipline display (untouched by this pass).
 
+**9. Review-fix pass round 4 (2026-08-09) - the one finding that survived
+rounds 1-3, closed with a class-level fix (1 Critical from a fourth
+adversarial code review).**
+
+**Why rounds 1-3 never closed this.** Each prior round guarded one more
+individual RENDER call site (`ApplyRestoredPlan`'s vm build, its live-tab
+`RenderPlan` call, then `Build()`'s own render tail) against a
+structurally-valid-but-degraded `plan.json` - e.g. a null entry inside
+`CraftingTreeNode.Children`. That pattern cannot converge: it only
+protects a call site someone already thought to guard, and this file's
+own render machinery has more than one. Two survived all three rounds
+because they are not part of any render PASS at all -
+`Views/Rendering/TreeSectionController.cs`'s "Expand All" button and the
+per-node expand/collapse toggle both call `RenderTreeNode` directly from a
+Click handler, on a node that was never visited during the guarded initial
+render because it was collapsed by default
+(`PlanContentHeightMath.TreeChildFlowHeight` returns 0 without recursing
+for a collapsed node, and `RenderTreeNode` itself only recurses into
+already-expanded children - the real-world default is every node past
+depth 1). A null `CraftingTreeNode.Children` entry at depth 2+ therefore
+sails through every existing try/catch untouched and only throws later,
+from a click, with no catch anywhere nearby -
+`node.Children.Count`/`foreach (var child in state.Node.Children)` crash
+outside any rollback machinery. A third, similarly unguarded site was
+found while building this fix and had not been reported before:
+`TreeSectionController`'s Craft All/Buy All buttons call
+`CraftingPlanPipeline.BuildPresetOverrides`, which walks the WHOLE
+`PlanSolveContext.Tree` (`RecipeNode`/`RecipeOption` graph) BEFORE
+`ApplyOverridesAndResolve`'s own try/catch is ever reached.
+
+**Fix (class-level, not another call-site guard).** A new
+`Services/PlanStructuralValidator.cs` (Blish-free, pure) walks the ENTIRE
+restored object graph once, at the deserialization boundary
+(`PlanStoreHelpers.DeserializePersistedPlan`, right after the existing
+Result/Plan/SchemaVersion gate) - both trees (`CraftingTreeNode`/
+`MultiItemRoots` the display path renders, and `PlanSolveContext.Tree`'s
+`RecipeNode`/`RecipeOption` graph the local override re-solve and
+`BuildPresetOverrides` both walk unconditionally on every single click,
+not just when there happens to be a Craft step) plus every list/dictionary
+`PlanViewModelBuilder`/`PlanResultBuilder`/`CraftingTreeBuilder`/
+`PlanSolver`/`CurrencyDisplayResolver` dereference with NO per-call null
+guard: `Plan.Steps` (required non-null; every entry non-null),
+`Plan.CurrencyCosts`/`Plan.TimegatedItems`/`UsedMaterials`/
+`RequiredDisciplines`/`RequiredRecipes`/`RequestedItems` (no null entries
+where non-null), `ItemMetadata`/`CurrencyMetadata` dictionaries (no null
+VALUES for a present key - a missing key was already handled everywhere),
+and, whenever a `SolveContext` is present, `Tree` (required non-null,
+recursively valid), `Prices` (required non-null, no null values -
+`PlanSolver.GetBuyCost`/`CollectPresetOverrides` both call
+`prices.TryGetValue` with no null check on the dictionary itself),
+`VendorOffers` (no null list values or entries), `Metadata`/
+`CurrencyMetadata`/`RequestedItems` (same shape as the result-level
+copies). Every `CraftingTreeNode`/`RecipeNode` recursion is bounded to a
+generous, explicit depth (200 - 10x+ any realistic GW2 crafting tree,
+though Newtonsoft's own unconfigured `JsonReader.MaxDepth` of 64 already
+rejects JSON nested this deep before the walk ever runs; the walk itself
+must not be the weak point per the round 4 mandate). A single invalid
+field anywhere rejects the WHOLE file - `PlanStoreHelpers` throws, which
+propagates to `PlanStore.LoadLatest`'s own existing try/catch: one Warn
+log line, then a null return (fresh start), the same "never partially
+accept" contract every other tolerance-gate check in that method already
+follows. The round 1-3 render-tail try/catch + rollback machinery
+(`RollBackFailedPlanRender`, `PlanStripStatusBoard.ClearRestoredSeed`) is
+kept unchanged as defense in depth, not removed - it still protects
+against any future degraded shape this walk does not yet know to name.
+
+New tests (`PlanStoreTests`, 6 new, Blish-free, real `PlanStore` + temp
+dir): every fixture starts from a REAL pipeline-produced `PersistedPlan`
+(a new `BuildDeepPipeline` helper gives a genuine 3-level tree so
+`CraftingTree.Children[0].Children[0]` is a real depth-2 node), serialized
+via the actual production `PlanStoreHelpers.SerializePersistedPlan`, then
+surgically corrupted at one exact JSON location via a `JObject`. A null
+entry inside `CraftingTreeNode.Children` at depth 2 is rejected (null +
+exactly one Warn, asserted by count and by the exact `PlanStructuralValidator`
+reason string, distinguishing it from every pre-existing rejection
+reason). An explicit `"Children": null` on a tree node is proven to LOAD
+SUCCESSFULLY, not rejected - `CraftingTreeNode.Children`'s own
+null-coalescing setter already neutralizes that exact shape one layer
+below the validator, so this documents why "null Children list" could not
+be reproduced as a corrupt-file case the way the mandate's wording
+literally describes, and proves the validator does not false-reject it. A
+null `RecipeNode.Recipes` LIST and a null `RecipeNode` ENTRY inside
+`RecipeOption.Ingredients`, both inside `SolveContext.Tree`, are each
+rejected - the closest real equivalent to a "null Children list"
+corruption, since `RecipeNode.Recipes`/`RecipeOption.Ingredients` have no
+such setter guard. A solve-context collection nulled (`SolveContext.Prices`
+set to `null`) is rejected. A null entry inside `Plan.Steps` is rejected.
+Every pre-existing `PlanStoreTests` fixture - including the full-featured,
+multi-item, and override-round-trip ones that already exercise every
+non-trivial shape `PlanSolveContext` carries - continues to pass
+unmodified, proving the validator accepts a real pipeline-generated plan
+unchanged.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
+warnings from either touched/new file). Module test suite green - 1268
+passed (was 1262 before this round-4 pass; +6 new tests, all listed
+above). No new Blish HUD references in tests; every new test exercises
+real production code (`PlanStore`/`PlanStoreHelpers`/`PlanStructuralValidator`
+via a real `CraftingPlanPipeline`-produced fixture) with no contract-mirror/
+fake-logic tests, no fake file I/O. Item/currency/vendor IDs remain
+internal-only. Pricing/solve logic itself is untouched - this pass adds
+one validation-only gate ahead of deserialization returning, nothing in
+the solve/render path changed. `PlanStructuralValidator.IsStructurallyValid`
+runs exactly once per module session (`Module.LoadAsync`'s single
+`PlanStore.LoadLatest()` call) - not a hot/per-frame path, so its O(graph
+size) walk carries no per-frame or per-click performance cost.
+
 Live desktop gate:
 [PENDING - the orchestrator fills in PASS/FAIL]
