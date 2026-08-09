@@ -210,6 +210,89 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(snapshot.FinalStatusText);
         }
 
+        // --- W3D (plan persistence): SeedRestored - review-fix, mustFix
+        // (new public production surface with zero prior test coverage) ---
+
+        [Fact]
+        public void SeedRestored_OnVirginBoard_SetsSequenceZeroNotInFlightAndFinalStatusText()
+        {
+            var board = new PlanStripStatusBoard();
+
+            board.SeedRestored("Generated Aug 9, 2026 10:30 AM - prices may have changed - Regenerate");
+
+            var snapshot = board.Snapshot();
+            Assert.Equal(0, snapshot.Sequence);
+            Assert.False(snapshot.InFlight);
+            Assert.Null(snapshot.PhaseText);
+            Assert.Equal(
+                "Generated Aug 9, 2026 10:30 AM - prices may have changed - Regenerate",
+                snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void SeedRestored_ThenRealBegin_SupersedesSeededState()
+        {
+            // The whole reason SeedRestored uses sequence 0 (a value
+            // CraftingPlanView's own ++_generateSequence convention can
+            // never produce): a genuine first Generate must unconditionally
+            // replace the restored banner, exactly like Begin already
+            // supersedes any earlier generation's state.
+            var board = new PlanStripStatusBoard();
+            board.SeedRestored("Generated Aug 9, 2026 10:30 AM - prices may have changed - Regenerate");
+
+            board.Begin(1);
+
+            var snapshot = board.Snapshot();
+            Assert.Equal(1, snapshot.Sequence);
+            Assert.True(snapshot.InFlight);
+            Assert.Null(snapshot.PhaseText);
+            Assert.Null(snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void SeedRestored_WhileGenerationInFlight_Rejected()
+        {
+            // Review-fix (critical): Module.LoadAsync can still be awaiting
+            // its own network refresh when a user opens the window and
+            // clicks Generate, so a real Begin(1) can land BEFORE the
+            // restore drain calls SeedRestored. Unconditionally stomping
+            // _sequence back to 0 in that window would silently reject
+            // every subsequent UpdatePhase(1,...)/Finish(1,...) for the
+            // in-flight generation (StatusUpdateGuard sees sequence 0, not
+            // 1) and freeze its spinner - the exact W3B "lost completion
+            // status" bug this board exists to prevent.
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+            board.UpdatePhase(1, 0, "Building recipe tree...");
+
+            board.SeedRestored("Generated Aug 9, 2026 10:30 AM - prices may have changed - Regenerate");
+
+            var snapshot = board.Snapshot();
+            Assert.Equal(1, snapshot.Sequence);
+            Assert.True(snapshot.InFlight);
+            Assert.Equal("Building recipe tree...", snapshot.PhaseText);
+            Assert.Null(snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void SeedRestored_AfterGenerationAlreadyFinished_Rejected()
+        {
+            // Same protection as the in-flight case above, for the
+            // "finished before the drain ran" ordering: a completed
+            // generation's OWN final status (success/error wording) must
+            // not be silently replaced by a stale on-disk restore banner.
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+            board.Finish(1, "Plan generated - Aug 9, 2026 10:35 AM");
+
+            board.SeedRestored("Generated Aug 9, 2026 10:30 AM - prices may have changed - Regenerate");
+
+            var snapshot = board.Snapshot();
+            Assert.Equal(1, snapshot.Sequence);
+            Assert.False(snapshot.InFlight);
+            Assert.Equal("Plan generated - Aug 9, 2026 10:35 AM", snapshot.FinalStatusText);
+        }
+
         [Fact]
         public void Snapshot_UnderConcurrentWriters_NeverThrowsAndEndsConsistent()
         {
