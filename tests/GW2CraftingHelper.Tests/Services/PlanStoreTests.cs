@@ -1177,6 +1177,46 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task LoadLatest_NullEntryInSolveContextUsedMaterials_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // Round 5 review-fix: SolveContext.UsedMaterials is a
+            // SEPARATELY serialized copy of the same list as
+            // CraftingPlanResult.UsedMaterials (Newtonsoft writes no $ref) -
+            // this corrupts ONLY the SolveContext copy, leaving
+            // Result.UsedMaterials itself clean, to prove the validator no
+            // longer has the asymmetry a plain check on Result.UsedMaterials
+            // alone would miss. Reachable from ANY override re-solve after a
+            // restore (ResolveWithOverrides -> PlanResultBuilder.Build's
+            // "foreach (var used in usedMaterials) { ... used.ItemId ... }"
+            // and SellSideEconomics.ComputeMaterialOpportunityCost's
+            // "used.ItemId"/"used.QuantityUsed", neither with a per-entry
+            // null check), not just Craft All/Buy All.
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy, ownMaterialsMode: OwnMaterialsMode.Valued);
+            Assert.NotNull(result.SolveContext);
+            Assert.NotEmpty(result.SolveContext.UsedMaterials);
+            Assert.NotEmpty(result.UsedMaterials);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                ((JArray)jObj["Result"]["SolveContext"]["UsedMaterials"])[0] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.UsedMaterials[0] is null", lastMessage());
+        }
+
+        [Fact]
         public async Task LoadLatest_NullEntryInPlanSteps_ReturnsNullAndLogsWarnExactlyOnce()
         {
             // Plan.Steps is read unconditionally by
