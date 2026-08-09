@@ -1526,4 +1526,98 @@ Item/currency/vendor IDs remain internal-only - only character names and
 discipline names (both already user-facing concepts) appear in the
 `CharacterAvailabilityText` display strings.
 
+**5. Review-fix pass round 2 (2026-08-08) - 2 further Must Fix findings
+from a follow-up adversarial review, both fixed.** Both findings were
+newly introduced BY item 4's own fixes interacting with each other -
+neither existed before that round.
+
+- *Must Fix: the item-4 "Use Own Materials" overlay fix bypassed the
+  account-preference tiebreak on the very branch it was meant to fix, and
+  then silently changed the reported discipline on the first local
+  override re-solve.* Item 4's fix backfilled `result.CharacterDisciplines`
+  onto the ALREADY-BUILT result after `Module.cs`'s useOwn:false pipeline
+  call returned - but `PlanResultBuilder.Build()` had already run, inside
+  that call, with `characterDisciplines` null (since `snapshot: null` was
+  passed to disable reduction, and the pipeline derived the tiebreak list
+  solely from `snapshot?.CharacterDisciplines` at the time). So the
+  account-preference tiebreak (item 4's OWN third fix) never actually ran
+  on this branch: a recipe coverable by, say, Armorsmith/Leatherworker/
+  Tailor with an account that only has Tailor still reported "Armorsmith -
+  Not trained on any character" with "Use Own Materials" off - the exact
+  misleading claim the tiebreak fix was supposed to close. Worse,
+  `PlanSolveContext` is mutable and the overlay also patched
+  `result.SolveContext.CharacterDisciplines`, so the FIRST local override
+  re-solve after that (`ResolveWithOverrides` -> `Build()` again, now with
+  a non-null `context.CharacterDisciplines`) silently re-picked "Tailor" -
+  the Required Disciplines section rewrote itself with no discipline-
+  related user action. Fixed by threading the cosmetic list into the
+  pipeline as its own argument instead of patching the result after the
+  fact: `GenerateStructuredAsync` (both the single-item and
+  `IReadOnlyList<PlanRequestItem>` overloads) and the private
+  `GenerateStructuredMultiAsync` all gained an optional
+  `characterDisciplines` parameter, used via
+  `characterDisciplines ?? snapshot?.CharacterDisciplines` wherever the
+  old `snapshot?.CharacterDisciplines`-only computation fed `Build()` and
+  `result.CharacterDisciplines` - so it is available to the tiebreak on
+  the VERY FIRST `Build()` call, on both branches, regardless of whether
+  `snapshot` itself is null. `Module.cs`'s lambda now passes
+  `characterDisciplines: _currentSnapshot?.CharacterDisciplines`
+  explicitly on BOTH the useOwn:true and useOwn:false branches (alongside
+  `snapshot: null` on the latter, still correctly disabling reduction/the
+  force-buy pre-pass/owned-currency annotation) and the post-hoc overlay
+  is gone entirely - the lambda is a plain (non-`async`) expression again,
+  matching its pre-W3C shape. `PlanSolveContext.CharacterDisciplines` is
+  populated from this same value at generation time, so a local
+  `ResolveWithOverrides` re-solve now carries forward an already-correct
+  list instead of "discovering" it partway through a session.
+- *Must Fix: doubling this feature's per-character API round trips (1 ->
+  2, sequential) doubled its exposure to the exact class of transient
+  failure that item 4's own all-or-nothing rule turns into a silent,
+  whole-account, every-refresh feature loss.* A 30-character account went
+  from 30 to 60 sequential per-character round trips inside the hard 60s
+  `SnapshotFetchTimeout` (`Module.cs`'s `CancelAfter`) whose expiry
+  discards the whole snapshot; independently, a single transient 429/500
+  on just ONE character's `/crafting` call - not implausible for GW2's
+  API - permanently wiped `CharacterDisciplines` for every character, on
+  every refresh, with only a `Warn` log line and no in-UI signal (item 4's
+  all-or-nothing rule is otherwise correct: see item 4's own rationale for
+  why a partial list is unacceptable). Fixed with two cheap mitigations
+  that do not reopen the reverted full-record endpoint: (1) each
+  character's inventory and crafting-discipline fetches now run
+  CONCURRENTLY via `Task.WhenAll` (two new private helpers,
+  `FetchCharacterInventoryItemsAsync`/`FetchCharacterCraftingAsync`, each
+  catching its own failures internally so neither one's failure faults
+  the other's `Task`), restoring the wall-clock cost to roughly one round
+  trip per character instead of two; and (2)
+  `FetchCharacterCraftingAsync` gained one bounded retry (2 attempts, no
+  artificial delay - mirroring `ItemMetadataService.GetMetadataAsync`'s
+  own first-wave + retry-wave pattern) before a character's crafting data
+  counts as failed, so a single transient hit self-heals instead of
+  wiping the whole account's discipline data. Concurrency is capped at 2
+  in-flight requests at a time (one character's own pair; the `foreach`
+  loop still awaits each character before moving to the next), so this
+  does not turn into an unbounded request burst against the GW2 API.
+
+New tests: `CraftingPlanPipelineTests` gained 2, proving the item-5 fix
+end to end through the exact call shape `Module.cs`'s useOwn:false branch
+uses (`snapshot: null`, `characterDisciplines` supplied explicitly) - one
+through the list overload's single-item short-circuit, one through the
+genuine multi-item path - both asserting the account-owned discipline
+(not the alphabetically-first one) is reported, and that a subsequent
+`ResolveWithOverrides` no-op re-solve reports the identical discipline
+rather than changing it. No test exercises the
+`Gw2AccountSnapshotService` concurrency/retry change directly, for the
+same reason item 4's per-character degradation fix has none (the file
+references `Blish_HUD`/`Gw2Sharp`, out of scope for the Blish-free-tests
+invariant) - covered by build + code review only, consistent with the
+file's existing zero-direct-test-coverage pattern.
+
+Validation (round 2): `dotnet build -p:Platform=x64` clean (0 errors);
+module test suite green - 1208 passed (was 1206 after round 1; +2 new
+tests, listed above). No new Blish HUD references in tests; both new
+tests exercise real production code
+(`CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`)
+with no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
+internal-only.
+
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
