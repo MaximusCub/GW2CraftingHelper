@@ -2045,5 +2045,85 @@ IDs remain internal-only. Not regressed: W3B's `PlanStripStatusBoard`
 pull-based status strip and W3C's per-character discipline display
 (neither touched by this pass).
 
+**8. Review-fix pass round 3 (2026-08-09) - 2 Must Fix findings from a
+third adversarial code review, both fixed.**
+
+- *Must Fix: finding 2's round-2 fix protected only the rare live-tab
+  branch, leaving the dominant restore-render path completely
+  unguarded.* `ApplyRestoredPlan` runs at module load, before the user
+  can possibly have switched to the Crafting Plan tab yet - the method's
+  own doc comment calls this "the common case". In that case
+  `ApplyRestoredPlan` only sets state fields (`_currentPlan = vm` among
+  them) and returns; the actual render happens later, on the tab's first
+  `Build()`, via that method's own tail:
+  `if (_currentPlan != null) RenderPlan(_currentPlan)`. That tail had no
+  try/catch of its own, and `Views/ViewAdapter.cs`'s `_buildAction(
+  contentPanel)` call around `Build()` has none either - so a
+  structurally valid but degraded `plan.json` (e.g. a null
+  `CraftingTreeNode.Children` entry, invisible to `PlanViewModelBuilder`'s
+  reference-copying vm build and only dereferenced once `RenderPlan`
+  walks the tree) escaped into Blish's own view construction on the
+  tab's first visit, and re-threw the SAME exception on every visit
+  after, since nothing ever cleared `_currentPlan`. Fixed: `Build()`'s
+  tail is now wrapped in the same try/catch shape as
+  `ApplyRestoredPlan`'s live-tab branch, both now calling one shared
+  `RollBackFailedPlanRender` helper.
+- *Must Fix: the round-2 rollback itself was incomplete - it never
+  undid the seeded staleness banner, the label text that had already
+  painted it, or `_contentPanel`'s own partially-built children.*
+  `PlanStripStatusBoard` had no clear/unseed API, so a rolled-back
+  restore left `FinalStatusText` (and the `_statusLabel` text
+  `RenderFromBoard` had already written from it, before the render
+  attempt) claiming "Generated \<time\> - prices may have changed -
+  Regenerate" forever - a persistent banner over a tab whose plan was
+  explicitly discarded, violating the repo invariant that a missing or
+  corrupt persisted plan means "no plan", never a fabricated one.
+  Separately, `RenderPlan` disposes `_contentPanel`'s existing children
+  before rebuilding, so an exception partway through left a half-built
+  plan parented in the live panel with no cleanup. Fixed three ways:
+  (1) `PlanStripStatusBoard` gained `ClearRestoredSeed()`, guarded by
+  the exact same `_sequence != 0 || _inFlight` check `SeedRestored`
+  itself uses, so a real Generate that raced in between the original
+  seed and the render failure is never clobbered by a rollback for a
+  plan it has already superseded; (2) the rollback calls it and, only
+  when it reports success, explicitly resets the status label back to
+  "Ready" (`RenderFromBoard` is pull-based and never overwrites a label
+  with an empty `FinalStatusText`, so clearing the board alone cannot
+  un-paint an already-rendered banner); (3) `RenderPlan`'s own
+  dispose-then-rebuild top was factored into a new
+  `ResetContentPanelToEmpty` helper, which the rollback also calls, so
+  a partial build is swept back to the same empty panel a fresh,
+  never-generated tab starts with. `_planGeneratedAt` is reset alongside
+  `_currentPlan` too, so no stale timestamp can outlive the plan it
+  described.
+
+Both fixes share one new private helper, `RollBackFailedPlanRender`,
+called from both `RenderPlan` call sites that can reach a
+still-unvalidated restored vm (`ApplyRestoredPlan`'s live-tab branch and
+`Build()`'s render tail) - a single rollback shape instead of two copies
+that could drift apart.
+
+New tests: `PlanStripStatusBoardTests` gained 4 for the new
+`ClearRestoredSeed` method (clears an active seed and returns true;
+harmless on a virgin board; rejected while a real generation is
+in-flight; rejected once a real generation has already finished),
+following the same coverage pattern round 1's `SeedRestored` tests
+established. No new `CraftingPlanView` test - unchanged from round 2's
+own note: it is Blish HUD UI code, out of reach of this repo's Blish-free
+xunit suite; both fixes were verified by code inspection plus the build/
+test run below.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors). Module test
+suite green - 1262 passed (was 1258 before this round-3 pass; +4 new
+tests, all listed above). Pre-existing StyleCop analyzer warnings
+unchanged in nature (not re-audited line-by-line, per item 6's own
+validation note). No new Blish HUD references in tests; every new test
+exercises real production code (`PlanStripStatusBoard`) with no
+contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
+internal-only. Not regressed: W3B's `PlanStripStatusBoard` pull-based
+status strip (`ClearRestoredSeed` is additive - every pre-existing
+Begin/UpdatePhase/Finish/SeedRestored behavior and test is unchanged) and
+W3C's per-character discipline display (untouched by this pass).
+
 Live desktop gate:
 [PENDING - the orchestrator fills in PASS/FAIL]
