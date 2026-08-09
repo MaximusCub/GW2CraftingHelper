@@ -1953,13 +1953,17 @@ built against real `CraftingPlanPipeline`/`PlanStore`/
 fake-logic tests, no fake file I/O (`PlanStoreTests` runs against a real
 temp directory throughout, matching the `SnapshotStoreTests` precedent).
 
-Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
-warnings from any touched file). Module test suite green - 1257 passed
-(was 1246 before this review-fix pass; +11 new tests, all listed above).
-No new Blish HUD references in tests; every new test exercises real
-production code with no contract-mirror/fake-logic tests. Item/currency/
-vendor IDs remain internal-only. Not regressed: W3B's
-`PlanStripStatusBoard` pull-based status strip (`SeedRestored`'s own
+Validation: `dotnet build -p:Platform=x64` clean (0 errors). Module test
+suite green - 1257 passed (was 1246 before this review-fix pass; +11 new
+tests, all listed above). Pre-existing StyleCop analyzer warnings (SA15xx/
+SA1201/etc., ~1370 across the project before this pass, none treated as
+errors) were not specifically re-audited line-by-line against this
+pass's ~350-line `Module.cs` growth - no attempt was made to keep that
+count exactly flat, unlike item 5's original (smaller) diff. No new
+Blish HUD references in tests; every new test exercises real production
+code with no contract-mirror/fake-logic tests. Item/currency/vendor IDs
+remain internal-only. Not regressed: W3B's `PlanStripStatusBoard`
+pull-based status strip (`SeedRestored`'s own
 guard is now stricter, every pre-existing Begin/UpdatePhase/Finish
 behavior and test is unchanged) and W3C's per-character discipline
 display (`CharacterDisciplines` still flows through
