@@ -1620,4 +1620,21 @@ tests exercise real production code
 with no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
 internal-only.
 
-Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Live desktop gate: PASS (2026-08-08, orchestrator session). Sandbox
+Blish (isolated preflight settings, dummy-window mode) with the
+synthetic snapshot seeded with 4 `CharacterDisciplines` entries across
+2 characters. Verified live across two generated plans:
+
+- "Zojja's Claymore" (Weaponsmith 500): the Required Disciplines row
+  rendered "Weaponsmith | Maximus Test (500), Alt Number Two (400/500)
+  | Level 500" - sufficient character plain, below-threshold character
+  in the slash form, sorted highest rating first; the "Characters"
+  column header present and aligned over the text.
+- "Zojja's Breastplate" (Armorsmith 500, deliberately absent from the
+  seed): the row rendered "Not trained on any character".
+
+No exceptions in the Blish log across the session. Alongside the W3C
+checks, the seeded snapshot rendered correctly on the Snapshot tab, the
+Required Recipes "(showing N missing of M)" header and Hide Unlocked
+default were intact, and craft steps showed "Mystic Forge" as a plain
+location tag with no fake level.
