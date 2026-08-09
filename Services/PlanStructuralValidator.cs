@@ -1,0 +1,455 @@
+using System.Collections.Generic;
+using GW2CraftingHelper.Models;
+
+namespace GW2CraftingHelper.Services
+{
+    /// <summary>
+    /// Round 4 review-fix (W3D adversarial review, critical): a single,
+    /// class-level structural walk of the ENTIRE object graph a
+    /// deserialized <see cref="PersistedPlan"/> carries, run once at the
+    /// deserialization boundary (<see cref="PlanStoreHelpers.DeserializePersistedPlan"/>)
+    /// before the file is accepted at all.
+    /// <para>
+    /// Rounds 1-3 each closed one more UNGUARDED NRE crash site reachable
+    /// from a structurally-valid-but-degraded plan.json (a try/catch around
+    /// <c>ApplyRestoredPlan</c>'s vm build, then its live-tab
+    /// <c>RenderPlan</c> call, then <c>Build()</c>'s own render tail) - but
+    /// every one of those fixes guarded an individual RENDER call site, not
+    /// the data itself. Two more unguarded call sites survived all three
+    /// rounds because they are not part of any render pass at all: the
+    /// "Expand All" button and the per-node expand/collapse toggle
+    /// (<c>Views/Rendering/TreeSectionController.cs</c>) both call
+    /// <c>RenderTreeNode</c> directly from a Click handler, on a node that
+    /// was NEVER visited during the guarded initial render because it was
+    /// collapsed by default (<c>PlanContentHeightMath.TreeChildFlowHeight</c>
+    /// returns 0 without recursing for a collapsed node, and
+    /// <c>RenderTreeNode</c> itself only recurses into already-expanded
+    /// children) - so a null entry inside <see cref="CraftingTreeNode.Children"/>
+    /// at depth 2+ (default-collapsed) sails straight through every
+    /// existing try/catch and only throws later, from a click, with no
+    /// catch anywhere nearby. A third, similarly unguarded site was found
+    /// while building this fix: <c>TreeSectionController</c>'s Craft
+    /// All/Buy All buttons call <c>CraftingPlanPipeline.BuildPresetOverrides</c>
+    /// - which walks the WHOLE <see cref="PlanSolveContext.Tree"/>
+    /// (<see cref="RecipeNode"/>/<see cref="RecipeOption"/> graph) - BEFORE
+    /// <c>ApplyOverridesAndResolve</c>'s own try/catch is ever reached.
+    /// Guarding each such site individually, as rounds 1-3 did, has already
+    /// been proven not to converge (every fix so far revealed exactly one
+    /// more unguarded site); this class instead makes the DATA safe once,
+    /// so no render/re-solve call site - guarded or not, today or added
+    /// later - can ever be handed a graph it does not already assume is
+    /// valid.
+    /// </para>
+    /// <para>
+    /// Every check below exists because a specific, already-identified
+    /// production code path dereferences that exact field with NO per-call
+    /// null guard, on the assumption (true for every solver-BUILT
+    /// <see cref="CraftingPlanResult"/>/<see cref="PlanSolveContext"/>, since
+    /// those are only ever constructed by trusted code - <see cref="PlanSolver"/>/
+    /// <see cref="PlanResultBuilder"/>/<see cref="CraftingTreeBuilder"/> -
+    /// never handed attacker- or corruption-controlled data) that the
+    /// invariant always holds. A restored <see cref="PersistedPlan"/> is the
+    /// ONE path that bypasses the solver entirely and hands these same
+    /// types straight from an on-disk file into that trusted code, so this
+    /// walk exists to re-establish, once, every invariant the solver's own
+    /// construction would otherwise have guaranteed for free. See each
+    /// check's own inline comment for the exact call site it protects.
+    /// </para>
+    /// <para>
+    /// Validation failure is the corrupt-file path (W3D spec item 4): the
+    /// caller throws, which propagates to <see cref="PlanStore.LoadLatest"/>'s
+    /// own try/catch - one Warn log line, then a null return (fresh start).
+    /// Never a partial accept: any single invalid field anywhere in the
+    /// graph rejects the WHOLE file, matching every other tolerance-gate
+    /// check in <see cref="PlanStoreHelpers.DeserializePersistedPlan"/>.
+    /// </para>
+    /// </summary>
+    internal static class PlanStructuralValidator
+    {
+        // 10x+ any realistic GW2 crafting tree depth (real trees observed
+        // during development top out around a dozen levels - raw material
+        // -> refined material -> component -> sub-assembly -> final item).
+        // Newtonsoft's own JsonReader.MaxDepth (64, unconfigured here - see
+        // PlanStoreHelpers' own doc comment on why no custom
+        // JsonSerializerSettings are used) already rejects JSON nested
+        // deeper than this before either recursive walk below ever runs,
+        // but per the W3D spec's round 4 mandate, the walk itself must not
+        // be the weak point - so it enforces its own generous, explicit
+        // bound rather than relying on that upstream protection alone. A
+        // depth this shallow is also nowhere near a real stack-overflow
+        // risk (a few hundred bytes per frame at most), so this exists
+        // purely to fail loudly and reject the file rather than to guard
+        // against an actual crash.
+        private const int MaxTreeDepth = 200;
+
+        /// <summary>
+        /// True when every null-assuming invariant the restore-render path
+        /// and the local override re-solve path rely on holds for the
+        /// entire <paramref name="plan"/> graph. <paramref name="reason"/>
+        /// is a short, human-readable (Warn-log-only, never user-facing)
+        /// description of the first violation found; callers must treat any
+        /// false result as "reject the whole file", never a partial accept.
+        /// </summary>
+        internal static bool IsStructurallyValid(PersistedPlan plan, out string reason)
+        {
+            reason = null;
+            var result = plan?.Result;
+            var craftingPlan = result?.Plan;
+            if (craftingPlan == null)
+            {
+                // Already checked by DeserializePersistedPlan's own
+                // structural gate before this runs - re-checked here too so
+                // this method stays safe to call (and test) in isolation.
+                reason = "missing Result.Plan";
+                return false;
+            }
+
+            // PlanViewModelBuilder.Build reads Plan.Steps unconditionally
+            // (result.Plan.Steps.Where(...)/.Select(...), no null guard) -
+            // the list itself must be non-null, and PlanResultBuilder.Build
+            // (foreach (var step in plan.Steps) { switch (step.Source) ... })
+            // dereferences every entry with no per-entry null check either.
+            if (craftingPlan.Steps == null)
+            {
+                reason = "Plan.Steps is null";
+                return false;
+            }
+            if (!NoNullEntries(craftingPlan.Steps, "Plan.Steps", out reason)) return false;
+
+            // PlanViewModelBuilder.BuildShoppingListSection/
+            // BuildCraftingStepsSection pass these straight into
+            // CurrencyDisplayResolver.ResolveAmounts/ResolveUnitAmounts,
+            // which iterate every line with no per-entry null check.
+            foreach (var step in craftingPlan.Steps)
+            {
+                if (!NoNullEntries(step.VendorCurrencyCosts, "PlanStep.VendorCurrencyCosts", out reason)) return false;
+                if (!NoNullEntries(step.VendorOfferCurrencyCostLinesPerBatch, "PlanStep.VendorOfferCurrencyCostLinesPerBatch", out reason)) return false;
+            }
+
+            // PlanViewModelBuilder.BuildSummarySection/BuildCraftingStepsSection
+            // both null-check the LIST before iterating, but dereference
+            // every entry (cc.CurrencyId, timegated.ItemId, ...) with no
+            // per-entry null check.
+            if (!NoNullEntries(craftingPlan.CurrencyCosts, "Plan.CurrencyCosts", out reason)) return false;
+            if (!NoNullEntries(craftingPlan.TimegatedItems, "Plan.TimegatedItems", out reason)) return false;
+
+            // PlanViewModelBuilder.BuildUsedMaterialsSection/
+            // BuildDisciplinesSection/BuildRecipesSection/BuildCraftingStepsSection
+            // all null-check the LIST before iterating, but dereference
+            // every entry with no per-entry null check (um.ItemId,
+            // disc.Discipline, recipe.Disciplines, ...).
+            if (!NoNullEntries(result.UsedMaterials, "UsedMaterials", out reason)) return false;
+            if (!NoNullEntries(result.RequiredDisciplines, "RequiredDisciplines", out reason)) return false;
+            if (!NoNullEntries(result.RequiredRecipes, "RequiredRecipes", out reason)) return false;
+
+            // PlanViewModelBuilder.BuildMultiItemTitle dereferences
+            // items[0].ItemId with no null check once isMultiItem gates on
+            // Count > 1.
+            if (!NoNullEntries(result.RequestedItems, "RequestedItems", out reason)) return false;
+
+            // PlanViewModelBuilder.ResolveName/ResolveIconUrl/ResolveRarity
+            // and CraftingTreeBuilder's own copies all call
+            // metadata.TryGetValue(id, out var meta) then dereference
+            // meta.Name/meta.IconUrl/meta.Rarity with no null check on meta
+            // itself - a dictionary VALUE of null (distinct from a missing
+            // key, which is already handled) would NRE.
+            if (!NoNullValues(result.ItemMetadata, "ItemMetadata", out reason)) return false;
+
+            // CurrencyDisplayResolver.ResolveName/ResolveIconUrl have the
+            // exact same meta-value-null gap as ItemMetadata above.
+            if (!NoNullValues(result.CurrencyMetadata, "CurrencyMetadata", out reason)) return false;
+
+            // The primary reported bug: a null entry inside
+            // CraftingTreeNode.Children at any depth is invisible to
+            // PlanViewModelBuilder's reference-copying vm build (TreeRoot =
+            // result.CraftingTree) and only ever dereferenced once
+            // RenderTreeNode actually walks that far - which, for a
+            // default-collapsed depth-2+ node, can happen long after every
+            // existing try/catch has already returned, from an unguarded
+            // "Expand All"/per-node-toggle Click handler.
+            if (result.CraftingTree != null &&
+                !IsValidCraftingTreeNode(result.CraftingTree, 0, "CraftingTree", out reason))
+            {
+                return false;
+            }
+
+            // M35 (multi-item plans): the same tree, N times over - never
+            // touched by PlanViewModelBuilder except by reference either.
+            if (!NoNullEntries(result.MultiItemRoots, "MultiItemRoots", out reason)) return false;
+            if (result.MultiItemRoots != null)
+            {
+                for (int i = 0; i < result.MultiItemRoots.Count; i++)
+                {
+                    if (!IsValidCraftingTreeNode(result.MultiItemRoots[i], 0, $"MultiItemRoots[{i}]", out reason))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            // The local override re-solve path (a plain pill click, a
+            // Best Path/Craft All/Buy All preset) needs its own graph -
+            // see IsValidSolveContext's own doc comment.
+            if (result.SolveContext != null && !IsValidSolveContext(result.SolveContext, out reason))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Recursively validates one <see cref="CraftingTreeNode"/> subtree
+        /// (the display tree - <see cref="CraftingPlanResult.CraftingTree"/>
+        /// or one element of <see cref="CraftingPlanResult.MultiItemRoots"/>).
+        /// <see cref="CraftingTreeNode.Children"/>'s own setter already
+        /// coerces a null value to <c>Array.Empty</c> (see that property's
+        /// doc comment), so a literal null Children LIST can never actually
+        /// exist on a deserialized instance - only a null ENTRY within an
+        /// otherwise non-null Children list is reachable, which is exactly
+        /// what <c>Views/Rendering/TreeSectionController.cs</c>'s
+        /// <c>node.Children.Count</c>/<c>foreach (var child in
+        /// state.Node.Children)</c> call sites (the Expand All button,
+        /// ~line 416; the per-node toggle, ~line 835) crash on.
+        /// </summary>
+        private static bool IsValidCraftingTreeNode(CraftingTreeNode node, int depth, string path, out string reason)
+        {
+            reason = null;
+            if (node == null)
+            {
+                reason = $"{path} is null";
+                return false;
+            }
+            if (depth > MaxTreeDepth)
+            {
+                reason = $"{path} exceeds max tree depth ({MaxTreeDepth})";
+                return false;
+            }
+
+            // TreeSectionController.RenderTreeNode passes this straight into
+            // CurrencyDisplayResolver.ResolveAmounts/ResolveTreeNodeUnitAmounts,
+            // which iterate every line with no per-entry null check.
+            if (!NoNullEntries(node.VendorCurrencyCosts, $"{path}.VendorCurrencyCosts", out reason)) return false;
+
+            var children = node.Children;
+            if (children == null) return true; // Defensive only - see this method's own doc comment.
+            for (int i = 0; i < children.Count; i++)
+            {
+                if (!IsValidCraftingTreeNode(children[i], depth + 1, $"{path}.Children[{i}]", out reason))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Validates a <see cref="PlanSolveContext"/> - everything a local
+        /// override re-solve (<c>CraftingPlanPipeline.ResolveWithOverrides</c>,
+        /// reached from a plain decision-pill click or the Best Path preset)
+        /// or a preset build (<c>CraftingPlanPipeline.BuildPresetOverrides</c>,
+        /// reached from the Craft All/Buy All buttons, UNGUARDED - it runs
+        /// before <c>TreeSectionController.ApplyOverridesAndResolve</c>'s own
+        /// try/catch is ever entered) dereferences without a null check.
+        /// </summary>
+        private static bool IsValidSolveContext(PlanSolveContext context, out string reason)
+        {
+            reason = null;
+
+            // PlanSolver.Evaluate/CraftingTreeBuilder.BuildNode/
+            // CraftingPlanPipeline.CollectPresetOverrides all walk
+            // node.Recipes/recipe.Ingredients unconditionally, for the
+            // WHOLE tree, on every single override re-solve (not gated on
+            // there being any Craft step) - so Tree must always be a fully
+            // valid graph whenever a SolveContext is present at all.
+            if (!IsValidRecipeNode(context.Tree, 0, "SolveContext.Tree", out reason)) return false;
+
+            // PlanSolver.GetBuyCost (called from Evaluate on every node) and
+            // CraftingPlanPipeline.CollectPresetOverrides both call
+            // prices.TryGetValue(...) with no null check on the dictionary
+            // itself - a null Prices would NRE on the very first node of
+            // the very first override click. A found entry whose VALUE is
+            // null then NREs inside PlanSolver.GetUnitPrice (price.SellInstant/
+            // price.BuyInstant), also with no null check.
+            if (context.Prices == null)
+            {
+                reason = "SolveContext.Prices is null";
+                return false;
+            }
+            if (!NoNullValues(context.Prices, "SolveContext.Prices", out reason)) return false;
+
+            // VendorBatchSolver.EvaluateVendorOffers already treats a null
+            // VendorOffers DICTIONARY as "no vendor offers" (explicit null
+            // check) - but a null LIST value for a present key, or a null
+            // VendorOffer entry within an otherwise non-null list, both NRE
+            // at its own "foreach (var offer in offers) { offer.OutputCount
+            // ... }" with no per-entry guard. The dictionary is keyed by
+            // item id, so - same reasoning as NoNullValues' own doc comment
+            // - the key is deliberately left out of reason (a Warn-level
+            // ModuleLog line the Log tab shows the user).
+            if (context.VendorOffers != null)
+            {
+                foreach (var kvp in context.VendorOffers)
+                {
+                    if (kvp.Value == null)
+                    {
+                        reason = "SolveContext.VendorOffers has a null offer list for one item";
+                        return false;
+                    }
+                    if (!NoNullEntries(kvp.Value, "SolveContext.VendorOffers[...]", out reason)) return false;
+                }
+            }
+
+            // CraftingTreeBuilder.ResolveName/ResolveIconUrl/ResolveRarity
+            // have the exact same meta-value-null gap as
+            // CraftingPlanResult.ItemMetadata above - reached on every
+            // override re-solve, not just the original Generate.
+            if (!NoNullValues(context.Metadata, "SolveContext.Metadata", out reason)) return false;
+            if (!NoNullValues(context.CurrencyMetadata, "SolveContext.CurrencyMetadata", out reason)) return false;
+
+            // Carried forward verbatim into the NEXT result.RequestedItems
+            // by ResolveWithOverrides (result.RequestedItems =
+            // context.RequestedItems) - see the matching check on
+            // CraftingPlanResult.RequestedItems above for why a null entry
+            // there NREs.
+            if (!NoNullEntries(context.RequestedItems, "SolveContext.RequestedItems", out reason)) return false;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Recursively validates one <see cref="RecipeNode"/> subtree (the
+        /// solve tree - <see cref="PlanSolveContext.Tree"/>). Unlike
+        /// <see cref="CraftingTreeNode.Children"/>, neither
+        /// <see cref="RecipeNode.Recipes"/> nor
+        /// <see cref="RecipeOption.Ingredients"/>/<see cref="RecipeOption.Disciplines"/>/
+        /// <see cref="RecipeOption.Flags"/> have a null-coalescing setter (they
+        /// are plain auto-properties with a <c>= new List&lt;T&gt;()</c>
+        /// initializer that Newtonsoft overwrites verbatim for an explicit
+        /// JSON <c>null</c>) - so a literal null LIST is genuinely reachable
+        /// on any of these, not just a null entry within one.
+        /// </summary>
+        private static bool IsValidRecipeNode(RecipeNode node, int depth, string path, out string reason)
+        {
+            reason = null;
+            if (node == null)
+            {
+                reason = $"{path} is null";
+                return false;
+            }
+            if (depth > MaxTreeDepth)
+            {
+                reason = $"{path} exceeds max tree depth ({MaxTreeDepth})";
+                return false;
+            }
+
+            // PlanSolver.Evaluate/IndexRecipeOptions/CraftingTreeBuilder.
+            // BuildNode/CollectPresetOverrides all do "foreach (var recipe
+            // in node.Recipes)" with no null check on the list itself.
+            if (node.Recipes == null)
+            {
+                reason = $"{path}.Recipes is null";
+                return false;
+            }
+
+            for (int i = 0; i < node.Recipes.Count; i++)
+            {
+                var option = node.Recipes[i];
+                string optionPath = $"{path}.Recipes[{i}]";
+                if (option == null)
+                {
+                    reason = $"{optionPath} is null";
+                    return false;
+                }
+
+                // PlanResultBuilder.Build reads option.Disciplines/
+                // option.Flags unconditionally (foreach (var discipline in
+                // option.Disciplines), option.Flags.Contains("AutoLearned"))
+                // once a Craft step resolves to this exact RecipeOption -
+                // reachable from a restored plan whose Steps includes any
+                // Craft-sourced step.
+                if (option.Disciplines == null)
+                {
+                    reason = $"{optionPath}.Disciplines is null";
+                    return false;
+                }
+                if (option.Flags == null)
+                {
+                    reason = $"{optionPath}.Flags is null";
+                    return false;
+                }
+
+                // PlanSolver.Evaluate/IndexRecipeOptions/CraftingTreeBuilder.
+                // BuildChildren/CollectPresetOverrides all do "foreach (var
+                // ingredient in recipe.Ingredients)" with no null check on
+                // the list itself.
+                if (option.Ingredients == null)
+                {
+                    reason = $"{optionPath}.Ingredients is null";
+                    return false;
+                }
+
+                for (int j = 0; j < option.Ingredients.Count; j++)
+                {
+                    if (!IsValidRecipeNode(option.Ingredients[j], depth + 1, $"{optionPath}.Ingredients[{j}]", out reason))
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// True when <paramref name="list"/> is null (every call site above
+        /// that uses this has already separately rejected a null list where
+        /// non-null is actually required - this helper only ever runs on a
+        /// field the caller has decided is optional) or contains no null
+        /// entries.
+        /// </summary>
+        private static bool NoNullEntries<T>(IReadOnlyList<T> list, string fieldName, out string reason)
+            where T : class
+        {
+            reason = null;
+            if (list == null) return true;
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] == null)
+                {
+                    reason = $"{fieldName}[{i}] is null";
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// True when <paramref name="dict"/> is null or contains no null
+        /// VALUES (a missing key is never a problem - every real reader
+        /// below this validator already guards a missing key with its own
+        /// TryGetValue check; only a present key whose value is null is the
+        /// unguarded case). Deliberately does NOT include the offending key
+        /// in <paramref name="reason"/>: every dictionary this is called on
+        /// (ItemMetadata/CurrencyMetadata/Prices/VendorOffers/Metadata) is
+        /// keyed by an item or currency id, and this reason string is a
+        /// Warn-level ModuleLog line the Log tab shows the user - the repo
+        /// invariant that item/currency/vendor ids are internal-only applies
+        /// there exactly as much as to any other UI surface.
+        /// </summary>
+        private static bool NoNullValues<TKey, TValue>(IReadOnlyDictionary<TKey, TValue> dict, string fieldName, out string reason)
+            where TValue : class
+        {
+            reason = null;
+            if (dict == null) return true;
+            foreach (var kvp in dict)
+            {
+                if (kvp.Value == null)
+                {
+                    reason = $"{fieldName} has a null value for one entry";
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+}

@@ -43,10 +43,12 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Deserializes a PersistedPlan from a JSON string. Returns null
         /// for null/whitespace input. Throws (does not swallow) for
-        /// malformed JSON or a schema too degraded to render safely (no
+        /// malformed JSON, a schema too degraded to render safely (no
         /// Result/Plan at all, or a SchemaVersion mismatch - see
-        /// PersistedPlan.CurrentSchemaVersion's own doc comment) - see this
-        /// class's own doc comment for why.
+        /// PersistedPlan.CurrentSchemaVersion's own doc comment), or a
+        /// structurally-valid-but-degraded object graph (round 4 review-fix,
+        /// critical - see PlanStructuralValidator's own doc comment) - see
+        /// this class's own doc comment for why.
         /// </summary>
         internal static PersistedPlan DeserializePersistedPlan(string json)
         {
@@ -68,6 +70,21 @@ namespace GW2CraftingHelper.Services
             {
                 throw new InvalidDataException(
                     "Persisted plan is missing Result/Plan or has an unsupported SchemaVersion - corrupt or old-schema file.");
+            }
+
+            // Round 4 review-fix (critical): a single, class-level walk of
+            // the ENTIRE restored object graph - the display tree, the
+            // solve tree, and every collection the restore-render and local
+            // override re-solve paths dereference without a null guard -
+            // rather than relying on individual render call sites to each
+            // guard themselves (rounds 1-3 proved that approach never
+            // converges: every fix revealed exactly one more unguarded
+            // site). See PlanStructuralValidator's own doc comment for the
+            // full inventory and the exact crash sites this closes.
+            if (!PlanStructuralValidator.IsStructurallyValid(plan, out string invalidReason))
+            {
+                throw new InvalidDataException(
+                    $"Persisted plan failed structural validation ({invalidReason}) - corrupt or degraded file.");
             }
 
             return plan;
