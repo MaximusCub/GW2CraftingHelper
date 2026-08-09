@@ -1227,4 +1227,73 @@ Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
 warnings). Module test suite - 1210 passed (was 1199; +11 new
 `PlanStripStatusBoardTests`).
 
+**Gate round 1 fix, review pass (2026-08-08) - 1 Critical + 3 Must Fix from
+adversarial review, all fixed.**
+
+- *Critical: the ordinary (no-tab-switch) completion path never showed the
+  final status.* `TriggerGenerate`'s `finally` block canceled
+  `_spinnerTicker` (`_spinnerTicker?.Cancel(); _spinnerTicker = null;`) in
+  the SAME `MainThreadMarshal.Run` drain as the success/catch callback's
+  `_statusBoard.Finish(myGen, ...)` call - both callbacks are queued
+  back-to-back with no `await` between them, and
+  `GameService.Overlay.QueueMainThreadUpdate` drains its whole queue in one
+  pass (docs/ARCHITECTURE.md section 1), so no real engine frame
+  (`Control.DoUpdate`) can land between them. `Finish()` is a pure state
+  write with no render side effect by design (the pull model), so
+  `RenderFromBoard`/`SpinnerTick` were the ONLY remaining renderers of the
+  final text - and `Cancel()` synchronously `Dispose()`s the ticker
+  (`Parent = null`, removed from `SpriteScreen`'s children) before
+  `SpinnerTick` ever gets a `DoUpdate` to observe the just-written `Finish()`
+  state. Net effect: the strip froze on the last phase text + spinner glyph
+  forever on the primary, most common completion path, never showing "Plan
+  generated - `<time>`" / "Error: ..." until the next Generate or a tab
+  flip - a regression against "preserve... the no-tab-switch path's
+  behavior" introduced by this same milestone's own fix. Fixed by calling
+  `RenderFromBoard(_statusBoard.Snapshot())` in the `finally` callback
+  immediately before `_spinnerTicker?.Cancel()`, flushing the final text
+  deterministically through the board before the ticker that would
+  otherwise have to render it is torn down.
+- *`PlanStripStatusBoard.Finish()` bypassed `StatusUpdateGuard`.* Checked
+  only `sequence != _sequence`, so it accepted a write onto a board that is
+  not in flight - including a virgin, never-`Begin()`'d board (`_sequence
+  == 0`, unreachable today only because the caller's `myGen` is always
+  `++_generateSequence` and therefore never 0 - not an invariant this class
+  should rely on its caller to hold) and a second `Finish()` for an
+  already-finished generation (would silently overwrite the first-recorded
+  wording). `Finish` now calls
+  `StatusUpdateGuard.ShouldApply(sequence, _sequence, !_inFlight)`, the same
+  guard `UpdatePhase` already used, making both methods consistent.
+- *`Build()`'s finished branch duplicated `RenderFromBoard`'s render
+  decision.* Re-derived its own inline "has a final status -> `SetStatus`
+  it, otherwise leave Ready" copy of `RenderFromBoard`'s own ladder, so two
+  independent copies of "what the strip shows for a given snapshot" existed
+  and could silently drift apart - contradicting `RenderFromBoard`'s own doc
+  comment claim of being "the ONLY place" that writes a snapshot into
+  `_statusLabel`. `Build()`'s not-in-flight branch now calls
+  `RenderFromBoard(boardSnapshot)` directly instead.
+- *The ticker's stop/render decision was untestable.* The exact contract the
+  milestone calls out ("when the board reports finished, render the final
+  status and stop itself") lived inline in `SpinnerTick`, a Blish-coupled
+  view method no test could reach - the board was provably correct in
+  isolation yet the feature broke because nothing proved the consumer side
+  ever rendered a finished snapshot. New pure `Services/PlanStripTickDecision.cs`
+  (`Decide(snapshot, myGen)` -> `Stop`/`RenderSpinner`/`RenderFinalAndStop`,
+  mirrors `StatusUpdateGuard`/`PhaseOrdinalGuard`'s shape) now owns that
+  decision; `SpinnerTick` just carries out whatever it returns.
+
+New tests: `PlanStripTickDecisionTests` (6 - in-flight renders spinner,
+Finish landing before the ticker's first tick renders final and stops,
+Finish landing between two ticks flips from spinner to final-and-stop, a
+superseded generation stops, a never-`Begin()`'d board stops, a null
+snapshot stops); 2 added to `PlanStripStatusBoardTests` (`Finish` on a
+virgin board rejected, a second `Finish` for the same generation rejected -
+the two cases the guard fix above closes). `CraftingPlanView`'s
+`SpinnerTick`/`Build()`/`TriggerGenerate` wiring itself has no new tests,
+same Blish-free-tests-invariant rationale as every other pass in this file
+- covered by the live desktop gate below.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors, 0 warnings from
+any touched file). Module test suite - 1218 passed (was 1210; +8 new: 6
+`PlanStripTickDecisionTests`, 2 added to `PlanStripStatusBoardTests`).
+
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
