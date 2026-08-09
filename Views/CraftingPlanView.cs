@@ -611,11 +611,14 @@ namespace GW2CraftingHelper.Views
         /// Mirrors TriggerGenerate's own success-path shape - adopts
         /// <paramref name="result"/> as the override loop's new baseline
         /// (_treeController.ResetForNewPlan, so a restored plan's decision
-        /// pills keep re-solving correctly with no network call), resets
-        /// section expansion, rebuilds the view model, and seeds the
-        /// status board with the staleness banner text
-        /// (PlanStripStatusBoard.SeedRestored) so the existing pull-based
-        /// strip renders it with zero new layout.
+        /// pills keep re-solving correctly with no network call), restores
+        /// the user's prior decision-pill overrides (RestoreOverrides -
+        /// review-fix, critical - see TreeSectionController.RestoreOverrides'
+        /// own doc comment for why this is required, not optional), resets
+        /// section expansion, rebuilds the view model, and seeds the status
+        /// board with the staleness banner text (PlanStripStatusBoard.
+        /// SeedRestored) so the existing pull-based strip renders it with
+        /// zero new layout.
         /// <para>
         /// Render guard mirrors TriggerGenerate's own liveness check: the
         /// Crafting Plan tab has usually not been Build() yet at this point
@@ -625,27 +628,74 @@ namespace GW2CraftingHelper.Views
         /// "if (_currentPlan != null) RenderPlan(_currentPlan)" tail
         /// renders it on first visit (see Build's own body); if the tab
         /// instead happens to already be live, this renders into it
-        /// directly rather than waiting for a rebuild that may never come.
+        /// directly rather than waiting for a rebuild that may never come -
+        /// review-fix (mustFix): that live-tab branch now also calls
+        /// RenderFromBoard right after seeding the board, alongside
+        /// RenderPlan, since Build()'s own "read a fresh Snapshot() on
+        /// every rebuild" re-arm never runs again for an already-live tab -
+        /// without it the staleness banner text stayed invisible until the
+        /// user switched tabs away and back.
+        /// </para>
+        /// <para>
+        /// Review-fix (mustFix): wrapped in two narrow try/catches instead
+        /// of running unguarded straight out of Module.Update() (Blish
+        /// HUD's own per-frame call, with no surrounding try/catch of its
+        /// own visible to this module) - PlanStoreHelpers' tolerance gate
+        /// only checks Result?.Plan/SchemaVersion structurally, so a
+        /// structurally valid but still-degraded plan.json (e.g. a null
+        /// Steps/UsedMaterials/RequiredDisciplines entry from a future
+        /// schema change) can still throw inside _vmBuilder.Build/RenderPlan.
+        /// The vm build happens BEFORE any state field is mutated (matching
+        /// TriggerGenerate's own established ordering - it builds vm first,
+        /// then mutates _treeController/_currentPlan/_planGeneratedAt in a
+        /// later callback), so a build failure leaves _currentPlan at
+        /// whatever it already held (null, on the ordinary restore path) -
+        /// a clean "fresh start" (spec item 4), not a half-applied one.
         /// </para>
         /// </summary>
-        public void ApplyRestoredPlan(CraftingPlanResult result, DateTime generatedAt)
+        public void ApplyRestoredPlan(
+            CraftingPlanResult result,
+            DateTime generatedAt,
+            IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides,
+            IReadOnlyList<int> ignoredItemIds)
         {
             if (result == null) return;
 
+            PlanViewModel vm;
+            try
+            {
+                vm = _vmBuilder.Build(result);
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan",
+                    $"Failed to render restored plan, starting fresh: {ex.GetType().Name} - {ex.Message}");
+                return;
+            }
+
             _treeController.ResetForNewPlan(result);
+            _treeController.RestoreOverrides(nodeOverrides, ignoredItemIds);
             _sectionExpansion.Clear();
             _lastDebugLog = result.DebugLog;
-            var vm = _vmBuilder.Build(result);
             _currentPlan = vm;
             _planGeneratedAt = generatedAt;
 
             _statusBoard.SeedRestored(
                 $"Generated {generatedAt:MMM d, yyyy h:mm tt} - prices may have changed - Regenerate");
+            RenderFromBoard(_statusBoard.Snapshot());
 
             if (_contentPanel == null || _contentPanel.Parent == null) return;
 
             _lastRenderedWidth = _contentPanel.Width;
-            RenderPlan(vm);
+            try
+            {
+                RenderPlan(vm);
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan",
+                    $"Failed to render restored plan into the live tab: {ex.GetType().Name} - {ex.Message}");
+            }
         }
 
         #endregion // General: construction & status
