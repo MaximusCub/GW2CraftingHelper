@@ -7,6 +7,7 @@ using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Tests.Helpers;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
@@ -63,6 +64,63 @@ namespace GW2CraftingHelper.Tests.Services
             var itemApi = new InMemoryItemApiClient();
             itemApi.AddItem(1, "Target", "t.png");
             itemApi.AddItem(2, "Ingredient", "i.png");
+
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+        }
+
+        // Round 4 review-fix (critical): a THREE-level real tree (item 1 <-
+        // recipe 10 <- item 2 <- recipe 20 <- item 3), so
+        // result.CraftingTree.Children[0].Children[0] is a real depth-2
+        // node - the PlanStructuralValidator tests below corrupt exactly
+        // that node (the default-collapsed depth the "Expand All"/per-node-
+        // toggle crash sites, and PlanContentHeightMath.IsNodeExpanded's
+        // own "depth < 2" default, both hinge on). Item 1/2 have no TP
+        // price at all (never passed to priceApi.AddPrice), so CanBuyTp is
+        // false for both and craft is the only feasible source - both
+        // therefore always have Children, regardless of price ordering.
+        private static CraftingPlanPipeline BuildDeepPipeline(out InMemoryPriceApiClient priceApi)
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+            recipeApi.AddSearchResult(2, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 2,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 100,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Middle", "m.png");
+            itemApi.AddItem(3, "Leaf", "l.png");
 
             return new CraftingPlanPipeline(
                 new RecipeService(recipeApi),
@@ -904,6 +962,248 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(resolvedOriginal.Plan.TotalCoinCost, resolvedReloaded.Plan.TotalCoinCost);
             Assert.Equal(ToJson(vmBuilder.Build(resolvedOriginal)), ToJson(vmBuilder.Build(resolvedReloaded)));
+        }
+
+        // --- Round 4 review-fix (critical): PlanStructuralValidator - a
+        // structurally-valid-but-degraded plan.json (e.g. a null entry deep
+        // inside CraftingTreeNode.Children, invisible to
+        // PlanViewModelBuilder's reference-copying vm build) used to sail
+        // through PlanStoreHelpers' tolerance gate and only NRE later, from
+        // an UNGUARDED Blish click handler (Expand All / the per-node
+        // expand toggle in TreeSectionController.RenderTreeNode, and
+        // TreeSectionController's Craft All/Buy All buttons via
+        // CraftingPlanPipeline.BuildPresetOverrides) with no try/catch
+        // anywhere nearby - see PlanStructuralValidator's own doc comment
+        // for the full inventory. Every fixture below starts from a REAL
+        // pipeline-produced PersistedPlan (matching this file's own
+        // established "real serialized fixtures, not hand-built objects"
+        // convention), serialized via the actual production
+        // PlanStoreHelpers.SerializePersistedPlan, then surgically
+        // corrupted at one exact JSON location via Newtonsoft's JObject -
+        // proving the validator rejects a file a naive parse/schema check
+        // would have accepted, and does so with the required "one Warn log
+        // line, return null" contract (never a partial accept). ---
+
+        private static string SerializeAndCorrupt(PersistedPlan plan, Action<JObject> corrupt)
+        {
+            string json = PlanStoreHelpers.SerializePersistedPlan(plan);
+            var jObj = JObject.Parse(json);
+            corrupt(jObj);
+            return jObj.ToString(Formatting.None);
+        }
+
+        // getLastMessage exposes the wrapped EXCEPTION's own Message (e.g.
+        // PlanStructuralValidator's "...failed structural validation
+        // (...)" text) rather than PlanStore.LoadLatest's own generic
+        // "Failed to load plan from {path}" wrapper string - the latter is
+        // identical across every failure kind, so only the exception
+        // message can distinguish "rejected by PlanStructuralValidator"
+        // from every other pre-existing rejection reason (a JSON parse
+        // failure, the Result/Plan/SchemaVersion gate).
+        private PlanStore NewWarnCountingStore(out Func<int> getWarnCount, out Func<string> getLastMessage)
+        {
+            int warnCount = 0;
+            string lastExceptionMessage = null;
+            var store = new PlanStore(_tempDir, (message, ex) =>
+            {
+                warnCount++;
+                lastExceptionMessage = ex?.Message;
+            });
+            getWarnCount = () => warnCount;
+            getLastMessage = () => lastExceptionMessage;
+            return store;
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullChildEntryInCraftingTreeAtDepth2_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            var pipeline = BuildDeepPipeline(out _);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            // Confirm the real fixture actually has the shape this test
+            // needs before corrupting it: root (depth 0, Craft) -> item 2
+            // (depth 1, Craft) -> item 3 (depth 2, leaf).
+            Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
+            Assert.Single(result.CraftingTree.Children);
+            var depth1Node = result.CraftingTree.Children[0];
+            Assert.Equal(CraftingDecision.Craft, depth1Node.Decision);
+            Assert.Single(depth1Node.Children);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                var depth2Children = (JArray)jObj["Result"]["CraftingTree"]["Children"][0]["Children"];
+                depth2Children[0] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            // Pins this down to PlanStructuralValidator specifically - not
+            // the pre-existing Result/Plan/SchemaVersion gate or a plain
+            // JSON parse failure, both of which use different message text.
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("CraftingTree.Children[0].Children[0]", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_ExplicitNullChildrenListOnTreeNode_LoadsSuccessfully()
+        {
+            // CraftingTreeNode.Children's own setter coerces a null value to
+            // Array.Empty<CraftingTreeNode>() (see that property's doc
+            // comment) - Newtonsoft always calls a writable property's
+            // public setter, so an explicit JSON "Children": null on some
+            // node can never actually reach PlanStructuralValidator as a
+            // null LIST; it is already neutralized one layer down, at the
+            // model itself. This proves the validator does not (and
+            // structurally cannot) false-reject that shape - a real
+            // "Children": null file still loads and renders exactly like
+            // the childless leaf it already was.
+            var pipeline = BuildDeepPipeline(out _);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                // Item 3 (depth 2) is a leaf - its own Children is already
+                // an empty array on disk; overwrite with an explicit null.
+                jObj["Result"]["CraftingTree"]["Children"][0]["Children"][0]["Children"] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded);
+            var leaf = loaded.Result.CraftingTree.Children[0].Children[0];
+            Assert.NotNull(leaf.Children);
+            Assert.Empty(leaf.Children);
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullRecipesListOnSolveContextTreeNode_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // Unlike CraftingTreeNode.Children, RecipeNode.Recipes has no
+            // null-coalescing setter (a plain auto-property with a "= new
+            // List<RecipeOption>()" initializer Newtonsoft overwrites
+            // verbatim) - so a null LIST is genuinely reachable here, the
+            // closest real equivalent to a "null Children list" corruption.
+            // PlanSolver.Evaluate/CraftingTreeBuilder.BuildNode/
+            // CraftingPlanPipeline.CollectPresetOverrides all walk
+            // node.Recipes unconditionally on EVERY override re-solve
+            // (Craft All/Buy All/a plain pill click), not just when there
+            // happens to be a Craft step.
+            var pipeline = BuildDeepPipeline(out _);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.SolveContext);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                var item2Node = jObj["Result"]["SolveContext"]["Tree"]["Recipes"][0]["Ingredients"][0];
+                item2Node["Recipes"] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.Tree.Recipes[0].Ingredients[0].Recipes", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullIngredientEntryInSolveContextTree_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // A null RecipeNode ENTRY inside RecipeOption.Ingredients (as
+            // opposed to the whole list being null, covered above) -
+            // reachable the same way: every override re-solve walks the
+            // full Ingredients list of every recipe on the path from Tree's
+            // root, unconditionally.
+            var pipeline = BuildDeepPipeline(out _);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.SolveContext);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                var item2Recipe = jObj["Result"]["SolveContext"]["Tree"]["Recipes"][0]["Ingredients"][0]["Recipes"][0];
+                ((JArray)item2Recipe["Ingredients"])[0] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.Tree.Recipes[0].Ingredients[0].Recipes[0].Ingredients[0]", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullSolveContextPrices_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // A solve-context COLLECTION nulled (as opposed to a tree
+            // shape) - PlanSolver.GetBuyCost/CraftingPlanPipeline.
+            // CollectPresetOverrides both call prices.TryGetValue(...) with
+            // no null check on the dictionary itself, so a null Prices
+            // would NRE on the very first node of the very first override
+            // re-solve or Craft All/Buy All click after a restore.
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.SolveContext);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                jObj["Result"]["SolveContext"]["Prices"] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.Prices is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullEntryInPlanSteps_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // Plan.Steps is read unconditionally by
+            // PlanViewModelBuilder.Build (result.Plan.Steps.Where(...)) - a
+            // null ENTRY inside an otherwise non-null list NREs on the very
+            // first vm build, whether that is the restore itself or a later
+            // override re-solve.
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotEmpty(result.Plan.Steps);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                ((JArray)jObj["Result"]["Plan"]["Steps"])[0] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("Plan.Steps[0] is null", lastMessage());
         }
     }
 }
