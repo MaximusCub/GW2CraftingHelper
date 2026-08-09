@@ -944,3 +944,115 @@ sandbox session, captures w3a_01-06 in preflight/captures):
   while cleared entries stay hidden - the floor survives tab rebuilds
   and does not block new entries.
 - Zero FATAL lines in the session log.
+
+## W3B: Generation progress + rich logging (2026-08-08)
+
+User-directed, field-test feedback: Generate Plan gave zero feedback while
+running (a static "Generating..." for the whole ~19s a real plan can take)
+and the log said nothing more useful than "Generation started (1 item)" /
+"Generation finished in 19036ms". Implemented in the isolated `wt-w3b`
+worktree off `master` (`ae68030`) on branch `w3b-generation-progress`.
+
+**1. Live coarse-phase events (`Services/PlanPhaseEvent.cs`).** A new,
+Blish-free `PlanPhase` enum (`BuildingTree`/`FetchingPrices`/
+`SolvingDecisions`/`FetchingItemDetails`/`BuildingDisplay`) and
+`PlanPhaseEvent` payload (phase, display name, optional `Done`/`Total`
+counts, reserved `Detail` string). `CraftingPlanPipeline.GenerateStructuredAsync`
+(both the single-item and `IReadOnlyList<PlanRequestItem>` overloads) and
+the private `GenerateStructuredMultiAsync` gained a new, optional
+`IProgress<PlanPhaseEvent> phaseProgress = null` parameter, reported once
+per phase at the moment it STARTS - a new private `PhaseTracker` nested
+class fires the live event, times the phase, and (see item 3) writes its
+Debug completion log line, all from the same 5 call sites each method
+already had a matching `PlanStatus` progress report at. The pre-existing,
+finer-grained `IProgress<PlanStatus>` channel is completely unchanged -
+this is a second, coarser, structured channel alongside it, not a
+replacement at the pipeline level. Fully backward compatible: optional
+parameter, defaults to `null`, every existing caller (`Module.cs`, every
+pipeline test) needed no changes.
+
+**2. Live status-strip spinner (`Views/CraftingPlanView.TriggerGenerate`).**
+The status label now shows a rotating ASCII spinner (`| / - \`) prefixed
+onto the current phase's text (e.g. "/ Fetching prices (418 items)..."),
+replacing the old static "Generating...". A new `_spinnerTicker`
+(`FrameTicker`, same mechanism as the pre-existing scroll-verify/resize-
+debounce tickers) advances the spinner glyph roughly every 150ms;
+`phaseProgress`'s callback updates the phase text as each new event
+arrives. Both the ticker's own step and the phase-event callback funnel
+through one `RenderSpinnerStatus` local function, which rechecks
+`StatusUpdateGuard.ShouldApply` (the exact M34-B1 #4 guard the pre-
+existing `PlanStatus` wiring already used) before touching the label - a
+stale tick from a superseded or already-finished generation can never
+clobber a newer one's text or the final "Plan generated -"/"Error:" text,
+regardless of how `QueueMainThreadUpdate`/`FrameTicker.DoUpdate` happen to
+interleave on any given frame. The old `IProgress<PlanStatus>` wiring to
+the status label is removed (the view now passes `progress: null` to the
+pipeline) - its frequent, static-feeling per-step text is exactly what the
+spinner + coarse phase text replaces; the pipeline itself still accepts
+and reports it (item 1) for any other future caller. The ticker is
+cancelled in `TriggerGenerate`'s own `finally` block (alongside the
+existing button re-enable) and in `StopLiveTickers` (tab switch / module
+unload), matching the other three tickers' teardown discipline exactly.
+
+**3. Rich `ModuleLog` logging, category "plan".** `CraftingPlanPipeline`
+gained an optional constructor-injected `ModuleLog moduleLog = null`
+(defaults to `ModuleLog.Shared` - `Module.cs`'s construction site never
+passes it), replacing every direct `ModuleLog.Shared.Write` call in the
+class with `_moduleLog.Write`, so tests can inject an isolated instance
+(see item 4). The `IReadOnlyList<PlanRequestItem>` wrapper also gained an
+optional `string requestLabel = null` - a best-effort "name x quantity[,
+name x quantity...]" label (e.g. "Orrax Manifested x1") that
+`CraftingPlanView` builds from its own already-resolved item-row search
+selection (no extra network round trip; falls back to the pre-W3B
+"(N items)" wording when absent, e.g. every pipeline test). Logging shape:
+Info on start ("Generating plan for Orrax Manifested x1"); Debug, one
+bounded entry per phase as it completes ("Fetching prices: 8400ms (418
+items)", written by `PhaseTracker`, never touching the OLD per-item-count
+detail); Info on finish, one compact per-phase summary line via a new
+`Services/Diagnostics/PlanPhaseTimingSummary` ("Plan for Orrax Manifested
+x1: tree 120ms, prices 8400ms (418 items), solve 30ms, item details
+9200ms, display 250ms - total 19036ms") - computed by bucketing the SAME
+raw timing lines `FinishTimingLog` already prepends to
+`CraftingPlanResult.DebugLog` into the 5 coarse phases (no separate
+timing plumbing needed between the single/multi methods and the wrapper);
+cancelled/failed lines keep their pre-existing wording, just with the
+label appended. `PlanTimingAnalyzer` gained a public `SummaryHeaderLine`
+constant (was an inline literal) so `PlanPhaseTimingSummary` can locate
+exactly where the raw per-step timing lines end within a full `DebugLog`
+and never mis-bucket a later, unrelated line (verified by a dedicated
+regression test - see item 4).
+
+**4. Tests.** `PlanPhaseTimingSummaryTests` (8 tests, pure-function
+coverage: null/empty input, the exact single- and multi-item bucketing
+shape, the summary-header-marker stop behavior against a full realistic
+`DebugLog` including `PlanResultBuilder`'s own trailing reduction/
+decision lines, forward-compatible handling of an unrecognized future
+step name, graceful degradation when a bucket is absent). Five new tests
+added to `CraftingPlanPipelineTests`: phase events fire in the expected
+order with sane payloads (only `FetchingPrices`/`FetchingItemDetails`
+carry a `Total`, `Done` always null) on a real single-item pipeline run
+and again on a real multi-item run; a null `phaseProgress` produces a
+byte-identical plan/economics result to omitting the parameter entirely;
+and two tests against a real, isolated `ModuleLog` instance (`new
+ModuleLog()`, never `ModuleLog.Shared`) configured with a real
+`ModuleLogStore` pointed at a `TempDirectory` - one proving the full
+`requestLabel` path (Info start/finish wording, exactly 5 Debug per-phase
+entries, every entry tagged "plan") after `WaitForPendingFileWrites`
+confirms they reached the on-disk JSONL file (not just the in-memory
+ring), the other proving the no-`requestLabel` fallback wording
+("Generating plan for 1 item").
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors); both test
+suites green - module suite 1182 passed (was 1169; +13 new tests: 8 in
+`PlanPhaseTimingSummaryTests`, 5 added to `CraftingPlanPipelineTests`),
+`VendorOfferUpdater.Tests` 135 passed (untouched, unaffected). No new
+Blish HUD references in tests; every new test exercises real production
+code (`CraftingPlanPipeline.GenerateStructuredAsync`/
+`GenerateStructuredMultiAsync`, `PlanPhaseTimingSummary`, a real
+`ModuleLog`/`ModuleLogStore`) with no contract-mirror/fake-logic tests.
+Pure-Blish view code (`CraftingPlanView`'s spinner ticker/status-strip
+wiring, `Module.cs`'s lambda forwarding) has no new tests per the
+Blish-free-tests invariant - covered instead by the live desktop gate
+below.
+
+Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
