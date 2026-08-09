@@ -137,23 +137,31 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Records generation <paramref name="sequence"/>'s final status
         /// text (success/cancel/failure wording, e.g. "Plan generated -
-        /// ..."/"Error: ...") and marks it no longer in flight.
-        /// Deliberately unconditional beyond the stale-sequence check -
-        /// unlike the pre-fix direct-label-write path this replaces, this
-        /// write is NEVER skipped because some view's panel happens to be
-        /// disposed or detached at the moment it runs; that is precisely
-        /// the bug this board exists to close (a pull-based reader picks
-        /// this text up whenever it next asks, regardless of what the view
-        /// was doing when Finish ran). Rejected (no-op) only if
-        /// <paramref name="sequence"/> is not the current generation (a
-        /// superseded generation's own completion must never overwrite a
-        /// newer generation's in-progress or already-finished state).
+        /// ..."/"Error: ...") and marks it no longer in flight. Unlike the
+        /// pre-fix direct-label-write path this replaces, this write is
+        /// NEVER skipped because some view's panel happens to be disposed
+        /// or detached at the moment it runs; that is precisely the bug
+        /// this board exists to close (a pull-based reader picks this text
+        /// up whenever it next asks, regardless of what the view was doing
+        /// when Finish ran). Rejected (no-op) via the same
+        /// <see cref="StatusUpdateGuard"/> UpdatePhase already uses, so
+        /// this is rejected in the same two cases: <paramref name="sequence"/>
+        /// is not the current generation (a superseded generation's own
+        /// completion must never overwrite a newer generation's in-progress
+        /// or already-finished state), or the current generation's status
+        /// is already closed (a raw sequence-only check would otherwise
+        /// accept a second Finish() for the same generation - silently
+        /// overwriting the first-recorded wording - and would accept a
+        /// Finish(0, ...) on a virgin, never-Begin()'d board, which is
+        /// unreachable today only because the caller's myGen is always
+        /// ++_generateSequence and therefore never 0 - not an invariant
+        /// this class should rely on its caller to hold).
         /// </summary>
         public void Finish(int sequence, string finalStatusText)
         {
             lock (_lock)
             {
-                if (sequence != _sequence) return;
+                if (!StatusUpdateGuard.ShouldApply(sequence, _sequence, !_inFlight)) return;
 
                 _inFlight = false;
                 _finalStatusText = finalStatusText;

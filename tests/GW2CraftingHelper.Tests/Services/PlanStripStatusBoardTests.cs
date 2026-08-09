@@ -134,6 +134,44 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void Finish_OnVirginBoard_Rejected()
+        {
+            // Gate round 2 review-fix: a raw `sequence != _sequence` check
+            // alone would have accepted Finish(0, ...) on a never-Begin()'d
+            // board, since a virgin board's own _sequence defaults to 0 -
+            // relying entirely on the caller's myGen always being
+            // ++_generateSequence (and therefore never 0) to avoid this.
+            // Finish must reject any write while the board is not in
+            // flight, exactly like UpdatePhase already does.
+            var board = new PlanStripStatusBoard();
+
+            board.Finish(0, "Plan generated - Aug 8, 2026 3:00 PM");
+
+            var snapshot = board.Snapshot();
+            Assert.False(snapshot.InFlight);
+            Assert.Null(snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void Finish_CalledTwiceForSameGeneration_SecondCallRejected()
+        {
+            // Gate round 2 review-fix: a raw sequence-only check would have
+            // let a second Finish() for the same, already-closed generation
+            // silently overwrite the first-recorded wording (a future
+            // cancel-plus-failure or retry path could plausibly complete
+            // twice). The first recorded text must win.
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+            board.Finish(1, "Plan generated - Aug 8, 2026 3:00 PM");
+
+            board.Finish(1, "Error: should not overwrite");
+
+            var snapshot = board.Snapshot();
+            Assert.False(snapshot.InFlight);
+            Assert.Equal("Plan generated - Aug 8, 2026 3:00 PM", snapshot.FinalStatusText);
+        }
+
+        [Fact]
         public void FinalStatus_ReadableByFreshSnapshotConsumer_AfterViewRebuild()
         {
             // Simulates the exact round-1 gate scenario: a completion lands
