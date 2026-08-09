@@ -183,11 +183,39 @@ namespace GW2CraftingHelper.Services
         /// above): this is not a write racing an in-flight generation, it
         /// is the board's own one-time initial seed - called at most once
         /// per module session, before the strip has shown anything else.
+        /// <para>
+        /// Review-fix (W3D adversarial review, critical): no-op if a real
+        /// generation has already Begin()'n this session (_sequence != 0)
+        /// or is currently in flight - "called at most once... before the
+        /// strip has shown anything else" above is a caller EXPECTATION,
+        /// not something this method used to enforce. Module.LoadAsync's
+        /// restore drain can lag well behind the module's own Update() loop
+        /// starting to tick (LoadAsync awaits a full account-snapshot
+        /// network refresh AFTER arming the restore flag but BEFORE
+        /// returning, and Blish HUD does not call a module's Update() until
+        /// LoadAsync's Task completes) - so a user can open the window and
+        /// click Generate while LoadAsync is still in flight, and have that
+        /// generation's Begin(1)/UpdatePhase(1,...)/Finish(1,...) all land
+        /// BEFORE this seed call finally runs. Unconditionally stomping
+        /// _sequence back to 0 in that window would silently reject every
+        /// subsequent UpdatePhase/Finish call for that in-flight generation
+        /// (StatusUpdateGuard.ShouldApply(1, 0, ...) is false once _sequence
+        /// is back to 0) and freeze its spinner on the next tick
+        /// (PlanStripTickDecision.Decide sees Sequence 0 != myGen 1 and
+        /// stops) - exactly the W3B "lost completion status" bug this board
+        /// exists to prevent. Checking _sequence == 0 alone would already
+        /// be sufficient (Begin only ever moves _sequence away from 0, and
+        /// never back), but the _inFlight check is kept too as a defensive,
+        /// self-documenting belt-and-braces guard rather than relying on
+        /// that invariant alone.
+        /// </para>
         /// </summary>
         public void SeedRestored(string finalStatusText)
         {
             lock (_lock)
             {
+                if (_sequence != 0 || _inFlight) return;
+
                 _sequence = 0;
                 _inFlight = false;
                 _phaseOrdinal = -1;
