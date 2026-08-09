@@ -170,32 +170,84 @@ namespace GW2CraftingHelper.Services
             try
             {
                 var characterNames = await _apiManager.Gw2ApiClient.V2.Characters.IdsAsync(ct);
+
+                // W3C (per-character discipline display): non-null as soon
+                // as the character list itself is obtained, even if it
+                // turns out empty or every character below fails - see
+                // AccountSnapshot.CharacterDisciplines' own doc comment for
+                // why null vs. empty is a meaningful distinction here.
+                snapshot.CharacterDisciplines = new List<SnapshotCharacterDiscipline>();
+
                 foreach (var name in characterNames)
                 {
                     ct.ThrowIfCancellationRequested();
                     try
                     {
-                        var inv = await _apiManager.Gw2ApiClient.V2.Characters[name].Inventory.GetAsync(ct);
-                        if (inv?.Bags == null) continue;
-                        foreach (var bag in inv.Bags)
+                        // W3C: fetches the character's FULL record
+                        // (V2.Characters[name].GetAsync) rather than the
+                        // narrower .Inventory sub-endpoint this call used
+                        // pre-W3C. The full record's .Bags is byte-
+                        // identical in shape to the narrower endpoint's own
+                        // .Bags (both IReadOnlyList<CharacterInventoryBag>,
+                        // confirmed via Gw2Sharp 1.7.4 reflection), and it
+                        // additionally carries .Crafting - the per-character
+                        // discipline data this package adds (see
+                        // AccountSnapshot.CharacterDisciplines) - so one
+                        // round trip now captures what previously took two.
+                        // Same scopes as before (account, characters, plus
+                        // inventories for a non-null Bags) - no new
+                        // permission requirement. Inventory and crafting
+                        // share this one try/catch: a failure here degrades
+                        // BOTH signals for this one character, same as the
+                        // pre-W3C behavior degraded inventory alone - it
+                        // still never fails the whole snapshot.
+                        var character = await _apiManager.Gw2ApiClient.V2.Characters[name].GetAsync(ct);
+
+                        if (character?.Bags != null)
                         {
-                            if (bag?.Inventory == null) continue;
-                            foreach (var item in bag.Inventory)
+                            foreach (var bag in character.Bags)
                             {
-                                if (item == null) continue;
-                                snapshot.Items.Add(new SnapshotItemEntry
+                                if (bag?.Inventory == null) continue;
+                                foreach (var item in bag.Inventory)
                                 {
-                                    ItemId = item.Id,
-                                    Count  = item.Count,
-                                    Source = AccountItemIndex.CharacterSourcePrefix + name
+                                    if (item == null) continue;
+                                    snapshot.Items.Add(new SnapshotItemEntry
+                                    {
+                                        ItemId = item.Id,
+                                        Count  = item.Count,
+                                        Source = AccountItemIndex.CharacterSourcePrefix + name
+                                    });
+                                }
+                            }
+                        }
+
+                        if (character?.Crafting != null)
+                        {
+                            foreach (var cd in character.Crafting)
+                            {
+                                if (cd == null) continue;
+                                snapshot.CharacterDisciplines.Add(new SnapshotCharacterDiscipline
+                                {
+                                    CharacterName = name,
+                                    // RawValue (not ToEnumString()/Value):
+                                    // preserves the literal string the API
+                                    // returned even for a discipline
+                                    // Gw2Sharp's enum does not recognize,
+                                    // and matches the plain-string shape
+                                    // RequiredDiscipline.Discipline already
+                                    // uses (from Recipe.Disciplines) so the
+                                    // two can be compared directly.
+                                    Discipline = cd.Discipline?.RawValue ?? "",
+                                    Rating = cd.Rating,
+                                    Active = cd.Active
                                 });
                             }
                         }
                     }
                     catch (Exception ex) when (!(ex is OperationCanceledException))
                     {
-                        Logger.Warn(ex, "Failed to fetch inventory for character {CharacterName}", name);
-                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch inventory for character {name}: {ex.GetType().Name} - {ex.Message}");
+                        Logger.Warn(ex, "Failed to fetch data for character {CharacterName}", name);
+                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch data for character {name}: {ex.GetType().Name} - {ex.Message}");
                     }
                 }
             }

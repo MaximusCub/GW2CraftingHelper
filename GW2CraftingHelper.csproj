@@ -54,6 +54,7 @@
     <Compile Include="Models\AccountSnapshot.cs" />
     <Compile Include="Models\SnapshotItemEntry.cs" />
     <Compile Include="Models\SnapshotWalletEntry.cs" />
+    <Compile Include="Models\SnapshotCharacterDiscipline.cs" />
     <Compile Include="Models\SnapshotSearchRow.cs" />
     <Compile Include="Models\SnapshotSourceFilter.cs" />
     <Compile Include="Module.cs" />
