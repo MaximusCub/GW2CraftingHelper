@@ -30,6 +30,14 @@ namespace GW2CraftingHelper.Services
         // for exact-count/content test assertions.
         private readonly ModuleLog _moduleLog;
 
+        // W3B review-fix: shared literal for both GenerateStructuredAsync's
+        // single-item Step 1 and GenerateStructuredMultiAsync's Step 1 -
+        // used both as the tree-building PlanPhaseEvent's Detail (surfaced
+        // live in CraftingPlanView.FormatPhaseText) and inside the
+        // existing PlanStatus wording, so the two channels never drift out
+        // of sync with each other.
+        private const string FirstRunTreeHint = "may take several seconds on first run";
+
         public CraftingPlanPipeline(
             RecipeService recipeService,
             TradingPostService tradingPostService,
@@ -80,13 +88,33 @@ namespace GW2CraftingHelper.Services
             var phaseTracker = new PhaseTracker(phaseProgress, _moduleLog);
 
             // Step 1: Build recipe tree
-            phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null);
+            // W3B review-fix: the "(may take several seconds on first run)"
+            // hint now also rides the phase event's Detail (see
+            // PlanPhaseEvent.Detail and CraftingPlanView.FormatPhaseText),
+            // so it still reaches the live status strip now that the view
+            // passes progress: null below - see FirstRunTreeHint's own
+            // doc comment.
+            phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
-                Message = "Building recipe tree (may take several seconds on first run)..."
+                Message = $"Building recipe tree ({FirstRunTreeHint})..."
             });
+            // W3B review-fix: these two RecipeService diagnostics (this one
+            // and the stale-seed warning below) exist to explain a slow
+            // first run and an out-of-date recipe seed - genuinely useful,
+            // not routine per-step noise, and CraftingPlanView now passes
+            // progress: null (the coarse phase events above replace
+            // PlanStatus's frequent per-step text for the live strip). Also
+            // writing them straight to ModuleLog guarantees they are never
+            // silently lost regardless of whether any IProgress<PlanStatus>
+            // consumer is attached - RecipeService's own statusReported/
+            // staleReported flags already bound this to at most one Info
+            // line each per generation, so this cannot spam the log.
             _recipeService.OnStatusUpdate = msg =>
+            {
                 progress?.Report(new PlanStatus { Message = msg });
+                _moduleLog.Write(ModuleLogLevel.Info, "plan", msg);
+            };
             sw.Restart();
             RecipeNode tree;
             try
@@ -418,8 +446,14 @@ namespace GW2CraftingHelper.Services
                 // result.DebugLog inside the single/multi method just
                 // called - see PlanPhaseTimingSummary's own doc comment for
                 // why no separate timing plumbing is needed between here
-                // and there.
-                string phaseSummary = PlanPhaseTimingSummary.FormatCompactSummary(result?.DebugLog);
+                // and there. W3B review-fix: sw (this wrapper's own
+                // Stopwatch, running since before the single/multi call)
+                // is now passed through as wallClockMs - the phase-sum-only
+                // "total" this used to log excludes every un-instrumented
+                // gap between steps, so it silently under-reported the
+                // real duration a field tester actually experiences; see
+                // FormatCompactSummary's own doc comment.
+                string phaseSummary = PlanPhaseTimingSummary.FormatCompactSummary(result?.DebugLog, sw.ElapsedMilliseconds);
                 _moduleLog.Write(ModuleLogLevel.Info, "plan",
                     string.IsNullOrEmpty(phaseSummary)
                         ? $"Generation finished in {sw.ElapsedMilliseconds}ms"
@@ -480,13 +514,19 @@ namespace GW2CraftingHelper.Services
 
             // Step 1: Build each item's own tree, then wrap them under the
             // synthetic multi-item root (RecipeService.BuildMultiItemTreeAsync).
-            phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null);
+            // W3B review-fix: see the single-item overload's matching call
+            // site for why FirstRunTreeHint/OnStatusUpdate's ModuleLog
+            // write were added.
+            phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
-                Message = "Building recipe trees (may take several seconds on first run)..."
+                Message = $"Building recipe trees ({FirstRunTreeHint})..."
             });
             _recipeService.OnStatusUpdate = msg =>
+            {
                 progress?.Report(new PlanStatus { Message = msg });
+                _moduleLog.Write(ModuleLogLevel.Info, "plan", msg);
+            };
             sw.Restart();
             RecipeNode tree;
             try
@@ -1186,8 +1226,12 @@ namespace GW2CraftingHelper.Services
             /// one. <paramref name="total"/> is an item/step count known up
             /// front (e.g. items to price), or null when not applicable -
             /// see PlanPhaseEvent.Total's own doc comment.
+            /// <paramref name="detail"/> is an optional short additional
+            /// detail (W3B review-fix: currently only the tree-building
+            /// phase's first-run hint - see PlanPhaseEvent.Detail's own doc
+            /// comment); null for every other call site.
             /// </summary>
-            public void Start(PlanPhase phase, string displayName, int? total)
+            public void Start(PlanPhase phase, string displayName, int? total, string detail = null)
             {
                 CompleteCurrent();
                 _currentPhase = phase;
@@ -1198,7 +1242,8 @@ namespace GW2CraftingHelper.Services
                 {
                     Phase = phase,
                     DisplayName = displayName,
-                    Total = total
+                    Total = total,
+                    Detail = detail
                 });
             }
 

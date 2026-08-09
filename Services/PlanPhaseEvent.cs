@@ -51,7 +51,14 @@ namespace GW2CraftingHelper.Services
         /// <summary>Item/step count for this phase, if known up front (e.g. items to price). Null when not applicable.</summary>
         public int? Total { get; set; }
 
-        /// <summary>Optional short additional detail. Unused (always null) in v1 - reserved for future use.</summary>
+        /// <summary>
+        /// Optional short additional detail, e.g. "may take several
+        /// seconds on first run" on the very first BuildingTree event of a
+        /// cold recipe cache (W3B review-fix - see
+        /// CraftingPlanPipeline.FirstRunTreeHint and
+        /// CraftingPlanView.FormatPhaseText). Null for every phase that has
+        /// none.
+        /// </summary>
         public string Detail { get; set; }
     }
 }

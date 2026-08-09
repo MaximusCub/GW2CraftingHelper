@@ -78,6 +78,38 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void FormatCompactSummary_WithWallClockMs_UsesWallClockAsTotalAndAppendsPhaseSum()
+        {
+            // W3B review-fix: the phase-sum-only "total" this used to log
+            // silently under-reports the real duration a field tester
+            // experiences by however long the un-instrumented gaps between
+            // steps ran. When the caller supplies the wrapper's own
+            // wall-clock elapsed time, it becomes the "total", with the
+            // phase sum appended alongside for diagnostic comparison - see
+            // the class doc comment's own worked example.
+            string summary = PlanPhaseTimingSummary.FormatCompactSummary(
+                BuildRealisticSingleItemDebugLog(), wallClockMs: 19036);
+
+            Assert.Equal(
+                "tree 125ms, prices 8402ms (3 items), solve 31ms, item details 9350ms (3 items), display 250ms - total 19036ms (phases 18158ms)",
+                summary);
+        }
+
+        [Fact]
+        public void FormatCompactSummary_NullWallClockMs_KeepsPhaseSumOnlyTotal_BackwardCompatible()
+        {
+            // The default (omitted) parameter must reproduce the exact
+            // pre-existing wording - every current caller/test relies on
+            // this (see FormatCompactSummary_SingleItemDebugLog_
+            // BucketsIntoFivePhasesInOrder above).
+            string summary = PlanPhaseTimingSummary.FormatCompactSummary(
+                BuildRealisticSingleItemDebugLog(), wallClockMs: null);
+
+            Assert.EndsWith(" - total 18158ms", summary);
+            Assert.DoesNotContain("phases", summary);
+        }
+
+        [Fact]
         public void FormatCompactSummary_StopsAtSummaryHeaderMarker_TrailingLinesNeverDoubleCounted()
         {
             // The "Total: 18158ms" line inside the percentage summary block

@@ -1099,6 +1099,174 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        [Fact]
+        public async Task GenerateStructuredAsync_List_FinishSummary_IncludesWallClockTotalDistinctFromPhaseSum()
+        {
+            // W3B review-fix: the finish summary's "total" used to be the
+            // SUM of the raw per-step timing lines, which necessarily
+            // excludes every un-instrumented gap between them and so
+            // silently under-reports the wall-clock duration a field
+            // tester actually experiences. It must now show the wrapper's
+            // own Stopwatch elapsed time as "total", with the phase sum
+            // appended alongside as "(phases Nms)" - see
+            // PlanPhaseTimingSummary.FormatCompactSummary's own doc
+            // comment.
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            using (var tmp = new TempDirectory())
+            {
+                var store = new ModuleLogStore(tmp.Path);
+                var log = new ModuleLog();
+                log.Configure(store, maxFileSizeBytes: 0, onStoreError: null);
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    moduleLog: log);
+
+                var items = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } };
+
+                await pipeline.GenerateStructuredAsync(
+                    items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,
+                    requestLabel: "Target x1");
+
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                var entries = store.ReadAll();
+
+                var finishEntry = entries.Single(e =>
+                    e.Level == ModuleLogLevel.Info && e.Tag == "plan"
+                    && e.Message.StartsWith("Plan for Target x1:"));
+
+                Assert.Contains(" - total ", finishEntry.Message);
+                // The phase sum is now a parenthetical alongside the real
+                // wall-clock total, never the total itself.
+                Assert.Contains("ms (phases ", finishEntry.Message);
+                Assert.EndsWith("ms)", finishEntry.Message);
+            }
+        }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_RecipeDiscoveryDiagnostic_ReachesModuleLog_EvenWithNullPlanStatusProgress()
+        {
+            // W3B review-fix: CraftingPlanView now passes progress: null
+            // (IProgress<PlanStatus>) on every real Generate click - the
+            // coarse phase events replace PlanStatus for the live status
+            // strip. RecipeService.OnStatusUpdate's "first run" diagnostic
+            // must still reach ModuleLog in that case instead of being
+            // silently lost. A fresh RecipeService's default
+            // InMemoryRecipeCacheStore starts empty, so the very first
+            // search deterministically misses (SearchMisses > SearchHits),
+            // which is exactly the condition RecipeService.PreWarmCacheAsync
+            // uses to report this message.
+            var recipeApi = new InMemoryRecipeApiClient();
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Item", "icon.png");
+
+            using (var tmp = new TempDirectory())
+            {
+                var store = new ModuleLogStore(tmp.Path);
+                var log = new ModuleLog();
+                log.Configure(store, maxFileSizeBytes: 0, onStoreError: null);
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    moduleLog: log);
+
+                await pipeline.GenerateStructuredAsync(
+                    1, 1, null, CancellationToken.None, progress: null,
+                    priceBasis: PriceBasis.InstantBuy);
+
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                var entries = store.ReadAll();
+
+                Assert.Contains(entries, e =>
+                    e.Level == ModuleLogLevel.Info && e.Tag == "plan"
+                    && e.Message.Contains("Discovering recipes from API"));
+            }
+        }
+
+        [Fact]
+        public async Task GenerateStructuredAsync_BuildingTreePhaseEvent_CarriesFirstRunHintAsDetail()
+        {
+            // W3B review-fix: the pre-W3B "(may take several seconds on
+            // first run)" PlanStatus hint is now unreachable once the view
+            // passes progress: null - it must still surface somewhere live,
+            // via PlanPhaseEvent.Detail on the BuildingTree event (see
+            // CraftingPlanView.FormatPhaseText).
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var phaseProgress = new CapturingProgress<PlanPhaseEvent>();
+
+            await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy, phaseProgress: phaseProgress);
+
+            var treeEvent = phaseProgress.Reports.Single(r => r.Phase == PlanPhase.BuildingTree);
+            Assert.False(string.IsNullOrEmpty(treeEvent.Detail));
+            Assert.Contains("first run", treeEvent.Detail);
+
+            // Every OTHER phase carries no Detail - reserved for the
+            // BuildingTree first-run hint only (v1 scope).
+            foreach (var report in phaseProgress.Reports)
+            {
+                if (report.Phase != PlanPhase.BuildingTree)
+                {
+                    Assert.Null(report.Detail);
+                }
+            }
+        }
+
         // --- Sell-side economics ---
 
         private static CraftingPlanPipeline BuildEconomicsPipeline(
