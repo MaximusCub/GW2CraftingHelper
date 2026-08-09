@@ -300,6 +300,13 @@ namespace GW2CraftingHelper.Services
             result.CurrencyMetadata = currencyMetadata;
             result.AcquisitionHints = _acquisitionHints;
 
+            // W3C: per-character discipline data, cosmetic only (see
+            // AccountSnapshot.CharacterDisciplines' doc comment) - a
+            // straight passthrough of the snapshot, never fed back into any
+            // decision/total. snapshot itself may be null (no account data
+            // available), in which case this stays null too.
+            result.CharacterDisciplines = snapshot?.CharacterDisciplines;
+
             // M34-B2a #4: owned-currency annotation, cosmetic only (see
             // AccountCurrencyIndex's doc comment) - built from the plan's
             // final currency totals and the wallet snapshot, never fed back
@@ -338,7 +345,8 @@ namespace GW2CraftingHelper.Services
                 OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
-                HomesteadTiers = tiers
+                HomesteadTiers = tiers,
+                CharacterDisciplines = result.CharacterDisciplines
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -687,6 +695,12 @@ namespace GW2CraftingHelper.Services
             result.AcquisitionHints = _acquisitionHints;
             result.RequestedItems = items;
 
+            // W3C: per-character discipline data, cosmetic only (see
+            // AccountSnapshot.CharacterDisciplines' doc comment) - see the
+            // single-item GenerateStructuredAsync's matching assignment
+            // above for the full rationale.
+            result.CharacterDisciplines = snapshot?.CharacterDisciplines;
+
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
                 BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
             result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
@@ -718,7 +732,8 @@ namespace GW2CraftingHelper.Services
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
                 RequestedItems = items,
-                HomesteadTiers = tiers
+                HomesteadTiers = tiers,
+                CharacterDisciplines = result.CharacterDisciplines
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -775,6 +790,11 @@ namespace GW2CraftingHelper.Services
             result.AcquisitionHints = context.AcquisitionHints;
             result.OwnedCurrencyAmounts = context.OwnedCurrencyAmounts;
             result.RequestedItems = context.RequestedItems;
+            // W3C: per-character discipline data, cosmetic only - carried
+            // forward from the generation-time context so a local override
+            // re-solve keeps showing it (see PlanSolveContext.
+            // CharacterDisciplines' doc comment).
+            result.CharacterDisciplines = context.CharacterDisciplines;
 
             BuildCraftingTreeResult(
                 result, context.Tree, solveResult.Decisions, context.Metadata,

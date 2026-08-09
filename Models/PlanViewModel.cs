@@ -176,5 +176,18 @@ namespace GW2CraftingHelper.Models
         // when no wallet snapshot was available at all, distinct from "0
         // owned" - only ever set on CurrencyCost rows.
         public int? CurrencyOwnedQuantity { get; set; }
+
+        // W3C (per-character discipline display, gw2efficiency parity):
+        // which of the account's characters have this DisciplineRow's
+        // discipline, and at what rating - e.g. "Anna (500), Bob
+        // (400/450)" (the "/450" suffix marks a character below the row's
+        // required MinRating - see PlanViewModelBuilder.
+        // BuildCharacterAvailabilityText). "Not trained on any character"
+        // when the snapshot has discipline data but no character has it.
+        // Null (not empty) when the snapshot has no character-crafting
+        // data at all (old snapshot / degraded fetch) - the renderer must
+        // show nothing extra for that case, never a fabricated claim
+        // either way. Only ever set on DisciplineRow rows.
+        public string CharacterAvailabilityText { get; set; }
     }
 }

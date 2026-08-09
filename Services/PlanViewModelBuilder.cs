@@ -483,11 +483,48 @@ namespace GW2CraftingHelper.Services
                 {
                     RowType = PlanRowType.DisciplineRow,
                     Label = disc.Discipline,
-                    Sublabel = $"Level {disc.MinRating}"
+                    Sublabel = $"Level {disc.MinRating}",
+                    CharacterAvailabilityText = BuildCharacterAvailabilityText(disc, result.CharacterDisciplines)
                 });
             }
 
             return section;
+        }
+
+        /// <summary>
+        /// W3C (per-character discipline display, gw2efficiency parity):
+        /// which characters have `disc`, and at what rating - see
+        /// PlanRowViewModel.CharacterAvailabilityText's own doc comment for
+        /// the exact output shapes. characterDisciplines is
+        /// CraftingPlanResult.CharacterDisciplines, a straight passthrough
+        /// of the account snapshot - null means the snapshot never
+        /// captured this data at all (old snapshot / degraded fetch), which
+        /// must never be conflated with "captured, and nobody has it".
+        /// </summary>
+        private static string BuildCharacterAvailabilityText(
+            RequiredDiscipline disc, IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines)
+        {
+            if (characterDisciplines == null)
+            {
+                return null;
+            }
+
+            var matches = characterDisciplines
+                .Where(cd => cd != null && string.Equals(cd.Discipline, disc.Discipline, StringComparison.Ordinal))
+                .OrderByDescending(cd => cd.Rating)
+                .ThenBy(cd => cd.CharacterName, StringComparer.Ordinal)
+                .ToList();
+
+            if (matches.Count == 0)
+            {
+                return "Not trained on any character";
+            }
+
+            var parts = matches.Select(cd => cd.Rating < disc.MinRating
+                ? $"{cd.CharacterName} ({cd.Rating}/{disc.MinRating})"
+                : $"{cd.CharacterName} ({cd.Rating})");
+
+            return string.Join(", ", parts);
         }
 
         private PlanSectionViewModel BuildRecipesSection(CraftingPlanResult result)
