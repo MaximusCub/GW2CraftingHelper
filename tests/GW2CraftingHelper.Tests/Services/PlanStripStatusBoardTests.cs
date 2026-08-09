@@ -1,0 +1,208 @@
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using GW2CraftingHelper.Services;
+using Xunit;
+
+namespace GW2CraftingHelper.Tests.Services
+{
+    public class PlanStripStatusBoardTests
+    {
+        [Fact]
+        public void Begin_MarksInFlight_ClearsPriorState()
+        {
+            var board = new PlanStripStatusBoard();
+
+            board.Begin(1);
+            var snapshot = board.Snapshot();
+
+            Assert.Equal(1, snapshot.Sequence);
+            Assert.True(snapshot.InFlight);
+            Assert.Null(snapshot.PhaseText);
+            Assert.Null(snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void UpdatePhase_CurrentGeneration_Applies()
+        {
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+
+            board.UpdatePhase(1, 0, "Building recipe tree...");
+
+            var snapshot = board.Snapshot();
+            Assert.True(snapshot.InFlight);
+            Assert.Equal("Building recipe tree...", snapshot.PhaseText);
+        }
+
+        [Fact]
+        public void UpdatePhase_LaterOrdinalSupersedesEarlier()
+        {
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+
+            board.UpdatePhase(1, 0, "Building recipe tree...");
+            board.UpdatePhase(1, 1, "Fetching prices (418 items)...");
+
+            Assert.Equal("Fetching prices (418 items)...", board.Snapshot().PhaseText);
+        }
+
+        [Fact]
+        public void UpdatePhase_StaleSequence_Rejected()
+        {
+            // A trailing phase event from a SUPERSEDED generation must
+            // never clobber the CURRENT generation's phase text - the
+            // exact race StatusUpdateGuard exists for, now folded into the
+            // board's own write side.
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+            board.UpdatePhase(1, 2, "Solving decisions...");
+            board.Begin(2);
+
+            board.UpdatePhase(1, 3, "Fetching item details (900 items)...");
+
+            var snapshot = board.Snapshot();
+            Assert.Equal(2, snapshot.Sequence);
+            Assert.Null(snapshot.PhaseText);
+        }
+
+        [Fact]
+        public void UpdatePhase_EarlierOrdinalAfterLater_Rejected()
+        {
+            // The out-of-order-drain race PhaseOrdinalGuard exists for: two
+            // Progress<T> posts for the SAME generation racing each other
+            // onto independent ThreadPool.QueueUserWorkItem calls, with the
+            // earlier phase's post landing second.
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+            board.UpdatePhase(1, 4, "Building display...");
+
+            board.UpdatePhase(1, 1, "Fetching prices (418 items)...");
+
+            Assert.Equal("Building display...", board.Snapshot().PhaseText);
+        }
+
+        [Fact]
+        public void UpdatePhase_AfterFinish_Rejected()
+        {
+            // A trailing phase-event tick draining after this SAME
+            // generation's own Finish() already ran must not resurrect a
+            // stale phase text over the already-written final status - the
+            // M34-B1 #4 "already closed" case, folded into the board.
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+            board.Finish(1, "Plan generated - Aug 8, 2026 3:00 PM");
+
+            board.UpdatePhase(1, 4, "Building display...");
+
+            var snapshot = board.Snapshot();
+            Assert.False(snapshot.InFlight);
+            Assert.Null(snapshot.PhaseText);
+            Assert.Equal("Plan generated - Aug 8, 2026 3:00 PM", snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void Finish_CurrentGeneration_SetsFinalStatusAndClearsInFlight()
+        {
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+            board.UpdatePhase(1, 0, "Building recipe tree...");
+
+            board.Finish(1, "Plan generated - Aug 8, 2026 3:00 PM");
+
+            var snapshot = board.Snapshot();
+            Assert.False(snapshot.InFlight);
+            Assert.Equal("Plan generated - Aug 8, 2026 3:00 PM", snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void Finish_StaleSequence_Rejected()
+        {
+            // A superseded generation's own completion (success/cancel/
+            // failure) must never overwrite a newer generation's
+            // in-progress or already-finished state.
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+            board.Begin(2);
+            board.UpdatePhase(2, 0, "Building recipe tree...");
+
+            board.Finish(1, "Error: stale generation");
+
+            var snapshot = board.Snapshot();
+            Assert.Equal(2, snapshot.Sequence);
+            Assert.True(snapshot.InFlight);
+            Assert.Null(snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void FinalStatus_ReadableByFreshSnapshotConsumer_AfterViewRebuild()
+        {
+            // Simulates the exact round-1 gate scenario: a completion lands
+            // (Finish), then a LATER, entirely separate Snapshot() call
+            // (standing in for a rebuilt CraftingPlanView's Build() reading
+            // the board fresh, e.g. after Plan -> Snapshot -> Plan) must
+            // still see the final status text - it was never lost because
+            // it was never gated on any view's own liveness in the first
+            // place.
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+            board.UpdatePhase(1, 0, "Building recipe tree...");
+            board.Finish(1, "Plan generated - Aug 8, 2026 3:00 PM");
+
+            // A brand new read, unrelated to any of the calls above.
+            var freshRead = board.Snapshot();
+
+            Assert.False(freshRead.InFlight);
+            Assert.Equal("Plan generated - Aug 8, 2026 3:00 PM", freshRead.FinalStatusText);
+        }
+
+        [Fact]
+        public void SecondGeneration_Begin_ClearsFirstGenerationsFinishedState()
+        {
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+            board.UpdatePhase(1, 0, "Building recipe tree...");
+            board.Finish(1, "Plan generated - Aug 8, 2026 3:00 PM");
+
+            board.Begin(2);
+
+            var snapshot = board.Snapshot();
+            Assert.Equal(2, snapshot.Sequence);
+            Assert.True(snapshot.InFlight);
+            Assert.Null(snapshot.PhaseText);
+            Assert.Null(snapshot.FinalStatusText);
+        }
+
+        [Fact]
+        public void Snapshot_UnderConcurrentWriters_NeverThrowsAndEndsConsistent()
+        {
+            // Not a race-detection test (the lock makes torn reads
+            // structurally impossible - see the class's own doc comment) -
+            // this proves the board tolerates many real concurrent writers
+            // (matching UpdatePhase/Finish's actual ThreadPool-thread
+            // callers) without exceptions, and that the generation which
+            // actually wins Finish() is reflected consistently afterward.
+            var board = new PlanStripStatusBoard();
+            board.Begin(1);
+
+            var tasks = new List<Task>();
+            for (int i = 0; i < 50; i++)
+            {
+                int ordinal = i % 5;
+                tasks.Add(Task.Run(() => board.UpdatePhase(1, ordinal, $"Phase {ordinal}...")));
+            }
+
+            for (int i = 0; i < 20; i++)
+            {
+                tasks.Add(Task.Run(() => board.Snapshot()));
+            }
+
+            Task.WaitAll(tasks.ToArray());
+            board.Finish(1, "Plan generated - Aug 8, 2026 3:00 PM");
+
+            var snapshot = board.Snapshot();
+            Assert.Equal(1, snapshot.Sequence);
+            Assert.False(snapshot.InFlight);
+            Assert.Equal("Plan generated - Aug 8, 2026 3:00 PM", snapshot.FinalStatusText);
+        }
+    }
+}
