@@ -662,20 +662,22 @@ namespace GW2CraftingHelper.Views
         /// null child inside CraftingTreeNode.Children (a structurally
         /// valid but degraded plan.json - passes PlanStoreHelpers' gate,
         /// survives the first try/catch's vm build untouched) is only ever
-        /// dereferenced once RenderPlan actually walks the tree here. Left
-        /// uncommitted, that poisoned _currentPlan would still be picked up
-        /// by Build()'s own unguarded "if (_currentPlan != null) RenderPlan
-        /// (_currentPlan)" tail on every subsequent visit to this tab - and
-        /// by extension ViewAdapter.Build, which wraps no try/catch of its
-        /// own around this view's Build() at all - throwing the SAME
-        /// exception again each time, not just once. The catch below rolls
-        /// every piece of state this method committed above back to the
-        /// exact "nothing restored" shape the tab starts in before
-        /// ApplyRestoredPlan ever runs (_treeController.ResetForNewPlan
-        /// (null) undoes ResetForNewPlan(result)+RestoreOverrides together -
-        /// see that method's own doc comment for why null is safe here),
-        /// so a degraded restore falls back to the ordinary empty
-        /// fresh-start state instead of a state that re-throws forever.
+        /// dereferenced once RenderPlan actually walks the tree here.
+        /// </para>
+        /// <para>
+        /// Round 3 review-fix (mustFix x2): round 2's rollback above was
+        /// itself incomplete two ways, and additionally only covered THIS
+        /// live-tab branch - not the far more common "tab not yet built"
+        /// path, where the very same poisoned vm was committed to
+        /// _currentPlan with no guard at all, then re-thrown by Build()'s
+        /// own unguarded render tail on the tab's first visit (and every
+        /// visit after, since nothing ever cleared _currentPlan). Both
+        /// gaps are now closed by <see cref="RollBackFailedPlanRender"/>,
+        /// a single shared rollback both this catch and Build()'s now-
+        /// guarded tail call into - see that method's own doc comment for
+        /// what it restores and why (the status board's seeded banner and
+        /// _contentPanel's own partially-built children were the two
+        /// pieces round 2 left behind).
         /// </para>
         /// </summary>
         public void ApplyRestoredPlan(
@@ -718,23 +720,78 @@ namespace GW2CraftingHelper.Views
             }
             catch (Exception ex)
             {
-                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan",
-                    $"Failed to render restored plan into the live tab: {ex.GetType().Name} - {ex.Message}");
+                RollBackFailedPlanRender(ex, "into the live tab");
+            }
+        }
 
-                // Round 2 review-fix (mustFix): roll back everything this
-                // method committed above (_treeController's overrides/
-                // ignore/expansion baseline, _lastDebugLog, _currentPlan)
-                // so this tab falls back to the same empty fresh-start
-                // shape it would have if the persisted file had failed the
-                // first (vm-build) guard instead - see this method's own
-                // doc comment. Leaving _currentPlan set to the vm that just
-                // failed here would re-throw the SAME exception out of
-                // Build()'s own unguarded RenderPlan tail on every later
-                // visit to this tab, not just this one.
-                _treeController.ResetForNewPlan(null);
-                _sectionExpansion.Clear();
-                _lastDebugLog = null;
-                _currentPlan = null;
+        /// <summary>
+        /// Round 3 review-fix (mustFix x2): shared rollback for a RenderPlan
+        /// call that threw while rendering a restored plan - called from
+        /// both places that can reach a still-unvalidated restored vm:
+        /// ApplyRestoredPlan's own live-tab branch above (the rare case -
+        /// the Crafting Plan tab already built before module load finished
+        /// restoring), and Build()'s render tail (the common case - see
+        /// ApplyRestoredPlan's own doc comment). Round 2 only ever wired
+        /// this rollback into the first of those two, leaving the far more
+        /// likely path (a fresh module load, tab not yet visited) able to
+        /// commit a poisoned _currentPlan with no guard at all - Build()'s
+        /// tail is guarded the same way now (see Build()'s own render-tail
+        /// try/catch).
+        /// <para>
+        /// Restores every piece of state either call site may have
+        /// committed back to the exact "nothing restored, nothing
+        /// generated yet" shape a fresh module load's Crafting Plan tab
+        /// starts in:
+        /// </para>
+        /// <list type="bullet">
+        /// <item><description>_treeController's override/ignore/expansion
+        /// baseline (ResetForNewPlan(null) undoes ResetForNewPlan(result)+
+        /// RestoreOverrides together - see that method's own doc comment
+        /// for why null is safe here) and its per-render tree state
+        /// (ResetContentPanelToEmpty's own ResetTreeRenderState half -
+        /// CreateTreeSection may have partially populated it before the
+        /// exception).</description></item>
+        /// <item><description>_lastDebugLog / _currentPlan /
+        /// _planGeneratedAt - leaving _currentPlan set to a vm that just
+        /// proved it cannot render would re-throw the SAME exception out
+        /// of Build()'s render tail on every later visit to this tab, not
+        /// just this one; _planGeneratedAt has no other reader once
+        /// _currentPlan is null, but is reset anyway so no stale timestamp
+        /// can outlive the plan it described.</description></item>
+        /// <item><description>_contentPanel's children (round 3, mustFix:
+        /// RenderPlan disposes-then-rebuilds in place, so a mid-build
+        /// exception - e.g. CreateTreeSection dereferencing a null child
+        /// partway through - can leave a partially-built plan parented in
+        /// a live panel; ResetContentPanelToEmpty sweeps it, same as a
+        /// fresh RenderPlan call's own top would).</description></item>
+        /// <item><description>the status board's seeded staleness banner
+        /// and the label text that already painted it (round 3, mustFix:
+        /// PlanStripStatusBoard.ClearRestoredSeed, plus an explicit
+        /// SetStatus("Ready") since RenderFromBoard is pull-based and
+        /// never overwrites a label with an empty FinalStatusText) - both
+        /// skipped whenever ClearRestoredSeed's own guard reports a real
+        /// Generate has raced in between the original seed and this
+        /// rollback, so an in-flight or already-finished generation's
+        /// status is never clobbered by a rollback for a plan it has
+        /// already superseded.</description></item>
+        /// </list>
+        /// </summary>
+        private void RollBackFailedPlanRender(Exception ex, string context)
+        {
+            ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan",
+                $"Failed to render restored plan {context}: {ex.GetType().Name} - {ex.Message}");
+
+            _treeController.ResetForNewPlan(null);
+            _sectionExpansion.Clear();
+            _lastDebugLog = null;
+            _currentPlan = null;
+            _planGeneratedAt = default(DateTime);
+
+            ResetContentPanelToEmpty();
+
+            if (_statusBoard.ClearRestoredSeed())
+            {
+                SetStatus("Ready");
             }
         }
 
@@ -1886,10 +1943,36 @@ namespace GW2CraftingHelper.Views
                 RenderFromBoard(boardSnapshot);
             }
 
+            // Round 3 review-fix (mustFix, finding 1): this is the DOMINANT
+            // restore-render path, not a rare corner case - ApplyRestoredPlan
+            // runs at module load, before the user can possibly have
+            // switched to this tab yet (see its own doc comment), so a
+            // restored plan is committed to _currentPlan here first and
+            // only actually rendered on the tab's first Build() - which is
+            // THIS call. Previously unguarded: a structurally valid but
+            // degraded plan.json (e.g. a null CraftingTreeNode.Children
+            // entry - passes PlanStoreHelpers' tolerance gate and
+            // PlanViewModelBuilder's reference-copying vm build untouched,
+            // only ever dereferenced once RenderPlan actually walks the
+            // tree) would throw here with no try/catch, escape into Blish's
+            // own view construction (Views/ViewAdapter.cs's _buildAction
+            // call wraps no try/catch of its own either), and re-throw the
+            // SAME exception on every subsequent visit to this tab, since
+            // nothing ever cleared _currentPlan. Shares
+            // RollBackFailedPlanRender with ApplyRestoredPlan's own
+            // live-tab branch - see that method's own doc comment for what
+            // it restores and why.
             if (_currentPlan != null)
             {
                 _lastRenderedWidth = w;
-                RenderPlan(_currentPlan);
+                try
+                {
+                    RenderPlan(_currentPlan);
+                }
+                catch (Exception ex)
+                {
+                    RollBackFailedPlanRender(ex, "on tab visit");
+                }
             }
         }
 
@@ -2788,28 +2871,41 @@ namespace GW2CraftingHelper.Views
         #endregion // General: current panel width helper
 
         #region 7. Section builders
-        private void RenderPlan(PlanViewModel vm)
+
+        /// <summary>
+        /// Round-3 review-fix (mustFix, finding 2): factored out of
+        /// RenderPlan's own top so the restore-render rollback helper
+        /// below can reach the exact same "nothing rendered yet" starting
+        /// point RenderPlan itself builds from - drops the tree render
+        /// state (M38 WP-25: _treeController.ResetTreeRenderState - see
+        /// that method's own doc comment), clears the relayout/re-ellipsis
+        /// action registries (M33 C2b - every closure in them captures
+        /// controls from a render that is about to be discarded, so
+        /// nothing here may outlive the dispose loop below), and disposes
+        /// whatever controls currently live in _contentPanel. Order
+        /// matters: the state resets happen before disposal so nothing
+        /// downstream can observe stale tree/relayout state pointing at
+        /// controls that are about to be gone.
+        /// </summary>
+        private void ResetContentPanelToEmpty()
         {
-            if (_contentPanel == null) return;
-
-            // Drop tree states up front so a plan without a tree section
-            // does not retain disposed controls from the previous render.
-            // M38 WP-25: moved onto _treeController.ResetTreeRenderState -
-            // see that method's own doc comment.
             _treeController.ResetTreeRenderState();
-
-            // M33 C2b: the relayout/re-ellipsis registries are rebuilt from
-            // scratch alongside every other per-render state above - same
-            // lifecycle as _treeNodeStates. Every closure captures controls
-            // from the render about to happen below; nothing here can
-            // outlive the dispose loop that follows.
             _relayoutActions.Clear();
             _reellipsisActions.Clear();
+
+            if (_contentPanel == null) return;
 
             foreach (var child in _contentPanel.Children.ToArray())
             {
                 child.Dispose();
             }
+        }
+
+        private void RenderPlan(PlanViewModel vm)
+        {
+            if (_contentPanel == null) return;
+
+            ResetContentPanelToEmpty();
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
 
