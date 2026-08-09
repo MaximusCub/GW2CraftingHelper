@@ -388,7 +388,13 @@ namespace GW2CraftingHelper
                 // CraftingPlanPipeline.GenerateStructuredAsync's own doc
                 // comment), so this lambda no longer needs its own
                 // single-vs-multi branch.
-                (items, useOwn, priceBasis, ct, progress) =>
+                // W3B: gained phaseProgress (live coarse-phase events) and
+                // requestLabel (best-effort item-name label) as two new
+                // trailing lambda parameters, both forwarded straight
+                // through to the pipeline - see
+                // CraftingPlanPipeline.GenerateStructuredAsync's matching
+                // parameters.
+                (items, useOwn, priceBasis, ct, progress, phaseProgress, requestLabel) =>
                 {
                     string activeChar = null;
                     try
@@ -424,12 +430,12 @@ namespace GW2CraftingHelper
                         return _craftingPipeline.GenerateStructuredAsync(
                             items, _currentSnapshot, ct, progress,
                             activeChar, priceBasis, currencyValuation, ownMaterialsMode,
-                            homesteadTiers);
+                            homesteadTiers, phaseProgress, requestLabel);
                     }
                     return _craftingPipeline.GenerateStructuredAsync(
                         items, null, ct, progress,
                         null, priceBasis, currencyValuation, ownMaterialsMode,
-                        homesteadTiers);
+                        homesteadTiers, phaseProgress, requestLabel);
                 },
                 _modalDialog,
                 _itemSearchProvider,
