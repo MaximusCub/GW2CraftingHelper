@@ -127,30 +127,114 @@ namespace GW2CraftingHelper
         private PersistedPlan _pendingPlanRestore;
         private bool _planRestoreDirty;
 
-        // W3D: the original request/timestamp behind the MOST RECENTLY
-        // persisted plan - the last successful Generate this session, or
-        // (if none has run yet) the restored plan loaded from disk. A
-        // later ResolveWithOverrides persist (see the resolveOverridesSync
-        // wiring below) reuses these as-is: a local override re-solve does
+        // Review-fix (W3D adversarial review, mustFix, replaces the four
+        // _lastPersistedPlan* fields this class used to carry): the
+        // original request/timestamp behind the MOST RECENTLY persisted
+        // plan - the last successful Generate this session, or (if none
+        // has run yet) the restored plan loaded from disk. A later
+        // ResolveWithOverrides persist (see the resolveOverridesSync
+        // wiring below) reuses this as-is: a local override re-solve does
         // not change what was requested or re-fetch prices, so the
         // persisted GeneratedAt/request must not silently advance just
         // because the user clicked a decision pill - see
-        // PersistAfterGenerateAsync's own doc comment. Written only from
-        // Update() (the restore drain, main thread) and
-        // PersistAfterGenerateAsync's post-await continuation (a
-        // ThreadPool thread with no SynchronizationContext) - both of
-        // which are sequenced strictly before any point a pill click could
-        // read them (Update()'s drain runs before the tab can even be
-        // built; PersistAfterGenerateAsync's write happens-before
-        // TriggerGenerate's own MainThreadMarshal.Run callback, which is
-        // what first renders the clickable pills a user could react to -
-        // see PersistAfterGenerateAsync's own comment), so no lock is
-        // needed for this cross-thread handoff, the same reasoning
-        // _lastDebugLog and other CraftingPlanView state already relies on.
-        private DateTime _lastPersistedPlanGeneratedAt;
-        private IReadOnlyList<PlanRequestItem> _lastPersistedPlanRequestItems;
-        private bool _lastPersistedPlanUseOwnMaterials;
-        private PriceBasis _lastPersistedPlanPriceBasis;
+        // PersistAfterGenerateAsync's own doc comment.
+        // <para>
+        // The four separate fields this replaced were written one-at-a-time
+        // with NO lock from PersistAfterGenerateAsync's ThreadPool
+        // continuation, while PersistResolvedPlanInBackground read all four
+        // synchronously on the MAIN thread from a pill click - a genuine,
+        // if narrow, race: a pill click's read interleaving between two of
+        // the four sequential field writes could persist a PersistedPlan
+        // whose GeneratedAt no longer matched its RequestItems/
+        // UseOwnMaterials/PriceBasis. Bundling all four into one immutable
+        // PersistedPlanMetadata object, published through a single
+        // `volatile` field, closes this: object construction always fully
+        // completes before the reference is published (a volatile write is
+        // a release fence), so any reader that observes a given
+        // PersistedPlanMetadata instance is guaranteed to see all four of
+        // its values as they were at that SAME publish - never a mix of an
+        // old value and a new one. This is the "single immutable metadata
+        // object published with Volatile.Write/Read" fix the review called
+        // for, using C#'s `volatile` field modifier (which gives the same
+        // release/acquire guarantee for reference assignment/read as
+        // explicit Volatile.Write/Read calls) rather than a lock, matching
+        // _refreshInProgress's own established volatile-field precedent
+        // just below for a similarly narrow cross-thread flag.
+        // </para>
+        private volatile PersistedPlanMetadata _lastPersistedPlanMetadata;
+
+        // Review-fix (W3D adversarial review, critical - closes a residual
+        // race the first pass of this fix left open): guards the compound
+        // "check _generateCompletedThisSession, and if false, publish
+        // restore metadata" sequence in Update()'s drain against
+        // PersistAfterGenerateAsync's own "set _generateCompletedThisSession
+        // = true, then publish generate metadata" sequence - two field
+        // writes each, on two different threads, that both need to be seen
+        // as a single atomic unit relative to each other. A bare volatile
+        // bool flag (the original fix) closes the multi-SECOND version of
+        // this race (LoadAsync's network-refresh window) but leaves a
+        // narrow, genuine TOCTOU window open: Update() could read the flag
+        // as still false a few CPU instructions before
+        // PersistAfterGenerateAsync sets it true, then both threads publish
+        // _lastPersistedPlanMetadata - whichever write lands last wins,
+        // which could leave the RESTORE's stale metadata paired with the
+        // just-generated Result already on disk from a PRIOR persist,
+        // AND/OR call ApplyRestoredPlan to clobber the just-rendered live
+        // view. Scoped to only the cheap field read/write pair below (never
+        // held across PlanStore.Save's disk I/O or ApplyRestoredPlan's
+        // Blish rendering work) so it can never stall the UI thread or
+        // delay TriggerGenerate's own await chain.
+        private readonly object _generateCompletionLock = new object();
+
+        // Review-fix (W3D adversarial review, mustFix): true once a real
+        // Generate (button click, or the "Use Own Materials" toggle's
+        // modal-confirm path) has completed successfully THIS session -
+        // distinct from _lastPersistedPlanMetadata being non-null, which a
+        // restored plan (no real Generate involved) also sets. Guards
+        // Update()'s restore drain: LoadAsync arms _planRestoreDirty BEFORE
+        // awaiting its own network refresh, but Blish HUD does not call
+        // Update() until LoadAsync's Task fully completes - so a user can
+        // open the window and have an entire Generate complete (rendering
+        // into a now-live tab) WHILE LoadAsync is still awaiting that
+        // refresh, before the restore drain ever runs. Without this guard,
+        // the drain would unconditionally overwrite that just-generated,
+        // user-visible plan (and its metadata) with the stale on-disk one
+        // the moment Update() finally started ticking. Set unconditionally
+        // as soon as ANY generateTask completes successfully - even a
+        // generation later found superseded for PERSISTING (see
+        // _persistGenerateSequence below) still means a real Generate ran,
+        // and CraftingPlanView's own myGen guard already ensures a
+        // superseded generation's result never reaches the view, so there
+        // is nothing left for this flag to protect against in that case.
+        // Every read and write of this field goes through
+        // _generateCompletionLock (see that field's own doc comment) - not
+        // volatile, since the lock already gives a strictly stronger
+        // visibility/ordering guarantee for the compound operations both
+        // sides need.
+        private bool _generateCompletedThisSession;
+
+        // Review-fix (W3D adversarial review, mustFix): mirrors
+        // CraftingPlanView's own ++_generateSequence "only the newest
+        // generation may act" convention, scoped to Module's OWN disk-write
+        // decision rather than reaching into CraftingPlanView's private
+        // field. PersistAfterGenerateAsync previously had no stale-
+        // generation guard at all, justified by "a second Generate cannot
+        // start while an earlier one's persist is still running" - which
+        // does NOT hold once OnOwnMaterialsToggled's modal-confirm path
+        // (Views/CraftingPlanView.cs) is considered: it fires a second
+        // TriggerGenerate gated only on `_currentPlan != null`, which W3D
+        // now makes true from module load onward (a restored plan), not on
+        // the Generate button's own disabled state. Incremented
+        // synchronously on the main thread, immediately before each
+        // generateTask is created (see the generateAsync lambda below) -
+        // always in lockstep with CraftingPlanView's own myGen bump, which
+        // happens synchronously just before `_generateAsync` is invoked -
+        // so the two counters advance 1:1, in the same order, and a
+        // superseded call is detected here exactly when CraftingPlanView's
+        // own guard would also discard it. volatile: written only on the
+        // main thread, but PersistAfterGenerateAsync's post-await
+        // continuation compares it from a ThreadPool thread.
+        private volatile int _persistGenerateSequence;
 
         private HttpClient _httpClient;
         private CraftingPlanPipeline _craftingPipeline;
@@ -510,7 +594,13 @@ namespace GW2CraftingHelper
                     // dispatch. A cancelled/failed generation propagates
                     // its exception through unchanged (persistence never
                     // runs) - see PersistAfterGenerateAsync's own doc
-                    // comment.
+                    // comment. Review-fix (mustFix): myPersistGen is
+                    // stamped HERE, synchronously, before generateTask is
+                    // even created - see _persistGenerateSequence's own doc
+                    // comment for why this must happen in lockstep with
+                    // CraftingPlanView's own myGen bump.
+                    int myPersistGen = ++_persistGenerateSequence;
+
                     Task<CraftingPlanResult> generateTask = useOwn
                         ? _craftingPipeline.GenerateStructuredAsync(
                             items, _currentSnapshot, ct, progress,
@@ -523,7 +613,7 @@ namespace GW2CraftingHelper
                             homesteadTiers, phaseProgress, requestLabel,
                             characterDisciplines: _currentSnapshot?.CharacterDisciplines);
 
-                    return PersistAfterGenerateAsync(generateTask, items, useOwn, priceBasis);
+                    return PersistAfterGenerateAsync(generateTask, items, useOwn, priceBasis, myPersistGen);
                 },
                 _modalDialog,
                 _itemSearchProvider,
@@ -532,7 +622,14 @@ namespace GW2CraftingHelper
                 (ctx, overrides, ignoredItemIds) =>
                 {
                     var result = _craftingPipeline.ResolveWithOverrides(ctx, overrides, ignoredItemIds);
-                    PersistResolvedPlanInBackground(result);
+                    // Review-fix (critical): overrides/ignoredItemIds are
+                    // the exact live state this re-solve just used - persist
+                    // them alongside the result so a restored session's
+                    // decision pills start from the same baseline, not
+                    // empty. See PersistResolvedPlanInBackground's own doc
+                    // comment for why these are copied before any
+                    // backgrounding.
+                    PersistResolvedPlanInBackground(result, overrides, ignoredItemIds);
                     return result;
                 }
             );
@@ -733,16 +830,50 @@ namespace GW2CraftingHelper
             // _refreshInProgress/_currentSnapshot early returns below - a
             // fresh account with no snapshot yet must still restore its
             // persisted plan.
+            // Review-fix (W3D adversarial review, critical): guarded by
+            // !_generateCompletedThisSession - LoadAsync can still be
+            // awaiting its own network refresh (arming this flag before
+            // that await) when Update() starts ticking, so a real Generate
+            // can complete and render into a live tab BEFORE this drain
+            // ever runs; without the guard, this block would silently
+            // overwrite that just-generated plan (and its metadata) with
+            // the stale on-disk one the moment it finally got to run. See
+            // _generateCompletedThisSession's own doc comment. The
+            // check-and-publish below runs under _generateCompletionLock
+            // (see that field's own doc comment) - PersistAfterGenerateAsync
+            // performs the matching "set completed, then publish generate
+            // metadata" sequence under the SAME lock, so the two can never
+            // interleave into a torn outcome (restore metadata paired with
+            // an already-on-disk generate Result, or vice versa). Only the
+            // cheap field check/write is inside the lock - ApplyRestoredPlan
+            // itself (Blish rendering work) runs outside it.
             if (_planRestoreDirty)
             {
                 _planRestoreDirty = false;
                 if (_pendingPlanRestore != null)
                 {
-                    _lastPersistedPlanGeneratedAt = _pendingPlanRestore.GeneratedAt;
-                    _lastPersistedPlanRequestItems = _pendingPlanRestore.RequestItems;
-                    _lastPersistedPlanUseOwnMaterials = _pendingPlanRestore.UseOwnMaterials;
-                    _lastPersistedPlanPriceBasis = _pendingPlanRestore.PriceBasis;
-                    _craftingContent?.ApplyRestoredPlan(_pendingPlanRestore.Result, _pendingPlanRestore.GeneratedAt);
+                    bool shouldApplyRestore;
+                    lock (_generateCompletionLock)
+                    {
+                        shouldApplyRestore = !_generateCompletedThisSession;
+                        if (shouldApplyRestore)
+                        {
+                            _lastPersistedPlanMetadata = new PersistedPlanMetadata(
+                                _pendingPlanRestore.GeneratedAt,
+                                _pendingPlanRestore.RequestItems,
+                                _pendingPlanRestore.UseOwnMaterials,
+                                _pendingPlanRestore.PriceBasis);
+                        }
+                    }
+
+                    if (shouldApplyRestore)
+                    {
+                        _craftingContent?.ApplyRestoredPlan(
+                            _pendingPlanRestore.Result,
+                            _pendingPlanRestore.GeneratedAt,
+                            _pendingPlanRestore.NodeOverrides,
+                            _pendingPlanRestore.IgnoredItemIds);
+                    }
                 }
             }
 
@@ -1029,6 +1160,37 @@ namespace GW2CraftingHelper
         }
 
         /// <summary>
+        /// Review-fix (W3D adversarial review, mustFix): the four values
+        /// PersistAfterGenerateAsync/PersistResolvedPlanInBackground/
+        /// Update()'s restore drain need to agree on atomically - see
+        /// Module's own _lastPersistedPlanMetadata field doc comment for
+        /// the race this closes. Deliberately a plain immutable data
+        /// holder (no behavior) private to Module - every consumer already
+        /// lives here, so there is no reason to widen this past module
+        /// scope the way PersistedPlan itself (the on-disk shape) needs to
+        /// be.
+        /// </summary>
+        private sealed class PersistedPlanMetadata
+        {
+            public DateTime GeneratedAt { get; }
+            public IReadOnlyList<PlanRequestItem> RequestItems { get; }
+            public bool UseOwnMaterials { get; }
+            public PriceBasis PriceBasis { get; }
+
+            public PersistedPlanMetadata(
+                DateTime generatedAt,
+                IReadOnlyList<PlanRequestItem> requestItems,
+                bool useOwnMaterials,
+                PriceBasis priceBasis)
+            {
+                GeneratedAt = generatedAt;
+                RequestItems = requestItems;
+                UseOwnMaterials = useOwnMaterials;
+                PriceBasis = priceBasis;
+            }
+        }
+
+        /// <summary>
         /// W3D (plan persistence across module restarts): awaits a Generate
         /// call and, only on success, persists the full result alongside
         /// the original request and a fresh timestamp - see PlanStore.cs's
@@ -1041,68 +1203,104 @@ namespace GW2CraftingHelper
         /// call already relies on - so the write below is already off the
         /// UI thread with no extra dispatch needed. A cancelled/failed
         /// generateTask propagates its exception out of the `await`
-        /// unchanged (persistence never runs, and _lastPersistedPlan*
+        /// unchanged (persistence never runs, and _lastPersistedPlanMetadata
         /// below is left at whatever it already held) - this method adds
         /// no new error handling, matching CraftingPlanView.TriggerGenerate's
         /// own catch block, which is unaffected by this wrapper.
         /// <para>
-        /// No generation-sequence guard is needed here (unlike
-        /// CraftingPlanView's own myGen checks): this whole method is now
-        /// part of the single Task CraftingPlanView.TriggerGenerate awaits
-        /// as `_generateAsync(...)`, which it only ever calls with
-        /// `_generateButton.Enabled = false` and does not re-enable until
-        /// its own `finally` runs AFTER that await completes - so a second
-        /// Generate (button click, or the "Use Own Materials" toggle's
-        /// modal-confirm path, which itself only re-fires TriggerGenerate
-        /// once a PRIOR generation already finished and set _currentPlan)
-        /// cannot start while this method is still running for an earlier
-        /// one. If that invariant ever changes (e.g. a future
-        /// cancel-and-regenerate feature), this method would need the same
-        /// stale-write guard _generateSequence gives every other
-        /// generation-completion path.
+        /// Review-fix (W3D adversarial review, mustFix): <paramref
+        /// name="myPersistGen"/> is this call's stamp from
+        /// _persistGenerateSequence (see that field's own doc comment) - a
+        /// second Generate CAN start while this one's own `await` above is
+        /// still pending (the Generate button's disabled state is not the
+        /// only path that starts a generation; see
+        /// _generateCompletedThisSession's doc comment), so the disk write
+        /// below is skipped entirely if a newer call has since started,
+        /// rather than persisting a generation the user has already moved
+        /// past. The earlier claim that no guard was needed here ("a second
+        /// Generate cannot start while an earlier one's persist is still
+        /// running") is exactly what this fix corrects.
         /// </para>
         /// </summary>
         private async Task<CraftingPlanResult> PersistAfterGenerateAsync(
             Task<CraftingPlanResult> generateTask,
             IReadOnlyList<PlanRequestItem> requestItems,
             bool useOwnMaterials,
-            PriceBasis priceBasis)
+            PriceBasis priceBasis,
+            int myPersistGen)
         {
             var result = await generateTask;
 
-            var generatedAt = DateTime.Now;
-            _lastPersistedPlanGeneratedAt = generatedAt;
-            _lastPersistedPlanRequestItems = requestItems;
-            _lastPersistedPlanUseOwnMaterials = useOwnMaterials;
-            _lastPersistedPlanPriceBasis = priceBasis;
+            // See _generateCompletedThisSession/_generateCompletionLock's
+            // own doc comments for why this is set unconditionally, under
+            // the lock, before the stale-generation check below.
+            lock (_generateCompletionLock)
+            {
+                _generateCompletedThisSession = true;
+            }
 
+            if (myPersistGen != _persistGenerateSequence) return result;
+
+            var generatedAt = DateTime.Now;
+            var metadata = new PersistedPlanMetadata(
+                generatedAt, requestItems, useOwnMaterials, priceBasis);
+            lock (_generateCompletionLock)
+            {
+                _lastPersistedPlanMetadata = metadata;
+            }
+
+            // A fresh Generate always starts the override loop clean (see
+            // TreeSectionController.ResetForNewPlan) - the persisted
+            // overrides/ignored-item-ids for a plan that was JUST generated
+            // are therefore always empty, never whatever an earlier
+            // (now-superseded) plan's own overrides happened to be.
             _planStore.Save(new PersistedPlan
             {
                 GeneratedAt = generatedAt,
                 RequestItems = requestItems,
                 UseOwnMaterials = useOwnMaterials,
                 PriceBasis = priceBasis,
-                Result = result
+                Result = result,
+                NodeOverrides = new Dictionary<int, AcquisitionSource>(),
+                IgnoredItemIds = new List<int>()
             });
 
             return result;
         }
 
+        // Review-fix (W3D adversarial review, mustFix - performance):
+        // latest-write-wins coalescing for PersistResolvedPlanInBackground's
+        // disk writes, guarded by this lock. A full PersistedPlan
+        // serialize+atomic-write is multi-hundred-KB on a real plan (see
+        // PlanStoreHelpers' own doc comment) - rapid pill clicking (or the
+        // Best Path/Craft All/Buy All presets) must not queue one such
+        // write per click, all serialized behind PlanStore's own internal
+        // _saveLock. Only the newest pending write is ever kept; a
+        // superseded one is dropped before it ever reaches PlanStore.Save -
+        // self-healing, same "whichever write lands last wins" contract
+        // PlanStore.Save's own doc comment already establishes for two
+        // overlapping writers, this just avoids paying to serialize/write
+        // the ones that would have lost anyway.
+        private readonly object _pendingPlanSaveLock = new object();
+        private PersistedPlan _pendingPlanSave;
+        private bool _planSaveWorkerRunning;
+
         /// <summary>
         /// W3D: persists an override-updated result "in place" - same
         /// GeneratedAt/original request as the plan's last full Generate
         /// (or, if none has run yet this session, the restored plan
-        /// LoadAsync applied - see _lastPersistedPlan* fields' own doc
-        /// comment), only Result itself updated. Unlike
-        /// PersistAfterGenerateAsync above, the caller here
+        /// LoadAsync applied - see _lastPersistedPlanMetadata's own doc
+        /// comment), only Result/NodeOverrides/IgnoredItemIds updated.
+        /// Unlike PersistAfterGenerateAsync above, the caller here
         /// (ResolveWithOverrides' wiring lambda) runs synchronously on the
         /// MAIN thread - a pill Click handler chain, see
         /// TreeSectionController.ApplyOverridesAndResolve - so the actual
-        /// file write is dispatched to a background thread via Task.Run
-        /// rather than running inline (docs/ARCHITECTURE.md section 1, "no
-        /// file I/O on the UI thread"). Fire-and-forget: never awaited, so
-        /// a slow or failing write can never delay the click's own
-        /// synchronous re-solve/render; PlanStore.Save's own internal
+        /// file write is dispatched to a background worker (see
+        /// _pendingPlanSaveLock's own doc comment) rather than running
+        /// inline (docs/ARCHITECTURE.md section 1, "no file I/O on the UI
+        /// thread"). Fire-and-forget from the caller's perspective: never
+        /// awaited, so a slow or failing write can never delay the click's
+        /// own synchronous re-solve/render; PlanStore.Save's own internal
         /// try/catch still logs a Warn on failure exactly like every other
         /// store. This can race PersistAfterGenerateAsync's own write (an
         /// override pill on an OLD plan stays clickable while a NEW
@@ -1112,27 +1310,103 @@ namespace GW2CraftingHelper
         /// write lands last on disk simply wins, same as any other
         /// last-write-wins file, and self-heals on the next successful
         /// persist either way. No-ops if nothing has ever been persisted
-        /// this session
-        /// (_lastPersistedPlanRequestItems still null) - unreachable in
-        /// practice (ResolveWithOverrides is only reachable once a plan,
-        /// generated or restored, already exists to click overrides on -
-        /// see TreeSectionController.ApplyOverridesAndResolve's own
-        /// _lastResult?.SolveContext == null bail), kept as a defensive
-        /// guard rather than an assumed invariant.
+        /// this session (_lastPersistedPlanMetadata still null) -
+        /// unreachable in practice (ResolveWithOverrides is only reachable
+        /// once a plan, generated or restored, already exists to click
+        /// overrides on - see TreeSectionController.
+        /// ApplyOverridesAndResolve's own _lastResult?.SolveContext == null
+        /// bail), kept as a defensive guard rather than an assumed
+        /// invariant.
+        /// <para>
+        /// Review-fix (W3D adversarial review, critical): <paramref
+        /// name="overrides"/>/<paramref name="ignoredItemIds"/> are the
+        /// SAME mutable Dictionary/HashSet TreeSectionController's own
+        /// _nodeOverrides/_ignoredItemIds fields are - copied into new,
+        /// independent collections HERE, synchronously on the main thread,
+        /// before this method returns, so the eventual background write
+        /// (below) never holds a live reference to state a LATER pill
+        /// click could still be mutating on the main thread while a
+        /// previous write is in flight.
+        /// </para>
         /// </summary>
-        private void PersistResolvedPlanInBackground(CraftingPlanResult result)
+        private void PersistResolvedPlanInBackground(
+            CraftingPlanResult result,
+            IReadOnlyDictionary<int, AcquisitionSource> overrides,
+            ISet<int> ignoredItemIds)
         {
-            if (_lastPersistedPlanRequestItems == null) return;
+            var metadata = _lastPersistedPlanMetadata;
+            if (metadata == null) return;
+
+            // Copied via an explicit loop, not the Dictionary(IDictionary<>)
+            // constructor - overrides is IReadOnlyDictionary<>, which does
+            // not implement IDictionary<> (a separate interface), and this
+            // project's target framework has no Dictionary constructor
+            // overload accepting a bare IEnumerable<KeyValuePair<>> either.
+            var overridesSnapshot = new Dictionary<int, AcquisitionSource>();
+            if (overrides != null)
+            {
+                foreach (var kvp in overrides)
+                {
+                    overridesSnapshot[kvp.Key] = kvp.Value;
+                }
+            }
+
+            var ignoredSnapshot = new List<int>();
+            if (ignoredItemIds != null)
+            {
+                foreach (int itemId in ignoredItemIds)
+                {
+                    ignoredSnapshot.Add(itemId);
+                }
+            }
 
             var persisted = new PersistedPlan
             {
-                GeneratedAt = _lastPersistedPlanGeneratedAt,
-                RequestItems = _lastPersistedPlanRequestItems,
-                UseOwnMaterials = _lastPersistedPlanUseOwnMaterials,
-                PriceBasis = _lastPersistedPlanPriceBasis,
-                Result = result
+                GeneratedAt = metadata.GeneratedAt,
+                RequestItems = metadata.RequestItems,
+                UseOwnMaterials = metadata.UseOwnMaterials,
+                PriceBasis = metadata.PriceBasis,
+                Result = result,
+                NodeOverrides = overridesSnapshot,
+                IgnoredItemIds = ignoredSnapshot
             };
-            Task.Run(() => _planStore.Save(persisted));
+
+            lock (_pendingPlanSaveLock)
+            {
+                _pendingPlanSave = persisted;
+                if (_planSaveWorkerRunning) return;
+                _planSaveWorkerRunning = true;
+            }
+
+            Task.Run(() => DrainPendingPlanSaves());
+        }
+
+        /// <summary>
+        /// Background worker loop for <see cref="PersistResolvedPlanInBackground"/>'s
+        /// coalescing - see <see cref="_pendingPlanSaveLock"/>'s own doc
+        /// comment. Runs until no further write is pending, saving only the
+        /// LATEST one queued at each pass; a write that lands while a
+        /// previous one is already mid-Save is picked up by the next loop
+        /// iteration instead of spawning a second concurrent worker.
+        /// </summary>
+        private void DrainPendingPlanSaves()
+        {
+            while (true)
+            {
+                PersistedPlan next;
+                lock (_pendingPlanSaveLock)
+                {
+                    next = _pendingPlanSave;
+                    _pendingPlanSave = null;
+                    if (next == null)
+                    {
+                        _planSaveWorkerRunning = false;
+                        return;
+                    }
+                }
+
+                _planStore.Save(next);
+            }
         }
 
         private static void BuildPlaceholder(Container container)
