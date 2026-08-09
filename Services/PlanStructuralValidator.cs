@@ -314,6 +314,24 @@ namespace GW2CraftingHelper.Services
             // there NREs.
             if (!NoNullEntries(context.RequestedItems, "SolveContext.RequestedItems", out reason)) return false;
 
+            // Round 5 review-fix (mustFix): SolveContext.UsedMaterials is a
+            // SEPARATELY serialized copy of the same list as
+            // CraftingPlanResult.UsedMaterials above (Newtonsoft writes no
+            // $ref by default - see PlanStoreHelpers' own doc comment on
+            // why no custom JsonSerializerSettings are used) - a plan.json
+            // with a clean Result.UsedMaterials but a null entry inside
+            // Result.SolveContext.UsedMaterials sails through the check
+            // above untouched. Every override re-solve
+            // (ResolveWithOverrides) passes context.UsedMaterials straight
+            // into PlanResultBuilder.Build ("foreach (var used in
+            // usedMaterials) { ... used.ItemId ... }", no per-entry null
+            // check) and, for a single-item context, into
+            // SellSideEconomics.ComputeMaterialOpportunityCost
+            // ("used.ItemId"/"used.QuantityUsed", also no per-entry check) -
+            // both reachable from a plain decision-pill click, not just the
+            // Craft All/Buy All presets this doc comment already covers.
+            if (!NoNullEntries(context.UsedMaterials, "SolveContext.UsedMaterials", out reason)) return false;
+
             return true;
         }
 
