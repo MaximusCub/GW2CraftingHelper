@@ -1042,17 +1042,77 @@ confirms they reached the on-disk JSONL file (not just the in-memory
 ring), the other proving the no-`requestLabel` fallback wording
 ("Generating plan for 1 item").
 
-Validation: `dotnet build -p:Platform=x64` clean (0 errors); both test
-suites green - module suite 1182 passed (was 1169; +13 new tests: 8 in
-`PlanPhaseTimingSummaryTests`, 5 added to `CraftingPlanPipelineTests`),
-`VendorOfferUpdater.Tests` 135 passed (untouched, unaffected). No new
-Blish HUD references in tests; every new test exercises real production
-code (`CraftingPlanPipeline.GenerateStructuredAsync`/
-`GenerateStructuredMultiAsync`, `PlanPhaseTimingSummary`, a real
+**5. Review-fix pass (this round) - 4 Must Fix findings from adversarial
+review, all fixed.**
+
+- *Tab-switch strip freeze.* `CraftingPlanView.Build()` calls
+  `StopLiveTickers` (cancels `_spinnerTicker`) and then constructs a
+  brand-new `_statusLabel` ("Ready") on every tab rebuild, but nothing
+  ever re-armed the ticker or re-rendered the current phase text for a
+  generation still genuinely in flight - the strip stuck on "Ready"
+  (silently, no spinner) until the generation's NEXT phase event, which
+  for the longest phase ("Fetching item details") can be most of the
+  run. `RenderSpinnerStatus`/`SpinnerTick` are now instance methods
+  parameterized on `myGen` (were TriggerGenerate-local closures), plus a
+  new `ArmSpinnerTicker(int myGen)` and `_generationInFlight` field;
+  `StopLiveTickers` no longer nulls `_currentPhaseText`; Build() re-arms
+  via `ArmSpinnerTicker(_generateSequence)` immediately after
+  reconstructing `_statusLabel` whenever `_generationInFlight` is true.
+- *No monotonic phase ordering.* `Progress<PlanPhaseEvent>` with no
+  `SynchronizationContext` posts every `Report` through an independent
+  `ThreadPool.QueueUserWorkItem`, so two phase events reported
+  milliseconds apart (warm cache, small plan) could be marshaled to the
+  main thread out of order - `StatusUpdateGuard` alone cannot catch this
+  since both events share the same generation. New pure
+  `Services/PhaseOrdinalGuard.cs` (mirrors `StatusUpdateGuard`'s shape) +
+  a `_currentPhaseOrdinal` field (reset to -1 per generation, alongside
+  `_currentPhaseText`) drop any event whose `(int)pe.Phase` is not
+  strictly greater than the last one actually applied.
+- *Finish summary lost the real wall-clock duration.* The phase-summed
+  "total" the compact summary line logged silently excluded every
+  un-instrumented gap between raw timing steps, so a real ~19s
+  generation could log "total 18158ms" with `sw.ElapsedMilliseconds`
+  (the number a field tester actually experiences) discarded entirely.
+  `PlanPhaseTimingSummary.FormatCompactSummary` gained an optional
+  `long? wallClockMs = null` parameter (default preserves the exact
+  pre-existing wording for every current caller/test); the pipeline's
+  `IReadOnlyList<PlanRequestItem>` wrapper now passes its own wrapper
+  `sw.ElapsedMilliseconds`, producing e.g. "... - total 19036ms (phases
+  18158ms)".
+- *`progress: null` silently dropped two real diagnostics.* Passing
+  `null` for the old `IProgress<PlanStatus>` channel (replaced for the
+  live strip by the coarse phase events) also silently dropped
+  `RecipeService.OnStatusUpdate`'s first-run recipe-discovery notice and
+  stale-recipe-seed warning, plus the tree-building phase's own "(may
+  take several seconds on first run)" hint - none of which have any
+  other surface. `CraftingPlanPipeline`'s `OnStatusUpdate` closures
+  (both the single-item and multi-item Step 1) now also write straight
+  to `ModuleLog` (Info, "plan") regardless of whether a live
+  `IProgress<PlanStatus>` consumer is attached (bounded to at most one
+  line each per generation by RecipeService's own
+  `statusReported`/`staleReported` flags); the first-run hint now rides
+  a new optional `detail` parameter on `PhaseTracker.Start` into
+  `PlanPhaseEvent.Detail`, surfaced live via
+  `CraftingPlanView.FormatPhaseText`.
+
+New tests: `PhaseOrdinalGuardTests` (4, pure-function coverage mirroring
+`StatusUpdateGuardTests`); `PlanPhaseTimingSummaryTests` gained 2
+(`wallClockMs` present/absent); `CraftingPlanPipelineTests` gained 3
+(finish summary shows a wall-clock total distinct from the phase sum;
+the recipe-discovery diagnostic reaches a real isolated `ModuleLog` even
+with `progress: null`; the `BuildingTree` phase event carries the
+first-run hint as `Detail`, no other phase does). The tab-switch
+re-arm/ordinal-guard call-site wiring inside `CraftingPlanView` itself
+has no new tests, same Blish-free-tests-invariant rationale as item 4
+above - covered by the live desktop gate below.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors); module test
+suite green - 1191 passed (was 1182 after the original milestone; +9
+new tests from this review-fix pass: 4 in `PhaseOrdinalGuardTests`, 2
+added to `PlanPhaseTimingSummaryTests`, 3 added to
+`CraftingPlanPipelineTests`). No new Blish HUD references in tests;
+every new test exercises real production code (`CraftingPlanPipeline`,
+`PlanPhaseTimingSummary`, `PhaseOrdinalGuard`, a real
 `ModuleLog`/`ModuleLogStore`) with no contract-mirror/fake-logic tests.
-Pure-Blish view code (`CraftingPlanView`'s spinner ticker/status-strip
-wiring, `Module.cs`'s lambda forwarding) has no new tests per the
-Blish-free-tests invariant - covered instead by the live desktop gate
-below.
 
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
