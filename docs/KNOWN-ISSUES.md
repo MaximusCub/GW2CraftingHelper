@@ -1150,4 +1150,81 @@ hoist the plan strip's generation status to Module level (LogViewFloor
 precedent) so a freshly built view re-arms from module state and
 completion writes are view-instance-independent.
 
+**Gate round 1 fix (2026-08-08): pull-based module-level status board.**
+
+New `Services/PlanStripStatusBoard.cs` (Blish-free, thread-safe - one
+internal lock; mirrors `SnapshotCommitGate`'s
+lock-plus-pure-guard-predicate style) is now the single holder of record
+for the status strip's generation sequence, in-flight flag, live phase
+text, and final completion/error text. `Begin(sequence)` (main thread,
+TriggerGenerate before any await) resets all of it for a new generation;
+`UpdatePhase(sequence, ordinal, text)` (the phaseProgress callback, any
+thread) and `Finish(sequence, finalStatusText)` (the pipeline's success/
+cancel/failure continuation, any thread) both write directly with no
+`MainThreadMarshal` hop, since neither touches a Blish control any more -
+`StatusUpdateGuard`/`PhaseOrdinalGuard` (unchanged, public surface intact)
+are re-applied internally under the board's own lock instead of by each
+caller. `CraftingPlanView`'s strip became a PULL consumer: the spinner
+`FrameTicker`'s per-tick step reads a fresh `Snapshot()` every frame,
+renders phase text + spinner while `InFlight`, and renders the final text
+and self-stops (`return false`) the moment the board reports finished -
+no completion-callback write into `_statusLabel` exists any more.
+`Build()` (any rebuild, tab switch or otherwise) also reads a fresh
+`Snapshot()` directly: in-flight re-arms the ticker (which immediately
+renders the board's current phase text, not "Ready"); finished-with-status
+renders that final text directly (this also closes the pre-existing quirk
+where a rebuilt view showed "Ready" despite an already-completed plan);
+nothing yet leaves "Ready". The four pre-fix instance fields
+(`_generationInFlight`, `_currentPhaseText`, `_currentPhaseOrdinal`,
+`_statusClosedForCurrentGeneration`) are removed entirely.
+`PlanStripStatusBoard` is owned by `Module` (`_planStripStatusBoard`,
+`GW2CraftingHelper.Services`) and constructor-injected into
+`CraftingPlanView`, the same module-level-state-outlives-a-rebuild
+ownership `LogViewFloor` established for the Log tab's Clear-view
+watermark - though unlike that getter/setter-delegate injection (needed
+because Blish reconstructs a fresh `LogTabContent` on every tab visit),
+`CraftingPlanView` is a singleton `Module.Initialize()` constructs exactly
+once and only re-invokes `Build()` on each visit, so a single
+constructor-injected reference is sufficient here.
+
+Root-cause correction: round 1's own write-up above attributed the bug to
+this module rebuilding tab views as brand-new instances per tab switch,
+by analogy with `LogTabContent`. That analogy does not hold for
+`CraftingPlanView` specifically - `Module.cs` constructs exactly one
+instance in `Initialize()` and every tab visit only re-invokes its
+`Build()` method, so the pre-fix instance fields did NOT reset on a tab
+switch the way `LogTabContent`'s fields did. The real mechanism: `Build()`
+unconditionally hardcoded `_statusLabel.Text = "Ready"` and only knew how
+to re-arm a STILL-IN-FLIGHT generation (via `_generationInFlight`) - it
+had no way to recover an ALREADY-FINISHED generation's completion text,
+because the completion callback only ever wrote that text directly into
+whichever `_statusLabel` was live at the moment it drained, gated behind a
+`_contentPanel.Parent == null` liveness bail. A completion landing while
+the user was on a different tab (panel detached-but-not-yet-disposed, or
+already disposed by the next `ViewAdapter.Build`'s defensive child-dispose
+sweep, depending on timing) either wrote into a since-discarded label or
+was skipped by that bail entirely - either way, nothing persisted the fact
+that the generation had finished, so the very next `Build()` had no state
+to consult and fell through to the hardcoded "Ready". The pull-based board
+fixes this by construction: `Finish()` is unconditional (no view-liveness
+check at all) and `Build()` always asks the board fresh, so which
+particular view instance or control existed at completion time no longer
+matters.
+
+New tests: `PlanStripStatusBoardTests` (11, pure-function/thread-safety
+coverage - `Begin`/`UpdatePhase`/`Finish` transitions, stale-sequence
+rejection on both `UpdatePhase` and `Finish`, stale-ordinal rejection,
+rejection of a trailing `UpdatePhase` after `Finish` has already closed
+the generation, a final-status read by an unrelated later `Snapshot()`
+call standing in for a rebuilt view's `Build()`, `Begin()` clearing a
+prior finished generation's leftover state, and a parallel-writers
+smoke test proving no exception/torn state under concurrent
+`UpdatePhase`/`Snapshot` calls). The `CraftingPlanView`/`Module.cs` wiring
+itself has no new tests, same Blish-free-tests-invariant rationale as
+every other pass in this file - covered by the live desktop gate below.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
+warnings). Module test suite - 1210 passed (was 1199; +11 new
+`PlanStripStatusBoardTests`).
+
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
