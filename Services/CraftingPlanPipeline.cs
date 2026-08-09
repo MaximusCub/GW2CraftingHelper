@@ -296,16 +296,21 @@ namespace GW2CraftingHelper.Services
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
             var resultBuilder = new PlanResultBuilder();
-            var result = resultBuilder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
-            result.CurrencyMetadata = currencyMetadata;
-            result.AcquisitionHints = _acquisitionHints;
-
             // W3C: per-character discipline data, cosmetic only (see
             // AccountSnapshot.CharacterDisciplines' doc comment) - a
             // straight passthrough of the snapshot, never fed back into any
-            // decision/total. snapshot itself may be null (no account data
-            // available), in which case this stays null too.
-            result.CharacterDisciplines = snapshot?.CharacterDisciplines;
+            // decision/total EXCEPT the Build() tiebreak below (see
+            // PlanResultBuilder.Build's characterDisciplines doc comment -
+            // it can only relabel which equally-good discipline is
+            // reported, never change a decision or a total). snapshot
+            // itself may be null (no account data available), in which
+            // case this stays null too.
+            var characterDisciplines = snapshot?.CharacterDisciplines;
+            var result = resultBuilder.Build(
+                plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, characterDisciplines);
+            result.CurrencyMetadata = currencyMetadata;
+            result.AcquisitionHints = _acquisitionHints;
+            result.CharacterDisciplines = characterDisciplines;
 
             // M34-B2a #4: owned-currency annotation, cosmetic only (see
             // AccountCurrencyIndex's doc comment) - built from the plan's
@@ -690,16 +695,18 @@ namespace GW2CraftingHelper.Services
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
             var resultBuilder = new PlanResultBuilder();
-            var result = resultBuilder.Build(plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds);
-            result.CurrencyMetadata = currencyMetadata;
-            result.AcquisitionHints = _acquisitionHints;
-            result.RequestedItems = items;
-
             // W3C: per-character discipline data, cosmetic only (see
             // AccountSnapshot.CharacterDisciplines' doc comment) - see the
             // single-item GenerateStructuredAsync's matching assignment
-            // above for the full rationale.
-            result.CharacterDisciplines = snapshot?.CharacterDisciplines;
+            // above for the full rationale, including the Build()
+            // tiebreak-only use.
+            var characterDisciplines = snapshot?.CharacterDisciplines;
+            var result = resultBuilder.Build(
+                plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, characterDisciplines);
+            result.CurrencyMetadata = currencyMetadata;
+            result.AcquisitionHints = _acquisitionHints;
+            result.RequestedItems = items;
+            result.CharacterDisciplines = characterDisciplines;
 
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
                 BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
@@ -785,7 +792,8 @@ namespace GW2CraftingHelper.Services
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(
                 solveResult.Plan, context.Tree, context.Metadata,
-                context.UsedMaterials, context.LearnedRecipeIds);
+                context.UsedMaterials, context.LearnedRecipeIds,
+                context.CharacterDisciplines);
             result.CurrencyMetadata = context.CurrencyMetadata;
             result.AcquisitionHints = context.AcquisitionHints;
             result.OwnedCurrencyAmounts = context.OwnedCurrencyAmounts;

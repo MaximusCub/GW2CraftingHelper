@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Models;
@@ -45,9 +46,38 @@ namespace GW2CraftingHelper.Services
             RecipeNode treeUsedForSolve,
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             List<UsedMaterial> usedMaterials,
-            ISet<int> learnedRecipeIds)
+            ISet<int> learnedRecipeIds,
+            // W3C review-fix (mustFix): which disciplines the account
+            // actually has, used ONLY to break the Pass 2 greedy-cover tie
+            // among equally-covering, not-yet-selected disciplines below -
+            // see the accountDisciplineNames doc comment further down.
+            // Optional/defaults to null so every pre-existing caller (every
+            // test in PlanResultBuilderTests, any future caller with no
+            // snapshot) is unaffected and falls back to the pre-W3C
+            // coverage-then-alphabetical order.
+            IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
             var debugLog = new List<string>();
+
+            // W3C review-fix: a discipline the account has ANY character
+            // trained in (any rating, active or not - see
+            // SnapshotCharacterDiscipline's own doc comment on why rating
+            // persists regardless of Active) is preferred over an
+            // equally-covering discipline nobody has, when the greedy cover
+            // below would otherwise fall through to a pure alphabetical
+            // pick. This never changes WHICH recipes need a discipline or
+            // HOW MANY disciplines are required - only, among ties, which
+            // discipline's name is reported - so it cannot affect
+            // usedMaterials/plan cost/decisions, only this cosmetic
+            // labeling choice. Empty (not null) when characterDisciplines
+            // is null, so the ThenByDescending below is a harmless no-op
+            // and every discipline ties at 0, preserving the exact
+            // pre-W3C alphabetical fallback.
+            var accountDisciplineNames = characterDisciplines != null
+                ? new HashSet<string>(
+                    characterDisciplines.Where(cd => cd != null).Select(cd => cd.Discipline),
+                    StringComparer.Ordinal)
+                : new HashSet<string>(StringComparer.Ordinal);
 
             // Debug: reduction summary
             if (usedMaterials == null)
@@ -244,10 +274,14 @@ namespace GW2CraftingHelper.Services
                     }
                 }
 
-                // Best discipline: highest coverage, then prefer already-selected, then alpha
+                // Best discipline: highest coverage, then prefer already-
+                // selected, then prefer a discipline the account actually
+                // has (W3C review-fix - see accountDisciplineNames' doc
+                // comment above), then alpha.
                 string best = freq.Keys
                     .OrderByDescending(d => freq[d])
                     .ThenByDescending(d => disciplineMap.ContainsKey(d) ? 1 : 0)
+                    .ThenByDescending(d => accountDisciplineNames.Contains(d) ? 1 : 0)
                     .ThenBy(d => d)
                     .First();
 
