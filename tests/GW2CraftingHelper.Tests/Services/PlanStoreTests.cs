@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Models;
@@ -1244,6 +1246,141 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("Plan.Steps[0] is null", lastMessage());
+        }
+
+        // --- Post-W3D quick fix (user-sanctioned, compression only): the
+        // on-disk container is now gzip, sniffed by its first two magic
+        // bytes (0x1F 0x8B) so plan.json files written by the pre-gzip
+        // PR #107 code (plain compact JSON) still load. Payload schema/
+        // PlanStructuralValidator gate are unchanged - only these four
+        // tests target the new container-encoding logic itself; every
+        // fixture/test above this point still exercises the same real
+        // PlanStore/production paths, now transparently gzip-backed. ---
+
+        // Real gzip bytes for a fixture STRING, built the same way
+        // PlanStore.Save's own (private) Compress helper does - reused by
+        // the backward-compat-break tests below, which need to hand-craft
+        // an on-disk file PlanStore.Save itself would never produce (a
+        // valid gzip member wrapping something other than a real
+        // PersistedPlan).
+        private static byte[] GzipBytes(string text)
+        {
+            byte[] textBytes = Encoding.UTF8.GetBytes(text);
+            using (var output = new MemoryStream())
+            {
+                using (var gzip = new GZipStream(output, CompressionMode.Compress, leaveOpen: true))
+                {
+                    gzip.Write(textBytes, 0, textBytes.Length);
+                }
+                return output.ToArray();
+            }
+        }
+
+        [Fact]
+        public async Task Save_Load_RoundTrip_WritesGzipOnDiskMateriallySmallerThanRawJson()
+        {
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            var plan = Wrap(result, new DateTime(2026, 8, 15, 10, 30, 0, DateTimeKind.Local));
+
+            _store.Save(plan);
+
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            byte[] onDiskBytes = File.ReadAllBytes(filePath);
+
+            // Gzip magic number (RFC 1952) - proves Save wrote a compressed
+            // container, not plain JSON.
+            Assert.True(onDiskBytes.Length >= 2);
+            Assert.Equal(0x1F, onDiskBytes[0]);
+            Assert.Equal(0x8B, onDiskBytes[1]);
+
+            int rawJsonByteLength = Encoding.UTF8.GetByteCount(PlanStoreHelpers.SerializePersistedPlan(plan));
+            Assert.True(onDiskBytes.Length < rawJsonByteLength,
+                $"Expected the gzip container ({onDiskBytes.Length} bytes) to be materially " +
+                $"smaller than the raw JSON it replaces ({rawJsonByteLength} bytes).");
+
+            // And the plan itself still round-trips through the compressed
+            // container exactly like it did through plain JSON pre-fix.
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            var vmBuilder = new PlanViewModelBuilder();
+            Assert.Equal(ToJson(vmBuilder.Build(result)), ToJson(vmBuilder.Build(loaded.Result)));
+        }
+
+        [Fact]
+        public async Task LoadLatest_PlainUncompressedJsonFile_StillLoads_BackwardCompat()
+        {
+            // A real plan.json from before this fix (PR #107's plain
+            // File.WriteAllText(json) path, never gzipped) - written here
+            // via the same production serializer PlanStore.Save itself
+            // uses internally, just without the compression step, to
+            // reproduce that exact on-disk shape.
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            var plan = Wrap(result, new DateTime(2026, 8, 15, 11, 0, 0, DateTimeKind.Local));
+
+            string json = PlanStoreHelpers.SerializePersistedPlan(plan);
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded);
+            var vmBuilder = new PlanViewModelBuilder();
+            Assert.Equal(ToJson(vmBuilder.Build(result)), ToJson(vmBuilder.Build(loaded.Result)));
+        }
+
+        [Fact]
+        public void LoadLatest_TruncatedGzipData_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            var plan = new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } },
+                UseOwnMaterials = false,
+                PriceBasis = PriceBasis.InstantBuy,
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 1, TargetQuantity = 1 } },
+                NodeOverrides = new Dictionary<int, AcquisitionSource>(),
+                IgnoredItemIds = new List<int>()
+            };
+            _store.Save(plan);
+
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            byte[] validGzipBytes = File.ReadAllBytes(filePath);
+            Assert.True(validGzipBytes.Length > 10, "Fixture gzip payload too small to truncate meaningfully.");
+
+            byte[] truncated = new byte[validGzipBytes.Length / 2];
+            Array.Copy(validGzipBytes, truncated, truncated.Length);
+            File.WriteAllBytes(filePath, truncated);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.NotNull(lastMessage());
+        }
+
+        [Fact]
+        public void LoadLatest_GzipWrappingInvalidJson_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllBytes(filePath, GzipBytes("{ \"Result\": { \"Plan\": { \"Target"));
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.NotNull(lastMessage());
         }
     }
 }
