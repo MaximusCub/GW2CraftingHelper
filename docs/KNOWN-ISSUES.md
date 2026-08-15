@@ -2290,5 +2290,28 @@ tests, no fake file I/O. Item/currency/vendor IDs remain internal-only.
 Pricing/solve logic itself is untouched - this pass only widens the
 existing round-4 validation gate to cover one more field.
 
-Live desktop gate:
-[PENDING - the orchestrator fills in PASS/FAIL]
+Live desktop gate: PASS (2026-08-15, orchestrator session, fresh
+sandbox, three scenarios across a real Blish restart cycle):
+
+- Generate + persist: a real Zojja's Claymore generation (4.2s)
+  produced data/plan.json (689 KB) and the normal "Plan generated -
+  <time>" strip.
+- Restart + restore: Blish killed and relaunched; the module log
+  showed ZERO generation activity (no auto-resolve), and the Plan tab
+  rendered the full plan instantly with the exact staleness banner
+  "Generated Aug 15, 2026 1:39 PM - prices may have changed -
+  Regenerate"; search box back at defaults per spec. On the RESTORED
+  data: "Expand All" rendered depth-3/4 nodes with zero exceptions
+  (the round-4 validator's crash class), and a decision-pill override
+  (TP -> CRAFT on the inscription) re-solved locally (total cost
+  52g30s33c -> 57g05s75c) and re-persisted the file (689 KB ->
+  712 KB, fresh mtime). Note: the first pill click hit the
+  already-selected TP pill - a semantic no-op per the M38 lesson -
+  correctly causing no re-solve and no rewrite.
+- Corrupt-file recovery: plan.json surgically corrupted
+  (CraftingTree.Children[0].Children[0] = null, the exact round-4
+  repro shape); relaunch produced EXACTLY one Warn naming the
+  validator reason ("... failed structural validation
+  (CraftingTree.Children[0].Children[0] is null) - corrupt or
+  degraded file."), a clean fresh-start Plan tab ("Ready", no plan),
+  and zero exceptions in the Blish log.
