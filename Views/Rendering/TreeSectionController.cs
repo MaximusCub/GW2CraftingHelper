@@ -314,7 +314,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // leftward with 4px gaps so they never collide with the title.
             int cursorX = panelWidth;
             var headerButtons = new List<(StandardButton Button, int Width)>(5);
-            StandardButton PlaceButtonRight(string text, int width)
+            StandardButton PlaceButtonRight(string text, int width, string tooltipText)
             {
                 cursorX -= width;
                 var button = new StandardButton()
@@ -322,6 +322,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Text = text,
                     Size = new Point(width, 24),
                     Location = new Point(cursorX, 3),
+                    BasicTooltipText = tooltipText,
                     Parent = headerPanel
                 };
                 headerButtons.Add((button, width));
@@ -329,11 +330,21 @@ namespace GW2CraftingHelper.Views.Rendering
                 return button;
             }
 
-            collapseAllButton = PlaceButtonRight("Collapse All", 96);
-            expandAllButton = PlaceButtonRight("Expand All", 92);
-            buyAllButton = PlaceButtonRight("Buy All", 70);
-            craftAllButton = PlaceButtonRight("Craft All", 76);
-            bestPathButton = PlaceButtonRight("Best Path", 80);
+            collapseAllButton = PlaceButtonRight("Collapse All", 96,
+                "Collapses every branch of the Recipe Tree back down to the top level.");
+            expandAllButton = PlaceButtonRight("Expand All", 92,
+                "Expands every branch of the Recipe Tree, including nested children, so the full tree is visible.");
+            buyAllButton = PlaceButtonRight("Buy All", 70,
+                "Forces every ingredient with a Trading Post price to Buy from TP, throughout the whole tree " +
+                "including nodes hidden under bought items - replacing any manual choices already made. " +
+                "Ingredients with no Trading Post price fall back to the solver's normal choice.");
+            craftAllButton = PlaceButtonRight("Craft All", 76,
+                "Forces every ingredient with a known recipe to Craft, throughout the whole tree including " +
+                "nodes hidden under bought items - replacing any manual choices already made. Ingredients " +
+                "with no recipe fall back to the solver's normal choice.");
+            bestPathButton = PlaceButtonRight("Best Path", 80,
+                "Clears every manual override, including Craft All/Buy All, and re-solves for the solver's " +
+                "cheapest plan. Ignore selections are left unchanged.");
 
             // M33 C2b: right-to-left button placement is font-only (fixed
             // widths) - pure reposition on every drag tick, same order as

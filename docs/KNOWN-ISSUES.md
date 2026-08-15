@@ -2356,3 +2356,30 @@ before this pass; +4 new tests) pass.
 No live desktop gate for this pass - container-encoding-only change,
 user-sanctioned quick fix, validated by real-file unit round-trip
 tests instead (see above).
+
+**Recipe Tree header button tooltips (2026-08-15).** Small user-requested
+diff, riding along with the W4A cost-section gate: the five Recipe Tree
+section header buttons (`Views/Rendering/TreeSectionController.cs`,
+`CreateTreeSection` - Best Path, Craft All, Buy All, Expand All, Collapse
+All) now set `BasicTooltipText` directly on the `StandardButton` itself
+(the control that actually captures the mouse - see the M32 lesson noted
+elsewhere in this doc). Each tooltip's wording was derived from the real
+click handler, not guessed: Craft All/Buy All call `ApplyPreset`, which
+clears every existing manual override and rebuilds it from
+`CraftingPlanPipeline.BuildPresetOverrides` walking the FULL solver tree
+(including nodes hidden under bought intermediates) - forcing Craft (or
+Buy from TP) on every node where that source is feasible, and leaving
+every infeasible node to the solver's own normal pick, exactly as
+`PlanSolver.Evaluate`'s override handling (`canCraft`/`canBuyTp` gates)
+actually resolves it. Best Path clears `_nodeOverrides` entirely
+(covering both individual pill clicks and a prior Craft All/Buy All) and
+re-solves for the solver's unforced cheapest plan; `_ignoredItemIds` is
+untouched by any of the three presets, matching the existing field-level
+doc comment on that collection. Expand All/Collapse All tooltips describe
+the existing recursive expand/build-lazy-children and hide-children
+behavior verbatim. Pure tooltip-string change - no production logic
+touched, no new tests (out of the Blish-free test scope for pure
+BasicTooltipText strings on Blish controls; hover text is covered by the
+live desktop gate).
+
+Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
