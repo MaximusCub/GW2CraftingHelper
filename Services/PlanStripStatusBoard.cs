@@ -169,6 +169,97 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// W3D (plan persistence across module restarts): seeds this board
+        /// with a restored plan's staleness-banner text at module load,
+        /// before any real Generate has run this session - see
+        /// Views/CraftingPlanView.cs's ApplyRestoredPlan and
+        /// Services/PlanStore.cs's own doc comment. Uses sequence 0, which
+        /// CraftingPlanView's own ++_generateSequence convention can never
+        /// produce (its first real generation is always sequence 1), so a
+        /// genuine Begin(1) always supersedes this seed exactly like it
+        /// would supersede any earlier generation's state - see Begin's own
+        /// doc comment ("always applies... unconditionally"). Deliberately
+        /// bypasses StatusUpdateGuard (unlike Begin/UpdatePhase/Finish
+        /// above): this is not a write racing an in-flight generation, it
+        /// is the board's own one-time initial seed - called at most once
+        /// per module session, before the strip has shown anything else.
+        /// <para>
+        /// Review-fix (W3D adversarial review, critical): no-op if a real
+        /// generation has already Begin()'n this session (_sequence != 0)
+        /// or is currently in flight - "called at most once... before the
+        /// strip has shown anything else" above is a caller EXPECTATION,
+        /// not something this method used to enforce. Module.LoadAsync's
+        /// restore drain can lag well behind the module's own Update() loop
+        /// starting to tick (LoadAsync awaits a full account-snapshot
+        /// network refresh AFTER arming the restore flag but BEFORE
+        /// returning, and Blish HUD does not call a module's Update() until
+        /// LoadAsync's Task completes) - so a user can open the window and
+        /// click Generate while LoadAsync is still in flight, and have that
+        /// generation's Begin(1)/UpdatePhase(1,...)/Finish(1,...) all land
+        /// BEFORE this seed call finally runs. Unconditionally stomping
+        /// _sequence back to 0 in that window would silently reject every
+        /// subsequent UpdatePhase/Finish call for that in-flight generation
+        /// (StatusUpdateGuard.ShouldApply(1, 0, ...) is false once _sequence
+        /// is back to 0) and freeze its spinner on the next tick
+        /// (PlanStripTickDecision.Decide sees Sequence 0 != myGen 1 and
+        /// stops) - exactly the W3B "lost completion status" bug this board
+        /// exists to prevent. Checking _sequence == 0 alone would already
+        /// be sufficient (Begin only ever moves _sequence away from 0, and
+        /// never back), but the _inFlight check is kept too as a defensive,
+        /// self-documenting belt-and-braces guard rather than relying on
+        /// that invariant alone.
+        /// </para>
+        /// </summary>
+        public void SeedRestored(string finalStatusText)
+        {
+            lock (_lock)
+            {
+                if (_sequence != 0 || _inFlight) return;
+
+                _sequence = 0;
+                _inFlight = false;
+                _phaseOrdinal = -1;
+                _phaseText = null;
+                _finalStatusText = finalStatusText;
+            }
+        }
+
+        /// <summary>
+        /// Round-3 review-fix (mustFix): undoes a <see cref="SeedRestored"/>
+        /// call whose downstream render subsequently failed - see
+        /// Views/CraftingPlanView.cs's shared rollback helper, called from
+        /// both RenderPlan call sites that can reach a still-unvalidated
+        /// restored plan (Build()'s own unguarded-until-now render tail,
+        /// and ApplyRestoredPlan's live-tab branch). Only clears
+        /// <c>_finalStatusText</c>, and only while this board still
+        /// reflects nothing but that one seed - the exact same
+        /// "<c>_sequence != 0 || _inFlight</c>" guard <see
+        /// cref="SeedRestored"/> itself uses, for the same reason (see its
+        /// own doc comment): a real Generate that raced in between the
+        /// original seed and the render failure that triggered this
+        /// rollback must never be clobbered by a rollback for a plan that
+        /// generation has already superseded. Returns whether it actually
+        /// cleared anything, so the caller knows whether it is also safe
+        /// to reset the status label's already-painted text back to
+        /// "Ready" - RenderFromBoard is pull-based and never overwrites a
+        /// label with an empty FinalStatusText, so clearing the board
+        /// alone is not enough to un-paint an already-rendered banner, but
+        /// forcing that reset unconditionally would stomp a genuinely
+        /// in-flight generation's live spinner text whenever this method's
+        /// own guard (correctly) no-ops.
+        /// </summary>
+        public bool ClearRestoredSeed()
+        {
+            lock (_lock)
+            {
+                if (_sequence != 0 || _inFlight) return false;
+
+                _finalStatusText = null;
+                return true;
+            }
+        }
+
+        /// <summary>
         /// A consistent, immutable snapshot of every field at one instant.
         /// The only way to read this board - never expose the individual
         /// fields separately, or a reader could observe a torn combination

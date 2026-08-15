@@ -1,0 +1,1249 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using GW2CraftingHelper.Models;
+using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Xunit;
+
+namespace GW2CraftingHelper.Tests.Services
+{
+    // W3D (plan persistence across module restarts). Mirrors
+    // SnapshotStoreTests' shape (a real store against a real temp
+    // directory - no fake file I/O). The round-trip fidelity tests build a
+    // real CraftingPlanResult via CraftingPlanPipeline + the fake API
+    // clients (InMemoryRecipeApiClient/InMemoryPriceApiClient/
+    // InMemoryItemApiClient), matching CraftingPlanPipelineTests' own
+    // fixture shape, rather than hand-constructing a CraftingPlanResult -
+    // the whole risk this package investigated (PlanSolveContext's
+    // interface-typed dictionaries/ISet, CurrencyValuation/
+    // HomesteadEfficiencyTiers' non-default constructors, the RecipeNode/
+    // CraftingTreeNode trees) only shows up on a REAL pipeline-produced
+    // result.
+    public class PlanStoreTests : IDisposable
+    {
+        private readonly string _tempDir;
+        private readonly PlanStore _store;
+
+        public PlanStoreTests()
+        {
+            _tempDir = Path.Combine(Path.GetTempPath(), "GW2CraftingHelper_Tests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(_tempDir);
+            _store = new PlanStore(_tempDir);
+        }
+
+        public void Dispose()
+        {
+            try { Directory.Delete(_tempDir, true); } catch { }
+        }
+
+        private static CraftingPlanPipeline BuildPipeline(out InMemoryPriceApiClient priceApi)
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            priceApi = new InMemoryPriceApiClient();
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+        }
+
+        // Round 4 review-fix (critical): a THREE-level real tree (item 1 <-
+        // recipe 10 <- item 2 <- recipe 20 <- item 3), so
+        // result.CraftingTree.Children[0].Children[0] is a real depth-2
+        // node - the PlanStructuralValidator tests below corrupt exactly
+        // that node (the default-collapsed depth the "Expand All"/per-node-
+        // toggle crash sites, and PlanContentHeightMath.IsNodeExpanded's
+        // own "depth < 2" default, both hinge on). Item 1/2 have no TP
+        // price at all (never passed to priceApi.AddPrice), so CanBuyTp is
+        // false for both and craft is the only feasible source - both
+        // therefore always have Children, regardless of price ordering.
+        private static CraftingPlanPipeline BuildDeepPipeline(out InMemoryPriceApiClient priceApi)
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+            recipeApi.AddSearchResult(2, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 2,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 100,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Middle", "m.png");
+            itemApi.AddItem(3, "Leaf", "l.png");
+
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+        }
+
+        // Mirrors CraftingPlanPipelineTests.BuildOwnMaterialsPipeline
+        // exactly (item 1 <- recipe 10 <- ingredientCount x item 2, with a
+        // real InventoryReducer wired in) - reused here (rather than made
+        // accessible cross-class) so this file's own fixtures stay
+        // self-contained, matching every other helper already duplicated
+        // between the two files (BuildPipeline itself, etc.).
+        private static CraftingPlanPipeline BuildOwnMaterialsPipeline(
+            out InMemoryPriceApiClient priceApi, int ingredientCount = 5)
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = ingredientCount }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            priceApi = new InMemoryPriceApiClient();
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+        }
+
+        // Mirrors CraftingPlanPipelineTests.BuildForceBuyPipeline/
+        // OwnFourOfIngredient exactly: item 1's fresh (zero-owned) buy(100)
+        // < craft(5x30=150)*0.85=127.5, so item 1's node is force-buy-
+        // flagged under OwnMaterialsMode.Valued - the scenario that
+        // populates PlanSolveContext.ForceBuyOnlyNodeIds (an ISet<int>) with
+        // real content, one of the exact shapes this review-fix pass
+        // targets.
+        private static CraftingPlanPipeline BuildForceBuyPipeline(out InMemoryPriceApiClient priceApi)
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 1000, sellUnitPrice: 100);
+            priceApi.AddPrice(2, buyUnitPrice: 300, sellUnitPrice: 30);
+            return pipeline;
+        }
+
+        private static AccountSnapshot OwnFourOfIngredient()
+        {
+            return new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry
+                    {
+                        ItemId = 2,
+                        Count = 4,
+                        Source = AccountItemIndex.SourceMaterialStorage
+                    }
+                }
+            };
+        }
+
+        private static PersistedPlan Wrap(
+            CraftingPlanResult result, DateTime generatedAt, int quantity = 1, bool useOwn = false,
+            PriceBasis priceBasis = PriceBasis.InstantBuy,
+            IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides = null,
+            IReadOnlyList<int> ignoredItemIds = null)
+        {
+            return new PersistedPlan
+            {
+                // Round 2 review-fix (mustFix): SchemaVersion has no
+                // property initializer any more (see PersistedPlan's own
+                // doc comment) - every real construction site sets it
+                // explicitly, so this fixture-building helper must too or
+                // every test built through it would round-trip as
+                // SchemaVersion 0 and get rejected as old-schema by
+                // PlanStoreHelpers.DeserializePersistedPlan.
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = generatedAt,
+                RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = quantity } },
+                UseOwnMaterials = useOwn,
+                PriceBasis = priceBasis,
+                Result = result,
+                // W3D review-fix: PersistedPlan.NodeOverrides/IgnoredItemIds
+                // are empty (never null) on every real persist path (see
+                // Module.PersistAfterGenerateAsync/
+                // PersistResolvedPlanInBackground) - defaulting the same
+                // way here keeps every pre-existing call to this helper
+                // exercising that same real shape instead of null.
+                NodeOverrides = nodeOverrides ?? new Dictionary<int, AcquisitionSource>(),
+                IgnoredItemIds = ignoredItemIds ?? new List<int>()
+            };
+        }
+
+        private static string ToJson(object value) => JsonConvert.SerializeObject(value, Formatting.Indented);
+
+        [Fact]
+        public async Task Save_Load_RoundTripsResultAsSameViewModel()
+        {
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            _store.Save(Wrap(result, new DateTime(2026, 8, 9, 10, 30, 0, DateTimeKind.Local)));
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.NotNull(loaded.Result);
+            Assert.NotSame(result, loaded.Result);
+
+            var vmBuilder = new PlanViewModelBuilder();
+            var originalVm = vmBuilder.Build(result);
+            var reloadedVm = vmBuilder.Build(loaded.Result);
+
+            Assert.Equal(ToJson(originalVm), ToJson(reloadedVm));
+        }
+
+        [Fact]
+        public async Task Save_Load_ResolveWithOverrides_MatchesOriginalContext()
+        {
+            var pipeline = BuildPipeline(out var priceApi);
+            // Craft (30) beats buy (1000); gives the override something real to flip.
+            priceApi.AddPrice(1, buyUnitPrice: 1000, sellUnitPrice: 2000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.SolveContext);
+            Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
+
+            _store.Save(Wrap(result, DateTime.Now));
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded?.Result?.SolveContext);
+
+            // Same override, applied to both the original in-memory context
+            // and the reloaded-from-disk one - the W3D correctness bar
+            // (spec item 3): both must produce identical decisions.
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+            };
+
+            var resolvedOriginal = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
+            var resolvedReloaded = pipeline.ResolveWithOverrides(loaded.Result.SolveContext, overrides);
+
+            Assert.Equal(AcquisitionSource.BuyFromTp, resolvedOriginal.Plan.Steps[0].Source);
+            Assert.Equal(resolvedOriginal.Plan.TotalCoinCost, resolvedReloaded.Plan.TotalCoinCost);
+            Assert.Equal(resolvedOriginal.CraftingProfit, resolvedReloaded.CraftingProfit);
+            Assert.Equal(resolvedOriginal.CraftingTree.Decision, resolvedReloaded.CraftingTree.Decision);
+
+            var vmBuilder = new PlanViewModelBuilder();
+            Assert.Equal(ToJson(vmBuilder.Build(resolvedOriginal)), ToJson(vmBuilder.Build(resolvedReloaded)));
+        }
+
+        [Fact]
+        public async Task Save_Load_RequestAndTimestampRoundTrip()
+        {
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(1, 3, null, CancellationToken.None,
+                priceBasis: PriceBasis.BuyOrder);
+
+            var timestamp = new DateTime(2026, 8, 9, 14, 22, 0, DateTimeKind.Local);
+            _store.Save(Wrap(result, timestamp, quantity: 3, useOwn: true, priceBasis: PriceBasis.BuyOrder));
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.Equal(timestamp, loaded.GeneratedAt);
+            Assert.True(loaded.UseOwnMaterials);
+            Assert.Equal(PriceBasis.BuyOrder, loaded.PriceBasis);
+            Assert.NotNull(loaded.RequestItems);
+            Assert.Single(loaded.RequestItems);
+            Assert.Equal(1, loaded.RequestItems[0].ItemId);
+            Assert.Equal(3, loaded.RequestItems[0].Quantity);
+        }
+
+        [Fact]
+        public async Task Save_AfterOverride_RoundTripsOverriddenResultInPlace()
+        {
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 1000, sellUnitPrice: 2000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+            };
+            var overridden = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
+            Assert.Equal(AcquisitionSource.BuyFromTp, overridden.Plan.Steps[0].Source);
+
+            // "In place": same GeneratedAt/request as the original Generate,
+            // only Result swapped for the override-updated one - mirrors
+            // Module.PersistResolvedPlanInBackground's own shape.
+            var generatedAt = new DateTime(2026, 8, 9, 9, 0, 0, DateTimeKind.Local);
+            _store.Save(Wrap(result, generatedAt));
+            _store.Save(Wrap(overridden, generatedAt));
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.Equal(generatedAt, loaded.GeneratedAt);
+            Assert.NotNull(loaded.Result);
+            Assert.Equal(AcquisitionSource.BuyFromTp, loaded.Result.Plan.Steps[0].Source);
+
+            var vmBuilder = new PlanViewModelBuilder();
+            Assert.Equal(ToJson(vmBuilder.Build(overridden)), ToJson(vmBuilder.Build(loaded.Result)));
+        }
+
+        // --- W3D review-fix (critical): the user's decision-pill overrides
+        // themselves must round-trip, not just the Result they produced -
+        // see Models/PersistedPlan.cs's NodeOverrides/IgnoredItemIds doc
+        // comments and TreeSectionController.RestoreOverrides. ---
+
+        [Fact]
+        public async Task Save_Load_NodeOverridesAndIgnoredItemIds_RoundTripAndDriveIdenticalReResolve()
+        {
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi, ingredientCount: 5);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000); // buying the target outright is far pricier - craft wins
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100); // BuyInstant (craft-cost basis) = 100
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            int rootNodeId = result.CraftingTree.NodeId;
+
+            // Mirrors what Module.PersistResolvedPlanInBackground actually
+            // persists: the SAME overrides/ignoredItemIds that produced
+            // Result, alongside Result itself - not just the Result.
+            var overrides = new Dictionary<int, AcquisitionSource> { { rootNodeId, AcquisitionSource.Craft } };
+            var ignoredItemIds = new HashSet<int> { 2 };
+            var overridden = pipeline.ResolveWithOverrides(result.SolveContext, overrides, ignoredItemIds);
+            Assert.Equal(0, overridden.Plan.TotalCoinCost); // craft, with its only ingredient ignored (zeroed)
+
+            var generatedAt = new DateTime(2026, 8, 9, 11, 0, 0, DateTimeKind.Local);
+            _store.Save(Wrap(overridden, generatedAt, nodeOverrides: overrides, ignoredItemIds: new List<int>(ignoredItemIds)));
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+
+            // The overrides/ignore set round-trip with their exact content -
+            // this is the state a restored session's decision-pill loop
+            // reseeds from (TreeSectionController.RestoreOverrides), not
+            // merely the Result they happened to produce.
+            Assert.NotNull(loaded.NodeOverrides);
+            Assert.Single(loaded.NodeOverrides);
+            Assert.Equal(AcquisitionSource.Craft, loaded.NodeOverrides[rootNodeId]);
+            Assert.NotNull(loaded.IgnoredItemIds);
+            Assert.Equal(new[] { 2 }, loaded.IgnoredItemIds);
+
+            // W3D spec item 3's correctness bar: re-applying the RELOADED
+            // overrides/ignoredItemIds to the RELOADED context (exactly what
+            // a FURTHER pill click after a restart would do) must produce
+            // identical decisions/economics to the same overrides applied to
+            // the original in-memory context - proving the overrides
+            // THEMSELVES survive to drive a further re-solve, not just that
+            // the already-overridden Result rendered the same.
+            var reloadedIgnored = new HashSet<int>(loaded.IgnoredItemIds);
+            var reResolvedOriginal = pipeline.ResolveWithOverrides(result.SolveContext, overrides, ignoredItemIds);
+            var reResolvedReloaded = pipeline.ResolveWithOverrides(loaded.Result.SolveContext, loaded.NodeOverrides, reloadedIgnored);
+
+            Assert.Equal(0, reResolvedReloaded.Plan.TotalCoinCost);
+            Assert.Equal(reResolvedOriginal.CraftingTree.Decision, reResolvedReloaded.CraftingTree.Decision);
+            Assert.Equal(reResolvedOriginal.CraftingTree.Children[0].IsIgnored, reResolvedReloaded.CraftingTree.Children[0].IsIgnored);
+
+            var vmBuilder = new PlanViewModelBuilder();
+            Assert.Equal(ToJson(vmBuilder.Build(reResolvedOriginal)), ToJson(vmBuilder.Build(reResolvedReloaded)));
+        }
+
+        [Fact]
+        public async Task Save_Load_FreshGenerate_NodeOverridesAndIgnoredItemIdsAreEmptyNotNull()
+        {
+            // Module.PersistAfterGenerateAsync (a fresh Generate, no
+            // overrides applied yet) always persists empty collections, not
+            // null - see that method's own doc comment. Deserializing an
+            // empty JSON array/object must still hand back an empty
+            // (usable) collection, not null, so TreeSectionController.
+            // RestoreOverrides' own null-check branches stay purely
+            // defensive rather than load-bearing on the ordinary path.
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            _store.Save(Wrap(result, DateTime.Now));
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.NotNull(loaded.NodeOverrides);
+            Assert.Empty(loaded.NodeOverrides);
+            Assert.NotNull(loaded.IgnoredItemIds);
+            Assert.Empty(loaded.IgnoredItemIds);
+        }
+
+        [Fact]
+        public void LoadLatest_MissingFile_ReturnsNull()
+        {
+            Assert.Null(_store.LoadLatest());
+        }
+
+        [Fact]
+        public void LoadLatest_CorruptTruncatedJson_ReturnsNullAndLogsWarnNoThrow()
+        {
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath, "{ \"Result\": { \"Plan\": { \"Target");
+
+            string capturedMessage = null;
+            Exception capturedException = null;
+            var store = new PlanStore(_tempDir, (message, ex) =>
+            {
+                capturedMessage = message;
+                capturedException = ex;
+            });
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.NotNull(capturedMessage);
+            Assert.NotNull(capturedException);
+        }
+
+        [Fact]
+        public void LoadLatest_WrongSchema_MissingResult_ReturnsNullAndLogsWarn()
+        {
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath, "{ \"GeneratedAt\": \"2026-08-09T00:00:00\", \"UseOwnMaterials\": true }");
+
+            string capturedMessage = null;
+            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.NotNull(capturedMessage);
+        }
+
+        // --- W3D review-fix (mustFix): SchemaVersion is what makes the
+        // "old-schema file = fresh start with one Warn log line" tolerance
+        // contract enforceable against a FUTURE member rename/removal, not
+        // just a Result/Plan structurally missing entirely - see
+        // Models/PersistedPlan.cs's CurrentSchemaVersion doc comment. ---
+
+        [Fact]
+        public void LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn()
+        {
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            // Structurally valid (Result/Plan present, would have passed
+            // the pre-review-fix check) but stamped with an old/
+            // incompatible SchemaVersion.
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": 0, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string capturedMessage = null;
+            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.NotNull(capturedMessage);
+        }
+
+        [Fact]
+        public void Save_Load_ExplicitCurrentSchemaVersion_RoundTrips()
+        {
+            // Round 2 review-fix (mustFix): PersistedPlan.SchemaVersion has
+            // NO property initializer any more - a caller (every real
+            // construction site in Module.cs) must set it explicitly. This
+            // proves the field itself round-trips correctly when set that
+            // way, complementing LoadLatest_MissingSchemaVersionField_
+            // ReturnsNullAndLogsWarn below, which proves the opposite case
+            // (never set at all) is correctly rejected rather than silently
+            // treated as current.
+            var plan = new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 2 } },
+                UseOwnMaterials = false,
+                PriceBasis = PriceBasis.InstantBuy,
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 2 } }
+            };
+
+            _store.Save(plan);
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded);
+            Assert.Equal(PersistedPlan.CurrentSchemaVersion, loaded.SchemaVersion);
+        }
+
+        [Fact]
+        public void LoadLatest_MissingSchemaVersionField_ReturnsNullAndLogsWarn()
+        {
+            // Round 2 review-fix (mustFix): the ONE class of old file that
+            // can actually exist (written before the SchemaVersion field
+            // existed, or by any code that forgets to set it) omits the
+            // member entirely, rather than writing an explicit 0 the way
+            // LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn above
+            // does. Newtonsoft only overwrites properties present in the
+            // JSON, so this is the exact case a `= CurrentSchemaVersion`
+            // property initializer would have let sail through silently -
+            // see PersistedPlan.SchemaVersion's own doc comment.
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath,
+                "{ \"GeneratedAt\": \"2026-08-09T00:00:00\", \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string capturedMessage = null;
+            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.NotNull(capturedMessage);
+        }
+
+        [Fact]
+        public void LoadLatest_EmptyFile_ReturnsNull()
+        {
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath, "");
+
+            Assert.Null(_store.LoadLatest());
+        }
+
+        [Fact]
+        public void Save_Load_ProducesNewInstance()
+        {
+            var plan = new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 2 } },
+                UseOwnMaterials = false,
+                PriceBasis = PriceBasis.InstantBuy,
+                Result = new CraftingPlanResult
+                {
+                    Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 2 }
+                }
+            };
+            _store.Save(plan);
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.NotSame(plan, loaded);
+            Assert.Equal(5, loaded.Result.Plan.TargetItemId);
+        }
+
+        [Fact]
+        public void Save_LeavesNoTmpFileBehind()
+        {
+            var plan = new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } },
+                UseOwnMaterials = false,
+                PriceBasis = PriceBasis.InstantBuy,
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 1, TargetQuantity = 1 } }
+            };
+            _store.Save(plan);
+
+            string tmpPath = Path.Combine(_tempDir, "plan.json.tmp");
+            Assert.False(File.Exists(tmpPath));
+        }
+
+        [Fact]
+        public void Save_DirectoryCreationFails_InvokesOnErrorInsteadOfThrowing()
+        {
+            string blockingPath = Path.Combine(_tempDir, "blocked-data-dir");
+            File.WriteAllText(blockingPath, "not a directory");
+
+            string capturedMessage = null;
+            Exception capturedException = null;
+            var store = new PlanStore(blockingPath, (message, ex) =>
+            {
+                capturedMessage = message;
+                capturedException = ex;
+            });
+
+            store.Save(new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                Result = new CraftingPlanResult { Plan = new CraftingPlan() }
+            });
+
+            Assert.NotNull(capturedMessage);
+            Assert.NotNull(capturedException);
+        }
+
+        // --- W3D review-fix (mustFix): the investigation's own flagged
+        // "exact shapes" (ISet<int>, IReadOnlyDictionary<int,
+        // IReadOnlyList<VendorOffer>>, a NON-empty CurrencyValuation/
+        // HomesteadEfficiencyTiers) were never actually exercised by any
+        // test above - every one built its pipeline with 4 args (no vendor
+        // store, no account recipe client, no currencyValuation/
+        // homesteadTiers/snapshot), so those SolveContext members were
+        // always null/empty in every round trip. These three tests build
+        // full-featured pipelines (vendor offers, a learned-recipe account
+        // client, a real snapshot, non-default CurrencyValuation/
+        // HomesteadEfficiencyTiers, and a genuine multi-item batch) so the
+        // serialization-fidelity risk item 1 of the KNOWN-ISSUES entry
+        // investigated is actually exercised, not just asserted. ---
+
+        [Fact]
+        public async Task Save_Load_ForceBuyOnlyNodeIds_RoundTripsAndManualOverrideStillWinsAfterReload()
+        {
+            // Mirrors CraftingPlanPipelineTests'
+            // ResolveWithOverrides_ForceBuyPrePass_ManualOverrideStillWins
+            // exactly, adding a persist/reload round trip in the middle -
+            // PlanSolveContext.ForceBuyOnlyNodeIds (an ISet<int> computed
+            // once at generation time) must survive that round trip for a
+            // restored session's manual-override-beats-automatic-pre-pass
+            // behavior to keep working identically.
+            var pipeline = BuildForceBuyPipeline(out _);
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, initial.CraftingTree.Decision);
+            Assert.NotNull(initial.SolveContext.ForceBuyOnlyNodeIds);
+            Assert.NotEmpty(initial.SolveContext.ForceBuyOnlyNodeIds);
+
+            _store.Save(Wrap(initial, DateTime.Now));
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded?.Result?.SolveContext);
+
+            Assert.NotNull(loaded.Result.SolveContext.ForceBuyOnlyNodeIds);
+            Assert.Equal(
+                new HashSet<int>(initial.SolveContext.ForceBuyOnlyNodeIds),
+                new HashSet<int>(loaded.Result.SolveContext.ForceBuyOnlyNodeIds));
+
+            // A no-op re-solve on the RELOADED context must still apply the
+            // pre-pass exactly like the original generation did.
+            var noOpReloaded = pipeline.ResolveWithOverrides(loaded.Result.SolveContext, null);
+            Assert.Equal(AcquisitionSource.BuyFromTp, noOpReloaded.Plan.Steps[0].Source);
+            Assert.Equal(100, noOpReloaded.Plan.TotalCoinCost);
+
+            // A manual override on the RELOADED context must still win over
+            // the automatic pre-pass, same as the original.
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { initial.CraftingTree.NodeId, AcquisitionSource.Craft }
+            };
+            var manualOriginal = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
+            var manualReloaded = pipeline.ResolveWithOverrides(loaded.Result.SolveContext, overrides);
+
+            Assert.Equal(CraftingDecision.Craft, manualReloaded.CraftingTree.Decision);
+            Assert.Equal(manualOriginal.Plan.TotalCoinCost, manualReloaded.Plan.TotalCoinCost);
+        }
+
+        [Fact]
+        public async Task Save_Load_FullFeaturedFixture_RoundTripsPreviouslyUnexercisedSolveContextShapes()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                var recipeApi = new InMemoryRecipeApiClient();
+                recipeApi.AddSearchResult(1, 10);
+                recipeApi.AddRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 5 }
+                    },
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 500,
+                    Flags = new List<string> { "AutoLearned" }
+                });
+
+                var priceApi = new InMemoryPriceApiClient();
+                priceApi.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 5000); // buying item 1 outright is far pricier - craft wins
+                priceApi.AddPrice(2, buyUnitPrice: 100, sellUnitPrice: 1000); // item 2's own TP price - far pricier than the vendor offer below
+
+                var itemApi = new InMemoryItemApiClient();
+                itemApi.AddItem(1, "Target", "t.png");
+                itemApi.AddItem(2, "Ingredient", "i.png");
+
+                var loader = new VendorOfferLoader();
+                var vendorStore = new VendorOfferStore(tmp.Path, loader);
+                vendorStore.LoadBaseline(null);
+                vendorStore.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-ingredient-offer",
+                        OutputItemId = 2,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Currency", Id = 2, Count = 10 }
+                        },
+                        MerchantName = "Test Vendor",
+                        Locations = new List<string>()
+                    }
+                });
+
+                var accountClient = new InMemoryAccountRecipeClient();
+                accountClient.AddLearnedRecipe(10);
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    vendorStore,
+                    reducer: new InventoryReducer(),
+                    accountRecipeClient: accountClient);
+
+                var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 1 } });
+                var tiers = new HomesteadEfficiencyTiers(new Dictionary<int, int>
+                {
+                    { Gw2Constants.RefinedHomesteadMetalItemId, 2 }
+                });
+
+                var snapshot = new AccountSnapshot
+                {
+                    Items = new List<SnapshotItemEntry>
+                    {
+                        new SnapshotItemEntry { ItemId = 2, Count = 2, Source = AccountItemIndex.SourceMaterialStorage }
+                    },
+                    Wallet = new List<SnapshotWalletEntry>
+                    {
+                        new SnapshotWalletEntry { CurrencyId = 2, Value = 500 }
+                    },
+                    CharacterDisciplines = new List<SnapshotCharacterDiscipline>
+                    {
+                        new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true }
+                    }
+                };
+
+                var result = await pipeline.GenerateStructuredAsync(
+                    1, 1, snapshot, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy,
+                    currencyValuation: valuation,
+                    homesteadTiers: tiers);
+
+                // Every one of the shapes the investigation flagged as risky
+                // (and previously untested) genuinely has content here.
+                Assert.NotNull(result.SolveContext.LearnedRecipeIds);
+                Assert.Contains(10, result.SolveContext.LearnedRecipeIds);
+
+                Assert.NotNull(result.SolveContext.VendorOffers);
+                Assert.True(result.SolveContext.VendorOffers.TryGetValue(2, out var item2Offers));
+                Assert.NotEmpty(item2Offers);
+
+                Assert.NotNull(result.SolveContext.CurrencyValuation);
+                Assert.True(result.SolveContext.CurrencyValuation.TryGetCopperValue(2, out long copperPerUnit));
+                Assert.Equal(1, copperPerUnit);
+
+                Assert.NotNull(result.SolveContext.HomesteadTiers);
+                Assert.Equal(2, result.SolveContext.HomesteadTiers.GetTier(Gw2Constants.RefinedHomesteadMetalItemId));
+
+                Assert.NotNull(result.UsedMaterials);
+                Assert.Contains(result.UsedMaterials, u => u.ItemId == 2 && u.QuantityUsed == 2);
+
+                Assert.NotNull(result.CharacterDisciplines);
+                Assert.Single(result.CharacterDisciplines);
+                Assert.Equal("Anna", result.CharacterDisciplines[0].CharacterName);
+
+                // Persist + reload.
+                var generatedAt = new DateTime(2026, 8, 9, 12, 0, 0, DateTimeKind.Local);
+                _store.Save(Wrap(result, generatedAt, useOwn: true));
+
+                var loaded = _store.LoadLatest();
+                Assert.NotNull(loaded?.Result?.SolveContext);
+
+                // The reloaded result renders identically to the original.
+                var vmBuilder = new PlanViewModelBuilder();
+                Assert.Equal(ToJson(vmBuilder.Build(result)), ToJson(vmBuilder.Build(loaded.Result)));
+
+                // Every flagged shape survived the round trip with its
+                // content intact, not just structurally present.
+                Assert.NotNull(loaded.Result.SolveContext.LearnedRecipeIds);
+                Assert.Contains(10, loaded.Result.SolveContext.LearnedRecipeIds);
+
+                Assert.True(loaded.Result.SolveContext.VendorOffers.TryGetValue(2, out var reloadedItem2Offers));
+                Assert.Equal(item2Offers.Count, reloadedItem2Offers.Count);
+                Assert.Equal(item2Offers[0].OfferId, reloadedItem2Offers[0].OfferId);
+
+                Assert.True(loaded.Result.SolveContext.CurrencyValuation.TryGetCopperValue(2, out long reloadedCopperPerUnit));
+                Assert.Equal(copperPerUnit, reloadedCopperPerUnit);
+
+                Assert.Equal(2, loaded.Result.SolveContext.HomesteadTiers.GetTier(Gw2Constants.RefinedHomesteadMetalItemId));
+
+                // And the whole graph still re-solves identically after the
+                // round trip - the W3D spec item 3 correctness bar, now
+                // proven against a fixture carrying every flagged shape at
+                // once rather than a minimal two-item tree.
+                var overrides = new Dictionary<int, AcquisitionSource>
+                {
+                    { result.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+                };
+                var resolvedOriginal = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
+                var resolvedReloaded = pipeline.ResolveWithOverrides(loaded.Result.SolveContext, overrides);
+
+                Assert.Equal(AcquisitionSource.BuyFromTp, resolvedReloaded.Plan.Steps[0].Source);
+                Assert.Equal(resolvedOriginal.Plan.TotalCoinCost, resolvedReloaded.Plan.TotalCoinCost);
+                Assert.Equal(ToJson(vmBuilder.Build(resolvedOriginal)), ToJson(vmBuilder.Build(resolvedReloaded)));
+            }
+        }
+
+        [Fact]
+        public async Task Save_Load_MultiItemBatch_RoundTripsAndResolveWithOverridesMatchesViaBatchBranch()
+        {
+            // CraftingPlanPipeline.ResolveWithOverrides branches on
+            // context.Tree.Id == Gw2Constants.MultiItemWrapperItemId
+            // (ApplySellSideEconomics vs. ApplyBatchSellSideEconomics) - a
+            // completely different code path than every single-item test
+            // above exercises. RequestedItems/MultiItemRoots must both
+            // survive the round trip for a restored multi-item plan's
+            // decision pills to keep resolving through the correct branch.
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+            recipeApi.AddSearchResult(2, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 2,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
+                },
+                Disciplines = new List<string> { "Armorsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200);
+            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
+            priceApi.AddPrice(4, buyUnitPrice: 20, sellUnitPrice: 200);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target Item A", "targeta.png");
+            itemApi.AddItem(2, "Target Item B", "targetb.png");
+            itemApi.AddItem(3, "Ingredient A", "ingredienta.png");
+            itemApi.AddItem(4, "Ingredient B", "ingredientb.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 2 },
+                new PlanRequestItem { ItemId = 2, Quantity = 3 }
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(items, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(2, result.MultiItemRoots.Count);
+            Assert.Equal(Gw2Constants.MultiItemWrapperItemId, result.SolveContext.Tree.Id);
+            Assert.NotNull(result.RequestedItems);
+            Assert.Equal(2, result.RequestedItems.Count);
+
+            var plan = new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = new DateTime(2026, 8, 9, 13, 0, 0, DateTimeKind.Local),
+                RequestItems = items,
+                UseOwnMaterials = false,
+                PriceBasis = PriceBasis.InstantBuy,
+                Result = result,
+                NodeOverrides = new Dictionary<int, AcquisitionSource>(),
+                IgnoredItemIds = new List<int>()
+            };
+            _store.Save(plan);
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded?.Result?.SolveContext);
+            Assert.Equal(2, loaded.Result.MultiItemRoots.Count);
+            Assert.Equal(Gw2Constants.MultiItemWrapperItemId, loaded.Result.SolveContext.Tree.Id);
+            Assert.NotNull(loaded.Result.RequestedItems);
+            Assert.Equal(2, loaded.Result.RequestedItems.Count);
+            Assert.Equal(2, loaded.RequestItems.Count);
+            Assert.Equal(1, loaded.RequestItems[0].ItemId);
+            Assert.Equal(2, loaded.RequestItems[0].Quantity);
+            Assert.Equal(2, loaded.RequestItems[1].ItemId);
+            Assert.Equal(3, loaded.RequestItems[1].Quantity);
+
+            var vmBuilder = new PlanViewModelBuilder();
+            Assert.Equal(ToJson(vmBuilder.Build(result)), ToJson(vmBuilder.Build(loaded.Result)));
+
+            // A local override re-solve through the MULTI-ITEM branch of
+            // ResolveWithOverrides must produce identical results on the
+            // original and reloaded contexts.
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { result.MultiItemRoots[0].NodeId, AcquisitionSource.BuyFromTp }
+            };
+            var resolvedOriginal = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
+            var resolvedReloaded = pipeline.ResolveWithOverrides(loaded.Result.SolveContext, overrides);
+
+            Assert.Equal(resolvedOriginal.Plan.TotalCoinCost, resolvedReloaded.Plan.TotalCoinCost);
+            Assert.Equal(ToJson(vmBuilder.Build(resolvedOriginal)), ToJson(vmBuilder.Build(resolvedReloaded)));
+        }
+
+        // --- Round 4 review-fix (critical): PlanStructuralValidator - a
+        // structurally-valid-but-degraded plan.json (e.g. a null entry deep
+        // inside CraftingTreeNode.Children, invisible to
+        // PlanViewModelBuilder's reference-copying vm build) used to sail
+        // through PlanStoreHelpers' tolerance gate and only NRE later, from
+        // an UNGUARDED Blish click handler (Expand All / the per-node
+        // expand toggle in TreeSectionController.RenderTreeNode, and
+        // TreeSectionController's Craft All/Buy All buttons via
+        // CraftingPlanPipeline.BuildPresetOverrides) with no try/catch
+        // anywhere nearby - see PlanStructuralValidator's own doc comment
+        // for the full inventory. Every fixture below starts from a REAL
+        // pipeline-produced PersistedPlan (matching this file's own
+        // established "real serialized fixtures, not hand-built objects"
+        // convention), serialized via the actual production
+        // PlanStoreHelpers.SerializePersistedPlan, then surgically
+        // corrupted at one exact JSON location via Newtonsoft's JObject -
+        // proving the validator rejects a file a naive parse/schema check
+        // would have accepted, and does so with the required "one Warn log
+        // line, return null" contract (never a partial accept). ---
+
+        private static string SerializeAndCorrupt(PersistedPlan plan, Action<JObject> corrupt)
+        {
+            string json = PlanStoreHelpers.SerializePersistedPlan(plan);
+            var jObj = JObject.Parse(json);
+            corrupt(jObj);
+            return jObj.ToString(Formatting.None);
+        }
+
+        // getLastMessage exposes the wrapped EXCEPTION's own Message (e.g.
+        // PlanStructuralValidator's "...failed structural validation
+        // (...)" text) rather than PlanStore.LoadLatest's own generic
+        // "Failed to load plan from {path}" wrapper string - the latter is
+        // identical across every failure kind, so only the exception
+        // message can distinguish "rejected by PlanStructuralValidator"
+        // from every other pre-existing rejection reason (a JSON parse
+        // failure, the Result/Plan/SchemaVersion gate).
+        private PlanStore NewWarnCountingStore(out Func<int> getWarnCount, out Func<string> getLastMessage)
+        {
+            int warnCount = 0;
+            string lastExceptionMessage = null;
+            var store = new PlanStore(_tempDir, (message, ex) =>
+            {
+                warnCount++;
+                lastExceptionMessage = ex?.Message;
+            });
+            getWarnCount = () => warnCount;
+            getLastMessage = () => lastExceptionMessage;
+            return store;
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullChildEntryInCraftingTreeAtDepth2_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            var pipeline = BuildDeepPipeline(out _);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            // Confirm the real fixture actually has the shape this test
+            // needs before corrupting it: root (depth 0, Craft) -> item 2
+            // (depth 1, Craft) -> item 3 (depth 2, leaf).
+            Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
+            Assert.Single(result.CraftingTree.Children);
+            var depth1Node = result.CraftingTree.Children[0];
+            Assert.Equal(CraftingDecision.Craft, depth1Node.Decision);
+            Assert.Single(depth1Node.Children);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                var depth2Children = (JArray)jObj["Result"]["CraftingTree"]["Children"][0]["Children"];
+                depth2Children[0] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            // Pins this down to PlanStructuralValidator specifically - not
+            // the pre-existing Result/Plan/SchemaVersion gate or a plain
+            // JSON parse failure, both of which use different message text.
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("CraftingTree.Children[0].Children[0]", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_ExplicitNullChildrenListOnTreeNode_LoadsSuccessfully()
+        {
+            // CraftingTreeNode.Children's own setter coerces a null value to
+            // Array.Empty<CraftingTreeNode>() (see that property's doc
+            // comment) - Newtonsoft always calls a writable property's
+            // public setter, so an explicit JSON "Children": null on some
+            // node can never actually reach PlanStructuralValidator as a
+            // null LIST; it is already neutralized one layer down, at the
+            // model itself. This proves the validator does not (and
+            // structurally cannot) false-reject that shape - a real
+            // "Children": null file still loads and renders exactly like
+            // the childless leaf it already was.
+            var pipeline = BuildDeepPipeline(out _);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                // Item 3 (depth 2) is a leaf - its own Children is already
+                // an empty array on disk; overwrite with an explicit null.
+                jObj["Result"]["CraftingTree"]["Children"][0]["Children"][0]["Children"] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded);
+            var leaf = loaded.Result.CraftingTree.Children[0].Children[0];
+            Assert.NotNull(leaf.Children);
+            Assert.Empty(leaf.Children);
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullRecipesListOnSolveContextTreeNode_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // Unlike CraftingTreeNode.Children, RecipeNode.Recipes has no
+            // null-coalescing setter (a plain auto-property with a "= new
+            // List<RecipeOption>()" initializer Newtonsoft overwrites
+            // verbatim) - so a null LIST is genuinely reachable here, the
+            // closest real equivalent to a "null Children list" corruption.
+            // PlanSolver.Evaluate/CraftingTreeBuilder.BuildNode/
+            // CraftingPlanPipeline.CollectPresetOverrides all walk
+            // node.Recipes unconditionally on EVERY override re-solve
+            // (Craft All/Buy All/a plain pill click), not just when there
+            // happens to be a Craft step.
+            var pipeline = BuildDeepPipeline(out _);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.SolveContext);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                var item2Node = jObj["Result"]["SolveContext"]["Tree"]["Recipes"][0]["Ingredients"][0];
+                item2Node["Recipes"] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.Tree.Recipes[0].Ingredients[0].Recipes", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullIngredientEntryInSolveContextTree_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // A null RecipeNode ENTRY inside RecipeOption.Ingredients (as
+            // opposed to the whole list being null, covered above) -
+            // reachable the same way: every override re-solve walks the
+            // full Ingredients list of every recipe on the path from Tree's
+            // root, unconditionally.
+            var pipeline = BuildDeepPipeline(out _);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.SolveContext);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                var item2Recipe = jObj["Result"]["SolveContext"]["Tree"]["Recipes"][0]["Ingredients"][0]["Recipes"][0];
+                ((JArray)item2Recipe["Ingredients"])[0] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.Tree.Recipes[0].Ingredients[0].Recipes[0].Ingredients[0]", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullSolveContextPrices_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // A solve-context COLLECTION nulled (as opposed to a tree
+            // shape) - PlanSolver.GetBuyCost/CraftingPlanPipeline.
+            // CollectPresetOverrides both call prices.TryGetValue(...) with
+            // no null check on the dictionary itself, so a null Prices
+            // would NRE on the very first node of the very first override
+            // re-solve or Craft All/Buy All click after a restore.
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.SolveContext);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                jObj["Result"]["SolveContext"]["Prices"] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.Prices is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullEntryInSolveContextUsedMaterials_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // Round 5 review-fix: SolveContext.UsedMaterials is a
+            // SEPARATELY serialized copy of the same list as
+            // CraftingPlanResult.UsedMaterials (Newtonsoft writes no $ref) -
+            // this corrupts ONLY the SolveContext copy, leaving
+            // Result.UsedMaterials itself clean, to prove the validator no
+            // longer has the asymmetry a plain check on Result.UsedMaterials
+            // alone would miss. Reachable from ANY override re-solve after a
+            // restore (ResolveWithOverrides -> PlanResultBuilder.Build's
+            // "foreach (var used in usedMaterials) { ... used.ItemId ... }"
+            // and SellSideEconomics.ComputeMaterialOpportunityCost's
+            // "used.ItemId"/"used.QuantityUsed", neither with a per-entry
+            // null check), not just Craft All/Buy All.
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy, ownMaterialsMode: OwnMaterialsMode.Valued);
+            Assert.NotNull(result.SolveContext);
+            Assert.NotEmpty(result.SolveContext.UsedMaterials);
+            Assert.NotEmpty(result.UsedMaterials);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                ((JArray)jObj["Result"]["SolveContext"]["UsedMaterials"])[0] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.UsedMaterials[0] is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullEntryInPlanSteps_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // Plan.Steps is read unconditionally by
+            // PlanViewModelBuilder.Build (result.Plan.Steps.Where(...)) - a
+            // null ENTRY inside an otherwise non-null list NREs on the very
+            // first vm build, whether that is the restore itself or a later
+            // override re-solve.
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotEmpty(result.Plan.Steps);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                ((JArray)jObj["Result"]["Plan"]["Steps"])[0] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("Plan.Steps[0] is null", lastMessage());
+        }
+    }
+}

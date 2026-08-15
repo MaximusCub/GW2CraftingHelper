@@ -1,8 +1,20 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+
 namespace GW2CraftingHelper.Models
 {
     /// <summary>
     /// Which Trading Post price is used to cost material acquisition.
     /// </summary>
+    // Review-fix (W3D adversarial review, mustFix): serialized as its enum
+    // NAME rather than Newtonsoft's bare-int default - PersistedPlan.
+    // PriceBasis is the only member of this enum's type ever written to
+    // disk (see Models/PersistedPlan.cs), so this is a type-level attribute
+    // with no other consumer to disturb, matching the same
+    // StringEnumConverter precedent Services/ModuleLogEntry.cs already uses
+    // for ModuleLogLevel. A future member reorder can no longer silently
+    // remap an already-persisted plan's price basis to a different value.
+    [JsonConverter(typeof(StringEnumConverter))]
     public enum PriceBasis
     {
         /// <summary>

@@ -1,3 +1,6 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+
 namespace GW2CraftingHelper.Models
 {
     /// <summary>
@@ -32,6 +35,16 @@ namespace GW2CraftingHelper.Models
     /// directly by <see cref="Services.CraftingTreeBuilder"/> for zero-quantity/owned and
     /// manually-ignored nodes, never derived from an <see cref="AcquisitionSource"/> value.
     /// </summary>
+    // Review-fix (W3D adversarial review, mustFix): serialized as its enum
+    // NAME rather than Newtonsoft's bare-int default - PersistedPlan.
+    // NodeOverrides' dictionary values, and every AcquisitionSource-typed
+    // member reachable from PersistedPlan.Result/SolveContext (PlanStep.
+    // Source, SolverDecision.Source, ...), are now written to plan.json
+    // (see Models/PersistedPlan.cs), matching the same StringEnumConverter
+    // precedent Services/ModuleLogEntry.cs already uses for
+    // ModuleLogLevel. A future member reorder can no longer silently remap
+    // an already-persisted plan's decisions to a different source.
+    [JsonConverter(typeof(StringEnumConverter))]
     public enum AcquisitionSource
     {
         BuyFromTp,

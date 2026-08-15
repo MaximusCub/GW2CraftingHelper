@@ -217,6 +217,48 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
+        /// Review-fix (W3D adversarial review, critical): re-seeds the
+        /// override loop's decision/ignore state from a persisted plan,
+        /// called from CraftingPlanView.ApplyRestoredPlan immediately after
+        /// ResetForNewPlan(result) (which the restore path also calls, to
+        /// adopt the restored result as _lastResult exactly like a fresh
+        /// Generate does - only the Clear()s above need undoing here).
+        /// Without this, a restored session's <see cref="_nodeOverrides"/>/
+        /// <see cref="_ignoredItemIds"/> would start empty even though the
+        /// restored <paramref name="result"/> already reflects the user's
+        /// prior overrides (it is the OUTPUT of applying them) - the very
+        /// next pill click would then re-solve with only that ONE new
+        /// override applied, silently discarding every override the user
+        /// set before restarting (W3D spec item 3's correctness bar).
+        /// <paramref name="nodeOverrides"/>/<paramref name="ignoredItemIds"/>
+        /// are copied, not aliased - this instance owns its two collections
+        /// for their entire lifetime (every other mutator below assumes
+        /// that), and PersistedPlan's own copies must stay independent so a
+        /// later pill click's Dictionary/HashSet mutation here can never
+        /// reach back into the object PlanStoreHelpers just deserialized.
+        /// </summary>
+        internal void RestoreOverrides(
+            IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides,
+            IReadOnlyList<int> ignoredItemIds)
+        {
+            if (nodeOverrides != null)
+            {
+                foreach (var kvp in nodeOverrides)
+                {
+                    _nodeOverrides[kvp.Key] = kvp.Value;
+                }
+            }
+
+            if (ignoredItemIds != null)
+            {
+                foreach (int itemId in ignoredItemIds)
+                {
+                    _ignoredItemIds.Add(itemId);
+                }
+            }
+        }
+
+        /// <summary>
         /// Renders the Recipe Tree section's single shared content
         /// FlowPanel: one root per requested item, stacked - N top-level
         /// trees for a multi-item batch (the synthetic wrapper root never
