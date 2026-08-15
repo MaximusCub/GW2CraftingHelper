@@ -2315,3 +2315,44 @@ sandbox, three scenarios across a real Blish restart cycle):
   (CraftingTree.Children[0].Children[0] is null) - corrupt or
   degraded file."), a clean fresh-start Plan tab ("Ready", no plan),
   and zero exceptions in the Blish log.
+
+**Post-W3D quick fix: gzip-compress the on-disk plan file
+(2026-08-15).** User-directed, "quick and dirty" scope: the ~700 KB
+plan.json this section measured above is now written gzip-compressed
+instead of as plain compact JSON. `PlanStore.Save` gzips the same
+serialized JSON bytes it always produced (`PlanStoreHelpers.
+SerializePersistedPlan`/`DeserializePersistedPlan` and the
+`PlanStructuralValidator` gate above are completely untouched - only
+the container encoding changed); the file name stays `plan.json` (no
+`.gz` rename - simplest, and avoids leaving an orphaned old-named file
+around). `PlanStore.LoadLatest` sniffs the first two on-disk bytes for
+the gzip magic number (0x1F 0x8B, RFC 1952) and decompresses when
+present, otherwise falls back to parsing the bytes as plain UTF-8
+JSON directly - so an existing plain-JSON `plan.json` written by the
+pre-fix PR #107 code still loads unchanged. Both decompression and
+JSON parsing happen inside `LoadLatest`'s single existing try/catch,
+so every prior tolerance guarantee (truncated/corrupt data, a
+gzip-wrapped-but-invalid-JSON file, a structurally-invalid plan) still
+produces exactly one Warn and a null return - never a partial load -
+with no new failure paths introduced. `System.IO.Compression.
+GZipStream` is in-box for net48; the csproj gained one plain
+`<Reference Include="System.IO.Compression" />` entry (no NuGet
+package, matching `System`/`System.Windows.Forms`'s own
+no-HintPath style).
+
+New tests (`PlanStoreTests`, four, all against a real `PlanStore` +
+temp dir, no fake file I/O): a save-then-load round trip asserts the
+on-disk file starts with the gzip magic bytes and is materially
+smaller than the raw serialized JSON (measured on the existing
+two-item fixture: 4146 bytes raw vs. 1306 bytes gzipped, about a 68%
+reduction); a plain uncompressed `plan.json` written directly via the
+production serializer (no gzip) still loads, proving backward
+compatibility with files in the wild; truncated gzip bytes and a
+gzip-wrapped invalid-JSON payload each return null with exactly one
+Warn logged, matching every other corrupt-file test in this section.
+All 30 `PlanStoreTests` and the full 1273-test module suite (was 1269
+before this pass; +4 new tests) pass.
+
+No live desktop gate for this pass - container-encoding-only change,
+user-sanctioned quick fix, validated by real-file unit round-trip
+tests instead (see above).
