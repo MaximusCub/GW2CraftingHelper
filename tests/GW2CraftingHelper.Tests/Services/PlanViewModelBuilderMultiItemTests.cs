@@ -145,7 +145,10 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
             var summaryRows = vm.Sections[0].Rows;
 
-            Assert.Equal(PlanRowType.MultiItemNote, summaryRows[summaryRows.Count - 1].RowType);
+            // W4A: the note row is now followed by the always-present
+            // footnote row, so it is second-to-last rather than last.
+            Assert.Equal(PlanRowType.MultiItemNote, summaryRows[summaryRows.Count - 2].RowType);
+            Assert.Equal(PlanRowType.SummaryFootnote, summaryRows[summaryRows.Count - 1].RowType);
         }
 
         [Fact]
@@ -197,7 +200,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void MultiItemRequest_SellValuePresent_AddsBatchWordedSellAndProfitRows()
+        public void MultiItemRequest_SellValuePresent_AddsBatchWordedSellAndProfitTiles()
         {
             var result = MakeResult(
                 totalCoinCost: 300, requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
@@ -206,16 +209,19 @@ namespace GW2CraftingHelper.Tests.Services
             result.CraftingProfit = 550;
 
             var vm = _builder.Build(result);
-            var rows = vm.Sections[0].Rows;
+            var profitTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.ProfitFormulaTile).ToList();
 
-            Assert.Equal("Sell value (batch total, after 15% TP fees)", rows[1].Label);
-            Assert.Equal(850L, rows[1].CoinValue);
-            Assert.Equal("Profit if sold (batch total)", rows[2].Label);
-            Assert.Equal(550L, rows[2].CoinValue);
+            Assert.Equal(3, profitTiles.Count);
+            Assert.Equal("Sell Value", profitTiles[0].Label);
+            Assert.Equal(850L, profitTiles[0].CoinValue);
+            Assert.Contains("batch total", profitTiles[0].TooltipText);
+            Assert.Equal("Profit if Sold", profitTiles[2].Label);
+            Assert.Equal(550L, profitTiles[2].CoinValue);
+            Assert.Contains("batch total", profitTiles[2].TooltipText);
         }
 
         [Fact]
-        public void MultiItemRequest_NegativeProfit_RendersAsLossWithBatchQualifier()
+        public void MultiItemRequest_NegativeProfit_RendersAsLossWithBatchQualifierInTooltip()
         {
             var result = MakeResult(
                 totalCoinCost: 900, requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
@@ -223,14 +229,14 @@ namespace GW2CraftingHelper.Tests.Services
             result.CraftingProfit = -160;
 
             var vm = _builder.Build(result);
-            var rows = vm.Sections[0].Rows;
+            var profitTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.ProfitFormulaTile && r.Label == "Loss if Sold");
 
-            Assert.Equal("Loss if sold (batch total)", rows[2].Label);
-            Assert.Equal(160L, rows[2].CoinValue);
+            Assert.Equal(160L, profitTile.CoinValue);
+            Assert.Contains("batch total", profitTile.TooltipText);
         }
 
         [Fact]
-        public void MultiItemRequest_CurrencyCostsPresent_ProfitRowGetsBatchAndCoinOnlyQualifier()
+        public void MultiItemRequest_CurrencyCostsPresent_ProfitTileTooltipGetsBatchAndCoinOnlyQualifier()
         {
             var result = MakeResult(
                 totalCoinCost: 100,
@@ -240,15 +246,16 @@ namespace GW2CraftingHelper.Tests.Services
             result.CraftingProfit = 240;
 
             var vm = _builder.Build(result);
-            var rows = vm.Sections[0].Rows;
+            var profitTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.ProfitFormulaTile && r.Label == "Profit if Sold");
 
-            Assert.Equal("Profit if sold (batch total, coin costs only)", rows[2].Label);
+            Assert.Contains("batch total", profitTile.TooltipText);
+            Assert.Contains("coin costs only", profitTile.TooltipText);
         }
 
         [Fact]
-        public void MultiItemRequest_SellRowNeverShowsPerItemQuantityQualifier()
+        public void MultiItemRequest_SellTileNeverShowsPerItemQuantityQualifier()
         {
-            // Single-item mode shows "Sell value (Nx, ...)" when
+            // Single-item mode's tooltip shows "(Nx, overproduction)" when
             // SellableQuantity overproduces the target quantity - that
             // qualifier has no meaning for a batch SUM across N different
             // items' own quantities, so it must never appear here.
@@ -260,8 +267,11 @@ namespace GW2CraftingHelper.Tests.Services
             result.CraftingProfit = 1400;
 
             var vm = _builder.Build(result);
+            var sellTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.ProfitFormulaTile && r.Label == "Sell Value");
 
-            Assert.Equal("Sell value (batch total, after 15% TP fees)", vm.Sections[0].Rows[1].Label);
+            Assert.Contains("batch total", sellTile.TooltipText);
+            Assert.DoesNotContain("5x", sellTile.TooltipText);
+            Assert.DoesNotContain("overproduction", sellTile.TooltipText);
         }
 
         [Fact]
@@ -280,7 +290,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var vm = _builder.Build(result);
             var summaryRows = vm.Sections[0].Rows;
-            var noteRow = summaryRows[summaryRows.Count - 1];
+            var noteRow = summaryRows.Single(r => r.RowType == PlanRowType.MultiItemNote);
 
             Assert.Equal(PlanRowType.MultiItemNote, noteRow.RowType);
             Assert.Equal(

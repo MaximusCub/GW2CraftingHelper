@@ -21,9 +21,16 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Single(vm.Sections);
             Assert.Equal(PlanSectionType.Summary, vm.Sections[0].SectionType);
-            Assert.Single(vm.Sections[0].Rows); // CoinTotal row
-            Assert.Equal(PlanRowType.CoinTotal, vm.Sections[0].Rows[0].RowType);
-            Assert.Equal(0L, vm.Sections[0].Rows[0].CoinValue);
+
+            var rows = vm.Sections[0].Rows;
+            // W4A: collapsed cost-formula tile ("Actual Cost to Craft") +
+            // the always-present footnote row - no profit band (no sell
+            // price), no currency rows (no currency costs).
+            Assert.Equal(2, rows.Count);
+            Assert.Equal(PlanRowType.CostFormulaTile, rows[0].RowType);
+            Assert.Equal("Actual Cost to Craft", rows[0].Label);
+            Assert.Equal(0L, rows[0].CoinValue);
+            Assert.Equal(PlanRowType.SummaryFootnote, rows[1].RowType);
         }
 
         // --- Target item resolution ---
@@ -63,59 +70,232 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Exotic", vm.TargetRarity);
         }
 
-        // --- Summary section ---
+        // --- W4A: cost formula band (collapse rule + arithmetic) ---
 
         [Fact]
-        public void SummarySection_CoinTotalRow()
+        public void CostBand_NoMaterialsUsed_CollapsesToSingleActualCostTile()
         {
             var result = MakeResult(totalCoinCost: 123456);
             var vm = _builder.Build(result);
 
             var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var coinRow = summary.Rows.First(r => r.RowType == PlanRowType.CoinTotal);
-            Assert.Equal(123456L, coinRow.CoinValue);
-            Assert.Equal("Total", coinRow.Label);
+            var costTiles = summary.Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Single(costTiles);
+            Assert.Equal("Actual Cost to Craft", costTiles[0].Label);
+            Assert.Equal(123456L, costTiles[0].CoinValue);
+            Assert.False(string.IsNullOrEmpty(costTiles[0].TooltipText));
         }
 
         [Fact]
-        public void SummarySection_CurrencyCosts()
+        public void CostBand_MaterialOpportunityCostZero_StillCollapses()
+        {
+            // A material with no instant-sell price contributes 0, not
+            // null - the collapse rule treats null AND 0 identically
+            // (spec: "when MaterialOpportunityCost is null or 0").
+            var result = MakeResult(totalCoinCost: 200);
+            result.MaterialOpportunityCost = 0;
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Single(costTiles);
+            Assert.Equal("Actual Cost to Craft", costTiles[0].Label);
+            Assert.Equal(200L, costTiles[0].CoinValue);
+        }
+
+        [Fact]
+        public void CostBand_MaterialsUsedPositive_ExpandsToThreeTilesWithCorrectArithmetic()
+        {
+            var result = MakeResult(totalCoinCost: 200);
+            result.MaterialOpportunityCost = 25;
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal("Total Materials Value", costTiles[0].Label);
+            Assert.Equal(225L, costTiles[0].CoinValue); // 200 + 25
+            Assert.Equal("Your Materials Used", costTiles[1].Label);
+            Assert.Equal(25L, costTiles[1].CoinValue);
+            Assert.Equal("Actual Cost to Craft", costTiles[2].Label);
+            Assert.Equal(200L, costTiles[2].CoinValue);
+
+            // M32 lesson (user-mandated tooltips): every tile header has
+            // its own non-empty tooltip.
+            Assert.All(costTiles, t => Assert.False(string.IsNullOrEmpty(t.TooltipText)));
+        }
+
+        [Fact]
+        public void CostBand_BuyOrderBasis_QualifierMovesToActualCostTooltip()
+        {
+            var result = MakeResult(totalCoinCost: 100);
+            result.PriceBasis = PriceBasis.BuyOrder;
+
+            var vm = _builder.Build(result);
+            var costTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CostFormulaTile);
+
+            // Caption stays short (no qualifier baked into the Label) - the
+            // basis qualifier now lives in the tooltip only.
+            Assert.Equal("Actual Cost to Craft", costTile.Label);
+            Assert.Contains("buy-order prices", costTile.TooltipText);
+        }
+
+        // --- W4A: profit formula band (presence/absence, arithmetic, sign) ---
+
+        [Fact]
+        public void ProfitBand_NoSellPrice_Absent()
+        {
+            var result = MakeResult(totalCoinCost: 500);
+            var vm = _builder.Build(result);
+
+            Assert.DoesNotContain(vm.Sections[0].Rows, r => r.RowType == PlanRowType.ProfitFormulaTile);
+        }
+
+        [Fact]
+        public void ProfitBand_SellPricePresent_ThreeTilesWithIdentityArithmetic()
+        {
+            var result = MakeResult(totalCoinCost: 300);
+            result.TargetUnitSellPrice = 400;
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 40;
+
+            var vm = _builder.Build(result);
+            var profitTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.ProfitFormulaTile).ToList();
+
+            Assert.Equal(3, profitTiles.Count);
+            Assert.Equal("Sell Value", profitTiles[0].Label);
+            Assert.Equal(340L, profitTiles[0].CoinValue);
+            Assert.Equal("Total Materials Value", profitTiles[1].Label);
+            // Single-item identity: NetSaleValue - CraftingProfit == 340 - 40 == 300 == TotalCoinCost.
+            Assert.Equal(300L, profitTiles[1].CoinValue);
+            Assert.Equal("Profit if Sold", profitTiles[2].Label);
+            Assert.Equal(40L, profitTiles[2].CoinValue);
+            Assert.All(profitTiles, t => Assert.False(string.IsNullOrEmpty(t.TooltipText)));
+        }
+
+        [Fact]
+        public void ProfitBand_NegativeProfit_LabeledLossWithAbsoluteValue()
+        {
+            var result = MakeResult(totalCoinCost: 500);
+            result.NetSaleValue = 340;
+            result.CraftingProfit = -160;
+
+            var vm = _builder.Build(result);
+            var profitTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.ProfitFormulaTile && r.Label.Contains("Loss"));
+
+            Assert.Equal("Loss if Sold", profitTile.Label);
+            Assert.Equal(160L, profitTile.CoinValue);
+        }
+
+        [Fact]
+        public void ProfitBand_TotalMaterialsValueMatchesCostBand_ForSingleItemPlan()
+        {
+            // The identity (SellSideEconomics.ApplySellSideEconomics) makes
+            // Band 2's derived Total Materials Value equal Band 1's, for
+            // every single-item plan.
+            var result = MakeResult(totalCoinCost: 200);
+            result.MaterialOpportunityCost = 25;
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 115; // 340 - 200 - 25
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            long costBandTotalMaterialsValue = rows.First(r => r.RowType == PlanRowType.CostFormulaTile && r.Label == "Total Materials Value").CoinValue;
+            long profitBandTotalMaterialsValue = rows.First(r => r.RowType == PlanRowType.ProfitFormulaTile && r.Label == "Total Materials Value").CoinValue;
+
+            Assert.Equal(225L, costBandTotalMaterialsValue);
+            Assert.Equal(costBandTotalMaterialsValue, profitBandTotalMaterialsValue);
+        }
+
+        [Fact]
+        public void ProfitBand_CurrencyCostsPresent_CoinOnlyQualifierInTooltip()
+        {
+            var result = MakeResult(
+                totalCoinCost: 100,
+                currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 2, Amount = 50 } });
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 240;
+
+            var vm = _builder.Build(result);
+            var profitTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.ProfitFormulaTile && r.Label.Contains("Profit"));
+
+            Assert.Equal("Profit if Sold", profitTile.Label);
+            Assert.Contains("coin costs only", profitTile.TooltipText);
+        }
+
+        [Fact]
+        public void ProfitBand_Overproduced_QualifierInSellTooltipNotLabel()
+        {
+            var result = MakeResult(targetQuantity: 1, totalCoinCost: 300);
+            result.SellableQuantity = 5;
+            result.NetSaleValue = 1700;
+            result.CraftingProfit = 1400;
+
+            var vm = _builder.Build(result);
+            var sellTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.ProfitFormulaTile && r.Label == "Sell Value");
+
+            Assert.Equal("Sell Value", sellTile.Label);
+            Assert.Contains("5x", sellTile.TooltipText);
+            Assert.Contains("overproduction", sellTile.TooltipText);
+        }
+
+        // --- W4A: currency table rows (alphabetical, Required/Have/Needed) ---
+
+        [Fact]
+        public void CurrencyTable_RowsSortedAlphabeticallyByName()
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 23, Amount = 50 },
-                new CurrencyCost { CurrencyId = 45, Amount = 100 }
+                new CurrencyCost { CurrencyId = 78, Amount = 250 }, // Fine Rift Essence
+                new CurrencyCost { CurrencyId = 79, Amount = 50 },  // Rare Rift Essence
+                new CurrencyCost { CurrencyId = 80, Amount = 100 }  // Masterwork Rift Essence
             });
             var vm = _builder.Build(result);
 
-            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var ccRows = summary.Rows.Where(r => r.RowType == PlanRowType.CurrencyCost).ToList();
-            Assert.Equal(2, ccRows.Count);
-            Assert.Equal("50x Spirit Shards", ccRows[0].Label);
-            Assert.Equal("100x Volatile Magic", ccRows[1].Label);
+            var ccRows = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CurrencyCost).ToList();
+            Assert.Equal(3, ccRows.Count);
+            Assert.Equal("Fine Rift Essence", ccRows[0].Label);
+            Assert.Equal("Masterwork Rift Essence", ccRows[1].Label);
+            Assert.Equal("Rare Rift Essence", ccRows[2].Label);
         }
 
-        // --- M34-B2b (view-model wiring dates to M34-B2a #4): owned/needed
-        // split on Total Cost currency rows ---
+        [Fact]
+        public void CurrencyTable_LabelIsNameOnly_RequiredMovedToQuantity()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 50 }
+            });
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("Spirit Shards", ccRow.Label);
+            Assert.Equal(50, ccRow.Quantity);
+        }
 
         [Fact]
-        public void SummarySection_CurrencyCost_OwnedAmountPresent_SetsCurrencyOwnedQuantity()
+        public void CurrencyTable_HaveIsUnclamped_ExceedsRequired()
         {
+            // W4A (user-mandated): the pre-W4A behavior clamped this to
+            // 500 (the Required amount) - the redesigned "Have" column
+            // must show the REAL holding instead.
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
                 new CurrencyCost { CurrencyId = 23, Amount = 500 }
             });
-            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 200 } };
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 999999 } };
 
             var vm = _builder.Build(result);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
 
-            var ccRow = vm.Sections
-                .First(s => s.SectionType == PlanSectionType.Summary)
-                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
-            Assert.Equal(200, ccRow.CurrencyOwnedQuantity);
+            Assert.Equal(999999, ccRow.CurrencyOwnedQuantity);
+            Assert.Equal(500, ccRow.Quantity);
         }
 
         [Fact]
-        public void SummarySection_CurrencyCost_OwnedExceedsNeeded_ClampedToAmount()
+        public void CurrencyTable_HaveCoversRequired_NeededZeroAndFullyCoveredTrue()
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
@@ -124,15 +304,47 @@ namespace GW2CraftingHelper.Tests.Services
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 999999 } };
 
             var vm = _builder.Build(result);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
 
-            var ccRow = vm.Sections
-                .First(s => s.SectionType == PlanSectionType.Summary)
-                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
-            Assert.Equal(500, ccRow.CurrencyOwnedQuantity);
+            Assert.Equal(0, ccRow.CurrencyNeededQuantity);
+            Assert.True(ccRow.CurrencyFullyCovered);
         }
 
         [Fact]
-        public void SummarySection_CurrencyCost_NoOwnedCurrencyAmounts_CurrencyOwnedQuantityNull()
+        public void CurrencyTable_HaveExactlyEqualsRequired_FullyCoveredTrue()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 200 }
+            });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 200 } };
+
+            var vm = _builder.Build(result);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+
+            Assert.Equal(0, ccRow.CurrencyNeededQuantity);
+            Assert.True(ccRow.CurrencyFullyCovered);
+        }
+
+        [Fact]
+        public void CurrencyTable_HaveBelowRequired_NeededIsGapAndNotCovered()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+            });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 200 } };
+
+            var vm = _builder.Build(result);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+
+            Assert.Equal(200, ccRow.CurrencyOwnedQuantity);
+            Assert.Equal(300, ccRow.CurrencyNeededQuantity);
+            Assert.False(ccRow.CurrencyFullyCovered);
+        }
+
+        [Fact]
+        public void CurrencyTable_NoWalletData_HaveAndNeededNullNotCovered()
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
@@ -140,15 +352,15 @@ namespace GW2CraftingHelper.Tests.Services
             });
 
             var vm = _builder.Build(result);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
 
-            var ccRow = vm.Sections
-                .First(s => s.SectionType == PlanSectionType.Summary)
-                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
             Assert.Null(ccRow.CurrencyOwnedQuantity);
+            Assert.Null(ccRow.CurrencyNeededQuantity);
+            Assert.False(ccRow.CurrencyFullyCovered);
         }
 
         [Fact]
-        public void SummarySection_CurrencyCost_OwnedAmountsMissingThisId_CurrencyOwnedQuantityNull()
+        public void CurrencyTable_WalletMissingThisCurrencyId_HaveAndNeededNull()
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
@@ -157,15 +369,15 @@ namespace GW2CraftingHelper.Tests.Services
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 2, 100 } }; // different currency id
 
             var vm = _builder.Build(result);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
 
-            var ccRow = vm.Sections
-                .First(s => s.SectionType == PlanSectionType.Summary)
-                .Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
             Assert.Null(ccRow.CurrencyOwnedQuantity);
+            Assert.Null(ccRow.CurrencyNeededQuantity);
+            Assert.False(ccRow.CurrencyFullyCovered);
         }
 
         [Fact]
-        public void SummarySection_AstralAcclaim_CorrectName()
+        public void CurrencyTable_AstralAcclaim_CorrectName()
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
@@ -173,32 +385,13 @@ namespace GW2CraftingHelper.Tests.Services
             });
             var vm = _builder.Build(result);
 
-            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
-            Assert.Equal("375x Astral Acclaim", ccRow.Label);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("Astral Acclaim", ccRow.Label);
+            Assert.Equal(375, ccRow.Quantity);
         }
 
         [Fact]
-        public void SummarySection_RiftEssenceCurrencies_CorrectNames()
-        {
-            var result = MakeResult(currencyCosts: new List<CurrencyCost>
-            {
-                new CurrencyCost { CurrencyId = 78, Amount = 250 },
-                new CurrencyCost { CurrencyId = 79, Amount = 50 },
-                new CurrencyCost { CurrencyId = 80, Amount = 100 }
-            });
-            var vm = _builder.Build(result);
-
-            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var ccRows = summary.Rows.Where(r => r.RowType == PlanRowType.CurrencyCost).ToList();
-            Assert.Equal(3, ccRows.Count);
-            Assert.Equal("250x Fine Rift Essence", ccRows[0].Label);
-            Assert.Equal("50x Rare Rift Essence", ccRows[1].Label);
-            Assert.Equal("100x Masterwork Rift Essence", ccRows[2].Label);
-        }
-
-        [Fact]
-        public void SummarySection_UnknownCurrency_NoIdDisplayed()
+        public void CurrencyTable_UnknownCurrency_NoIdDisplayed()
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
@@ -206,16 +399,16 @@ namespace GW2CraftingHelper.Tests.Services
             });
             var vm = _builder.Build(result);
 
-            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
-            Assert.Equal("10x Currency", ccRow.Label);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("Currency", ccRow.Label);
             Assert.DoesNotContain("99999", ccRow.Label);
+            Assert.Equal(10, ccRow.Quantity);
         }
 
         // --- Currency icons (M30 #3) ---
 
         [Fact]
-        public void SummarySection_CurrencyCost_IconUrlFromMetadata_WhenPresent()
+        public void CurrencyTable_IconUrlFromMetadata_WhenPresent()
         {
             var currencyMeta = new Dictionary<int, CurrencyMetadata>
             {
@@ -226,14 +419,13 @@ namespace GW2CraftingHelper.Tests.Services
                 currencyMetadata: currencyMeta);
             var vm = _builder.Build(result);
 
-            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
             Assert.Equal("spirit_shard.png", ccRow.IconUrl);
-            Assert.Equal("50x Spirit Shards", ccRow.Label);
+            Assert.Equal("Spirit Shards", ccRow.Label);
         }
 
         [Fact]
-        public void SummarySection_CurrencyCost_IconUrlNull_WhenMetadataAbsent()
+        public void CurrencyTable_IconUrlNull_WhenMetadataAbsent()
         {
             // No CurrencyMetadata supplied at all (e.g. the pipeline was not
             // wired with a CurrencyMetadataService) - row must render
@@ -244,14 +436,13 @@ namespace GW2CraftingHelper.Tests.Services
             });
             var vm = _builder.Build(result);
 
-            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
             Assert.Null(ccRow.IconUrl);
-            Assert.Equal("50x Spirit Shards", ccRow.Label);
+            Assert.Equal("Spirit Shards", ccRow.Label);
         }
 
         [Fact]
-        public void SummarySection_CurrencyCost_IconUrlNull_WhenIdMissingFromMetadata()
+        public void CurrencyTable_IconUrlNull_WhenIdMissingFromMetadata()
         {
             // Metadata dictionary is present (fetch succeeded) but does not
             // contain this particular currency id - still no placeholder.
@@ -264,14 +455,13 @@ namespace GW2CraftingHelper.Tests.Services
                 currencyMetadata: currencyMeta);
             var vm = _builder.Build(result);
 
-            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
             Assert.Null(ccRow.IconUrl);
-            Assert.Equal("50x Spirit Shards", ccRow.Label);
+            Assert.Equal("Spirit Shards", ccRow.Label);
         }
 
         [Fact]
-        public void SummarySection_CurrencyCost_NamePrefersMetadataOverConstantsFallback()
+        public void CurrencyTable_NamePrefersMetadataOverConstantsFallback()
         {
             // Metadata name deliberately differs from the Gw2Constants
             // offline table to prove the live-fetched name wins.
@@ -284,13 +474,13 @@ namespace GW2CraftingHelper.Tests.Services
                 currencyMetadata: currencyMeta);
             var vm = _builder.Build(result);
 
-            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
-            Assert.Equal("7x Spirit Shard (Live)", ccRow.Label);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("Spirit Shard (Live)", ccRow.Label);
+            Assert.Equal(7, ccRow.Quantity);
         }
 
         [Fact]
-        public void SummarySection_CurrencyCost_IdPresentButEmptyNameAndIcon_FallsBackToConstantsAndNullIcon()
+        public void CurrencyTable_IdPresentButEmptyNameAndIcon_FallsBackToConstantsAndNullIcon()
         {
             // Id IS in the metadata dictionary (fetch succeeded and covers
             // this currency), but the entry's Name/IconUrl are both empty
@@ -307,14 +497,13 @@ namespace GW2CraftingHelper.Tests.Services
                 currencyMetadata: currencyMeta);
             var vm = _builder.Build(result);
 
-            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
-            Assert.Equal("50x Spirit Shards", ccRow.Label);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("Spirit Shards", ccRow.Label);
             Assert.Null(ccRow.IconUrl);
         }
 
         [Fact]
-        public void SummarySection_CurrencyCost_UnknownId_FallsBackToGeneric_EvenWithMetadataPresent()
+        public void CurrencyTable_UnknownId_FallsBackToGeneric_EvenWithMetadataPresent()
         {
             var currencyMeta = new Dictionary<int, CurrencyMetadata>
             {
@@ -325,10 +514,27 @@ namespace GW2CraftingHelper.Tests.Services
                 currencyMetadata: currencyMeta);
             var vm = _builder.Build(result);
 
-            var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
-            var ccRow = summary.Rows.First(r => r.RowType == PlanRowType.CurrencyCost);
-            Assert.Equal("10x Currency", ccRow.Label);
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("Currency", ccRow.Label);
             Assert.Null(ccRow.IconUrl);
+        }
+
+        // --- W4A: footnote row ---
+
+        [Fact]
+        public void Footnote_AlwaysPresentAsLastRow()
+        {
+            var result = MakeResult(totalCoinCost: 500, currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 50 }
+            });
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal(PlanRowType.SummaryFootnote, rows[rows.Count - 1].RowType);
+            Assert.Equal(
+                "Prices are Trading Post data - actual purchase and sale prices are likely to vary.",
+                rows[rows.Count - 1].Label);
         }
     }
 }
