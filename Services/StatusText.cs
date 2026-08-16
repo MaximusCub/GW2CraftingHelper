@@ -25,10 +25,10 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// M39 (snapshot search, d1-snapshot-about-settings.md Feature 1):
         /// formats a snapshot's age for the Snapshot tab's staleness suffix,
-        /// e.g. "Updated - 3:41 PM (2m ago)". A negative age (CapturedAt
-        /// momentarily ahead of the local clock - e.g. minor clock skew
-        /// right after a fetch) is treated as zero rather than shown as a
-        /// negative duration.
+        /// e.g. "Updated - Aug 15, 2026 3:41 PM (2m ago)". A negative age
+        /// (CapturedAt momentarily ahead of the local clock - e.g. minor
+        /// clock skew right after a fetch) is treated as zero rather than
+        /// shown as a negative duration.
         /// </summary>
         public static string ForSnapshotAge(TimeSpan age)
         {

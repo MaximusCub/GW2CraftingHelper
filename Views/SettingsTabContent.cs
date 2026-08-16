@@ -387,7 +387,7 @@ namespace GW2CraftingHelper.Views
 
             if (invalidCount == 0)
             {
-                _homesteadStatusLabel.Text = $"Saved - {DateTime.Now:t}";
+                _homesteadStatusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
                 _homesteadStatusLabel.TextColor = SuccessTextColor;
             }
             else
@@ -647,7 +647,7 @@ namespace GW2CraftingHelper.Views
 
             if (invalidCount == 0)
             {
-                _logStatusLabel.Text = $"Saved - {DateTime.Now:t}";
+                _logStatusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
                 _logStatusLabel.TextColor = SuccessTextColor;
             }
             else
@@ -782,7 +782,7 @@ namespace GW2CraftingHelper.Views
 
             if (invalidCount == 0)
             {
-                _snapshotStatusLabel.Text = $"Saved - {DateTime.Now:t}";
+                _snapshotStatusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
                 _snapshotStatusLabel.TextColor = SuccessTextColor;
             }
             else
@@ -994,7 +994,7 @@ namespace GW2CraftingHelper.Views
 
             if (invalidCount == 0)
             {
-                _statusLabel.Text = $"Saved - {DateTime.Now:t}";
+                _statusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
                 _statusLabel.TextColor = SuccessTextColor;
             }
             else
