@@ -123,6 +123,18 @@ namespace GW2CraftingHelper.Services
             // (M34-B1 #1 - gw2e parity), instead of trusting the sum of
             // several already-independently-ceil'd per-occurrence costs.
             public VendorBatchSolver.VendorOfferBatch? VendorBatch;
+
+            // AUDIT ROW 20/38 (gw2e price-side fallback parity): true only
+            // for a BuyFromTp decision whose committed unit price came from
+            // the NON-preferred TP side (see GetUnitPrice's fallback
+            // overload) because the basis-preferred side had no listings
+            // (0). False for every other Source - Commit gates it on
+            // src == AcquisitionSource.BuyFromTp so a stale true from a
+            // sibling buyTotalCost computation can never leak onto a
+            // Craft/BuyFromVendor/UnknownSource decision. Surfaced on the
+            // public SolverDecision so CraftingTreeBuilder can flag the
+            // affected CraftingTreeNode for the unit-price tooltip caveat.
+            public bool PriceSideFellBack;
         }
 
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
@@ -361,7 +373,8 @@ namespace GW2CraftingHelper.Services
                     VendorComponentCostsUnreliable = kvp.Value.VendorComponentCostsUnreliable,
                     CanCraft = kvp.Value.CanCraft,
                     CanBuyTp = kvp.Value.CanBuyTp,
-                    CanBuyVendor = kvp.Value.CanBuyVendor
+                    CanBuyVendor = kvp.Value.CanBuyVendor,
+                    PriceSideFellBack = kvp.Value.PriceSideFellBack
                 };
             }
 
@@ -431,7 +444,7 @@ namespace GW2CraftingHelper.Services
                 return 0L;
             }
 
-            long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices, priceBasis);
+            long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices, priceBasis, out bool buyPriceSideFellBack);
 
             // Evaluate vendor offers. Offers costing only coin (directly or via
             // TP-priced item barter) are comparable with TP/craft coin costs and
@@ -772,7 +785,13 @@ namespace GW2CraftingHelper.Services
                     CanBuyTp = canBuyTp,
                     CanBuyVendor = canBuyVendor,
                     HasUnvaluedCurrency = hasUnvaluedCurrency,
-                    VendorBatch = vendorBatch
+                    VendorBatch = vendorBatch,
+                    // AUDIT ROW 20/38: only ever true for the committed
+                    // Source actually being BuyFromTp - buyPriceSideFellBack
+                    // is computed unconditionally above regardless of which
+                    // Source ultimately wins, so this gate stops it leaking
+                    // onto a Craft/BuyFromVendor/UnknownSource commit.
+                    PriceSideFellBack = src == AcquisitionSource.BuyFromTp && buyPriceSideFellBack
                 };
                 return comparisonValue;
             }
@@ -1421,11 +1440,13 @@ namespace GW2CraftingHelper.Services
         private long? GetBuyCost(
             int itemId, int quantity,
             IReadOnlyDictionary<int, ItemPrice> prices,
-            PriceBasis priceBasis)
+            PriceBasis priceBasis,
+            out bool priceSideFellBack)
         {
+            priceSideFellBack = false;
             if (prices.TryGetValue(itemId, out var price))
             {
-                int unitPrice = GetUnitPrice(price, priceBasis);
+                int unitPrice = GetUnitPrice(price, priceBasis, out priceSideFellBack);
                 if (unitPrice > 0)
                 {
                     return (long)quantity * unitPrice;
@@ -1440,9 +1461,43 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         internal static int GetUnitPrice(ItemPrice price, PriceBasis priceBasis)
         {
-            return priceBasis == PriceBasis.BuyOrder
+            return GetUnitPrice(price, priceBasis, out _);
+        }
+
+        /// <summary>
+        /// AUDIT ROW 20/38 (gw2e price-side fallback parity): same as the
+        /// two-arg overload above, but also reports whether the preferred
+        /// side was empty (0) and this item's OTHER TP side was used
+        /// instead - gw2e's own live behavior (preferred side first,
+        /// same-item cross-side fallback when missing/zero, unpriced only
+        /// when BOTH sides are empty). Previously an item with an empty
+        /// preferred side returned 0 outright, which GetBuyCost's `> 0`
+        /// check then treated as fully unpriceable - dropping the BuyFromTp
+        /// option entirely even though the OTHER side had a real listing.
+        /// This is the single site PlanSolver.GetBuyCost and
+        /// VendorBatchSolver's per-item TP-valued cost-line pricing both
+        /// route through (via the two-arg overload), so both gain the
+        /// fallback consistently without duplicating the side-selection
+        /// logic. 0 on both sides still returns 0 with the out param false -
+        /// the existing "unpriceable" handling at every call site is
+        /// unchanged.
+        /// </summary>
+        internal static int GetUnitPrice(ItemPrice price, PriceBasis priceBasis, out bool priceSideFellBack)
+        {
+            int preferred = priceBasis == PriceBasis.BuyOrder
                 ? price.SellInstant
                 : price.BuyInstant;
+            if (preferred > 0)
+            {
+                priceSideFellBack = false;
+                return preferred;
+            }
+
+            int otherSide = priceBasis == PriceBasis.BuyOrder
+                ? price.BuyInstant
+                : price.SellInstant;
+            priceSideFellBack = otherSide > 0;
+            return otherSide;
         }
     }
 }
