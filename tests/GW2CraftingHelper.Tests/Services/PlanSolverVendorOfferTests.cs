@@ -352,5 +352,136 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromVendor, plan.Steps[0].Source);
             Assert.Equal(300, plan.TotalCoinCost);
         }
+
+        // --- W4B: SolverDecision.VendorItemCosts/VendorHasRawCoin ---
+
+        [Fact]
+        public void MixedItemAndCurrencyOffer_PopulatesVendorItemCosts_AndNotHasRawCoin()
+        {
+            // 5x item 42 (TP 10 each = 50) + 3x currency 23, no raw coin.
+            var tree = Leaf(1, 2);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(
+                1, new[] { (42, 5) }, new[] { (23, 3) });
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var decision = result.Decisions.Values.Single(d => d.Source == AcquisitionSource.BuyFromVendor);
+
+            Assert.False(decision.VendorHasRawCoin);
+            Assert.NotNull(decision.VendorItemCosts);
+            Assert.Single(decision.VendorItemCosts);
+            Assert.Equal(42, decision.VendorItemCosts[0].ItemId);
+            Assert.Equal(10, decision.VendorItemCosts[0].Quantity); // 5 * qty 2
+            Assert.Equal(100, decision.VendorItemCosts[0].GoldValue); // 10 * 10 unit price
+
+            Assert.NotNull(decision.VendorCurrencyCosts);
+            Assert.Single(decision.VendorCurrencyCosts);
+            Assert.Equal(23, decision.VendorCurrencyCosts[0].Id);
+            Assert.Equal(6, decision.VendorCurrencyCosts[0].Count); // 3 * qty 2
+
+            // The item's folded gold is part of TotalCost/plan.TotalCoinCost
+            // - the exact same number GoldValue reports, never a divergent
+            // recompute.
+            Assert.Equal(100, decision.TotalCost);
+        }
+
+        [Fact]
+        public void RawCoinPlusItemOffer_HasRawCoinTrue()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(
+                1, new[] { (42, 2) }, currencyCostLines: null, coinCost: 5);
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var decision = result.Decisions.Values.Single(d => d.Source == AcquisitionSource.BuyFromVendor);
+
+            Assert.True(decision.VendorHasRawCoin);
+            Assert.NotNull(decision.VendorItemCosts);
+            Assert.Single(decision.VendorItemCosts);
+            Assert.Equal(20, decision.VendorItemCosts[0].GoldValue); // 2 * 10
+            Assert.Equal(25, decision.TotalCost); // 5 raw coin + 20 item-folded
+        }
+
+        [Fact]
+        public void PureItemOffer_VendorItemCostsPopulated_HasRawCoinFalse()
+        {
+            // Single-kind (item-only) offer - still populates VendorItemCosts
+            // (CraftingTreeBuilder's own kind-count gate is what decides
+            // whether a leaf gets synthesized, not this raw field).
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } },
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(1, new[] { (42, 5) }, currencyCostLines: null);
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var decision = result.Decisions.Values.Single(d => d.Source == AcquisitionSource.BuyFromVendor);
+
+            Assert.False(decision.VendorHasRawCoin);
+            Assert.Null(decision.VendorCurrencyCosts);
+            Assert.NotNull(decision.VendorItemCosts);
+            Assert.Single(decision.VendorItemCosts);
+            Assert.Equal(50, decision.VendorItemCosts[0].GoldValue);
+        }
+
+        [Fact]
+        public void PureCoinOffer_VendorItemCostsNull_HasRawCoinTrue()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 100) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var decision = result.Decisions.Values.Single(d => d.Source == AcquisitionSource.BuyFromVendor);
+
+            Assert.True(decision.VendorHasRawCoin);
+            Assert.Null(decision.VendorItemCosts);
+            Assert.Null(decision.VendorCurrencyCosts);
+        }
+
+        [Fact]
+        public void NonVendorDecision_VendorItemCostsNull_HasRawCoinFalse()
+        {
+            var tree = Leaf(1, 5);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 50 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, null);
+            var decision = result.Decisions.Values.Single(d => d.Source == AcquisitionSource.BuyFromTp);
+
+            Assert.Null(decision.VendorItemCosts);
+            Assert.False(decision.VendorHasRawCoin);
+        }
     }
 }

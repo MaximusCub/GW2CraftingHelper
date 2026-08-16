@@ -5,6 +5,7 @@ using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
 using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
+using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
@@ -989,6 +990,305 @@ namespace GW2CraftingHelper.Tests.Services
             foreach (var child in node.Children)
             {
                 AssertChildrenNeverNull(child);
+            }
+        }
+
+        // ---- W4B: vendor cost-component leaves ----
+
+        /// <summary>
+        /// Mixed offer: 5x item 42 (TP 10 each) + 3x currency 23 (no raw
+        /// coin) - 2 kinds, so leaves ARE synthesized. Real solve, real
+        /// builder, exactly like BuildViaRealSolver but threading the W4B
+        /// currencyMetadata/owned* params.
+        /// </summary>
+        private static (CraftingTreeNode Node, SolverDecision Decision) BuildMixedVendorNode(
+            int itemCostItemId = 42,
+            int itemCostCount = 5,
+            int currencyId = 23,
+            int currencyCount = 3,
+            int quantity = 2,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts = null,
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts = null)
+        {
+            var tree = Leaf(1, quantity);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { itemCostItemId, new ItemPrice { ItemId = itemCostItemId, BuyInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(
+                1, new[] { (itemCostItemId, itemCostCount) }, new[] { (currencyId, currencyCount) });
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var metadata = Meta((itemCostItemId, "Glob of Ectoplasm", "ecto.png"));
+
+            var solver = new PlanSolver();
+            var solveResult = solver.Solve(tree, prices, vendorOffers);
+            var decision = solveResult.Decisions.Values.Single(d => d.Source == AcquisitionSource.BuyFromVendor);
+
+            var builder = new CraftingTreeBuilder();
+            var node = builder.BuildTree(
+                tree, solveResult.Decisions, metadata,
+                currencyMetadata: currencyMetadata,
+                ownedCurrencyAmounts: ownedCurrencyAmounts,
+                ownedVendorItemAmounts: ownedVendorItemAmounts);
+            return (node, decision);
+        }
+
+        [Fact]
+        public void MixedOffer_SynthesizesItemAndCurrencyLeaves()
+        {
+            var (node, decision) = BuildMixedVendorNode();
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.Equal(2, node.Children.Count);
+
+            var itemLeaf = node.Children.Single(c => c.ItemId == 42);
+            Assert.True(itemLeaf.IsCostComponent);
+            Assert.Equal("Glob of Ectoplasm", itemLeaf.Name);
+            Assert.Equal("ecto.png", itemLeaf.IconUrl);
+            Assert.Equal(10, itemLeaf.Quantity); // 5 * qty 2
+            Assert.Equal(100, itemLeaf.SubtreeCost); // 10 * unit price 10
+            Assert.Empty(itemLeaf.Children);
+
+            var currencyLeaf = node.Children.Single(c => c.ItemId == 23);
+            Assert.True(currencyLeaf.IsCostComponent);
+            Assert.Equal(6, currencyLeaf.Quantity); // 3 * qty 2
+            // Currency leaf's cost cell is deliberately blank - the
+            // quantity IS the cost.
+            Assert.Null(currencyLeaf.SubtreeCost);
+
+            // Parent's own SubtreeCost equals the item leaf's exact
+            // GoldValue - the same number, never independently recomputed.
+            Assert.Equal(itemLeaf.SubtreeCost, node.SubtreeCost);
+            Assert.Equal(decision.TotalCost, node.SubtreeCost);
+        }
+
+        [Fact]
+        public void MixedOffer_NoDecisionPillFields_NoRecipeId()
+        {
+            var (node, _) = BuildMixedVendorNode();
+            var itemLeaf = node.Children.Single(c => c.ItemId == 42);
+
+            // Component leaves have no feasible-source flags at all - never
+            // override-clickable (see DecisionPillPlannerTests for the pill
+            // vocabulary itself).
+            Assert.False(itemLeaf.CanCraft);
+            Assert.False(itemLeaf.CanBuyTp);
+            Assert.False(itemLeaf.CanBuyVendor);
+            Assert.Null(itemLeaf.RecipeId);
+            Assert.False(itemLeaf.IsReferenceBranch);
+        }
+
+        [Fact]
+        public void SingleKindVendorOffer_ItemOnly_NoLeaves()
+        {
+            // Pure-item offer (item folds directly to coin) - only 1 kind,
+            // so the unchanged path applies: no leaves at all.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(1, new[] { (42, 5) }, currencyCostLines: null);
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var metadata = Meta((1, "Vendor Item", "v.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.Empty(node.Children);
+            Assert.Equal(50, node.SubtreeCost);
+        }
+
+        [Fact]
+        public void SingleKindVendorOffer_CurrencyOnly_NoLeaves()
+        {
+            var tree = Leaf(1, 5);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, coinCost: 0, currencyId: 23, currencyCount: 10) } }
+            };
+            var metadata = Meta((1, "Vendor Item", "v.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.Empty(node.Children);
+        }
+
+        [Fact]
+        public void SingleKindVendorOffer_CoinOnly_NoLeaves()
+        {
+            var tree = Leaf(1, 3);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 50) } }
+            };
+            var metadata = Meta((1, "Vendor Item", "v.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.Empty(node.Children);
+            Assert.Equal(150, node.SubtreeCost);
+        }
+
+        [Fact]
+        public void CoinPlusCurrencyOffer_TwoKinds_SynthesizesCurrencyLeafOnly_NoCoinLeaf()
+        {
+            // Coin + currency, no item - 2 kinds, so leaves ARE
+            // synthesized, but only for the currency (coin never gets its
+            // own leaf - see BuildVendorCostComponentLeaves' doc comment).
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, coinCost: 20, currencyId: 23, currencyCount: 10) } }
+            };
+            var metadata = Meta((1, "Vendor Item", "v.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            Assert.Single(node.Children);
+            var currencyLeaf = node.Children[0];
+            Assert.True(currencyLeaf.IsCostComponent);
+            Assert.Equal(23, currencyLeaf.ItemId);
+            Assert.Equal(10, currencyLeaf.Quantity);
+            Assert.Equal(20, node.SubtreeCost); // raw coin folded silently, no leaf
+        }
+
+        [Fact]
+        public void MixedOffer_HavePill_FullCoverage()
+        {
+            var ownedItems = new Dictionary<int, int> { { 42, 999 } }; // more than needed (10)
+            var (node, _) = BuildMixedVendorNode(ownedVendorItemAmounts: ownedItems);
+            var itemLeaf = node.Children.Single(c => c.ItemId == 42);
+
+            Assert.Equal(10, itemLeaf.ComponentOwnedQuantity); // clamped to need
+            // Quantity/cost themselves are UNCHANGED by ownership.
+            Assert.Equal(10, itemLeaf.Quantity);
+            Assert.Equal(100, itemLeaf.SubtreeCost);
+        }
+
+        [Fact]
+        public void MixedOffer_HavePill_PartialCoverage()
+        {
+            var ownedItems = new Dictionary<int, int> { { 42, 4 } }; // less than needed (10)
+            var (node, _) = BuildMixedVendorNode(ownedVendorItemAmounts: ownedItems);
+            var itemLeaf = node.Children.Single(c => c.ItemId == 42);
+
+            Assert.Equal(4, itemLeaf.ComponentOwnedQuantity);
+            Assert.Equal(10, itemLeaf.Quantity);
+        }
+
+        [Fact]
+        public void MixedOffer_HavePill_NoCoverage_ZeroOwnedQuantity()
+        {
+            var (node, _) = BuildMixedVendorNode(ownedVendorItemAmounts: null);
+            var itemLeaf = node.Children.Single(c => c.ItemId == 42);
+            var currencyLeaf = node.Children.Single(c => c.ItemId == 23);
+
+            Assert.Equal(0, itemLeaf.ComponentOwnedQuantity);
+            Assert.Equal(0, currencyLeaf.ComponentOwnedQuantity);
+        }
+
+        [Fact]
+        public void MixedOffer_CurrencyLeaf_HavePill_FromOwnedCurrencyAmounts()
+        {
+            var ownedCurrency = new Dictionary<int, int> { { 23, 6 } }; // exact coverage (need 6)
+            var (node, _) = BuildMixedVendorNode(ownedCurrencyAmounts: ownedCurrency);
+            var currencyLeaf = node.Children.Single(c => c.ItemId == 23);
+
+            Assert.Equal(6, currencyLeaf.ComponentOwnedQuantity);
+            Assert.Equal(6, currencyLeaf.Quantity);
+        }
+
+        [Fact]
+        public void MixedOffer_CurrencyLeaf_NameIconFromCurrencyMetadata()
+        {
+            var currencyMeta = new Dictionary<int, CurrencyMetadata>
+            {
+                { 23, new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "shard.png" } }
+            };
+            var (node, _) = BuildMixedVendorNode(currencyMetadata: currencyMeta);
+            var currencyLeaf = node.Children.Single(c => c.ItemId == 23);
+
+            Assert.Equal("Spirit Shards", currencyLeaf.Name);
+            Assert.Equal("shard.png", currencyLeaf.IconUrl);
+        }
+
+        [Fact]
+        public void MixedOffer_CurrencyLeaf_NoMetadata_FallsBackToOfflineName()
+        {
+            var (node, _) = BuildMixedVendorNode(currencyId: 23);
+            var currencyLeaf = node.Children.Single(c => c.ItemId == 23);
+
+            // Gw2Constants' offline fallback for id 23 is "Spirit Shards" -
+            // see CurrencyDisplayResolver.ResolveName's fallback chain.
+            Assert.Equal("Spirit Shards", currencyLeaf.Name);
+        }
+
+        [Fact]
+        public void ComponentLeafNodeIds_StableAcrossTwoBuilds()
+        {
+            var tree = Leaf(1, 2);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(1, new[] { (42, 5) }, new[] { (23, 3) });
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var metadata = Meta((42, "Ecto", "e.png"));
+            var solver = new PlanSolver();
+            var builder = new CraftingTreeBuilder();
+
+            // First build (assigns real NodeIds).
+            var solveResult1 = solver.Solve(tree, prices, vendorOffers);
+            var node1 = builder.BuildTree(tree, solveResult1.Decisions, metadata);
+
+            // Second build against the SAME tree object, assignNodeIds:
+            // false - mirrors ResolveWithOverrides' local re-solve.
+            var solveResult2 = solver.Solve(
+                tree, prices, vendorOffers, PriceBasis.InstantBuy,
+                overrides: null, currencyValuation: null,
+                assignNodeIds: false);
+            var node2 = builder.BuildTree(tree, solveResult2.Decisions, metadata);
+
+            Assert.Equal(node1.NodeId, node2.NodeId);
+            var itemLeaf1 = node1.Children.Single(c => c.ItemId == 42);
+            var itemLeaf2 = node2.Children.Single(c => c.ItemId == 42);
+            var currencyLeaf1 = node1.Children.Single(c => c.ItemId == 23);
+            var currencyLeaf2 = node2.Children.Single(c => c.ItemId == 23);
+
+            Assert.Equal(itemLeaf1.NodeId, itemLeaf2.NodeId);
+            Assert.Equal(currencyLeaf1.NodeId, currencyLeaf2.NodeId);
+            // Every synthetic id is negative - cannot collide with a real
+            // (always >= 0) RecipeNodeIds-assigned id.
+            Assert.True(itemLeaf1.NodeId < 0);
+            Assert.True(currencyLeaf1.NodeId < 0);
+            Assert.NotEqual(itemLeaf1.NodeId, currencyLeaf1.NodeId);
+        }
+
+        [Fact]
+        public void ComponentLeaves_DoNotCollideWithRealNodeIds()
+        {
+            var (node, _) = BuildMixedVendorNode();
+            var realIds = new HashSet<int> { node.NodeId };
+            foreach (var leaf in node.Children)
+            {
+                Assert.DoesNotContain(leaf.NodeId, realIds);
+                Assert.True(leaf.NodeId < 0);
             }
         }
     }

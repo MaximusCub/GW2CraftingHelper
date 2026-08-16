@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -1381,6 +1382,98 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(loaded);
             Assert.Equal(1, warnCount());
             Assert.NotNull(lastMessage());
+        }
+
+        // ---- W4B (vendor cost-component leaves): persistence round-trip
+        // + PlanStructuralValidator acceptance ----
+
+        /// <summary>
+        /// Real pipeline, real VendorOfferStore-backed offer mixing a
+        /// TP-valued Item cost line with a non-coin currency cost line (2
+        /// kinds) - so CraftingTreeBuilder synthesizes component leaves
+        /// (see CraftingPlanPipelineTests.GenerateMixedVendorPlanAsync for
+        /// the sibling copy of this fixture shape). Mirrors this file's own
+        /// "build a REAL CraftingPlanResult, never hand-construct one"
+        /// discipline (see this class's own header comment).
+        /// </summary>
+        private static async Task<CraftingPlanResult> GenerateMixedVendorResultAsync()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1 - vendor-only.
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(42, buyUnitPrice: 10, sellUnitPrice: 20);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Amalgamated Rift Essence", "essence.png");
+            itemApi.AddItem(42, "Glob of Ectoplasm", "ecto.png");
+
+            using (var tmp = new TempDirectory())
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tmp.Path, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-mixed-w4b-persist",
+                        OutputItemId = 1,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Item", Id = 42, Count = 5 },
+                            new CostLine { Type = "Currency", Id = 23, Count = 3 }
+                        },
+                        MerchantName = "Test NPC",
+                        Locations = new List<string>()
+                    }
+                });
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store);
+
+                return await pipeline.GenerateStructuredAsync(1, 2, null, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy);
+            }
+        }
+
+        [Fact]
+        public async Task Save_Load_RoundTripsComponentLeaves_AndPassesStructuralValidation()
+        {
+            var result = await GenerateMixedVendorResultAsync();
+            Assert.Equal(2, result.CraftingTree.Children.Count); // sanity: leaves were actually built
+
+            _store.Save(Wrap(result, new DateTime(2026, 8, 15, 9, 0, 0, DateTimeKind.Local), quantity: 2));
+
+            // A successful non-null LoadLatest() already proves
+            // PlanStructuralValidator.IsStructurallyValid accepted the
+            // component leaves (a rejection returns null - see
+            // PlanStoreHelpers.DeserializePersistedPlan/
+            // PlanStructuralValidator's own doc comment): IsValidCraftingTreeNode's
+            // recursive Children walk covers these leaves the same as any
+            // other node, with no W4B-specific change needed there.
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.NotNull(loaded.Result.CraftingTree);
+            Assert.Equal(2, loaded.Result.CraftingTree.Children.Count);
+
+            var itemLeaf = loaded.Result.CraftingTree.Children.Single(c => c.ItemId == 42);
+            Assert.True(itemLeaf.IsCostComponent);
+            Assert.Equal("Glob of Ectoplasm", itemLeaf.Name);
+            Assert.Equal(10, itemLeaf.Quantity);
+            Assert.Equal(200, itemLeaf.SubtreeCost);
+            Assert.Equal(0, itemLeaf.ComponentOwnedQuantity);
+            Assert.Equal(result.CraftingTree.Children.Single(c => c.ItemId == 42).NodeId, itemLeaf.NodeId);
+
+            var currencyLeaf = loaded.Result.CraftingTree.Children.Single(c => c.ItemId == 23);
+            Assert.True(currencyLeaf.IsCostComponent);
+            Assert.Equal(6, currencyLeaf.Quantity);
+            Assert.Null(currencyLeaf.SubtreeCost);
         }
     }
 }

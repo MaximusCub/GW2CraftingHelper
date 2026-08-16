@@ -366,6 +366,194 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
         }
 
+        // --- W4B: vendor cost-component leaves, end-to-end through the real pipeline ---
+
+        /// <summary>
+        /// Real field case shape: a vendor-only item (no recipe, no TP
+        /// price) whose winning offer mixes a TP-valued Item cost line
+        /// (Globs of Ectoplasm, id 42) with a non-coin currency cost line
+        /// (id 23) - 2 kinds, so CraftingTreeBuilder synthesizes component
+        /// leaves. Proves the metadata-fetch widening (item 42's real name/
+        /// icon resolve, not "Unknown Item"), the leaf synthesis itself
+        /// through the full pipeline (not just the unit-level builder
+        /// tests), and the parent/leaf consistency end to end.
+        /// </summary>
+        private static async Task<(CraftingPlanPipeline Pipeline, CraftingPlanResult Result)> GenerateMixedVendorPlanAsync(
+            AccountSnapshot snapshot = null)
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1 - vendor-only, matching the real
+            // Amalgamated Rift Essence field case.
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(42, buyUnitPrice: 10, sellUnitPrice: 20);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Amalgamated Rift Essence", "essence.png");
+            itemApi.AddItem(42, "Glob of Ectoplasm", "ecto.png");
+
+            CraftingPlanPipeline pipeline;
+            CraftingPlanResult result;
+            // Scoped like every other tmp-dir call site in this file -
+            // VendorOfferStore loads everything it needs into memory
+            // inside this block; nothing after GenerateStructuredAsync
+            // returns re-reads the directory (ResolveWithOverrides reuses
+            // the in-memory PlanSolveContext.VendorOffers captured here,
+            // never the store itself again).
+            using (var tmp = new TempDirectory())
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tmp.Path, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-mixed-w4b",
+                        OutputItemId = 1,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Item", Id = 42, Count = 5 },
+                            new CostLine { Type = "Currency", Id = 23, Count = 3 }
+                        },
+                        MerchantName = "Test NPC",
+                        Locations = new List<string>()
+                    }
+                });
+
+                pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store,
+                    reducer: new InventoryReducer());
+
+                result = await pipeline.GenerateStructuredAsync(1, 2, snapshot, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy);
+            }
+            return (pipeline, result);
+        }
+
+        [Fact]
+        public async Task MixedVendorOffer_SynthesizesLeavesWithRealMetadata()
+        {
+            var (_, result) = await GenerateMixedVendorPlanAsync();
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, result.Plan.Steps[0].Source);
+            Assert.NotNull(result.CraftingTree);
+            Assert.Equal(2, result.CraftingTree.Children.Count);
+
+            var itemLeaf = result.CraftingTree.Children.Single(c => c.ItemId == 42);
+            Assert.True(itemLeaf.IsCostComponent);
+            // Metadata-fetch widening: item 42 is never a recipe-tree
+            // ingredient (only a vendor CostLines entry), so its real
+            // name/icon only resolves if AddVendorItemComponentIds worked.
+            Assert.Equal("Glob of Ectoplasm", itemLeaf.Name);
+            Assert.Equal("ecto.png", itemLeaf.IconUrl);
+            Assert.Equal(10, itemLeaf.Quantity); // 5 * requested qty 2
+            Assert.Equal(200, itemLeaf.SubtreeCost); // 10 * unit price 10
+
+            var currencyLeaf = result.CraftingTree.Children.Single(c => c.ItemId == 23);
+            Assert.True(currencyLeaf.IsCostComponent);
+            Assert.Equal(6, currencyLeaf.Quantity);
+            Assert.Null(currencyLeaf.SubtreeCost);
+
+            // Parent total == the item leaf's exact gold value (no raw
+            // coin, no other component in this offer).
+            Assert.Equal(itemLeaf.SubtreeCost, result.CraftingTree.SubtreeCost);
+        }
+
+        [Fact]
+        public async Task MixedVendorOffer_NoSnapshot_HavePillDataAbsent()
+        {
+            var (_, result) = await GenerateMixedVendorPlanAsync(snapshot: null);
+
+            Assert.Null(result.SolveContext.OwnedVendorItemAmounts);
+            var itemLeaf = result.CraftingTree.Children.Single(c => c.ItemId == 42);
+            Assert.Equal(0, itemLeaf.ComponentOwnedQuantity);
+        }
+
+        [Fact]
+        public async Task MixedVendorOffer_WithSnapshot_HavePillDataFlowsToLeaves()
+        {
+            var snapshot = new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry { ItemId = 42, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
+                },
+                Wallet = new List<SnapshotWalletEntry>
+                {
+                    new SnapshotWalletEntry { CurrencyId = 23, Value = 999 }
+                }
+            };
+
+            var (_, result) = await GenerateMixedVendorPlanAsync(snapshot);
+
+            Assert.NotNull(result.SolveContext.OwnedVendorItemAmounts);
+            Assert.Equal(4, result.SolveContext.OwnedVendorItemAmounts[42]);
+
+            var itemLeaf = result.CraftingTree.Children.Single(c => c.ItemId == 42);
+            Assert.Equal(4, itemLeaf.ComponentOwnedQuantity); // partial: need 10, own 4
+            Assert.Equal(10, itemLeaf.Quantity); // unchanged by ownership
+
+            var currencyLeaf = result.CraftingTree.Children.Single(c => c.ItemId == 23);
+            Assert.Equal(6, currencyLeaf.ComponentOwnedQuantity); // clamped to need (own 999, need 6)
+        }
+
+        [Fact]
+        public async Task MixedVendorOffer_ResolveWithOverrides_LeavesSurviveRoundTrip_StableIds()
+        {
+            var (pipeline, result) = await GenerateMixedVendorPlanAsync();
+            var itemLeafBefore = result.CraftingTree.Children.Single(c => c.ItemId == 42);
+            var currencyLeafBefore = result.CraftingTree.Children.Single(c => c.ItemId == 23);
+
+            // A plain no-op re-solve (null overrides), exactly what a
+            // decision-pill click on some OTHER node in a real plan would
+            // trigger - proves the component leaves survive
+            // ResolveWithOverrides' rebuild with the SAME NodeIds (so
+            // TreeSectionController's expansion-state dictionary is not
+            // silently orphaned).
+            var resolved = pipeline.ResolveWithOverrides(result.SolveContext, null);
+
+            Assert.NotNull(resolved.CraftingTree);
+            Assert.Equal(2, resolved.CraftingTree.Children.Count);
+            var itemLeafAfter = resolved.CraftingTree.Children.Single(c => c.ItemId == 42);
+            var currencyLeafAfter = resolved.CraftingTree.Children.Single(c => c.ItemId == 23);
+
+            Assert.Equal(itemLeafBefore.NodeId, itemLeafAfter.NodeId);
+            Assert.Equal(currencyLeafBefore.NodeId, currencyLeafAfter.NodeId);
+            Assert.Equal(itemLeafBefore.SubtreeCost, itemLeafAfter.SubtreeCost);
+        }
+
+        [Fact]
+        public async Task MixedVendorOffer_BuildPresetOverrides_WalksSolverTreeOnly_UnaffectedByComponentLeaves()
+        {
+            // BuildPresetOverrides/CollectPresetOverrides walk
+            // PlanSolveContext.Tree (RecipeNode/RecipeOption) - a
+            // completely separate object graph from CraftingTreeNode/the
+            // synthetic component leaves, which never correspond to any
+            // RecipeNode at all. This proves it end to end: building a
+            // preset override map and resolving with it neither throws nor
+            // somehow keys an override off a negative synthetic NodeId (a
+            // RecipeNode's own NodeId is always >= 0 - see RecipeNodeIds).
+            var (pipeline, result) = await GenerateMixedVendorPlanAsync();
+
+            var buyAll = CraftingPlanPipeline.BuildPresetOverrides(result.SolveContext, AcquisitionSource.BuyFromTp);
+            Assert.All(buyAll.Keys, nodeId => Assert.True(nodeId >= 0));
+
+            var resolved = pipeline.ResolveWithOverrides(result.SolveContext, buyAll);
+
+            // Item 1 has no TP price at all, so the "buy all" preset cannot
+            // apply to it (infeasible override is ignored) - it keeps its
+            // vendor decision and its component leaves, proving the preset
+            // build/resolve pass never disturbed them.
+            Assert.Equal(AcquisitionSource.BuyFromVendor, resolved.Plan.Steps[0].Source);
+            Assert.Equal(2, resolved.CraftingTree.Children.Count);
+        }
+
         // M38 WP-14: this test used to prove the (now-deleted, test-only)
         // GenerateAsync produced the same base plan as GenerateStructuredAsync
         // with a null snapshot, plus the latter's extra structured fields.

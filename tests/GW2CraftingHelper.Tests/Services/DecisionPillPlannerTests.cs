@@ -22,7 +22,8 @@ namespace GW2CraftingHelper.Tests.Services
             CraftingDecision decision,
             bool canCraft = false, bool canBuyTp = false, bool canBuyVendor = false,
             string acquisitionBadge = null, int ownedQuantityUsed = 0, bool isIgnored = false,
-            bool isAchievementBitDeduped = false, int quantity = 1)
+            bool isAchievementBitDeduped = false, int quantity = 1,
+            bool isCostComponent = false, int componentOwnedQuantity = 0)
         {
             return new CraftingTreeNode
             {
@@ -37,7 +38,9 @@ namespace GW2CraftingHelper.Tests.Services
                 AcquisitionBadge = acquisitionBadge,
                 OwnedQuantityUsed = ownedQuantityUsed,
                 IsIgnored = isIgnored,
-                IsAchievementBitDeduped = isAchievementBitDeduped
+                IsAchievementBitDeduped = isAchievementBitDeduped,
+                IsCostComponent = isCostComponent,
+                ComponentOwnedQuantity = componentOwnedQuantity
             };
         }
 
@@ -531,6 +534,78 @@ namespace GW2CraftingHelper.Tests.Services
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
             Assert.Equal(2, specs.Count); // UNKNOWN + IGNORE
             Assert.Equal("UNKNOWN", specs[0].Text);
+        }
+
+        // ---- W4B: cost-component leaves - informational-only pill vocabulary ----
+
+        [Fact]
+        public void CostComponent_NoOwnership_NoPill()
+        {
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 5, componentOwnedQuantity: 0);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Empty(specs);
+        }
+
+        [Fact]
+        public void CostComponent_PartialOwnership_OwnedInfoPill()
+        {
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 10, componentOwnedQuantity: 4);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("HAVE 4/10 NEEDED", specs[0].Text);
+            Assert.Equal(PillKind.OwnedInfo, specs[0].Kind);
+            Assert.Null(specs[0].Source);
+        }
+
+        [Fact]
+        public void CostComponent_FullOwnership_PlainHavePill()
+        {
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 6, componentOwnedQuantity: 6);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("HAVE", specs[0].Text);
+            Assert.Equal(PillKind.Have, specs[0].Kind);
+        }
+
+        [Fact]
+        public void CostComponent_OverOwnership_StillPlainHavePill_NoOverflow()
+        {
+            // Owning MORE than needed still reads as full coverage, not a
+            // partial "HAVE 999/6 NEEDED" nonsense pill.
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 6, componentOwnedQuantity: 999);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("HAVE", specs[0].Text);
+        }
+
+        [Fact]
+        public void CostComponent_NeverGetsDecisionOrIgnorePills()
+        {
+            // Even when CanCraft/CanBuyTp/CanBuyVendor happen to be true
+            // (never set by the real builder, but the pill planner must
+            // never let a decision pill leak through regardless), a cost
+            // component gets ONLY the informational pill - no CRAFT/TP/
+            // VENDOR pill, no IGNORE toggle, not override-clickable.
+            var node = Node(
+                CraftingDecision.BuyFromVendor, canCraft: true, canBuyTp: true, canBuyVendor: true,
+                isCostComponent: true, quantity: 6, componentOwnedQuantity: 3);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal(PillKind.OwnedInfo, specs[0].Kind);
+            Assert.All(specs, s => Assert.Null(s.Source));
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Ignore);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Selected);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Available);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Locked);
         }
     }
 }
