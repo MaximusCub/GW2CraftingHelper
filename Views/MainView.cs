@@ -97,36 +97,16 @@ namespace GW2CraftingHelper.Views
         private CancellationTokenSource _searchDebounceCts;
 
         // Layout constants
-        //
-        // Review fix (min-width overlap): the header panel now has two
-        // rows - title/buttons on row 1 (y 0-35), status text on its own
-        // row 2 (y 40-70) instead of squeezed between the title and
-        // _clearButton on row 1. The status text can run up to ~79 chars
-        // once the capture date/time and staleness-age suffix are both
-        // present (e.g. a refresh-failure status), which measured close to
-        // or past the old row's free run (_clearButton's left edge minus
-        // the label's x=140 start) at the window's clamped 930x710 minimum
-        // size - and since _clearButton/_refreshButton paint over the
-        // label on overflow with no ellipsis, the date/time tail is
-        // exactly what got hidden. Giving the status its own full-width
-        // row removes the button-adjacency constraint entirely rather than
-        // truncating the text (rejected once already - see
-        // ApplyStatusDisplay's doc comment history). HeaderHeight grew by
-        // 30 (matching row 1's own 35px content height plus its 5px
-        // bottom margin, applied to row 2 as well) to fit the new row;
-        // every row below it shifts down by the same 30 to keep their
-        // existing gaps.
         private const int HeaderRowY = 5;
-        private const int HeaderHeight = 70;
-        private const int StatusRowY = 40;
-        private const int SearchRowY = 80;
+        private const int HeaderHeight = 40;
+        private const int SearchRowY = 50;
         private const int SearchRowHeight = 35;
-        private const int SourceFilterRowY = 118;
+        private const int SourceFilterRowY = 88;
         private const int SourceFilterHeight = 30;
-        private const int CoinRowY = 152;
+        private const int CoinRowY = 122;
         private const int CoinHeight = 24;
-        private const int ContentY = 180;
-        private const int TopRegionHeight = 180;
+        private const int ContentY = 150;
+        private const int TopRegionHeight = 150;
 
         private const int SearchBoxWidth = 300;
         private const int FilterDropdownWidth = 140;
@@ -233,7 +213,7 @@ namespace GW2CraftingHelper.Views
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, StatusRowY),
+                Location = new Point(140, 12),
                 Parent = _headerPanel
             };
             // Capture Blish's own real default rather than guessing/
@@ -647,20 +627,20 @@ namespace GW2CraftingHelper.Views
         /// render, SetSnapshot, SetStatus) so the two can never drift out
         /// of sync with each other.
         /// <para>
-        /// Layout risk resolved: adding the capture date to every status
-        /// string (RefreshNowAsync's "Updated"/"Cache Cleared" strings,
-        /// StatusText.ForRefreshFailure's callers) plus this method's own
-        /// "(Nh Nm ago)" suffix produces a run (up to ~79 chars on
-        /// refresh-failure statuses) that could approach or exceed the old
-        /// row's free space between the label and _clearButton's left edge
-        /// at the window's clamped 930x710 minimum size - and since the
-        /// buttons paint over the label on overflow with no ellipsis, the
-        /// date/time tail is exactly what got hidden. Rather than
-        /// truncating (rejected - it would cut the date users need most on
-        /// failure statuses) or narrowing the buttons, _statusLabel now has
-        /// its own row below the title/buttons row (see the Layout
-        /// constants block's own comment), giving it the panel's full
-        /// width with no button-adjacency constraint at all.
+        /// Layout risk (reported, not silently patched around): adding the
+        /// capture date to every status string (RefreshNowAsync's
+        /// "Updated"/"Cache Cleared" strings, StatusText.ForRefreshFailure's
+        /// callers) plus this method's own "(Nh Nm ago)" suffix can produce
+        /// a run long enough to approach or exceed the free space in
+        /// _headerPanel before _clearButton's left edge at the window's
+        /// clamped 930x710 minimum size (Module.cs's
+        /// ResizableTabbedWindow.HandleWindowResize). Truncating here would
+        /// cut the tail of the string, which is exactly where the date/time
+        /// now lives - worst on the failure statuses a user most needs to
+        /// date. This method intentionally does not truncate; if the free
+        /// run at minimum size proves too tight in practice, the fix
+        /// belongs in the header layout (e.g. widening the label's run or
+        /// shortening the button row), not in this label's text.
         /// </para>
         /// </summary>
         private void ApplyStatusDisplay()
