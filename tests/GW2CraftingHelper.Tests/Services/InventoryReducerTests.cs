@@ -1133,5 +1133,242 @@ namespace GW2CraftingHelper.Tests.Services
             // Original tree not mutated by either call
             Assert.Equal(10, tree.Quantity);
         }
+
+        // ---- VOM design (Candidate A): decision-guided pool consumption ----
+        // (design-value-own-materials.md Section 6 test plan - the guide
+        // dictionary a throwaway zero-owned PlanSolver.Solve produces,
+        // consumed via Reduce's new optional 4th argument.)
+
+        [Fact]
+        public void MultipleRecipeOptions_DecisionGuided_NonPrimaryOptionConsumesPoolWhenChosen()
+        {
+            // Same shape as MultipleRecipeOptions_OnlyPrimaryOptionConsumesPool
+            // (root item 1, two recipe options each needing 5 of item 2,
+            // pool has exactly 5), but this time the guide says the solver
+            // actually chose option B (RecipeId 20), NOT the primary
+            // (first-listed) option A - direct converse proving the fix
+            // generalizes past the old i==0 heuristic.
+            var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
+            optionA.Ingredients.Add(Leaf(2, 5));
+            var optionB = new RecipeOption { RecipeId = 20, OutputCount = 1, CraftsNeeded = 1 };
+            optionB.Ingredients.Add(Leaf(2, 5));
+
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                NodeId = 1,
+                Recipes = new List<RecipeOption> { optionA, optionB }
+            };
+
+            var guide = new Dictionary<int, SolverDecision>
+            {
+                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
+            };
+
+            var pool = new Dictionary<int, int> { { 2, 5 } };
+            var result = _reducer.Reduce(tree, pool, guide);
+
+            var reducedOptionA = result.ReducedTree.Recipes[0];
+            var reducedOptionB = result.ReducedTree.Recipes[1];
+
+            // Chosen (non-primary) option's ingredient fully covered by the pool
+            Assert.Equal(5, reducedOptionA.Ingredients[0].Quantity); // untouched
+            Assert.Equal(0, reducedOptionB.Ingredients[0].Quantity); // discounted
+
+            var totalUsed = result.UsedMaterials.Where(u => u.ItemId == 2).Sum(u => u.QuantityUsed);
+            Assert.Equal(5, totalUsed);
+        }
+
+        [Fact]
+        public void NodeDecidedBuy_IngredientsNeverConsumed_NoPhantomUsedMaterials()
+        {
+            // Node has a recipe (CanCraft would be true), but the guide's
+            // decision for it is BuyFromTp - no option may consume the
+            // pool for its descendants, and the ingredient must not appear
+            // in UsedMaterials at all (the audited row-31 "phantom
+            // UsedMaterials" bug this design fixes).
+            var tree = Craftable(1, 1, 10, 1, Leaf(2, 5));
+            tree.NodeId = 1;
+
+            var guide = new Dictionary<int, SolverDecision>
+            {
+                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
+            };
+
+            var pool = new Dictionary<int, int> { { 2, 5 } };
+            var result = _reducer.Reduce(tree, pool, guide);
+
+            Assert.Equal(5, result.ReducedTree.Recipes[0].Ingredients[0].Quantity);
+            Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
+            Assert.Empty(result.UsedMaterials);
+        }
+
+        [Fact]
+        public void NodeDecidedBuy_OwnStockOfNodeItself_StillCreditedAgainstThatNode()
+        {
+            // The node ITSELF is owned and its guided decision is Buy - its
+            // own Quantity must still be discounted (consumeFromPool is
+            // inherited from the caller/parent, unchanged by the guide),
+            // even though its ingredients (below) never consume anything.
+            var tree = Craftable(1, 5, 10, 1, Leaf(2, 5));
+            tree.NodeId = 1;
+
+            var guide = new Dictionary<int, SolverDecision>
+            {
+                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
+            };
+
+            var pool = new Dictionary<int, int> { { 1, 3 }, { 2, 5 } };
+            var result = _reducer.Reduce(tree, pool, guide);
+
+            // Node's own quantity discounted from 5 to 2 (3 owned units used).
+            Assert.Equal(2, result.ReducedTree.Quantity);
+            Assert.Contains(result.UsedMaterials, u => u.ItemId == 1 && u.QuantityUsed == 3);
+
+            // The ingredient's own Quantity still rescales to match the
+            // node's new (already-reduced) demand - unconditional, per
+            // ReduceNode's doc comment (M33 Finding 1) - so 2, not the
+            // original 5. What the guide actually gates is pool
+            // CONSUMPTION: the ingredient's own 5 owned units in the pool
+            // are never touched, since the node was decided Buy.
+            Assert.Equal(2, result.ReducedTree.Recipes[0].Ingredients[0].Quantity);
+            Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
+        }
+
+        [Fact]
+        public void MissingNodeInGuide_FallsBackToPrimaryHeuristic()
+        {
+            // Guide is non-null but does not contain this node's NodeId
+            // (defensive fallback) - must reproduce the exact legacy i==0
+            // primary-option heuristic, same as MultipleRecipeOptions_
+            // OnlyPrimaryOptionConsumesPool with a null guide.
+            var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
+            optionA.Ingredients.Add(Leaf(2, 5));
+            var optionB = new RecipeOption { RecipeId = 20, OutputCount = 1, CraftsNeeded = 1 };
+            optionB.Ingredients.Add(Leaf(2, 5));
+
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                NodeId = 1,
+                Recipes = new List<RecipeOption> { optionA, optionB }
+            };
+
+            // Guide references a totally different NodeId (99) - this
+            // node's own NodeId (1) is absent from it.
+            var guide = new Dictionary<int, SolverDecision>
+            {
+                { 99, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
+            };
+
+            var pool = new Dictionary<int, int> { { 2, 5 } };
+            var result = _reducer.Reduce(tree, pool, guide);
+
+            var reducedOptionA = result.ReducedTree.Recipes[0];
+            var reducedOptionB = result.ReducedTree.Recipes[1];
+
+            // Primary option's ingredient fully covered by the pool (legacy
+            // heuristic), alternate option untouched.
+            Assert.Equal(0, reducedOptionA.Ingredients[0].Quantity);
+            Assert.Equal(5, reducedOptionB.Ingredients[0].Quantity);
+        }
+
+        // ---- Sourced_ mirrors (AccountItemIndex overload - the actual
+        // production code path) ----
+
+        [Fact]
+        public void Sourced_MultipleRecipeOptions_DecisionGuided_NonPrimaryOptionConsumesPoolWhenChosen()
+        {
+            var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
+            optionA.Ingredients.Add(Leaf(2, 5));
+            var optionB = new RecipeOption { RecipeId = 20, OutputCount = 1, CraftsNeeded = 1 };
+            optionB.Ingredients.Add(Leaf(2, 5));
+
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                NodeId = 1,
+                Recipes = new List<RecipeOption> { optionA, optionB }
+            };
+
+            var guide = new Dictionary<int, SolverDecision>
+            {
+                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null, guide);
+
+            var reducedOptionA = result.ReducedTree.Recipes[0];
+            var reducedOptionB = result.ReducedTree.Recipes[1];
+
+            Assert.Equal(5, reducedOptionA.Ingredients[0].Quantity);
+            Assert.Equal(0, reducedOptionB.Ingredients[0].Quantity);
+
+            var totalUsed = result.UsedMaterials.Where(u => u.ItemId == 2).Sum(u => u.QuantityUsed);
+            Assert.Equal(5, totalUsed);
+        }
+
+        [Fact]
+        public void Sourced_NodeDecidedBuy_IngredientsNeverConsumed_NoPhantomUsedMaterials()
+        {
+            var tree = Craftable(1, 1, 10, 1, Leaf(2, 5));
+            tree.NodeId = 1;
+
+            var guide = new Dictionary<int, SolverDecision>
+            {
+                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null, guide);
+
+            Assert.Equal(5, result.ReducedTree.Recipes[0].Ingredients[0].Quantity);
+            Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
+            Assert.Empty(result.UsedMaterials);
+        }
+
+        [Fact]
+        public void Sourced_NodeDecidedBuy_OwnStockOfNodeItself_StillCreditedAgainstThatNode()
+        {
+            var tree = Craftable(1, 5, 10, 1, Leaf(2, 5));
+            tree.NodeId = 1;
+
+            var guide = new Dictionary<int, SolverDecision>
+            {
+                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 3, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null, guide);
+
+            Assert.Equal(2, result.ReducedTree.Quantity);
+            Assert.Contains(result.UsedMaterials, u => u.ItemId == 1 && u.QuantityUsed == 3);
+
+            // See the non-sourced mirror's matching comment - the
+            // ingredient's Quantity rescales to 2 unconditionally; only its
+            // pool consumption (5 owned units, untouched) is guide-gated.
+            Assert.Equal(2, result.ReducedTree.Recipes[0].Ingredients[0].Quantity);
+            Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
+        }
     }
 }
