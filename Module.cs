@@ -493,6 +493,44 @@ namespace GW2CraftingHelper
 
             var recipeCacheStore = new CompositeRecipeCacheStore(recipeSeed, recipeOverlay);
 
+            // opportunity-notes (SEASONAL VENDOR TIP): read Blish's
+            // FestivalContext ONCE here at load (not on every plan
+            // generation) and project it to plain strings -
+            // CraftingPlanPipeline (and everything it calls) must stay
+            // Blish-free for its own tests, so nothing beyond this point
+            // ever touches GameService.Contexts again. GetContext<T>
+            // returns null when the context type is not registered at all;
+            // TryGetActiveFestivals returns ContextAvailability.NotReady/
+            // Unavailable/Failed (instead of Available) for every other
+            // failure state. Every one of those, plus any unexpected
+            // exception, collapses to the same empty list here - "no
+            // festival active", never a guess (repo invariant: do not
+            // invent data when APIs are missing).
+            var activeFestivalNames = new List<string>();
+            try
+            {
+                var festivalContext = GameService.Contexts.GetContext<Blish_HUD.Contexts.FestivalContext>();
+                if (festivalContext != null)
+                {
+                    var availability = festivalContext.TryGetActiveFestivals(out var festivalResult);
+                    if (availability == Blish_HUD.Contexts.ContextAvailability.Available &&
+                        festivalResult.Value != null)
+                    {
+                        foreach (var festival in festivalResult.Value)
+                        {
+                            if (!string.IsNullOrEmpty(festival.Name))
+                            {
+                                activeFestivalNames.Add(festival.Name);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Festival context unavailable, seasonal vendor tips disabled: {ex.GetType().Name} - {ex.Message}");
+            }
+
             _craftingPipeline = new CraftingPlanPipeline(
                 new RecipeService(recipeApi, cacheStore: recipeCacheStore),
                 new TradingPostService(priceApi),
@@ -503,7 +541,8 @@ namespace GW2CraftingHelper
                 accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager),
                 currencyMetadataService: new CurrencyMetadataService(_httpClient),
                 acquisitionHints: acquisitionHints,
-                dailyCooldownItems: dailyCooldownItems);
+                dailyCooldownItems: dailyCooldownItems,
+                activeFestivalNames: activeFestivalNames);
 
             try
             {
