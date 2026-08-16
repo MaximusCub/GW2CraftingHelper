@@ -4523,4 +4523,98 @@ are all Blish-bound and outside this repo's test-runnable surface; the
 icon-placeholder fix in particular (a Snapshot-tab render change) has
 not been visually confirmed in a live client.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+### PART D: post-PART-C follow-up review fixes
+
+1. **Coverage gap against a named brief target: Charged Quartz Crystal
+   (43772).** PART C finding 2 correctly removed 43772 from
+   `ref/daily_cooldown_items.json` (dead data - the notice pass only ever
+   inspects `AcquisitionSource.Craft` steps, and 43772 is never a recipe
+   output). But 43772 is one of the brief's own named motivating examples,
+   is `AccountBound`/no-TP/no-vendor-offer, and had no
+   `ref/acquisition_hints_seed.json` entry either - so it resolved to a
+   `ShoppingUnknown` leaf with zero timegate signal at all. Concrete
+   consequence: a plan for one Grow Lamp (66993, seeded) needs 10x Charged
+   Quartz Crystal and emitted no notice anywhere. Fixed with the minimal,
+   fully-additive remedy: added a `ref/acquisition_hints_seed.json` entry
+   for 43772 (hint text names the Place of Power source, the 1-per-day
+   cap, and account-bound/no-TP status; badge `DAILY`), reusing the
+   existing `ShoppingUnknown` hint/badge path
+   (`PlanViewModelBuilder.ResolveHintText`/`ResolveBadgeText`) with no new
+   code. `AcquisitionHintServiceTests.Load_ShippedSeedFile_*` updated
+   (6 -> 7 entries) to pin the new entry. The general limitation PART C
+   already documented (the notice pass only ever covers `Craft`-source
+   steps) still stands and is unchanged by this fix.
+2. **Nice-to-haves taken alongside (all cheap, same-file as their own
+   finding):**
+   - `Models/DailyCooldownItem.cs`: `PerDayCap`'s doc comment now states
+     it is output-UNITS per day (matching how
+     `AppendDailyCooldownNotices` actually compares it against
+     `PlanStep.Quantity`) and flags that every seeded recipe today has
+     `output_item_count == 1`, so a future multi-output entry would need
+     the comparison divided by the recipe's own output count, not
+     `PerDayCap` reinterpreted. No behavior change (still latent, no
+     seeded recipe triggers it).
+   - `Services/PlanViewModelBuilder.cs`: craft-cooldown notice wording
+     appends "(runs in parallel with other daily-gated items)" - each row
+     was already individually accurate, but nothing said multiple rows'
+     day-estimates are independent maxima, not a sum (the flagship
+     Gift of Aurene / multi-Dragon-Hatchling-Doll-component case).
+     `PlanViewModelBuilderDailyCooldownTests`' existing substring
+     assertions (`"30 days"`, `"3 days"`) still pass unchanged.
+   - `tests/.../Services/CraftingPlanPipelineTests.cs`: new
+     `DailyCooldownItems_SurvivesGenerateStructuredAsync_
+     AndResolveWithOverridesRoundTrip` pins the seed dictionary through a
+     `GenerateStructuredAsync` -> `ResolveWithOverrides` round trip
+     (mirrors the file's own `ResolveWithOverrides_
+     CarriesCharacterDisciplinesForward` shape) - closes the previously
+     untested 5-site hand-copied wiring in `CraftingPlanPipeline.cs`.
+   - `docs/gw2e-considerations.md` Section 11 / `docs/research/
+     gw2e-convergence-matrix.md` row 42 marked **Resolved**, matching the
+     sibling Section 12 / row 46 resolution PART C already recorded for
+     the same PART B #3 fix - both had been left describing the
+     `AccountCurrencyIndex.cs` comment fix as still-open.
+   - `Services/AccountCurrencyIndex.cs`: the PART B #3 comment correction
+     is refined - it previously asserted gw2efficiency nets owned
+     currency out "at BOTH the Shopping List/summary display layer AND
+     via a per-node pill," but only the per-node pill is measured
+     evidence (a live `componentTree.html` fetch); the summary-layer half
+     was the original unverified M34-era claim carried forward unchanged.
+     Now reads "at least via a per-node display pill," with an explicit
+     note that the summary-layer half is unconfirmed. No behavior change.
+   - `tests/.../Models/Gw2ConstantsCurrencyNamesTests.cs`: the bare
+     `LiveApiNameById[id]` indexer inside the `foreach` is now preceded by
+     an `Assert.True(...ContainsKey(id)...)` check with a legible failure
+     message, so a future id added to `ExpectedDictName` without a
+     matching `LiveApiNameById` entry fails cleanly instead of throwing
+     an undiagnostic `KeyNotFoundException`.
+   - `Services/DailyCooldownItemService.cs`: `Load` now also skips an
+     entry with `ItemId <= 0` (previously only `PerDayCap` was
+     validated) - no `PlanStep` ever carries one, matching the existing
+     malformed-seed-data guard shape. New test
+     `Load_ZeroOrNegativeItemId_EntrySkipped_NoThrow`.
+   - Not taken: the split-source under-reporting and parallel-vs-additive
+     *aggregation* (as opposed to wording) nice-to-haves remain latent
+     only (no seeded item currently has a vendor offer, per
+     `ref/vendor_offers.json`) and would need solver-adjacent design
+     work, out of scope for a same-file cheap fix.
+
+Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-cooldowns/GW2CraftingHelper.csproj -p:Platform=x64` -
+0 errors, warning count/content unchanged from baseline (all warnings
+are the project's pre-existing StyleCop noise pattern). Tests:
+`"/mnt/c/Program Files/dotnet/dotnet.exe" test
+C:/Dev/Blish/wt-cooldowns/tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` -
+1431 passed, 0 failed (1429 baseline + 2 new: `Load_
+ZeroOrNegativeItemId_EntrySkipped_NoThrow` and `DailyCooldownItems_
+SurvivesGenerateStructuredAsync_AndResolveWithOverridesRoundTrip`). No
+Blish HUD/BlishHUD.exe reference in any test file; every new/changed
+assertion exercises a real production entry point
+(`AcquisitionHintService.Load`, `DailyCooldownItemService.Load`,
+`CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`,
+`Gw2ConstantsCurrencyNamesTests`), no contract mirrors, no fake file
+I/O. IDs remain internal-only - the new/changed hint text never
+surfaces an item id. No live desktop verification was performed (same
+Blish-bound surface as PART A/B/C).
+
+Gate: PASS - build 0 errors, full suite 1431/1431 passed, no repo
+invariant violations found in review.

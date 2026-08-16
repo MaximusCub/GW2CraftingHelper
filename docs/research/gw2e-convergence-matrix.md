@@ -921,9 +921,10 @@ reader itself flagged the duplication risk explicitly). **ADOPT** (size: S).
   note that per-node display risks visually implying the same wallet
   balance is independently available at every occurrence of that currency
   across the tree (a currency is pooled, not per-branch-consumable like an
-  item) - our aggregate-only summary avoids that ambiguity. Considerations
-  entry added, flagging the stale internal citation for a doc-only
-  correction.
+  item) - our aggregate-only summary avoids that ambiguity. **Resolved**
+  (audit row 56 PART B #3, 2026-08-16): the stale internal citation in
+  `AccountCurrencyIndex.cs` was corrected in place (Considerations Section
+  11 updated to match). No behavior change.
 
   Correction to this row's own original "what would resolve it" pointer:
   it named `calculateTreeQuantity.ts`'s per-node `ownedQuantity` assignment
