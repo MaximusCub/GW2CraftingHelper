@@ -572,6 +572,17 @@ namespace GW2CraftingHelper.Tests.Services
         /// NO have pill forever, even with the item sitting in the account
         /// (ResolveWithOverrides never re-fetches EITHER - see its own doc
         /// comment).
+        ///
+        /// W4B review-fix round 2 (Must Fix): the offer's non-coin Currency
+        /// cost line (id 23) is the exact currency-side sibling of the
+        /// item-side gap above - BuildOwnedCurrencyAmounts used to scope
+        /// its ownership scan strictly to the baseline plan's aggregated
+        /// CurrencyCosts, so a currency component surfaced only by this
+        /// same override would get correct name/icon but NO have pill
+        /// either, permanently, even with a full wallet. The wallet entry
+        /// for currency 23 below proves BuildOwnedCurrencyAmounts's own
+        /// AddAllVendorOfferCurrencyComponentIds widening now covers it the
+        /// same way the item side already did.
         /// </summary>
         [Fact]
         public async Task MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadataAndOwnership()
@@ -606,11 +617,23 @@ namespace GW2CraftingHelper.Tests.Services
             // BuildOwnedVendorItemComponentAmounts' widened vendorOffers
             // scan - not just AddVendorItemComponentIds' decisions scan -
             // is what puts 42 into PlanSolveContext.OwnedVendorItemAmounts.
+            //
+            // Wallet has 5 of currency 23 - full coverage of the 6 (3 *
+            // requested qty 2) the override's winning offer will need for
+            // that non-coin currency component, same "baseline decision is
+            // Craft, so decisions-scoped ownership never sees it" setup as
+            // item 42 above, proving BuildOwnedCurrencyAmounts' widened
+            // vendorOffers scan populates PlanSolveContext.
+            // OwnedCurrencyAmounts for it too.
             var snapshot = new AccountSnapshot
             {
                 Items = new List<SnapshotItemEntry>
                 {
                     new SnapshotItemEntry { ItemId = 42, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
+                },
+                Wallet = new List<SnapshotWalletEntry>
+                {
+                    new SnapshotWalletEntry { CurrencyId = 23, Value = 5 }
                 }
             };
 
@@ -651,13 +674,17 @@ namespace GW2CraftingHelper.Tests.Services
             }
 
             // Baseline: craft wins, so no component leaves exist yet, and
-            // the winning decision never touched VendorItemCosts at all -
-            // but OwnedVendorItemAmounts must already carry item 42's
-            // owned count, widened from vendorOffers rather than decisions.
+            // the winning decision never touched VendorItemCosts/
+            // VendorCurrencyCosts at all - but OwnedVendorItemAmounts/
+            // OwnedCurrencyAmounts must already carry item 42's and
+            // currency 23's owned counts, both widened from vendorOffers
+            // rather than decisions.
             Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
             Assert.Empty(result.CraftingTree.Children.Where(c => c.IsCostComponent));
             Assert.NotNull(result.SolveContext.OwnedVendorItemAmounts);
             Assert.Equal(4, result.SolveContext.OwnedVendorItemAmounts[42]);
+            Assert.NotNull(result.SolveContext.OwnedCurrencyAmounts);
+            Assert.Equal(5, result.SolveContext.OwnedCurrencyAmounts[23]);
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
@@ -676,6 +703,21 @@ namespace GW2CraftingHelper.Tests.Services
             // baseline winner.
             Assert.Equal(10, itemLeaf.Quantity);
             Assert.Equal(4, itemLeaf.ComponentOwnedQuantity);
+
+            // W4B review-fix round 2: the currency-side twin of the item
+            // assertion above - 5 owned out of 6 needed (3 * requested
+            // qty 2) must equally survive the local re-solve, proving
+            // BuildOwnedCurrencyAmounts' widened vendorOffers scan (not
+            // just plan.CurrencyCosts) is what put currency 23 into
+            // PlanSolveContext.OwnedCurrencyAmounts in the first place.
+            var currencyLeaf = resolved.CraftingTree.Children.Single(c => c.ItemId == 23);
+            Assert.True(currencyLeaf.IsCostComponent);
+            Assert.Equal(6, currencyLeaf.Quantity);
+            Assert.Equal(5, currencyLeaf.ComponentOwnedQuantity);
+            // Cost cell deliberately blank for currency components (repo
+            // invariant restated in BuildVendorCostComponentLeaves' doc
+            // comment) - unaffected by this round's ownership fix.
+            Assert.Null(currencyLeaf.SubtreeCost);
         }
 
         // M38 WP-14: this test used to prove the (now-deleted, test-only)

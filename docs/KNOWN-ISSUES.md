@@ -2696,4 +2696,62 @@ themselves needed no change in either fix - both walk the SOLVER tree via
 decision-making, only the cosmetic metadata/ownership maps consulted
 afterward when building display leaves.
 
+**Review-fix round 3 (2026-08-15) - 1 Must Fix finding: the round-2
+ownership widening covered the ITEM component map only and missed its
+exact currency-side sibling.**
+
+- *Fix (Must Fix, `Services/CraftingPlanPipeline.cs`
+  `BuildOwnedCurrencyAmounts`): the currency ownership map was never
+  widened the way the item one was.* Round 2 widened
+  `BuildOwnedVendorItemComponentAmounts` to scan every vendor offer's Item
+  cost lines (`AddAllVendorOfferItemComponentIds`), not just the baseline
+  winning decisions - but `BuildOwnedCurrencyAmounts` still keyed its
+  dictionary strictly off `plan.CurrencyCosts`, the baseline plan's
+  aggregated currency totals. Same failure shape as round 2, currency
+  side: a node whose baseline decision is Craft, manually overridden to
+  `BuyFromVendor` via `ResolveWithOverrides`, surfaces a currency
+  cost-component leaf with a correct name/icon/quantity but permanently NO
+  have pill, even with a full wallet, because that currency id was never
+  in `plan.CurrencyCosts` and `PlanSolveContext.OwnedCurrencyAmounts` is
+  captured once at generation time and reused verbatim (never
+  recomputed) by `ResolveWithOverrides` - exactly the reuse-verbatim
+  argument that justified the round-2 item-side fix. Added
+  `AddAllVendorOfferCurrencyComponentIds`, the currency-side twin of
+  `AddAllVendorOfferItemComponentIds` (same non-coin-Currency /
+  `Count > 0` filter `VendorBatchSolver.EvaluateVendorOffers` itself
+  uses), and widened `BuildOwnedCurrencyAmounts` to scan `vendorOffers`
+  through it in addition to `plan.CurrencyCosts`, at both call sites
+  (single-item and multi-item generation entry points). Harmless for the
+  pre-existing currency summary rows (`PlanViewModelBuilder`), which only
+  ever look up the ids they themselves iterate from `plan.CurrencyCosts` -
+  extra keys in the returned map are simply never read by that caller.
+  Extended test: `CraftingPlanPipelineTests.
+  MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadataAndOwnership`
+  now also attaches a wallet entry for the offer's non-coin currency
+  component and asserts `ComponentOwnedQuantity` on the currency leaf
+  survives the override re-solve, the currency-side sibling of the
+  existing item-leaf assertion in the same test.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors); full module
+test suite green - 1309 passed (unchanged count - the round-3 fix
+extended the same existing test the round-2 fix had already extended,
+rather than adding a new one). No new Blish HUD references in tests; the
+extended test exercises real production code (`PlanSolver.Solve`,
+`CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`)
+with no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
+internal-only. `VendorBatchSolver.cs`'s DO-NOT-TOUCH merged-ceil methods
+were not touched at all this round (the fix is entirely inside
+`CraftingPlanPipeline.cs`, a cosmetic ownership-annotation map consulted
+strictly after solving). `ResolveWithOverrides`/`BuildPresetOverrides`
+themselves needed no change: `BuildPresetOverrides` walks `context.Tree`
+(the solver's `RecipeNode` tree) and never references
+`OwnedCurrencyAmounts` at all - confirmed by reading it. `ResolveWithOverrides`'s
+own decision-making call, `_solver.Solve(context.Tree, ...)`, is likewise
+never given `OwnedCurrencyAmounts` and cannot see it; that map is only
+passed, read-only, into `BuildCraftingTreeResult` afterward, which
+annotates the DISPLAY tree's already-decided leaves with a HAVE pill - it
+cannot feed back into `solveResult.Decisions`, so this fix cannot affect a
+solver decision, only the cosmetic HAVE pill a display leaf reads
+afterward.
+
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]

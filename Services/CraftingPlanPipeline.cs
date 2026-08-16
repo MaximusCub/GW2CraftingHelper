@@ -346,8 +346,10 @@ namespace GW2CraftingHelper.Services
             // AccountCurrencyIndex's doc comment) - built from the plan's
             // final currency totals and the wallet snapshot, never fed back
             // into any decision/total above.
+            // W4B review-fix (Must Fix): also pass vendorOffers - see
+            // BuildOwnedCurrencyAmounts' own doc comment for why.
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
-                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
+                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts, vendorOffers);
             result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
 
             // W4B: owned-item annotation for vendor cost-component ITEM
@@ -764,8 +766,10 @@ namespace GW2CraftingHelper.Services
             result.RequestedItems = items;
             result.CharacterDisciplines = effectiveCharacterDisciplines;
 
+            // W4B review-fix (Must Fix): also pass vendorOffers - see
+            // BuildOwnedCurrencyAmounts' own doc comment for why.
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
-                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
+                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts, vendorOffers);
             result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
 
             // W4B: see the single-item overload's matching computation.
@@ -831,7 +835,14 @@ namespace GW2CraftingHelper.Services
         /// (GenerateStructuredAsync/GenerateStructuredMultiAsync) widen
         /// their metadata fetch for exactly this via
         /// AddAllVendorOfferItemComponentIds - see that method's own doc
-        /// comment - rather than this method fetching anything itself.
+        /// comment - rather than this method fetching anything itself. The
+        /// same is true of context.OwnedCurrencyAmounts/
+        /// OwnedVendorItemAmounts below (line 875/887 reuse them verbatim,
+        /// never recomputed here): the generation-time callers already
+        /// widen BOTH via BuildOwnedCurrencyAmounts(..., vendorOffers) and
+        /// BuildOwnedVendorItemComponentAmounts(..., vendorOffers) so a
+        /// component leaf surfaced only by an override still gets a correct
+        /// HAVE pill - see each method's own doc comment.
         /// </summary>
         public CraftingPlanResult ResolveWithOverrides(
             PlanSolveContext context,
@@ -1228,24 +1239,105 @@ namespace GW2CraftingHelper.Services
         /// currency totals (see AccountCurrencyIndex's doc comment) -
         /// cosmetic only, computed strictly AFTER the plan/solve already
         /// exist, never fed back into them. Null when there is no wallet
-        /// snapshot or the plan needs no currency at all, so callers can
+        /// snapshot and the plan needs no currency at all, so callers can
         /// treat null as "no data" distinctly from "0 owned".
+        ///
+        /// W4B review-fix (Must Fix): widened the SAME way
+        /// BuildOwnedVendorItemComponentAmounts widens its item id set (see
+        /// that method's own doc comment for the full rationale) -
+        /// <paramref name="vendorOffers"/> is scanned for every non-coin
+        /// Currency cost line on ANY vendor offer for ANY item in the tree,
+        /// not just the currency ids that made it into the baseline plan's
+        /// aggregated <paramref name="currencyCosts"/>. Without this, a
+        /// currency cost-component LEAF surfaced only by a manual override
+        /// (a node whose baseline decision was Craft, so its vendor offer's
+        /// currency cost lines were never folded into plan.CurrencyCosts)
+        /// would show correct name/icon/quantity but no HAVE pill,
+        /// permanently, even with a full wallet - the exact sibling of the
+        /// item-side gap AddAllVendorOfferItemComponentIds already closes.
+        /// Harmless for the pre-existing currency SUMMARY rows
+        /// (PlanViewModelBuilder), which only ever look up the ids they
+        /// themselves iterate from plan.CurrencyCosts - extra keys in the
+        /// returned map are simply never read by that caller.
         /// </summary>
         private static IReadOnlyDictionary<int, int> BuildOwnedCurrencyAmounts(
-            AccountSnapshot snapshot, List<CurrencyCost> currencyCosts)
+            AccountSnapshot snapshot, List<CurrencyCost> currencyCosts,
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null)
         {
-            if (snapshot == null || currencyCosts == null || currencyCosts.Count == 0)
+            if (snapshot == null)
+            {
+                return null;
+            }
+
+            var currencyIds = new HashSet<int>();
+            if (currencyCosts != null)
+            {
+                foreach (var cc in currencyCosts)
+                {
+                    currencyIds.Add(cc.CurrencyId);
+                }
+            }
+            AddAllVendorOfferCurrencyComponentIds(vendorOffers, currencyIds);
+            if (currencyIds.Count == 0)
             {
                 return null;
             }
 
             var currencyIndex = new AccountCurrencyIndex(snapshot.Wallet);
-            var result = new Dictionary<int, int>(currencyCosts.Count);
-            foreach (var cc in currencyCosts)
+            var result = new Dictionary<int, int>(currencyIds.Count);
+            foreach (var currencyId in currencyIds)
             {
-                result[cc.CurrencyId] = currencyIndex.GetQuantity(cc.CurrencyId);
+                result[currencyId] = currencyIndex.GetQuantity(currencyId);
             }
             return result;
+        }
+
+        /// <summary>
+        /// W4B review-fix (Must Fix): currency-side twin of
+        /// AddAllVendorOfferItemComponentIds (see that method's own doc
+        /// comment for the full "why a decisions-only scan is not enough"
+        /// rationale - identical reasoning applies here). Adds every
+        /// currency id that appears as a non-coin Currency cost line on any
+        /// vendor offer for any item in the tree into
+        /// <paramref name="currencyIds"/>, mirroring exactly the
+        /// Type=="Currency" / Id != Gw2Constants.CoinCurrencyId / Count > 0
+        /// filter VendorBatchSolver.EvaluateVendorOffers itself uses to
+        /// decide what counts as a non-coin currency cost line (see that
+        /// method's own comments) - so this widened set can only ever
+        /// contain ids a real leaf could actually surface. A no-op when no
+        /// vendor offer in the tree has any non-coin Currency cost line at
+        /// all (the common case).
+        /// </summary>
+        private static void AddAllVendorOfferCurrencyComponentIds(
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers, HashSet<int> currencyIds)
+        {
+            if (vendorOffers == null)
+            {
+                return;
+            }
+            foreach (var offers in vendorOffers.Values)
+            {
+                if (offers == null)
+                {
+                    continue;
+                }
+                foreach (var offer in offers)
+                {
+                    if (offer?.CostLines == null)
+                    {
+                        continue;
+                    }
+                    foreach (var cost in offer.CostLines)
+                    {
+                        if (string.Equals(cost.Type, "Currency", StringComparison.Ordinal)
+                            && cost.Id != Gw2Constants.CoinCurrencyId
+                            && cost.Count > 0)
+                        {
+                            currencyIds.Add(cost.Id);
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
