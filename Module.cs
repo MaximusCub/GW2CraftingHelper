@@ -560,7 +560,15 @@ namespace GW2CraftingHelper
                         ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan", $"Gw2Mumble unavailable, active character unknown: {ex.GetType().Name} - {ex.Message}");
                     }
 
-                    var currencyValuation = _settings.GetCurrencyValuation();
+                    // currency-ux-package (Feature 1): the EFFECTIVE
+                    // valuation (user overrides + CurrencyDecisionDefaults'
+                    // curated defaults, minus anything explicitly cleared -
+                    // see ModuleSettings.GetEffectiveCurrencyValuation's own
+                    // doc comment) - not the raw GetCurrencyValuation the
+                    // Settings tab itself reads, which must stay default-
+                    // free so it can tell a real user override apart from
+                    // an applied default.
+                    var currencyValuation = _settings.GetEffectiveCurrencyValuation();
                     var ownMaterialsMode = _settings.GetOwnMaterialsMode();
                     var homesteadTiers = _settings.GetHomesteadEfficiencyTiers();
 
