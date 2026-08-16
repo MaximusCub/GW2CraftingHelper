@@ -517,5 +517,39 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(decision.VendorCurrencyCosts);
             Assert.Single(decision.VendorCurrencyCosts);
         }
+
+        /// <summary>
+        /// W4B review-fix (Must Fix): the sibling defect to
+        /// <see cref="ZeroCountItemCostLine_DoesNotPopulateVendorItemCosts"/>
+        /// one field over - a malformed offer with a Count-0 non-coin
+        /// Currency cost line must not invent a phantom "currency" cost
+        /// KIND either. Mixed with a real Item line so the pre-fix bug
+        /// (VendorCurrencyCosts wrongly populated with a 0-quantity entry,
+        /// flipping kindCount from 1 real kind to 2) is directly observable
+        /// on the committed decision.
+        /// </summary>
+        [Fact]
+        public void ZeroCountCurrencyCostLine_DoesNotPopulateVendorCurrencyCosts()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(
+                1, new[] { (42, 5) }, new[] { (23, 0) });
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var decision = result.Decisions.Values.Single(d => d.Source == AcquisitionSource.BuyFromVendor);
+
+            Assert.Null(decision.VendorCurrencyCosts);
+            Assert.NotNull(decision.VendorItemCosts);
+            Assert.Single(decision.VendorItemCosts);
+        }
     }
 }

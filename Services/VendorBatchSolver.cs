@@ -289,7 +289,28 @@ namespace GW2CraftingHelper.Services
                         }
                         else
                         {
-                            currencyCosts.Add(cost);
+                            // W4B review-fix (Must Fix): guard with
+                            // Count > 0, mirroring the raw-coin branch's own
+                            // `if (cost.Count > 0)` guard 5 lines above and
+                            // the identical Item-cost-line guard below - a
+                            // zero/negative-count non-coin Currency cost
+                            // line (e.g. malformed wiki-scraped seed data)
+                            // must never invent a phantom "currency" cost
+                            // KIND. Without this, a single-kind offer with a
+                            // stray Count-0 Currency line would wrongly flip
+                            // into leaf-synthesis mode
+                            // (CraftingTreeBuilder.BuildVendorCostComponentLeaves'
+                            // kindCount gate) and render a 0-quantity ghost
+                            // leaf with a blank cost and no pill (a negative
+                            // Count would render a negative-quantity leaf
+                            // instead - survives the `scaled > int.MaxValue`
+                            // check below just like the Item side). coinCost
+                            // above is untouched either way - a Count of 0
+                            // never reaches it from this branch.
+                            if (cost.Count > 0)
+                            {
+                                currencyCosts.Add(cost);
+                            }
                         }
                     }
                     else if (string.Equals(cost.Type, "Item", StringComparison.Ordinal))
