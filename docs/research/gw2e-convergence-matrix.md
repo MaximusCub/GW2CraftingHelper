@@ -24,7 +24,11 @@ behavior, across five areas:
 This document is the synthesis pass over those five reads: 62 raw findings
 were deduplicated to 57 distinct matrix rows (5 pairs of rows independently
 reported the same mechanism from two areas; each pair is merged into one row
-below, noted where it happened).
+below, noted where it happened). A subsequent correction pass fixed four
+verdicts, annotated several evidence gaps in place, and added row 63
+(Homestead Refinement efficiency tiers - a mechanism the five-area sweep
+missed entirely) - see the "Updated by a correction pass" note at the top of
+the Summary section for the full list of what changed.
 
 ## Evidence standard
 
@@ -143,7 +147,7 @@ evidence.
 - Rationale: already implemented and tested; the port is faithful and both
   deviations are justified. No action.
 
-### 5. GuildUpgrade ingredient type (Guild Hall / Scribe decoration components)
+### 5. GuildUpgrade ingredient type (Guild Hall / Scribe decoration components) [reachable once in-flight versioned-recipe ingestion lands]
 
 - gw2e (measured): `recipe-nesting/src/api.d.ts` declares
   `type: 'Item' | 'GuildUpgrade' | 'Currency'`. `nestRecipe()` resolves a
@@ -156,15 +160,38 @@ evidence.
   `Services/RecipeService.cs:294-297` treats any non-"Item" type as a leaf;
   `Services/CraftingTreeBuilder.cs:80-86` then labels it
   `CraftingDecision.Currency` and calls `Gw2Constants.ResolveCurrencyName`,
-  which falls back to the literal string "Currency" for unrecognized ids - a
-  GuildUpgrade ingredient would silently render as a generic "Currency" pill
-  with a meaningless name.
-- Verdict: **ADOPT** (size: S)
-- Rationale: currently latent - `ref/recipes_seed.json`'s ingredient `type`
-  values are `{"Item"}` only today, so no production data exercises this path
-  - but it is a real, concrete mis-rendering defect waiting to happen, not a
-  taste difference. Fix: recognize "GuildUpgrade" explicitly and route it to
-  Unknown/hint-driven display instead of the Currency branch (full
+  which falls back to the literal string "Currency" for unrecognized ids.
+  Severity is worse than a mis-rendered pill: `Services/PlanSolver.cs:428`
+  special-cases only `ingredient.IngredientType == "Currency"` - a
+  GuildUpgrade leaf does not match that check, falls through to the same
+  method's `Evaluate()` call, and gets priced as an ordinary ITEM against
+  whatever Trading Post item happens to share that numeric id, while
+  `CraftingTreeBuilder.cs:80-86` simultaneously labels the very same node
+  "Currency" in the tree display. That is a wrong cost and a wrong
+  shopping-list line, not only a labeling defect.
+- Verdict: **ADOPT** (size: S-M)
+- Rationale: corrected from an earlier pass, which understated both
+  reachability and severity. Reachability: the earlier claim that
+  `ref/recipes_seed.json`'s ingredient `type` values are `{"Item"}` only
+  today is false - measured this pass (`python` scan of the same seed file,
+  14,736 recipe entries): 47,554 `Item` + 3 `Currency` ingredients, zero
+  `GuildUpgrade`, i.e. exactly `{Item, Currency}`, matching row 62's own
+  correct citation of the same file (the two rows previously contradicted
+  each other on this point; row 62 was right, this row was wrong). But the
+  seed's absence of `GuildUpgrade` is an artifact of how it was ingested,
+  not of GW2's real recipe data: measured this pass via
+  `api.guildwars2.com/v2/recipes/12002?v=2022-03-23`, which returns
+  `{"type":"GuildUpgrade","id":829,"count":5}` as a real ingredient (a
+  600-recipe versioned sample carries 70 `GuildUpgrade` + 41 `Currency`
+  occurrences) - the unversioned endpoint this seed was evidently built from
+  returns no `type` field at all. That gap is exactly what the in-flight
+  versioned-recipe ingestion fix closes, so this path goes from latent to
+  live the moment that branch merges; it is not a hypothetical future case.
+  Fix: recognize "GuildUpgrade" explicitly in both
+  `Services/PlanSolver.cs:428`'s Currency special-case (so it is not silently
+  costed as an item) and `Services/CraftingTreeBuilder.cs:80-86`'s display
+  branch (so it does not render as "Currency"), routing it to
+  Unknown/hint-driven display instead until real resolution exists (full
   recipe/decoration resolution is a larger, separate consideration - see
   Edge-case row 62, "Guild Hall decorations / permanent guild upgrades").
 
@@ -376,16 +403,41 @@ tree re-flagging, rounding*
   `currencyValuation` entry sets `allValued=false`, routing the WHOLE offer
   to a fallback tier ranked only against other fallback offers, never
   against TP/craft in `PickCheapest`.
-- Verdict: **ADOPT** (in-flight - named in task context as "craft/vendor
-  comparability asymmetry fix")
+- Verdict: **ADOPT** (the asymmetry finding only, in-flight - named in task
+  context as "craft/vendor comparability asymmetry fix"); the RESOLUTION
+  DIRECTION is corrected below and is not part of this ADOPT.
 - Rationale: this row documents the mechanism independently but is not a new
-  discovery. The asymmetry is real: our own craft-ingredient handling
-  treats an unvalued currency as zero-contribution and lets the recipe
-  compete normally (row 15), while vendor-offer handling disqualifies the
-  whole offer for the same condition. gw2e's uniform treatment is the more
-  internally-consistent model and does not violate the invalid-currency-
-  comparison invariant any more than our own craft-side handling already
-  accepts.
+  discovery, and the asymmetry itself is real and belongs here: our own
+  craft-ingredient handling (`Services/PlanSolver.cs:428-456`) treats an
+  unvalued currency as zero-contribution and lets the recipe compete
+  normally (row 15), while vendor-offer handling
+  (`Services/VendorBatchSolver.cs:274-320`) disqualifies the whole offer for
+  the identical condition - an internal inconsistency in our own logic
+  worth fixing regardless of which direction the fix takes.
+
+  Corrected from an earlier pass: that pass additionally prescribed gw2e's
+  specific resolution - uniform treatment where an unvalued currency
+  contributes 0 and the offer competes normally in `PickCheapest` - as the
+  fix direction. That prescription does not survive scrutiny against the
+  repo's own hard constraint of "no invalid currency comparisons": a vendor
+  offer priced entirely in an unvalued currency (e.g. 500 Karma, no user
+  valuation configured) would evaluate to 0 copper under gw2e's model and
+  win outright against every priced coin/craft alternative, producing a
+  zero-cost plan for something that in reality costs real currency the user
+  hasn't told the solver how to weigh. The craft-side precedent this row
+  leaned on for "gw2e's model doesn't violate the invariant any more than
+  our own craft-side handling already accepts" is not equivalent: on the
+  craft side, an unvalued currency is one ingredient among others that ARE
+  priced, so the resulting understatement is bounded by the rest of the
+  recipe's real cost; a vendor offer can be 100% currency, with nothing
+  bounding the understatement. Symmetry could equally be restored in the
+  opposite direction instead - making an unvalued currency ingredient
+  disqualify its recipe from comparison too, the same way an unvalued
+  vendor offer is disqualified today. Per this audit's own decision rules,
+  a resolution direction that conflicts with a hard constraint goes to
+  `docs/gw2e-considerations.md` for the maintainer to work through, rather
+  than being asserted as the ADOPT; the asymmetry finding itself remains an
+  ADOPT action item independent of that open question.
 
 ### 18. Vendor-purchasability modeling: separate acquisition-source arm with its own tie-break vs gw2e's "vendor is just a recipe"
 
@@ -432,10 +484,17 @@ tree re-flagging, rounding*
 
 *(Independently reported by both the Costing and the Valuations readers; merged here - the Valuations reader explicitly flagged the duplication risk.)*
 
-- gw2e (measured, `gw2e-parity-spec.md` Section 2.2 quoting `application.js`'s
-  price-map builder `u(itemIds, mode)`): when the user's selected side has no
-  price for a specific item, that one item silently falls back to the other
-  side rather than being left unpriced.
+- gw2e (**inferred/unverified**, not independently re-fetched this pass -
+  cited second-hand from `gw2e-parity-spec.md` Section 2.2, which itself
+  quotes `application.js`'s price-map builder `u(itemIds, mode)`): when the
+  user's selected side has no price for a specific item, that one item
+  silently falls back to the other side rather than being left unpriced.
+  Evidence-gap note: `application.js` is the live minified app bundle, and
+  this same audit elsewhere (row 58) states directly that a bundle grep
+  against it was inconclusive - it is the one artifact this audit admits it
+  could not grep reliably. For the sole ADOPT resting on this source, the
+  claim should be treated as inferred, not measured, until it is re-quoted
+  first-hand.
 - Ours (measured, `Services/PlanSolver.cs:1041-1055` `GetBuyCost` and
   `Services/VendorBatchSolver.cs:241-256`, both via the shared
   `GetUnitPrice`): returns exactly one side with no fallback; treats
@@ -548,8 +607,16 @@ tree re-flagging, rounding*
 - Rationale: different enforcement layer (gw2e: UI never offers an
   infeasible choice; ours: solver defensively re-validates and gracefully
   degrades) but the same end guarantee - a truly infeasible source is never
-  forced. Whether the display layer actually uses the exposed `Can*` flags
-  to hide pills is outside this area's file set.
+  forced. Closed caveat (stitched in from row 39, which this row originally
+  left as "outside this area's file set"): row 39 measures
+  `Services/DecisionPillPlanner.cs:119-165` `BuildPillSpecs` reading
+  `CraftingTreeNode.CanCraft`/`CanBuyTp`/`CanBuyVendor`
+  (`Models/CraftingTreeNode.cs:61-63`) to decide which of up to three
+  concurrent pills to render per node - confirming the display layer does
+  consume the exposed `Can*` flags to gate pill visibility, the same way
+  gw2e's `ng-hide` conditions do. The two rows should have been read
+  together rather than shipped with one EQUIVALENT carrying a self-declared
+  unverified half.
 
 ### 27. Policy-driven bulk force-buy list (gw2e's `forceBuyItems` - "Daily cooldowns = Buy" and "Mystic Forge Promotions = Disallow" default settings)
 
@@ -562,15 +629,21 @@ tree re-flagging, rounding*
   "force buy" machinery is `forceBuyOnlyNodeIds` (row 25) and per-node
   manual overrides (row 26), neither of which is a caller-supplied,
   policy-driven, item-id-keyed bulk list independent of price comparison.
-- Verdict: **ADOPT** (size: M)
-- Rationale: a genuine feature gap, not a bug in existing logic. The
-  plumbing already exists in the right shape to extend -
-  `forceBuyOnlyNodeIds` (`PlanSolver.cs:101-105, 503-505, 555`) is already a
-  generic "exclude craft from auto-pick, manual override still wins" id-set
-  parameter; a settings-gated feature could compute a similar set following
-  `OwnedMaterialsForceBuyPrePass.cs`'s own pattern. Related: Edge-case row 56
-  (intrinsic daily crafting cooldowns) would supply the same underlying
-  curated id list this feature needs for its "Daily cooldowns = Buy" half.
+- Verdict: **PRESERVE** (corrected from an earlier ADOPT pass - see below)
+- Rationale: fails the ADOPT bar on this audit's own decision rule - both
+  toggle halves are a user-preference policy choice (which side of a
+  price-independent default you want applied), not gw2e handling a case
+  better than ours, and nothing in our current logic is incorrect today. It
+  also directly contradicts row 61, which classifies the identical "Mystic
+  Forge Promotions = Disallow" half of this same mechanism as **PRESERVE**
+  because "building the toggle before the underlying data exists would be
+  speculative scope creep" - that reasoning applies verbatim to this row's
+  promotions half, and its cooldown half is equally not-yet-buildable: it
+  depends on row 56's curated daily-cooldown id list, which does not exist
+  in the codebase yet and is itself only a row 56 ADOPT proposal, not
+  shipped data. Two rows must not give opposite verdicts to the same
+  mechanism. Considerations entry added; at most this is a deferred
+  follow-on to row 56, once that curated id list exists.
 
 ---
 
@@ -680,7 +753,7 @@ same conclusion: **EQUIVALENT**, already implemented).
 
 ### 34. "Ignore" pill availability and cascade depth
 
-*(Merged with row 47 in Area 4, "Ignore-pill visibility gating"; both readers independently surfaced the same underlying divergence from different angles.)*
+*(Merged with row 43 in Area 4, "Ignore-pill visibility gating"; both readers independently surfaced the same underlying divergence from different angles. Corrected cross-reference: an earlier pass of this row pointed to row 47 instead - row 47 is "Tree-node default expansion depth," an unrelated mechanism. Row 43 is the correct match; considerations entry 7 already cited rows 34/43 correctly.)*
 
 - gw2e (measured, `componentTree.html:221-230`): the Ignore pill's own
   `ng-show` is `useOwnItems === 'true' && showprofit == false && (...)` - it
@@ -700,12 +773,21 @@ same conclusion: **EQUIVALENT**, already implemented).
 - Verdict: **PRESERVE**
 - Rationale: two divergences bundled together. The cascade-depth narrowing
   is already known and self-documented (KNOWN-ISSUES #20.4) - nothing new
-  there. The always-available-regardless-of-mode-or-snapshot gating is a
-  genuinely new observation: a user with no account connection at all can
-  still click Ignore and get a free-cost node, a strictly more general (not
-  incorrect) affordance than gw2e's gated version. Reasonable either way -
-  considerations entry added as a follow-up to the existing #20.4 record
-  rather than a new standalone bug.
+  there. The always-available-regardless-of-mode-or-snapshot gating: a user
+  with no account connection at all can still click Ignore and get a
+  free-cost node, a strictly more general (not incorrect) affordance than
+  gw2e's gated version. Corrected novelty claim: an earlier pass described
+  this as "a genuinely new observation" - that overclaims. `docs/KNOWN-
+  ISSUES.md`'s own DEFERRED list already records this exact question
+  verbatim: "Ignore-pill cascade semantics + own-materials gating
+  divergences (#20.4): revisit only on user feedback." The user has already
+  been shown this divergence and has already chosen to defer it, not left
+  it unraised - this row re-surfaces it with fresh supporting evidence (the
+  live `ng-show` gate and gw2e's `useOwnItems` default) rather than
+  discovering it. Considerations entry added as a follow-up to the existing
+  #20.4 record, explicitly noting it restates an already-deferred item
+  rather than new ground - consistent with this log's own preamble promise
+  not to re-raise settled ground.
 
 ### 35. Own-materials cost annotation: framing and presentation
 
@@ -841,9 +923,24 @@ reader itself flagged the duplication risk explicitly). **ADOPT** (size: S).
   across the tree (a currency is pooled, not per-branch-consumable like an
   item) - our aggregate-only summary avoids that ambiguity. Considerations
   entry added, flagging the stale internal citation for a doc-only
-  correction; full confidence on the underlying design intent would need
-  `calculateTreeQuantity.ts`'s per-node `ownedQuantity` assignment rule
-  (not fetched in this pass).
+  correction.
+
+  Correction to this row's own original "what would resolve it" pointer:
+  it named `calculateTreeQuantity.ts`'s per-node `ownedQuantity` assignment
+  rule as "not fetched in this pass" and the thing that would give full
+  confidence. That file has now been fetched (`raw.githubusercontent.com/
+  gw2efficiency/recipe-calculation/master/src/calculateTreeQuantity.ts`)
+  and it contains no per-node `ownedQuantity` assignment at all; it
+  explicitly EXCLUDES Currency-type nodes from availability consumption
+  altogether (`if (nesting > 0 && tree.type !== 'Currency' && !ignoreAvailable
+  && availableItems[tree.id])`). This strengthens the PRESERVE - gw2e's own
+  quantity-calculation engine never nets owned currency against any node,
+  tree or summary - but it invalidates the original pointer: whatever
+  populates `componentTree.html`'s "Using N owned currency" pill is computed
+  somewhere in `application.js` (the live app bundle), not in the published
+  `recipe-calculation` package, so a future confirm attempt should not aim
+  back at `calculateTreeQuantity.ts` a second time - it would find the same
+  answer again.
 
 ### 43. Ignore-pill visibility gating (vs. always-offered)
 
@@ -867,17 +964,28 @@ KNOWN-ISSUES #20.4.
   item whose FINAL solved decision is vendor-purchase with merged
   NeededCount actually exceeding the seeded cap. A capped item the solver
   ultimately routes to TP/craft instead shows no cap information anywhere.
-- Verdict: **ADOPT** (size: S)
-- Rationale: the module already seeds real DailyCap/WeeklyCap data
-  (KNOWN-ISSUES #28/#33) but only surfaces it post-hoc, after the plan is
-  fully solved, and only for the winning path. Adding an inline tree-row
-  badge/tooltip (display-only, reusing already-seeded
-  `VendorOffer.DailyCap`/`WeeklyCap` joined by item id in
-  `TreeSectionController`, no solver change) would let a user see cap
-  exposure BEFORE committing to a craft-vs-buy choice, matching gw2e's
-  earlier-and-independent-of-decision surfacing. No
-  PlanContentHeightMath/PlanRelayoutMath change needed if implemented as a
-  tooltip-only badge reusing the existing pill-tooltip pattern.
+- Verdict: **PRESERVE** (corrected from an earlier ADOPT pass - see below)
+- Rationale: no correctness or decision impact exists on either side - row 55
+  (**EQUIVALENT**, re-verified this pass: `dailyCooldowns.ts` is imported by
+  none of `cheapestTree`/`calculateTreeCraftFlags`/`calculateTreePrices`/
+  `calculateTreeQuantity`) already establishes that purchase caps are
+  informational-only in both engines. The delta here is purely WHERE and
+  WHEN an advisory renders, not whether it affects the plan. Ours fires only
+  when the merged `NeededCount` actually exceeds a cap on the committed
+  vendor path (higher-signal, decision-relevant); gw2e badges every capped
+  component unconditionally regardless of which source wins (more noise -
+  a cap on an item the solver ultimately routes to TP/craft never
+  constrains the plan at all). This is the same class of divergence as row
+  48 (wiki-link icon), which the audit itself scored **PRESERVE** as "a UI
+  convenience, not core craft-vs-buy correctness" - row 44 was scored
+  inconsistently against that sibling row. Considerations entry added.
+  Evidence-gap note: the earlier ADOPT pass also asserted, without a
+  measured check, that an inline tree-row badge would need "no
+  PlanContentHeightMath/PlanRelayoutMath change ... if implemented as a
+  tooltip-only badge" - adding content to a tree row is precisely the class
+  of change that perturbs row-height/relayout inputs, both of which are
+  DO-NOT-TOUCH; that assurance was unverified and should not be treated as
+  settled if this is ever revisited.
 
 ### 45. "Recipe has N variants" badge (compensating for gw2e's one-recipe-per-output nesting ceiling) [already-known, ARE case]
 
@@ -1180,6 +1288,20 @@ mechanics, decorations/guild upgrades*
   hard constraint), same seed-file shape already in production. Fills a
   real, high-value gap given legendary crafting is a headline use case for
   a crafting-planner module.
+- Evidence-gap note: the gw2e-side measurement above establishes only that
+  gw2e HAS this data (283 achievement-gated recipes, via a recovered
+  `custom-recipes.json` snapshot cited in `m37-r3-achievement-dedup.md`) -
+  and that snapshot is itself gw2e's research-only data, the exact boundary
+  this repo's invariants forbid using as a runtime or seed source, so it
+  cannot be where the curated replacement comes from. Nothing measured in
+  this pass establishes that all ~283 collection-gated recipes' full
+  ingredient lists can actually be re-curated from the wiki or the official
+  API at that volume - the #26 precedent this row leans on covered a single
+  recipe (Infinite Trebuchet Blueprint), not 283. Both the "wiki/official-
+  API-cross-verified" fix shape and the size-M estimate above are therefore
+  unsupported by direct evidence and should be treated as inferred, not
+  measured, until a real feasibility check (e.g. a sample pull of a handful
+  of these recipes' ingredient lists from the wiki) is done.
 
 ### 60. Random-output ("gambling") Mystic Forge precursor recipes (4 ingredients -> a probabilistic single output drawn from a small pool)
 
@@ -1248,17 +1370,99 @@ mechanics, decorations/guild upgrades*
 
 ---
 
+## Coverage-gap addendum
+
+The row below was not produced by any of the five area reads - it is a
+mechanism the synthesis pass missed entirely (zero hits for
+`competenc|homestead|efficiencyTier|userEfficiency` in either this matrix or
+`docs/gw2e-considerations.md` before this correction), even though the task
+brief's own already-known list flagged it as a divergence that "belongs in
+considerations." Added here during the correction pass to close that
+coverage gap. Numbered 63 (after the original 62-row sweep) rather than
+inserted into the Area 2/3 sequence, to avoid renumbering rows already
+cross-referenced elsewhere in this document and in
+`docs/gw2e-considerations.md`.
+
+### 63. Homestead Refinement efficiency-tier mechanism: continuous per-recipe scaling vs discrete per-tier offer rows [already implemented, M37/KNOWN-ISSUES #24 - newly added to this audit's coverage, not a new discovery]
+
+- gw2e (measured, `raw.githubusercontent.com/gw2efficiency/recipe-calculation/master/src/cheapestTree.ts`,
+  cross-checked in `docs/research/m37-r1-homestead.md` Section 1.2): `cheapestTree`
+  takes a `userEfficiencyTiers` parameter defaulting to `{'102306':'0',
+  '102205':'0','103049':'0'}` (Fiber/Metal/Wood Homestead Refinement
+  stations, tier 0 = no upgrade). `applyEfficiencyTiersToTree()` runs before
+  any pricing pass and, for a matched Homestead Refinement recipe node,
+  continuously scales the single component's quantity
+  (`component.quantity = component.quantity / (efficiencyTier * 2)`,
+  doubling output when input drops below 1), plus three hardcoded per-item
+  quirks layered on top of that general formula: onion (12142), potato
+  (12135), and iron ore (19699) each get a special-cased discount at tier 1
+  that the general halving formula does not produce on its own.
+- Ours (measured, `Models/HomesteadEfficiencyTiers.cs`,
+  `Services/CraftingPlanPipeline.cs:95/245`, `Services/PlanSolver.cs:139-142`,
+  `Services/VendorBatchSolver.cs:171-220`): `HomesteadEfficiencyTiers`
+  (default tier 0 for every material, matching gw2e's own default) is wired
+  through the pipeline into both the solver and vendor-offer evaluation.
+  Mechanically different from gw2e's continuous per-recipe scaling: our
+  wiki-seeded data carries separate discrete vendor-offer rows pre-tagged
+  with a `HomesteadTier`, and `VendorBatchSolver.EvaluateVendorOffers`
+  simply excludes any offer whose tagged tier exceeds the user's configured
+  tier for that output material - a coarser, offer-selection-based
+  mechanism rather than gw2e's continuous quantity-formula scaling with
+  hardcoded per-item exceptions. Prior art: `docs/research/m37-r1-homestead.md`
+  (936-line research report backing the M37 implementation);
+  `docs/KNOWN-ISSUES.md` #24 ("FIXED in M37").
+- Verdict: **PRESERVE**
+- Rationale: already implemented and already deliberate, not a gap this
+  audit is surfacing for the first time - M37's own research report already
+  weighed gw2e's mechanism and chose a different implementation strategy
+  (discrete pre-tagged offer rows over a continuous per-recipe scaling
+  formula) while preserving the same user-facing default (tier 0, matching
+  gw2e) and the same absence of a master "do you own Homestead" gate
+  (gw2e has none either, per `m37-r1-homestead.md` Section 1.5). This is
+  exactly the kind of taste/architecture divergence this audit's own
+  decision rules route to PRESERVE-plus-considerations rather than ADOPT,
+  and the task brief's already-known list said as much before this audit
+  began. Recorded here only because the mechanism was otherwise entirely
+  absent from this matrix's coverage, which risked implying it had never
+  been compared. Considerations entry added, cross-referencing the existing
+  M37/`m37-r1-homestead.md`/KNOWN-ISSUES #24 record rather than re-litigating
+  it.
+
+---
+
 ## Summary
 
-- 57 distinct mechanisms compared (62 raw findings, 5 duplicate pairs merged).
+*(Updated by a correction pass after initial publication - see the inline
+"corrected from an earlier pass" notes on rows 5, 17, 20, 27, 34, 42, 44, 59,
+and the new row 63. Counts below reflect the corrected state.)*
+
+- 58 distinct mechanisms compared (63 raw findings - the original 62 from the
+  five-area sweep plus row 63, added during the correction pass to close a
+  coverage gap the sweep missed entirely - 5 duplicate pairs merged).
 - **EQUIVALENT**: 23 rows (behavior matches in substance).
-- **PRESERVE**: 26 rows (taste or marked improvement; open questions in
-  `docs/gw2e-considerations.md`).
-- **ADOPT**: 8 distinct action items (2 already in-flight per existing
-  project tracking; 6 net-new from this audit). See
+- **PRESERVE**: 29 rows (taste or marked improvement; open questions in
+  `docs/gw2e-considerations.md`). Rows 27 and 44 moved here from ADOPT in the
+  correction pass (both failed the ADOPT bar - policy/taste preference and a
+  where/when-to-render UI question respectively, neither a case of gw2e
+  handling something better or a bug in ours); row 63 (Homestead Refinement
+  efficiency tiers) is new.
+- **ADOPT**: 6 distinct action items. Row 17 is in-flight (named in project
+  tracking as the "craft/vendor comparability asymmetry fix") but its
+  resolution DIRECTION was corrected out to a considerations entry rather
+  than asserted, since gw2e's specific model can breach the
+  no-invalid-currency-comparisons hard constraint. Row 5 becomes reachable
+  once the in-flight versioned-recipe-ingestion fix lands (previously
+  mis-assessed as latent against production data that doesn't reflect that
+  fix). Rows 20, 31, 56, 59 are net-new. See
   `docs/gw2e-considerations.md`'s companion summary and existing project
   tracking for follow-up package scoping.
-- **INVESTIGATE**: 0 rows (no row required this verdict; two rows carry an
-  explicitly labeled INFERRED sub-claim that a follow-up fetch could
-  upgrade to measured - rows 58 and 60 - but neither blocks its own
-  verdict).
+- **INVESTIGATE**: 0 rows (no row required this verdict). Evidence-standard
+  caveats worth tracking on rows that keep their verdict regardless: rows 58
+  and 60 carry an explicitly labeled INFERRED sub-claim; row 20's sole
+  gw2e-side citation was corrected from measured to inferred/unverified
+  (never independently re-fetched, and sourced from the one artifact this
+  audit elsewhere admits it could not grep reliably - row 58's bundle
+  caveat); row 59's "wiki/official-API-cross-verified, size M" fix framing
+  was corrected to flagged-as-inferred (evidence establishes gw2e HAS the
+  data, not that ~283 recipes' ingredients can be curated at that volume).
+  None of these block their row's own verdict.

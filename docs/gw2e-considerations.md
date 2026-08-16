@@ -16,6 +16,10 @@ is arguably better), and what it would take to change if you ever want to.
 Source references point into `docs/research/gw2e-convergence-matrix.md` (the
 full evidence trail lives there) by matrix row number.
 
+*Updated by a correction pass after initial publication: entries 20-23 are
+new, entries 7 and 11 had wording corrected in place. See the Summary at the
+bottom for what changed and why.*
+
 ---
 
 ## 1. Should the module ship a curated default currency-value table? [constraint-blocked]
@@ -170,11 +174,16 @@ craft/vendor tie). Is our tie-break rule the right one?
 
 ---
 
-## 7. "Ignore" pill: always available vs gated behind an active own-materials mode
+## 7. "Ignore" pill: always available vs gated behind an active own-materials mode [already deferred - #20.4]
 
 **The question**: should the Ignore pill (which zeroes a node's cost/quantity
 tree-wide) be available all the time, or only when you're actively valuing
-owned materials / connected to an account?
+owned materials / connected to an account? You've already seen this question
+once and deferred it (`docs/KNOWN-ISSUES.md`'s DEFERRED list: "Ignore-pill
+cascade semantics + own-materials gating divergences (#20.4): revisit only on
+user feedback") - this entry restates it with fresher supporting evidence, it
+is not a new discovery. An earlier pass of this log described the gating half
+below as "a genuinely new observation," which overclaimed; corrected here.
 
 - **gw2e**: the Ignore pill only renders when "Value Own Materials" is
   toggled on (and that toggle itself defaults off) - a user who hasn't
@@ -196,7 +205,8 @@ owned materials / connected to an account?
 - **What matching gw2e would look like**: gate `AppendOwnershipPills`'s
   Ignore pill on `OwnMaterialsMode != Free` (and optionally on an active
   snapshot), a small conditional in `DecisionPillPlanner.cs`.
-- Matrix reference: rows 34/43 (merged).
+- Matrix reference: rows 34/43 (merged; row 34's own header previously
+  mis-cited its merge partner as row 47 - corrected to row 43).
 
 ---
 
@@ -289,10 +299,17 @@ where that currency appears, or only once in the summary?
   cites an older internal report claiming gw2e "only ever nets owned
   currency out at the summary layer" - a live fetch this session shows that
   claim is not accurate (gw2e does have a per-node pill). That comment
-  should get a doc-only correction. Full confidence on gw2e's actual
-  per-node assignment RULE (not just that the pill exists) would need
-  reading `calculateTreeQuantity.ts`'s per-node `ownedQuantity` logic, which
-  was not fetched in this pass.
+  should get a doc-only correction.
+- **Corrected follow-up pointer**: this entry previously said full confidence
+  on gw2e's actual per-node assignment rule would need reading
+  `calculateTreeQuantity.ts`'s per-node `ownedQuantity` logic, "not fetched
+  in this pass." That file has since been fetched, and it settles the
+  opposite of what the pointer implied: it assigns no per-node
+  `ownedQuantity` at all, and it explicitly excludes Currency-type nodes
+  from availability consumption entirely. Whatever populates the tree pill's
+  number is computed in gw2e's live `application.js` bundle, not in the
+  published `recipe-calculation` package - a future confirm attempt should
+  aim there, not back at `calculateTreeQuantity.ts`.
 - Matrix reference: row 42.
 
 ---
@@ -465,12 +482,179 @@ worth a future milestone?
 
 ---
 
+## 20. Policy-driven bulk force-buy list: "Daily cooldowns = Buy" and "Mystic Forge Promotions = Disallow"
+
+**The question**: gw2e ships two settings that unconditionally force a
+matching item to Buy regardless of price comparison - one for items with an
+intrinsic daily crafting cooldown, one for time-limited promotional
+precursor recipes. Do you want either as a settings toggle?
+
+- **gw2e**: `cheapestTree`'s `forceBuyItems` list is populated from these two
+  UI toggles, resolved once per calculation and applied independent of
+  whether a valid buy price even exists.
+- **Ours**: no equivalent concept - grepped `Services/*.cs` and
+  `Models/*.cs` for DailyCooldown/MysticForgePromotion, zero hits. The only
+  force-buy machinery that exists (`forceBuyOnlyNodeIds`, entry 25's
+  pre-pass; per-node manual overrides) is price-comparison-driven, not a
+  caller-supplied policy list.
+- **Why this landed here and not as an automatic fix**: this was initially
+  scored as an ADOPT ("a genuine feature gap"), which does not survive
+  scrutiny against this log's own decision rule - both toggle halves are a
+  user-preference policy choice (which side of a price-independent default
+  you want applied), not gw2e handling a case better than ours, and nothing
+  in our current logic is wrong today. It also would have directly
+  contradicted entry 18 below (Mystic Forge Promotions), which correctly
+  treats the identical promotions toggle as not-yet-buildable because the
+  underlying recipe data doesn't exist yet - the same reasoning applies to
+  this row's promotions half, and its cooldown half depends on data that is
+  itself only a proposal (the matrix's row 56, "intrinsic recipe-level daily
+  crafting cooldowns" - a curated id list that doesn't exist in the codebase
+  yet).
+- **What building this would look like, if you want it**: at most a deferred
+  follow-on to row 56 once its curated daily-cooldown id list exists - the
+  cooldown half of this toggle would consume that same list; the promotions
+  half additionally needs the legendary/precursor recipe data entry 18
+  below is waiting on.
+- Matrix reference: row 27 (related: rows 56, 61/entry 18).
+
+---
+
+## 21. Vendor purchase-cap indicator: inline tree-row badge vs. Crafting-Steps-only notice
+
+**The question**: should a vendor purchase cap show up as a badge on the tree
+row itself (so you see exposure before committing to a source), or only in
+the Crafting Steps section once the plan has already been solved and a
+vendor path has won?
+
+- **gw2e**: an hourglass icon renders on every non-root, non-coin component's
+  row whenever its matched vendor data carries a daily or weekly purchase
+  cap - shown unconditionally, independent of which acquisition source
+  ultimately wins for that node.
+- **Ours**: a plain-text notice appears only inside the Crafting Steps
+  section, and only for an item whose FINAL solved decision is
+  vendor-purchase with merged demand actually exceeding the seeded cap. A
+  capped item the solver routes to TP or craft instead shows no cap
+  information anywhere.
+- **Why this is a real tradeoff, not a clear-cut adopt**: matrix row 55
+  already establishes purchase caps are informational-only in both engines
+  (already implemented on our side, per KNOWN-ISSUES #20.2/#28/#33) -
+  neither side lets a cap change the craft/buy/vendor decision. So the only
+  thing in question is where and when
+  an advisory renders, not whether it affects your plan. Ours fires only
+  when a cap actually binds on the path you're committed to (higher signal);
+  gw2e badges every capped component regardless of which source wins (more
+  noise - a cap on an item routed to TP/craft never constrains anything).
+  This was initially scored ADOPT, inconsistently with how this same log
+  treats entry 14 below (the wiki-link icon), a UI-convenience row scored
+  PRESERVE on the same "not core craft-vs-buy correctness" reasoning that
+  applies here too.
+- **A build note if you do want it**: an earlier pass asserted that an
+  inline tooltip-only badge would need "no PlanContentHeightMath/
+  PlanRelayoutMath change" - that assurance was never actually checked.
+  Adding content to a tree row is exactly the class of change that perturbs
+  row-height/relayout inputs, and both of those are on this repo's
+  DO-NOT-TOUCH list. Verify that concretely before assuming a tooltip-only
+  badge is free.
+- **What matching gw2e would look like**: an inline tree-row badge/tooltip
+  (display-only, reusing already-seeded `VendorOffer.DailyCap`/`WeeklyCap`
+  joined by item id in `TreeSectionController`, no solver change) - but see
+  the build note above before assuming that's actually height-neutral.
+- Matrix reference: row 44.
+
+---
+
+## 22. Vendor offer priced entirely in an unvalued currency: which side should give way? [hard-constraint conflict]
+
+**The question**: our craft-ingredient handling and our vendor-offer handling
+disagree about what an unvalued (un-priced) non-coin currency should do to
+comparability. Craft-side, an unvalued currency ingredient contributes zero
+and the recipe still competes normally. Vendor-side, an offer with even one
+unvalued currency line gets pulled out of the normal comparison entirely and
+only competes against other similarly-disqualified offers. That asymmetry is
+real and a fix is already in flight - but which direction should the fix
+resolve it?
+
+- **gw2e's model** (uniform treatment: an unvalued currency contributes zero,
+  the offer/recipe competes normally either way) is NOT safe to port as-is.
+  Porting it would let a vendor offer priced 100% in an unvalued currency
+  (say, 500 Karma with no valuation configured) evaluate to 0 copper and win
+  outright against every priced coin/craft alternative - a zero-cost plan
+  for something that actually costs real currency. That breaches this
+  repo's own "no invalid currency comparisons" invariant.
+- **Why the craft-side precedent doesn't settle it**: on the craft side, an
+  unvalued currency is one ingredient among others that ARE priced, so the
+  understatement is bounded by the rest of the recipe's real cost. A vendor
+  offer can be entirely currency, with nothing bounding the understatement -
+  the two situations aren't equivalent even though they look symmetric on
+  the surface.
+- **The other direction is equally available**: instead of loosening the
+  vendor side to match the craft side's leniency, the craft side could be
+  tightened to match the vendor side's caution - make an unvalued currency
+  ingredient disqualify its recipe from comparison too, the same way an
+  unvalued vendor offer is disqualified today. Both directions restore
+  symmetry; only one of them risks a zero-cost plan.
+- **What to decide**: whether comparability should lean permissive (gw2e's
+  way, currency-blind and hoping the amounts are usually small enough not to
+  matter) or leans conservative (disqualify anything with an un-priceable
+  cost component, on either side, until the user prices it) - a genuine
+  product/risk call, not a mechanical fix.
+- Matrix reference: row 17 (the asymmetry finding itself is an ADOPT action
+  item in the matrix; this entry is only the contested resolution
+  direction).
+
+---
+
+## 23. Homestead Refinement efficiency tiers: continuous formula vs discrete tagged offers [already implemented - awareness only]
+
+**The question**: no fresh decision needed - this entry exists because the
+mechanism was missing from this log's coverage entirely, not because
+anything about it is unresolved. Recorded for completeness.
+
+- **gw2e**: `cheapestTree`'s `userEfficiencyTiers` parameter feeds
+  `applyEfficiencyTiersToTree()`, which continuously scales a matched
+  Homestead Refinement recipe's component quantity by formula
+  (halving input per tier, doubling output once input drops below 1),
+  layered with three hardcoded per-item quirks (onion, potato, iron ore)
+  that the general formula doesn't produce on its own.
+- **Ours**: `HomesteadEfficiencyTiers` (default tier 0 for every material,
+  matching gw2e's own default) is wired through the pipeline into both the
+  solver and vendor-offer evaluation, but mechanically differently -
+  wiki-seeded data carries discrete vendor-offer rows pre-tagged with a
+  tier, and any offer above the user's configured tier is simply excluded
+  from consideration, rather than continuously scaling a formula.
+- **Why this is settled, not open**: this was already researched and
+  deliberately implemented in M37 (`docs/research/m37-r1-homestead.md`,
+  936 lines; `docs/KNOWN-ISSUES.md` #24, "FIXED in M37") - a different
+  implementation strategy chosen on purpose while preserving gw2e's
+  user-facing default (tier 0) and its absence of a master "do you own
+  Homestead" gate (gw2e has none either). Nothing here needs your attention
+  unless you want to revisit that M37 decision on its own merits.
+- Matrix reference: row 63.
+
+---
+
 ## Summary
 
-19 entries above. Each maps to a PRESERVE (or constraint-blocked) row in
+23 entries above (19 from the original pass, plus 20-23 added in a
+correction pass). Each maps to a PRESERVE (or constraint-blocked) row in
 `docs/research/gw2e-convergence-matrix.md`; several PRESERVE rows in that
 matrix are not repeated here because they were already fully settled/tracked
 elsewhere (KNOWN-ISSUES.md, gw2e-parity-spec.md) with no open question left
 for you to weigh - the matrix marks those explicitly as
 "[already-known]"/"[in-flight]" so you can see the full picture without this
 log re-raising settled ground.
+
+**Correction pass notes**: entries 20 and 21 are new because matrix rows 27
+and 44 moved here from ADOPT (both failed the ADOPT bar on review - policy
+preference and a where/when-to-render question, not gw2e handling something
+better or a bug in ours). Entry 22 is new because matrix row 17's asymmetry
+finding stays an ADOPT action item, but its previously-asserted resolution
+direction turned out to conflict with the "no invalid currency comparisons"
+hard constraint and was moved here instead, per this log's own routing rule
+for constraint conflicts. Entry 23 is new because the underlying mechanism
+(Homestead Refinement efficiency tiers) was absent from both this log and
+the matrix entirely, despite already being implemented and documented
+elsewhere (M37/KNOWN-ISSUES #24) - added to close that coverage gap, not
+because anything about it is unresolved. Entries 7 and 11 had wording
+corrected in place (a novelty overclaim and an invalidated follow-up
+pointer, respectively) without changing their underlying verdicts.
