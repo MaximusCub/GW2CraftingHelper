@@ -80,6 +80,39 @@ namespace GW2CraftingHelper.Models
         // The view renders these dimmed and collapsed by default.
         public bool IsReferenceBranch { get; set; }
 
+        // W4B (vendor cost-component leaves): true only for a DISPLAY-ONLY
+        // synthetic leaf CraftingTreeBuilder.BuildVendorCostComponentLeaves
+        // creates under a BuyFromVendor node whose winning offer mixed 2+
+        // cost kinds (coin / non-coin currency / TP-valued item) - never
+        // set on a real solver-backed node. Default false, additive, so an
+        // old plan.json simply deserializes every existing node with this
+        // false (renders exactly as before W4B) until the plan is
+        // regenerated. Downstream effects of this flag:
+        // - DecisionPillPlanner.BuildPillSpecs gives it ONLY an
+        //   informational HAVE/"HAVE N/M NEEDED" pill (from
+        //   ComponentOwnedQuantity below) or no pill at all - never a
+        //   decision pill, never Ignore, never override-clickable.
+        // - It corresponds to no RecipeNode at all (it is never fed back
+        //   into PlanSolver.Evaluate/CollectPresetOverrides, which walk the
+        //   SOLVER tree exclusively - see CraftingPlanPipeline.
+        //   CollectPresetOverrides), so it cannot affect a solver decision.
+        public bool IsCostComponent { get; set; }
+
+        // W4B: informational-only "how much of this cost component's own
+        // Quantity do you already own" count, populated ONLY when
+        // IsCostComponent is true (0 otherwise). Unlike OwnedQuantityUsed
+        // above, this NEVER reduces Quantity or any displayed cost - a
+        // cost component is a fact about what the winning vendor offer
+        // charges, not a shopping demand InventoryReducer ever sees (see
+        // AccountCurrencyIndex/AccountItemIndex's own "cosmetic
+        // reconciliation, never consulted by the solver" precedent, which
+        // this reuses for both currency and item components). Deliberately
+        // a separate field from OwnedQuantityUsed (whose own doc comment's
+        // "Quantity + OwnedQuantityUsed recovers the original pre-
+        // reduction demand" contract does not hold here - Quantity on a
+        // cost-component leaf is never reduced at all).
+        public int ComponentOwnedQuantity { get; set; }
+
         // Wiki-derived acquisition guidance (see AcquisitionHintService),
         // set only for Decision == Unknown nodes with a seeded hint.
         // Tooltip-only text, never an id.
