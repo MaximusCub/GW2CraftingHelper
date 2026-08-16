@@ -201,6 +201,48 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task NullTypedIngredient_BecomesLeaf_RecipeNeverExpanded()
+        {
+            // Adversarial-review finding (2026-08-16): RawIngredient.Type
+            // deserializes to null when a seed/overlay JSON row omits
+            // "type" (System.Text.Json applies no default), so this shape
+            // is reachable from real cache data even though today's seed
+            // always carries a type string. BuildNodeAsync's guard must be
+            // Item-positive like every other guard in this fix series
+            // (PlanSolver.Evaluate/Collect/RecomputeCraftCosts,
+            // CraftingTreeBuilder.BuildNode) - null must be treated as
+            // NOT an item and never recurse into a recipe search, so the
+            // rest of the pipeline's own Item-positive guards (which
+            // already skip pricing/expanding a non-"Item" node) stay in
+            // sync with what the tree actually contains instead of being
+            // handed an unexpectedly-populated subtree for a node type
+            // they treat as an unpriced leaf.
+            var api = new InMemoryRecipeApiClient();
+            api.AddSearchResult(1, 10);
+            api.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                    new RawIngredient { Type = null, Id = 99, Count = 5 }
+                }
+            });
+
+            var svc = new RecipeService(api);
+            var node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);
+
+            var nullTypedNode = node.Recipes[0].Ingredients[1];
+            Assert.Equal(99, nullTypedNode.Id);
+            Assert.Null(nullTypedNode.IngredientType);
+            Assert.Equal(5, nullTypedNode.Quantity);
+            Assert.True(nullTypedNode.IsLeaf);
+            Assert.Empty(nullTypedNode.Recipes);
+        }
+
+        [Fact]
         public async Task SelfReferentialIngredient_BecomesLeaf_QuantityDoesNotCompound()
         {
             // M33 item 4 (m5 Finding 2 / r2 report): a real, wiki-verified

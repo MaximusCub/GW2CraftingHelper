@@ -4345,15 +4345,23 @@ whatever PASS/FAIL verdict was meant only for the most recent one - or,
 after this section's own append, four. Fixed by stripping the trailing
 `Gate:` line from all three prior sections (all now superseded by this
 one, which incorporates everything from all three plus the class-level
-fix above) and leaving exactly one PENDING `Gate:` line in the entire
-document - the one at the end of this section. (The document also
-carries several pre-existing, already-filled `Gate: PASS ...` lines from
-earlier, unrelated milestones; those are untouched and out of scope - a
-naive replace targeting the literal string `Gate:` rather than the
-specific PENDING placeholder would still have matched them too.) Nothing
-else in those three sections was altered besides the "Remaining /
-deferred" bullet noted below and the removal of each stale `Gate:` line
-itself.
+fix above) and leaving exactly one PENDING `Gate:` line in the document
+as of this commit - the one at the end of this section. (The document
+also carries several pre-existing, already-filled `Gate: PASS ...`
+lines from earlier, unrelated milestones; those are untouched and out
+of scope - a naive replace targeting the literal string `Gate:` rather
+than the specific PENDING placeholder would still have matched them
+too.) Nothing else in those three sections was altered besides the
+"Remaining / deferred" bullet noted below and the removal of each stale
+`Gate:` line itself. NOTE this "exactly one" claim describes only the
+state as of this commit, not a standing document-wide fact: it is an
+invariant every later-appended section is individually responsible for
+re-establishing (by stripping whichever line was previously at EOF
+before adding its own) each time a further adversarial pass appends
+another section below this one - see the fix recorded near the end of
+this document for a case where a later commit dropped that
+responsibility and left two PENDING lines standing at once, and the
+follow-up commit that restored the invariant.
 
 **Fixed (Must Fix - dropped backlog item / dangling forward reference):
 the "RESOLVED (2026-08-16)" marker on the original out-of-scope
@@ -4590,8 +4598,6 @@ abstraction for it is not justified under this repo's "avoid
 infrastructure unless required" efficiency principle - out of scope for
 this targeted fix.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
-
 ## GuildUpgrade ingredient costing/display fix - pill-layer instance-vs-class gap closed (2026-08-16)
 
 A seventh adversarial pass (external orchestrator review) found the
@@ -4703,5 +4709,184 @@ abstraction for it is not justified under this repo's "avoid
 infrastructure unless required" efficiency principle for a targeted
 fix - out of scope here, same call made in the immediately preceding
 section for a structurally identical case.
+
+## GuildUpgrade ingredient costing/display fix - orchestrator fix-loop: Gate-line duplication, RecipeService type-guard drift, vendor cost-line classification sibling closed (2026-08-16)
+
+An eighth adversarial pass (external orchestrator review of the whole
+saga above) found three defects: this document's own Gate-line contract
+was broken again by the two immediately preceding sections, a fourth
+Item-positive guard site (`RecipeService.BuildNodeAsync`) was left out
+of the class sweep the rest of this saga performed, and the vendor
+cost-line classification loop this saga never touched has the
+structurally identical silently-drop-unrecognized-type shape the whole
+saga exists to close, in a different domain (`VendorOffer.CostLines[].Type`
+rather than `RecipeNode.IngredientType`/`RawIngredient.Type`). No
+DO-NOT-TOUCH code was touched (`Services/ModuleLog.cs`,
+`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`,
+scroll machinery); `VendorBatchSolver`'s merged-ceil batching math
+(the `unitsNeeded`/scaling arithmetic below the cost-line loop) was
+also left untouched, per the finding's own explicit carve-out - only
+the cost-line classification loop above it was in scope.
+
+**Fixed (Must Fix - deliverable-contract violation, recurrence of the
+defect the "residual class-gap follow-up" section above already fixed
+once): the "pill-layer instance-vs-class gap closed" section immediately
+above this one appended its own `Gate: [PENDING - the orchestrator fills
+in PASS/FAIL]` line without stripping the one already sitting at the end
+of the "Evaluate doc-comment invariant..." section before it, leaving
+two PENDING lines standing in the document at once.** The two sections
+between the original "residual class-gap follow-up" fix and this one
+("unrecognized-type class sweep completion...", "Evaluate doc-comment
+invariant...") had each correctly stripped their own predecessor's Gate
+line before appending a new one, so the single-PENDING-line invariant
+actually held for two more appends after the original fix before the
+"pill-layer" section's append broke it again. A naive string replace
+targeting the literal PENDING marker would have stamped whatever verdict
+was meant only for the latest section onto the superseded one as well -
+the exact hazard the "residual class-gap follow-up" section's own fix
+already exists to prevent. That earlier fix's own wording stated the
+outcome as a standing fact about the document ("leaving exactly one
+PENDING `Gate:` line in the entire document") rather than a per-append
+responsibility every later section must independently uphold, which is
+plausibly why the lapse went uncaught for two appends before it
+recurred. Fixed by stripping the stale `Gate:` line from the "Evaluate
+doc-comment invariant..." section (superseded by the "pill-layer"
+section appended after it) and reworking the earlier "residual
+class-gap follow-up" section's wording from a standing document-wide
+claim to an explicitly commit-scoped one ("...in the document as of
+this commit"), with a new sentence pointing readers at this section as
+the place a later violation was found and fixed - so a future reader of
+that earlier section is told the invariant needs active per-append
+maintenance rather than reading it as a fact that holds forever.
+Exactly one PENDING `Gate:` line now remains in the document: the one
+at the end of this section.
+
+**Fixed (Must Fix - class sweep left a fourth Item-positive guard site
+untouched, reintroducing the exact instance-vs-class drift this whole
+saga exists to eliminate): `RecipeService.BuildNodeAsync`'s guard read
+`if (!string.IsNullOrEmpty(ingredientType) && ingredientType != "Item")`
+- unlike every sibling guard this saga already converted
+(`PlanSolver.Evaluate`/`Collect`/`RecomputeCraftCosts`,
+`CraftingTreeBuilder.BuildNode`, all now flatly `!= "Item"`), a null or
+empty `ingredientType` fell through this guard's `IsNullOrEmpty` clause
+and was treated AS an item - its recipes were searched and its subtree
+fully expanded, exactly like a genuine `"Item"` node.** That is now
+inconsistent with every downstream site: `PlanSolver.Evaluate`'s
+Item-positive top guard treats that same null-typed node as unpriceable
+the moment it is reached (contributes zero to `craftCost`/
+`craftRealCost`, demotes to fallback tier, generates no shopping steps
+for the whole subtree `RecipeService` bothered to build), and
+`CraftingTreeBuilder.BuildNode` renders it as the generic "Unrecognized
+ingredient (unresolved)" leaf with no recursion into the children
+`RecipeService` attached beneath it - so the mismatch does not crash or
+mis-price anything today, it silently discards a real, wiki-verified
+subtree's worth of cost and shopping-list detail. Not reachable with
+today's data (`ref/recipes_seed.json`: 48237 Item / 678 GuildUpgrade /
+195 Currency, 0 missing type; `Gw2RecipeApiClient.cs` defaults a missing
+API `type` string to `"Item"`; `MysticForgeRecipeData.cs` rejects an
+empty `type` outright during ingestion), but `RawIngredient.Type` is a
+plain `string` property with no default, and `RecipeCacheSerializer`
+deserializes seed/overlay `RawRecipe`/`RawIngredient` rows straight
+through `System.Text.Json` with no default-value handling - commit
+e81b7e4 (2026-02-14) shows this exact field WAS null-valued before the
+API-client default was added, so the shape is a real historical
+regression risk, not a hypothetical one. Fixed by inverting the guard to
+match every sibling site: `if (ingredientType != "Item")`, so null,
+empty, and any other non-`"Item"` string all short-circuit to an
+unexpanded leaf node the same way `"Currency"`/`"GuildUpgrade"`/an
+unrecognized type already do, keeping `RecipeService`'s tree-shape
+decision in sync with what `PlanSolver` and `CraftingTreeBuilder` will
+do with that same node afterward.
+
+**Fixed (Must Fix - class, not instance: structurally identical
+unrecognized-cost-line-type sibling in the vendor domain, left open by
+the "Currency sibling icon/rarity leak" section's own exclusion note
+above, which answered only the specific `GuildUpgrade`-vs-`CostLine.Type`
+instance and not the general class): `VendorBatchSolver.EvaluateVendorOffers`'s
+cost-line fold handled `cost.Type == "Currency"` and `else if == "Item"`
+with no final `else` - an unrecognized `CostLine.Type` fell through both
+branches, contributing nothing to `coinCost` and never touching
+`priceable`, so the offer was costed as though that line did not exist
+at all.** Concretely: a vendor offer whose only real cost is an
+unrecognized-type line would price at 0 coin and can win `BuyFromVendor`
+over a correctly-priced TP alternative - an understated, fabricated-low
+price, not a crash, which is the harder-to-notice failure mode.
+`VendorOfferLoader.Load` performs no type validation at load (only a
+null-stream check) and `ref/vendor_offers.json` is tool-scraped from the
+wiki, the same ingestion shape that let `"GuildUpgrade"` reach the
+recipe-ingredient side of this saga in the first place, so a future
+third `CostLine.Type` (today only `"Currency"`/`"Item"` appear in
+practice) reaches this loop directly. Fixed by adding a final `else`
+that mirrors the Item-with-no-price branch immediately above it:
+`priceable = false; break;` - the whole offer is excluded rather than
+priced as if the unrecognized line were absent. The merged-ceil batching
+math below this loop (`unitsNeeded` and everything that scales off it)
+was not touched, per this finding's own explicit DO-NOT-TOUCH carve-out
+- this fix only changes which offers reach that math, never how it
+computes once an offer is deemed priceable.
+
+**Tests (2 net new, real production code paths, no Blish references):**
+`RecipeServiceTests.NullTypedIngredient_BecomesLeaf_RecipeNeverExpanded`
+- feeds `RecipeService.BuildTreeAsync` a real recipe (via
+`InMemoryRecipeApiClient`) whose second ingredient has `Type = null`,
+asserting it lands as an unexpanded leaf (`IsLeaf`, empty `Recipes`) with
+its id/quantity intact rather than being recipe-expanded as an item.
+`PlanSolverVendorOfferTests.VendorOfferWithUnrecognizedCostLineType_TreatedAsUnpriceable_NeverWinsOverTp`
+- gives `PlanSolver.Solve` a real `VendorOffer` whose only `CostLine` has
+an unrecognized `Type` and a real TP price for the same item, asserting
+the plan falls back to `BuyFromTp` at the real price rather than
+`BuyFromVendor` at the fabricated zero. No new test files (`.csproj`
+unchanged - `RecipeServiceTests.cs` and `PlanSolverVendorOfferTests.cs`
+both already existed and are already registered). Item/currency ids
+remain internal-only in both assertions; no Blish HUD references; both
+tests call `RecipeService.BuildTreeAsync`/`PlanSolver.Solve` directly
+against real fixtures (`InMemoryRecipeApiClient`, `RawRecipe`/
+`RawIngredient`, `VendorOffer`/`CostLine`, `ItemPrice`), no
+contract-mirror/fake-logic test.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
+errors, only pre-existing StyleCop warnings, none new on
+`Services/RecipeService.cs` or `Services/VendorBatchSolver.cs`). Tests:
+`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+- 1396 total (1394 + 2 new) - PASS, 0 failed.
+
+**Self-review findings (Code Reviewer Mode, fixed before commit):** swept
+`Services/PlanSolver.cs` and `Services/CraftingTreeBuilder.cs` again for
+any other `IsNullOrEmpty`-style guard on `IngredientType` that the
+earlier class sweeps might have missed alongside `RecipeService`'s (
+`grep -n "IsNullOrEmpty.*[Ii]ngredient\|[Ii]ngredientType.*IsNullOrEmpty"`)
+- no other hit; `RecipeService.BuildNodeAsync` was the only remaining
+non-Item-positive site. Confirmed the `RecipeService` guard change does
+not alter behavior for the two paths that matter most: a genuine
+`"Item"` node still proceeds to `visiting.Add`/recipe search exactly as
+before (guard condition for `"Item"` is `false` either way, old and
+new), and a `"Currency"`/`"GuildUpgrade"`/other-non-empty-non-Item type
+still short-circuits exactly as before (old guard's `!= "Item"` clause
+already caught those; only the null/empty case changed). Confirmed
+`VendorBatchSolver`'s new `else` branch is unreachable for both
+currently-real `CostLine.Type` values (`"Currency"`, `"Item"`) via the
+full test-suite run showing no change in any pre-existing vendor-offer
+test's outcome, and reachable exactly once for the new test's
+deliberately-unrecognized type. Checked whether `CraftingPlanPipeline`'s
+three other `cost.Type ==` loops (`Currency`/`Item` id-prefetch
+collectors for TP prices and currency/item metadata) have the same
+silent-drop hazard - they do not: an unrecognized type there simply adds
+nothing to a prefetch `HashSet`, which is the correct behavior for a
+"gather ids to look up" loop and not the "does this line count toward
+the price" gate `VendorBatchSolver`'s loop is, so those sites were
+correctly left untouched rather than being swept as siblings that do not
+actually share the bug's precondition. No Critical findings. Nice to
+have, not applied (scope discipline): the `RecipeService` test above
+covers `Type = null` but not `Type = ""` (empty string) - the fixed
+guard treats both identically (`!= "Item"` is true for both), and the
+prior guard's own `IsNullOrEmpty` check already proves the code author's
+awareness of the empty-string case, so a second near-duplicate test
+asserting the same code path for a different falsy input was judged
+redundant rather than additive coverage; out of scope for this targeted
+fix. `DecisionPillPlanner`'s `Currency`/`GuildUpgrade`/
+`UnrecognizedIngredient` three-way duplication (noted as a deferred nice
+to have in the immediately preceding section) remains deferred for the
+same reason given there - not part of this finding set, no new
+duplication introduced by this section's own changes.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

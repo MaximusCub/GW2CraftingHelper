@@ -291,7 +291,7 @@ namespace GW2CraftingHelper.Services
                 AchievementBit = achievementBit
             };
 
-            if (!string.IsNullOrEmpty(ingredientType) && ingredientType != "Item")
+            if (ingredientType != "Item")
             {
                 return node;
             }
