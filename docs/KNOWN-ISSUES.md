@@ -4345,10 +4345,15 @@ whatever PASS/FAIL verdict was meant only for the most recent one - or,
 after this section's own append, four. Fixed by stripping the trailing
 `Gate:` line from all three prior sections (all now superseded by this
 one, which incorporates everything from all three plus the class-level
-fix above) and leaving exactly one `Gate:` line in the entire document -
-the one at the end of this section. Nothing else in those three sections
-was altered besides the "Remaining / deferred" bullet noted below and
-the removal of each stale `Gate:` line itself.
+fix above) and leaving exactly one PENDING `Gate:` line in the entire
+document - the one at the end of this section. (The document also
+carries several pre-existing, already-filled `Gate: PASS ...` lines from
+earlier, unrelated milestones; those are untouched and out of scope - a
+naive replace targeting the literal string `Gate:` rather than the
+specific PENDING placeholder would still have matched them too.) Nothing
+else in those three sections was altered besides the "Remaining /
+deferred" bullet noted below and the removal of each stale `Gate:` line
+itself.
 
 **Fixed (Must Fix - dropped backlog item / dangling forward reference):
 the "RESOLVED (2026-08-16)" marker on the original out-of-scope
@@ -4396,5 +4401,92 @@ not applied (scope discipline): the "Remaining / deferred" bullet added
 above could eventually become its own tracked milestone item rather than
 a bullet inside a fix write-up, but restructuring this document's own
 organization was not part of this task's scope.
+
+## GuildUpgrade ingredient costing/display fix - unrecognized-type class sweep completion + Gate-line claim fix (2026-08-16)
+
+A fifth adversarial pass (external orchestrator review of the section
+immediately above) found two defects: the unrecognized-ingredient-type
+fallthrough's class sweep was only 2/5 complete, and this document's own
+previous section made a false factual claim about how many `Gate:` lines
+the document contains. No DO-NOT-TOUCH code was touched
+(`Services/ModuleLog.cs`, `Services/PlanContentHeightMath.cs`,
+`Services/PlanRelayoutMath.cs`, scroll machinery, `VendorBatchSolver`'s
+merged-ceil batching math).
+
+**Fixed (Must Fix - class sweep left 3/5 fields leaking): the
+unrecognized-ingredient-type fallthrough in `CraftingTreeBuilder.
+BuildNode` (the `!decisions.TryGetValue(...)` branch) only cleared
+IconUrl and Rarity for a non-`"Item"` node - Name, AcquisitionHint, and
+AcquisitionBadge were still resolved from the ITEM-domain `metadata`/
+`hints` dictionaries keyed on the raw ingredient id, the exact same
+wrong-domain leak class the branch's own comment claimed to close.**
+Verified: with a colliding `metadata`/`hints` entry, a
+`{Id=829, IngredientType="MysteryIngredientType"}` node rendered an
+unrelated item's Name, AcquisitionHint, and AcquisitionBadge - the badge
+in particular becomes the literal pill text `DecisionPillPlanner.
+BuildPillSpecs` renders, making the wrong-domain value the single most
+visible thing on the row. Separately, with no collision, `ResolveName`'s
+"Unknown Item" fallback mislabeled a non-item as an item - the same
+mislabel class the sibling `GuildUpgrade` branch's "Guild upgrade
+(unresolved)" label exists to avoid one branch above. The existing test
+`UnrecognizedIngredientType_NeverResolvesIconOrRarityViaItemMetadata_
+EvenWhenIdCollides` seeded `Name = "Unrelated Item"` into the colliding
+fixture and never asserted on Name, so the leak sat inside the fixture of
+the test meant to prove it closed. Fixed by resetting `Name` to a
+generic, ID-free label (`"Unrecognized ingredient (unresolved)"`,
+matching the `GuildUpgrade` branch's shape) and skipping
+`ApplyAcquisitionHint` entirely for non-`"Item"` nodes in this branch
+(it looks `hints` up by the same raw-id/ITEM-domain key `metadata` uses,
+so a partial fix leaving it in place would have kept the
+AcquisitionHint/AcquisitionBadge leak open). Extended the existing test
+to also seed a colliding `hints` entry and assert Name, AcquisitionHint,
+and AcquisitionBadge all stay clear of it, alongside the pre-existing
+IconUrl/Rarity assertions.
+
+**Fixed (Must Fix - false claim in the deliverable record): the section
+immediately above claimed stripping the three stale Gate lines left
+"exactly one `Gate:` line in the entire document."** Measured:
+`grep -c '^Gate:' docs/KNOWN-ISSUES.md` returned 5, not 1 - four
+pre-existing, already-filled `Gate: PASS 2026-08-16 ...` lines from
+earlier, unrelated milestones plus the one `PENDING` line the claim was
+actually describing. The functional contract (exactly one `PENDING` Gate
+line, file ending with the exact required line) was met; the stated fact
+about the literal string `Gate:` was not, and it was wrong about the
+precise hazard the paragraph exists to eliminate - a naive replace
+targeting `Gate:` (rather than the specific `PENDING` placeholder) still
+matches five lines, not one. Fixed by correcting the claim to "exactly
+one PENDING `Gate:` line" and adding a parenthetical noting the
+pre-existing filled Gate lines are untouched and out of scope.
+
+**Tests (0 net new; 1 existing test extended, real production code
+paths, no Blish references):**
+`CraftingTreeBuilderTests.cs`'s
+`UnrecognizedIngredientType_NeverResolvesIconOrRarityViaItemMetadata_
+EvenWhenIdCollides` now also seeds a colliding `AcquisitionHint` entry
+and asserts Name, AcquisitionHint, and AcquisitionBadge, in addition to
+its pre-existing IconUrl/Rarity assertions. `.csproj` unchanged (no new
+test files). Item/currency ids remain internal-only in the assertion;
+no Blish HUD references; the test calls `CraftingTreeBuilder.BuildTree`
+directly against real `RecipeNode`/`ItemMetadata`/`AcquisitionHint`
+fixtures, no contract-mirror/fake-logic test.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
+errors, only pre-existing StyleCop warnings, none new on
+`Services/CraftingTreeBuilder.cs` or the touched test file). Tests:
+`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+- 1390 total (unchanged - existing test extended, not a new one) - PASS,
+0 failed.
+
+**Self-review findings (Code Reviewer Mode, fixed before commit):** none
+beyond the two fixed above - the non-`"Item"` branch's early `return`
+was checked to confirm it cannot fall through into the `ApplyAcquisitionHint`
+call meant only for genuine `"Item"` nodes with no decision; the `"Item"`
+path through this same branch (a real item with no recipe/price, the
+`AcquisitionSource.UnknownSource` case) was confirmed unchanged - it
+still resolves Name/IconUrl/Rarity from `metadata` and still calls
+`ApplyAcquisitionHint`. Nice to have, not applied (scope discipline): the
+five-field class sweep is now complete for this one fallthrough branch,
+but no other site in this file was audited for the same collision
+pattern - out of scope for this targeted fix.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

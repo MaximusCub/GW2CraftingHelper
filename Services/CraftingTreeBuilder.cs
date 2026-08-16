@@ -210,19 +210,36 @@ namespace GW2CraftingHelper.Services
                     // does not specifically recognize (not "Item",
                     // "GuildUpgrade", or "Currency") reaches here with no
                     // memo entry - PlanSolver's Evaluate never prices it
-                    // (see that method's Item-positive top guard). IconUrl/
-                    // Rarity were already populated above from `metadata`
-                    // keyed on the raw ingredient id in the ITEM domain -
-                    // the exact same wrong-domain leak the GuildUpgrade and
-                    // Currency branches above already close for their own
-                    // known types must be closed here too, since a same-
-                    // numbered genuine item entry reaching `metadata` via
-                    // one of CraftingPlanPipeline's other routes (step item
-                    // ids, used-material ids, vendor cost-component ids)
-                    // cannot be ruled out - see the GuildUpgrade branch's
-                    // own doc comment above for the full explanation.
+                    // (see that method's Item-positive top guard). Name/
+                    // IconUrl/Rarity were already populated above from
+                    // `metadata` keyed on the raw ingredient id in the ITEM
+                    // domain, and hints/ApplyAcquisitionHint below is keyed
+                    // the same way - the exact same wrong-domain leak the
+                    // GuildUpgrade and Currency branches above already close
+                    // for their own known types must be closed here too,
+                    // since a same-numbered genuine item entry reaching
+                    // `metadata` (or `hints`) via one of
+                    // CraftingPlanPipeline's other routes (step item ids,
+                    // used-material ids, vendor cost-component ids) cannot
+                    // be ruled out - see the GuildUpgrade branch's own doc
+                    // comment above for the full explanation. Name is reset
+                    // to a generic, ID-free label (matching the GuildUpgrade
+                    // branch's "Guild upgrade (unresolved)" shape) rather
+                    // than left at ResolveName's item-domain "Unknown Item"
+                    // fallback, which would mislabel a non-item as an item -
+                    // the same mislabel class the GuildUpgrade branch's
+                    // label was written to avoid one branch above.
+                    // AcquisitionHint/AcquisitionBadge are skipped outright
+                    // (not just IconUrl/Rarity) since ApplyAcquisitionHint
+                    // looks `hints` up by this same raw ingredient id in the
+                    // ITEM domain - a colliding entry would otherwise put an
+                    // unrelated item's acquisition text, and its badge (the
+                    // literal pill text DecisionPillPlanner renders), on a
+                    // node this builder never identified as that item.
+                    treeNode.Name = "Unrecognized ingredient (unresolved)";
                     treeNode.IconUrl = null;
                     treeNode.Rarity = null;
+                    return treeNode;
                 }
                 ApplyAcquisitionHint(treeNode, hints);
                 return treeNode;

@@ -622,11 +622,17 @@ namespace GW2CraftingHelper.Tests.Services
             // Mirrors CurrencyNode_NeverResolvesIconOrRarityViaItemMetadata_
             // EvenWhenIdCollides and GuildUpgradeNode_
             // NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides
-            // above - `metadata` happens to carry a genuine entry for the
-            // same numeric id as this unrecognized-type ingredient. Both
-            // IconUrl and Rarity must stay clear of the item-keyed lookup
-            // set earlier in BuildNode, even though this type falls through
-            // to the generic Unknown leaf rather than a dedicated branch.
+            // above - `metadata` and `hints` (both keyed by raw ingredient
+            // id in the ITEM domain) happen to carry genuine entries for
+            // the same numeric id as this unrecognized-type ingredient.
+            // Name, IconUrl, Rarity, AcquisitionHint and AcquisitionBadge
+            // must ALL stay clear of the item-keyed lookups set earlier in
+            // BuildNode / ApplyAcquisitionHint, even though this type falls
+            // through to the generic Unknown leaf rather than a dedicated
+            // branch - a collision leaking any one of the five would put an
+            // unrelated item's data (including its badge, the literal pill
+            // text DecisionPillPlanner renders) on a node this builder
+            // never identified as that item.
             var node = Leaf(829, 5, "MysteryIngredientType");
             node.NodeId = 0;
             var decisions = new Dictionary<int, SolverDecision>();
@@ -634,13 +640,20 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
             };
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 829, new AcquisitionHint { ItemId = 829, Hint = "Salvage from unrelated item", Badge = "SALVAGE" } }
+            };
 
             var builder = new CraftingTreeBuilder();
-            var treeNode = builder.BuildTree(node, decisions, metadata);
+            var treeNode = builder.BuildTree(node, decisions, metadata, hints);
 
             Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Equal("Unrecognized ingredient (unresolved)", treeNode.Name);
             Assert.Null(treeNode.IconUrl);
             Assert.Null(treeNode.Rarity);
+            Assert.Null(treeNode.AcquisitionHint);
+            Assert.Null(treeNode.AcquisitionBadge);
         }
 
         [Fact]
