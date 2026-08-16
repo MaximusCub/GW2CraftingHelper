@@ -21,25 +21,54 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var instant = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.InstantBuy).Plan;
-            var order = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.BuyOrder).Plan;
+            var instant = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.InstantBuy);
+            var order = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.BuyOrder);
 
-            Assert.Equal(200, instant.TotalCoinCost);
-            Assert.Equal(120, order.TotalCoinCost);
+            Assert.Equal(200, instant.Plan.TotalCoinCost);
+            Assert.Equal(120, order.Plan.TotalCoinCost);
+            // AUDIT ROW 20/38: preferred side present on both sides ->
+            // used directly, no same-item other-side fallback triggered.
+            Assert.False(instant.Decisions[0].PriceSideFellBack);
+            Assert.False(order.Decisions[0].PriceSideFellBack);
         }
 
         [Fact]
-        public void BuyOrderBasis_NoBuyOrders_ItemNotPriceable()
+        public void BuyOrderBasis_NoBuyOrders_FallsBackToInstantBuyPrice()
         {
+            // AUDIT ROW 20/38 (gw2e price-side fallback parity): the
+            // preferred side (buy orders / SellInstant) is empty, but this
+            // SAME item's other side (instant-buy / BuyInstant) has a real
+            // listing - gw2e falls back to it instead of treating the item
+            // as unpriceable. Previously this returned UnknownSource.
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } }
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(Leaf(1, 1), prices, null, PriceBasis.BuyOrder).Plan;
+            var result = solver.Solve(Leaf(1, 1), prices, null, PriceBasis.BuyOrder);
 
-            Assert.Equal(AcquisitionSource.UnknownSource, plan.Steps[0].Source);
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
+            Assert.Equal(100, result.Plan.TotalCoinCost);
+            Assert.True(result.Decisions[0].PriceSideFellBack);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_BothSidesEmpty_ItemNotPriceable()
+        {
+            // AUDIT ROW 20/38: both TP sides empty stays unpriceable - the
+            // fallback only ever tries this SAME item's other side, never
+            // invents a price from nothing.
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 0 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(Leaf(1, 1), prices, null, PriceBasis.BuyOrder);
+
+            Assert.Equal(AcquisitionSource.UnknownSource, result.Plan.Steps[0].Source);
+            Assert.False(result.Decisions[0].PriceSideFellBack);
         }
 
         [Fact]
@@ -87,6 +116,47 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 200, SellInstant = 100 } },
                 { 42, new ItemPrice { ItemId = 42, BuyInstant = 10, SellInstant = 4 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var order = solver.Solve(Leaf(1, 1), prices, vendorOffers, PriceBasis.BuyOrder).Plan;
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, order.Steps[0].Source);
+            Assert.Equal(20, order.TotalCoinCost);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_VendorItemBarter_BarterItemFallsBackToOtherSide()
+        {
+            // AUDIT ROW 20/38: PlanSolver.GetUnitPrice is the single site
+            // VendorBatchSolver's Item-cost-line pricing routes through, so
+            // the same-item other-side fallback must reach it too. Barter
+            // item 42's preferred side (buy orders / SellInstant) is empty
+            // here - only its BuyInstant side has a listing - so the offer
+            // must still price (5 x 4 = 20) rather than be dropped as
+            // unpriceable, same total as the sibling
+            // BuyOrderBasis_VendorItemBarter_PricedAtBasis test above where
+            // both sides were populated directly.
+            var offer = new VendorOffer
+            {
+                OfferId = "test-barter-basis-fallback",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Item", Id = 42, Count = 5 }
+                },
+                MerchantName = "Barter Vendor",
+                Locations = new List<string>()
+            };
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200, SellInstant = 100 } },
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 4, SellInstant = 0 } }
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
