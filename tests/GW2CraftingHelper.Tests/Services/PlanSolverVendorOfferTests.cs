@@ -483,5 +483,39 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(decision.VendorItemCosts);
             Assert.False(decision.VendorHasRawCoin);
         }
+
+        /// <summary>
+        /// W4B review-fix (Must Fix): a malformed offer with a Count-0 Item
+        /// cost line (e.g. bad wiki-scraped seed data) must not invent a
+        /// phantom "item" cost KIND - matches the raw-coin branch's own
+        /// `if (cost.Count > 0)` guard a few lines above it. Mixed with a
+        /// real currency line so the pre-fix bug (VendorItemCosts wrongly
+        /// populated with a 0-quantity/0-gold entry, flipping kindCount
+        /// from 1 real kind to 2) is directly observable on the committed
+        /// decision.
+        /// </summary>
+        [Fact]
+        public void ZeroCountItemCostLine_DoesNotPopulateVendorItemCosts()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(
+                1, new[] { (42, 0) }, new[] { (23, 10) });
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var decision = result.Decisions.Values.Single(d => d.Source == AcquisitionSource.BuyFromVendor);
+
+            Assert.Null(decision.VendorItemCosts);
+            Assert.NotNull(decision.VendorCurrencyCosts);
+            Assert.Single(decision.VendorCurrencyCosts);
+        }
     }
 }

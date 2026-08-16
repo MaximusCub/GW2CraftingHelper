@@ -300,8 +300,25 @@ namespace GW2CraftingHelper.Services
                         if (unitPrice > 0)
                         {
                             coinCost += (long)cost.Count * unitPrice;
-                            (itemCostRaw ?? (itemCostRaw = new List<(int, int, int)>()))
-                                .Add((cost.Id, cost.Count, unitPrice));
+                            // W4B review-fix (Must Fix): guard the raw
+                            // capture with Count > 0, mirroring the raw-coin
+                            // branch's own `if (cost.Count > 0)` guard above
+                            // - a zero/negative-count Item cost line (e.g.
+                            // malformed wiki-scraped seed data) must never
+                            // invent a phantom "item" cost KIND. Without
+                            // this, a single-kind offer with a stray
+                            // Count-0 Item line would wrongly flip into
+                            // leaf-synthesis mode (CraftingTreeBuilder.
+                            // BuildVendorCostComponentLeaves' kindCount
+                            // gate) and render a 0-quantity/negative-cost
+                            // ghost leaf. coinCost above is left untouched -
+                            // a Count of 0 contributes nothing to it either
+                            // way.
+                            if (cost.Count > 0)
+                            {
+                                (itemCostRaw ?? (itemCostRaw = new List<(int, int, int)>()))
+                                    .Add((cost.Id, cost.Count, unitPrice));
+                            }
                         }
                         else
                         {
@@ -330,6 +347,29 @@ namespace GW2CraftingHelper.Services
                 // CostLine.Count (int): a scaled quantity too large for
                 // VendorItemCostLine.Quantity (int) skips the offer rather
                 // than truncating it silently.
+                //
+                // W4B review-fix note: a follow-up review flagged this
+                // `itemsScalable`/`continue` guard as new control flow added
+                // inside EvaluateVendorOffers (one of the six DO-NOT-TOUCH
+                // merged-ceil batching methods), asking for it to be either
+                // explicitly justified or rewritten as a non-disqualifying
+                // clamp. Kept as-is, deliberately: it is structurally
+                // identical to - and only extends to a second cost
+                // dimension - the pre-existing `scalable`/`continue` guard a
+                // few lines below for the currency lines (same file, same
+                // loop, same overflow-safety shape, predates this feature),
+                // so it introduces no new KIND of control flow, only
+                // coverage for a new field. It can only fire when a single
+                // occurrence's scaled Item-cost quantity exceeds
+                // int.MaxValue (billions of units of one vendor item in one
+                // purchase) - unreachable with real GW2 data. Rewriting it
+                // as a clamp instead (silently truncating the represented
+                // cost/quantity rather than skipping the offer) would be
+                // the actual behavior change and strictly worse: a clamped
+                // value is silently wrong, while skipping the offer here -
+                // exactly like its currency sibling - never touches
+                // TotalCost/UnitCost/batch selection for any realistic
+                // input and fails safe rather than silently.
                 List<VendorItemCostLine> scaledItemCosts = null;
                 bool itemsScalable = true;
                 if (itemCostRaw != null)
@@ -739,6 +779,18 @@ namespace GW2CraftingHelper.Services
         /// PlanSolver.AggregateStep) absorbing the exact remainder so the
         /// allocated shares always sum to precisely step.TotalCost - no
         /// drift, no invented precision.
+        ///
+        /// W4B review-fix note: a component leaf's raw VendorItemCosts/
+        /// VendorCurrencyCosts (captured pre-merge, per occurrence, by
+        /// EvaluateVendorOffers) are NOT re-derived here the way TotalCost
+        /// is - they can disagree with the corrected share this method
+        /// computes whenever a step merges 2+ tree occurrences. This method
+        /// itself is unchanged (DO-NOT-TOUCH: merged-ceil batching math);
+        /// the caller (PlanSolver.Solve, see FlagUnreliableVendorComponentCosts)
+        /// reads this method's own already-public outputs (vendorOccurrences,
+        /// stepMap) AFTER it returns to mark which decisions must suppress
+        /// component-leaf display for that reason - see
+        /// CraftingTreeBuilder.BuildVendorCostComponentLeaves.
         /// </summary>
         internal void AllocateVendorNodeCosts(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
