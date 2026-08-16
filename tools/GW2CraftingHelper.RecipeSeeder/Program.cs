@@ -245,7 +245,13 @@ namespace GW2CraftingHelper.RecipeSeeder
             return 0;
         }
 
-        private static async Task<List<int>> FetchAllRecipeIdsAsync(
+        // Review-fix (recipe-ingestion-fix): internal (not private) + the
+        // matching InternalsVisibleTo in this project's .csproj so
+        // GW2CraftingHelper.RecipeSeeder.Tests can assert the schema-
+        // version query parameter on the actual outgoing request, mirroring
+        // Gw2RecipeApiClientHttpTests' StubHandler coverage of the runtime
+        // client's own identical fix.
+        internal static async Task<List<int>> FetchAllRecipeIdsAsync(
             HttpClient httpClient)
         {
             string json = await httpClient.GetStringAsync(
@@ -307,7 +313,9 @@ namespace GW2CraftingHelper.RecipeSeeder
             return result;
         }
 
-        private static async Task<List<RawRecipe>> FetchRecipeBatchAsync(
+        // Review-fix (recipe-ingestion-fix): internal, see
+        // FetchAllRecipeIdsAsync's matching doc comment above.
+        internal static async Task<List<RawRecipe>> FetchRecipeBatchAsync(
             HttpClient httpClient, List<int> ids)
         {
             string idsParam = string.Join(",",

@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="GW2CraftingHelper.RecipeSeeder.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\GW2CraftingHelper.csproj">
       <SetPlatform>Platform=x64</SetPlatform>
     </ProjectReference>
