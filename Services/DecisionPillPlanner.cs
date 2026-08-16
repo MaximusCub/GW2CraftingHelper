@@ -85,6 +85,38 @@ namespace GW2CraftingHelper.Services
         {
             var specs = new List<PillSpec>(3);
 
+            // W4B (vendor cost-component leaves): checked BEFORE every
+            // other branch below - a component leaf is a fact about a
+            // price, not an acquisition decision, so it must NEVER get a
+            // decision pill (CRAFT/TP/VENDOR/CURRENCY/UNKNOWN) or the
+            // Ignore toggle, and it must not fall into the ordinary
+            // Have/OwnedInfo path below (which reads OwnedQuantityUsed - a
+            // field this leaf never populates, since its Quantity is never
+            // reduced for ownership - see CraftingTreeNode.
+            // ComponentOwnedQuantity's own doc comment). Reuses the SAME
+            // Have/OwnedInfo PillKinds and "HAVE"/"HAVE x/y NEEDED" text
+            // vocabulary as the ordinary owned-materials pills below (the
+            // W4B design's explicit "follow the existing pill vocabulary
+            // exactly" instruction), just sourced from
+            // ComponentOwnedQuantity/Quantity instead of
+            // OwnedQuantityUsed/Quantity, and never followed by an Ignore
+            // pill.
+            if (node.IsCostComponent)
+            {
+                if (node.Quantity > 0 && node.ComponentOwnedQuantity >= node.Quantity)
+                {
+                    specs.Add(new PillSpec("HAVE", null, PillKind.Have));
+                }
+                else if (node.ComponentOwnedQuantity > 0)
+                {
+                    specs.Add(new PillSpec(
+                        $"HAVE {node.ComponentOwnedQuantity}/{node.Quantity} NEEDED",
+                        null,
+                        PillKind.OwnedInfo));
+                }
+                return specs;
+            }
+
             if (node.Decision == CraftingDecision.Have)
             {
                 // M37 (KNOWN-ISSUES #26): a dedup-zeroed node gets ONLY the

@@ -13,11 +13,21 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             IReadOnlyDictionary<int, AcquisitionHint> hints = null,
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId = null,
-            ISet<int> ignoredItemIds = null)
+            ISet<int> ignoredItemIds = null,
+            // W4B (vendor cost-component leaves): all three optional/null-
+            // tolerant, same convention as every other cosmetic lookup on
+            // this method - a caller that omits them simply gets no
+            // currency icon/name or HAVE-pill data on any synthesized
+            // component leaf, never a crash or a missing leaf. See
+            // BuildVendorCostComponentLeaves for how each is used.
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts = null,
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts = null)
         {
             return BuildNode(node: root, decisions: decisions, metadata: metadata, hints: hints,
                 insideReferenceBranch: false, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId,
-                ignoredItemIds: ignoredItemIds);
+                ignoredItemIds: ignoredItemIds, currencyMetadata: currencyMetadata,
+                ownedCurrencyAmounts: ownedCurrencyAmounts, ownedVendorItemAmounts: ownedVendorItemAmounts);
         }
 
         private static CraftingTreeNode BuildNode(
@@ -27,7 +37,10 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, AcquisitionHint> hints,
             bool insideReferenceBranch,
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
-            ISet<int> ignoredItemIds)
+            ISet<int> ignoredItemIds,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts,
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts)
         {
             var treeNode = new CraftingTreeNode
             {
@@ -121,45 +134,231 @@ namespace GW2CraftingHelper.Services
                     // a reference branch is still hypothetical content, and
                     // must keep suppressing further reference branches
                     // below it - see the cap comment below for why.
-                    treeNode.Children = BuildChildren(recipe, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId, ignoredItemIds);
+                    treeNode.Children = BuildChildren(
+                        recipe, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId,
+                        ignoredItemIds, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts);
                 }
             }
-            else if (!insideReferenceBranch &&
-                     (decision.Source == AcquisitionSource.BuyFromTp ||
-                      decision.Source == AcquisitionSource.BuyFromVendor) &&
-                     node.Recipes.Count > 0)
+            else
             {
-                // Reference branch: gw2e's "what it would cost to craft
-                // instead" - informational, not an actual crafting step, so
-                // it is built from recipe[0] (the deterministic first
-                // option) rather than a "chosen" recipe, since nothing was
-                // crafted here. PlanSolver.Evaluate always walks every
-                // recipe's ingredients to get a comparison value, even for a
-                // node it ultimately decides to buy, so those ingredients'
-                // decisions already exist in the dict - safe to recurse into
-                // here.
-                //
-                // Capped to AT MOST ONE reference branch per root-to-leaf
-                // path: everything built below here passes
-                // insideReferenceBranch=true, which blocks starting another
-                // one no matter how many further Craft/Buy-with-recipe
-                // decisions alternate beneath it. A naive "reset to
-                // not-inside on every Craft step" cap (tried first) does NOT
-                // bound this: GW2 crafting data very commonly alternates
-                // buyable-with-a-recipe <-> craft <-> buyable-with-a-recipe
-                // down a chain, and node.Recipes here is the FULL
-                // alternate-recipe graph the upstream RecipeService already
-                // expanded for every option (not just the solver's chosen
-                // path, which is all this builder walked before) - letting
-                // reference branches restart at every such alternation
-                // measured as an effectively unbounded hang on a real deep
-                // item (Deldrimor Steel Ingot) during manual verification.
-                treeNode.Children = BuildChildren(node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId, ignoredItemIds: ignoredItemIds);
-                treeNode.IsReferenceBranch = true;
+                // W4B: a BuyFromVendor node whose winning offer mixed 2+
+                // cost KINDS (coin / non-coin currency / TP-valued item)
+                // gets DISPLAY-ONLY component-leaf children instead of the
+                // reference branch below - see
+                // BuildVendorCostComponentLeaves' own doc comment for why
+                // this takes precedence (only reachable when node.Recipes
+                // is ALSO non-empty - a vendor-only item with no recipe at
+                // all, the common real case, was never going to build a
+                // reference branch anyway). Null (fewer than 2 kinds, or
+                // not a BuyFromVendor decision at all) falls through to the
+                // existing reference-branch logic completely unchanged.
+                List<CraftingTreeNode> componentLeaves = decision.Source == AcquisitionSource.BuyFromVendor
+                    ? BuildVendorCostComponentLeaves(
+                        node.NodeId, decision, metadata, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts)
+                    : null;
+
+                if (componentLeaves != null)
+                {
+                    treeNode.Children = componentLeaves;
+                }
+                else if (!insideReferenceBranch &&
+                         (decision.Source == AcquisitionSource.BuyFromTp ||
+                          decision.Source == AcquisitionSource.BuyFromVendor) &&
+                         node.Recipes.Count > 0)
+                {
+                    // Reference branch: gw2e's "what it would cost to craft
+                    // instead" - informational, not an actual crafting step, so
+                    // it is built from recipe[0] (the deterministic first
+                    // option) rather than a "chosen" recipe, since nothing was
+                    // crafted here. PlanSolver.Evaluate always walks every
+                    // recipe's ingredients to get a comparison value, even for a
+                    // node it ultimately decides to buy, so those ingredients'
+                    // decisions already exist in the dict - safe to recurse into
+                    // here.
+                    //
+                    // Capped to AT MOST ONE reference branch per root-to-leaf
+                    // path: everything built below here passes
+                    // insideReferenceBranch=true, which blocks starting another
+                    // one no matter how many further Craft/Buy-with-recipe
+                    // decisions alternate beneath it. A naive "reset to
+                    // not-inside on every Craft step" cap (tried first) does NOT
+                    // bound this: GW2 crafting data very commonly alternates
+                    // buyable-with-a-recipe <-> craft <-> buyable-with-a-recipe
+                    // down a chain, and node.Recipes here is the FULL
+                    // alternate-recipe graph the upstream RecipeService already
+                    // expanded for every option (not just the solver's chosen
+                    // path, which is all this builder walked before) - letting
+                    // reference branches restart at every such alternation
+                    // measured as an effectively unbounded hang on a real deep
+                    // item (Deldrimor Steel Ingot) during manual verification.
+                    treeNode.Children = BuildChildren(
+                        node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true,
+                        ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId, ignoredItemIds: ignoredItemIds,
+                        currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
+                        ownedVendorItemAmounts: ownedVendorItemAmounts);
+                    treeNode.IsReferenceBranch = true;
+                }
             }
 
             ApplyAcquisitionHint(treeNode, hints);
             return treeNode;
+        }
+
+        /// <summary>
+        /// W4B (vendor cost-component leaves): synthesizes DISPLAY-ONLY
+        /// child leaves for a BuyFromVendor node whose winning offer mixed
+        /// 2+ cost KINDS (coin / non-coin currency / TP-valued item) - the
+        /// real field case that motivated this (an "Amalgamated Rift
+        /// Essence" vendor cost inside an Endless Summer plan: 3 wallet
+        /// currencies + Globs of Ectoplasm) was rendering as one very long
+        /// segmented cost cell that collided with the row layout AND hid
+        /// that part of the "gold" total was actually paid in items, not
+        /// coin. Returns null when the winning offer had fewer than 2
+        /// kinds, so the caller falls back to the existing reference-branch
+        /// behavior completely unchanged (this is also why a pure-coin or
+        /// pure-currency or pure-item offer - the overwhelming majority of
+        /// vendor offers - never gets any leaves at all: each of those has
+        /// exactly one kind).
+        ///
+        /// A raw coin component (decision.VendorHasRawCoin) is deliberately
+        /// NEVER given its own leaf, even when it is one of the 2+ kinds
+        /// that triggered synthesis - it simply stays folded into the
+        /// parent's own SubtreeCost exactly as it already is today. This is
+        /// the simplest presentation that still keeps "parent total = sum
+        /// of the parts a leaf can show" true: a currency leaf's own cost
+        /// cell is blank by design (the quantity IS the cost - see the
+        /// currency-leaf comment below), so the only leaves that need to
+        /// visibly sum to anything are the item leaves, and coin needs no
+        /// leaf to be accounted for (it is just money, already visible in
+        /// the parent's own total).
+        ///
+        /// Every number placed on a leaf here is READ from
+        /// decision.VendorCurrencyCosts/VendorItemCosts - fields
+        /// VendorBatchSolver.EvaluateVendorOffers already computed for this
+        /// exact tree occurrence and folded into decision.TotalCost/
+        /// ComparisonValue - nothing is recomputed, so a leaf's displayed
+        /// amount can never drift from what the parent's own SubtreeCost
+        /// already shows (see VendorItemCostLine.GoldValue's own doc
+        /// comment for exactly where that number was captured).
+        /// </summary>
+        private static List<CraftingTreeNode> BuildVendorCostComponentLeaves(
+            int parentNodeId,
+            SolverDecision decision,
+            IReadOnlyDictionary<int, ItemMetadata> metadata,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts,
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts)
+        {
+            int currencyCount = decision.VendorCurrencyCosts?.Count ?? 0;
+            int itemCount = decision.VendorItemCosts?.Count ?? 0;
+            int kindCount = (currencyCount > 0 ? 1 : 0) + (itemCount > 0 ? 1 : 0) + (decision.VendorHasRawCoin ? 1 : 0);
+            if (kindCount < 2)
+            {
+                return null;
+            }
+
+            var leaves = new List<CraftingTreeNode>(itemCount + currencyCount);
+            int componentIndex = 0;
+
+            // Item components first (the piece the collapsed parent's coin
+            // total was hiding) - see SyntheticComponentNodeId for the
+            // collision-safety argument behind the id each leaf gets.
+            if (decision.VendorItemCosts != null)
+            {
+                foreach (var line in decision.VendorItemCosts)
+                {
+                    leaves.Add(new CraftingTreeNode
+                    {
+                        ItemId = line.ItemId,
+                        NodeId = SyntheticComponentNodeId(parentNodeId, componentIndex++),
+                        Name = ResolveName(line.ItemId, metadata),
+                        IconUrl = ResolveIcon(line.ItemId, metadata),
+                        Rarity = ResolveRarity(line.ItemId, metadata),
+                        Quantity = line.Quantity,
+                        Decision = CraftingDecision.BuyFromVendor,
+                        IsCostComponent = true,
+                        // The exact gold value already folded into the
+                        // parent's own SubtreeCost for this line - see this
+                        // method's own doc comment.
+                        SubtreeCost = line.GoldValue,
+                        UnitCost = line.Quantity > 0 ? line.GoldValue / line.Quantity : (long?)null,
+                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.ItemId, line.Quantity, ownedVendorItemAmounts)
+                    });
+                }
+            }
+
+            // Currency components: cost cell deliberately left blank (no
+            // SubtreeCost) - the quantity itself IS the cost; showing it a
+            // second time as an invented currency-to-gold rate would be
+            // circular (repo invariant: never invent exchange rates).
+            // Name/icon resolved the same way the currency SUMMARY rows
+            // and the tree's own "Unit price:" tooltip already do
+            // (CurrencyDisplayResolver, live metadata with the offline
+            // Gw2Constants fallback) - not the bare offline-only fallback
+            // the solver-tree Currency-ingredient branch above uses, so
+            // this leaf shows a real icon whenever currency metadata is
+            // available.
+            if (decision.VendorCurrencyCosts != null)
+            {
+                foreach (var line in decision.VendorCurrencyCosts)
+                {
+                    leaves.Add(new CraftingTreeNode
+                    {
+                        ItemId = line.Id,
+                        NodeId = SyntheticComponentNodeId(parentNodeId, componentIndex++),
+                        Name = CurrencyDisplayResolver.ResolveName(line.Id, currencyMetadata),
+                        IconUrl = CurrencyDisplayResolver.ResolveIconUrl(line.Id, currencyMetadata),
+                        Quantity = line.Count,
+                        Decision = CraftingDecision.BuyFromVendor,
+                        IsCostComponent = true,
+                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.Id, line.Count, ownedCurrencyAmounts)
+                    });
+                }
+            }
+
+            return leaves;
+        }
+
+        /// <summary>
+        /// Deterministic, stable id for a W4B synthetic component leaf -
+        /// cannot collide with a real RecipeNodeIds-assigned id (always a
+        /// small non-negative int, 0..N-1 for an N-node tree - see
+        /// RecipeNodeIds.Assign) because this is always negative. Stable
+        /// across ResolveWithOverrides rebuilds of the SAME tree because
+        /// both inputs are: parentNodeId is the real solver node's own
+        /// NodeId, which RecipeNodeIds.Assign fixes once per tree and
+        /// PlanSolver.Solve's assignNodeIds:false reuses verbatim on every
+        /// local re-solve (see RecipeNodeIds' own doc comment); componentIndex
+        /// is this leaf's fixed position within decision.VendorItemCosts/
+        /// VendorCurrencyCosts, which are themselves built by iterating the
+        /// SAME winning VendorOffer's own CostLines list (a plain List,
+        /// never re-ordered) on every re-solve of the same context. The
+        /// x1000 spacing is far larger than any real vendor offer's cost
+        /// line count (single digits in practice), leaving no realistic
+        /// risk of two components of the same parent colliding.
+        /// </summary>
+        private static int SyntheticComponentNodeId(int parentNodeId, int componentIndex)
+        {
+            return -(parentNodeId * 1000 + componentIndex + 1);
+        }
+
+        /// <summary>
+        /// Informational HAVE-pill coverage for a W4B cost-component leaf -
+        /// min(owned, needed), 0 when there is no ownership data for this
+        /// id at all. Never influences Quantity/SubtreeCost above - purely
+        /// what DecisionPillPlanner reads to decide between a plain HAVE
+        /// pill (fully covered), a "HAVE x/y NEEDED" info pill (partially
+        /// covered), or no pill (owned == null/0) - see
+        /// CraftingTreeNode.ComponentOwnedQuantity's own doc comment.
+        /// </summary>
+        private static int ResolveOwnedQuantity(
+            int id, int needed, IReadOnlyDictionary<int, int> ownedAmounts)
+        {
+            if (ownedAmounts == null || !ownedAmounts.TryGetValue(id, out int owned))
+            {
+                return 0;
+            }
+            return Math.Min(owned, needed);
         }
 
         /// <summary>
@@ -200,12 +399,17 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, AcquisitionHint> hints,
             bool insideReferenceBranch,
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
-            ISet<int> ignoredItemIds)
+            ISet<int> ignoredItemIds,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts,
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts)
         {
             var children = new List<CraftingTreeNode>(recipe.Ingredients.Count);
             foreach (var ingredient in recipe.Ingredients)
             {
-                children.Add(BuildNode(ingredient, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId, ignoredItemIds));
+                children.Add(BuildNode(
+                    ingredient, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId,
+                    ignoredItemIds, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts));
             }
             return children;
         }
