@@ -26,6 +26,26 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task FetchBatchIntoCache_DerivesIsAccountBound_FromRawItemFlags()
+        {
+            // Review fix (finding 6): real-path coverage for
+            // FetchBatchIntoCacheAsync's IsAccountBound derivation - every
+            // other IsAccountBound assertion in this branch hand-sets the
+            // field on an ItemMetadata fixture directly, which proves
+            // nothing about this plumbing. Drives the actual production
+            // method through the fake IItemApiClient instead.
+            var api = new InMemoryItemApiClient();
+            api.AddItem(1, "Bound Item", "bound.png", flags: new List<string> { "AccountBound" });
+            api.AddItem(2, "Sellable Item", "sellable.png", flags: new List<string> { "AccountBindOnUse" });
+            var svc = new ItemMetadataService(api);
+
+            var result = await svc.GetMetadataAsync(new[] { 1, 2 }, CancellationToken.None);
+
+            Assert.True(result[1].IsAccountBound);
+            Assert.False(result[2].IsAccountBound);
+        }
+
+        [Fact]
         public async Task TransientPartialResponse_RetriedOnce()
         {
             var api = new InMemoryItemApiClient();

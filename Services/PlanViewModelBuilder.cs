@@ -124,6 +124,19 @@ namespace GW2CraftingHelper.Services
                 vm.Sections.Add(BuildCraftingStepsSection(craftSteps, result));
             }
 
+            // 7. Notes section (design-plan-notes.md, Option 1) - only if
+            // it has at least one note to show. Last, per that design's
+            // section 5: every note kind is a caveat ABOUT facts shown in
+            // an earlier section (excess reclaim references craft-step
+            // quantities; competency notes reference the Required
+            // Disciplines rows just above; the forge-scope note is a
+            // "read this after you've seen the plan" caveat).
+            var notesSection = BuildNotesSection(result);
+            if (notesSection.Rows.Count > 0)
+            {
+                vm.Sections.Add(notesSection);
+            }
+
             return vm;
         }
 
@@ -810,16 +823,11 @@ namespace GW2CraftingHelper.Services
         private static string BuildCharacterAvailabilityText(
             RequiredDiscipline disc, IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines)
         {
-            if (characterDisciplines == null)
+            var matches = MatchingCharacterDisciplines(disc.Discipline, characterDisciplines);
+            if (matches == null)
             {
                 return null;
             }
-
-            var matches = characterDisciplines
-                .Where(cd => cd != null && string.Equals(cd.Discipline, disc.Discipline, StringComparison.Ordinal))
-                .OrderByDescending(cd => cd.Rating)
-                .ThenBy(cd => cd.CharacterName, StringComparer.Ordinal)
-                .ToList();
 
             if (matches.Count == 0)
             {
@@ -831,6 +839,249 @@ namespace GW2CraftingHelper.Services
                 : $"{cd.CharacterName} ({cd.Rating})");
 
             return string.Join(", ", parts);
+        }
+
+        /// <summary>
+        /// design-plan-notes.md (Notes section, competency notes): shared
+        /// filter/sort BuildCharacterAvailabilityText and BestCharacterRating
+        /// both build on, extracted so the two call sites can't drift on
+        /// which characters count as "having" a discipline or how ties
+        /// break. Same null contract as BuildCharacterAvailabilityText's own
+        /// doc comment: null (not an empty list) when characterDisciplines
+        /// itself is null (no snapshot captured this data at all) - a
+        /// caller must not conflate that with "captured, and nobody has
+        /// it" (empty list). Highest rating first, then character name
+        /// alphabetical for ties - matches this method's pre-extraction
+        /// ordering byte-for-byte.
+        /// </summary>
+        private static List<SnapshotCharacterDiscipline> MatchingCharacterDisciplines(
+            string discipline, IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines)
+        {
+            if (characterDisciplines == null)
+            {
+                return null;
+            }
+
+            return characterDisciplines
+                .Where(cd => cd != null && string.Equals(cd.Discipline, discipline, StringComparison.Ordinal))
+                .OrderByDescending(cd => cd.Rating)
+                .ThenBy(cd => cd.CharacterName, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        /// <summary>
+        /// design-plan-notes.md (Notes section, competency notes): the
+        /// account's best rating for `discipline`, plus which character
+        /// achieved it (ties broken alphabetically, same as
+        /// MatchingCharacterDisciplines) - used by BuildNotesSection to
+        /// decide whether a RequiredDiscipline is "blocked" (best == null,
+        /// or best.Rating &lt; the discipline's MinRating) and to word the
+        /// note. Null under the identical two conditions
+        /// BuildCharacterAvailabilityText already distinguishes: no
+        /// snapshot at all (characterDisciplines == null) and a snapshot
+        /// with zero characters on this discipline (matches.Count == 0) -
+        /// a caller cannot tell those apart from this return value alone,
+        /// by design; BuildNotesSection reads characterDisciplines == null
+        /// directly wherever that distinction matters (never renders a
+        /// competency line at all without a snapshot).
+        /// </summary>
+        private static (int Rating, string CharacterName)? BestCharacterRating(
+            string discipline, IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines)
+        {
+            var matches = MatchingCharacterDisciplines(discipline, characterDisciplines);
+            if (matches == null || matches.Count == 0)
+            {
+                return null;
+            }
+
+            return (matches[0].Rating, matches[0].CharacterName);
+        }
+
+        /// <summary>
+        /// design-plan-notes.md (Notes section, Option 1 - single flat
+        /// section, one shared NoteLine row shape). Assembles rows in a
+        /// fixed order - excess/reclaim lines, then a total (only when 2+
+        /// excess lines exist), then competency lines, then the gambling-
+        /// forge scope line (0 or 1) - so re-solves and screenshots stay
+        /// diffable. Returns a section with zero rows when every note kind
+        /// is empty; the caller (Build()) only appends it to vm.Sections
+        /// when Rows.Count > 0, so an empty Notes section never renders a
+        /// header at all.
+        /// </summary>
+        private PlanSectionViewModel BuildNotesSection(CraftingPlanResult result)
+        {
+            var section = new PlanSectionViewModel
+            {
+                SectionType = PlanSectionType.Notes,
+                IsDefaultExpanded = true
+            };
+
+            // Review fix (nice-to-have): every other section's "(N)" counts
+            // real entries, not a rollup row - tracked separately from
+            // section.Rows.Count so the "Total reclaimable value" row (and,
+            // below, every physical row the forge-scope note now spans)
+            // never inflates the count.
+            int noteEntryCount = 0;
+
+            // 1. Excess/reclaim lines, alphabetical by resolved item name -
+            // same StringComparer.Ordinal stable-sort precedent
+            // BuildCurrencyTableRows already uses for its own rows. Review
+            // fix (finding 3, MEASURED): sort on the resolved NAME itself,
+            // not the composed Label - every label starts with the shared
+            // "Excess: <qty>x " prefix, so sorting the whole Label put
+            // quantity digits ahead of the name ("12x Zircon Ore" sorted
+            // before "3x Apple"), contradicting this very comment.
+            if (result.ExcessCraftOutputs != null && result.ExcessCraftOutputs.Count > 0)
+            {
+                var excessRows = new List<(string Name, PlanRowViewModel Row)>(result.ExcessCraftOutputs.Count);
+                long totalReclaim = 0;
+                // Review fix (finding 5, MEASURED): an unpriced row
+                // (ReclaimValue == null because no live SellInstant, not
+                // because the item is account-bound) rendered identically
+                // to a genuinely worthless one and silently understated
+                // "Total reclaimable value" - flag it on the row and on the
+                // total whenever any contributor was unpriced.
+                bool anyUnpriced = false;
+                foreach (var excess in result.ExcessCraftOutputs)
+                {
+                    string name = ResolveName(excess.ItemId, result.ItemMetadata);
+                    long coinValue = excess.ReclaimValue ?? 0;
+                    totalReclaim += coinValue;
+
+                    bool unpriced = !excess.IsAccountBound && !excess.ReclaimValue.HasValue;
+                    if (unpriced)
+                    {
+                        anyUnpriced = true;
+                    }
+
+                    string suffix = excess.IsAccountBound
+                        ? " (account-bound, not sellable)"
+                        : unpriced
+                            ? " (no sell price)"
+                            : string.Empty;
+
+                    excessRows.Add((name, new PlanRowViewModel
+                    {
+                        RowType = PlanRowType.NoteLine,
+                        Label = $"Excess: {excess.ExcessQuantity}x {name}{suffix}",
+                        CoinValue = coinValue
+                    }));
+                    noteEntryCount++;
+                }
+
+                section.Rows.AddRange(excessRows
+                    .OrderBy(r => r.Name, StringComparer.Ordinal)
+                    .Select(r => r.Row));
+
+                // A single excess line is already its own total - matches
+                // SummarySectionRenderer's own "don't show a redundant
+                // single-item rollup" instinct.
+                if (result.ExcessCraftOutputs.Count > 1)
+                {
+                    section.Rows.Add(new PlanRowViewModel
+                    {
+                        RowType = PlanRowType.NoteLine,
+                        Label = anyUnpriced
+                            ? "Total reclaimable value (excludes unpriced items)"
+                            : "Total reclaimable value",
+                        CoinValue = totalReclaim
+                    });
+                }
+            }
+
+            // 2. Competency lines, alphabetical by discipline - matches
+            // RequiredDisciplines' own display order (disciplineMap.OrderBy
+            // in PlanResultBuilder.Build). A discipline is "blocked" only
+            // when a real snapshot exists AND the account's best rating for
+            // it is missing or below MinRating - CharacterDisciplines ==
+            // null (no snapshot) must never produce a false "blocked"
+            // claim, mirroring BuildCharacterAvailabilityText's own null
+            // contract.
+            if (result.CharacterDisciplines != null && result.RequiredDisciplines != null)
+            {
+                foreach (var disc in result.RequiredDisciplines)
+                {
+                    var best = BestCharacterRating(disc.Discipline, result.CharacterDisciplines);
+                    bool blocked = best == null || best.Value.Rating < disc.MinRating;
+                    if (!blocked)
+                    {
+                        continue;
+                    }
+
+                    string label = best == null
+                        ? $"{disc.Discipline} {disc.MinRating} required - not trained on any character"
+                        : $"{disc.Discipline} {disc.MinRating} required - highest on this account: {best.Value.Rating} ({best.Value.CharacterName})";
+
+                    section.Rows.Add(new PlanRowViewModel
+                    {
+                        RowType = PlanRowType.NoteLine,
+                        Label = label
+                    });
+                    noteEntryCount++;
+                }
+            }
+
+            // 3. Gambling-forge scope note (0 or 1 logical entry). Wording
+            // deliberately distinguishes the two mechanics design-plan-
+            // notes.md section 9 flags as easy to conflate: this plan's own
+            // Mystic-Clover-style fractional yield IS probability-adjusted
+            // (EV already priced in) - true multi-outcome gambles (e.g.
+            // precursor forging) are a DIFFERENT mechanic this module has
+            // no data for at all and are never represented in a plan,
+            // in either direction.
+            //
+            // Review fix (finding 4, INFERRED - no live desktop
+            // verification was performed, see docs/KNOWN-ISSUES.md): the
+            // single-row, ~243-char version of this note would have
+            // clipped horizontally at NotesSectionRenderer's panel edge
+            // (panelWidth ~884px at DefaultFont14, AutoSizeWidth label with
+            // no max-width cap) - a label cannot overflow a fixed-height
+            // row's HEIGHT, only its own horizontal extent, so the failure
+            // mode here is edge-clipping, not row overflow. The clipped
+            // portion would have been exactly the "true multi-outcome
+            // gambles... never models and never shows" caveat the note
+            // exists to deliver. Split at the existing sentence break plus
+            // one clause break, into 3 NoteLine rows, each now a complete
+            // sentence - this preserves the 28px-per-row contract exactly
+            // (section height is rows.Count * FallbackTextRowHeight) while
+            // keeping every word of the original text visible regardless
+            // of panel width.
+            if (result.ProbabilisticForgeOutputItemIds != null &&
+                result.ProbabilisticForgeOutputItemIds.Count > 0)
+            {
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.NoteLine,
+                    Label = "This plan includes a Mystic Clover-style Mystic Forge yield - its expected " +
+                        "output is already probability-adjusted."
+                });
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.NoteLine,
+                    Label = "True multi-outcome Mystic Forge gambles (e.g. precursor forging) are a " +
+                        "different mechanic."
+                });
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.NoteLine,
+                    Label = "This plan never models or shows them."
+                });
+                noteEntryCount++;
+            }
+
+            // Matches every other section's "Title (N)" convention (Used
+            // Materials/Shopping List/Crafting Steps/Required Disciplines/
+            // Required Recipes all count their own final row list this same
+            // way) - computed last so it reflects every note kind above.
+            // Review fix (nice-to-have): counts real note ENTRIES
+            // (noteEntryCount), not section.Rows.Count - the latter also
+            // includes the "Total reclaimable value" rollup row and, as of
+            // the finding-4 split above, 3 physical rows for what is still
+            // one logical forge-scope note, either of which would inflate
+            // "Notes (N)" past the number of things actually being said.
+            section.Title = $"Notes ({noteEntryCount})";
+
+            return section;
         }
 
         private PlanSectionViewModel BuildRecipesSection(CraftingPlanResult result)

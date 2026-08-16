@@ -28,7 +28,9 @@ namespace GW2CraftingHelper.Tests.Helpers
             List<PlanRequestItem> requestedItems = null,
             List<CraftingTreeNode> multiItemRoots = null,
             List<SnapshotCharacterDiscipline> characterDisciplines = null,
-            Dictionary<int, DailyCooldownItem> dailyCooldownItems = null)
+            Dictionary<int, DailyCooldownItem> dailyCooldownItems = null,
+            List<ExcessCraftOutput> excessCraftOutputs = null,
+            List<int> probabilisticForgeOutputItemIds = null)
         {
             return new CraftingPlanResult
             {
@@ -59,7 +61,13 @@ namespace GW2CraftingHelper.Tests.Helpers
                 // convention, so a test that doesn't pass this explicitly
                 // exercises the same "no data" path production code hits
                 // for every pre-W3C/degraded snapshot.
-                CharacterDisciplines = characterDisciplines
+                CharacterDisciplines = characterDisciplines,
+                // design-plan-notes.md (Notes section): matches
+                // RequiredDisciplines/RequiredRecipes' own "empty list, not
+                // null" default above - production (ExcessCraftOutputCalculator/
+                // PlanResultBuilder) never leaves either field null once run.
+                ExcessCraftOutputs = excessCraftOutputs ?? new List<ExcessCraftOutput>(),
+                ProbabilisticForgeOutputItemIds = probabilisticForgeOutputItemIds ?? new List<int>()
             };
         }
 

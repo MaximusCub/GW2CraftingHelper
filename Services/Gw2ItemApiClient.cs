@@ -49,12 +49,40 @@ namespace GW2CraftingHelper.Services
                 var results = new List<RawItem>();
                 foreach (var item in array)
                 {
+                    // design-plan-notes.md (Notes section, excess/reclaim
+                    // account-bound exclusion): the "flags" array (e.g.
+                    // "AccountBound") was previously parsed nowhere - see
+                    // RawItem.Flags' own doc comment. Missing/non-array
+                    // "flags" yields an empty list, never null, mirroring
+                    // the Name/Icon/Rarity "" fallback convention above.
+                    var flags = new List<string>();
+                    var flagsToken = item["flags"] as JArray;
+                    if (flagsToken != null)
+                    {
+                        foreach (var flag in flagsToken)
+                        {
+                            // Nice-to-have (review fix): a malformed array
+                            // element (null, or a non-string token) must
+                            // not inject a null into Flags - RawItem.Flags'
+                            // own doc comment promises a never-null LIST,
+                            // but a null ENTRY inside it would still be a
+                            // silent contract violation for any future
+                            // consumer beyond the current Contains(...) check.
+                            var flagValue = flag.Value<string>();
+                            if (flagValue != null)
+                            {
+                                flags.Add(flagValue);
+                            }
+                        }
+                    }
+
                     results.Add(new RawItem
                     {
                         Id = item.Value<int>("id"),
                         Name = item.Value<string>("name") ?? "",
                         Icon = item.Value<string>("icon") ?? "",
-                        Rarity = item.Value<string>("rarity") ?? ""
+                        Rarity = item.Value<string>("rarity") ?? "",
+                        Flags = flags
                     });
                 }
 
