@@ -424,9 +424,13 @@ namespace GW2CraftingHelper.Views.Rendering
                     var s = _treeNodeStates[i];
                     if (!s.ChildrenBuilt)
                     {
-                        foreach (var child in s.Node.Children)
+                        int captionSplitIndex = ReceiptCaptionHelper.ComputeCaptionSplitIndex(s.Node);
+                        for (int childIndex = 0; childIndex < s.Node.Children.Count; childIndex++)
                         {
-                            RenderTreeNode(child, s.ChildContainer, _getCurrentPanelWidth(), s.Depth + 1, s.ChildDimmed);
+                            string childCaption = ReceiptCaptionHelper.CaptionForChildIndex(captionSplitIndex, childIndex);
+                            RenderTreeNode(
+                                s.Node.Children[childIndex], s.ChildContainer, _getCurrentPanelWidth(),
+                                s.Depth + 1, s.ChildDimmed, childCaption);
                         }
                         s.ChildrenBuilt = true;
                     }
@@ -574,7 +578,16 @@ namespace GW2CraftingHelper.Views.Rendering
         // CurrencyMetadata; PreserveScrollAcross(...) ->
         // _preserveScrollAcross(...); GetCurrentPanelWidth() ->
         // _getCurrentPanelWidth().
-        private void RenderTreeNode(CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, bool dimmed)
+        // UI-bundle milestone: captionText is the sanctioned tooltip
+        // fallback for Feature C (receipt/what-if captions) - see
+        // ReceiptCaptionHelper's own doc comment for why a real extra ROW
+        // is not used (frozen PlanContentHeightMath tree-height math counts
+        // exactly node.Children.Count rows per level). null for every node
+        // except the first child of each group under a node whose Children
+        // stack cost-component leaves + a reference branch - see the three
+        // call sites that compute it via ReceiptCaptionHelper.
+        private void RenderTreeNode(
+            CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, bool dimmed, string captionText = null)
         {
             int indent = depth * TreeIndentPer;
             bool hasChildren = node.Children.Count > 0;
@@ -846,6 +859,35 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 extraTooltipLines.Add(node.AcquisitionHint);
             }
+
+            // UI-bundle milestone, Feature C (receipt/what-if captions):
+            // sanctioned tooltip fallback - see the class-level doc comment
+            // on the captionText parameter above. Inserted at the front so
+            // it reads first, ahead of any unit-price/caveat lines already
+            // in extraTooltipLines.
+            if (!string.IsNullOrEmpty(captionText))
+            {
+                extraTooltipLines.Insert(0, captionText);
+            }
+
+            // UI-bundle milestone, Feature A (wiki links): this module's
+            // FIRST external-URL launch (deliberate maintainer decision) -
+            // a context action (right-click), not a visible icon, per the
+            // maintainer's pre-authorized placement discretion. Right-click
+            // cannot collide with this row's own left-click expand/collapse
+            // toggle (wired below, only when hasChildren) and is naturally
+            // low-accidental-click-risk for a click that steals focus into
+            // the default browser. Every tree row gets this, item leaf or
+            // internal node alike - a wiki page that does not exist for an
+            // internal-only concept (e.g. a synthesized cost-component
+            // "currency" name) just 404s rather than crashing anything.
+            string wikiUrl = WikiLinkBuilder.BuildItemPageUrl(node.Name);
+            if (wikiUrl != null)
+            {
+                rowPanel.RightMouseButtonPressed += (_, __) => WikiLinkLauncher.Open(wikiUrl);
+                extraTooltipLines.Add("Right-click: Open wiki page");
+            }
+
             UpdateTreeRowTooltip(rowPanel, displayName, fullName, extraTooltipLines);
 
             // Decision pill column: one pill per feasible source (direct
@@ -925,9 +967,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 _treeNodeStates.Add(state);
                 if (isExpanded)
                 {
-                    foreach (var child in node.Children)
+                    // UI-bundle milestone, Feature C: caption split computed
+                    // once per node, reused for every child index - see
+                    // ReceiptCaptionHelper's own doc comment.
+                    int captionSplitIndex = ReceiptCaptionHelper.ComputeCaptionSplitIndex(node);
+                    for (int childIndex = 0; childIndex < node.Children.Count; childIndex++)
                     {
-                        RenderTreeNode(child, childFlow, panelWidth, depth + 1, childDimmed);
+                        string childCaption = ReceiptCaptionHelper.CaptionForChildIndex(captionSplitIndex, childIndex);
+                        RenderTreeNode(node.Children[childIndex], childFlow, panelWidth, depth + 1, childDimmed, childCaption);
                     }
                     state.ChildrenBuilt = true;
                     state.IsExpanded = true;
@@ -959,10 +1006,13 @@ namespace GW2CraftingHelper.Views.Rendering
                             // triggers a rebuild) width this node itself was
                             // built at - see GetCurrentPanelWidth.
                             int currentWidth = _getCurrentPanelWidth();
-                            foreach (var child in state.Node.Children)
+                            int captionSplitIndex = ReceiptCaptionHelper.ComputeCaptionSplitIndex(state.Node);
+                            for (int childIndex = 0; childIndex < state.Node.Children.Count; childIndex++)
                             {
+                                string childCaption = ReceiptCaptionHelper.CaptionForChildIndex(captionSplitIndex, childIndex);
                                 RenderTreeNode(
-                                    child, state.ChildContainer, currentWidth, state.Depth + 1, state.ChildDimmed);
+                                    state.Node.Children[childIndex], state.ChildContainer, currentWidth,
+                                    state.Depth + 1, state.ChildDimmed, childCaption);
                             }
                             state.ChildrenBuilt = true;
                         }
