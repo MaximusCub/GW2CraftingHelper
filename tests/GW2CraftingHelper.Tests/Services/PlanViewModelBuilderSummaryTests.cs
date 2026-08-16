@@ -578,5 +578,43 @@ namespace GW2CraftingHelper.Tests.Services
                 "Prices are Trading Post data - actual purchase and sale prices are likely to vary.",
                 rows[rows.Count - 1].Label);
         }
+
+        // --- AUDIT ROW 20/38 review-fix (TEST GAP): PlanViewModel.PriceBasis pass-through ---
+        //
+        // PlanViewModelBuilder.Build's `PriceBasis = result.PriceBasis`
+        // assignment is the SOLE feed for TreeSectionController's fell-
+        // back-price tooltip caveat, which renders one of two OPPOSITE
+        // sentences depending on this value ("Buy-order price unavailable
+        // - instant-buy price shown" vs. "Instant-buy price unavailable -
+        // buy-order price shown"). Nothing previously asserted the
+        // assignment itself, so deleting it (or any future refactor that
+        // silently drops it) would leave every BuyOrder-basis plan
+        // rendering the InstantBuy-basis sentence - the exact inverse
+        // claim - with no test failing. BuyOrder is asserted explicitly
+        // (not the enum's own default of InstantBuy = 0) so a dropped
+        // assignment, which would leave vm.PriceBasis at its own default
+        // of InstantBuy, cannot coincidentally satisfy the assertion.
+
+        [Fact]
+        public void Build_PriceBasisBuyOrder_PassedThroughToViewModel()
+        {
+            var result = MakeResult();
+            result.PriceBasis = PriceBasis.BuyOrder;
+
+            var vm = _builder.Build(result);
+
+            Assert.Equal(PriceBasis.BuyOrder, vm.PriceBasis);
+        }
+
+        [Fact]
+        public void Build_PriceBasisInstantBuy_PassedThroughToViewModel()
+        {
+            var result = MakeResult();
+            result.PriceBasis = PriceBasis.InstantBuy;
+
+            var vm = _builder.Build(result);
+
+            Assert.Equal(PriceBasis.InstantBuy, vm.PriceBasis);
+        }
     }
 }

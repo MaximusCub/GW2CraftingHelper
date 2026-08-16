@@ -66,13 +66,21 @@ namespace GW2CraftingHelper.Models
         public long? UnitCost { get; set; }
         public long? SubtreeCost { get; set; }
 
-        // AUDIT ROW 20/38 (gw2e price-side fallback parity): true only for
-        // a BuyFromTp node whose UnitCost above came from the item's NON-
-        // preferred TP side because the preferred side (per the plan's
-        // PriceBasis) had no listings - see SolverDecision.PriceSideFellBack
-        // and PlanSolver.GetUnitPrice's fallback overload. Always false for
-        // every other Decision. The recipe-tree renderer reads this to add
-        // a "other side shown" caveat to the unit-price tooltip.
+        // AUDIT ROW 20/38 (gw2e price-side fallback parity): true when this
+        // node's UnitCost above came from an item's NON-preferred TP side
+        // because the preferred side (per the plan's PriceBasis) had no
+        // listings - see PlanSolver.GetUnitPrice's fallback overload. Two
+        // distinct producers, both gated the same way at their own source:
+        // (1) a plain BuyFromTp node, from SolverDecision.PriceSideFellBack
+        // (CraftingTreeBuilder.BuildNode gates this to Decision ==
+        // BuyFromTp only); (2) a BuyFromVendor cost-component leaf
+        // (IsCostComponent) representing a TP-valued Item barter line, from
+        // VendorItemCostLine.PriceSideFellBack (review-fix,
+        // BuildVendorCostComponentLeaves) - the leaf's OWN price, not the
+        // parent vendor node's. Always false for every other node,
+        // including the parent BuyFromVendor node itself and any currency
+        // cost-component leaf. The recipe-tree renderer reads this to add
+        // an "other side shown" caveat to the unit-price tooltip.
         public bool PriceSideFellBack { get; set; }
 
         // Non-coin currency cost of a BuyFromVendor decision (see

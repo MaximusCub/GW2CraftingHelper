@@ -349,7 +349,17 @@ namespace GW2CraftingHelper.Services
                         // method's own doc comment.
                         SubtreeCost = line.GoldValue,
                         UnitCost = line.Quantity > 0 ? line.GoldValue / line.Quantity : (long?)null,
-                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.ItemId, ownedVendorItemAmounts)
+                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.ItemId, ownedVendorItemAmounts),
+                        // AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap):
+                        // this leaf's UnitCost above came from the barter
+                        // item's own TP price (VendorItemCostLine.GoldValue -
+                        // see VendorBatchSolver.EvaluateVendorOffers), which
+                        // can itself have fallen back to the item's NON-
+                        // preferred TP side. Threaded through unchanged so
+                        // TreeSectionController's existing fell-back-price
+                        // tooltip caveat can also catch this leaf, not just
+                        // a plain BuyFromTp node.
+                        PriceSideFellBack = line.PriceSideFellBack
                     });
                 }
             }

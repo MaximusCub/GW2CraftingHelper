@@ -751,7 +751,18 @@ namespace GW2CraftingHelper.Views.Rendering
             // Deliberately outside the node.Quantity > 1 gate above: this
             // caveat is about WHICH TP side priced the node, not about a
             // qty=1 row already showing its own total as the unit price.
-            if (node.Decision == CraftingDecision.BuyFromTp && node.PriceSideFellBack)
+            //
+            // Review-fix (DISPLAY CAVEAT gap): also covers a BuyFromVendor
+            // cost-component leaf (node.IsCostComponent) whose own TP-
+            // valued barter price fell back the same way - see
+            // VendorItemCostLine.PriceSideFellBack and
+            // CraftingTreeBuilder.BuildVendorCostComponentLeaves. A plain
+            // BuyFromVendor node (not a cost component) never sets this
+            // flag (CraftingTreeNode.PriceSideFellBack's own doc comment),
+            // so the added IsCostComponent check cannot fire for the
+            // ordinary vendor-node case, only this item-barter-leaf case.
+            if ((node.Decision == CraftingDecision.BuyFromTp || node.IsCostComponent) &&
+                node.PriceSideFellBack)
             {
                 extraTooltipLines.Add(_getCurrentPlan()?.PriceBasis == PriceBasis.BuyOrder
                     ? "Buy-order price unavailable - instant-buy price shown"

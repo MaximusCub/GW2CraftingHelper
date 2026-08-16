@@ -1141,6 +1141,61 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(decision.TotalCost, node.SubtreeCost);
         }
 
+        // ---- AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap): item cost-component leaf PriceSideFellBack ----
+
+        [Fact]
+        public void MixedOffer_ItemCostPreferredSideEmpty_LeafFlagsPriceSideFellBack()
+        {
+            // The barter item's preferred TP side under the default
+            // InstantBuy basis (BuyInstant) is empty here - its price only
+            // exists via this same item's other-side fallback to
+            // SellInstant (see PlanSolver.GetUnitPrice's 3-arg overload).
+            // Previously this fell-back price folded silently into the
+            // item leaf's UnitCost with no way for the user to tell (the
+            // tooltip caveat used to be gated to Decision == BuyFromTp
+            // only, and this leaf's Decision is BuyFromVendor) - see
+            // VendorItemCostLine.PriceSideFellBack and
+            // CraftingTreeBuilder.BuildVendorCostComponentLeaves.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 0, SellInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(1, new[] { (42, 5) }, new[] { (23, 3) });
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var metadata = Meta((42, "Glob of Ectoplasm", "ecto.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            var itemLeaf = node.Children.Single(c => c.ItemId == 42);
+            Assert.True(itemLeaf.IsCostComponent);
+            Assert.True(itemLeaf.PriceSideFellBack);
+            Assert.Equal(10, itemLeaf.UnitCost); // fallen-back SellInstant side
+            Assert.Equal(50, itemLeaf.SubtreeCost); // 5 * 10
+
+            // A currency component leaf is never TP-priced at all, so its
+            // PriceSideFellBack must stay false regardless of the item
+            // leaf's own fallback in the same offer.
+            var currencyLeaf = node.Children.Single(c => c.ItemId == 23);
+            Assert.False(currencyLeaf.PriceSideFellBack);
+        }
+
+        [Fact]
+        public void MixedOffer_ItemCostPreferredSidePresent_LeafPriceSideFellBackFalse()
+        {
+            // Sibling negative case for the fixture above (BuildMixedVendorNode's
+            // default prices only set BuyInstant, the InstantBuy basis's own
+            // preferred side, so no fallback occurs) - the field must not be
+            // true by default.
+            var (node, _) = BuildMixedVendorNode();
+
+            var itemLeaf = node.Children.Single(c => c.ItemId == 42);
+            Assert.False(itemLeaf.PriceSideFellBack);
+        }
+
         [Fact]
         public void MixedOffer_NoDecisionPillFields_NoRecipeId()
         {

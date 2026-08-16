@@ -4037,3 +4037,147 @@ solver/builder-layer test and doc-comment fix, no UI-adjacent behavior
 changed.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+## AUDIT ROW 20/38 review-fix round 2: PriceBasis pass-through test gap + vendor-barter DISPLAY CAVEAT (2026-08-16)
+
+A second adversarial pass over the AUDIT ROW 20/38 TP price-side
+fallback change (two sections above) found two further issues, both
+fixed here.
+
+**Finding 1 (Must Fix, test gap)**: `PlanViewModelBuilder.Build`'s
+`PriceBasis = result.PriceBasis` assignment is the sole feed for the
+recipe-tree tooltip's basis-dependent sentence choice (`Views/
+Rendering/TreeSectionController.cs`'s `_getCurrentPlan()?.PriceBasis ==
+PriceBasis.BuyOrder` check) - the one line deciding which of two
+OPPOSITE caveat sentences the user sees. Nothing asserted it: deleting
+the assignment (or any refactor that silently drops it) would leave
+`vm.PriceBasis` at its own default (`InstantBuy = 0`), so every
+BuyOrder-basis plan would render "Instant-buy price unavailable -
+buy-order price shown" when buy orders were actually the missing side -
+the exact inverse claim - with all existing tests still green. Two
+tests close the gap in `PlanViewModelBuilderSummaryTests.cs`:
+`Build_PriceBasisBuyOrder_PassedThroughToViewModel` and
+`Build_PriceBasisInstantBuy_PassedThroughToViewModel`, each setting
+`result.PriceBasis` explicitly and asserting `vm.PriceBasis` matches.
+BuyOrder is asserted explicitly (not relying on `MakeResult`'s implicit
+InstantBuy default) so a dropped assignment cannot coincidentally
+satisfy the assertion by leaving the value at its own zero default.
+
+**Finding 2 (Must Fix, display caveat incomplete)**: the DISPLAY CAVEAT
+follow-up recorded in the first AUDIT ROW 20/38 section named only the
+shopping-list gap as an open follow-up; it missed that the fallback
+change itself widened a second, already-shipped display gap in the
+vendor item-barter path. `VendorBatchSolver.EvaluateVendorOffers`'s Item
+cost-line pricing (the site that call for the same-item cross-side
+fallback) feeds `CraftingTreeBuilder.BuildVendorCostComponentLeaves`,
+which synthesizes a `BuyFromVendor`/`IsCostComponent` leaf whose
+`UnitCost` is that fallen-back TP price - and the existing tooltip
+caveat was gated to `node.Decision == CraftingDecision.BuyFromTp` only,
+so this leaf rendered an unqualified "Unit price: ..." line with no way
+for the user to tell the price came from the non-preferred side.
+
+**Fix**: threaded the fell-back fact all the way from the price lookup
+to the tooltip, mirroring the existing BuyFromTp path rather than adding
+a parallel mechanism:
+- `VendorBatchSolver.EvaluateVendorOffers`'s Item cost-line branch now
+  calls the 3-arg `PlanSolver.GetUnitPrice(price, priceBasis, out
+  priceSideFellBack)` overload directly (previously the 2-arg one, which
+  discards the fact) and carries the out param through `itemCostRaw`'s
+  tuple (now 4-element) into the scaled `VendorItemCostLine`.
+- `Models/VendorItemCostLine.cs` gained a `PriceSideFellBack` bool.
+- `CraftingTreeBuilder.BuildVendorCostComponentLeaves` copies it onto
+  the synthesized item leaf's own `CraftingTreeNode.PriceSideFellBack` -
+  a currency cost-component leaf never sets this (it is never
+  TP-priced), so it stays false there unconditionally.
+- `TreeSectionController`'s tooltip gate widened from `node.Decision ==
+  CraftingDecision.BuyFromTp` to `(node.Decision == BuyFromTp ||
+  node.IsCostComponent) && node.PriceSideFellBack`. Every
+  `IsCostComponent` leaf's `Decision` is always `BuyFromVendor`
+  (`BuildVendorCostComponentLeaves` sets it unconditionally for both
+  item and currency leaves - confirmed the method's caller in
+  `CraftingTreeBuilder.BuildNode` only ever invokes it when
+  `decision.Source == AcquisitionSource.BuyFromVendor`), so the added
+  `IsCostComponent` disjunct cannot fire for an ordinary,
+  non-cost-component `BuyFromVendor` node - that node's own
+  `PriceSideFellBack` stays false regardless (`CraftingTreeNode.
+  PriceSideFellBack`'s own doc comment), so the gate widening carries no
+  regression risk for the pre-existing vendor-node tooltip.
+- Fixed a doc comment this same change made stale: the 3-arg
+  `GetUnitPrice` overload's own comment said `VendorBatchSolver`
+  reached it "via the two-arg overload" - no longer true now that
+  `VendorBatchSolver` calls it directly. Doc-only, no behavior change;
+  the remaining 2-arg caller (`CraftingPlanPipeline`'s Buy-All preset
+  feasibility check) only ever needed the `> 0` priceable check, never
+  the fell-back fact, so it is unaffected.
+
+The `VendorBatchSolver` merged-ceil batching math itself
+(`FinalizeVendorBatches`/`AllocateVendorNodeCosts`/the `unitsNeeded`
+scaling arithmetic) was not touched - only an additional boolean was
+carried alongside the existing per-line tuple/`VendorItemCostLine`
+fields, the same category of addition the prior W4B review-fix round
+already established as acceptable in this DO-NOT-TOUCH method (see that
+round's own `itemsScalable` note).
+
+The shopping-list row tooltip still does not carry either caveat (the
+original section's own recorded follow-up) - unchanged and still open,
+not addressed by this pass.
+
+**Tests**:
+- `CraftingTreeBuilderTests.
+  MixedOffer_ItemCostPreferredSideEmpty_LeafFlagsPriceSideFellBack` -
+  real solver + real builder, a 2-kind vendor offer (TP-valued item +
+  non-coin currency) whose item cost line's preferred TP side is empty;
+  asserts the item leaf's `PriceSideFellBack` is true, its `UnitCost`
+  is the fallen-back side's price, and the sibling currency leaf's
+  `PriceSideFellBack` stays false.
+- `CraftingTreeBuilderTests.
+  MixedOffer_ItemCostPreferredSidePresent_LeafPriceSideFellBackFalse` -
+  sibling negative case (reuses the existing `BuildMixedVendorNode`
+  fixture, whose item price only populates the preferred side) proving
+  the flag is not true by default.
+
+Both exercise real `PlanSolver.Solve`/`CraftingTreeBuilder.BuildTree`
+production code paths (the file's existing `BuildViaRealSolver`/
+`BuildMixedVendorNode` helpers) - no contract-mirror or fake-logic
+tests. `TreeSectionController.cs` itself remains untested (Blish-bound
+UI code, outside this repo's Blish-free test-runnable surface, same
+constraint every other UI-adjacent entry in this file notes).
+
+**Self-review findings** (Code Reviewer Mode pass over this diff):
+confirmed `itemCostRaw`'s tuple-type change from 3 to 4 elements has
+exactly one producer and one consumer in `VendorBatchSolver.cs` (grepped
+for any other `(int, int, int)` tuple literal of that shape - none
+found), so no stray call site was left on the old shape; confirmed the
+`unitPrice > 0` / `priceable = false` branch structure is unchanged byte-
+for-byte aside from capturing the extra out param, so a both-sides-empty
+Item cost line still makes the whole offer unpriceable exactly as
+before; confirmed `PriceSideFellBack` defaults `false` on a plain
+`new VendorItemCostLine { }` (no constructor), so any code path that
+never explicitly sets it (there is none - the sole producer always sets
+it) would fail safe rather than silently claiming a fallback; confirmed
+neither changed test file references Blish HUD, and neither touches
+`ModuleLog.cs`, `PlanContentHeightMath.cs`, `PlanRelayoutMath.cs`,
+scroll machinery, or the merged-ceil batching math (all DO-NOT-TOUCH).
+Nice-to-have (not applied - the two new `PlanViewModelBuilderSummaryTests`
+cases each construct their own `MakeResult()` rather than sharing a
+private helper for the two-line "set PriceBasis, build, assert" pattern;
+left as plain inline `[Fact]`s to match this file's existing
+CurrencyMetadata pass-through pair's own style rather than introduce a
+new per-file helper for two call sites).
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` clean, 0
+errors (StyleCop warning count on touched lines unchanged - all new
+comments/lines follow the file's existing comment-wrapping convention).
+Tests: 1378 passed, 0 failed (baseline 1374 from the previous section;
++4 net new - the two `PlanViewModelBuilderSummaryTests` and two
+`CraftingTreeBuilderTests` cases listed above). No Blish HUD/
+BlishHUD.exe references added to tests; both edited test files remain
+Blish-free. IDs remain internal-only; coin icons unaffected (no
+coin-rendering code touched - `PriceSideFellBack` is a boolean flag, not
+a price value). No live desktop verification performed for this pass -
+purely solver/builder-layer plus a display-controller code change
+verified through the builder-layer tests above (`TreeSectionController`
+is Blish-bound and outside this session's test-runnable surface, same
+constraint prior UI-adjacent entries in this file note).
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]

@@ -1479,13 +1479,18 @@ namespace GW2CraftingHelper.Services
         /// preferred side returned 0 outright, which GetBuyCost's `> 0`
         /// check then treated as fully unpriceable - dropping the BuyFromTp
         /// option entirely even though the OTHER side had a real listing.
-        /// This is the single site PlanSolver.GetBuyCost and
-        /// VendorBatchSolver's per-item TP-valued cost-line pricing both
-        /// route through (via the two-arg overload), so both gain the
-        /// fallback consistently without duplicating the side-selection
-        /// logic. 0 on both sides still returns 0 with the out param false -
-        /// the existing "unpriceable" handling at every call site is
-        /// unchanged.
+        /// This is the single side-selection logic both PlanSolver.
+        /// GetBuyCost and VendorBatchSolver's per-item TP-valued cost-line
+        /// pricing call directly (review-fix: VendorBatchSolver switched
+        /// from the two-arg overload to this one so its own fell-back fact
+        /// reaches VendorItemCostLine.PriceSideFellBack rather than being
+        /// discarded), so both gain the fallback consistently without
+        /// duplicating the side-selection logic. The remaining two-arg
+        /// caller (CraftingPlanPipeline's Buy-All preset feasibility check)
+        /// only ever needs the `> 0` priceable check, not the fell-back
+        /// fact itself. 0 on both sides still returns 0 with the out param
+        /// false - the existing "unpriceable" handling at every call site
+        /// is unchanged.
         /// </summary>
         internal static int GetUnitPrice(ItemPrice price, PriceBasis priceBasis, out bool priceSideFellBack)
         {

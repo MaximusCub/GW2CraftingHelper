@@ -271,9 +271,13 @@ namespace GW2CraftingHelper.Services
                 // exactly what already fed the `coinCost += cost.Count *
                 // unitPrice` line below - captured here so a display leaf
                 // can be built from it after unitsNeeded scaling, without
-                // ever recomputing the multiplication.
+                // ever recomputing the multiplication. PriceSideFellBack
+                // (AUDIT ROW 20/38 review-fix) is this same line's own
+                // GetUnitPrice out param, carried alongside so the scaled
+                // VendorItemCostLine below can flag it the same way a
+                // plain BuyFromTp node already is.
                 bool hasRawCoin = false;
-                List<(int ItemId, int Count, int UnitPrice)> itemCostRaw = null;
+                List<(int ItemId, int Count, int UnitPrice, bool PriceSideFellBack)> itemCostRaw = null;
 
                 foreach (var cost in offer.CostLines ?? Enumerable.Empty<CostLine>())
                 {
@@ -315,9 +319,18 @@ namespace GW2CraftingHelper.Services
                     }
                     else if (string.Equals(cost.Type, "Item", StringComparison.Ordinal))
                     {
-                        int unitPrice = prices.TryGetValue(cost.Id, out var itemPrice)
-                            ? PlanSolver.GetUnitPrice(itemPrice, priceBasis)
-                            : 0;
+                        // AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap):
+                        // the 3-arg GetUnitPrice overload replaces the
+                        // 2-arg one used here previously so this barter
+                        // item's own fell-back-side fact is captured, not
+                        // just discarded - see itemCostRaw's doc comment
+                        // above and VendorItemCostLine.PriceSideFellBack.
+                        int unitPrice = 0;
+                        bool itemPriceSideFellBack = false;
+                        if (prices.TryGetValue(cost.Id, out var itemPrice))
+                        {
+                            unitPrice = PlanSolver.GetUnitPrice(itemPrice, priceBasis, out itemPriceSideFellBack);
+                        }
                         if (unitPrice > 0)
                         {
                             coinCost += (long)cost.Count * unitPrice;
@@ -337,8 +350,8 @@ namespace GW2CraftingHelper.Services
                             // way.
                             if (cost.Count > 0)
                             {
-                                (itemCostRaw ?? (itemCostRaw = new List<(int, int, int)>()))
-                                    .Add((cost.Id, cost.Count, unitPrice));
+                                (itemCostRaw ?? (itemCostRaw = new List<(int, int, int, bool)>()))
+                                    .Add((cost.Id, cost.Count, unitPrice, itemPriceSideFellBack));
                             }
                         }
                         else
@@ -408,7 +421,8 @@ namespace GW2CraftingHelper.Services
                         {
                             ItemId = ic.ItemId,
                             Quantity = (int)scaledQty,
-                            GoldValue = (long)ic.Count * unitsNeeded * ic.UnitPrice
+                            GoldValue = (long)ic.Count * unitsNeeded * ic.UnitPrice,
+                            PriceSideFellBack = ic.PriceSideFellBack
                         });
                     }
                 }
