@@ -2700,4 +2700,82 @@ band operators and widened currency columns) are unverified live and
 should get a look in a real Blish HUD session before this is considered
 fully done.
 
+**12. Adversarial-review fix round 2 (2026-08-15) - 1 blocking finding
+fixed from a second independent code review, this one specifically
+targeting round 1's own fixes.**
+
+- **Loss-band `"="` operator asserts a false equation (Must Fix,
+  `Views/Rendering/SummarySectionRenderer.cs` `CreateFormulaBand`,
+  introduced by round 1's "formula-band operators never drawn" fix
+  above).** Round 1 started literally drawing `"-"`/`"="` between tiles,
+  but the profit band's loss tile has always shown `Math.Abs(profit)`
+  under a `"Loss if Sold"` caption (the pre-existing sign convention,
+  predating both review rounds - coin amounts render via
+  `CoinCurrencyRenderer.BuildCoinSegments`, which clamps negative input to
+  0, so there was never a way to show a signed coin value without
+  touching that shared, reused-not-modified machinery). Once round 1 made
+  the band's final boundary a literal `"="`, that pre-existing convention
+  became actively wrong on screen: `PlanViewModelBuilderSummaryTests.
+  ProfitBand_NegativeProfit_LabeledLossWithAbsoluteValue`'s own numbers
+  (`NetSaleValue = 340`, `TotalMaterialsValue = 500`, `profit = -160`)
+  render as `"340 - 500 = 160"`, which is false (the true right-hand side
+  is -160). This is the common case, not an edge case - most GW2 recipes
+  craft at a loss. Fixed by giving `PlanRowViewModel` a new
+  `FormulaResultIsExact` field (default `true`, read only on a band's
+  LAST tile): `PlanViewModelBuilder.BuildProfitFormulaBand` sets it to
+  `profit >= 0` on the Profit/Loss tile (the only row either band ever
+  sets it false on - Band 1's three non-negative terms always balance
+  exactly, so every other tile keeps the true default);
+  `CreateFormulaBand` reads it to choose the final boundary's symbol -
+  `"="` when true, a new neutral `":"` separator (`NeutralResultSeparator`
+  - deliberately not `"-"`, which would misread as a second subtraction,
+  and not `"="`, the exact claim being removed) when false. The
+  non-final boundary (Band size is always 1 or 3 tiles; only a 3-tile
+  band has a non-final boundary at all) is untouched - the left two
+  tiles' own subtraction was never in question, only whether the FINAL
+  tile's displayed value is the true right-hand side. `Math.Abs(profit)`
+  and the `"Loss if Sold"` caption are both UNCHANGED (grep-swept: the
+  only `Math.Abs` call in `Services/`/`Views/`/`Models/` outside test
+  code is this one, so there is no sibling instance of this pattern to
+  fix elsewhere) - this fix only changes which punctuation mark is drawn
+  at one boundary, never the coin math, never the caption text, and never
+  touches `CoinSegmentMath`/`CoinCurrencyRenderer` (reused as-is, per
+  task instruction). Covered by three new/extended
+  `PlanViewModelBuilderSummaryTests.cs` cases:
+  `ProfitBand_NegativeProfit_LabeledLossWithAbsoluteValue` now also
+  asserts `FormulaResultIsExact == false`; a new
+  `ProfitBand_ZeroProfit_FormulaResultIsExactTrue` covers the `profit ==
+  0` boundary of the `>= 0` check (identity holds exactly there too, not
+  just for strictly positive profit); and both
+  `ProfitBand_SellPricePresent_ThreeTilesWithIdentityArithmetic` and
+  `CostBand_MaterialsUsedPositive_ExpandsToThreeTilesWithCorrectArithmetic`
+  gained an explicit `FormulaResultIsExact == true` assertion on their
+  respective bands' last tile. `SummarySectionRenderer.cs` itself stays
+  Blish-bound and untestable directly per the repo's test invariants, so
+  the operator-selection LOGIC is asserted at the data-flag level
+  (`FormulaResultIsExact`) rather than the rendered glyph - the same
+  boundary the class's own existing tests already draw for tooltip text
+  and coin values, which are likewise never rendered in a test.
+
+Re-validated after this round-2 fix: `dotnet build -p:Platform=x64`
+clean, 0 errors (only pre-existing StyleCop warnings, none on lines this
+round touched). Module test suite green - 1304 passed, 0 failed (was
+1303 after round 1, before this whole W4A package's baseline of 1273;
++31 net new tests overall, +1 from this round: three cases extended/
+added, but `ProfitBand_ZeroProfit_FormulaResultIsExactTrue` is the only
+wholly new `[Fact]`). No new Blish HUD references in tests; the new/
+changed assertions all still drive the real `PlanViewModelBuilder.
+Build(CraftingPlanResult)` entry point. Not regressed: `Services/
+ModuleLog.cs`/`PlanContentHeightMath.cs`/`PlanRelayoutMath.cs`/scroll
+machinery/merged-ceil vendor batching all remain zero diff across both
+review rounds; `Views/Rendering/TreeSectionController.cs` was not
+touched; `CoinSegmentMath`/`CoinCurrencyRenderer` were read but not
+modified - the fix lives entirely in `PlanRowViewModel` (new field),
+`PlanViewModelBuilder.BuildProfitFormulaBand` (sets it), and
+`SummarySectionRenderer.CreateFormulaBand` (reads it). Item/currency/
+vendor IDs remain internal-only; coin amounts still render icon-right-
+of-number throughout (unchanged). No live desktop verification was
+performed for this round either, same caveat as item 11's own closing
+paragraph above.
+
 [PENDING - the orchestrator fills in PASS/FAIL]
