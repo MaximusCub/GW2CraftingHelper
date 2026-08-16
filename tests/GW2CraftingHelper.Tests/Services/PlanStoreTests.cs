@@ -206,7 +206,11 @@ namespace GW2CraftingHelper.Tests.Services
             CraftingPlanResult result, DateTime generatedAt, int quantity = 1, bool useOwn = false,
             PriceBasis priceBasis = PriceBasis.InstantBuy,
             IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides = null,
-            IReadOnlyList<int> ignoredItemIds = null)
+            IReadOnlyList<int> ignoredItemIds = null,
+            // VOM design: mirrors useOwn/priceBasis above - default true
+            // matches ValueOwnMaterials' own real-world default (see
+            // Views/CraftingPlanView.cs's _valueOwnMaterials field).
+            bool valueOwn = true)
         {
             return new PersistedPlan
             {
@@ -222,6 +226,7 @@ namespace GW2CraftingHelper.Tests.Services
                 RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = quantity } },
                 UseOwnMaterials = useOwn,
                 PriceBasis = priceBasis,
+                ValueOwnMaterials = valueOwn,
                 Result = result,
                 // W3D review-fix: PersistedPlan.NodeOverrides/IgnoredItemIds
                 // are empty (never null) on every real persist path (see
@@ -309,13 +314,17 @@ namespace GW2CraftingHelper.Tests.Services
                 priceBasis: PriceBasis.BuyOrder);
 
             var timestamp = new DateTime(2026, 8, 9, 14, 22, 0, DateTimeKind.Local);
-            _store.Save(Wrap(result, timestamp, quantity: 3, useOwn: true, priceBasis: PriceBasis.BuyOrder));
+            _store.Save(Wrap(result, timestamp, quantity: 3, useOwn: true, priceBasis: PriceBasis.BuyOrder, valueOwn: false));
 
             var loaded = _store.LoadLatest();
             Assert.NotNull(loaded);
             Assert.Equal(timestamp, loaded.GeneratedAt);
             Assert.True(loaded.UseOwnMaterials);
             Assert.Equal(PriceBasis.BuyOrder, loaded.PriceBasis);
+            // VOM design: ValueOwnMaterials round-trips independently of
+            // UseOwnMaterials - false here specifically to prove it is not
+            // just silently mirroring useOwn's own true value above.
+            Assert.False(loaded.ValueOwnMaterials);
             Assert.NotNull(loaded.RequestItems);
             Assert.Single(loaded.RequestItems);
             Assert.Equal(1, loaded.RequestItems[0].ItemId);
@@ -499,6 +508,30 @@ namespace GW2CraftingHelper.Tests.Services
             // incompatible SchemaVersion.
             File.WriteAllText(filePath,
                 "{ \"SchemaVersion\": 0, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string capturedMessage = null;
+            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.NotNull(capturedMessage);
+        }
+
+        [Fact]
+        public void LoadLatest_VomSchemaVersion1File_ReturnsNullAndLogsWarn()
+        {
+            // VOM design (Section 5.4): CurrentSchemaVersion bumped 1 -> 2
+            // for the new PersistedPlan.ValueOwnMaterials field. A
+            // genuinely realistic old file - SchemaVersion 1 (the actual
+            // previous CurrentSchemaVersion, not the synthetic "0" the
+            // pre-existing LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn
+            // test above uses) - must be rejected exactly the same way,
+            // degrading to Module's "no restored plan" fresh-start path,
+            // not silently defaulting ValueOwnMaterials to false.
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": 1, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
             string capturedMessage = null;
             var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
@@ -1217,6 +1250,114 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("SolveContext.UsedMaterials[0] is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullRecipesListOnSolveContextUnreducedTree_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // VOM finding #1 fix: UnreducedTree is walked by
+            // ResolveWithOverrides' guideSolve (_solver.Solve) and
+            // re-reduction (_reducer.Reduce) on EVERY override re-solve
+            // once the force-buy pre-pass ran at generation time (Valued
+            // mode + a non-null snapshot - see PlanSolveContext.
+            // UnreducedTree's own doc comment), the exact same
+            // unconditional node.Recipes walk as Tree above (which the two
+            // tests above this one already cover). Before this fix, a
+            // plan.json with "UnreducedTree":{"Recipes":null} sailed
+            // through PlanStructuralValidator untouched and NREd on the
+            // very first override pill click of a restored plan.
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy, ownMaterialsMode: OwnMaterialsMode.Valued);
+            Assert.NotNull(result.SolveContext);
+            Assert.NotNull(result.SolveContext.UnreducedTree);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                jObj["Result"]["SolveContext"]["UnreducedTree"]["Recipes"] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.UnreducedTree.Recipes is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullEntryInSolveContextAccountItems_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // VOM finding #1 fix: AccountItemIndex's constructor (Services/
+            // AccountItemIndex.cs) null-checks the LIST but not each entry
+            // ("entry.Count"/"entry.Source" with no per-entry guard) - a
+            // null ENTRY NREs identically to the UnreducedTree gap above,
+            // reachable the same way (any override re-solve once the
+            // force-buy pre-pass ran).
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy, ownMaterialsMode: OwnMaterialsMode.Valued);
+            Assert.NotNull(result.SolveContext);
+            Assert.NotEmpty(result.SolveContext.AccountItems);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                ((JArray)jObj["Result"]["SolveContext"]["AccountItems"])[0] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.AccountItems[0] is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_SolveContextUnreducedTreeSetButAccountItemsNull_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // VOM finding #1 bonus fix: UnreducedTree and AccountItems are
+            // always populated TOGETHER at generation time (both gated on
+            // useForceBuyPrePass). Without this check, a restored file with
+            // UnreducedTree set but AccountItems null degraded SILENTLY
+            // instead of crashing or being rejected: AccountItemIndex(null)
+            // builds an empty index, so a subsequent override re-solve
+            // re-prices every owned material as if none were owned.
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy, ownMaterialsMode: OwnMaterialsMode.Valued);
+            Assert.NotNull(result.SolveContext);
+            Assert.NotNull(result.SolveContext.UnreducedTree);
+            Assert.NotEmpty(result.SolveContext.AccountItems);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                jObj["Result"]["SolveContext"]["AccountItems"] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains(
+                "SolveContext.UnreducedTree is set but SolveContext.AccountItems is null",
+                lastMessage());
         }
 
         [Fact]

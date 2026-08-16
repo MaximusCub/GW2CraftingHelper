@@ -43,8 +43,18 @@ namespace GW2CraftingHelper.Models
         /// a file this code never wrote (missing the field, or carrying an
         /// explicit old value) deserializes as anything else.
         /// </para>
+        /// <para>
+        /// VOM design (Section 5.4): bumped 1 -&gt; 2 for the new <see
+        /// cref="ValueOwnMaterials"/> field below - the first real exercise
+        /// of this reject-and-regenerate mechanism since it was introduced.
+        /// A SchemaVersion-1 file is now rejected (not silently defaulted
+        /// to <c>false</c>) by PlanStoreHelpers.DeserializePersistedPlan,
+        /// degrading to Module's existing "no restored plan" path (one Warn
+        /// log line, empty Crafting Plan tab on first load after upgrade) -
+        /// a known, already-exercised, safe fresh-start, not a crash.
+        /// </para>
         /// </summary>
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why
@@ -81,6 +91,16 @@ namespace GW2CraftingHelper.Models
 
         /// <summary>Price basis (instant-buy vs. buy orders) at generation time.</summary>
         public PriceBasis PriceBasis { get; set; }
+
+        /// <summary>
+        /// VOM design (Section 5.3): "Value Own Materials" checkbox state
+        /// at generation time - the per-plan session toggle in
+        /// Views/CraftingPlanView.cs's controls panel (see its
+        /// _valueOwnMaterials field's own doc comment), mirroring <see
+        /// cref="UseOwnMaterials"/> above exactly. Added as part of the
+        /// <see cref="CurrentSchemaVersion"/> 1 -&gt; 2 bump.
+        /// </summary>
+        public bool ValueOwnMaterials { get; set; }
 
         /// <summary>
         /// The full displayed result, including its SolveContext - the

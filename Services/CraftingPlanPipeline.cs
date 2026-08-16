@@ -22,6 +22,23 @@ namespace GW2CraftingHelper.Services
         private readonly IReadOnlyDictionary<int, AcquisitionHint> _acquisitionHints;
         private readonly IReadOnlyDictionary<int, DailyCooldownItem> _dailyCooldownItems;
 
+        // VOM finding #3 fix: ResolveWithOverrides rebuilds an
+        // AccountItemIndex from context.AccountItems - an immutable,
+        // GENERATION-time snapshot (see PlanSolveContext.AccountItems' own
+        // doc comment) - on EVERY override pill click, even though repeat
+        // clicks against the same restored/generated plan pass the exact
+        // same list reference every time. Caches the last-built index keyed
+        // by reference equality on the context object itself (this pipeline
+        // instance is a single Module-wide singleton shared across every
+        // open plan tab - see Module.cs's construction site - so a
+        // different plan/tab simply misses and rebuilds once, same as
+        // today). Safe without locking: ResolveWithOverrides only ever runs
+        // synchronously on the UI thread (see its own doc comment); the
+        // concurrent, background-thread generation path never touches these
+        // fields (its own AccountItemIndex is a local variable, unrelated).
+        private PlanSolveContext _cachedAccountIndexContext;
+        private AccountItemIndex _cachedAccountIndex;
+
         // W3B: rich per-generation logging sink. Optional constructor
         // injection (defaults to the app-wide ModuleLog.Shared singleton -
         // see Module.cs's construction site, which never passes this) so
@@ -198,6 +215,51 @@ namespace GW2CraftingHelper.Services
                 RecipeNodeIds.Assign(tree);
             }
 
+            // Step 5.5/5.6 (M34-B2a #3 / VOM design Candidate A - review-fix:
+            // merged into one `if` block, was two adjacent identical
+            // `if (useForceBuyPrePass)` blocks - see GenerateStructuredMultiAsync's
+            // matching block for why keeping the two edit sites in lockstep
+            // matters here). Both computed against `tree` - the ORIGINAL,
+            // UNREDUCED tree (InventoryReducer.Reduce below only ever
+            // mutates its CLONE, so `tree` still holds the full
+            // pre-ownership demand here) - matching gw2e's own
+            // zero-owned-baseline mechanics exactly (Section 2.2 of the R2
+            // report): otherwise, evaluating this rule on the ALREADY-
+            // reduced tree would make it a near no-op in precisely the
+            // scenario it exists for, since owning a pile of components
+            // already makes their post-reduction craft cost look cheap
+            // regardless of what a FRESH purchase would cost. Moved ahead
+            // of Step 6 (VOM design, Candidate A) so its output can feed
+            // the zero-owned decision pass below, which Step 6's Reduce
+            // call now needs as its guide.
+            //
+            // Step 5.6's throwaway Solve() runs on the SAME zero-owned/
+            // unreduced `tree`, this time WITH forceBuyOnlyNodeIds applied,
+            // so its Decisions dictionary reflects the exact Craft/Buy/
+            // vendor/recipe-option choice a zero-owned baseline would make.
+            // InventoryReducer.Reduce below uses this as a guide: only the
+            // option this decision actually chose gets to consume owned
+            // stock, so owned stock can never flip a decision toward a
+            // chain that was worse at market prices - it can only make the
+            // zero-owned winner an even stronger winner. Null guide
+            // (useForceBuyPrePass false, e.g. Free mode or no snapshot)
+            // leaves InventoryReducer's legacy primary-option heuristic
+            // fully in charge, unchanged.
+            ISet<int> forceBuyOnlyNodeIds = null;
+            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
+            if (useForceBuyPrePass)
+            {
+                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
+
+                var zeroOwnedSolve = _solver.Solve(
+                    tree, prices, vendorOffers, priceBasis,
+                    overrides: null, currencyValuation: valuation,
+                    forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                    homesteadTiers: tiers);
+                zeroOwnedDecisions = zeroOwnedSolve.Decisions;
+            }
+
             // Step 6: Inventory reduction
             phaseTracker.Start(PlanPhase.SolvingDecisions, "Solving decisions", null);
             progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
@@ -205,33 +267,21 @@ namespace GW2CraftingHelper.Services
             RecipeNode treeUsedForSolve = tree;
             List<UsedMaterial> usedMaterials = null;
             Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null;
+            // VOM finding #1 fix: captured here (rather than scoped inside
+            // the `if` below) so it can also feed PlanSolveContext.
+            // AccountIndex further down - see that field's own doc comment.
+            AccountItemIndex accountIndex = null;
 
             if (snapshot != null && _reducer != null)
             {
-                var index = new AccountItemIndex(snapshot.Items);
-                var reduced = _reducer.Reduce(tree, index, activeCharacterName);
+                accountIndex = new AccountItemIndex(snapshot.Items);
+                var reduced = _reducer.Reduce(tree, accountIndex, activeCharacterName, zeroOwnedDecisions);
                 treeUsedForSolve = reduced.ReducedTree;
                 usedMaterials = reduced.UsedMaterials;
                 ownedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
             }
             sw.Stop();
             timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
-
-            // Step 6.5 (M34-B2a #3): computed against `tree` - the ORIGINAL,
-            // UNREDUCED tree (Reduce above only ever mutates its CLONE, so
-            // `tree` still holds the full pre-ownership demand here) -
-            // matching gw2e's own zero-owned-baseline mechanics exactly
-            // (Section 2.2 of the R2 report): otherwise, evaluating this
-            // rule on the ALREADY-reduced tree would make it a near no-op
-            // in precisely the scenario it exists for, since owning a pile
-            // of components already makes their post-reduction craft cost
-            // look cheap regardless of what a FRESH purchase would cost.
-            ISet<int> forceBuyOnlyNodeIds = null;
-            if (useForceBuyPrePass)
-            {
-                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
-            }
 
             // Step 7: Solve. assignNodeIds:false only when the pre-pass
             // above pre-assigned ids to `tree` (and therefore, via cloning,
@@ -403,7 +453,14 @@ namespace GW2CraftingHelper.Services
                 OwnedVendorItemAmounts = ownedVendorItemAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
                 HomesteadTiers = tiers,
-                CharacterDisciplines = result.CharacterDisciplines
+                CharacterDisciplines = result.CharacterDisciplines,
+                // VOM finding #1 fix: only populated when the force-buy
+                // pre-pass ran (useForceBuyPrePass implies snapshot/reducer
+                // non-null, so accountIndex is guaranteed set here too) -
+                // see PlanSolveContext.UnreducedTree's own doc comment.
+                UnreducedTree = useForceBuyPrePass ? tree : null,
+                AccountItems = useForceBuyPrePass ? ProjectAccountItemsForSolveContext(snapshot.Items) : null,
+                ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -658,6 +715,28 @@ namespace GW2CraftingHelper.Services
                 RecipeNodeIds.Assign(tree);
             }
 
+            // Step 5.5/5.6 (M34-B2a #3 / VOM design Candidate A - review-fix:
+            // merged into one `if` block, was two adjacent identical
+            // `if (useForceBuyPrePass)` blocks): see the single-item
+            // overload's matching block for the full rationale - same
+            // force-buy pre-pass, same zero-owned decision pass, same WHOLE
+            // wrapper batch at once, moved ahead of Step 6 so its output can
+            // guide InventoryReducer.Reduce below.
+            ISet<int> forceBuyOnlyNodeIds = null;
+            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
+            if (useForceBuyPrePass)
+            {
+                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
+
+                var zeroOwnedSolve = _solver.Solve(
+                    tree, prices, vendorOffers, priceBasis,
+                    overrides: null, currencyValuation: valuation,
+                    forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                    homesteadTiers: tiers);
+                zeroOwnedDecisions = zeroOwnedSolve.Decisions;
+            }
+
             // Step 6: Inventory reduction
             phaseTracker.Start(PlanPhase.SolvingDecisions, "Solving decisions", null);
             progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
@@ -665,24 +744,20 @@ namespace GW2CraftingHelper.Services
             RecipeNode treeUsedForSolve = tree;
             List<UsedMaterial> usedMaterials = null;
             Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null;
+            // VOM finding #1 fix: see the single-item overload's matching
+            // declaration for why this is hoisted out of the `if` below.
+            AccountItemIndex accountIndex = null;
 
             if (snapshot != null && _reducer != null)
             {
-                var index = new AccountItemIndex(snapshot.Items);
-                var reduced = _reducer.Reduce(tree, index, activeCharacterName);
+                accountIndex = new AccountItemIndex(snapshot.Items);
+                var reduced = _reducer.Reduce(tree, accountIndex, activeCharacterName, zeroOwnedDecisions);
                 treeUsedForSolve = reduced.ReducedTree;
                 usedMaterials = reduced.UsedMaterials;
                 ownedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
             }
             sw.Stop();
             timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
-
-            ISet<int> forceBuyOnlyNodeIds = null;
-            if (useForceBuyPrePass)
-            {
-                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
-            }
 
             // Step 7: Solve. The wrapper tree is fed through exactly like a
             // single item's tree - see PlanSolver.Collect's own doc comment
@@ -829,7 +904,13 @@ namespace GW2CraftingHelper.Services
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
                 RequestedItems = items,
                 HomesteadTiers = tiers,
-                CharacterDisciplines = result.CharacterDisciplines
+                CharacterDisciplines = result.CharacterDisciplines,
+                // VOM finding #1 fix: see the single-item overload's
+                // matching assignment (PlanSolveContext.UnreducedTree's own
+                // doc comment).
+                UnreducedTree = useForceBuyPrePass ? tree : null,
+                AccountItems = useForceBuyPrePass ? ProjectAccountItemsForSolveContext(snapshot.Items) : null,
+                ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -876,20 +957,72 @@ namespace GW2CraftingHelper.Services
             // the caller on every re-solve, exactly like `overrides` itself.
             ISet<int> ignoredItemIds = null)
         {
+            // VOM finding #1 fix: context.Tree/UsedMaterials/
+            // OwnedQuantityUsedByNodeId were reduced at GENERATION time
+            // using a guide keyed to the ZERO-OWNED decision at each node
+            // (see InventoryReducer.ReduceNode's doc comment) - a node the
+            // force-buy pre-pass flagged Buy therefore never discounted its
+            // own ingredient subtree. Replaying `overrides` against that
+            // frozen tree is correct for every node whose decision did NOT
+            // change, but silently wrong the moment an override flips a
+            // force-buy-flagged node to Craft: its ingredients are still
+            // priced at the full, un-owned cost even though real owned
+            // stock exists. When context.UnreducedTree is set (the pre-pass
+            // ran at generation time - see that field's own doc comment),
+            // re-run the SAME zero-owned-decision-pass-then-reduce dance
+            // Step 5.6/6 used at generation, but this time with `overrides`
+            // (and `ignoredItemIds`) applied to the decision pass, so the
+            // guide - and therefore which branch may discount - stays in
+            // sync with whatever the user actually picked. Falls back to
+            // the frozen context.Tree/UsedMaterials verbatim (today's exact
+            // behavior) whenever no pre-pass ran, since there is then
+            // nothing to re-guide (context.Tree is already the tree the
+            // legacy heuristic reduced, and it is already correct).
+            RecipeNode solveTree = context.Tree;
+            List<UsedMaterial> usedMaterials = context.UsedMaterials;
+            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId = context.OwnedQuantityUsedByNodeId;
+
+            // Defensive: UnreducedTree is only ever set alongside a reducer
+            // at generation time (see PlanSolveContext.UnreducedTree's doc
+            // comment), but guard against a mismatched pipeline instance
+            // (context generated by one CraftingPlanPipeline, resolved
+            // against another with no _reducer wired up) rather than NRE.
+            if (context.UnreducedTree != null && _reducer != null)
+            {
+                var guideSolve = _solver.Solve(
+                    context.UnreducedTree, context.Prices, context.VendorOffers,
+                    context.PriceBasis, overrides, context.CurrencyValuation,
+                    forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
+                    assignNodeIds: false,
+                    ignoredItemIds: ignoredItemIds,
+                    homesteadTiers: context.HomesteadTiers);
+
+                var accountIndex = GetOrBuildAccountItemIndex(context);
+                var reduced = _reducer.Reduce(
+                    context.UnreducedTree, accountIndex, context.ActiveCharacterName,
+                    guideSolve.Decisions);
+
+                solveTree = reduced.ReducedTree;
+                usedMaterials = reduced.UsedMaterials;
+                ownedQuantityUsedByNodeId = BuildOwnedQuantityUsedByNodeId(reduced.OwnedQuantityUsedByNode);
+            }
+
             // M34-B2a #3: reapply the SAME force-buy pre-pass result the
             // original generation computed, so a local per-node override
             // re-solve doesn't silently forget it for every other node - a
             // manual override in `overrides` still always wins (see
-            // PlanSolver.Evaluate). assignNodeIds:false: context.Tree's
-            // nodes already carry stable ids from the original generation's
-            // own Solve() call (whether freshly assigned there, or
-            // pre-assigned/preserved for the force-buy pre-pass - see
-            // RecipeNodeIds) - reassigning again here would either be a
-            // harmless no-op (the common case) or, when the pre-pass ran,
-            // would renumber the tree's already-pruned/non-contiguous ids
-            // from scratch and desync them from forceBuyOnlyNodeIds' keys.
+            // PlanSolver.Evaluate). assignNodeIds:false: solveTree's nodes
+            // already carry stable ids from the original generation's own
+            // Solve() call (whether freshly assigned there, or pre-assigned/
+            // preserved for the force-buy pre-pass - see RecipeNodeIds), and
+            // (when re-reduced above) InventoryReducer.CloneNode preserves
+            // those same ids onto the fresh clone - reassigning again here
+            // would either be a harmless no-op (the common case) or, when
+            // the pre-pass ran, would renumber the tree's already-pruned/
+            // non-contiguous ids from scratch and desync them from
+            // forceBuyOnlyNodeIds' keys.
             var solveResult = _solver.Solve(
-                context.Tree, context.Prices, context.VendorOffers,
+                solveTree, context.Prices, context.VendorOffers,
                 context.PriceBasis, overrides, context.CurrencyValuation,
                 forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
                 assignNodeIds: false,
@@ -898,8 +1031,8 @@ namespace GW2CraftingHelper.Services
 
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(
-                solveResult.Plan, context.Tree, context.Metadata,
-                context.UsedMaterials, context.LearnedRecipeIds,
+                solveResult.Plan, solveTree, context.Metadata,
+                usedMaterials, context.LearnedRecipeIds,
                 context.CharacterDisciplines);
             result.CurrencyMetadata = context.CurrencyMetadata;
             result.AcquisitionHints = context.AcquisitionHints;
@@ -913,8 +1046,8 @@ namespace GW2CraftingHelper.Services
             result.CharacterDisciplines = context.CharacterDisciplines;
 
             BuildCraftingTreeResult(
-                result, context.Tree, solveResult.Decisions, context.Metadata,
-                context.AcquisitionHints, context.OwnedQuantityUsedByNodeId, ignoredItemIds,
+                result, solveTree, solveResult.Decisions, context.Metadata,
+                context.AcquisitionHints, ownedQuantityUsedByNodeId, ignoredItemIds,
                 currencyMetadata: context.CurrencyMetadata, ownedCurrencyAmounts: context.OwnedCurrencyAmounts,
                 ownedVendorItemAmounts: context.OwnedVendorItemAmounts);
 
@@ -928,17 +1061,31 @@ namespace GW2CraftingHelper.Services
             if (context.Tree.Id != Gw2Constants.MultiItemWrapperItemId)
             {
                 SellSideEconomics.ApplySellSideEconomics(
-                    result, context.Tree, solveResult, context.Prices,
+                    result, solveTree, solveResult, context.Prices,
                     context.TargetItemId, context.Quantity, context.PriceBasis,
-                    context.UsedMaterials, context.OwnMaterialsMode);
+                    usedMaterials, context.OwnMaterialsMode);
             }
             else
             {
                 SellSideEconomics.ApplyBatchSellSideEconomics(
-                    result, context.Tree, solveResult, context.Prices,
+                    result, solveTree, solveResult, context.Prices,
                     context.RequestedItems, context.PriceBasis,
-                    context.UsedMaterials, context.OwnMaterialsMode);
+                    usedMaterials, context.OwnMaterialsMode);
             }
+            // Post-review note (VOM finding #6, not fixed here): `context`
+            // itself is carried forward verbatim, so context.Tree/
+            // UsedMaterials/OwnedQuantityUsedByNodeId stay the GENERATION-
+            // time values even when the UnreducedTree branch above just
+            // computed fresh solveTree/usedMaterials/ownedQuantityUsedByNodeId
+            // for THIS call's `result`. Harmless for repeat re-solves (each
+            // one re-derives its own fresh locals from context.UnreducedTree
+            // again), but BuildPresetOverrides (Craft All/Buy All) walks
+            // context.Tree directly - since reduction prunes
+            // (node.Recipes.Clear() at Quantity 0), a preset built from this
+            // stale context.Tree after an override re-reduces the tree can
+            // legitimately have a different node set than the fresh
+            // solveTree just computed, so it can emit overrides for pruned
+            // nodes and miss nodes that reappeared.
 
             // design-plan-notes.md (Notes section, excess/reclaim): a local
             // override/Ignore re-solve must recompute ExcessCraftOutputs
@@ -1265,6 +1412,60 @@ namespace GW2CraftingHelper.Services
                 result[kvp.Key.NodeId] = kvp.Value;
             }
             return result;
+        }
+
+        /// <summary>
+        /// VOM finding #3 fix: returns the AccountItemIndex built from
+        /// <paramref name="context"/>.AccountItems, reusing the last one
+        /// built for this exact context reference (see the matching
+        /// _cachedAccountIndex/_cachedAccountIndexContext field doc comment
+        /// for why reference equality is safe here) instead of rebuilding
+        /// an identical index on every override click.
+        /// </summary>
+        private AccountItemIndex GetOrBuildAccountItemIndex(PlanSolveContext context)
+        {
+            if (!ReferenceEquals(_cachedAccountIndexContext, context))
+            {
+                _cachedAccountIndex = new AccountItemIndex(context.AccountItems);
+                _cachedAccountIndexContext = context;
+            }
+            return _cachedAccountIndex;
+        }
+
+        /// <summary>
+        /// VOM finding #2 fix: PlanSolveContext.AccountItems is persisted
+        /// verbatim into plan.json (PlanSolveContext is serialized as part
+        /// of PersistedPlan.Result.SolveContext - see PlanStoreHelpers' own
+        /// doc comment), but ResolveWithOverrides' re-reduction only ever
+        /// builds an AccountItemIndex from it (Services/AccountItemIndex.cs)
+        /// - a constructor that reads ONLY ItemId/Count/Source. SnapshotItemEntry's
+        /// Name and (render-service URL) IconUrl are pure dead weight in this
+        /// context, plausibly the bulk of a real account's item list in
+        /// bytes. Projects down to the three fields actually consulted
+        /// before the whole list is captured, so a full account snapshot
+        /// (thousands of entries) isn't serialized/deserialized/gzipped on
+        /// every override pill click for nothing. Null input yields null
+        /// (matches AccountItems' own "unpopulated when the pre-pass didn't
+        /// run" contract).
+        /// </summary>
+        private static IReadOnlyList<SnapshotItemEntry> ProjectAccountItemsForSolveContext(
+            IReadOnlyList<SnapshotItemEntry> items)
+        {
+            if (items == null)
+            {
+                return null;
+            }
+            var projected = new List<SnapshotItemEntry>(items.Count);
+            foreach (var entry in items)
+            {
+                projected.Add(new SnapshotItemEntry
+                {
+                    ItemId = entry.ItemId,
+                    Count = entry.Count,
+                    Source = entry.Source
+                });
+            }
+            return projected;
         }
 
         /// <summary>
