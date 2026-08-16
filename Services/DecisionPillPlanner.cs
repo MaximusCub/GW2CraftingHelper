@@ -85,7 +85,24 @@ namespace GW2CraftingHelper.Services
         /// arm exists purely as a non-crashing safety net for a future
         /// regression, not a real code path today.
         /// </summary>
-        public static List<PillSpec> BuildPillSpecs(CraftingTreeNode node)
+        /// <param name="node">The tree node to build pills for.</param>
+        /// <param name="currencyPlanTotals">
+        /// currency-ux-package (Feature 2): PlanViewModel.CurrencyPlanTotals
+        /// - the WHOLE plan's real currency need, keyed by currency id.
+        /// Null (the default) reproduces this method's pre-Feature-2
+        /// behavior exactly - every existing call site/test that omits this
+        /// parameter is unaffected.
+        /// </param>
+        /// <param name="ownedCurrencyAmounts">
+        /// PlanViewModel.OwnedCurrencyAmounts - raw wallet holding, keyed by
+        /// currency id. Null (the default, same as when no snapshot is
+        /// available) suppresses the new HAVE/TOTAL pill entirely rather
+        /// than implying 0 owned - see AppendCurrencyOwnershipPill.
+        /// </param>
+        public static List<PillSpec> BuildPillSpecs(
+            CraftingTreeNode node,
+            IReadOnlyDictionary<int, long> currencyPlanTotals = null,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts = null)
         {
             var specs = new List<PillSpec>(3);
 
@@ -125,9 +142,19 @@ namespace GW2CraftingHelper.Services
             {
                 if (!node.SubtreeCost.HasValue)
                 {
+                    // currency-ux-package (Feature 2): a currency-type
+                    // component's own row-scope OWN badge is REPLACED by
+                    // the same plan-scope HAVE/TOTAL pill every ordinary
+                    // currency leaf gets below - see
+                    // AppendCurrencyOwnershipPill's own doc comment for why
+                    // row-scope ComponentOwnedQuantity is deliberately not
+                    // used here. An item-type component (the else branch
+                    // below, SubtreeCost.HasValue) keeps its OWN badge
+                    // unchanged - out of this feature's scope.
                     specs.Add(new PillSpec("CURRENCY", null, PillKind.Locked));
+                    AppendCurrencyOwnershipPill(specs, node.ItemId, currencyPlanTotals, ownedCurrencyAmounts);
                 }
-                if (node.ComponentOwnedQuantity > 0)
+                else if (node.ComponentOwnedQuantity > 0)
                 {
                     specs.Add(new PillSpec(
                         $"OWN {node.ComponentOwnedQuantity}",
@@ -165,6 +192,10 @@ namespace GW2CraftingHelper.Services
             if (node.Decision == CraftingDecision.Currency)
             {
                 specs.Add(new PillSpec("CURRENCY", null, PillKind.Locked));
+                // currency-ux-package (Feature 2): every ordinary currency
+                // leaf gets the same plan-scope HAVE/TOTAL pill the
+                // cost-component branch above adds.
+                AppendCurrencyOwnershipPill(specs, node.ItemId, currencyPlanTotals, ownedCurrencyAmounts);
                 return specs;
             }
             // guildupgrade-ingredients fix: a distinct locked pill from
@@ -275,6 +306,58 @@ namespace GW2CraftingHelper.Services
         /// and reuses the vocabulary of the existing full-coverage HAVE
         /// pill instead of inventing a third one.
         /// </summary>
+        /// <summary>
+        /// currency-ux-package (Feature 2, maintainer's own design):
+        /// appends the plan-scope "HAVE {have}/{planTotal} TOTAL" pill
+        /// shared by every currency leaf (ordinary and cost-component
+        /// alike) - have = whole-plan wallet holding,
+        /// planTotal = the WHOLE plan's need for this currency id
+        /// (PlanViewModel.CurrencyPlanTotals, itself
+        /// CraftingPlanResult.Plan.CurrencyCosts). BOTH numbers are
+        /// plan-scope facts, deliberately NOT this row's own need
+        /// (node.Quantity) - the identical pill text is therefore truthful
+        /// at every tree occurrence of the same currency id, unlike an
+        /// item pill's row-scope "NEEDED" wording. Omitted entirely when
+        /// <paramref name="ownedCurrencyAmounts"/> is null (no wallet
+        /// snapshot at all - "have" is genuinely unknown, not zero) or does
+        /// not contain this currency id, mirroring how the ordinary item
+        /// OwnedInfo pill is only ever added when there is real ownership
+        /// data to report.
+        ///
+        /// FULL COVERAGE (have &gt;= planTotal) collapses to the plain blue
+        /// PillKind.Have pill with just "HAVE" - the same kind/text an
+        /// ordinary fully-owned item gets - matching item-pill vocabulary
+        /// per the maintainer's design; the counts move into the tooltip
+        /// (see TreeSectionController.RenderDecisionPills). Partial or zero
+        /// coverage keeps the "HAVE {have}/{planTotal} TOTAL" text on a
+        /// PillKind.OwnedInfo pill - the "TOTAL" suffix (vs. the ordinary
+        /// item pill's "NEEDED" suffix) is deliberate, distinguishing this
+        /// plan-scope fact from the item pills' row-scope NEEDED.
+        /// </summary>
+        private static void AppendCurrencyOwnershipPill(
+            List<PillSpec> specs,
+            int currencyId,
+            IReadOnlyDictionary<int, long> currencyPlanTotals,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts)
+        {
+            if (ownedCurrencyAmounts == null || !ownedCurrencyAmounts.TryGetValue(currencyId, out int have))
+            {
+                return;
+            }
+
+            long planTotal = 0;
+            currencyPlanTotals?.TryGetValue(currencyId, out planTotal);
+
+            if (have >= planTotal)
+            {
+                specs.Add(new PillSpec("HAVE", null, PillKind.Have));
+            }
+            else
+            {
+                specs.Add(new PillSpec($"HAVE {have}/{planTotal} TOTAL", null, PillKind.OwnedInfo));
+            }
+        }
+
         private static void AppendOwnershipPills(List<PillSpec> specs, CraftingTreeNode node)
         {
             if (node.OwnedQuantityUsed > 0)

@@ -131,6 +131,28 @@ namespace GW2CraftingHelper.Models
         // side names ("buy-order price unavailable" vs. "instant-buy price
         // unavailable") instead of a basis-agnostic message.
         public PriceBasis PriceBasis { get; set; }
+
+        // currency-ux-package (Feature 2): plan-scope currency facts for
+        // the Recipe Tree's per-leaf "HAVE {have}/{planTotal} TOTAL" pill
+        // (DecisionPillPlanner.BuildPillSpecs/TreeSectionController.
+        // RenderDecisionPills) - deliberately whole-PLAN totals, not any
+        // per-row allocation, so the identical pill text is truthful at
+        // every tree occurrence of the same currency id (see
+        // DecisionPillPlanner's own doc comment on why no allocation is
+        // computed). Both are plain passthroughs of already-computed plan
+        // facts, keyed by currency id:
+        //
+        // CurrencyPlanTotals: CraftingPlanResult.Plan.CurrencyCosts (the
+        // whole plan's real currency need), converted to a dictionary.
+        // Null when the plan needs no currency at all.
+        //
+        // OwnedCurrencyAmounts: passthrough of CraftingPlanResult.
+        // OwnedCurrencyAmounts (raw wallet holding, never clamped to need -
+        // see that field's own doc comment). Null when no wallet snapshot
+        // was available - distinct from "0 owned", and the tree renderer
+        // must treat it that way (omit the pill entirely, not show HAVE 0).
+        public IReadOnlyDictionary<int, long> CurrencyPlanTotals { get; set; }
+        public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
     }
 
     /// <summary>
