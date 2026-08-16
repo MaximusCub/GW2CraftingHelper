@@ -7,6 +7,7 @@ using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -243,7 +244,7 @@ namespace GW2CraftingHelper.Views
             {
                 _clearCache();
                 SetSnapshot(null);
-                var status = $"Cache Cleared \u2014 {DateTime.Now:t}";
+                var status = $"Cache Cleared \u2014 {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
                 SetStatus(status);
                 _saveStatus(status);
             };
@@ -526,7 +527,7 @@ namespace GW2CraftingHelper.Views
             {
                 var snapshot = await _refreshAsync();
                 string status = snapshot != null
-                    ? $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}"
+                    ? $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}"
                     : null;
 
                 // Persist BEFORE marshaling, while still on this
@@ -581,7 +582,7 @@ namespace GW2CraftingHelper.Views
 
                 var classification = SnapshotFailureClassifier.Classify(ex);
                 string cause = StatusText.ForRefreshFailure(classification.Kind, classification.FailedSourceCount, classification.TotalSourceCount);
-                var status = $"{cause} \u2014 {DateTime.Now:t}";
+                var status = $"{cause} \u2014 {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
                 _saveStatusThreadSafe(status);
                 MainThreadMarshal.Run(() =>
                 {
@@ -619,12 +620,30 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Composes the header status label's text (base status text plus
-        /// a staleness-age suffix, e.g. "Updated - 3:41 PM (2m ago)") and
-        /// recolors it once the snapshot is older than
+        /// a staleness-age suffix, e.g. "Updated - Aug 15, 2026 3:41 PM
+        /// (2m ago)") and recolors it once the snapshot is older than
         /// <see cref="StaleThreshold"/>. Called from every place the
         /// status text or the snapshot itself changes (Build's initial
         /// render, SetSnapshot, SetStatus) so the two can never drift out
         /// of sync with each other.
+        /// <para>
+        /// Layout risk (reported, not silently patched around): adding the
+        /// capture date to every status string (RefreshNowAsync's "Updated"
+        /// string, the _clearButton.Click handler's "Cache Cleared" string at
+        /// ~line 247, StatusText.ForRefreshFailure's callers) plus this
+        /// method's own "(Nh Nm ago)" suffix can produce a run long enough to
+        /// approach or exceed the free space in _headerPanel before
+        /// _clearButton's left edge at the window's clamped 930x710 minimum
+        /// size (Views/ResizableTabbedWindow.cs's HandleWindowResize; the
+        /// Point(930, 710) minimum-size argument itself is passed from
+        /// Module.cs). Truncating here would cut the tail of the string,
+        /// which is exactly where the date/time now lives - worst on the
+        /// failure statuses a user most needs to date. This method
+        /// intentionally does not truncate; if the free run at minimum size
+        /// proves too tight in practice, the fix belongs in the header layout
+        /// (e.g. widening the label's run or shortening the button row), not
+        /// in this label's text.
+        /// </para>
         /// </summary>
         private void ApplyStatusDisplay()
         {

@@ -314,7 +314,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // leftward with 4px gaps so they never collide with the title.
             int cursorX = panelWidth;
             var headerButtons = new List<(StandardButton Button, int Width)>(5);
-            StandardButton PlaceButtonRight(string text, int width)
+            StandardButton PlaceButtonRight(string text, int width, string tooltipText)
             {
                 cursorX -= width;
                 var button = new StandardButton()
@@ -322,6 +322,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Text = text,
                     Size = new Point(width, 24),
                     Location = new Point(cursorX, 3),
+                    BasicTooltipText = tooltipText,
                     Parent = headerPanel
                 };
                 headerButtons.Add((button, width));
@@ -329,11 +330,21 @@ namespace GW2CraftingHelper.Views.Rendering
                 return button;
             }
 
-            collapseAllButton = PlaceButtonRight("Collapse All", 96);
-            expandAllButton = PlaceButtonRight("Expand All", 92);
-            buyAllButton = PlaceButtonRight("Buy All", 70);
-            craftAllButton = PlaceButtonRight("Craft All", 76);
-            bestPathButton = PlaceButtonRight("Best Path", 80);
+            collapseAllButton = PlaceButtonRight("Collapse All", 96,
+                "Collapses every branch of the Recipe Tree back down to the top level.");
+            expandAllButton = PlaceButtonRight("Expand All", 92,
+                "Expands every branch of the Recipe Tree, including nested children, so the full tree is visible.");
+            buyAllButton = PlaceButtonRight("Buy All", 70,
+                "Forces every ingredient with a Trading Post price to Buy from TP, throughout the whole tree " +
+                "including nodes hidden under bought items - replacing any manual choices already made. " +
+                "Ingredients with no Trading Post price fall back to the solver's normal choice.");
+            craftAllButton = PlaceButtonRight("Craft All", 76,
+                "Forces every ingredient with a known recipe to Craft, throughout the whole tree including " +
+                "nodes hidden under bought items - replacing any manual choices already made. Ingredients " +
+                "with no recipe fall back to the solver's normal choice.");
+            bestPathButton = PlaceButtonRight("Best Path", 80,
+                "Clears every manual override, including Craft All/Buy All, and re-solves for the solver's " +
+                "cheapest plan. Ignore selections are left unchanged.");
 
             // M33 C2b: right-to-left button placement is font-only (fixed
             // widths) - pure reposition on every drag tick, same order as
@@ -754,12 +765,26 @@ namespace GW2CraftingHelper.Views.Rendering
             // fix, same CoinCurrencyRenderer.RenderValueCellRightAligned entry point); a
             // decision whose real cost is genuinely zero-and-uncosted
             // renders a dash instead of an invented "0".
+            //
+            // W4B: a node whose children are the new synthesized cost-
+            // component leaves (see CraftingTreeBuilder.
+            // BuildVendorCostComponentLeaves - every child of such a node is
+            // a component leaf, never mixed with a reference branch or a
+            // real craft child) shows ONLY the compact gold total here - no
+            // currency segments - since the breakdown those segments used
+            // to cram into this one row now lives one expand-click away as
+            // real child rows. This is the fix for the exact collision the
+            // W4B field case hit (a mixed coin/currency/item vendor cost
+            // rendering as one very long segmented row).
+            bool hasCostComponentChildren = node.Children.Count > 0 && node.Children[0].IsCostComponent;
             CoinCurrencyRenderer.ValueCellHandle costCell = null;
             if (node.SubtreeCost.HasValue)
             {
                 var costFont = GameService.Content.DefaultFont14;
-                var currencyAmounts = CurrencyDisplayResolver.ResolveAmounts(
-                    node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata);
+                var currencyAmounts = hasCostComponentChildren
+                    ? null
+                    : CurrencyDisplayResolver.ResolveAmounts(
+                        node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata);
                 costCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
                     rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
             }
@@ -1059,13 +1084,26 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.Locked)
                 {
+                    // W4B (2026-08-15): a cost-component leaf's "CURRENCY"
+                    // badge (BuildPillSpecs' IsCostComponent short-circuit) -
+                    // its cost cell is deliberately blank because the
+                    // quantity itself IS the cost, in a non-coin currency
+                    // (see CraftingTreeBuilder.
+                    // BuildVendorCostComponentLeaves' currency-line branch) -
+                    // never a "no source"/"no choice" situation like every
+                    // other Locked pill below, so it gets its own tooltip
+                    // before either of those checks run.
+                    if (node.IsCostComponent)
+                    {
+                        tooltipText = "Paid in a non-coin currency - no gold value to show here";
+                    }
                     // The UNKNOWN pill (node.Decision == Unknown - no
                     // feasible source at all) is a different situation from
                     // every other locked pill (exactly one feasible source,
                     // just not a choice): "Only available source" is
                     // misleading there since there IS no available source.
                     // Prefer the seeded wiki hint when one exists.
-                    if (node.Decision == CraftingDecision.Unknown)
+                    else if (node.Decision == CraftingDecision.Unknown)
                     {
                         tooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
                             ? node.AcquisitionHint
@@ -1086,6 +1124,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.Have)
                 {
+                    // W4B (2026-08-15): a cost-component leaf can no longer
+                    // reach this branch - BuildPillSpecs' IsCostComponent
+                    // short-circuit now emits only the "OWN n"/"CURRENCY"
+                    // badges (never PillKind.Have) for a component leaf, so
+                    // this tooltip only ever needs the ordinary-node wording
+                    // below.
+                    //
                     // Maintainer's final wording pass (2026-08-06): matches
                     // the OwnedInfo pill's "Needs N - ..." vocabulary below
                     // instead of the old bare "Fully covered by your
@@ -1097,19 +1142,38 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.OwnedInfo)
                 {
-                    // Field-test finding A's tooltip spelled out what the
-                    // pill text means in full sentences, alongside the tree
-                    // row's own remaining-need "Nx" prefix (node.Quantity);
-                    // the maintainer's final wording pass (2026-08-06, see
-                    // DecisionPillPlanner.AppendOwnershipPills) reworded the
-                    // pill itself to "HAVE {used}/{total} NEEDED" and this
-                    // tooltip to match, without changing what either number
-                    // means - remaining (node.Quantity) is still total minus
-                    // used.
-                    int totalDemand = node.OwnedQuantityUsed + node.Quantity;
-                    tooltipText =
-                        $"Needs {totalDemand} total - {node.OwnedQuantityUsed} covered by your materials, " +
-                        $"{node.Quantity} left to acquire";
+                    if (node.IsCostComponent)
+                    {
+                        // W4B (2026-08-15): the "OWN n" badge's own tooltip -
+                        // unlike the ordinary OwnedInfo case below, owning
+                        // some of a cost component never reduces what still
+                        // has to be handed over as part of this purchase, or
+                        // this line's cost (see CraftingTreeNode.
+                        // ComponentOwnedQuantity's own doc comment) - purely
+                        // informational, stated explicitly so it is never
+                        // mistaken for the ordinary "reduced the plan"
+                        // OwnedInfo/HAVE vocabulary used everywhere else in
+                        // the tree.
+                        tooltipText =
+                            $"You own {node.ComponentOwnedQuantity} - informational only, " +
+                            "does not change the plan cost";
+                    }
+                    else
+                    {
+                        // Field-test finding A's tooltip spelled out what the
+                        // pill text means in full sentences, alongside the tree
+                        // row's own remaining-need "Nx" prefix (node.Quantity);
+                        // the maintainer's final wording pass (2026-08-06, see
+                        // DecisionPillPlanner.AppendOwnershipPills) reworded the
+                        // pill itself to "HAVE {used}/{total} NEEDED" and this
+                        // tooltip to match, without changing what either number
+                        // means - remaining (node.Quantity) is still total minus
+                        // used.
+                        int totalDemand = node.OwnedQuantityUsed + node.Quantity;
+                        tooltipText =
+                            $"Needs {totalDemand} total - {node.OwnedQuantityUsed} covered by your materials, " +
+                            $"{node.Quantity} left to acquire";
+                    }
                 }
                 else if (spec.Kind == PillKind.AchievementBitDeduped)
                 {

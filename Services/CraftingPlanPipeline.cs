@@ -269,6 +269,20 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
+            // W4B: a vendor cost-component ITEM leaf (e.g. Globs of
+            // Ectoplasm) is never a real tree ingredient - only a
+            // VendorOffer.CostLines entry - so allItemIds above never
+            // collects it. Add every such id here, before the single bulk
+            // metadata fetch below, so CraftingTreeBuilder can resolve a
+            // real name/icon for it instead of falling back to "Unknown
+            // Item" (see AddVendorItemComponentIds).
+            AddVendorItemComponentIds(solveResult.Decisions, metadataIds);
+            // W4B review-fix (Must Fix): also widen for every OTHER offer
+            // (not just the baseline winning one) reachable by a later
+            // manual override - see AddAllVendorOfferItemComponentIds' own
+            // doc comment for why ResolveWithOverrides needs this covered
+            // up front (it never re-fetches metadata).
+            AddAllVendorOfferItemComponentIds(vendorOffers, metadataIds);
             phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
             progress?.Report(new PlanStatus
             {
@@ -332,15 +346,26 @@ namespace GW2CraftingHelper.Services
             // AccountCurrencyIndex's doc comment) - built from the plan's
             // final currency totals and the wallet snapshot, never fed back
             // into any decision/total above.
+            // W4B review-fix (Must Fix): also pass vendorOffers - see
+            // BuildOwnedCurrencyAmounts' own doc comment for why.
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
-                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
+                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts, vendorOffers);
             result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
+
+            // W4B: owned-item annotation for vendor cost-component ITEM
+            // leaves, cosmetic only - see
+            // BuildOwnedVendorItemComponentAmounts' own doc comment.
+            // W4B review-fix (Must Fix): also pass vendorOffers - see that
+            // method's own doc comment for why.
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
+                BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions, vendorOffers);
 
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(
                 treeUsedForSolve, solveResult.Decisions, metadata, _acquisitionHints,
-                ownedQuantityUsedByNodeId);
+                ownedQuantityUsedByNodeId, ignoredItemIds: null, currencyMetadata: currencyMetadata,
+                ownedCurrencyAmounts: ownedCurrencyAmounts, ownedVendorItemAmounts: ownedVendorItemAmounts);
 
             SellSideEconomics.ApplySellSideEconomics(
                 result, treeUsedForSolve, solveResult, prices,
@@ -365,6 +390,7 @@ namespace GW2CraftingHelper.Services
                 AcquisitionHints = _acquisitionHints,
                 OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
+                OwnedVendorItemAmounts = ownedVendorItemAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
                 HomesteadTiers = tiers,
                 CharacterDisciplines = result.CharacterDisciplines
@@ -682,6 +708,12 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
+            // W4B: see the single-item overload's matching call for why.
+            AddVendorItemComponentIds(solveResult.Decisions, metadataIds);
+            // W4B review-fix (Must Fix): see the single-item overload's
+            // matching call site (AddAllVendorOfferItemComponentIds' own
+            // doc comment).
+            AddAllVendorOfferItemComponentIds(vendorOffers, metadataIds);
             phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
             progress?.Report(new PlanStatus
             {
@@ -734,13 +766,23 @@ namespace GW2CraftingHelper.Services
             result.RequestedItems = items;
             result.CharacterDisciplines = effectiveCharacterDisciplines;
 
+            // W4B review-fix (Must Fix): also pass vendorOffers - see
+            // BuildOwnedCurrencyAmounts' own doc comment for why.
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
-                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
+                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts, vendorOffers);
             result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
+
+            // W4B: see the single-item overload's matching computation.
+            // W4B review-fix (Must Fix): also pass vendorOffers - see that
+            // method's own doc comment for why.
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
+                BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions, vendorOffers);
 
             BuildCraftingTreeResult(
                 result, treeUsedForSolve, solveResult.Decisions, metadata,
-                _acquisitionHints, ownedQuantityUsedByNodeId, ignoredItemIds: null);
+                _acquisitionHints, ownedQuantityUsedByNodeId, ignoredItemIds: null,
+                currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
+                ownedVendorItemAmounts: ownedVendorItemAmounts);
 
             SellSideEconomics.ApplyBatchSellSideEconomics(
                 result, treeUsedForSolve, solveResult, prices, items,
@@ -763,6 +805,7 @@ namespace GW2CraftingHelper.Services
                 AcquisitionHints = _acquisitionHints,
                 OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
+                OwnedVendorItemAmounts = ownedVendorItemAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
                 RequestedItems = items,
                 HomesteadTiers = tiers,
@@ -782,6 +825,24 @@ namespace GW2CraftingHelper.Services
         /// Re-solves a previously generated plan with per-node decision
         /// overrides. Purely local: reuses the context's tree, prices,
         /// offers, and metadata; no network calls.
+        ///
+        /// W4B review-fix (Must Fix): because this never re-fetches
+        /// metadata, context.Metadata must already cover every id a
+        /// possible override could surface - including a vendor cost-
+        /// component ITEM leaf on an offer that was NOT the baseline
+        /// winner (e.g. a node whose original decision was Craft, manually
+        /// overridden here to BuyFromVendor). The generation-time callers
+        /// (GenerateStructuredAsync/GenerateStructuredMultiAsync) widen
+        /// their metadata fetch for exactly this via
+        /// AddAllVendorOfferItemComponentIds - see that method's own doc
+        /// comment - rather than this method fetching anything itself. The
+        /// same is true of context.OwnedCurrencyAmounts/
+        /// OwnedVendorItemAmounts below (line 875/887 reuse them verbatim,
+        /// never recomputed here): the generation-time callers already
+        /// widen BOTH via BuildOwnedCurrencyAmounts(..., vendorOffers) and
+        /// BuildOwnedVendorItemComponentAmounts(..., vendorOffers) so a
+        /// component leaf surfaced only by an override still gets a correct
+        /// HAVE pill - see each method's own doc comment.
         /// </summary>
         public CraftingPlanResult ResolveWithOverrides(
             PlanSolveContext context,
@@ -832,7 +893,9 @@ namespace GW2CraftingHelper.Services
 
             BuildCraftingTreeResult(
                 result, context.Tree, solveResult.Decisions, context.Metadata,
-                context.AcquisitionHints, context.OwnedQuantityUsedByNodeId, ignoredItemIds);
+                context.AcquisitionHints, context.OwnedQuantityUsedByNodeId, ignoredItemIds,
+                currencyMetadata: context.CurrencyMetadata, ownedCurrencyAmounts: context.OwnedCurrencyAmounts,
+                ownedVendorItemAmounts: context.OwnedVendorItemAmounts);
 
             // M37 (closes KNOWN-ISSUES #25): a local override/Ignore
             // re-solve must recompute whichever sell-side economics the
@@ -1110,7 +1173,13 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             IReadOnlyDictionary<int, AcquisitionHint> hints,
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
-            ISet<int> ignoredItemIds)
+            ISet<int> ignoredItemIds,
+            // W4B: optional/null-tolerant, threaded straight through to
+            // CraftingTreeBuilder.BuildTree - see that method's own doc
+            // comment.
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts = null,
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts = null)
         {
             var treeBuilder = new CraftingTreeBuilder();
 
@@ -1125,7 +1194,8 @@ namespace GW2CraftingHelper.Services
                     {
                         roots.Add(treeBuilder.BuildTree(
                             itemRoot, decisions, metadata, hints,
-                            ownedQuantityUsedByNodeId, ignoredItemIds));
+                            ownedQuantityUsedByNodeId, ignoredItemIds,
+                            currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts));
                     }
                 }
                 result.CraftingTree = null;
@@ -1135,7 +1205,8 @@ namespace GW2CraftingHelper.Services
             {
                 result.CraftingTree = treeBuilder.BuildTree(
                     tree, decisions, metadata, hints,
-                    ownedQuantityUsedByNodeId, ignoredItemIds);
+                    ownedQuantityUsedByNodeId, ignoredItemIds,
+                    currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts);
                 result.MultiItemRoots = null;
             }
         }
@@ -1168,22 +1239,249 @@ namespace GW2CraftingHelper.Services
         /// currency totals (see AccountCurrencyIndex's doc comment) -
         /// cosmetic only, computed strictly AFTER the plan/solve already
         /// exist, never fed back into them. Null when there is no wallet
-        /// snapshot or the plan needs no currency at all, so callers can
+        /// snapshot and the plan needs no currency at all, so callers can
         /// treat null as "no data" distinctly from "0 owned".
+        ///
+        /// W4B review-fix (Must Fix): widened the SAME way
+        /// BuildOwnedVendorItemComponentAmounts widens its item id set (see
+        /// that method's own doc comment for the full rationale) -
+        /// <paramref name="vendorOffers"/> is scanned for every non-coin
+        /// Currency cost line on ANY vendor offer for ANY item in the tree,
+        /// not just the currency ids that made it into the baseline plan's
+        /// aggregated <paramref name="currencyCosts"/>. Without this, a
+        /// currency cost-component LEAF surfaced only by a manual override
+        /// (a node whose baseline decision was Craft, so its vendor offer's
+        /// currency cost lines were never folded into plan.CurrencyCosts)
+        /// would show correct name/icon/quantity but no HAVE pill,
+        /// permanently, even with a full wallet - the exact sibling of the
+        /// item-side gap AddAllVendorOfferItemComponentIds already closes.
+        /// Harmless for the pre-existing currency SUMMARY rows
+        /// (PlanViewModelBuilder), which only ever look up the ids they
+        /// themselves iterate from plan.CurrencyCosts - extra keys in the
+        /// returned map are simply never read by that caller.
         /// </summary>
         private static IReadOnlyDictionary<int, int> BuildOwnedCurrencyAmounts(
-            AccountSnapshot snapshot, List<CurrencyCost> currencyCosts)
+            AccountSnapshot snapshot, List<CurrencyCost> currencyCosts,
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null)
         {
-            if (snapshot == null || currencyCosts == null || currencyCosts.Count == 0)
+            if (snapshot == null)
+            {
+                return null;
+            }
+
+            var currencyIds = new HashSet<int>();
+            if (currencyCosts != null)
+            {
+                foreach (var cc in currencyCosts)
+                {
+                    currencyIds.Add(cc.CurrencyId);
+                }
+            }
+            AddAllVendorOfferCurrencyComponentIds(vendorOffers, currencyIds);
+            if (currencyIds.Count == 0)
             {
                 return null;
             }
 
             var currencyIndex = new AccountCurrencyIndex(snapshot.Wallet);
-            var result = new Dictionary<int, int>(currencyCosts.Count);
-            foreach (var cc in currencyCosts)
+            var result = new Dictionary<int, int>(currencyIds.Count);
+            foreach (var currencyId in currencyIds)
             {
-                result[cc.CurrencyId] = currencyIndex.GetQuantity(cc.CurrencyId);
+                result[currencyId] = currencyIndex.GetQuantity(currencyId);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// W4B review-fix (Must Fix): currency-side twin of
+        /// AddAllVendorOfferItemComponentIds (see that method's own doc
+        /// comment for the full "why a decisions-only scan is not enough"
+        /// rationale - identical reasoning applies here). Adds every
+        /// currency id that appears as a non-coin Currency cost line on any
+        /// vendor offer for any item in the tree into
+        /// <paramref name="currencyIds"/>, mirroring exactly the
+        /// Type=="Currency" / Id != Gw2Constants.CoinCurrencyId / Count > 0
+        /// filter VendorBatchSolver.EvaluateVendorOffers itself uses to
+        /// decide what counts as a non-coin currency cost line (see that
+        /// method's own comments) - so this widened set can only ever
+        /// contain ids a real leaf could actually surface. A no-op when no
+        /// vendor offer in the tree has any non-coin Currency cost line at
+        /// all (the common case).
+        /// </summary>
+        private static void AddAllVendorOfferCurrencyComponentIds(
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers, HashSet<int> currencyIds)
+        {
+            if (vendorOffers == null)
+            {
+                return;
+            }
+            foreach (var offers in vendorOffers.Values)
+            {
+                if (offers == null)
+                {
+                    continue;
+                }
+                foreach (var offer in offers)
+                {
+                    if (offer?.CostLines == null)
+                    {
+                        continue;
+                    }
+                    foreach (var cost in offer.CostLines)
+                    {
+                        if (string.Equals(cost.Type, "Currency", StringComparison.Ordinal)
+                            && cost.Id != Gw2Constants.CoinCurrencyId
+                            && cost.Count > 0)
+                        {
+                            currencyIds.Add(cost.Id);
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// W4B (vendor cost-component leaves): adds every item id that
+        /// appears as a TP-valued Item cost line on any winning
+        /// BuyFromVendor decision (SolverDecision.VendorItemCosts) into
+        /// <paramref name="metadataIds"/> - called before the single bulk
+        /// item-metadata fetch each generation path already makes, so
+        /// CraftingTreeBuilder's synthesized item-component leaves get a
+        /// real name/icon instead of the "Unknown Item"/null fallback (see
+        /// CraftingTreeBuilder.ResolveName/ResolveIcon). A no-op when no
+        /// decision has any VendorItemCosts at all (the common case).
+        /// </summary>
+        private static void AddVendorItemComponentIds(
+            IReadOnlyDictionary<int, SolverDecision> decisions, HashSet<int> metadataIds)
+        {
+            if (decisions == null)
+            {
+                return;
+            }
+            foreach (var decision in decisions.Values)
+            {
+                if (decision.VendorItemCosts == null)
+                {
+                    continue;
+                }
+                foreach (var line in decision.VendorItemCosts)
+                {
+                    metadataIds.Add(line.ItemId);
+                }
+            }
+        }
+
+        /// <summary>
+        /// W4B review-fix (Must Fix): widens <paramref name="metadataIds"/>
+        /// to cover every item id that appears as a TP-valued Item cost
+        /// line on ANY vendor offer for ANY item in the tree - not just the
+        /// ones on the BASELINE winning decisions AddVendorItemComponentIds
+        /// (decisions overload, above) already covers. `ResolveWithOverrides`
+        /// is a purely local, no-network re-solve that reuses
+        /// PlanSolveContext.Metadata verbatim (see its own doc comment) -
+        /// it never re-fetches metadata. Without this, forcing a node to
+        /// BuyFromVendor via a manual override at generation time can win a
+        /// DIFFERENT offer than the one Evaluate originally picked (e.g. a
+        /// node whose baseline decision was Craft, so its vendor offer's
+        /// item cost component was never scanned by the decisions-only
+        /// overload above) - that offer's item component would render as
+        /// "Unknown Item" with no icon, forever, until the plan is fully
+        /// regenerated. Scanning every offer for every item that has ANY
+        /// vendor offer (using vendorOffers, already fetched for this
+        /// generation - no extra network round trip) guarantees every
+        /// offer reachable by ANY override, comparable or fallback, already
+        /// has its item components' metadata in hand before
+        /// ResolveWithOverrides ever runs. A no-op when no vendor offer in
+        /// the tree has any Item cost line at all (the common case).
+        /// </summary>
+        private static void AddAllVendorOfferItemComponentIds(
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers, HashSet<int> metadataIds)
+        {
+            if (vendorOffers == null)
+            {
+                return;
+            }
+            foreach (var offers in vendorOffers.Values)
+            {
+                if (offers == null)
+                {
+                    continue;
+                }
+                foreach (var offer in offers)
+                {
+                    if (offer?.CostLines == null)
+                    {
+                        continue;
+                    }
+                    foreach (var cost in offer.CostLines)
+                    {
+                        if (string.Equals(cost.Type, "Item", StringComparison.Ordinal))
+                        {
+                            metadataIds.Add(cost.Id);
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// W4B: owned-item annotation for vendor cost-component ITEM leaves
+        /// (CraftingTreeNode.ComponentOwnedQuantity), computed strictly
+        /// AFTER solving from the account inventory snapshot - the exact
+        /// same "cosmetic reconciliation, never fed back into any decision
+        /// or total" contract BuildOwnedCurrencyAmounts already has for
+        /// currencies (see AccountCurrencyIndex/AccountItemIndex's own doc
+        /// comments), just for item components instead of wallet
+        /// currencies. Scoped to only the item ids that actually appear as
+        /// a vendor Item cost component anywhere in this solve (not every
+        /// owned item in the account) - null when there is no snapshot or
+        /// no such component anywhere, so callers can treat null as "no
+        /// data" distinctly from "0 owned", same as
+        /// BuildOwnedCurrencyAmounts.
+        ///
+        /// W4B review-fix (Must Fix): widened the same way
+        /// AddAllVendorOfferItemComponentIds widened the metadata scan
+        /// (same commit's own doc comment) - <paramref name="vendorOffers"/>
+        /// is scanned for every Item cost line on ANY offer, not just the
+        /// BASELINE winning decisions AddVendorItemComponentIds alone
+        /// covers. PlanSolveContext.OwnedVendorItemAmounts is, like
+        /// Metadata, captured once at generation time and reused verbatim
+        /// by ResolveWithOverrides (see its own doc comment) - it is never
+        /// recomputed. Without this, a node whose baseline decision was
+        /// Craft (so its vendor offer's item cost component was never
+        /// scanned by the decisions-only overload), manually overridden to
+        /// BuyFromVendor via ResolveWithOverrides, would show its item
+        /// component leaf with correct name/icon (metadata already
+        /// widened) but NO have pill - permanently - even with the item
+        /// sitting in the account, until the whole plan is regenerated.
+        /// </summary>
+        private static IReadOnlyDictionary<int, int> BuildOwnedVendorItemComponentAmounts(
+            AccountSnapshot snapshot, IReadOnlyDictionary<int, SolverDecision> decisions,
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers)
+        {
+            if (snapshot == null)
+            {
+                return null;
+            }
+
+            var itemIds = new HashSet<int>();
+            AddVendorItemComponentIds(decisions, itemIds);
+            AddAllVendorOfferItemComponentIds(vendorOffers, itemIds);
+            if (itemIds.Count == 0)
+            {
+                return null;
+            }
+
+            var itemIndex = new AccountItemIndex(snapshot.Items);
+            var result = new Dictionary<int, int>(itemIds.Count);
+            foreach (var itemId in itemIds)
+            {
+                int total = 0;
+                foreach (var source in itemIndex.GetSources(itemId))
+                {
+                    total += itemIndex.GetQuantity(itemId, source);
+                }
+                result[itemId] = total;
             }
             return result;
         }
