@@ -62,6 +62,34 @@ namespace GW2CraftingHelper.Services
             public long? ComparisonValue;
             public int RecipeId;
             public List<CostLine> VendorCurrencyCosts;
+
+            // W4B: see SolverDecision.VendorItemCosts/VendorHasRawCoin's own
+            // doc comments - straight passthrough of
+            // VendorBatchSolver.VendorOfferEvaluation's matching fields for
+            // whichever offer (comparable or fallback) this decision
+            // committed to.
+            public List<VendorItemCostLine> VendorItemCosts;
+            public bool VendorHasRawCoin;
+
+            // W4B review-fix (Critical): true once
+            // VendorBatchSolver.AllocateVendorNodeCosts has reallocated this
+            // occurrence's share of a vendor step that MERGED 2+ tree
+            // occurrences of the same item (see that method's own doc
+            // comment). TotalCost is corrected in that case, but
+            // VendorItemCosts/VendorCurrencyCosts above are NOT - they stay
+            // the pre-merge, per-occurrence-local numbers EvaluateVendorOffers
+            // originally captured for THIS occurrence alone, which can
+            // disagree with the corrected TotalCost/share once 2+ occurrences
+            // are folded into one true merged-ceil purchase.
+            // CraftingTreeBuilder.BuildVendorCostComponentLeaves checks this
+            // flag and suppresses leaf synthesis entirely whenever it is
+            // true, rather than render a component number it cannot prove
+            // still sums to the parent's own (corrected) total. Always false
+            // for a single-occurrence vendor buy (see
+            // AllocateVendorNodeCosts - nothing was actually reallocated
+            // there, so the original per-occurrence numbers stay accurate).
+            public bool VendorComponentCostsUnreliable;
+
             public bool CanCraft;
             public bool CanBuyTp;
             public bool CanBuyVendor;
@@ -201,6 +229,19 @@ namespace GW2CraftingHelper.Services
             // `tree` down, so `memo`/Decisions/SubtreeCost are already
             // fully correct at every level after this line, however deep.
             _vendorBatchSolver.AllocateVendorNodeCosts(stepMap, vendorOccurrences, memo);
+
+            // W4B review-fix (Critical): AllocateVendorNodeCosts above
+            // corrects decision.TotalCost for every occurrence of a merged
+            // vendor step, but a decision's VendorItemCosts/VendorCurrencyCosts
+            // (captured pre-merge, per occurrence) are never re-derived the
+            // same way - see FlagUnreliableVendorComponentCosts' own doc
+            // comment. Deliberately kept OUT of VendorBatchSolver (DO-NOT-
+            // TOUCH: merged-ceil batching math) - this only READS
+            // AllocateVendorNodeCosts' own already-public inputs/outputs
+            // (vendorOccurrences, stepMap) after it returns, and writes a
+            // new auxiliary flag; it changes no cost, no share, no batch
+            // selection.
+            FlagUnreliableVendorComponentCosts(stepMap, vendorOccurrences, memo);
             RecomputeCraftCosts(tree, memo, ignoredItemIds);
 
             // Pass 2d (M34 fix - wave-validator finding): stepMap's
@@ -278,6 +319,9 @@ namespace GW2CraftingHelper.Services
                     RecipeId = kvp.Value.RecipeId,
                     TotalCost = kvp.Value.TotalCost,
                     VendorCurrencyCosts = kvp.Value.VendorCurrencyCosts,
+                    VendorItemCosts = kvp.Value.VendorItemCosts,
+                    VendorHasRawCoin = kvp.Value.VendorHasRawCoin,
+                    VendorComponentCostsUnreliable = kvp.Value.VendorComponentCostsUnreliable,
                     CanCraft = kvp.Value.CanCraft,
                     CanBuyTp = kvp.Value.CanBuyTp,
                     CanBuyVendor = kvp.Value.CanBuyVendor
@@ -376,6 +420,13 @@ namespace GW2CraftingHelper.Services
             long? fallbackVendorCoinCost = vendorEvaluation.FallbackCoinCost;
             List<CostLine> fallbackVendorCurrencyCosts = vendorEvaluation.FallbackCurrencyCosts;
             VendorBatchSolver.VendorOfferBatch? fallbackVendorBatch = vendorEvaluation.FallbackBatch;
+
+            // W4B: see SolverDecision.VendorItemCosts/VendorHasRawCoin's doc
+            // comments.
+            List<VendorItemCostLine> comparableVendorItemCosts = vendorEvaluation.BestComparableItemCosts;
+            bool comparableVendorHasRawCoin = vendorEvaluation.BestComparableHasRawCoin;
+            List<VendorItemCostLine> fallbackVendorItemCosts = vendorEvaluation.FallbackItemCosts;
+            bool fallbackVendorHasRawCoin = vendorEvaluation.FallbackHasRawCoin;
 
             // Evaluate recipe options. EVERY non-currency ingredient of
             // EVERY recipe is always evaluated (M33 Finding 1 fix) - no
@@ -510,7 +561,13 @@ namespace GW2CraftingHelper.Services
             long? Commit(
                 AcquisitionSource src, long? cost, long? comparisonValue,
                 int recipeId, List<CostLine> vendorCurrencyCosts,
-                VendorBatchSolver.VendorOfferBatch? vendorBatch = null)
+                VendorBatchSolver.VendorOfferBatch? vendorBatch = null,
+                // W4B: only ever passed non-default by the 3 BuyFromVendor
+                // call sites below - every Craft/BuyFromTp/UnknownSource
+                // Commit call keeps the defaults (null/false), same as they
+                // already do for vendorCurrencyCosts/vendorBatch above.
+                List<VendorItemCostLine> vendorItemCosts = null,
+                bool vendorHasRawCoin = false)
             {
                 memo[node.NodeId] = new Decision
                 {
@@ -519,6 +576,8 @@ namespace GW2CraftingHelper.Services
                     ComparisonValue = comparisonValue,
                     RecipeId = recipeId,
                     VendorCurrencyCosts = vendorCurrencyCosts,
+                    VendorItemCosts = vendorItemCosts,
+                    VendorHasRawCoin = vendorHasRawCoin,
                     CanCraft = canCraft,
                     CanBuyTp = canBuyTp,
                     CanBuyVendor = canBuyVendor,
@@ -543,8 +602,8 @@ namespace GW2CraftingHelper.Services
                 if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
                 {
                     return comparableVendorValue.HasValue
-                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch)
-                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch);
+                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch, comparableVendorItemCosts, comparableVendorHasRawCoin)
+                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch, fallbackVendorItemCosts, fallbackVendorHasRawCoin);
                 }
             }
 
@@ -557,7 +616,7 @@ namespace GW2CraftingHelper.Services
 
             if (source == AcquisitionSource.BuyFromVendor)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch);
+                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch, comparableVendorItemCosts, comparableVendorHasRawCoin);
             }
 
             if (source == AcquisitionSource.BuyFromTp)
@@ -581,7 +640,7 @@ namespace GW2CraftingHelper.Services
             // crafted" - no recipe, no price, genuinely no known source.
             if (fallbackVendorCoinCost.HasValue)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch);
+                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch, fallbackVendorItemCosts, fallbackVendorHasRawCoin);
             }
 
             return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);
@@ -891,6 +950,55 @@ namespace GW2CraftingHelper.Services
                         ? _vendorBatchSolver.MergeVendorCurrencyCosts(null, decision.VendorCurrencyCosts)
                         : null
                 };
+            }
+        }
+
+        /// <summary>
+        /// W4B review-fix (Critical): marks every occurrence of a MERGED
+        /// (2+ tree occurrences) vendor step's memo entry with
+        /// Decision.VendorComponentCostsUnreliable = true, so
+        /// CraftingTreeBuilder never synthesizes a cost-component leaf for
+        /// it (see that field's own doc comment on why the raw
+        /// VendorItemCosts/VendorCurrencyCosts stop being trustworthy once
+        /// AllocateVendorNodeCosts reallocates the step's corrected total
+        /// across occurrences). Runs strictly AFTER AllocateVendorNodeCosts
+        /// so this sees the SAME stepMap/vendorOccurrences that method's own
+        /// reallocation used - the exact gate
+        /// (`step.VendorOfferOutputCount &gt; 0`) that decides whether a
+        /// step was actually corrected, plus occurrences.Count &gt; 1 for
+        /// "genuinely merged" (a single-occurrence step's share always
+        /// equals step.TotalCost exactly, so nothing there is stale).
+        /// Read-only with respect to VendorBatchSolver: only inspects
+        /// stepMap/vendorOccurrences and writes the new auxiliary flag on
+        /// `memo` - never touches TotalCost, UnitCost, or any batch/ceil
+        /// arithmetic (all DO-NOT-TOUCH, computed entirely by
+        /// AllocateVendorNodeCosts/FinalizeVendorBatches above).
+        /// </summary>
+        private static void FlagUnreliableVendorComponentCosts(
+            Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
+            Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
+            Dictionary<int, Decision> memo)
+        {
+            foreach (var kvp in vendorOccurrences)
+            {
+                var occurrences = kvp.Value;
+                if (occurrences.Count <= 1)
+                {
+                    continue;
+                }
+                if (!stepMap.TryGetValue(kvp.Key, out var step) || step.VendorOfferOutputCount <= 0)
+                {
+                    continue;
+                }
+
+                foreach (var (nodeId, _) in occurrences)
+                {
+                    if (memo.TryGetValue(nodeId, out var decision))
+                    {
+                        decision.VendorComponentCostsUnreliable = true;
+                        memo[nodeId] = decision;
+                    }
+                }
             }
         }
 

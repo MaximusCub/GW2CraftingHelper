@@ -62,5 +62,59 @@ namespace GW2CraftingHelper.Tests.Helpers
                 SeasonalCap = seasonalCap
             };
         }
+
+        /// <summary>
+        /// W4B (vendor cost-component leaves): an offer mixing TP-valued
+        /// Item cost line(s) with non-coin currency cost line(s) - the real
+        /// field case that motivated the feature ("Amalgamated Rift
+        /// Essence": currencies + Globs of Ectoplasm). itemCostLines/
+        /// currencyCostLines are (id, count) pairs at the OFFER's own
+        /// per-batch (unscaled) rate; coinCost is an optional raw coin
+        /// line, omitted entirely when 0 (matching MixedVendorOffer's own
+        /// convention above) so a caller can build a genuine 2-kind
+        /// (item+currency, no coin) offer.
+        /// </summary>
+        public static VendorOffer ItemAndCurrencyVendorOffer(
+            int outputItemId,
+            (int ItemId, int Count)[] itemCostLines,
+            (int CurrencyId, int Count)[] currencyCostLines,
+            int coinCost = 0,
+            int outputCount = 1)
+        {
+            var costLines = new List<CostLine>();
+            if (coinCost > 0)
+            {
+                costLines.Add(new CostLine
+                {
+                    Type = "Currency",
+                    Id = Gw2Constants.CoinCurrencyId,
+                    Count = coinCost
+                });
+            }
+            if (itemCostLines != null)
+            {
+                foreach (var (itemId, count) in itemCostLines)
+                {
+                    costLines.Add(new CostLine { Type = "Item", Id = itemId, Count = count });
+                }
+            }
+            if (currencyCostLines != null)
+            {
+                foreach (var (currencyId, count) in currencyCostLines)
+                {
+                    costLines.Add(new CostLine { Type = "Currency", Id = currencyId, Count = count });
+                }
+            }
+
+            return new VendorOffer
+            {
+                OfferId = "test-item-currency-" + outputItemId,
+                OutputItemId = outputItemId,
+                OutputCount = outputCount,
+                CostLines = costLines,
+                MerchantName = "Barter Vendor",
+                Locations = new List<string>()
+            };
+        }
     }
 }

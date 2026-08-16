@@ -22,7 +22,18 @@ namespace GW2CraftingHelper.Tests.Services
             CraftingDecision decision,
             bool canCraft = false, bool canBuyTp = false, bool canBuyVendor = false,
             string acquisitionBadge = null, int ownedQuantityUsed = 0, bool isIgnored = false,
-            bool isAchievementBitDeduped = false, int quantity = 1)
+            bool isAchievementBitDeduped = false, int quantity = 1,
+            bool isCostComponent = false, int componentOwnedQuantity = 0,
+            // W4B (2026-08-15): lets cost-component tests pick between the
+            // item-type leaf shape (non-null SubtreeCost, a real gold
+            // value - see CraftingTreeBuilder.BuildVendorCostComponentLeaves'
+            // item-line branch) and the currency-type shape (SubtreeCost
+            // left null - the "deliberately blank cost cell" the CURRENCY
+            // badge keys off, see its currency-line branch). Null by
+            // default, matching every pre-existing caller of this helper
+            // (none of which ever set SubtreeCost), so this is purely
+            // additive.
+            long? subtreeCost = null)
         {
             return new CraftingTreeNode
             {
@@ -37,7 +48,10 @@ namespace GW2CraftingHelper.Tests.Services
                 AcquisitionBadge = acquisitionBadge,
                 OwnedQuantityUsed = ownedQuantityUsed,
                 IsIgnored = isIgnored,
-                IsAchievementBitDeduped = isAchievementBitDeduped
+                IsAchievementBitDeduped = isAchievementBitDeduped,
+                IsCostComponent = isCostComponent,
+                ComponentOwnedQuantity = componentOwnedQuantity,
+                SubtreeCost = subtreeCost
             };
         }
 
@@ -531,6 +545,155 @@ namespace GW2CraftingHelper.Tests.Services
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
             Assert.Equal(2, specs.Count); // UNKNOWN + IGNORE
             Assert.Equal("UNKNOWN", specs[0].Text);
+        }
+
+        // ---- W4B: cost-component leaves - informational-only pill
+        // vocabulary ----
+        //
+        // Maintainer's field-test finding (2026-08-15): the earlier HAVE/
+        // "HAVE x/y NEEDED" vocabulary was replaced by a subdued "OWN n"
+        // badge (PillKind.OwnedInfo, the same muted-gold kind the ordinary
+        // partial-ownership annotation uses) showing the raw
+        // ComponentOwnedQuantity holding - no full-vs-partial split,
+        // because ownership never changes what a component leaf costs
+        // either way (see DecisionPillPlanner.BuildPillSpecs' own doc
+        // comment). Tests below use the item-type leaf shape (a real
+        // SubtreeCost gold value) unless named "CurrencyType", so they
+        // isolate the OWN-badge behavior from the separate CURRENCY-badge
+        // behavior covered by its own block further down.
+
+        [Fact]
+        public void CostComponent_NoOwnership_NoPill()
+        {
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 5,
+                componentOwnedQuantity: 0, subtreeCost: 100);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Empty(specs);
+        }
+
+        [Fact]
+        public void CostComponent_ItemType_PartialOwnership_ShowsOwnBadge_NoCurrencyBadge()
+        {
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 10,
+                componentOwnedQuantity: 4, subtreeCost: 100);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("OWN 4", specs[0].Text);
+            Assert.Equal(PillKind.OwnedInfo, specs[0].Kind);
+            Assert.Null(specs[0].Source);
+        }
+
+        [Fact]
+        public void CostComponent_ItemType_FullOwnership_StillShowsOwnBadge_NotHave()
+        {
+            // Full coverage no longer collapses to a plain HAVE pill for a
+            // cost component - the blue HAVE vocabulary means "reduced the
+            // plan cost" everywhere else in the tree, which is never true
+            // here, so the badge stays "OWN n" regardless of whether n
+            // covers the full need.
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 6,
+                componentOwnedQuantity: 6, subtreeCost: 100);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("OWN 6", specs[0].Text);
+            Assert.Equal(PillKind.OwnedInfo, specs[0].Kind);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Have);
+        }
+
+        [Fact]
+        public void CostComponent_OwnershipExceedsQuantity_BadgeShowsRawHolding()
+        {
+            // The badge shows the raw ComponentOwnedQuantity holding with
+            // no second capping against Quantity at this layer - production
+            // CraftingTreeBuilder.ResolveOwnedQuantity already caps it to
+            // min(owned, needed) before it ever reaches here
+            // (CraftingTreeBuilderTests covers that separately), so this
+            // pins that BuildPillSpecs itself performs no clamp of its own.
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 6,
+                componentOwnedQuantity: 999, subtreeCost: 100);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("OWN 999", specs[0].Text);
+        }
+
+        [Fact]
+        public void CostComponent_NeverGetsDecisionOrIgnorePills()
+        {
+            // Even when CanCraft/CanBuyTp/CanBuyVendor happen to be true
+            // (never set by the real builder, but the pill planner must
+            // never let a decision pill leak through regardless), a cost
+            // component gets ONLY the informational badge(s) - no CRAFT/TP/
+            // VENDOR/UNKNOWN pill, no IGNORE toggle, not override-clickable.
+            var node = Node(
+                CraftingDecision.BuyFromVendor, canCraft: true, canBuyTp: true, canBuyVendor: true,
+                isCostComponent: true, quantity: 6, componentOwnedQuantity: 3, subtreeCost: 100);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal(PillKind.OwnedInfo, specs[0].Kind);
+            Assert.All(specs, s => Assert.Null(s.Source));
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Ignore);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Selected);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Available);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Locked);
+        }
+
+        // ---- W4B (2026-08-15): "CURRENCY" badge on the blank-cost-cell
+        // (currency-type) component shape - explains at a glance why no
+        // gold value is shown, gw2efficiency's own grey Currency-badge
+        // pattern. May coexist with the OWN badge on the same leaf. ----
+
+        [Fact]
+        public void CostComponent_CurrencyType_BlankCostCell_ShowsCurrencyBadge()
+        {
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 5,
+                componentOwnedQuantity: 0, subtreeCost: null);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("CURRENCY", specs[0].Text);
+            Assert.Equal(PillKind.Locked, specs[0].Kind);
+            Assert.Null(specs[0].Source);
+        }
+
+        [Fact]
+        public void CostComponent_CurrencyType_WithOwnership_ShowsBothBadgesTogether_CurrencyFirst()
+        {
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 5,
+                componentOwnedQuantity: 3, subtreeCost: null);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Equal(2, specs.Count);
+            Assert.Equal("CURRENCY", specs[0].Text);
+            Assert.Equal(PillKind.Locked, specs[0].Kind);
+            Assert.Equal("OWN 3", specs[1].Text);
+            Assert.Equal(PillKind.OwnedInfo, specs[1].Kind);
+        }
+
+        [Fact]
+        public void CostComponent_ItemType_NeverGetsCurrencyBadge()
+        {
+            // A non-null SubtreeCost (the item-type leaf shape) must never
+            // carry the CURRENCY badge, even when the gold value itself
+            // happens to be 0 - the badge is keyed off SubtreeCost.HasValue,
+            // not the amount, so "no pill at all" stays exactly empty here,
+            // not a stray CURRENCY badge.
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 5,
+                componentOwnedQuantity: 0, subtreeCost: 0);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Empty(specs);
         }
     }
 }
