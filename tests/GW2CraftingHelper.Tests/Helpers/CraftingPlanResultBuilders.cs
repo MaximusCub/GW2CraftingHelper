@@ -24,6 +24,7 @@ namespace GW2CraftingHelper.Tests.Helpers
             List<RequiredRecipe> requiredRecipes = null,
             Dictionary<int, CurrencyMetadata> currencyMetadata = null,
             Dictionary<int, AcquisitionHint> acquisitionHints = null,
+            Dictionary<int, DailyCooldownItem> dailyCooldownItems = null,
             List<TimegatedItem> timegatedItems = null,
             List<PlanRequestItem> requestedItems = null,
             List<CraftingTreeNode> multiItemRoots = null,
@@ -49,6 +50,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                 DebugLog = new List<string>(),
                 CurrencyMetadata = currencyMetadata,
                 AcquisitionHints = acquisitionHints,
+                DailyCooldownItems = dailyCooldownItems,
                 RequestedItems = requestedItems,
                 MultiItemRoots = multiItemRoots,
                 // W3C: defaults to null (not an empty list) - matches

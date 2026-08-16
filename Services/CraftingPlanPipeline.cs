@@ -20,6 +20,7 @@ namespace GW2CraftingHelper.Services
         private readonly IAccountRecipeClient _accountRecipeClient;
         private readonly CurrencyMetadataService _currencyMetadataService;
         private readonly IReadOnlyDictionary<int, AcquisitionHint> _acquisitionHints;
+        private readonly IReadOnlyDictionary<int, DailyCooldownItem> _dailyCooldownItems;
 
         // W3B: rich per-generation logging sink. Optional constructor
         // injection (defaults to the app-wide ModuleLog.Shared singleton -
@@ -48,7 +49,8 @@ namespace GW2CraftingHelper.Services
             IAccountRecipeClient accountRecipeClient = null,
             CurrencyMetadataService currencyMetadataService = null,
             IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null,
-            ModuleLog moduleLog = null)
+            ModuleLog moduleLog = null,
+            IReadOnlyDictionary<int, DailyCooldownItem> dailyCooldownItems = null)
         {
             _recipeService = recipeService;
             _tradingPostService = tradingPostService;
@@ -60,6 +62,7 @@ namespace GW2CraftingHelper.Services
             _currencyMetadataService = currencyMetadataService;
             _acquisitionHints = acquisitionHints;
             _moduleLog = moduleLog ?? ModuleLog.Shared;
+            _dailyCooldownItems = dailyCooldownItems;
         }
 
         public async Task<CraftingPlanResult> GenerateStructuredAsync(
@@ -340,6 +343,7 @@ namespace GW2CraftingHelper.Services
                 plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
             result.CurrencyMetadata = currencyMetadata;
             result.AcquisitionHints = _acquisitionHints;
+            result.DailyCooldownItems = _dailyCooldownItems;
             result.CharacterDisciplines = effectiveCharacterDisciplines;
 
             // M34-B2a #4: owned-currency annotation, cosmetic only (see
@@ -388,6 +392,7 @@ namespace GW2CraftingHelper.Services
                 OwnMaterialsMode = ownMaterialsMode,
                 CurrencyMetadata = currencyMetadata,
                 AcquisitionHints = _acquisitionHints,
+                DailyCooldownItems = _dailyCooldownItems,
                 OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
                 OwnedVendorItemAmounts = ownedVendorItemAmounts,
@@ -763,6 +768,7 @@ namespace GW2CraftingHelper.Services
                 plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
             result.CurrencyMetadata = currencyMetadata;
             result.AcquisitionHints = _acquisitionHints;
+            result.DailyCooldownItems = _dailyCooldownItems;
             result.RequestedItems = items;
             result.CharacterDisciplines = effectiveCharacterDisciplines;
 
@@ -803,6 +809,7 @@ namespace GW2CraftingHelper.Services
                 OwnMaterialsMode = ownMaterialsMode,
                 CurrencyMetadata = currencyMetadata,
                 AcquisitionHints = _acquisitionHints,
+                DailyCooldownItems = _dailyCooldownItems,
                 OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
                 OwnedVendorItemAmounts = ownedVendorItemAmounts,
@@ -883,6 +890,7 @@ namespace GW2CraftingHelper.Services
                 context.CharacterDisciplines);
             result.CurrencyMetadata = context.CurrencyMetadata;
             result.AcquisitionHints = context.AcquisitionHints;
+            result.DailyCooldownItems = context.DailyCooldownItems;
             result.OwnedCurrencyAmounts = context.OwnedCurrencyAmounts;
             result.RequestedItems = context.RequestedItems;
             // W3C: per-character discipline data, cosmetic only - carried

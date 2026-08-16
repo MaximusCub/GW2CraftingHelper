@@ -60,6 +60,15 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyDictionary<int, AcquisitionHint> AcquisitionHints { get; set; }
 
         /// <summary>
+        /// Wiki-verified daily-craft-cooldown data snapshotted at GENERATION
+        /// time, mirroring AcquisitionHints immediately above (same
+        /// static-local-seed reasoning) - so ResolveWithOverrides' local
+        /// re-solve keeps producing craft-cooldown notices without any
+        /// refetch.
+        /// </summary>
+        public IReadOnlyDictionary<int, DailyCooldownItem> DailyCooldownItems { get; set; }
+
+        /// <summary>
         /// Per-node owned-quantity attribution snapshotted at GENERATION
         /// time (M34-B2a #1, see ReducedTreeResult.OwnedQuantityUsedByNode
         /// and CraftingPlanPipeline.BuildOwnedQuantityUsedByNodeId) - NodeId

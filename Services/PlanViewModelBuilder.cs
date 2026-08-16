@@ -641,7 +641,62 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
+            // Daily craft-cooldown notices (audit row 56, gw2e parity in
+            // spirit with the vendor-cap notices above): additive,
+            // informational-only pass over the real craft steps just built,
+            // keyed on the wiki-verified seed (DailyCooldownItemService /
+            // ref/daily_cooldown_items.json). Never touches the solver or
+            // Plan.TimegatedItems - this reuses only the TimegatedNotice ROW
+            // SHAPE (plain Label text, see CraftStepsSectionRenderer.Render's
+            // generic TextRowRenderer branch), not the vendor-cap model
+            // type, so a recipe-level cooldown can never be confused with a
+            // vendor purchase cap in PlanStructuralValidator or anywhere
+            // else that reads Plan.TimegatedItems directly.
+            AppendDailyCooldownNotices(section, steps, result);
+
             return section;
+        }
+
+        /// <summary>
+        /// Appends one TimegatedNotice row per Craft-source step whose
+        /// aggregate Quantity (already merged across the whole tree, same
+        /// aggregate PlanStep.Quantity every other row in this section
+        /// reads) exceeds the seed's PerDayCap for that item - "crafting N
+        /// takes about N/cap days (cap per day per account)" wording,
+        /// mirroring the vendor-cap notice's own plain-informational tone.
+        /// A step at or under the cap gets no notice (a single day's worth
+        /// needs no warning). result.DailyCooldownItems is null whenever
+        /// the module was not wired with the seed (Module.cs's own
+        /// try/catch degrades to null on a missing/bad file) - this method
+        /// is then a no-op, exactly like every other optional-seed lookup
+        /// in this class.
+        /// </summary>
+        private static void AppendDailyCooldownNotices(
+            PlanSectionViewModel section, List<PlanStep> craftSteps, CraftingPlanResult result)
+        {
+            if (result.DailyCooldownItems == null || result.DailyCooldownItems.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var step in craftSteps)
+            {
+                if (!result.DailyCooldownItems.TryGetValue(step.ItemId, out var cooldown) ||
+                    cooldown == null || cooldown.PerDayCap <= 0 || step.Quantity <= cooldown.PerDayCap)
+                {
+                    continue;
+                }
+
+                string itemName = ResolveName(step.ItemId, result.ItemMetadata);
+                int days = (int)Math.Ceiling((double)step.Quantity / cooldown.PerDayCap);
+
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.TimegatedNotice,
+                    Label = $"{itemName} is timegated - {cooldown.PerDayCap} per day per account - " +
+                        $"crafting {step.Quantity} will take about {days} day{(days == 1 ? "" : "s")}"
+                });
+            }
         }
 
         private PlanSectionViewModel BuildDisciplinesSection(CraftingPlanResult result)
