@@ -124,6 +124,13 @@ namespace GW2CraftingHelper.Tests.Services
             // M32 lesson (user-mandated tooltips): every tile header has
             // its own non-empty tooltip.
             Assert.All(costTiles, t => Assert.False(string.IsNullOrEmpty(t.TooltipText)));
+
+            // Review fix (round 2): the cost band's three non-negative
+            // terms always balance exactly (225 - 25 == 200), so its
+            // final-boundary operator is always the true "=" - the
+            // FormulaResultIsExact escape hatch exists for the profit
+            // band's loss case only.
+            Assert.True(costTiles[2].FormulaResultIsExact);
         }
 
         [Fact]
@@ -172,6 +179,12 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Profit if Sold", profitTiles[2].Label);
             Assert.Equal(40L, profitTiles[2].CoinValue);
             Assert.All(profitTiles, t => Assert.False(string.IsNullOrEmpty(t.TooltipText)));
+
+            // Review fix (round 2): a non-negative profit means the drawn
+            // "Sell Value - Total Materials Value = Profit if Sold"
+            // equation is literally true (340 - 300 == 40), so the
+            // renderer's final-boundary operator stays "=".
+            Assert.True(profitTiles[2].FormulaResultIsExact);
         }
 
         [Fact]
@@ -186,6 +199,35 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal("Loss if Sold", profitTile.Label);
             Assert.Equal(160L, profitTile.CoinValue);
+
+            // Review fix (round 2): the abs-value "Loss if Sold" display
+            // makes "Sell Value - Total Materials Value = Loss if Sold"
+            // (340 - 500 = 160) arithmetically false - the true right-hand
+            // side is -160, not 160. FormulaResultIsExact false tells
+            // SummarySectionRenderer.CreateFormulaBand to draw a neutral
+            // separator instead of an asserting "=" for this band's final
+            // boundary.
+            Assert.False(profitTile.FormulaResultIsExact);
+        }
+
+        [Fact]
+        public void ProfitBand_ZeroProfit_FormulaResultIsExactTrue()
+        {
+            // profit == 0 is the boundary of the ">= 0" check in
+            // BuildProfitFormulaBand - Label stays "Profit if Sold" (not
+            // "Loss") and the equation (340 - 340 = 0) is exactly true, so
+            // FormulaResultIsExact must be true here too, not just for a
+            // strictly positive profit.
+            var result = MakeResult(totalCoinCost: 340);
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 0;
+
+            var vm = _builder.Build(result);
+            var profitTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.ProfitFormulaTile && r.Label.Contains("Profit"));
+
+            Assert.Equal("Profit if Sold", profitTile.Label);
+            Assert.Equal(0L, profitTile.CoinValue);
+            Assert.True(profitTile.FormulaResultIsExact);
         }
 
         [Fact]
