@@ -142,6 +142,7 @@
     <Compile Include="Views\Rendering\CoinCurrencyRenderer.cs" />
     <Compile Include="Views\Rendering\ISectionRelayoutSink.cs" />
     <Compile Include="Views\Rendering\DisciplinesSectionRenderer.cs" />
+    <Compile Include="Views\Rendering\NotesSectionRenderer.cs" />
     <Compile Include="Views\Rendering\PillColors.cs" />
     <Compile Include="Views\Rendering\UsedMaterialsSectionRenderer.cs" />
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />

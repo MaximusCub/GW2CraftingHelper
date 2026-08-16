@@ -3337,6 +3337,14 @@ namespace GW2CraftingHelper.Views
                     // DisciplinesSectionRenderer's doc comment).
                     new DisciplinesSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
+                case PlanSectionType.Notes:
+                    // design-plan-notes.md (Notes section, Option 1): row
+                    // rendering lives in Views/Rendering/NotesSectionRenderer -
+                    // needs its own case rather than the default fallback
+                    // below, since CreateTextRow never draws a coin value
+                    // and this section's excess/reclaim lines carry one.
+                    new NotesSectionRenderer(this).Render(section, contentFlow, panelWidth);
+                    break;
                 // PlanSectionType.RequiredRecipes is handled entirely by
                 // CreateRequiredRecipesSection (early return above) - never
                 // reaches this switch, so no case for it here.
