@@ -277,6 +277,12 @@ namespace GW2CraftingHelper.Services
             // real name/icon for it instead of falling back to "Unknown
             // Item" (see AddVendorItemComponentIds).
             AddVendorItemComponentIds(solveResult.Decisions, metadataIds);
+            // W4B review-fix (Must Fix): also widen for every OTHER offer
+            // (not just the baseline winning one) reachable by a later
+            // manual override - see AddAllVendorOfferItemComponentIds' own
+            // doc comment for why ResolveWithOverrides needs this covered
+            // up front (it never re-fetches metadata).
+            AddAllVendorOfferItemComponentIds(vendorOffers, metadataIds);
             phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
             progress?.Report(new PlanStatus
             {
@@ -700,6 +706,10 @@ namespace GW2CraftingHelper.Services
             }
             // W4B: see the single-item overload's matching call for why.
             AddVendorItemComponentIds(solveResult.Decisions, metadataIds);
+            // W4B review-fix (Must Fix): see the single-item overload's
+            // matching call site (AddAllVendorOfferItemComponentIds' own
+            // doc comment).
+            AddAllVendorOfferItemComponentIds(vendorOffers, metadataIds);
             phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
             progress?.Report(new PlanStatus
             {
@@ -807,6 +817,17 @@ namespace GW2CraftingHelper.Services
         /// Re-solves a previously generated plan with per-node decision
         /// overrides. Purely local: reuses the context's tree, prices,
         /// offers, and metadata; no network calls.
+        ///
+        /// W4B review-fix (Must Fix): because this never re-fetches
+        /// metadata, context.Metadata must already cover every id a
+        /// possible override could surface - including a vendor cost-
+        /// component ITEM leaf on an offer that was NOT the baseline
+        /// winner (e.g. a node whose original decision was Craft, manually
+        /// overridden here to BuyFromVendor). The generation-time callers
+        /// (GenerateStructuredAsync/GenerateStructuredMultiAsync) widen
+        /// their metadata fetch for exactly this via
+        /// AddAllVendorOfferItemComponentIds - see that method's own doc
+        /// comment - rather than this method fetching anything itself.
         /// </summary>
         public CraftingPlanResult ResolveWithOverrides(
             PlanSolveContext context,
@@ -1250,6 +1271,59 @@ namespace GW2CraftingHelper.Services
                 foreach (var line in decision.VendorItemCosts)
                 {
                     metadataIds.Add(line.ItemId);
+                }
+            }
+        }
+
+        /// <summary>
+        /// W4B review-fix (Must Fix): widens <paramref name="metadataIds"/>
+        /// to cover every item id that appears as a TP-valued Item cost
+        /// line on ANY vendor offer for ANY item in the tree - not just the
+        /// ones on the BASELINE winning decisions AddVendorItemComponentIds
+        /// (decisions overload, above) already covers. `ResolveWithOverrides`
+        /// is a purely local, no-network re-solve that reuses
+        /// PlanSolveContext.Metadata verbatim (see its own doc comment) -
+        /// it never re-fetches metadata. Without this, forcing a node to
+        /// BuyFromVendor via a manual override at generation time can win a
+        /// DIFFERENT offer than the one Evaluate originally picked (e.g. a
+        /// node whose baseline decision was Craft, so its vendor offer's
+        /// item cost component was never scanned by the decisions-only
+        /// overload above) - that offer's item component would render as
+        /// "Unknown Item" with no icon, forever, until the plan is fully
+        /// regenerated. Scanning every offer for every item that has ANY
+        /// vendor offer (using vendorOffers, already fetched for this
+        /// generation - no extra network round trip) guarantees every
+        /// offer reachable by ANY override, comparable or fallback, already
+        /// has its item components' metadata in hand before
+        /// ResolveWithOverrides ever runs. A no-op when no vendor offer in
+        /// the tree has any Item cost line at all (the common case).
+        /// </summary>
+        private static void AddAllVendorOfferItemComponentIds(
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers, HashSet<int> metadataIds)
+        {
+            if (vendorOffers == null)
+            {
+                return;
+            }
+            foreach (var offers in vendorOffers.Values)
+            {
+                if (offers == null)
+                {
+                    continue;
+                }
+                foreach (var offer in offers)
+                {
+                    if (offer?.CostLines == null)
+                    {
+                        continue;
+                    }
+                    foreach (var cost in offer.CostLines)
+                    {
+                        if (string.Equals(cost.Type, "Item", StringComparison.Ordinal))
+                        {
+                            metadataIds.Add(cost.Id);
+                        }
+                    }
                 }
             }
         }

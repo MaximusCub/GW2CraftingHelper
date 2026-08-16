@@ -554,6 +554,100 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(2, resolved.CraftingTree.Children.Count);
         }
 
+        /// <summary>
+        /// W4B review-fix (Must Fix): item 1's BASELINE decision is Craft
+        /// (a cheap 1x item-2 recipe undercuts the vendor offer below), so
+        /// the winning offer's item cost component (id 42, "Glob of
+        /// Ectoplasm") is never scanned by the decisions-only
+        /// AddVendorItemComponentIds overload - only
+        /// AddAllVendorOfferItemComponentIds (scanning every vendorOffers
+        /// entry, not just the winning decision) can widen metadata for
+        /// it. A manual per-node override forcing item 1 to BuyFromVendor
+        /// via ResolveWithOverrides - an ordinary, commonly-used
+        /// interaction - then surfaces that item's component leaf; without
+        /// the fix it would render "Unknown Item"/null icon forever
+        /// (ResolveWithOverrides never re-fetches metadata - see its own
+        /// doc comment).
+        /// </summary>
+        [Fact]
+        public async Task MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadata()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(2, buyUnitPrice: 1, sellUnitPrice: 1); // craft is cheap - the baseline winner
+            priceApi.AddPrice(42, buyUnitPrice: 10, sellUnitPrice: 20);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Amalgamated Rift Essence", "essence.png");
+            itemApi.AddItem(2, "Cheap Ingredient", "cheap.png");
+            itemApi.AddItem(42, "Glob of Ectoplasm", "ecto.png");
+
+            CraftingPlanPipeline pipeline;
+            CraftingPlanResult result;
+            using (var tmp = new TempDirectory())
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tmp.Path, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-not-baseline-w4b",
+                        OutputItemId = 1,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Item", Id = 42, Count = 5 },
+                            new CostLine { Type = "Currency", Id = 23, Count = 3 }
+                        },
+                        MerchantName = "Test NPC",
+                        Locations = new List<string>()
+                    }
+                });
+
+                pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store,
+                    reducer: new InventoryReducer());
+
+                result = await pipeline.GenerateStructuredAsync(1, 2, null, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy);
+            }
+
+            // Baseline: craft wins, so no component leaves exist yet, and
+            // the winning decision never touched VendorItemCosts at all.
+            Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
+            Assert.Empty(result.CraftingTree.Children.Where(c => c.IsCostComponent));
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromVendor }
+            };
+            var resolved = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, resolved.CraftingTree.Decision);
+            var itemLeaf = resolved.CraftingTree.Children.Single(c => c.ItemId == 42);
+            Assert.True(itemLeaf.IsCostComponent);
+            Assert.Equal("Glob of Ectoplasm", itemLeaf.Name);
+            Assert.Equal("ecto.png", itemLeaf.IconUrl);
+        }
+
         // M38 WP-14: this test used to prove the (now-deleted, test-only)
         // GenerateAsync produced the same base plan as GenerateStructuredAsync
         // with a null snapshot, plus the latter's extra structured fields.
