@@ -49,12 +49,29 @@ namespace GW2CraftingHelper.Services
                 var results = new List<RawItem>();
                 foreach (var item in array)
                 {
+                    // design-plan-notes.md (Notes section, excess/reclaim
+                    // account-bound exclusion): the "flags" array (e.g.
+                    // "AccountBound") was previously parsed nowhere - see
+                    // RawItem.Flags' own doc comment. Missing/non-array
+                    // "flags" yields an empty list, never null, mirroring
+                    // the Name/Icon/Rarity "" fallback convention above.
+                    var flags = new List<string>();
+                    var flagsToken = item["flags"] as JArray;
+                    if (flagsToken != null)
+                    {
+                        foreach (var flag in flagsToken)
+                        {
+                            flags.Add(flag.Value<string>());
+                        }
+                    }
+
                     results.Add(new RawItem
                     {
                         Id = item.Value<int>("id"),
                         Name = item.Value<string>("name") ?? "",
                         Icon = item.Value<string>("icon") ?? "",
-                        Rarity = item.Value<string>("rarity") ?? ""
+                        Rarity = item.Value<string>("rarity") ?? "",
+                        Flags = flags
                     });
                 }
 
