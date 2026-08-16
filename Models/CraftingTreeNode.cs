@@ -77,18 +77,21 @@ namespace GW2CraftingHelper.Models
         // (IsCostComponent) representing a TP-valued Item barter line, from
         // VendorItemCostLine.PriceSideFellBack (review-fix,
         // BuildVendorCostComponentLeaves) - the leaf's OWN price, not the
-        // parent vendor node's; (3) review-fix round 3 (DISPLAY CAVEAT gap):
-        // a BuyFromVendor node that got NO cost-component leaves at all
-        // (kindCount < 2, or VendorComponentCostsUnreliable suppressed
-        // synthesis) - the OR of every VendorItemCosts line's own
-        // PriceSideFellBack, since there is no leaf to carry the caveat
-        // instead (CraftingTreeBuilder.BuildNode, right after componentLeaves
-        // is computed). Always false for every other node, including a
-        // currency cost-component leaf and a BuyFromVendor node that DID get
-        // component leaves (case (3) never fires there - the leaves
-        // themselves carry it per case (2)). The recipe-tree renderer reads
-        // this to add an "other side shown" caveat to the unit-price
-        // tooltip.
+        // parent vendor node's; (3) review-fix round 3 (DISPLAY CAVEAT gap),
+        // widened round 7 (multi-kind offers): a BuyFromVendor node - the OR
+        // of every VendorItemCosts line's own PriceSideFellBack, set
+        // regardless of whether that node also got cost-component leaves
+        // (CraftingTreeBuilder.BuildNode, right after componentLeaves is
+        // computed), so both the parent AND a leaf beneath it can carry the
+        // flag at once with no double-counting (they are separate nodes).
+        // Always false for every other node, including a currency
+        // cost-component leaf (never TP-priced). The recipe-tree renderer
+        // reads this to add a caveat to the unit-price tooltip - a DIFFERENT
+        // sentence for case (3) than for cases (1)/(2) (review-fix round 8):
+        // a BuyFromVendor parent's flag describes one of ITS cost items
+        // falling back, not the row's own item, so the wording names the
+        // component rather than asserting the row's own price fell back -
+        // see TreeSectionController.RenderTreeNode's tooltip-gate comment.
         public bool PriceSideFellBack { get; set; }
 
         // Non-coin currency cost of a BuyFromVendor decision (see

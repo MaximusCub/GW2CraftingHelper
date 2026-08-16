@@ -780,21 +780,43 @@ namespace GW2CraftingHelper.Views.Rendering
             // item's value, and that parent node is exactly what renders
             // collapsed by default a couple of levels deep
             // (PlanContentHeightMath.IsNodeExpanded caps expansion at
-            // depth < 2), hiding the leaf-only caveat. No change needed
-            // here - `node.Decision == CraftingDecision.BuyFromVendor`
-            // already reads the widened parent flag with no further gate
-            // changes; the leaf below it (if any) keeps carrying its own
-            // flag too, so both rows can show the caveat with no
-            // double-render (they are separate tooltip lines on separate
-            // rows).
-            if ((node.Decision == CraftingDecision.BuyFromTp ||
-                 node.Decision == CraftingDecision.BuyFromVendor ||
-                 node.IsCostComponent) &&
-                node.PriceSideFellBack)
+            // depth < 2), hiding the leaf-only caveat. `node.Decision ==
+            // CraftingDecision.BuyFromVendor` reads the widened parent flag
+            // with no further gate changes; the leaf below it (if any)
+            // keeps carrying its own flag too, so both rows can show a
+            // caveat with no double-render (they are separate tooltip
+            // lines on separate rows).
+            //
+            // Review-fix round 8 (misattributed caveat text on vendor
+            // rows): a BuyFromVendor PARENT's PriceSideFellBack is never
+            // about ITS OWN item's TP price - that node was not bought on
+            // the TP at all - it is an aggregate ("did any barter cost
+            // line fall back") folded up from VendorItemCosts so the
+            // caveat is reachable even when the offending leaf renders
+            // collapsed (see the BuildNode comments this mirrors). Reusing
+            // the BuyFromTp/cost-component-leaf sentence here asserted THIS
+            // row's item has no buy orders on the preferred side, which is
+            // false in general: the row's own item may have a perfectly
+            // healthy TP presence, or none at all - only one of its vendor
+            // cost items fell back. A BuyFromTp node and an IsCostComponent
+            // leaf both keep the original sentence unchanged - for those
+            // two, the flag genuinely describes the row's own price. A
+            // plain BuyFromVendor parent (not itself a cost-component leaf
+            // - a leaf's Decision is always BuyFromVendor too, so this is
+            // an explicit "not a leaf" carve-out, checked first) gets a
+            // distinct sentence naming the component instead of the row.
+            if (node.PriceSideFellBack &&
+                (node.Decision == CraftingDecision.BuyFromTp || node.IsCostComponent))
             {
                 extraTooltipLines.Add(_getCurrentPlan()?.PriceBasis == PriceBasis.BuyOrder
                     ? "Buy-order price unavailable - instant-buy price shown"
                     : "Instant-buy price unavailable - buy-order price shown");
+            }
+            else if (node.PriceSideFellBack && node.Decision == CraftingDecision.BuyFromVendor)
+            {
+                extraTooltipLines.Add(_getCurrentPlan()?.PriceBasis == PriceBasis.BuyOrder
+                    ? "A vendor cost item's buy-order price is unavailable - its instant-buy price is used"
+                    : "A vendor cost item's instant-buy price is unavailable - its buy-order price is used");
             }
 
             if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
