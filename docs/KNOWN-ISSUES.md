@@ -4310,4 +4310,104 @@ builder-layer tests above (`TreeSectionController` is Blish-bound and
 outside this session's test-runnable surface, same constraint every
 prior UI-adjacent entry in this file notes).
 
+## AUDIT ROW 20/38 review-fix round 4: BuyFromVendor test-gap closure + GetUnitPrice doc verification (2026-08-16)
+
+A fourth adversarial pass over the AUDIT ROW 20/38 TP price-side
+fallback change raised two findings; one required a test-gap fix, the
+other was verified already resolved by round 2 and needed no change.
+
+**Finding 1 (Must Fix, test gap)**: `PlanSolver.Commit`'s
+`src == AcquisitionSource.BuyFromTp && buyPriceSideFellBack` gate (and
+`CraftingTreeBuilder.BuildNode`'s repeated
+`decision.Source == AcquisitionSource.BuyFromTp && decision.PriceSideFellBack`
+mirror of it) had a `Craft`-winning negative case at both layers
+(`PlanSolverPriceBasisAndOverrideTests.
+BuyOrderBasis_CraftWinsOverFallbackPricedBuy_DecisionFlagStaysFalse`,
+round 2; `CraftingTreeBuilderTests.
+CraftNode_WinsOverFallbackPricedBuy_PriceSideFellBackStaysFalseOnNode`,
+round 2) but no `BuyFromVendor`-winning negative case at either layer -
+the other source both gates must hold false against. Every existing
+`BuyFromVendor`-plus-fallback fixture in the suite either priced the
+item's OWN preferred TP side directly (no fallback in play at all) or
+routed through the separate vendor-barter `VendorItemCosts`/leaf
+caveat path (a different mechanism - `CraftingTreeBuilder.cs`'s own
+line-224 block - that only fires for barter-cost vendor offers), so a
+plain coin vendor offer beating a fallback-priced TP option never
+exercised either `src == BuyFromTp` gate with `Source == BuyFromVendor`.
+
+**Fix**: no production code changed - this was a test-only gap. Added
+one `[Fact]` per layer, both real-solver/real-builder (no
+contract-mirror or fake-logic tests):
+
+- `PlanSolverPriceBasisAndOverrideTests.
+  BuyOrderBasis_VendorWinsOverFallbackPricedBuy_DecisionFlagStaysFalse` -
+  a TP-priceable leaf (preferred side empty, other side populated, so
+  `buyPriceSideFellBack` is computed `true` for the losing TP option) with
+  a cheaper plain coin `VendorOffer`; asserts
+  `SolverDecision.PriceSideFellBack == false` on the winning
+  `BuyFromVendor` decision.
+- `CraftingTreeBuilderTests.
+  VendorNode_WinsOverFallbackPricedBuy_PriceSideFellBackStaysFalseOnNode` -
+  same fixture shape built through `BuildViaRealSolver`; asserts
+  `CraftingTreeNode.PriceSideFellBack == false`. The offer is
+  coin-only (`decision.VendorItemCosts` is null), so the separate
+  vendor-barter caveat block from round 3 is confirmed not to fire
+  either - the test would fail with a `NullReferenceException` inside
+  `BuildNode` if that block's null-guard on `VendorItemCosts` regressed,
+  making this test double as a regression check for that guard too.
+
+**Finding 2 (verified already resolved, no action)**: the review flagged
+`PlanSolver.GetUnitPrice`'s 2-arg overload doc comment as stale ("lowest
+sell listing (instant) or highest buy order (patient). 0 = not
+priceable." with no mention of the same-item cross-side fallback it now
+performs) and named `VendorBatchSolver.cs` as a caller still bound to
+that summary. Checked the current doc comment directly (not via the
+finding's quoted text): round 2's own "review-fix: close PriceSideFellBack
+test gap, fix stale GetUnitPrice doc" commit already rewrote it to state
+the fallback and point at the 3-arg overload for the fell-back fact, and
+`VendorBatchSolver.cs` already calls the 3-arg overload exclusively (a
+round-2 change, confirmed via `grep -n GetUnitPrice`) - the only
+remaining 2-arg caller is `CraftingPlanPipeline.CollectPresetOverrides`,
+which the current doc comment already covers accurately ("The remaining
+two-arg caller ... only ever needs the `> 0` priceable check, not the
+fell-back fact itself"). No further doc change made - the finding was
+already fully addressed by prior work on this branch; re-editing an
+already-correct comment would be an unrequested diff with no behavior or
+documentation gain.
+
+**Self-review findings** (Code Reviewer Mode pass over this diff):
+confirmed the new `VendorNode_WinsOverFallbackPricedBuy_...` test uses a
+pure-coin `VendorOffer` (via the shared `CoinVendorOffer` helper)
+specifically so `BuildVendorCostComponentLeaves`' `kindCount == 1`
+short-circuit returns null and `decision.VendorItemCosts` stays null,
+keeping this test isolated to the `src == BuyFromTp` gate rather than
+also exercising the round-3 barter-caveat path (which already has its
+own dedicated tests); confirmed the new `PlanSolver`-level test's
+vendor coin cost (40) is strictly below both the fallback-priced buy
+total (100) and would also be below any craft option had one existed,
+so `PickCheapest` picks `BuyFromVendor` unambiguously with no tie logic
+in play; confirmed neither new test touches `VendorBatchSolver`'s
+merged-ceil batching (`CoinVendorOffer` produces one offer, one
+occurrence, no batching path at all). Nice-to-have (not applied - out
+of scope, no production gap to close): the new tests don't assert
+`CanBuyTp`/`CanBuyVendor` availability flags alongside `PriceSideFellBack`,
+which would make the "both options were genuinely live, vendor won on
+cost, not by TP being unavailable" precondition explicit rather than
+implicit in the fixture's price/offer values - existing sibling tests in
+both files follow the same convention (asserting only the fields under
+test), so adding it here alone would be inconsistent with the file's own
+established style rather than a real coverage gain.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` clean, 0
+errors, 0 warnings (no production `.cs` file touched this round - the
+diff is test-file-only). Tests: 1382 passed, 0 failed (baseline 1380
+from the previous section; +2 net new, exactly the two `[Fact]` tests
+listed above - confirmed via `dotnet test
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`). No Blish
+HUD/BlishHUD.exe references added to tests; both edited test files
+remain Blish-free and exercise real `PlanSolver.Solve`/
+`CraftingTreeBuilder.BuildTree` production code paths, not contract
+mirrors. Repo invariants otherwise not in play - no pricing-comparability,
+ID-display, or coin-icon-ordering code was touched.
+
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

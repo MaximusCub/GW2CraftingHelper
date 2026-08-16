@@ -98,6 +98,37 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void BuyOrderBasis_VendorWinsOverFallbackPricedBuy_DecisionFlagStaysFalse()
+        {
+            // AUDIT ROW 20/38 review-fix (test gap): sibling of
+            // BuyOrderBasis_CraftWinsOverFallbackPricedBuy_DecisionFlagStaysFalse
+            // above, but exercising the OTHER half of Commit's
+            // `src == AcquisitionSource.BuyFromTp` gate - a BuyFromVendor
+            // win, not a Craft win. Item 1's preferred side (buy orders /
+            // SellInstant) is empty, so buyPriceSideFellBack is computed
+            // true for the (losing) TP option; the vendor coin offer (40)
+            // beats both the fallback-priced buy (100) and the leaf's lack
+            // of a craft option outright, so the gate must keep the flag
+            // false on the winning BuyFromVendor decision.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 40) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.BuyOrder);
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, result.Decisions[0].Source);
+            Assert.Equal(40, result.Plan.TotalCoinCost);
+            Assert.False(result.Decisions[0].PriceSideFellBack);
+        }
+
+        [Fact]
         public void BuyOrderBasis_CanFlipBuyVsCraftDecision()
         {
             // Output: instant 100 / order 90. Craft from 2x ingredient:

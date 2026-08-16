@@ -1739,5 +1739,41 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(CraftingDecision.Craft, node.Decision);
             Assert.False(node.PriceSideFellBack);
         }
+
+        /// <summary>
+        /// AUDIT ROW 20/38 review-fix (test gap): sibling of
+        /// CraftNode_WinsOverFallbackPricedBuy_PriceSideFellBackStaysFalseOnNode
+        /// above, but for a BuyFromVendor win instead of Craft - the other
+        /// source the repeated BuyFromTp-only guard in
+        /// CraftingTreeBuilder.BuildNode must gate against. Item 1's own
+        /// (losing) buy option internally falls back to its other TP side
+        /// (BuyInstant empty, SellInstant populated, under the default
+        /// InstantBuy basis), but a plain coin vendor offer beats it
+        /// outright, so the flag must stay false on the built
+        /// CraftingTreeNode. This is a pure coin offer (no Item cost
+        /// lines), so the separate vendor-barter DISPLAY CAVEAT path
+        /// (decision.VendorItemCosts.Any(...) a few lines below the guard)
+        /// is not in play either - decision.VendorItemCosts is null here.
+        /// </summary>
+        [Fact]
+        public void VendorNode_WinsOverFallbackPricedBuy_PriceSideFellBackStaysFalseOnNode()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 100 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 40) } }
+            };
+            var metadata = Meta((1, "Vendor Item", "v.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.Equal(40, node.SubtreeCost);
+            Assert.False(node.PriceSideFellBack);
+        }
     }
 }
