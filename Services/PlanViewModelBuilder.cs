@@ -690,11 +690,17 @@ namespace GW2CraftingHelper.Services
                 string itemName = ResolveName(step.ItemId, result.ItemMetadata);
                 int days = (int)Math.Ceiling((double)step.Quantity / cooldown.PerDayCap);
 
+                // Review fix (audit row 56 PART C nice-to-have): the
+                // singular "day" branch was dead code - this loop already
+                // `continue`s above whenever step.Quantity <= cooldown.
+                // PerDayCap, so every notice reaching this point has
+                // Quantity > PerDayCap, making days = Ceiling(qty / cap)
+                // always >= 2. Always plural.
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.TimegatedNotice,
                     Label = $"{itemName} is timegated - {cooldown.PerDayCap} per day per account - " +
-                        $"crafting {step.Quantity} will take about {days} day{(days == 1 ? "" : "s")}"
+                        $"crafting {step.Quantity} will take about {days} days"
                 });
             }
         }
