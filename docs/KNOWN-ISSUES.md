@@ -4603,4 +4603,147 @@ comparability, ID-display, or coin-icon-ordering code was touched;
 `Services/PlanRelayoutMath.cs`, scroll machinery, and
 `VendorBatchSolver`'s merged-ceil batching math were not touched.
 
+## AUDIT ROW 20/38 review-fix round 7: multi-kind DISPLAY CAVEAT gap + false build-verification claim (2026-08-16)
+
+A seventh adversarial pass over the AUDIT ROW 20/38 TP price-side
+fallback change found two further issues, both fixed here.
+
+**Finding 1 (Must Fix, DISPLAY CAVEAT gap, multi-kind offers)**: round
+3's `CraftingTreeBuilder.BuildNode` fix only set the parent
+`BuyFromVendor` node's `PriceSideFellBack` when `componentLeaves ==
+null` - i.e. only for a `kindCount < 2` offer or one suppressed by
+`VendorComponentCostsUnreliable`. A winning vendor offer with 2+ cost
+KINDS (item + coin, item + currency) builds component leaves, and the
+per-line `PriceSideFellBack` fact only ever reached the leaf, never the
+parent, for that shape - the same gap round 3 fixed for `kindCount==1`,
+left open for the multi-kind case. That leaf is hidden by default in
+exactly the common case:
+`PlanContentHeightMath.IsNodeExpanded` returns `!dimmed && depth < 2`,
+and `TreeChildFlowHeight` sets `childDimmed = dimmed ||
+node.Decision != Craft`, so any vendor node at depth >= 2 or beneath a
+non-Craft ancestor renders collapsed - the parent's coin total (the
+only thing visible) silently contained a fallen-back TP price with no
+indicator anywhere on the row actually shown.
+
+**Fix**: dropped the `componentLeaves == null` condition from
+`BuildNode`'s parent-flag check - the parent's `PriceSideFellBack` is
+now set to `decision.VendorItemCosts.Any(line =>
+line.PriceSideFellBack)` whenever `decision.Source ==
+AcquisitionSource.BuyFromVendor` and `VendorItemCosts` is non-null,
+unconditional on whether component leaves were also built. The leaf
+keeps carrying its own flag too (unchanged) - `TreeSectionController`'s
+tooltip gate already reads `node.Decision ==
+CraftingDecision.BuyFromVendor` unconditionally (round 3), so no
+renderer change was needed; both rows (parent and leaf, when a leaf
+exists) can show the caveat with no double-render since they are
+separate tooltip lines on separate rows. Updated both the
+`CraftingTreeBuilder.BuildNode` doc comment and the matching
+`TreeSectionController` tooltip-gate comment (round 3's, which had
+described the parent flag as covering only the no-leaves case) to state
+the widened rule; left the `TreeSectionController` gate condition itself
+untouched since it already covered this without modification.
+
+**Tests** (`CraftingTreeBuilderTests.cs`, exercises real
+`PlanSolver.Solve`/`CraftingTreeBuilder.BuildTree` production code paths
+via the file's existing `BuildViaRealSolver` helper - no contract-mirror
+or fake-logic test):
+
+- `MixedOffer_ItemCostPreferredSideEmpty_LeafFlagsPriceSideFellBack`
+  (existing 2-kind fixture, item + currency) gained
+  `Assert.True(node.PriceSideFellBack)` alongside its existing leaf-level
+  assertion - previously nothing pinned the parent for this shape, so
+  the round-3 regression this round closes could have shipped silently.
+- `MixedOffer_ItemCostPreferredSidePresent_LeafPriceSideFellBackFalse`
+  (its no-fallback sibling) gained the matching
+  `Assert.False(node.PriceSideFellBack)` negative case, following the
+  same paired-assertion pattern round 3 used for the `kindCount==1`
+  tests.
+
+**Finding 2 (Must Fix, false verification claim)**: this file's round-3
+section stated "grepped the full warning list for the three touched
+production files - `CraftingTreeBuilder.cs`, `Models/CraftingTreeNode.cs`,
+`Views/Rendering/TreeSectionController.cs` - zero hits, so no new
+StyleCop warnings on touched lines." Measured via `dotnet build
+GW2CraftingHelper.csproj -p:Platform=x64 -t:Rebuild`: that round's diff
+introduced two new warnings in `TreeSectionController.cs` - SA1515
+(single-line comment should be preceded by blank line) on the first
+line of the new AUDIT ROW comment block, and SA1513 (closing brace
+should be followed by blank line) on the new `if` block's closing brace
+- both on lines that round's diff added. The claim was false; the file
+carries roughly two hundred pre-existing StyleCop warnings of this same
+pervasive pattern, so the two new ones were easy to miss by eye but not
+by a real warning-list diff.
+
+**Fix**: added the two missing blank lines (one before the AUDIT ROW
+comment block, one after the `if` block's closing brace) rather than
+just rewording the claim - both insertions match the surrounding file's
+established style either way (blank line before a new comment block,
+blank line after a closing brace before the next statement), so this is
+a real fix, not just a truthful restatement. Verified with a scoped
+before/after warning diff (`git stash`/rebuild/`git stash pop`, isolating
+this branch's edits from the file's ~200 pre-existing warnings): before,
+`TreeSectionController.cs` carried SA1513 at old lines 744 and 782 (each
+counted twice - `dotnet build` emits each diagnostic from two analyzer
+passes) in addition to the file's pre-existing warnings, plus SA1515 at
+old line 745; after the two blank-line insertions, both are gone and
+every subsequent warning in the file simply shifted down by two lines,
+with no new warning introduced anywhere in the file (confirmed by
+diffing the full before/after warning-code histograms, not just the two
+targeted lines). `CraftingTreeBuilder.cs`'s warning histogram is
+byte-for-byte identical before and after this round's Finding 1 fix (10
+SA1117, 2 SA1202, 2 SA1407, 6 SA1413, 18 SA1513, 10 SA1515 both times) -
+the one-line conditional change added zero new warnings there either.
+
+**Self-review findings** (Code Reviewer Mode pass over this diff):
+confirmed `decision.VendorItemCosts != null` is still checked before
+`.Any(...)` in the widened `BuildNode` block, so a `BuyFromVendor`
+decision with only currency/coin cost lines (no item lines at all) still
+takes the null-guard branch and leaves the flag at its prior `false`,
+unchanged from round 3; confirmed nothing else in `BuildNode` reads
+`treeNode.PriceSideFellBack` between this block and the
+`componentLeaves != null`/`wantsReferenceBranch` stacking logic a few
+lines below, so widening the flag has no effect on which children get
+built or how - the flag and the children list are fully independent
+outputs; confirmed the `TreeSectionController` tooltip gate
+(`node.Decision == CraftingDecision.BuyFromVendor`) already covered the
+widened parent flag with zero renderer changes required, so this fix is
+genuinely a one-line production change plus comment/test updates, not a
+larger diff in disguise; grepped both touched `.cs` files and the
+touched test file for non-ASCII bytes and for an em dash character -
+none found, ASCII-only preserved; grepped the test file for
+"Blish"/"Gw2Sharp" - none found, test file stays Blish-free; confirmed
+via `git status` that none of `Services/ModuleLog.cs`,
+`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`,
+scroll machinery, or `VendorBatchSolver`'s merged-ceil batching math
+were touched this round. Nice-to-have (not applied - out of scope, same
+"minimal fix, no new abstraction" reasoning round 3 gave for the
+identical tradeoff): the two-copies-of-every-warning quirk in
+`dotnet build`'s output (every diagnostic in this project's full-rebuild
+log appears exactly twice) made the manual grep in round 3 easy to get
+wrong by eye - a small script wrapping `dotnet build -t:Rebuild` with a
+before/after warning-count diff over `git diff --name-only` would turn
+this class of claim into a mechanically-verified one instead of relying
+on each review round to run the exact right grep; not added since it
+would be new tooling infrastructure with no production code to exercise,
+and this round's diff already demonstrates the manual `git
+stash`/rebuild/`git stash pop` technique inline.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -t:Rebuild`
+clean, 0 errors. Warnings: verified via scoped before/after diff (above)
+that Finding 1's change added zero new warnings to `CraftingTreeBuilder.cs`
+and Finding 2's fix removed the two warnings it targeted from
+`TreeSectionController.cs` with no new ones introduced (re-verified after
+the round-3 tooltip-gate comment update in the same file). Tests: 1383
+passed, 0 failed (same total as round 6 - two existing `[Fact]` tests
+gained assertions, no test added or removed, confirmed via `dotnet test
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`). No Blish
+HUD/BlishHUD.exe references added to tests; the edited test file remains
+Blish-free and exercises real `PlanSolver`/`CraftingTreeBuilder`
+production code paths, not contract mirrors. IDs remain internal-only;
+coin icons unaffected (no coin-rendering code touched - `PriceSideFellBack`
+is a boolean flag, not a price value). `Services/ModuleLog.cs`,
+`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`,
+scroll machinery, and `VendorBatchSolver`'s merged-ceil batching math were
+not touched.
+
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

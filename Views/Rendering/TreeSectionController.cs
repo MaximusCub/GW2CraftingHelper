@@ -742,6 +742,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     }
                 }
             }
+
             // AUDIT ROW 20/38 (gw2e price-side fallback parity, DISPLAY
             // CAVEAT): this node's TP unit price came from the item's
             // NON-preferred side because the preferred side had no
@@ -762,15 +763,30 @@ namespace GW2CraftingHelper.Views.Rendering
             // BuyFromVendor node with no cost-component leaves at all (a
             // pure item-barter offer, kindCount==1 - the common case - or
             // any offer VendorComponentCostsUnreliable suppressed leaf
-            // synthesis for) - CraftingTreeBuilder.BuildNode now sets that
+            // synthesis for) - CraftingTreeBuilder.BuildNode sets that
             // node's own PriceSideFellBack (OR across VendorItemCosts) in
-            // exactly this case, so `node.Decision ==
+            // that case, so `node.Decision ==
             // CraftingDecision.BuyFromVendor` on its own already covers
             // both this case and the cost-component leaf above (a leaf's
             // own Decision is always BuyFromVendor too - see
             // BuildVendorCostComponentLeaves) - IsCostComponent is kept as
             // an explicit disjunct anyway to document both producers by
             // name rather than rely on that overlap implicitly.
+            //
+            // Review-fix round 7 (DISPLAY CAVEAT gap, multi-kind offers):
+            // BuildNode's parent-flag check widened further to also cover a
+            // BuyFromVendor node that DID get component leaves (2+ cost
+            // kinds) - its own coin total still includes the fallen-back
+            // item's value, and that parent node is exactly what renders
+            // collapsed by default a couple of levels deep
+            // (PlanContentHeightMath.IsNodeExpanded caps expansion at
+            // depth < 2), hiding the leaf-only caveat. No change needed
+            // here - `node.Decision == CraftingDecision.BuyFromVendor`
+            // already reads the widened parent flag with no further gate
+            // changes; the leaf below it (if any) keeps carrying its own
+            // flag too, so both rows can show the caveat with no
+            // double-render (they are separate tooltip lines on separate
+            // rows).
             if ((node.Decision == CraftingDecision.BuyFromTp ||
                  node.Decision == CraftingDecision.BuyFromVendor ||
                  node.IsCostComponent) &&
@@ -780,6 +796,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     ? "Buy-order price unavailable - instant-buy price shown"
                     : "Instant-buy price unavailable - buy-order price shown");
             }
+
             if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
             {
                 extraTooltipLines.Add(node.AcquisitionHint);

@@ -1170,6 +1170,13 @@ namespace GW2CraftingHelper.Tests.Services
 
             var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
 
+            // Round 7: the parent BuyFromVendor node's own coin cost already
+            // includes the fallen-back item's value, and that node commonly
+            // renders collapsed (PlanContentHeightMath.IsNodeExpanded caps
+            // expansion at depth < 2, hiding this leaf by default) - so the
+            // parent must carry the flag too, not just the leaf.
+            Assert.True(node.PriceSideFellBack);
+
             var itemLeaf = node.Children.Single(c => c.ItemId == 42);
             Assert.True(itemLeaf.IsCostComponent);
             Assert.True(itemLeaf.PriceSideFellBack);
@@ -1191,6 +1198,8 @@ namespace GW2CraftingHelper.Tests.Services
             // preferred side, so no fallback occurs) - the field must not be
             // true by default.
             var (node, _) = BuildMixedVendorNode();
+
+            Assert.False(node.PriceSideFellBack);
 
             var itemLeaf = node.Children.Single(c => c.ItemId == 42);
             Assert.False(itemLeaf.PriceSideFellBack);
