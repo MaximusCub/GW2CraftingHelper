@@ -298,8 +298,13 @@ where that currency appears, or only once in the summary?
 - **A loose end worth flagging**: the code comment in `AccountCurrencyIndex.cs`
   cites an older internal report claiming gw2e "only ever nets owned
   currency out at the summary layer" - a live fetch this session shows that
-  claim is not accurate (gw2e does have a per-node pill). That comment
-  should get a doc-only correction.
+  claim is not accurate (gw2e does have a per-node pill). **Resolved**
+  (audit row 56 PART B #3, 2026-08-16; refined 2026-08-16): the comment was
+  corrected in place to "at least via a per-node display pill" rather than
+  claiming both a pill and a summary layer - only the pill is measured
+  evidence from the live fetch, and the pill is scoped to display only
+  (gw2e's own quantity engine never nets owned currency into decision math
+  either). No behavior change.
 - **Corrected follow-up pointer**: this entry previously said full confidence
   on gw2e's actual per-node assignment rule would need reading
   `calculateTreeQuantity.ts`'s per-node `ownedQuantity` logic, "not fetched
@@ -327,9 +332,10 @@ where that currency appears, or only once in the summary?
   provenance claim doesn't hold up. No such concept, and no matching CSS
   class, exists anywhere in gw2e's current live templates. This looks like
   either a stale claim or a reference to something gw2e has since removed.
-- **What to do**: a small comment fix at
-  `TreeSectionController.cs:767-770` to say this is a module-original
-  enhancement rather than a port. No behavior change.
+- **Resolved** (audit row 56 PART B #3, 2026-08-16): the comment at
+  `TreeSectionController.cs` (now near line 895) was corrected in place to
+  say this is a module-original enhancement rather than a gw2e port. No
+  behavior change.
 - Matrix reference: row 46.
 
 ---

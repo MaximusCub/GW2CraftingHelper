@@ -1,5 +1,4 @@
 using Blish_HUD;
-using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
@@ -933,23 +932,12 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            AsyncTexture2D icon;
-            if (string.IsNullOrEmpty(row.IconUrl))
-            {
-                icon = new AsyncTexture2D(ContentService.Textures.Error);
-            }
-            else
-            {
-                icon = GameService.Content.GetRenderServiceTexture(row.IconUrl);
-            }
-
-            new Panel()
-            {
-                Size = new Point(32, 32),
-                Location = new Point(2, 2),
-                BackgroundTexture = icon,
-                Parent = rowPanel
-            };
+            // A missing IconUrl is a data gap (e.g. the API dropped it),
+            // never a genuine load failure - IconControls.CreateItemIcon
+            // degrades it to a neutral empty-slot square instead of
+            // Blish's alarming magenta missing-texture placeholder (audit
+            // row 56 PART B #1).
+            IconControls.CreateItemIcon(rowPanel, row.IconUrl, 2, 2);
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.
@@ -987,23 +975,10 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            AsyncTexture2D icon;
-            if (string.IsNullOrEmpty(entry.IconUrl))
-            {
-                icon = new AsyncTexture2D(ContentService.Textures.Error);
-            }
-            else
-            {
-                icon = GameService.Content.GetRenderServiceTexture(entry.IconUrl);
-            }
-
-            new Panel()
-            {
-                Size = new Point(32, 32),
-                Location = new Point(2, 2),
-                BackgroundTexture = icon,
-                Parent = rowPanel
-            };
+            // See CreateItemRow's matching comment (audit row 56 PART B #1) -
+            // same data-gap-vs-failure distinction applies to a wallet
+            // currency's icon (e.g. the reported Spirit Shards row).
+            IconControls.CreateItemIcon(rowPanel, entry.IconUrl, 2, 2);
 
             // Never display raw currency IDs (repo invariant).
             string name = string.IsNullOrEmpty(entry.CurrencyName) ? "Unknown Currency" : entry.CurrencyName;
