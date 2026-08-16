@@ -303,23 +303,6 @@ namespace GW2CraftingHelper.Services
             CurrencyValuationsJson.Value = CurrencyValuationSerializer.Serialize(valuation);
         }
 
-        /// <summary>
-        /// Maps the ValueOwnMaterials toggle onto the pipeline's
-        /// OwnMaterialsMode enum. Defaults to Valued (see ValueOwnMaterials'
-        /// own doc comment for why).
-        ///
-        /// SUPERSEDED (VOM design Section 5): no longer called on the live
-        /// Module.cs path - the per-plan CraftingPlanView checkbox
-        /// (`_valueOwnMaterials`) now drives OwnMaterialsMode directly at
-        /// the call site instead. Left in place (dead code, harmless) since
-        /// nothing else calls it and removing a public method is a wider
-        /// change than this design requires.
-        /// </summary>
-        public OwnMaterialsMode GetOwnMaterialsMode()
-        {
-            return ValueOwnMaterials.Value ? OwnMaterialsMode.Valued : OwnMaterialsMode.Free;
-        }
-
         public void ResetToDefaults()
         {
             ModalDialogX.Value = -1;

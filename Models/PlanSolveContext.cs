@@ -143,5 +143,42 @@ namespace GW2CraftingHelper.Models
         /// under the same conditions as the source field.
         /// </summary>
         public IReadOnlyList<SnapshotCharacterDiscipline> CharacterDisciplines { get; set; }
+
+        /// <summary>
+        /// VOM finding #1 fix: the ORIGINAL, unreduced tree from GENERATION
+        /// time (the same `tree` OwnedMaterialsForceBuyPrePass and the
+        /// zero-owned decision pass ran against - see CraftingPlanPipeline's
+        /// Step 5.5/5.6), snapshotted here ONLY when the force-buy pre-pass
+        /// ran (ForceBuyOnlyNodeIds != null) so ResolveWithOverrides can
+        /// re-run InventoryReducer.Reduce with an overrides-aware guide on
+        /// every local re-solve, instead of permanently replaying overrides
+        /// against the ALREADY-reduced Tree above - which froze ingredient
+        /// discounts against the zero-owned decision forever, even after a
+        /// manual override flips a force-buy-flagged node to Craft. Null
+        /// whenever the pre-pass did not run (Free mode, or no snapshot/
+        /// reducer at generation time) - Tree/UsedMaterials above are
+        /// already final and correct in that case, so no re-reduction is
+        /// needed or possible. See AccountIndex/ActiveCharacterName below,
+        /// both populated under the exact same condition as this field.
+        /// </summary>
+        public RecipeNode UnreducedTree { get; set; }
+
+        /// <summary>
+        /// The raw owned-item entries InventoryReducer.Reduce's
+        /// AccountItemIndex was built from at GENERATION time (NOT the
+        /// AccountItemIndex itself - that type lives in the Services
+        /// namespace, and Models deliberately never references Services),
+        /// retained so ResolveWithOverrides can rebuild an identical index
+        /// and re-run reduction against the SAME owned-material pool - see
+        /// UnreducedTree's doc comment for when this is populated.
+        /// </summary>
+        public IReadOnlyList<SnapshotItemEntry> AccountItems { get; set; }
+
+        /// <summary>
+        /// The active character name at GENERATION time, threaded through
+        /// to a re-reduction the same way UnreducedTree/AccountIndex are -
+        /// see UnreducedTree's doc comment.
+        /// </summary>
+        public string ActiveCharacterName { get; set; }
     }
 }

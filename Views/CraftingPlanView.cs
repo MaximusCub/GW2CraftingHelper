@@ -704,7 +704,22 @@ namespace GW2CraftingHelper.Views
             CraftingPlanResult result,
             DateTime generatedAt,
             IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides,
-            IReadOnlyList<int> ignoredItemIds)
+            IReadOnlyList<int> ignoredItemIds,
+            // Post-review fix (VOM finding #4): "Value Own Materials"
+            // checkbox state at the GENERATION time this plan was
+            // persisted (PersistedPlan.ValueOwnMaterials) - restoring it
+            // here is the whole reason that field was added to the schema
+            // (see PersistedPlan.ValueOwnMaterials' own doc comment); it
+            // previously round-tripped to disk and back but was never fed
+            // into the live checkbox, so every restored session silently
+            // reset to the checkbox's construction-time default (true)
+            // regardless of what the user had actually chosen. See
+            // _valueOwnMaterials/_valueOwnMaterialsCheckbox below for where
+            // this is applied. UseOwnMaterials/PriceBasis have the same
+            // pre-existing gap (their live controls are not restored
+            // either) but that is out of scope for this fix - see
+            // docs/KNOWN-ISSUES.md.
+            bool valueOwnMaterials)
         {
             if (result == null) return;
 
@@ -726,6 +741,15 @@ namespace GW2CraftingHelper.Views
             _lastDebugLog = result.DebugLog;
             _currentPlan = vm;
             _planGeneratedAt = generatedAt;
+
+            // Post-review fix (VOM finding #4): restore the checkbox's
+            // backing field AND its displayed Checked state - see this
+            // method's valueOwnMaterials parameter doc comment.
+            _valueOwnMaterials = valueOwnMaterials;
+            if (_valueOwnMaterialsCheckbox != null)
+            {
+                _valueOwnMaterialsCheckbox.Checked = valueOwnMaterials;
+            }
 
             // Culture policy (applies to every ToString(..., CultureInfo.
             // InvariantCulture) timestamp in this file, not just this one):
@@ -1842,7 +1866,13 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, 7),
                 Parent = _controlsPanel
             };
-            _ownMaterialsCheckbox.CheckedChanged += OnOwnMaterialsToggled;
+            // Review-fix: CheckedChanged is wired further down, AFTER
+            // _valueOwnMaterialsCheckbox is constructed below - not here.
+            // OnOwnMaterialsToggled dereferences _valueOwnMaterialsCheckbox
+            // unconditionally in all three of its Enabled-sync sites; wiring
+            // the handler before that field exists would leave a live
+            // handler that NREs on the very first click if construction of
+            // any control between here and there ever throws.
 
             // Price basis selector; applies on the next Generate.
             new Label()
@@ -1885,12 +1915,25 @@ namespace GW2CraftingHelper.Views
                 Checked = _valueOwnMaterials,
                 Enabled = _useOwnMaterials,
                 Location = new Point(350, 7),
-                Parent = _controlsPanel
+                Parent = _controlsPanel,
+                // Review-fix: with this ON, owned materials are priced at
+                // market rate up front - the plan may then tell you to buy
+                // ingredients you already have on hand instead of using
+                // them, whenever a different recipe option is cheaper at
+                // fresh market prices. Off uses whatever you already own
+                // first, even down a pricier path.
+                BasicTooltipText = "Compare recipe options at fresh market prices, as if you owned nothing - may recommend buying materials you already have instead of using them, if a different option is cheaper. Off: always uses what you already own first."
             };
             _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
             {
                 _valueOwnMaterials = e.Checked;
             };
+
+            // Review-fix: wired here (after _valueOwnMaterialsCheckbox
+            // above is fully constructed), not immediately after
+            // _ownMaterialsCheckbox's own construction - see the comment at
+            // that construction site.
+            _ownMaterialsCheckbox.CheckedChanged += OnOwnMaterialsToggled;
 
             _generateButton = new StandardButton()
             {

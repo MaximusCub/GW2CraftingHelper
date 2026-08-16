@@ -4357,10 +4357,23 @@ premise**: the design doc that authored this milestone's plan claimed
 their checkbox's DISPLAYED state across a module restart - inspecting
 `Views/CraftingPlanView.cs::ApplyRestoredPlan` during implementation
 showed this is not actually true (only `Module.cs`'s own on-disk
-round-trip exists; the restored value is never fed back into the live
-checkbox). `PersistedPlan.ValueOwnMaterials` was implemented to match
-the two fields' REAL existing behavior (round-trips to disk, does not
-restore the checkbox) rather than the stated-but-unimplemented premise.
+round-trip exists; the restored value was not fed back into the live
+checkbox).
+
+**Correction (post-review)**: the premise being false was found during
+implementation, but `PersistedPlan.ValueOwnMaterials` was then shipped
+matching that same non-restoring behavior (round-trips to disk, never
+reaches the live checkbox) instead of being wired up - meaning the
+field, and the schema bump that came with it, earned nothing: every
+user's persisted plan would be discarded on upgrade for a value that
+still would not have been restored to the control that mattered.
+**Fixed**: `ApplyRestoredPlan` now takes a `valueOwnMaterials`
+parameter and sets both `_valueOwnMaterials` and (when the tab has
+already been built) `_valueOwnMaterialsCheckbox.Checked` from it -
+`Module.cs`'s restore call site threads `_pendingPlanRestore.
+ValueOwnMaterials` through. `UseOwnMaterials`/`PriceBasis` keep their
+pre-existing (out of scope for this fix) non-restoring behavior - only
+the NEW field this milestone added was in scope.
 
 **Schema bump**: `PersistedPlan.ValueOwnMaterials` (new field) bumped
 `PersistedPlan.CurrentSchemaVersion` from 1 to 2 - the first real
@@ -4371,23 +4384,48 @@ persisted plan is rejected outright by
 Module falls back to its existing "no restored plan" path (empty
 Crafting Plan tab) - a known, already-exercised, safe degrade, not a
 crash. **One-time cost**: every user's currently-persisted plan is
-discarded on first load after this milestone ships.
+discarded on first load after this milestone ships. Now justified by
+the fix above (the field is actually restored to the live control), not
+by a field nobody reads.
 
 **Re-baseline audit** (full suite run, not assumed-green - exactly two
 Valued-mode fixtures' numbers changed, both traced to the audited bug
 fix below, not a regression):
 
 - `CraftingPlanPipelineTests.ResolveWithOverrides_ForceBuyPrePass_ManualOverrideStillWins`:
-  expected `TotalCoinCost` changed 30 -> 150. The fixture's root item is
-  force-buy-flagged (zero-owned decision = `BuyFromTp`), so the guided
-  reduction no longer phantom-consumes its owned ingredient stock down
-  the never-chosen craft branch. Manually overriding that branch back to
-  Craft afterward now correctly re-prices the FULL, non-owned-discounted
-  ingredient cost (the branch was genuinely never reduced) instead of a
-  phantom-discounted number - a known, accepted limitation of the
-  override-replays-against-a-fixed-tree architecture (an override away
-  from a Buy-decided branch can never retroactively discount ingredients
-  reduction correctly skipped), not a new regression.
+  **correction (post-review)** - an earlier draft of this entry
+  re-baselined this test's expected `TotalCoinCost` from 30 to 150 and
+  described the new number as "a known, accepted limitation of the
+  override-replays-against-a-fixed-tree architecture... not a new
+  regression." That framing was WRONG: 30 was the correct, real-world
+  number (master already returned it), and 150 was a genuine regression
+  this same milestone introduced, not a pre-existing limitation - the
+  fixture's root item is force-buy-flagged (zero-owned decision =
+  `BuyFromTp`), so the guided reduction correctly never discounts its
+  owned ingredient stock down the never-chosen craft branch at
+  GENERATION time; but `ResolveWithOverrides` used to replay a manual
+  override to Craft against that same frozen, never-discounted tree,
+  showing the user a plan to buy 5x item 2 for 150 coin when they
+  actually own 4 of the 5 needed and would really spend 30. **Fixed**:
+  `PlanSolveContext` now also snapshots the GENERATION-time unreduced
+  tree (`UnreducedTree`) and the raw account items/character
+  (`AccountItems`/`ActiveCharacterName`) whenever the force-buy pre-pass
+  ran. `ResolveWithOverrides` uses them to re-run the SAME zero-owned-
+  decision-pass-then-`Reduce` dance `GenerateStructuredAsync` uses at
+  generation time, but with `overrides`/`ignoredItemIds` folded into the
+  decision pass, so a node an override flips to Craft gets its
+  ingredients correctly re-discounted against the user's real owned
+  stock. `TotalCoinCost` for this test is back to 30, matching master.
+  Falls back to the old frozen-`context.Tree` behavior verbatim
+  whenever the pre-pass did not run at generation time (Free mode, or
+  no snapshot) - no change to that path. **Cost note**: `PlanSolveContext`
+  (persisted to disk verbatim as part of `PersistedPlan.Result.
+  SolveContext` - see `PlanStoreHelpers`) now also carries
+  `UnreducedTree` whenever the pre-pass ran, roughly doubling the
+  tree-shaped portion of a Valued-mode-with-snapshot plan's persisted
+  JSON (Metadata/Prices/VendorOffers are unaffected - same reference,
+  not duplicated). Not measured against a real large tree; accepted as
+  the cost of correctness on this path, not optimized.
 - `MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostIsWholeTreeSum`:
   `MaterialOpportunityCost` changed from a non-zero phantom credit to
   `null` throughout (standalone and batch) - the bought root's owned
@@ -4423,8 +4461,8 @@ contract-mirror or fake-logic tests):
   ingredient - proves the winning choice does not flip toward the
   listed-first option). Two design test-plan bullets are satisfied by
   already-existing/already-updated tests rather than new duplicates:
-  the manual-override-still-wins case by the re-baselined
-  `ResolveWithOverrides_ForceBuyPrePass_ManualOverrideStillWins` above,
+  the manual-override-still-wins case by (following the correction
+  above) `ResolveWithOverrides_ForceBuyPrePass_ManualOverrideStillWins`,
   and the Free-mode regression pin by the pre-existing
   `Structured_FreeMode_SameOwnershipScenario_CraftsFromReducedRemainder`
   (stayed green unchanged, since Free mode never builds a guide).
@@ -4461,6 +4499,29 @@ precursor tree - consistent with the design doc's own risk assessment
 No cross-call memoization exists in `PlanSolver` today (a fresh
 `Dictionary` every call), so this cost is linear in tree size and would
 scale accordingly on a substantially larger tree than tested here.
+
+**Known residual (post-review, not guarded/tested)**: the decision-
+invariance guarantee above is narrower than earlier drafts of this
+entry (and `InventoryReducer`'s own doc comments) claimed. The guide
+is computed on the UNREDUCED tree, but a node's OWN Quantity can still
+shrink from owned stock of that node's own item id (unrelated to the
+guide), and craft cost is non-linear in quantity
+(`ComputeCraftsNeeded`'s ceiling division, `VendorBatchSolver`'s
+per-batch math) - so shrinking a node's own Quantity can raise its
+effective per-unit cost enough to flip the REAL (post-reduction) solve's
+decision for THAT node away from what the guide assumed, after its
+ingredients were already discounted and written into `UsedMaterials`
+against the guide's Craft assumption. This is the audited row-31
+phantom-`UsedMaterials` bug re-entering through a second door. Requires
+a node with owned stock of ITSELF plus owned stock of its own
+ingredients, and a recipe/vendor batch whose output count is greater
+than 1 - not exercised by any existing fixture. See
+`InventoryReducer.ReduceNode`'s doc comment for the precise mechanism.
+Left undone (not treated as blocking this milestone) rather than
+attempting a fix: closing it properly needs the same
+"solve-then-detect-a-flip-then-re-reduce" shape as the `ResolveWithOverrides`
+fix above, applied to `GenerateStructuredAsync`/`GenerateStructuredMultiAsync`
+themselves - a real design change, not a small guard.
 
 Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - clean,
 0 errors (StyleCop warning count unchanged from before this milestone -

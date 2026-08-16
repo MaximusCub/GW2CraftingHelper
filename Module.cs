@@ -886,7 +886,8 @@ namespace GW2CraftingHelper
                             _pendingPlanRestore.Result,
                             _pendingPlanRestore.GeneratedAt,
                             _pendingPlanRestore.NodeOverrides,
-                            _pendingPlanRestore.IgnoredItemIds);
+                            _pendingPlanRestore.IgnoredItemIds,
+                            _pendingPlanRestore.ValueOwnMaterials);
                     }
                 }
             }

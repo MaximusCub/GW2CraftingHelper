@@ -1227,6 +1227,91 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
+        /// Post-review coverage gap fix: every Valued-mode multi-item
+        /// assertion above (this class) exercised a wrapper root whose
+        /// guide decision was Buy - so `UsedMaterials`/
+        /// `MaterialOpportunityCost` were always asserted NULL/empty, and
+        /// the one test that DOES prove owned stock is drained through the
+        /// synthetic wrapper
+        /// (GenerateStructuredAsync_MultiItem_WithSnapshot_SharedOwnedRawMaterial_PoolDrainsAcrossRootsInRequestOrder
+        /// above) calls GenerateStructuredAsync WITHOUT ownMaterialsMode,
+        /// which defaults to Free and never builds a guide at all. Net
+        /// effect: positive owned-material crediting through the wrapper in
+        /// Valued mode had zero coverage - if the wrapper root's guide
+        /// decision were ever not Craft-with-matching-RecipeId, ALL
+        /// owned-material crediting in multi-item Valued mode would
+        /// silently vanish and the whole suite would still be green.
+        ///
+        /// Reuses BuildBuyVsCraftPipeline's exact fixture (root 1100 always
+        /// buys, root 1200 always crafts - see that method's own doc
+        /// comment) but this time owns root 1200's OWN craft ingredient
+        /// (1201, fully - exactly the 1 unit its recipe needs) instead of
+        /// root 1100's. Since 1200's zero-owned decision is Craft, the
+        /// guided reduction (InventoryReducer.Reduce's zeroOwnedDecisions
+        /// parameter) must let this owned unit be consumed - proving the
+        /// positive-crediting path actually works through the multi-item
+        /// wrapper, not merely that the negative (Buy-decided, no
+        /// crediting) path does.
+        /// </summary>
+        [Fact]
+        public async Task GenerateStructuredAsync_MultiItem_ValuedMode_CraftDecidedRootOwnedIngredientIsCreditedThroughWrapper()
+        {
+            var pipeline = BuildBuyVsCraftPipeline();
+
+            // Own exactly the 1 unit of item 1201 that root 1200's recipe
+            // needs (root 1100 owns nothing of its own ingredient, 1101).
+            var snapshot = new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry { ItemId = 1201, Count = 1, Source = AccountItemIndex.SourceMaterialStorage }
+                }
+            };
+
+            var standalone1200 = await pipeline.GenerateStructuredAsync(
+                1200, 1, snapshot, CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued, priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(CraftingDecision.Craft, standalone1200.CraftingTree.Decision);
+            var standaloneUsed = Assert.Single(standalone1200.UsedMaterials);
+            Assert.Equal(1201, standaloneUsed.ItemId);
+            Assert.Equal(1, standaloneUsed.QuantityUsed);
+            // NetSaleRevenue(unitPrice: 5 [1201's SellInstant, the raw
+            // buyUnitPrice param - see BuildBuyVsCraftPipeline], quantity: 1)
+            // = 5 - max(1, round(5*5%)) - max(1, round(5*10%)) = 5 - 1 - 1 = 3.
+            Assert.Equal(3, standalone1200.MaterialOpportunityCost);
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1100, Quantity = 1 },
+                new PlanRequestItem { ItemId = 1200, Quantity = 1 }
+            };
+
+            var batch = await pipeline.GenerateStructuredAsync(
+                items, snapshot, CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued, priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, batch.MultiItemRoots[0].Decision);
+            Assert.Equal(CraftingDecision.Craft, batch.MultiItemRoots[1].Decision);
+
+            // The wrapper's SHARED reduction pool credited root 1200's
+            // owned ingredient exactly as the standalone solve did - proof
+            // that positive owned-material crediting survives the
+            // multi-item wrapper in Valued mode, not just the Buy-decided
+            // (nothing-credited) case every other Valued-mode multi-item
+            // test in this class covers.
+            var batchUsed = Assert.Single(batch.UsedMaterials);
+            Assert.Equal(1201, batchUsed.ItemId);
+            Assert.Equal(1, batchUsed.QuantityUsed);
+            Assert.Equal(3, batch.MaterialOpportunityCost);
+            // Root 1100 still buys outright at 50 coin; root 1200 needs no
+            // purchase at all (its one ingredient came entirely from
+            // inventory) - matching the standalone sum.
+            Assert.Equal(50, batch.Plan.TotalCoinCost);
+            Assert.DoesNotContain(batch.Plan.Steps, s => s.ItemId == 1201);
+        }
+
+        /// <summary>
         /// M37 review finding: no committed test exercised
         /// ApplyBatchSellSideEconomics' per-root ItemCraftCost summation
         /// when two qualifying (crafted + tradable) roots share a cost

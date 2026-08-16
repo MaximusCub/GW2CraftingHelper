@@ -1277,6 +1277,56 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(5, reducedOptionB.Ingredients[0].Quantity);
         }
 
+        [Fact]
+        public void StaleRecipeIdInGuide_NoOptionMatches_SuppressesAllConsumptionForThatNode()
+        {
+            // Post-review coverage gap fix: a guide entry present FOR this
+            // node's NodeId, with Source == Craft, but whose RecipeId
+            // matches NEITHER option (a stale/UnknownSource guide entry -
+            // e.g. the tree's recipe options changed between the guide
+            // solve and this Reduce call, which should never happen in
+            // production but is not structurally prevented by the
+            // IReadOnlyDictionary<int, SolverDecision> parameter type).
+            // Unlike a NodeId genuinely missing from the guide (which falls
+            // back to the legacy i==0-primary-option heuristic - see
+            // MissingNodeInGuide_FallsBackToPrimaryHeuristic above), THIS
+            // case still counts as `hasGuide == true` (the NodeId IS
+            // present), so optionConsumes is false for EVERY option (none
+            // has option.RecipeId == 999) - no fallback, no consumption at
+            // all for this node's descendants. Pinning this as documented,
+            // intentional behavior (see ReduceNode's own doc comment),
+            // NOT a bug.
+            var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
+            optionA.Ingredients.Add(Leaf(2, 5));
+            var optionB = new RecipeOption { RecipeId = 20, OutputCount = 1, CraftsNeeded = 1 };
+            optionB.Ingredients.Add(Leaf(2, 5));
+
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                NodeId = 1,
+                Recipes = new List<RecipeOption> { optionA, optionB }
+            };
+
+            var guide = new Dictionary<int, SolverDecision>
+            {
+                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 999 } }
+            };
+
+            var pool = new Dictionary<int, int> { { 2, 5 } };
+            var result = _reducer.Reduce(tree, pool, guide);
+
+            var reducedOptionA = result.ReducedTree.Recipes[0];
+            var reducedOptionB = result.ReducedTree.Recipes[1];
+
+            // Neither option consumed the pool - not even the primary one.
+            Assert.Equal(5, reducedOptionA.Ingredients[0].Quantity);
+            Assert.Equal(5, reducedOptionB.Ingredients[0].Quantity);
+            Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
+        }
+
         // ---- Sourced_ mirrors (AccountItemIndex overload - the actual
         // production code path) ----
 
@@ -1368,6 +1418,95 @@ namespace GW2CraftingHelper.Tests.Services
             // ingredient's Quantity rescales to 2 unconditionally; only its
             // pool consumption (5 owned units, untouched) is guide-gated.
             Assert.Equal(2, result.ReducedTree.Recipes[0].Ingredients[0].Quantity);
+            Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
+        }
+
+        [Fact]
+        public void Sourced_MissingNodeInGuide_FallsBackToPrimaryHeuristic()
+        {
+            // Post-review coverage gap fix: MissingNodeInGuide_
+            // FallsBackToPrimaryHeuristic above pins this defensive
+            // fallback only on the flat-Dictionary overload - production
+            // exclusively calls the AccountItemIndex-sourced overload this
+            // class mirrors (see ReduceNodeSourced's own doc comment,
+            // which claims "identical reasoning" without a dedicated pin).
+            var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
+            optionA.Ingredients.Add(Leaf(2, 5));
+            var optionB = new RecipeOption { RecipeId = 20, OutputCount = 1, CraftsNeeded = 1 };
+            optionB.Ingredients.Add(Leaf(2, 5));
+
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                NodeId = 1,
+                Recipes = new List<RecipeOption> { optionA, optionB }
+            };
+
+            // Guide references a totally different NodeId (99) - this
+            // node's own NodeId (1) is absent from it.
+            var guide = new Dictionary<int, SolverDecision>
+            {
+                { 99, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null, guide);
+
+            var reducedOptionA = result.ReducedTree.Recipes[0];
+            var reducedOptionB = result.ReducedTree.Recipes[1];
+
+            // Primary option's ingredient fully covered by the pool (legacy
+            // heuristic), alternate option untouched - same as the
+            // flat-Dictionary mirror.
+            Assert.Equal(0, reducedOptionA.Ingredients[0].Quantity);
+            Assert.Equal(5, reducedOptionB.Ingredients[0].Quantity);
+        }
+
+        [Fact]
+        public void Sourced_StaleRecipeIdInGuide_NoOptionMatches_SuppressesAllConsumptionForThatNode()
+        {
+            // Sourced mirror of StaleRecipeIdInGuide_NoOptionMatches_
+            // SuppressesAllConsumptionForThatNode above - see that test's
+            // own doc comment for the full rationale. Pinned on the
+            // production AccountItemIndex overload too, since this is the
+            // path a stale guide entry would actually be hit through.
+            var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
+            optionA.Ingredients.Add(Leaf(2, 5));
+            var optionB = new RecipeOption { RecipeId = 20, OutputCount = 1, CraftsNeeded = 1 };
+            optionB.Ingredients.Add(Leaf(2, 5));
+
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                NodeId = 1,
+                Recipes = new List<RecipeOption> { optionA, optionB }
+            };
+
+            var guide = new Dictionary<int, SolverDecision>
+            {
+                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 999 } }
+            };
+
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+
+            var result = _reducer.Reduce(tree, index, null, guide);
+
+            var reducedOptionA = result.ReducedTree.Recipes[0];
+            var reducedOptionB = result.ReducedTree.Recipes[1];
+
+            Assert.Equal(5, reducedOptionA.Ingredients[0].Quantity);
+            Assert.Equal(5, reducedOptionB.Ingredients[0].Quantity);
             Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
         }
     }

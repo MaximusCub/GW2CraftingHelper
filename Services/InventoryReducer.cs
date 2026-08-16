@@ -69,9 +69,28 @@ namespace GW2CraftingHelper.Services
         ///   ingredients, mirroring PlanSolver.Evaluate's own
         ///   ignoredItemIds/Quantity==0 handling elsewhere in this codebase.
         ///   Since discounting only ever lowers a cost, and only along the
-        ///   path the zero-owned pass already declared the winner, the real
-        ///   (post-reduction) Solve() can never be pulled toward a path that
-        ///   was worse at market prices - only made an even stronger winner.
+        ///   path the zero-owned pass already declared the winner, owned
+        ///   ingredient stock further down the tree can never pull the real
+        ///   (post-reduction) Solve() toward a DIFFERENT recipe option than
+        ///   the guide chose for this node.
+        ///
+        ///   KNOWN RESIDUAL (not guarded/tested - see docs/KNOWN-ISSUES.md):
+        ///   this does NOT guarantee the guide's Source/Craft-vs-Buy
+        ///   decision for THIS node itself still holds after reduction. The
+        ///   guide is computed on the UNREDUCED tree, but this node's OWN
+        ///   Quantity (above, via consumeFromPool on the CALLER's side) can
+        ///   still shrink here from owned stock of the node's own item id -
+        ///   and because craft cost is non-linear in quantity
+        ///   (ComputeCraftsNeeded's ceiling division, and
+        ///   VendorBatchSolver's per-batch math), shrinking a node's own
+        ///   Quantity can raise its effective per-unit cost enough to flip
+        ///   the REAL solve's decision for this node away from what the
+        ///   guide assumed (e.g. Craft -&gt; Buy) - after this node's
+        ///   ingredients were already discounted and written into
+        ///   UsedMaterials against the guide's Craft assumption. Requires a
+        ///   node with owned stock of ITSELF plus owned stock of its own
+        ///   ingredients, and a recipe/vendor batch whose output count is
+        ///   greater than 1.
         /// - Legacy heuristic (M34-B2a #2, gw2e parity / M1 Finding 5): used
         ///   whenever <paramref name="zeroOwnedDecisions"/> is null (every
         ///   pre-VOM caller/test) OR does not contain this node's NodeId
@@ -146,8 +165,17 @@ namespace GW2CraftingHelper.Services
             }
 
             SolverDecision guideDecision = null;
+            // Review-fix: Reduce is public API with an IReadOnlyDictionary
+            // parameter - PlanSolver never emits a null VALUE, but nothing
+            // stops a caller from doing so. TryGetValue alone returns true
+            // for an entry whose value IS null, and the code below
+            // dereferences guideDecision.Source unconditionally whenever
+            // hasGuide is true - the extra null check keeps a
+            // maliciously/accidentally null-valued entry falling back to
+            // the safe legacy heuristic instead of throwing.
             bool hasGuide = zeroOwnedDecisions != null &&
-                zeroOwnedDecisions.TryGetValue(node.NodeId, out guideDecision);
+                zeroOwnedDecisions.TryGetValue(node.NodeId, out guideDecision) &&
+                guideDecision != null;
 
             for (int i = 0; i < node.Recipes.Count; i++)
             {
@@ -317,8 +345,17 @@ namespace GW2CraftingHelper.Services
             }
 
             SolverDecision guideDecision = null;
+            // Review-fix: Reduce is public API with an IReadOnlyDictionary
+            // parameter - PlanSolver never emits a null VALUE, but nothing
+            // stops a caller from doing so. TryGetValue alone returns true
+            // for an entry whose value IS null, and the code below
+            // dereferences guideDecision.Source unconditionally whenever
+            // hasGuide is true - the extra null check keeps a
+            // maliciously/accidentally null-valued entry falling back to
+            // the safe legacy heuristic instead of throwing.
             bool hasGuide = zeroOwnedDecisions != null &&
-                zeroOwnedDecisions.TryGetValue(node.NodeId, out guideDecision);
+                zeroOwnedDecisions.TryGetValue(node.NodeId, out guideDecision) &&
+                guideDecision != null;
 
             for (int i = 0; i < node.Recipes.Count; i++)
             {
