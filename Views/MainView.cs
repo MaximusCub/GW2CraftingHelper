@@ -619,12 +619,28 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Composes the header status label's text (base status text plus
-        /// a staleness-age suffix, e.g. "Updated - 3:41 PM (2m ago)") and
-        /// recolors it once the snapshot is older than
+        /// a staleness-age suffix, e.g. "Updated - Aug 15, 2026 3:41 PM
+        /// (2m ago)") and recolors it once the snapshot is older than
         /// <see cref="StaleThreshold"/>. Called from every place the
         /// status text or the snapshot itself changes (Build's initial
         /// render, SetSnapshot, SetStatus) so the two can never drift out
         /// of sync with each other.
+        /// <para>
+        /// Review fix: the composed text is capped to the run of
+        /// _headerPanel actually free before _clearButton's left edge.
+        /// Adding the capture date to every status string (RefreshNowAsync's
+        /// "Updated"/"Cache Cleared" strings, StatusText.ForRefreshFailure's
+        /// callers) plus this method's own "(Nh Nm ago)" suffix can together
+        /// exceed that run at the window's clamped 930x710 minimum size
+        /// (Module.cs's ResizableTabbedWindow.HandleWindowResize) - since
+        /// _clearButton/_refreshButton are added to _headerPanel AFTER this
+        /// label, they paint over its tail rather than the label clipping
+        /// itself. _clearButton.Location.X is kept current by
+        /// OnPanelResized on every resize tick, so this reads the
+        /// up-to-date free run whenever text actually changes. Reuses
+        /// LabelHelpers.EllipsizeToWidth, the same truncation the Crafting
+        /// Plan tab's row labels already use - no new truncation logic.
+        /// </para>
         /// </summary>
         private void ApplyStatusDisplay()
         {
@@ -644,7 +660,8 @@ namespace GW2CraftingHelper.Views
                 _statusLabel.TextColor = _defaultStatusColor;
             }
 
-            _statusLabel.Text = text;
+            int maxWidth = _clearButton.Location.X - _statusLabel.Location.X - 10;
+            _statusLabel.Text = LabelHelpers.EllipsizeToWidth(GameService.Content.DefaultFont14, text, maxWidth);
         }
 
         /// <summary>
