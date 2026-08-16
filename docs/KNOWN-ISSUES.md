@@ -4616,4 +4616,4 @@ I/O. IDs remain internal-only - the new/changed hint text never
 surfaces an item id. No live desktop verification was performed (same
 Blish-bound surface as PART A/B/C).
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: not yet run live - queued for the next batched desktop session. Merged after the full review pipeline resolved every finding, under the maintainer's standing merge directive (2026-08-16).
