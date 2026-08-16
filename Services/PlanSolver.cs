@@ -62,6 +62,15 @@ namespace GW2CraftingHelper.Services
             public long? ComparisonValue;
             public int RecipeId;
             public List<CostLine> VendorCurrencyCosts;
+
+            // W4B: see SolverDecision.VendorItemCosts/VendorHasRawCoin's own
+            // doc comments - straight passthrough of
+            // VendorBatchSolver.VendorOfferEvaluation's matching fields for
+            // whichever offer (comparable or fallback) this decision
+            // committed to.
+            public List<VendorItemCostLine> VendorItemCosts;
+            public bool VendorHasRawCoin;
+
             public bool CanCraft;
             public bool CanBuyTp;
             public bool CanBuyVendor;
@@ -278,6 +287,8 @@ namespace GW2CraftingHelper.Services
                     RecipeId = kvp.Value.RecipeId,
                     TotalCost = kvp.Value.TotalCost,
                     VendorCurrencyCosts = kvp.Value.VendorCurrencyCosts,
+                    VendorItemCosts = kvp.Value.VendorItemCosts,
+                    VendorHasRawCoin = kvp.Value.VendorHasRawCoin,
                     CanCraft = kvp.Value.CanCraft,
                     CanBuyTp = kvp.Value.CanBuyTp,
                     CanBuyVendor = kvp.Value.CanBuyVendor
@@ -376,6 +387,13 @@ namespace GW2CraftingHelper.Services
             long? fallbackVendorCoinCost = vendorEvaluation.FallbackCoinCost;
             List<CostLine> fallbackVendorCurrencyCosts = vendorEvaluation.FallbackCurrencyCosts;
             VendorBatchSolver.VendorOfferBatch? fallbackVendorBatch = vendorEvaluation.FallbackBatch;
+
+            // W4B: see SolverDecision.VendorItemCosts/VendorHasRawCoin's doc
+            // comments.
+            List<VendorItemCostLine> comparableVendorItemCosts = vendorEvaluation.BestComparableItemCosts;
+            bool comparableVendorHasRawCoin = vendorEvaluation.BestComparableHasRawCoin;
+            List<VendorItemCostLine> fallbackVendorItemCosts = vendorEvaluation.FallbackItemCosts;
+            bool fallbackVendorHasRawCoin = vendorEvaluation.FallbackHasRawCoin;
 
             // Evaluate recipe options. EVERY non-currency ingredient of
             // EVERY recipe is always evaluated (M33 Finding 1 fix) - no
@@ -510,7 +528,13 @@ namespace GW2CraftingHelper.Services
             long? Commit(
                 AcquisitionSource src, long? cost, long? comparisonValue,
                 int recipeId, List<CostLine> vendorCurrencyCosts,
-                VendorBatchSolver.VendorOfferBatch? vendorBatch = null)
+                VendorBatchSolver.VendorOfferBatch? vendorBatch = null,
+                // W4B: only ever passed non-default by the 3 BuyFromVendor
+                // call sites below - every Craft/BuyFromTp/UnknownSource
+                // Commit call keeps the defaults (null/false), same as they
+                // already do for vendorCurrencyCosts/vendorBatch above.
+                List<VendorItemCostLine> vendorItemCosts = null,
+                bool vendorHasRawCoin = false)
             {
                 memo[node.NodeId] = new Decision
                 {
@@ -519,6 +543,8 @@ namespace GW2CraftingHelper.Services
                     ComparisonValue = comparisonValue,
                     RecipeId = recipeId,
                     VendorCurrencyCosts = vendorCurrencyCosts,
+                    VendorItemCosts = vendorItemCosts,
+                    VendorHasRawCoin = vendorHasRawCoin,
                     CanCraft = canCraft,
                     CanBuyTp = canBuyTp,
                     CanBuyVendor = canBuyVendor,
@@ -543,8 +569,8 @@ namespace GW2CraftingHelper.Services
                 if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
                 {
                     return comparableVendorValue.HasValue
-                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch)
-                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch);
+                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch, comparableVendorItemCosts, comparableVendorHasRawCoin)
+                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch, fallbackVendorItemCosts, fallbackVendorHasRawCoin);
                 }
             }
 
@@ -557,7 +583,7 @@ namespace GW2CraftingHelper.Services
 
             if (source == AcquisitionSource.BuyFromVendor)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch);
+                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch, comparableVendorItemCosts, comparableVendorHasRawCoin);
             }
 
             if (source == AcquisitionSource.BuyFromTp)
@@ -581,7 +607,7 @@ namespace GW2CraftingHelper.Services
             // crafted" - no recipe, no price, genuinely no known source.
             if (fallbackVendorCoinCost.HasValue)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch);
+                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch, fallbackVendorItemCosts, fallbackVendorHasRawCoin);
             }
 
             return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);

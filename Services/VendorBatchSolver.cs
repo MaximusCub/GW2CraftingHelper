@@ -97,6 +97,28 @@ namespace GW2CraftingHelper.Services
             public readonly List<CostLine> FallbackCurrencyCosts;
             public readonly VendorOfferBatch? FallbackBatch;
 
+            // W4B (vendor cost-component leaves): additive outputs alongside
+            // the pre-existing fields above - captured at the SAME per-line
+            // multiplication EvaluateVendorOffers already performed for
+            // every offer (never a second/divergent computation), purely so
+            // a display-tree leaf can be built from real, already-computed
+            // numbers. BestComparableItemCosts/FallbackItemCosts are the
+            // winning offer's TP-valued Item cost lines (Type=="Item" on the
+            // raw offer), scaled to this occurrence's unitsNeeded - null
+            // when the winning offer had none. BestComparableHasRawCoin/
+            // FallbackHasRawCoin report only whether the winning offer had a
+            // genuine raw coin cost line (Type=="Currency",
+            // Id==Gw2Constants.CoinCurrencyId) with Count > 0 - distinct
+            // from an item-folded coin contribution - so a caller can tell
+            // "coin" apart from "item money" as its own cost KIND without
+            // re-deriving it from TotalCost (which mixes both). Neither
+            // field changes any existing comparison/selection/scaling
+            // logic in this method.
+            public readonly List<VendorItemCostLine> BestComparableItemCosts;
+            public readonly bool BestComparableHasRawCoin;
+            public readonly List<VendorItemCostLine> FallbackItemCosts;
+            public readonly bool FallbackHasRawCoin;
+
             public VendorOfferEvaluation(
                 long? bestComparableValue,
                 long? bestComparableCoinCost,
@@ -104,7 +126,11 @@ namespace GW2CraftingHelper.Services
                 VendorOfferBatch? bestComparableBatch,
                 long? fallbackCoinCost,
                 List<CostLine> fallbackCurrencyCosts,
-                VendorOfferBatch? fallbackBatch)
+                VendorOfferBatch? fallbackBatch,
+                List<VendorItemCostLine> bestComparableItemCosts = null,
+                bool bestComparableHasRawCoin = false,
+                List<VendorItemCostLine> fallbackItemCosts = null,
+                bool fallbackHasRawCoin = false)
             {
                 BestComparableValue = bestComparableValue;
                 BestComparableCoinCost = bestComparableCoinCost;
@@ -113,6 +139,10 @@ namespace GW2CraftingHelper.Services
                 FallbackCoinCost = fallbackCoinCost;
                 FallbackCurrencyCosts = fallbackCurrencyCosts;
                 FallbackBatch = fallbackBatch;
+                BestComparableItemCosts = bestComparableItemCosts;
+                BestComparableHasRawCoin = bestComparableHasRawCoin;
+                FallbackItemCosts = fallbackItemCosts;
+                FallbackHasRawCoin = fallbackHasRawCoin;
             }
         }
 
@@ -180,6 +210,12 @@ namespace GW2CraftingHelper.Services
             long fallbackCurrencyUnits = 0;
             int fallbackSingleCurrencyId = -1;
 
+            // W4B: see VendorOfferEvaluation's own doc comment.
+            List<VendorItemCostLine> bestComparableItemCosts = null;
+            bool bestComparableHasRawCoin = false;
+            List<VendorItemCostLine> fallbackItemCosts = null;
+            bool fallbackHasRawCoin = false;
+
             if (vendorOffers == null ||
                 !vendorOffers.TryGetValue(node.Id, out var offers))
             {
@@ -225,6 +261,20 @@ namespace GW2CraftingHelper.Services
                 bool priceable = true;
                 var currencyCosts = new List<CostLine>();
 
+                // W4B: raw (unscaled, per-batch) capture of this offer's
+                // coin-presence and Item cost lines, purely additive - read
+                // alongside the existing coinCost fold below, never
+                // altering it. hasRawCoin distinguishes a genuine coin cost
+                // line from coin that only exists because an Item line was
+                // folded in (see VendorOfferEvaluation.BestComparableHasRawCoin's
+                // doc comment). itemCostRaw's (Count, UnitPrice) pair is
+                // exactly what already fed the `coinCost += cost.Count *
+                // unitPrice` line below - captured here so a display leaf
+                // can be built from it after unitsNeeded scaling, without
+                // ever recomputing the multiplication.
+                bool hasRawCoin = false;
+                List<(int ItemId, int Count, int UnitPrice)> itemCostRaw = null;
+
                 foreach (var cost in offer.CostLines ?? Enumerable.Empty<CostLine>())
                 {
                     if (string.Equals(cost.Type, "Currency", StringComparison.Ordinal))
@@ -232,6 +282,10 @@ namespace GW2CraftingHelper.Services
                         if (cost.Id == Gw2Constants.CoinCurrencyId)
                         {
                             coinCost += (long)cost.Count;
+                            if (cost.Count > 0)
+                            {
+                                hasRawCoin = true;
+                            }
                         }
                         else
                         {
@@ -246,6 +300,8 @@ namespace GW2CraftingHelper.Services
                         if (unitPrice > 0)
                         {
                             coinCost += (long)cost.Count * unitPrice;
+                            (itemCostRaw ?? (itemCostRaw = new List<(int, int, int)>()))
+                                .Add((cost.Id, cost.Count, unitPrice));
                         }
                         else
                         {
@@ -263,6 +319,43 @@ namespace GW2CraftingHelper.Services
                 int unitsNeeded = (int)Math.Ceiling((double)node.Quantity / offer.OutputCount);
 
                 long totalCoinCost = coinCost * unitsNeeded;
+
+                // W4B: scale itemCostRaw by this occurrence's unitsNeeded -
+                // the exact same scale factor totalCoinCost above just
+                // applied. GoldValue below is (unscaled Count * unitPrice)
+                // * unitsNeeded, i.e. byte-for-byte the same arithmetic
+                // that line's own contribution to totalCoinCost already
+                // used - never a second, potentially-diverging computation.
+                // Guarded the same way the currency scaling below guards
+                // CostLine.Count (int): a scaled quantity too large for
+                // VendorItemCostLine.Quantity (int) skips the offer rather
+                // than truncating it silently.
+                List<VendorItemCostLine> scaledItemCosts = null;
+                bool itemsScalable = true;
+                if (itemCostRaw != null)
+                {
+                    scaledItemCosts = new List<VendorItemCostLine>(itemCostRaw.Count);
+                    foreach (var ic in itemCostRaw)
+                    {
+                        long scaledQty = (long)ic.Count * unitsNeeded;
+                        if (scaledQty > int.MaxValue)
+                        {
+                            itemsScalable = false;
+                            break;
+                        }
+                        scaledItemCosts.Add(new VendorItemCostLine
+                        {
+                            ItemId = ic.ItemId,
+                            Quantity = (int)scaledQty,
+                            GoldValue = (long)ic.Count * unitsNeeded * ic.UnitPrice
+                        });
+                    }
+                }
+
+                if (!itemsScalable)
+                {
+                    continue;
+                }
 
                 // Scale and value the non-coin currency lines (no-op for a
                 // pure-coin offer, which has none). allValued stays
@@ -343,6 +436,8 @@ namespace GW2CraftingHelper.Services
                         bestComparableValue = comparisonValue;
                         bestComparableCoinCost = totalCoinCost;
                         bestComparableCurrencyCosts = scaledCurrencyCosts;
+                        bestComparableItemCosts = scaledItemCosts;
+                        bestComparableHasRawCoin = hasRawCoin;
                         bestComparableBatch = new VendorOfferBatch
                         {
                             OutputCount = offer.OutputCount,
@@ -374,6 +469,8 @@ namespace GW2CraftingHelper.Services
                     fallbackCurrencyCosts = scaledCurrencyCosts;
                     fallbackCurrencyUnits = totalCurrencyUnits;
                     fallbackSingleCurrencyId = singleCurrencyId;
+                    fallbackItemCosts = scaledItemCosts;
+                    fallbackHasRawCoin = hasRawCoin;
                     fallbackBatch = new VendorOfferBatch
                     {
                         OutputCount = offer.OutputCount,
@@ -393,7 +490,11 @@ namespace GW2CraftingHelper.Services
                 bestComparableBatch,
                 fallbackCoinCost,
                 fallbackCurrencyCosts,
-                fallbackBatch);
+                fallbackBatch,
+                bestComparableItemCosts,
+                bestComparableHasRawCoin,
+                fallbackItemCosts,
+                fallbackHasRawCoin);
         }
 
         /// <summary>

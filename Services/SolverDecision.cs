@@ -16,6 +16,29 @@ namespace GW2CraftingHelper.Services
         // A later display task threads this into the tree/shopping UI.
         public IReadOnlyList<CostLine> VendorCurrencyCosts { get; internal set; }
 
+        // W4B (vendor cost-component leaves): TP-valued Item cost lines of
+        // a winning BuyFromVendor decision (e.g. Globs of Ectoplasm),
+        // already scaled to this occurrence's own quantity - null/empty for
+        // every other Source, and also null for a BuyFromVendor decision
+        // whose offer had no Item cost lines at all. Each entry's GoldValue
+        // is the exact amount already folded into TotalCost for that line
+        // (see VendorItemCostLine's own doc comment) - CraftingTreeBuilder
+        // reads this to synthesize display-only cost-component leaves
+        // without ever recomputing the fold.
+        public IReadOnlyList<VendorItemCostLine> VendorItemCosts { get; internal set; }
+
+        // W4B: true only when the winning BuyFromVendor decision's offer
+        // had a genuine raw coin cost line (Type=="Currency",
+        // Id==Gw2Constants.CoinCurrencyId, Count > 0) - distinct from coin
+        // that exists only because an Item cost line got TP-valued and
+        // folded in. False for every other Source. Used solely to decide
+        // whether "coin" counts as one of the offer's 2+ cost KINDS when
+        // deciding whether to synthesize component leaves (see
+        // CraftingTreeBuilder.BuildVendorCostComponentLeaves) - a raw coin
+        // component never gets its own leaf either way (see that method's
+        // doc comment for why).
+        public bool VendorHasRawCoin { get; internal set; }
+
         // Which acquisition paths were feasible for this node, independent
         // of which one was chosen. Drives the per-node override UI.
         //
