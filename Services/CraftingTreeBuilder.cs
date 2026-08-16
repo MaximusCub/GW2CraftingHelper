@@ -193,6 +193,11 @@ namespace GW2CraftingHelper.Services
             treeNode.CanCraft = decision.CanCraft;
             treeNode.CanBuyTp = decision.CanBuyTp;
             treeNode.CanBuyVendor = decision.CanBuyVendor;
+            // source-selection-simplification: see CraftingTreeNode's own
+            // matching field doc comments.
+            treeNode.CraftCostBreakdown = decision.CraftCostBreakdown;
+            treeNode.BuyFromTpCostBreakdown = decision.BuyFromTpCostBreakdown;
+            treeNode.BuyFromVendorCostBreakdown = decision.BuyFromVendorCostBreakdown;
             treeNode.VendorCurrencyCosts = decision.Source == AcquisitionSource.BuyFromVendor
                 ? decision.VendorCurrencyCosts
                 : null;

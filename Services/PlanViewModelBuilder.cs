@@ -23,6 +23,9 @@ namespace GW2CraftingHelper.Services
                 TreeRoot = isMultiItem ? null : result.CraftingTree,
                 MultiItemRoots = isMultiItem ? result.MultiItemRoots : null,
                 CurrencyMetadata = result.CurrencyMetadata,
+                // source-selection-simplification: see PlanViewModel.
+                // ItemMetadata's own doc comment.
+                ItemMetadata = result.ItemMetadata,
                 PriceBasis = result.PriceBasis,
                 // currency-ux-package (Feature 2): whole-plan currency
                 // totals/holding, unaffected by isMultiItem - result.Plan
@@ -1209,7 +1212,13 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        private static string ResolveName(
+        // source-selection-simplification: widened private -> internal (no
+        // logic change) so TreeSectionController can resolve a Subdued
+        // pill's StrictDomination item-kind delta to a display name too -
+        // see PlanViewModel.ItemMetadata's own doc comment. Still not
+        // public - stays same-assembly-only, matching every other
+        // resolver this pure builder class exposes.
+        internal static string ResolveName(
             int itemId, IReadOnlyDictionary<int, ItemMetadata> metadata)
         {
             if (metadata != null &&

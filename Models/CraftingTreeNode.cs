@@ -230,6 +230,22 @@ namespace GW2CraftingHelper.Models
         // (or no hint at all) - the view falls back to "UNKNOWN".
         public string AcquisitionBadge { get; set; }
 
+        // source-selection-simplification (maintainer-approved redesign,
+        // docs/gw2e-considerations.md): raw cost breakdowns for EVERY
+        // feasible source at this node, straight passthrough of
+        // SolverDecision's own matching fields (see PillSourceCostBreakdown's
+        // own doc comment) - null until CraftingTreeBuilder populates them
+        // for a real "Item" node with a solved decision (the same early-
+        // return nodes that never set CanCraft/CanBuyTp/CanBuyVendor either -
+        // Have/GuildUpgrade/Currency/UnrecognizedIngredient/cost-component
+        // leaves - leave these null too, since DecisionPillPlanner never
+        // needs a breakdown comparison for a node with no real source
+        // choice). Consumed by PillSubduingEvaluator via DecisionPillPlanner
+        // - never fed back into any displayed cost.
+        public PillSourceCostBreakdown CraftCostBreakdown { get; set; }
+        public PillSourceCostBreakdown BuyFromTpCostBreakdown { get; set; }
+        public PillSourceCostBreakdown BuyFromVendorCostBreakdown { get; set; }
+
         public IReadOnlyList<CraftingTreeNode> Children
         {
             get => _children;

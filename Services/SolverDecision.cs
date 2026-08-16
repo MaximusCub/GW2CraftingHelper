@@ -101,5 +101,20 @@ namespace GW2CraftingHelper.Services
         // matching CraftingTreeNode so the recipe-tree unit-price tooltip
         // can tell the user which side was actually used.
         public bool PriceSideFellBack { get; internal set; }
+
+        // source-selection-simplification (maintainer-approved redesign,
+        // docs/gw2e-considerations.md): raw cost breakdowns for EVERY
+        // feasible source at this node, straight passthrough of
+        // PlanSolver.Decision's own matching fields - see
+        // PillSourceCostBreakdown's own doc comment for why these exist
+        // independent of Source/TotalCost above (unlike VendorCurrencyCosts/
+        // VendorItemCosts, populated for every source, not just the
+        // winner). Always non-null (IsAvailable reflects CanCraft/CanBuyTp/
+        // CanBuyVendor above). Feeds CraftingTreeNode's own matching fields
+        // via CraftingTreeBuilder, ultimately consumed by
+        // PillSubduingEvaluator - never read by any cost total.
+        public PillSourceCostBreakdown CraftCostBreakdown { get; internal set; }
+        public PillSourceCostBreakdown BuyFromTpCostBreakdown { get; internal set; }
+        public PillSourceCostBreakdown BuyFromVendorCostBreakdown { get; internal set; }
     }
 }

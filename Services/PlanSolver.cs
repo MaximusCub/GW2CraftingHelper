@@ -141,6 +141,23 @@ namespace GW2CraftingHelper.Services
             // public SolverDecision so CraftingTreeBuilder can flag the
             // affected CraftingTreeNode for the unit-price tooltip caveat.
             public bool PriceSideFellBack;
+
+            // source-selection-simplification (maintainer-approved
+            // redesign, docs/gw2e-considerations.md): raw cost breakdowns
+            // for EVERY feasible source at this node, computed regardless
+            // of which one wins (see PillSourceCostBreakdown's own doc
+            // comment for why - unlike VendorCurrencyCosts/VendorItemCosts
+            // above, which stay winner-only). Null (not IsAvailable=false)
+            // is never used here - each is always a real, non-null
+            // PillSourceCostBreakdown with IsAvailable reflecting the
+            // matching CanCraft/CanBuyTp/CanBuyVendor flag, so a consumer
+            // never needs a separate null check before reading
+            // IsAvailable. Feeds PillSubduingEvaluator via
+            // CraftingTreeNode's own matching fields - never read by
+            // PickCheapest or any cost total.
+            public PillSourceCostBreakdown CraftCostBreakdown;
+            public PillSourceCostBreakdown BuyFromTpCostBreakdown;
+            public PillSourceCostBreakdown BuyFromVendorCostBreakdown;
         }
 
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
@@ -521,7 +538,10 @@ namespace GW2CraftingHelper.Services
                     CanCraft = kvp.Value.CanCraft,
                     CanBuyTp = kvp.Value.CanBuyTp,
                     CanBuyVendor = kvp.Value.CanBuyVendor,
-                    PriceSideFellBack = kvp.Value.PriceSideFellBack
+                    PriceSideFellBack = kvp.Value.PriceSideFellBack,
+                    CraftCostBreakdown = kvp.Value.CraftCostBreakdown,
+                    BuyFromTpCostBreakdown = kvp.Value.BuyFromTpCostBreakdown,
+                    BuyFromVendorCostBreakdown = kvp.Value.BuyFromVendorCostBreakdown
                 };
             }
 
@@ -604,7 +624,15 @@ namespace GW2CraftingHelper.Services
                     CanCraft = false,
                     CanBuyTp = false,
                     CanBuyVendor = false,
-                    VendorBatch = null
+                    VendorBatch = null,
+                    // source-selection-simplification: kept non-null for
+                    // the same reason CanCraft/CanBuyTp/CanBuyVendor are
+                    // explicitly false rather than omitted - see this
+                    // block's own doc comment (CraftingTreeBuilder never
+                    // reads any of these for an ignored node either way).
+                    CraftCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false },
+                    BuyFromTpCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false },
+                    BuyFromVendorCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false }
                 };
                 return 0L;
             }
@@ -979,6 +1007,51 @@ namespace GW2CraftingHelper.Services
                 craftExcludedFromAutoPick = true;
             }
 
+            // source-selection-simplification: raw cost breakdowns for
+            // EVERY feasible source at this node - see
+            // PillSourceCostBreakdown's own doc comment for why these are
+            // computed unconditionally (not just for whichever source
+            // wins) and never fed back into any cost/comparison above.
+            var tpBreakdown = canBuyTp
+                ? new PillSourceCostBreakdown
+                {
+                    IsAvailable = true,
+                    RawCoin = buyTotalCost.Value,
+                    DecisionValue = buyTotalCost.Value
+                }
+                : new PillSourceCostBreakdown { IsAvailable = false };
+
+            PillSourceCostBreakdown vendorBreakdown;
+            if (comparableVendorValue.HasValue)
+            {
+                vendorBreakdown = BuildVendorCostBreakdown(
+                    comparableVendorCoinCost, comparableVendorCurrencyCosts, comparableVendorItemCosts,
+                    comparableVendorValue);
+            }
+            else if (fallbackVendorCoinCost.HasValue)
+            {
+                // Fallback tier = an unvalued non-coin currency line exists
+                // somewhere on this offer - DecisionValue stays null (see
+                // PillSourceCostBreakdown.DecisionValue's own doc comment),
+                // mirroring hasUnvaluedCurrency's craft-side treatment
+                // below exactly.
+                vendorBreakdown = BuildVendorCostBreakdown(
+                    fallbackVendorCoinCost, fallbackVendorCurrencyCosts, fallbackVendorItemCosts, null);
+            }
+            else
+            {
+                vendorBreakdown = new PillSourceCostBreakdown { IsAvailable = false };
+            }
+
+            // Comparable-first, fallback otherwise - the SAME recipe
+            // autoPickCraftOption above already resolved to (whichever
+            // recipe would actually be crafted if craft auto-wins).
+            var craftBreakdown = autoPickCraftOption != null
+                ? BuildCraftCostBreakdown(
+                    autoPickCraftOption,
+                    bestComparableOption != null ? bestComparableCraftCost : (long?)null)
+                : new PillSourceCostBreakdown { IsAvailable = false };
+
             // cost = real coin (Decision.TotalCost / display); comparisonValue
             // = parent-comparison value (Decision.ComparisonValue). Commit
             // returns comparisonValue - see Decision.ComparisonValue and the
@@ -1017,7 +1090,15 @@ namespace GW2CraftingHelper.Services
                     // is computed unconditionally above regardless of which
                     // Source ultimately wins, so this gate stops it leaking
                     // onto a Craft/BuyFromVendor/UnknownSource commit.
-                    PriceSideFellBack = src == AcquisitionSource.BuyFromTp && buyPriceSideFellBack
+                    PriceSideFellBack = src == AcquisitionSource.BuyFromTp && buyPriceSideFellBack,
+                    // source-selection-simplification: attached
+                    // unconditionally, same as CanCraft/CanBuyTp/
+                    // CanBuyVendor just above - see the breakdown-building
+                    // block ahead of this Commit definition and
+                    // PillSourceCostBreakdown's own doc comment.
+                    CraftCostBreakdown = craftBreakdown,
+                    BuyFromTpCostBreakdown = tpBreakdown,
+                    BuyFromVendorCostBreakdown = vendorBreakdown
                 };
                 return comparisonValue;
             }
@@ -1175,6 +1256,104 @@ namespace GW2CraftingHelper.Services
             }
 
             return AcquisitionSource.UnknownSource;
+        }
+
+        /// <summary>
+        /// source-selection-simplification: decomposes a winning-or-
+        /// fallback vendor offer's ALREADY-EVALUATED cost fields
+        /// (VendorBatchSolver.EvaluateVendorOffers' own output - never
+        /// recomputed here) into a PillSourceCostBreakdown. RawCoin
+        /// subtracts each item line's own GoldValue back out of coinCost
+        /// (which already has it folded in - see VendorItemCostLine's own
+        /// doc comment) so the item's raw quantity is what competes in
+        /// strict-domination comparisons, not its TP-valued gold - see
+        /// PillSourceCostBreakdown.RawCoin's own doc comment.
+        /// </summary>
+        private static PillSourceCostBreakdown BuildVendorCostBreakdown(
+            long? coinCost, List<CostLine> currencyCosts, List<VendorItemCostLine> itemCosts, long? decisionValue)
+        {
+            long itemFoldedValue = 0L;
+            var lines = new List<CostLine>();
+            if (currencyCosts != null)
+            {
+                lines.AddRange(currencyCosts);
+            }
+            if (itemCosts != null)
+            {
+                foreach (var line in itemCosts)
+                {
+                    itemFoldedValue += line.GoldValue;
+                    lines.Add(new CostLine { Type = "Item", Id = line.ItemId, Count = line.Quantity });
+                }
+            }
+
+            return new PillSourceCostBreakdown
+            {
+                IsAvailable = true,
+                RawCoin = (coinCost ?? 0L) - itemFoldedValue,
+                CostLines = lines,
+                DecisionValue = decisionValue
+            };
+        }
+
+        /// <summary>
+        /// source-selection-simplification: decomposes a candidate craft
+        /// recipe's DIRECT (non-recursive) ingredient list into a
+        /// PillSourceCostBreakdown - a Currency-type ingredient becomes a
+        /// raw currency line (or RawCoin, for the coin currency id
+        /// itself), an Item-type ingredient becomes a raw item line at
+        /// its OWN stated quantity (already scaled to this node's real
+        /// demand by RecipeService/InventoryReducer, same granularity as
+        /// VendorItemCostLine.Quantity - see that field's own doc
+        /// comment), directly comparable to a vendor offer's own item cost
+        /// lines by id with NO pricing/recursion needed. A GuildUpgrade or
+        /// other unrecognized ingredient type contributes no line here
+        /// (mirrors the recipe loop's own hasUnvaluedCurrency treatment
+        /// for those types - there is no representable "kind" for them).
+        /// Duplicate ingredient entries of the same (Type, Id) are summed
+        /// into one line.
+        /// </summary>
+        private static PillSourceCostBreakdown BuildCraftCostBreakdown(RecipeOption option, long? decisionValue)
+        {
+            long rawCoin = 0L;
+            var lineTotals = new Dictionary<(string Type, int Id), int>();
+
+            foreach (var ingredient in option.Ingredients)
+            {
+                if (ingredient.IngredientType == "Currency")
+                {
+                    if (ingredient.Id == Gw2Constants.CoinCurrencyId)
+                    {
+                        rawCoin += ingredient.Quantity;
+                        continue;
+                    }
+                    var key = ("Currency", ingredient.Id);
+                    lineTotals[key] = lineTotals.TryGetValue(key, out int existing)
+                        ? existing + ingredient.Quantity
+                        : ingredient.Quantity;
+                }
+                else if (ingredient.IngredientType == "Item")
+                {
+                    var key = ("Item", ingredient.Id);
+                    lineTotals[key] = lineTotals.TryGetValue(key, out int existing)
+                        ? existing + ingredient.Quantity
+                        : ingredient.Quantity;
+                }
+            }
+
+            var lines = new List<CostLine>(lineTotals.Count);
+            foreach (var kvp in lineTotals)
+            {
+                lines.Add(new CostLine { Type = kvp.Key.Type, Id = kvp.Key.Id, Count = kvp.Value });
+            }
+
+            return new PillSourceCostBreakdown
+            {
+                IsAvailable = true,
+                RawCoin = rawCoin,
+                CostLines = lines,
+                DecisionValue = decisionValue
+            };
         }
 
         private void Collect(
