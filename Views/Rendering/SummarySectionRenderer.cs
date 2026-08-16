@@ -3,6 +3,7 @@ using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using System;
 using System.Collections.Generic;
 
@@ -50,7 +51,19 @@ namespace GW2CraftingHelper.Views.Rendering
             var profitBandRows = new List<PlanRowViewModel>();
             var currencyRows = new List<PlanRowViewModel>();
             var noteRows = new List<PlanRowViewModel>();
-            PlanRowViewModel footnoteRow = null;
+            // Review fix: a List, like noteRows - not a single "last row
+            // wins" variable. SummarySectionLayoutMath.BodyHeight sums
+            // FallbackTextRowHeight per SummaryFootnote row it counts
+            // (its own doc comment: "summed rather than assumed so a
+            // null/absent footnote degrades gracefully instead of
+            // desyncing height from what actually rendered"); a renderer
+            // that only drew the LAST such row while BodyHeight kept
+            // counting all of them would silently reserve dead space (or
+            // too little) the moment a second footnote row ever existed -
+            // rendering every row it is handed keeps the two in agreement
+            // by construction, the same way noteRows already does for
+            // MultiItemNote.
+            var footnoteRows = new List<PlanRowViewModel>();
 
             foreach (var row in section.Rows)
             {
@@ -69,7 +82,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         noteRows.Add(row);
                         break;
                     case PlanRowType.SummaryFootnote:
-                        footnoteRow = row;
+                        footnoteRows.Add(row);
                         break;
                         // PlanRowType.CoinTotal is never emitted by
                         // PlanViewModelBuilder any more (see that enum
@@ -103,9 +116,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 TextRowRenderer.CreateTextRow(row.Label, contentFlow, panelWidth, _sink);
             }
 
-            if (footnoteRow != null)
+            foreach (var row in footnoteRows)
             {
-                CreateFootnoteRow(footnoteRow.Label, contentFlow, panelWidth);
+                CreateFootnoteRow(row.Label, contentFlow, panelWidth);
             }
         }
 
@@ -140,6 +153,17 @@ namespace GW2CraftingHelper.Views.Rendering
         /// PlanRowViewModel.TooltipText's own doc comment), not on
         /// rowPanel, so hovering the header text always shows it
         /// regardless of what other controls might overlap the row.
+        ///
+        /// Review fix: the "-"/"=" formula operators between tiles are now
+        /// actually drawn (a small dim Label centered on each tile
+        /// boundary - no tooltip, so it never steals hover from a
+        /// neighboring caption). Without them, three same-shaped tiles
+        /// with no visible relationship between them was exactly the "two-
+        /// tile split-column band" ambiguity the W4A redesign exists to
+        /// remove - worse than before, since it is now two adjacent
+        /// unlabelled-relationship bands instead of one. Never drawn for a
+        /// collapsed 1-tile band (tileCount == 1): there is nothing to
+        /// relate a single tile to.
         /// </summary>
         private void CreateFormulaBand(List<PlanRowViewModel> tileRows, FlowPanel parent, int panelWidth)
         {
@@ -149,6 +173,7 @@ namespace GW2CraftingHelper.Views.Rendering
             const int rowHeight = PlanContentHeightMath.CostTileRowHeight;
             const int totalMargin = 40;
             const int minTileWidth = 80;
+            const int operatorY = 30;
             var geometry = PlanRelayoutMath.ComputeCostTileGeometry(panelWidth, tileCount, totalMargin, minTileWidth);
 
             var rowPanel = new Panel()
@@ -189,6 +214,35 @@ namespace GW2CraftingHelper.Views.Rendering
                 tiles.Add(new CostTileHandle { CaptionLabel = captionLabel, Segments = segmentHandle });
             }
 
+            // One operator per boundary BETWEEN two tiles (tileCount - 1 of
+            // them): "-" for every boundary except the last, "=" for the
+            // last (the formula always reads "A - B = C" for the only
+            // uncollapsed tile count this band ever has, 3). Centered on
+            // the boundary x (where tile i+1 begins - tiles are laid out
+            // contiguously with no gap, per ComputeCostTileGeometry).
+            List<Label> operatorLabels = null;
+            if (tileCount > 1)
+            {
+                operatorLabels = new List<Label>(tileCount - 1);
+                for (int i = 1; i < tileCount; i++)
+                {
+                    string symbol = i == tileCount - 1 ? "=" : "-";
+                    int boundaryX = geometry.StartX + i * geometry.TileWidth;
+                    int symbolWidth = (int)System.Math.Ceiling(amountFont.MeasureString(symbol).Width);
+                    var operatorLabel = new Label()
+                    {
+                        Text = symbol,
+                        Font = amountFont,
+                        TextColor = captionColor,
+                        AutoSizeWidth = true,
+                        AutoSizeHeight = true,
+                        Location = new Point(boundaryX - symbolWidth / 2, operatorY),
+                        Parent = rowPanel
+                    };
+                    operatorLabels.Add(operatorLabel);
+                }
+            }
+
             // M33 C2b [FANOUT]: every tile's caption + coin segments are
             // font-only (invariant to panelWidth) - only tileWidth/startX
             // and each tile's own centering offset move. No MeasureString.
@@ -206,6 +260,16 @@ namespace GW2CraftingHelper.Views.Rendering
                     int segmentsWidth = ShoppingColumnMath.SegmentRunWidth(tile.Segments.TextWidths, CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinLabelIconGap, CoinSegmentMath.CoinSegmentGap);
                     int coinStartX = tileX + PlanRelayoutMath.CenterX(g.TileWidth, segmentsWidth);
                     CoinCurrencyRenderer.RepositionSegments(tile.Segments, coinStartX, 30);
+                }
+
+                if (operatorLabels != null)
+                {
+                    for (int i = 0; i < operatorLabels.Count; i++)
+                    {
+                        int boundaryX = g.StartX + (i + 1) * g.TileWidth;
+                        var operatorLabel = operatorLabels[i];
+                        operatorLabel.Location = new Point(boundaryX - operatorLabel.Width / 2, operatorY);
+                    }
                 }
             });
         }
@@ -225,14 +289,54 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private void CreateCurrencyTable(List<PlanRowViewModel> rows, FlowPanel parent, int panelWidth)
         {
-            CreateCurrencyTableHeaderRow(parent, panelWidth);
+            // Review fix: pre-scan the actual widest rendered
+            // Required/Have/Needed value across every row this render -
+            // mirrors ShoppingListSectionRenderer.Render's own maxEachWidth/
+            // maxTotalWidth pre-scan (see SummarySectionLayoutMath's
+            // EffectiveCurrencyNumberColumnWidth doc comment for why the
+            // fixed 60px floor alone is not always enough: an unclamped
+            // Have value for a currency like Karma can run 6-7 digits).
+            // One pass over rows (a plan's currency list is short - a
+            // handful of entries in practice) with the SAME font both the
+            // header and every data row already use.
+            var font = GameService.Content.DefaultFont14;
+            int widestNumberWidth = 0;
+            foreach (var row in rows)
+            {
+                int rowWidest = MeasureWidestCurrencyNumber(row, font);
+                if (rowWidest > widestNumberWidth) widestNumberWidth = rowWidest;
+            }
+
+            CreateCurrencyTableHeaderRow(parent, panelWidth, widestNumberWidth);
             for (int i = 0; i < rows.Count; i++)
             {
-                CreateCurrencyTableRow(rows[i], parent, panelWidth, i == rows.Count - 1);
+                CreateCurrencyTableRow(rows[i], parent, panelWidth, widestNumberWidth, i == rows.Count - 1);
             }
         }
 
-        private void CreateCurrencyTableHeaderRow(FlowPanel parent, int panelWidth)
+        /// <summary>
+        /// Widest of a single currency row's own rendered Required/Have/
+        /// Needed strings (Have/Needed already "-" rather than a fabricated
+        /// number when no wallet snapshot exists - see
+        /// PlanRowViewModel.CurrencyOwnedQuantity's doc comment - "-" is
+        /// always narrower than a real value, so it never drives the max).
+        /// </summary>
+        private static int MeasureWidestCurrencyNumber(PlanRowViewModel row, BitmapFont font)
+        {
+            int widest = (int)System.Math.Ceiling(font.MeasureString(row.Quantity.ToString()).Width);
+
+            string haveText = row.CurrencyOwnedQuantity.HasValue ? row.CurrencyOwnedQuantity.Value.ToString() : "-";
+            int haveWidth = (int)System.Math.Ceiling(font.MeasureString(haveText).Width);
+            if (haveWidth > widest) widest = haveWidth;
+
+            string neededText = row.CurrencyNeededQuantity.HasValue ? row.CurrencyNeededQuantity.Value.ToString() : "-";
+            int neededWidth = (int)System.Math.Ceiling(font.MeasureString(neededText).Width);
+            if (neededWidth > widest) widest = neededWidth;
+
+            return widest;
+        }
+
+        private void CreateCurrencyTableHeaderRow(FlowPanel parent, int panelWidth, int widestNumberWidth)
         {
             var rowPanel = new Panel()
             {
@@ -248,15 +352,20 @@ namespace GW2CraftingHelper.Views.Rendering
                 Location = new Point(SummarySectionLayoutMath.CurrencyNameX, 5), Parent = rowPanel
             };
 
-            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth);
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth, widestNumberWidth);
             var requiredLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Required", font, Color.White, edges.RequiredRightEdge, 5);
             var haveLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Have", font, Color.White, edges.HaveRightEdge, 5);
             var neededLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Needed", font, Color.White, edges.NeededRightEdge, 5);
 
+            // M33 C2b: widestNumberWidth is cached from the build-time
+            // pre-scan (data-derived, not panelWidth-derived - it never
+            // needs to re-run on resize, same reasoning as
+            // ShoppingListSectionRenderer's own cached maxEachWidth/
+            // maxTotalWidth).
             _sink.AddRelayout(w =>
             {
                 rowPanel.Size = new Point(w, PlanContentHeightMath.CTableHeaderRowHeight);
-                var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w);
+                var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
                 requiredLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), 5);
                 haveLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), 5);
                 neededLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), 5);
@@ -291,7 +400,7 @@ namespace GW2CraftingHelper.Views.Rendering
         // source tag already use), never a raw Unicode character.
         private const string FullCoverageMarkerText = "OK";
 
-        private void CreateCurrencyTableRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        private void CreateCurrencyTableRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, int widestNumberWidth, bool isLast)
         {
             const int rowHeight = CurrencyRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
@@ -306,9 +415,10 @@ namespace GW2CraftingHelper.Views.Rendering
             }
 
             const int nameX = SummarySectionLayoutMath.CurrencyNameX;
-            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth);
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth, widestNumberWidth);
+            int numberColumnWidth = SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(widestNumberWidth);
             int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
-                edges.RequiredRightEdge, SummarySectionLayoutMath.CurrencyNumberColumnWidth, SummarySectionLayoutMath.CurrencyColumnGap, nameX);
+                edges.RequiredRightEdge, numberColumnWidth, SummarySectionLayoutMath.CurrencyColumnGap, nameX);
             string fullName = row.Label ?? "";
             string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
             var nameLabel = new Label()
@@ -319,6 +429,16 @@ namespace GW2CraftingHelper.Views.Rendering
             };
             if (displayName != fullName)
             {
+                // Review fix: stamp BOTH the label AND its containing
+                // panel - the M32 lesson (field-test finding D,
+                // docs/KNOWN-ISSUES.md "Field-test UX wave") is that a
+                // label captures the mouse before a tooltip on a control
+                // underneath it would ever be reached. nameLabel sits
+                // directly on top of the truncated text (the one thing
+                // that visually looks hoverable), so a tooltip on rowPanel
+                // alone was swallowed there and only fired on the blank
+                // strip beside the name.
+                nameLabel.BasicTooltipText = fullName;
                 rowPanel.BasicTooltipText = fullName;
             }
 
@@ -363,7 +483,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink.AddRelayout(w =>
             {
                 rowPanel.Size = new Point(w, rowHeight);
-                var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w);
+                var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
                 requiredLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), 4);
                 haveLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), 4);
                 neededLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), 4);
@@ -374,14 +494,18 @@ namespace GW2CraftingHelper.Views.Rendering
             });
             _sink.AddReellipsis(w =>
             {
-                var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w);
+                var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
                 int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
-                    e.RequiredRightEdge, SummarySectionLayoutMath.CurrencyNumberColumnWidth, SummarySectionLayoutMath.CurrencyColumnGap, nameX);
+                    e.RequiredRightEdge, numberColumnWidth, SummarySectionLayoutMath.CurrencyColumnGap, nameX);
                 string newDisplayName = LabelHelpers.EllipsizeToWidth(font, fullName, newMaxWidth);
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    rowPanel.BasicTooltipText = newDisplayName != fullName ? fullName : null;
+                    // Review fix: both controls, same reasoning as the
+                    // build-time tooltip assignment above.
+                    string tooltip = newDisplayName != fullName ? fullName : null;
+                    nameLabel.BasicTooltipText = tooltip;
+                    rowPanel.BasicTooltipText = tooltip;
                 }
             });
         }
