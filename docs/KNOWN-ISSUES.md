@@ -3408,6 +3408,14 @@ it were a tradeable item). Cosmetic-only, bounded to Guild Decoration
 recipes, and needs real design work (a new ingredient-type concept, not
 a one-line fix) - left for a future milestone.
 
+**RESOLVED (2026-08-16):** this finding under-described the real
+severity - a live-API audit found a GuildUpgrade ingredient falls through
+`PlanSolver`'s item-pricing path and is priced as whatever TP ITEM shares
+its numeric id, a genuine mis-costing bug, not just a display gap. See
+"GuildUpgrade ingredient costing/display fix" below for the fix (the
+renamed test above is now
+`GuildUpgradeIngredient_NeverPricedAsItemOrCurrency_DisplaysAsUnresolvedGuildUpgrade`).
+
 Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
 errors). Tests: `dotnet test tests/GW2CraftingHelper.Tests/
 GW2CraftingHelper.Tests.csproj` - 1276 total (1273 baseline + 3 net new:
@@ -3852,3 +3860,138 @@ Follow-ups (recorded during a later polish pass, not yet implemented):
   (`CurrencyDisplayResolver.ResolveAmounts`) - the same currency can
   show two different owned numbers in one window; decide whether to
   unclamp the shopping list to match.
+
+---
+
+## GuildUpgrade ingredient costing/display fix (2026-08-16)
+
+Orchestrator-checksummed audit finding (confirmed via live API): the
+versioned GW2 API returns ingredient `{type:"GuildUpgrade", id:<upgradeId>,
+count:N}` on Guild Decoration recipes (e.g. recipe 12002 -> item 80471,
+guild upgrade id 829, ~70 occurrences in a 600-recipe sample, 678 across the
+full current seed). The "Recipe-ingestion bug class" entry above first
+surfaced this as a cosmetic display gap; this audit found it was actually
+a real mis-costing bug too - see that entry's own RESOLVED note.
+
+**Root cause (two independent sites):**
+
+1. `Services/CraftingTreeBuilder.cs`'s non-`"Item"` branch labeled ANY
+   non-Item ingredient `CraftingDecision.Currency` and resolved a
+   **currency** name from the id via `Gw2Constants.ResolveCurrencyName` -
+   wrong domain (a guild upgrade id is not a wallet currency id, and the
+   two id spaces numerically overlap in the real seed - several
+   GuildUpgrade ids, e.g. 73-87, fall inside `KnownCurrencyNames`' own
+   2-80 range).
+2. `Services/PlanSolver.cs`'s ingredient loop (`Evaluate`) special-cased
+   only `IngredientType == "Currency"`, so a `GuildUpgrade` ingredient fell
+   through to the item-pricing path (`Evaluate` called directly on it,
+   `GetBuyCost` looked up its numeric id in the TP price table) and was
+   priced as whatever TP **item** happened to share that numeric id - wrong
+   cost, wrong shopping list, silently inflating (or deflating) the
+   containing recipe's real coin total.
+
+**Fix (matches the approved direction exactly):**
+
+- `Models/CraftingDecision.cs` gained a new `GuildUpgrade` member,
+  deliberately **appended last** (after `Unknown`, not inserted earlier) -
+  this enum has no `StringEnumConverter` and round-trips through
+  `PersistedPlan`/`plan.json` as a raw ordinal int, so inserting it anywhere
+  earlier would have silently reassigned `Unknown`'s on-disk integer and
+  misread every previously-persisted plan on load. Caught during this
+  fix's own Code Reviewer Mode self-review pass, not by a test.
+- `CraftingTreeBuilder.BuildNode` gained an explicit `"GuildUpgrade"` branch
+  (checked before the generic non-`"Item"` branch): sets
+  `Decision = CraftingDecision.GuildUpgrade`, a generic ID-free display name
+  (`"Guild upgrade (unresolved)"` - IDs are never displayed, repo
+  invariant), and an acquisition-hint-style `AcquisitionHint` explanation.
+  Never calls `Gw2Constants.ResolveCurrencyName`/`CurrencyDisplayResolver`
+  and never consults `currencyMetadata` - confirmed via a dedicated
+  id-collision test (`GuildUpgradeNode_NeverResolvesViaCurrencyMetadata_
+  EvenWhenIdCollides`). No live metadata source exists for a guild-upgrade
+  id today: `CollectTreeItemIds` only ever fetches `ItemMetadata` for
+  `"Item"`-typed ids, so the `metadata` dict never carries a genuine entry
+  for one either - confirmed by code inspection, not assumed.
+- `PlanSolver.Evaluate`'s ingredient loop gained an explicit `"GuildUpgrade"`
+  branch (checked before the `"Currency"` branch): unconditionally sets
+  `hasUnvaluedCurrency = true` and contributes zero to both `craftCost` and
+  `craftRealCost` - **never** attempting a `currencyValuation` lookup on the
+  ingredient's id, even when the user's `CurrencyValuation` happens to hold
+  an entry for that exact numeric id (the same cross-domain collision risk
+  as the display side). This reuses the EXACT SAME fallback-tier machinery
+  an unvalued real `Currency` ingredient already drives (`Decision.
+  HasUnvaluedCurrency`, the comparable/fallback recipe-tier split, and its
+  existing transitive propagation up through Craft ancestors) rather than
+  inventing a parallel mechanism - per instruction, and verified by a
+  dedicated nested-Craft-ancestor test
+  (`GuildUpgradeIngredient_TransitivelyDemotesAncestorCraft_
+  TpWinsDespiteCheaperRealCraftCost`) that the existing propagation code
+  needed zero changes to cover the new ingredient type correctly.
+- `PlanSolver.Collect` gained an explicit `"GuildUpgrade"` branch (checked
+  before `"Currency"`): returns immediately without touching `currencyMap`
+  - a `GuildUpgrade` ingredient must never surface in `plan.CurrencyCosts`,
+  the Summary currency table, or any wallet lookup keyed off that table
+  (confirmed empty in every new test). It also never generates a shopping/
+  craft-step `PlanStep` (no memo entry ever exists for it, since
+  `Evaluate`'s ingredient loop never calls `Evaluate` on it directly).
+- `PlanSolver.RecomputeCraftCosts` gained matching `"GuildUpgrade"` guards
+  (top-of-method + ingredient loop) for consistency with the other three
+  sites, though the top-of-method guard is defense-in-depth only given the
+  current call graph (a `GuildUpgrade` node never has a memo entry to
+  recompute from).
+- `DecisionPillPlanner.BuildPillSpecs` gained a distinct single, non-
+  interactive `"GUILD UPGRADE"` locked pill (mirrors the `CURRENCY` pill's
+  shape, reuses `PillKind.Locked` - no new pill color/kind needed).
+- `Views/Rendering/TreeSectionController.cs` (Blish-bound, untestable
+  directly) widened two existing `Decision == Unknown` tooltip branches to
+  also cover `Decision == GuildUpgrade`, so the `AcquisitionHint`
+  explanation the tree builder now always sets actually renders (both the
+  row tooltip and the pill tooltip) instead of silently falling to the
+  generic "Only available source" text a locked pill gets by default.
+
+**Sweep (repo rule: fix the class, not the instance):** grepped every
+`IngredientType`/`"Currency"`/`"Item"` comparison in `Services/`/`Models/`
+(`AchievementBitDedupPrePass`, `CraftingPlanPipeline`'s override/id-
+collection helpers, `InventoryReducer`, `RecipeService.BuildNodeAsync`'s
+leaf-handling guard) - every one of them is already `"Item"`-gated
+(`== "Item"` or `!= "Item"`), so a `"GuildUpgrade"` node was already routed
+correctly as a non-consumable, non-recipe-expanding leaf at every one of
+those sites with zero changes needed. `Services/VendorBatchSolver.cs` and
+`Services/CraftingPlanPipeline.cs`'s vendor-offer-currency-id collectors
+compare a DIFFERENT field (`VendorOffer.CostLines[].Type`, the vendor-offer
+data model) that has no `"GuildUpgrade"` concept at all - confirmed
+unrelated, not touched.
+
+**Tests (11 net new, real production code paths, no Blish references):**
+`PlanSolverGuildUpgradeTests.cs` (new file, 5 tests: never-priced-as-item,
+never-priced-as-currency-even-with-a-colliding-valuation-id, never-in-
+CurrencyCosts, transitive fallback-tier propagation through a Craft
+ancestor, and a degenerate GuildUpgrade-only recipe still crafts at zero
+cost); `CraftingTreeBuilderTests.cs` (+3: decision/name/hint shape, never
+resolves via currencyMetadata even on an id collision, Ignore-toggle
+scoping parity with the Currency case); `DecisionPillPlannerTests.cs` (+2:
+pill shape, no Ignore/OwnedInfo pills); `AmalgamatedRiftEssenceIngestionTests.cs`
+(the existing GuildUpgrade test rewritten in place to assert the fixed
+behavior instead of documenting the old gap as intentional, plus 1 new test
+using the exact real recipe 12002 -> item 80471 shape from
+`ref/recipes_seed.json`, the audit's own reference case).
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
+errors, only pre-existing StyleCop warnings, none on touched lines). Tests:
+`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` -
+1380 total (1369 baseline + 11 net new) - PASS, 0 failed.
+
+**Self-review findings (Code Reviewer Mode, fixed before commit):** the
+`CraftingDecision` enum-ordinal/persistence risk above (Must Fix, fixed);
+a stale `CraftingTreeNode.AcquisitionHint` doc comment that undersold its
+now-two population sources (Nice to Have, fixed); a missing transitive-
+propagation regression test for a nested `GuildUpgrade` descendant (Nice
+to Have widened to Must Fix given the audit's explicit "be consistent with
+that machinery" instruction - added). No Critical findings. Out of scope,
+confirmed unaffected and left untouched per the milestone's DO-NOT-TOUCH
+list: `Services/ModuleLog.cs`, `Services/PlanContentHeightMath.cs` (a
+`GuildUpgrade` node's `Decision != CraftingDecision.Craft` already dims its
+subtree exactly like `Currency`/`Have`/`Unknown` do today, with zero code
+change needed there), `Services/PlanRelayoutMath.cs`, scroll machinery,
+`VendorBatchSolver`'s merged-ceil batching math.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
