@@ -32,5 +32,19 @@ namespace GW2CraftingHelper.Models
         // existing rows rather than collapsing them into a formula avoids
         // re-deriving those bugs in code - see VendorBatchSolver.EvaluateVendorOffers.
         public int? HomesteadTier { get; set; }
+
+        // opportunity-notes (SEASONAL VENDOR TIP): the festival this offer
+        // is only available during (Blish_HUD.Contexts.FestivalContext.
+        // Festival.Name, e.g. "halloween" - lowercase, MEASURED, see
+        // Gw2Constants.HalloweenFestivalName), or null for every regular,
+        // year-round offer. Additive, backward-compatible - existing
+        // offers deserialize with this null. NEVER read by the solver
+        // (VendorBatchSolver/PlanSolver) - a seasonal offer is
+        // unconditionally excluded from the solver's own candidate set
+        // regardless of this value (see Services/SeasonalOfferFilter) - the
+        // plan always assumes the regular market. Consumed only by
+        // Services/SeasonalVendorTipCalculator for the informational Plan
+        // Notes tip.
+        public string SeasonalFestival { get; set; }
     }
 }

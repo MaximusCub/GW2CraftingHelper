@@ -177,6 +177,30 @@ namespace GW2CraftingHelper.Models
         // reference branch in that mixed case.
         public bool IsReferenceBranch { get; set; }
 
+        // opportunity-notes (RECIPE-SHEET SAVINGS): the raw candidate
+        // recipe used to build the reference branch above (node.Recipes[0]
+        // in CraftingTreeBuilder - the SAME "deterministic first option"
+        // whose ingredients the reference branch already costs out), kept
+        // alongside it so a later annotation pass (RecipeSheetSavingsCalculator)
+        // can tell whether "what it would cost to craft instead" is
+        // actually blocked on an unlearned, purchasable-sheet recipe -
+        // without re-walking the solver's own RecipeNode tree. Set ONLY
+        // alongside IsReferenceBranch (never for a Craft-decision node,
+        // which already has its own RecipeId/Disciplines above from the
+        // CHOSEN recipe); null/default otherwise. Never used for cost math
+        // or display itself - the reference branch's own Children
+        // SubtreeCost sum remains the sole real craft-cost figure.
+        public int? ReferenceRecipeId { get; set; }
+        public List<string> ReferenceRecipeDisciplines { get; set; }
+        public int ReferenceRecipeMinRating { get; set; }
+
+        // True when ReferenceRecipeId's own recipe carries the GW2 API's
+        // "LearnedFromItem" flag (unlocked by consuming a purchasable
+        // recipe sheet, rather than auto-known or achievement/vendor-
+        // sourced) - see RecipeOption.Flags. Meaningless when
+        // ReferenceRecipeId is null.
+        public bool ReferenceRecipeIsLearnedFromItem { get; set; }
+
         // W4B (vendor cost-component leaves): true only for a DISPLAY-ONLY
         // synthetic leaf CraftingTreeBuilder.BuildVendorCostComponentLeaves
         // creates under a BuyFromVendor node whose winning offer mixed 2+
