@@ -59,8 +59,33 @@ namespace GW2CraftingHelper.Models
         public static readonly IReadOnlyList<int> HomesteadRefinementMaterialIds =
             new[] { RefinedHomesteadFiberItemId, RefinedHomesteadMetalItemId, RefinedHomesteadWoodItemId };
 
-        // TODO: Currency names are sourced from api.guildwars2.com/v2/currencies.
-        // Verify against the official API if broadening coverage beyond this set.
+        // Currency names are sourced from api.guildwars2.com/v2/currencies.
+        // Review-fix (recipe-ingestion-fix, Must Fix): re-verified every
+        // entry live (curl api.guildwars2.com/v2/currencies?ids=all,
+        // 2026-08-15) after the reseed newly ingested 187 recipes with
+        // Currency ingredients this table had never been cross-checked
+        // against - several entries were shifted by one or more ids
+        // (e.g. 49/50 held each other's names) and went unnoticed only
+        // because no recipe had exercised them before now:
+        //   36 was "Elegy Mosaics" (live: "Testimony of Desert Heroics";
+        //       Elegy Mosaic is id 35) - corrected, not removed: ref/
+        //       vendor_offers.json has real Currency-type cost lines keyed
+        //       36, so a wrong-but-present name was still strictly better
+        //       than dropping to the literal "Currency" fallback here.
+        //   49 was "Festival Tokens" (live: "Mistborn Key")
+        //   50 was "Mistborn Motes" (live: "Festival Token"; no currency
+        //       named "Mistborn Motes" exists)
+        //   58 was "Jade Slivers" (live: "War Supplies"; Jade Sliver is id 64)
+        //   59 was "Research Notes" (live: "Unstable Fractal Essence";
+        //       Research Note is id 61)
+        //   60 was "Imperial Favors" (live: "Tyrian Defense Seal";
+        //       Imperial Favor is id 68)
+        // 61 (Research Note) and 65 (Testimony of Jade Heroics) were added:
+        // both are used by real recipe Currency ingredients in
+        // ref/recipes_seed.json (61 alone by 186 of the 187 newly-visible
+        // recipes) and were previously entirely absent, falling back to the
+        // literal displayed word "Currency" for every one of them.
+        // Verify against the official API again if broadening coverage.
         public static readonly Dictionary<int, string> KnownCurrencyNames = new Dictionary<int, string>
         {
             { 2, "Karma" },
@@ -92,16 +117,18 @@ namespace GW2CraftingHelper.Models
             { 32, "Unbound Magic" },
             { 33, "Ascended Shards of Glory" },
             { 34, "Trade Contracts" },
-            { 36, "Elegy Mosaics" },
+            { 36, "Testimony of Desert Heroics" },
             { 45, "Volatile Magic" },
             { 47, "Racing Medallions" },
-            { 49, "Festival Tokens" },
-            { 50, "Mistborn Motes" },
-            { 58, "Jade Slivers" },
-            { 59, "Research Notes" },
-            { 60, "Imperial Favors" },
+            { 49, "Mistborn Keys" },
+            { 50, "Festival Tokens" },
+            { 58, "War Supplies" },
+            { 59, "Unstable Fractal Essence" },
+            { 60, "Tyrian Defense Seals" },
+            { 61, "Research Notes" },
             { 62, "Unusual Coins" },
             { 63, "Astral Acclaim" },
+            { 65, "Testimony of Jade Heroics" },
             { 78, "Fine Rift Essence" },
             { 79, "Rare Rift Essence" },
             { 80, "Masterwork Rift Essence" }

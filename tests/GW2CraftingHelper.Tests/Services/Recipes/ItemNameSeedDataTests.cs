@@ -79,7 +79,16 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var data = ItemNameSeedData.Load(stream);
 
-                Assert.Equal(14587, data.Items.Count);
+                // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): was
+                // 14587 before that fix re-ran the full seeder chain
+                // (including this file - item_name_seed.json is generated
+                // from the same craftable-item-id set recipe_search_seed.json
+                // indexes) - now includes names for every output item of
+                // the ~230 newly-visible recipes, plus six months of
+                // ordinary game-content growth (see the matching
+                // RecipeCacheSerializerTests count-drift comment for the
+                // full breakdown).
+                Assert.Equal(14762, data.Items.Count);
                 Assert.All(data.Items, item =>
                 {
                     Assert.True(item.Id > 0);

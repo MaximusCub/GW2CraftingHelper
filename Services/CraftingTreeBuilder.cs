@@ -20,6 +20,11 @@ namespace GW2CraftingHelper.Services
             // currency icon/name or HAVE-pill data on any synthesized
             // component leaf, never a crash or a missing leaf. See
             // BuildVendorCostComponentLeaves for how each is used.
+            // Review-fix (recipe-ingestion-fix, Must Fix): currencyMetadata
+            // is also now read by the plain Currency-leaf naming below -
+            // see BuildNode's Currency leaf naming for why this closes the
+            // whole class of Gw2Constants.KnownCurrencyNames drift rather
+            // than just the two ids the review caught.
             IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null,
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts = null,
             IReadOnlyDictionary<int, int> ownedVendorItemAmounts = null)
@@ -90,11 +95,22 @@ namespace GW2CraftingHelper.Services
                 return treeNode;
             }
 
-            // Currency nodes are leaf nodes
+            // Currency nodes are leaf nodes. Review-fix
+            // (recipe-ingestion-fix, Must Fix): prefer the live-fetched
+            // CurrencyMetadataService name via CurrencyDisplayResolver -
+            // the same live-preferred/static-fallback chain
+            // PlanViewModelBuilder's Summary-section and shopping-row
+            // currency costs already use (KNOWN-ISSUES #16) - over calling
+            // Gw2Constants.ResolveCurrencyName directly, so a future id the
+            // static table has wrong or lacks (see KnownCurrencyNames' own
+            // doc comment on the 2026-08-15 audit) still resolves correctly
+            // whenever currencyMetadata is available, rather than only
+            // ever depending on this file staying manually in sync with
+            // the live API.
             if (node.IngredientType != "Item")
             {
                 treeNode.Decision = CraftingDecision.Currency;
-                treeNode.Name = Gw2Constants.ResolveCurrencyName(node.Id);
+                treeNode.Name = CurrencyDisplayResolver.ResolveName(node.Id, currencyMetadata);
                 return treeNode;
             }
 

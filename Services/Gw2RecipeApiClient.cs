@@ -13,6 +13,28 @@ namespace GW2CraftingHelper.Services
     {
         private const string BaseUrl = "https://api.guildwars2.com/v2";
 
+        // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): every
+        // /v2/recipes call in this class previously omitted the schema-
+        // version query parameter entirely. The GW2 API hides the whole
+        // currency-ingredient era of recipes (e.g. 14025, Amalgamated Rift
+        // Essence -> item 100930) from UNVERSIONED /v2/recipes,
+        // /v2/recipes/search, and /v2/recipes/{id} responses - verified via
+        // live probes: unversioned /v2/recipes lists 13,183 ids, versioned
+        // ?v=latest lists 13,371 (188 missing), and an unversioned
+        // /v2/recipes/14025 404s outright while the versioned request
+        // returns the full recipe. Pinned to a literal date rather than
+        // "v=latest": the module always wants "the schema version that
+        // exists today" so an upstream schema bump can never silently
+        // change ingredient JSON shape (Currency vs. Item key names) for
+        // this client without a deliberate review of this constant - a
+        // literal date keeps returning the same shape it returns today,
+        // permanently, exactly like v=latest would UNTIL a future schema
+        // revision, at which point v=latest would silently start returning
+        // the new shape and this constant would not. Re-pin (bump the
+        // date) only alongside a verified review of the new schema's
+        // ingredient shape.
+        private const string SchemaVersion = "2026-08-15";
+
         private readonly HttpClient _http;
 
         public Gw2RecipeApiClient(HttpClient http)
@@ -22,7 +44,23 @@ namespace GW2CraftingHelper.Services
 
         public async Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct)
         {
-            var url = $"{BaseUrl}/recipes/search?output={itemId}";
+            // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): even
+            // WITH the schema version pinned above, this endpoint's own
+            // upstream search INDEX has a gap independent of the missing-
+            // recipes bug fixed here - verified live: even
+            // /v2/recipes/search?output=100930&v=latest (the exact
+            // currency-ingredient recipe this fix restores visibility for)
+            // returns an EMPTY array, while the recipe itself fully exists
+            // and is fetchable by id. Versioning this URL fixes every
+            // recipe this client can otherwise SEE via search; it cannot
+            // fix recipes upstream's own search index never indexed in the
+            // first place. Those recipes remain discoverable only through
+            // the seeded search index (ref/recipe_search_seed.json, built
+            // by tools/GW2CraftingHelper.RecipeSeeder by walking the full
+            // /v2/recipes id list rather than this search endpoint) - a
+            // live cache-miss fallback through THIS method alone cannot
+            // discover them.
+            var url = $"{BaseUrl}/recipes/search?output={itemId}&v={SchemaVersion}";
             string json = await GetJsonAsync(url, ct);
             if (json == null)
             {
@@ -33,7 +71,7 @@ namespace GW2CraftingHelper.Services
 
         public async Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
         {
-            var url = $"{BaseUrl}/recipes/{recipeId}";
+            var url = $"{BaseUrl}/recipes/{recipeId}?v={SchemaVersion}";
             string json = await GetJsonAsync(url, ct);
             if (json == null)
             {
@@ -105,11 +143,52 @@ namespace GW2CraftingHelper.Services
             {
                 foreach (var ing in ingredients)
                 {
+                    // KNOWN-ISSUES recipe-ingestion bug class
+                    // (2026-08-15): the versioned schema pinned above
+                    // keys EVERY ingredient's item id as "id" - verified
+                    // live for both a Currency ingredient (recipe
+                    // 14025) and a plain, type-less Item ingredient
+                    // (recipe 7785, versioned) - "item_id" is only the
+                    // UNVERSIONED shape's key. "item_id" is kept as a
+                    // fallback purely for defense (an accidental
+                    // unversioned call, or a future regression); it is
+                    // not required by any row currently in
+                    // ref/recipes_seed.json (checked: every existing
+                    // seed row's ingredients already use "id", since
+                    // that file stores RawIngredient's own C# property
+                    // name, not the raw API key).
+                    //
+                    // Review-fix (recipe-ingestion-fix): Value<int?>(key)
+                    // returns null only when the key is genuinely absent
+                    // (unlike Value<int>(key), which silently returns 0
+                    // for a missing key) - used for both id and count so a
+                    // row missing BOTH "id" and "item_id", or missing
+                    // "count" entirely, is detected and skipped rather
+                    // than silently ingested as item id 0 / count 0. A
+                    // zero-id ingredient is not inert: CraftingPlanPipeline.
+                    // CollectItemIds would add it as a real Item node,
+                    // trigger a /v2/commerce/prices lookup for item 0, and
+                    // render an unnamed leaf in the tree. Unlike the
+                    // offline seeder (tools/GW2CraftingHelper.RecipeSeeder/
+                    // Program.cs), which throws on this same malformed
+                    // shape - an acceptable, loud failure for a developer-
+                    // run batch tool - this client sits on the live plan-
+                    // generation path, so skipping just the one malformed
+                    // ingredient lets the rest of a real recipe still
+                    // render instead of aborting the whole plan over one
+                    // bad row.
+                    int? id = ing.Value<int?>("id") ?? ing.Value<int?>("item_id");
+                    int? count = ing.Value<int?>("count");
+                    if (!id.HasValue || id.Value <= 0 || !count.HasValue)
+                    {
+                        continue;
+                    }
+
                     recipe.Ingredients.Add(new RawIngredient
                     {
                         Type = ing.Value<string>("type") ?? "Item",
-                        Id = ing.Value<int>("item_id"),
-                        Count = ing.Value<int>("count")
+                        Id = id.Value,
+                        Count = count.Value
                     });
                 }
             }
