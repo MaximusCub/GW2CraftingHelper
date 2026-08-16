@@ -375,6 +375,11 @@ namespace GW2CraftingHelper.Services
                 result, treeUsedForSolve, solveResult, prices,
                 targetItemId, quantity, priceBasis, usedMaterials, ownMaterialsMode);
 
+            // design-plan-notes.md (Notes section, excess/reclaim):
+            // annotation-only, same architectural role as SellSideEconomics
+            // above - writes only result.ExcessCraftOutputs.
+            ExcessCraftOutputCalculator.Apply(result, prices, metadata);
+
             // Capture inputs so the UI can re-solve locally with per-node
             // overrides (no network round-trips).
             result.SolveContext = new PlanSolveContext
@@ -794,6 +799,14 @@ namespace GW2CraftingHelper.Services
                 result, treeUsedForSolve, solveResult, prices, items,
                 priceBasis, usedMaterials, ownMaterialsMode);
 
+            // design-plan-notes.md (Notes section, excess/reclaim):
+            // annotation-only, same architectural role as
+            // SellSideEconomics above - writes only
+            // result.ExcessCraftOutputs. Walks MultiItemRoots (set by the
+            // BuildCraftingTreeResult call above) same as the single-item
+            // call site walks CraftingTree.
+            ExcessCraftOutputCalculator.Apply(result, prices, metadata);
+
             result.SolveContext = new PlanSolveContext
             {
                 TargetItemId = Gw2Constants.MultiItemWrapperItemId,
@@ -926,6 +939,18 @@ namespace GW2CraftingHelper.Services
                     context.RequestedItems, context.PriceBasis,
                     context.UsedMaterials, context.OwnMaterialsMode);
             }
+
+            // design-plan-notes.md (Notes section, excess/reclaim): a local
+            // override/Ignore re-solve must recompute ExcessCraftOutputs
+            // exactly like it recomputes sell-side economics above - see
+            // this method's own comment on that call for why (KNOWN-ISSUES
+            // #25's precedent). Single call, unlike the sell-side branch
+            // above: ExcessCraftOutputCalculator.Apply already walks
+            // whichever of result.CraftingTree/MultiItemRoots
+            // BuildCraftingTreeResult populated, so it needs no single-vs-
+            // batch branch of its own.
+            ExcessCraftOutputCalculator.Apply(result, context.Prices, context.Metadata);
+
             result.SolveContext = context;
 
             if (result.DebugLog == null)
