@@ -327,9 +327,10 @@ where that currency appears, or only once in the summary?
   provenance claim doesn't hold up. No such concept, and no matching CSS
   class, exists anywhere in gw2e's current live templates. This looks like
   either a stale claim or a reference to something gw2e has since removed.
-- **What to do**: a small comment fix at
-  `TreeSectionController.cs:767-770` to say this is a module-original
-  enhancement rather than a port. No behavior change.
+- **Resolved** (audit row 56 PART B #3, 2026-08-16): the comment at
+  `TreeSectionController.cs` (now near line 895) was corrected in place to
+  say this is a module-original enhancement rather than a gw2e port. No
+  behavior change.
 - Matrix reference: row 46.
 
 ---

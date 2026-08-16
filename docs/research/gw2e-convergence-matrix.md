@@ -1020,11 +1020,11 @@ KNOWN-ISSUES #20.4.
   `TreeSectionController.cs:767-770` attributes it to "gw2e's '.not-crafted'
   informational reference branch" - that specific provenance claim does not
   hold up against the current live template (no such gated-but-rendered
-  concept, no matching CSS class, anywhere). Behavior preserved as-is;
-  recommend a small doc-only correction to the comment's provenance claim
-  (module-original enhancement, not a gw2e port), noted in the
-  considerations log since the audit's evidence standard caught the
-  mismatch.
+  concept, no matching CSS class, anywhere). Behavior preserved as-is.
+  **Resolved** (audit row 56 PART B #3, 2026-08-16): the comment's
+  provenance claim was corrected in place (module-original enhancement,
+  not a gw2e port) - the considerations log entry (Section 12) is updated
+  to match.
 
 ### 47. Tree-node default expansion depth
 
