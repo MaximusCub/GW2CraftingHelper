@@ -118,6 +118,20 @@ namespace GW2CraftingHelper.Services
             // chosen root recipe over-produces (OutputCount does not divide
             // the requested quantity), this root's own cost pays for the
             // whole batch, so the extra units are sellable too.
+            //
+            // Review fix (finding 8, MEASURED): "produced" must use the
+            // SAME basis CraftsNeeded was derived from - ExpectedOutputCount
+            // (EV), not the nominal OutputCount - exactly the finding-1 fix
+            // ExcessCraftOutputCalculator.Walk already applies. For an
+            // integer-yield recipe ExpectedOutputCount == OutputCount (a
+            // no-op ratio of 1.0); only a Mystic-Clover-style fractional-EV
+            // root recipe diverges, and using the nominal basis there was
+            // inflating sellableQuantity (and therefore NetSaleValue/the
+            // Profit tile - a real total, not an advisory one) far past
+            // what the recipe actually expects to yield. Falls back to
+            // OutputCount only when ExpectedOutputCount is unset (a
+            // pre-existing tree/fixture that never populated it) - mirrors
+            // ExcessCraftOutputCalculator.Walk's own fallback exactly.
             int sellableQuantity = requestedQuantity;
             long itemCraftCost = 0L;
             if (solveResult.Decisions.TryGetValue(itemRoot.NodeId, out var rootDecision))
@@ -129,7 +143,10 @@ namespace GW2CraftingHelper.Services
                         .FirstOrDefault(r => r.RecipeId == rootDecision.RecipeId);
                     if (chosenRecipe != null && chosenRecipe.OutputCount > 0)
                     {
-                        int produced = chosenRecipe.CraftsNeeded * chosenRecipe.OutputCount;
+                        double basis = chosenRecipe.ExpectedOutputCount > 0
+                            ? chosenRecipe.ExpectedOutputCount
+                            : chosenRecipe.OutputCount;
+                        int produced = (int)Math.Floor(chosenRecipe.CraftsNeeded * basis);
                         if (produced > sellableQuantity)
                         {
                             sellableQuantity = produced;

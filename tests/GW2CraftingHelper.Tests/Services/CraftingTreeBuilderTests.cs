@@ -87,8 +87,9 @@ namespace GW2CraftingHelper.Tests.Services
         public void CraftNode_ChildrenAreIngredients()
         {
             // Item 1 crafts from 2x item 2. Craft is cheaper.
-            var tree = Craftable(1, 1,
-                Option(10, 1, 1, Leaf(2, 2)));
+            var option = Option(10, 1, 1, Leaf(2, 2));
+            option.ExpectedOutputCount = 1.0;
+            var tree = Craftable(1, 1, option);
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
@@ -107,6 +108,14 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(node.IsReferenceBranch); // real craft, not a reference branch
             Assert.Single(node.Children);
 
+            // Review fix (finding 7): the Notes excess feature is entirely
+            // downstream of these three fields (CraftingTreeBuilder.BuildNode
+            // copying them from the chosen RecipeOption) - nothing asserted
+            // they actually land on the tree node before this.
+            Assert.Equal(1, node.CraftsNeeded);
+            Assert.Equal(1, node.RecipeOutputCount);
+            Assert.Equal(1.0, node.RecipeExpectedOutputCount);
+
             var child = node.Children[0];
             Assert.Equal(2, child.ItemId);
             Assert.Equal("Ingot", child.Name);
@@ -115,6 +124,13 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(100, child.UnitCost);
             Assert.Equal(200, child.SubtreeCost);
             Assert.False(child.IsReferenceBranch); // no recipe to build a reference branch from
+
+            // Review fix (finding 7): a non-Craft node must carry none of
+            // the three Craft-only fields (CraftingTreeNode.CraftsNeeded's
+            // own doc comment: "null for every other decision").
+            Assert.Null(child.CraftsNeeded);
+            Assert.Null(child.RecipeOutputCount);
+            Assert.Null(child.RecipeExpectedOutputCount);
             Assert.Empty(child.Children);
         }
 

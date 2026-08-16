@@ -17,9 +17,13 @@ namespace GW2CraftingHelper.Models
         public int ItemId { get; set; }
 
         // Sum, over every Craft occurrence of ItemId, of
-        // (CraftsNeeded * RecipeOutputCount - Quantity) where positive.
-        // Always > 0 - a non-positive total is never added to the list at
-        // all (ExcessCraftOutputCalculator only emits items with real
+        // (CraftsNeeded * RecipeExpectedOutputCount - Quantity) where
+        // positive - the EV basis, not the nominal RecipeOutputCount (see
+        // ExcessCraftOutputCalculator's finding-1 comment for why: using
+        // RecipeOutputCount fabricates a large fake surplus for a
+        // fractional-EV recipe like Mystic Clover). Always > 0 - a
+        // non-positive total is never added to the list at all
+        // (ExcessCraftOutputCalculator only emits items with real
         // surplus).
         public int ExcessQuantity { get; set; }
 

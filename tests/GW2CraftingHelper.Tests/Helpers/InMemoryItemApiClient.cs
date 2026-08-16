@@ -27,9 +27,9 @@ namespace GW2CraftingHelper.Tests.Helpers
         /// </summary>
         public int ThrowOnCallNumber { get; set; }
 
-        public void AddItem(int id, string name, string icon, string rarity = null)
+        public void AddItem(int id, string name, string icon, string rarity = null, List<string> flags = null)
         {
-            _items[id] = new RawItem { Id = id, Name = name, Icon = icon, Rarity = rarity };
+            _items[id] = new RawItem { Id = id, Name = name, Icon = icon, Rarity = rarity, Flags = flags };
         }
 
         public Task<IReadOnlyList<RawItem>> GetItemsAsync(

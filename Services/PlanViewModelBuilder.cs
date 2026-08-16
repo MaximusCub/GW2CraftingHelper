@@ -1030,18 +1030,22 @@ namespace GW2CraftingHelper.Services
             // no data for at all and are never represented in a plan,
             // in either direction.
             //
-            // Review fix (finding 4, MEASURED): the single-row, ~243-char
-            // version of this note overflowed NotesSectionRenderer's fixed
-            // 28px row (panelWidth ~884px at DefaultFont14) - the clipped
-            // half was exactly the "true multi-outcome gambles... never
-            // models and never shows" caveat the note exists to deliver.
-            // Split verbatim (no rewording) at the existing sentence break
-            // plus one clause break, into 3 NoteLine rows - this preserves
-            // the 28px-per-row contract exactly (section height is
-            // rows.Count * FallbackTextRowHeight) while keeping every word
-            // of the original text visible. The first row's text is the
-            // exact substring that was already confirmed to render fully
-            // un-clipped in the single-row version.
+            // Review fix (finding 4, INFERRED - no live desktop
+            // verification was performed, see docs/KNOWN-ISSUES.md): the
+            // single-row, ~243-char version of this note would have
+            // clipped horizontally at NotesSectionRenderer's panel edge
+            // (panelWidth ~884px at DefaultFont14, AutoSizeWidth label with
+            // no max-width cap) - a label cannot overflow a fixed-height
+            // row's HEIGHT, only its own horizontal extent, so the failure
+            // mode here is edge-clipping, not row overflow. The clipped
+            // portion would have been exactly the "true multi-outcome
+            // gambles... never models and never shows" caveat the note
+            // exists to deliver. Split at the existing sentence break plus
+            // one clause break, into 3 NoteLine rows, each now a complete
+            // sentence - this preserves the 28px-per-row contract exactly
+            // (section height is rows.Count * FallbackTextRowHeight) while
+            // keeping every word of the original text visible regardless
+            // of panel width.
             if (result.ProbabilisticForgeOutputItemIds != null &&
                 result.ProbabilisticForgeOutputItemIds.Count > 0)
             {
@@ -1055,12 +1059,12 @@ namespace GW2CraftingHelper.Services
                 {
                     RowType = PlanRowType.NoteLine,
                     Label = "True multi-outcome Mystic Forge gambles (e.g. precursor forging) are a " +
-                        "different mechanic"
+                        "different mechanic."
                 });
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.NoteLine,
-                    Label = "this plan never models and never shows."
+                    Label = "This plan never models or shows them."
                 });
                 noteEntryCount++;
             }

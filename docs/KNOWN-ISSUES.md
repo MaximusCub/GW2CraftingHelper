@@ -4803,10 +4803,20 @@ current code before editing; the design's structure held unchanged.
 4. **`ExcessCraftOutputCalculator`** (`6662925`, new, `internal static`,
    mirrors `SellSideEconomics`' shape) - walks `CraftingTree`/
    `MultiItemRoots`, aggregates every `Decision == Craft` occurrence's
-   positive `(CraftsNeeded * RecipeOutputCount - Quantity)` surplus by
-   `ItemId`, resolves `ReclaimValue` (null when unpriced OR
-   account-bound) / `IsAccountBound`. Advisory-only by construction: it
-   writes nothing but `CraftingPlanResult.ExcessCraftOutputs`.
+   positive `(CraftsNeeded * RecipeExpectedOutputCount - Quantity)`
+   surplus (the EV basis, not the nominal `RecipeOutputCount` - using the
+   nominal basis fabricates a large fake surplus for a fractional-EV
+   recipe like Mystic Clover) by `ItemId`, resolves `ReclaimValue` (null
+   when unpriced OR account-bound) / `IsAccountBound`. Advisory-only by
+   construction: it writes nothing but `CraftingPlanResult.
+   ExcessCraftOutputs`. Excludes two categories of node from the walk:
+   any node beneath an `IsReferenceBranch` subtree (hypothetical "what it
+   would cost to craft instead" content, never actually crafted), and
+   every requested root item id (single-item `CraftingTree`, or each
+   `MultiItemRoots` entry) - the root's own over-production is already
+   advertised via `SellSideEconomics.ComputePerItemEconomics`'
+   `sellableQuantity` bump, so including it here would double-advertise
+   the same coins under a different label.
 5. **`PlanResultBuilder`** (`4fd0a1e`) - extends the existing
    `craftSteps`/`recipeOptionIndex` loop with the Mystic-Clover-style
    signal (`MysticForge` discipline + `ExpectedOutputCount <
@@ -4902,10 +4912,18 @@ exceeding its own estimate) was implemented in full per the primary path.
 Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - clean, 0
 errors (only pre-existing StyleCop warnings, none in new/edited files).
 Tests (measured, `dotnet test tests/GW2CraftingHelper.Tests/
-GW2CraftingHelper.Tests.csproj`): 1501 (baseline) -> 1524 (+23), all
-green at every one of the eight commit checkpoints (verified individually
-via `git stash push --keep-index` before each commit, not just at the
-end). One unrelated flaky failure was observed once
+GW2CraftingHelper.Tests.csproj`): 1501 (baseline) -> 1533 after the
+initial implementation, -> 1536 (+35 total) after the review-fix round
+(findings 6/7/8 each added real-production-path test coverage:
+`ItemMetadataServiceTests.FetchBatchIntoCache_DerivesIsAccountBound_
+FromRawItemFlags`, `Gw2ApiClient404Tests.ItemClient_ParsesFlags_
+MissingFieldYieldsEmptyList`, `SellSideEconomicsTests.
+ComputePerItemEconomics_FractionalEvRoot_UsesExpectedOutputCountNotNominalOutputCount`,
+plus two new assertions appended to the existing
+`CraftingTreeBuilderTests.CraftNode_ChildrenAreIngredients`). All green
+at every one of the eight commit checkpoints (verified individually via
+`git stash push --keep-index` before each commit, not just at the end).
+One unrelated flaky failure was observed once
 (`TradingPostServiceTests.ConcurrentCalls_OverlappingIds_
 SharedIdsCoalesce_UniqueIdFetchedSeparately`, a pre-existing concurrency
 test) and confirmed non-reproducing on immediate re-run, both isolated

@@ -27,6 +27,21 @@ namespace GW2CraftingHelper.Views.Rendering
     // a coin cell - renders at exactly that height. Both branches below use
     // the same fixed rowHeight; the DEBUG assert at the end of CreateNoteRow
     // is the load-bearing check this class's own correctness depends on.
+    //
+    // Review fix (findings 2/3): the label is now ellipsized against the
+    // available width (rightEdge minus the coin cell, when present) rather
+    // than a raw AutoSizeWidth label with no cap - matching every other
+    // label+right-value row shape in this codebase (UsedMaterialsSectionRenderer
+    // -> IconNameRowHelpers.CreateIconAndEllipsizedName / LabelHelpers.
+    // EllipsizeToWidth). Unlike that icon+name helper (which is
+    // icon-column-specific), this row has no icon, so it calls
+    // LabelHelpers.EllipsizeToWidth/PlanRelayoutMath.NameMaxWidthBeforeColumn
+    // directly rather than going through IconNameRowHelpers. A truncated
+    // row also gets a BasicTooltipText with the full, untruncated text -
+    // same "ellipsize + tooltip" contract as every other truncatable row.
+    // Re-ellipsized at settle via AddReellipsis, mirroring
+    // IconNameRowHelpers.ReellipsizeName's own "only touch Text/tooltip
+    // when the displayed string actually changed" gate.
     internal sealed class NotesSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -53,18 +68,12 @@ namespace GW2CraftingHelper.Views.Rendering
         private void CreateNoteRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
         {
             const int rowHeight = PlanContentHeightMath.FallbackTextRowHeight;
+            const int labelX = 8;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
             var font = GameService.Content.DefaultFont14;
 
-            new Label()
-            {
-                Text = "  " + (row.Label ?? ""),
-                Font = font,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(8, 4),
-                Parent = rowPanel
-            };
+            string fullText = "  " + (row.Label ?? "");
+            bool hasCoin = row.CoinValue > 0;
 
             // Coin cell only when CoinValue > 0 - mirrors
             // CoinCurrencyRenderer's own "hasCoin = copper > 0" convention,
@@ -72,7 +81,33 @@ namespace GW2CraftingHelper.Views.Rendering
             // plain-text NoteLine (competency/forge-scope) renders NO value
             // cell at all rather than an unpriced dash - there is no price
             // concept for those lines to begin with.
-            if (row.CoinValue > 0)
+            //
+            // MeasureValueWidth is called BEFORE the cell itself is built
+            // so the label's own max width can reserve room for it -
+            // mirrors MeasureValueWidth's own documented shopping-list
+            // pre-scan use, same "measure-then-build" ordering.
+            int coinCellWidth = hasCoin ? CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, null, font) : 0;
+            int gapBeforeCoin = hasCoin ? 12 : 0;
+
+            int maxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                panelWidth - 8, coinCellWidth, gapBeforeCoin, labelX);
+            string displayText = LabelHelpers.EllipsizeToWidth(font, fullText, maxWidth);
+
+            var label = new Label()
+            {
+                Text = displayText,
+                Font = font,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(labelX, 4),
+                Parent = rowPanel
+            };
+            if (displayText != fullText)
+            {
+                rowPanel.BasicTooltipText = row.Label ?? "";
+            }
+
+            if (hasCoin)
             {
                 int rightEdge = panelWidth - 8;
                 var coinHandle = CoinCurrencyRenderer.RenderValueCellRightAligned(
@@ -89,6 +124,21 @@ namespace GW2CraftingHelper.Views.Rendering
                 _sink.AddRelayout(w => rowPanel.Size = new Point(w, rowHeight));
             }
 
+            _sink.AddReellipsis(w =>
+            {
+                int newCoinCellWidth = hasCoin
+                    ? CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, null, font)
+                    : 0;
+                int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                    w - 8, newCoinCellWidth, gapBeforeCoin, labelX);
+                string newDisplayText = LabelHelpers.EllipsizeToWidth(font, fullText, newMaxWidth);
+                if (label.Text != newDisplayText)
+                {
+                    label.Text = newDisplayText;
+                    rowPanel.BasicTooltipText = newDisplayText != fullText ? (row.Label ?? "") : null;
+                }
+            });
+
 #if DEBUG
             // Load-bearing per this class's own doc comment: PlanSectionType.
             // Notes relies on PlanContentHeightMath's default arm (rows.Count
@@ -96,10 +146,22 @@ namespace GW2CraftingHelper.Views.Rendering
             // when every row renders at exactly that height. Fail loud in
             // DEBUG rather than silently drifting the section's real height
             // out of sync with what CraftingPlanView computed for it.
-            System.Diagnostics.Debug.Assert(
-                rowPanel.Height == rowHeight,
-                "NotesSectionRenderer: every NoteLine row must render at exactly " +
-                "PlanContentHeightMath.FallbackTextRowHeight - see this class's own doc comment.");
+            //
+            // Review fix (finding 3): re-reading rowPanel.Height here (set
+            // from the same const rowHeight two statements above the
+            // original version of this assert) can never fail - it guards
+            // nothing. The real ways a NoteLine could break the 28px
+            // contract are a child control growing taller than the row (a
+            // future WrapText/larger-font change to the label, or a coin
+            // cell taller than rowHeight - 4), so assert on the CHILDREN's
+            // own extents instead.
+            foreach (var child in rowPanel.Children)
+            {
+                System.Diagnostics.Debug.Assert(
+                    child.Bottom <= rowHeight,
+                    "NotesSectionRenderer: every NoteLine row's child controls must fit within " +
+                    "PlanContentHeightMath.FallbackTextRowHeight - see this class's own doc comment.");
+            }
 #endif
         }
     }

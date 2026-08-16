@@ -61,7 +61,18 @@ namespace GW2CraftingHelper.Services
                     {
                         foreach (var flag in flagsToken)
                         {
-                            flags.Add(flag.Value<string>());
+                            // Nice-to-have (review fix): a malformed array
+                            // element (null, or a non-string token) must
+                            // not inject a null into Flags - RawItem.Flags'
+                            // own doc comment promises a never-null LIST,
+                            // but a null ENTRY inside it would still be a
+                            // silent contract violation for any future
+                            // consumer beyond the current Contains(...) check.
+                            var flagValue = flag.Value<string>();
+                            if (flagValue != null)
+                            {
+                                flags.Add(flagValue);
+                            }
                         }
                     }
 

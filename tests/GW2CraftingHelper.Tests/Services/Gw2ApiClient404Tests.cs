@@ -150,6 +150,29 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task ItemClient_ParsesFlags_MissingFieldYieldsEmptyList()
+        {
+            // Review fix (finding 6): real-path coverage for
+            // Gw2ItemApiClient.GetItemsAsync's "flags" array parsing -
+            // previously nothing asserted this half of the account-bound
+            // plumbing (only ItemMetadataService's derivation from an
+            // already-built RawItem was covered).
+            var json = @"[
+                {""id"":1,""name"":""A"",""icon"":""http://a.png"",""flags"":[""AccountBound"",""NoSell""]},
+                {""id"":2,""name"":""B"",""icon"":""http://b.png""}]";
+            using (var handler = new StubHandler(HttpStatusCode.OK, json))
+            using (var http = new HttpClient(handler))
+            {
+                var client = new Gw2ItemApiClient(http);
+                var result = await client.GetItemsAsync(
+                    new[] { 1, 2 }, CancellationToken.None);
+
+                Assert.Equal(new[] { "AccountBound", "NoSell" }, result[0].Flags);
+                Assert.Empty(result[1].Flags);
+            }
+        }
+
+        [Fact]
         public async Task ItemClient_500_ThrowsWithStatusCode()
         {
             using (var handler = new StubHandler(HttpStatusCode.InternalServerError))

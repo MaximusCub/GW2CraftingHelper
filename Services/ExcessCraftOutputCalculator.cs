@@ -11,7 +11,9 @@ namespace GW2CraftingHelper.Services
     /// already-built display tree (CraftingTreeResult.CraftingTree for a
     /// single-item plan, MultiItemRoots for a batch) and aggregates every
     /// Decision == Craft occurrence's positive (CraftsNeeded *
-    /// RecipeOutputCount - Quantity) surplus, grouped by ItemId.
+    /// RecipeExpectedOutputCount - Quantity) surplus (the EV basis, not the
+    /// nominal RecipeOutputCount - see the finding-1 comment on Walk
+    /// below), grouped by ItemId.
     ///
     /// Aggregation is deliberately by ItemId across every tree occurrence,
     /// not per tree node: a shared sub-ingredient crafted in two unrelated
@@ -62,7 +64,9 @@ namespace GW2CraftingHelper.Services
             // Review fix (finding 6, MEASURED): SellSideEconomics.
             // ComputePerItemEconomics already raises the ROOT item's own
             // sellableQuantity (and therefore NetSaleValue/the Profit tile)
-            // to CraftsNeeded * OutputCount whenever the root recipe
+            // to CraftsNeeded * ExpectedOutputCount (the same EV basis as
+            // finding 1 above - see the finding-8 fix on
+            // ComputePerItemEconomics itself) whenever the root recipe
             // over-produces - the Total Cost section already advertises
             // this exact surplus. The display-tree root is also a Craft
             // node, so without this exclusion the walk above would emit
@@ -160,11 +164,31 @@ namespace GW2CraftingHelper.Services
                 // that never set the new field (old plan.json, direct test
                 // fixtures) - a real Craft node always has one of the two
                 // populated together with CraftsNeeded.
-                double basis = node.RecipeExpectedOutputCount.HasValue && node.RecipeExpectedOutputCount.Value > 0
-                    ? node.RecipeExpectedOutputCount.Value
-                    : node.RecipeOutputCount.Value;
-                double producedEv = node.CraftsNeeded.Value * basis;
-                int excess = (int)Math.Floor(producedEv - node.Quantity);
+                // Nice-to-have (review fix): an ordinary integer-yield
+                // recipe's basis is a double that merely happens to hold an
+                // integer (ExpectedOutputCount == OutputCount, ratio 1.0) -
+                // computing producedEv through floating point there exposes
+                // the whole "excess" figure to any future source of
+                // representation error (e.g. 2.9999999996 silently
+                // dropping a whole unit). Fast-pathed as plain integer math
+                // whenever the two bases are equal; only a genuine
+                // fractional-EV recipe (Mystic Clover-style) takes the
+                // double path below.
+                int excess;
+                if (node.RecipeExpectedOutputCount.HasValue &&
+                    node.RecipeExpectedOutputCount.Value == node.RecipeOutputCount.Value)
+                {
+                    excess = (node.CraftsNeeded.Value * node.RecipeOutputCount.Value) - node.Quantity;
+                }
+                else
+                {
+                    double basis = node.RecipeExpectedOutputCount.HasValue && node.RecipeExpectedOutputCount.Value > 0
+                        ? node.RecipeExpectedOutputCount.Value
+                        : node.RecipeOutputCount.Value;
+                    double producedEv = node.CraftsNeeded.Value * basis;
+                    excess = (int)Math.Floor(producedEv - node.Quantity);
+                }
+
                 if (excess > 0)
                 {
                     excessByItemId[node.ItemId] = excessByItemId.TryGetValue(node.ItemId, out var existing)
