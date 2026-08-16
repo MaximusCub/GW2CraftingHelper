@@ -2288,6 +2288,69 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(resolved.CharacterDisciplines);
         }
 
+        // Review nice-to-have (audit row 56 follow-up): CraftingPlanPipeline
+        // assigns DailyCooldownItems at five hand-copied sites (mirroring
+        // AcquisitionHints), none of which had a test pinning the seed
+        // survives a GenerateStructuredAsync -> ResolveWithOverrides round
+        // trip - a future refactor could silently drop one site. This
+        // mirrors ResolveWithOverrides_CarriesCharacterDisciplinesForward's
+        // shape immediately above, applied to the daily-cooldown seed
+        // instead.
+        [Fact]
+        public async Task DailyCooldownItems_SurvivesGenerateStructuredAsync_AndResolveWithOverridesRoundTrip()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target Item", "target.png");
+            itemApi.AddItem(2, "Ingredient", "ingredient.png");
+
+            var seed = new Dictionary<int, DailyCooldownItem>
+            {
+                [2] = new DailyCooldownItem { ItemId = 2, PerDayCap = 1 }
+            };
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                vendorOfferStore: null,
+                reducer: null,
+                accountRecipeClient: null,
+                currencyMetadataService: null,
+                acquisitionHints: null,
+                moduleLog: null,
+                dailyCooldownItems: seed);
+
+            var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.Same(seed, initial.DailyCooldownItems);
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+            };
+            var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
+
+            Assert.Same(seed, resolved.DailyCooldownItems);
+        }
+
         [Fact]
         public async Task BuildPresetOverrides_CraftAll_ReachesNodesUnderBoughtIntermediates()
         {

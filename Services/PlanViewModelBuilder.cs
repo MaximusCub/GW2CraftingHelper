@@ -699,8 +699,17 @@ namespace GW2CraftingHelper.Services
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.TimegatedNotice,
+                    // Review nice-to-have (post-PART-C follow-up): each
+                    // notice row is individually accurate but says nothing
+                    // about how multiple rows combine - the real floor
+                    // across several gated items in one plan is max(days),
+                    // not the sum, since the per-account daily caps run
+                    // independently of each other (e.g. the flagship
+                    // Gift of Aurene case, which needs several gated
+                    // Dragon Hatchling Doll components at once).
                     Label = $"{itemName} is timegated - {cooldown.PerDayCap} per day per account - " +
-                        $"crafting {step.Quantity} will take about {days} days"
+                        $"crafting {step.Quantity} will take about {days} days " +
+                        "(runs in parallel with other daily-gated items)"
                 });
             }
         }

@@ -119,6 +119,34 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        [Fact]
+        public void Load_ZeroOrNegativeItemId_EntrySkipped_NoThrow()
+        {
+            // Review nice-to-have: same malformed-data guard shape as the
+            // existing PerDayCap check above - no PlanStep ever carries an
+            // ItemId <= 0, so an entry claiming one is bad seed data, not a
+            // real recipe.
+            string json = @"{
+                ""schemaVersion"": 1,
+                ""generatedAt"": ""2026-08-16T00:00:00Z"",
+                ""source"": ""test"",
+                ""items"": [
+                    { ""itemId"": 0, ""perDayCap"": 1, ""sourceUrl"": ""https://example.com/a"", ""lastVerified"": ""2026-01-01"" },
+                    { ""itemId"": -5, ""perDayCap"": 1, ""sourceUrl"": ""https://example.com/b"", ""lastVerified"": ""2026-01-01"" },
+                    { ""itemId"": 102, ""perDayCap"": 1, ""sourceUrl"": ""https://example.com/c"", ""lastVerified"": ""2026-01-01"" }
+                ]
+            }";
+            using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
+            {
+                var items = DailyCooldownItemService.Load(stream);
+
+                Assert.Single(items);
+                Assert.True(items.ContainsKey(102));
+                Assert.False(items.ContainsKey(0));
+                Assert.False(items.ContainsKey(-5));
+            }
+        }
+
         // --- Shipped seed file (pins the real file against silent drift) ---
 
         [Fact]

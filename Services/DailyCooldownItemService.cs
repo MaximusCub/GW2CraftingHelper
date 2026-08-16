@@ -58,12 +58,19 @@ namespace GW2CraftingHelper.Services
 
                     foreach (var entry in envelope.Items)
                     {
-                        if (entry == null || entry.PerDayCap <= 0)
+                        if (entry == null || entry.ItemId <= 0 || entry.PerDayCap <= 0)
                         {
                             // A zero/negative cap is not a real recipe
                             // limit (and would divide-by-zero the "days
                             // needed" math downstream) - skip rather than
                             // invent a notice from malformed seed data.
+                            // Review nice-to-have: an itemId <= 0 is
+                            // equally malformed (no PlanStep ever carries
+                            // one) - same guard shape as PerDayCap. This
+                            // guard is stricter than AcquisitionHintService.
+                            // Load, which does not validate ItemId; harmless
+                            // divergence, not a behavior change either
+                            // service depends on.
                             continue;
                         }
                         // Last-write-wins on duplicate item ids, matching

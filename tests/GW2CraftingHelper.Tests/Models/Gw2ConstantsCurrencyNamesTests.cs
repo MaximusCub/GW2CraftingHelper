@@ -87,6 +87,15 @@ namespace GW2CraftingHelper.Tests.Models
             {
                 int id = kvp.Key;
                 string expectedName = kvp.Value;
+
+                // Review nice-to-have: a bare LiveApiNameById[id] indexer
+                // here would throw an undiagnostic KeyNotFoundException if
+                // a future id were added to ExpectedDictName without a
+                // matching LiveApiNameById entry, instead of one of this
+                // file's own legible failure messages.
+                Assert.True(
+                    LiveApiNameById.ContainsKey(id),
+                    $"LiveApiNameById is missing id {id} - add its real live-API name alongside the new ExpectedDictName entry.");
                 string liveName = LiveApiNameById[id];
 
                 Assert.True(

@@ -10,13 +10,16 @@ namespace GW2CraftingHelper.Services
     /// decision math (a Currency node's usedQuantity always equals its
     /// totalQuantity regardless of wallet balance). Audit row 56 PART B #3
     /// (corrected provenance): gw2efficiency nets owned currency out at
-    /// BOTH the Shopping List / summary display layer AND via a per-node
-    /// "owned" display pill on the tree itself - it is not summary-layer-
-    /// only, as this comment previously and incorrectly claimed. The pill
-    /// is display only, not decision math: gw2e's own quantity engine
-    /// never nets owned currency into a decision either (docs/research/
-    /// gw2e-convergence-matrix.md, calculateTreeQuantity.ts finding),
-    /// same as this class. This class is that
+    /// least via a per-node "owned" display pill on the tree itself
+    /// (componentTree.html, live-fetched) - it is not summary-layer-only,
+    /// as this comment previously and incorrectly claimed. (Whether gw2e
+    /// ALSO nets it out at a separate summary layer is not itself
+    /// confirmed by that fetch; only the per-node pill is measured
+    /// evidence - see docs/research/gw2e-convergence-matrix.md row 42.)
+    /// The pill is display only, not decision math: gw2e's own quantity
+    /// engine never nets owned currency into a decision either (docs/
+    /// research/gw2e-convergence-matrix.md, calculateTreeQuantity.ts
+    /// finding), same as this class. This class is that
     /// reconciliation's data source for this module - an
     /// AccountItemIndex-adjacent lookup over
     /// AccountSnapshot.Wallet, never consulted by InventoryReducer or
