@@ -127,7 +127,12 @@ namespace GW2CraftingHelper.Models
         public int ComponentOwnedQuantity { get; set; }
 
         // Wiki-derived acquisition guidance (see AcquisitionHintService),
-        // set only for Decision == Unknown nodes with a seeded hint.
+        // set for Decision == Unknown nodes with a seeded hint. Also set
+        // (guildupgrade-ingredients fix) for Decision == GuildUpgrade
+        // nodes with a fixed, non-seeded explanation - see
+        // CraftingTreeBuilder's "GuildUpgrade" branch - since that
+        // decision has the same "no priceable source, here is why" shape
+        // as Unknown but no AcquisitionHintService entry to draw from.
         // Tooltip-only text, never an id.
         public string AcquisitionHint { get; set; }
 

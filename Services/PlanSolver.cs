@@ -379,10 +379,11 @@ namespace GW2CraftingHelper.Services
         /// callers summing ingredient costs for a parent craft are summing
         /// comparison values, which is required for the parent's own
         /// craft-vs-buy comparison to be correct (see Decision.ComparisonValue).
-        /// EVERY non-currency ingredient of EVERY recipe on this node is
-        /// evaluated (and therefore gets its own memo entry) regardless of
-        /// whether this node ends up bought, crafted via a different
-        /// recipe, or unpriceable itself - see the recipe loop below.
+        /// EVERY non-currency, non-guild-upgrade ingredient of EVERY recipe
+        /// on this node is evaluated (and therefore gets its own memo
+        /// entry) regardless of whether this node ends up bought, crafted
+        /// via a different recipe, or unpriceable itself - see the recipe
+        /// loop below.
         /// </summary>
         private long? Evaluate(
             RecipeNode node,
@@ -397,7 +398,13 @@ namespace GW2CraftingHelper.Services
             ISet<int> ignoredItemIds = null,
             HomesteadEfficiencyTiers homesteadTiers = null)
         {
-            if (node.IngredientType == "Currency")
+            // guildupgrade-ingredients fix: a "GuildUpgrade" node is never
+            // itself Evaluate()-called by the ingredient loop below (it
+            // continues past it just like a real Currency ingredient, see
+            // that loop) - this guard is defense-in-depth only, mirroring
+            // the Currency guard immediately below, in case a future
+            // caller ever invokes Evaluate directly on one.
+            if (node.IngredientType == "Currency" || node.IngredientType == "GuildUpgrade")
             {
                 return null;
             }
@@ -549,6 +556,30 @@ namespace GW2CraftingHelper.Services
 
                 foreach (var ingredient in recipe.Ingredients)
                 {
+                    if (ingredient.IngredientType == "GuildUpgrade")
+                    {
+                        // guildupgrade-ingredients fix: a Guild Decoration
+                        // recipe's claimed-guild-hall-upgrade requirement
+                        // (GW2 API ingredient type "GuildUpgrade") is never
+                        // priced as an item (this id is not a TP item id -
+                        // see CollectItemIds' "Item"-only fetch guard) and
+                        // never priced as a currency either, even though
+                        // CurrencyValuation might coincidentally hold an
+                        // entry for this exact numeric id - GuildUpgrade
+                        // ids and wallet currency ids are two unrelated id
+                        // spaces that DO overlap numerically in real recipe
+                        // data (see Gw2Constants.KnownCurrencyNames' own
+                        // doc comment), so consulting currencyValuation
+                        // here would silently misprice this ingredient
+                        // using an unrelated currency's rate. Demotes the
+                        // recipe to the fallback tier unconditionally -
+                        // exactly the same machinery a genuinely unvalued
+                        // Currency ingredient uses below - and contributes
+                        // zero to both craftCost and craftRealCost.
+                        hasUnvaluedCurrency = true;
+                        continue;
+                    }
+
                     if (ingredient.IngredientType == "Currency")
                     {
                         // Mirrors EvaluateVendorOffers' identical coin-vs-
@@ -944,6 +975,22 @@ namespace GW2CraftingHelper.Services
             ref int craftCounter,
             ISet<int> ignoredItemIds = null)
         {
+            if (node.IngredientType == "GuildUpgrade")
+            {
+                // guildupgrade-ingredients fix: unlike a real Currency
+                // ingredient below, a GuildUpgrade node must NEVER
+                // accumulate into currencyMap - it is not a wallet
+                // currency (see Evaluate's ingredient loop for the pricing
+                // side of this same fix) and must never surface in
+                // plan.CurrencyCosts, the Summary currency table, or any
+                // wallet lookup keyed off that table. It carries no memo
+                // entry either (Evaluate's ingredient loop never calls
+                // Evaluate on it), so it also never reaches the ordinary
+                // decision/step-generation code below - this early return
+                // is the only handling it needs.
+                return;
+            }
+
             if (node.IngredientType == "Currency")
             {
                 // Adversarial-review follow-up (fourth-site finding): a
@@ -1297,7 +1344,13 @@ namespace GW2CraftingHelper.Services
         private static long? RecomputeCraftCosts(
             RecipeNode node, Dictionary<int, Decision> memo, ISet<int> ignoredItemIds)
         {
-            if (node.IngredientType == "Currency")
+            // guildupgrade-ingredients fix: mirrors the Currency guard
+            // immediately below - a GuildUpgrade node carries no memo
+            // entry (see Evaluate's ingredient loop), so this is defense-
+            // in-depth consistency, not load-bearing on its own (the
+            // ingredient-loop skip further down already never recurses
+            // into one).
+            if (node.IngredientType == "Currency" || node.IngredientType == "GuildUpgrade")
             {
                 return null;
             }
@@ -1325,6 +1378,16 @@ namespace GW2CraftingHelper.Services
             {
                 foreach (var ingredient in chosenRecipe.Ingredients)
                 {
+                    if (ingredient.IngredientType == "GuildUpgrade")
+                    {
+                        // guildupgrade-ingredients fix: never a real coin
+                        // contribution (see Evaluate's ingredient loop) -
+                        // explicit skip, mirroring the Currency branch
+                        // immediately below, rather than relying on the
+                        // recursive call's own top-of-method guard to
+                        // return null.
+                        continue;
+                    }
                     if (ingredient.IngredientType == "Currency")
                     {
                         // Adversarial-review follow-up (finding 3's sibling

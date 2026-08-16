@@ -95,6 +95,39 @@ namespace GW2CraftingHelper.Services
                 return treeNode;
             }
 
+            // GuildUpgrade nodes are leaf nodes too, but a DISTINCT
+            // situation from a real wallet Currency (guildupgrade-
+            // ingredients fix - see docs/KNOWN-ISSUES.md): the GW2 API
+            // tags a Guild Decoration recipe's claimed-guild-hall-upgrade
+            // requirement with ingredient type "GuildUpgrade" (e.g. recipe
+            // 12002 -> item 80471 needs guild upgrade id 829), and a guild
+            // upgrade id is NOT a wallet currency id - the two id spaces
+            // numerically overlap in the real seed (several GuildUpgrade
+            // ids fall inside Gw2Constants.KnownCurrencyNames' own 2-80
+            // range), so resolving this via
+            // Gw2Constants.ResolveCurrencyName/CurrencyDisplayResolver
+            // (as the generic non-Item branch below does for a real
+            // Currency) would risk displaying an unrelated currency's
+            // name. No live metadata source exists for a guild upgrade id
+            // today either: CollectTreeItemIds only ever fetches ItemMetadata
+            // for "Item"-typed ids, so `metadata` never carries a genuine
+            // entry for this id (see that method's own guard). IDs must
+            // never be displayed (repo invariant), so this uses a generic,
+            // ID-free label plus an acquisition-hint-style explanation
+            // instead of the item-branch's "Unknown Item" fallback or the
+            // currency-branch's literal "Currency" fallback. Full guild-
+            // decoration crafting support (resolving the real upgrade name,
+            // verifying ownership) is out of scope - see docs/KNOWN-ISSUES.md.
+            if (node.IngredientType == "GuildUpgrade")
+            {
+                treeNode.Decision = CraftingDecision.GuildUpgrade;
+                treeNode.Name = "Guild upgrade (unresolved)";
+                treeNode.AcquisitionHint =
+                    "Requires a claimed Guild Hall upgrade. This module does not " +
+                    "yet resolve guild upgrade names or verify ownership.";
+                return treeNode;
+            }
+
             // Currency nodes are leaf nodes. Review-fix
             // (recipe-ingestion-fix, Must Fix): prefer the live-fetched
             // CurrencyMetadataService name via CurrencyDisplayResolver -

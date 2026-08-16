@@ -66,9 +66,10 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// One pill per feasible acquisition source: 2-3 pills means a real
         /// choice, exactly 1 pill means the source is locked - the pill
-        /// count itself is the affordance. HAVE/CURRENCY/UNKNOWN are always
-        /// single, non-interactive pills (no AcquisitionSource value
-        /// represents "force use owned materials", so there is nothing to
+        /// count itself is the affordance. HAVE/CURRENCY/GUILD UPGRADE/
+        /// UNKNOWN are always single, non-interactive pills (no
+        /// AcquisitionSource value represents "force use owned materials"
+        /// or "resolve this guild upgrade", so there is nothing to
         /// override to).
         ///
         /// The selected pill (Kind == Selected, or the sole Locked pill
@@ -161,6 +162,16 @@ namespace GW2CraftingHelper.Services
             if (node.Decision == CraftingDecision.Currency)
             {
                 specs.Add(new PillSpec("CURRENCY", null, PillKind.Locked));
+                return specs;
+            }
+            // guildupgrade-ingredients fix: a distinct locked pill from
+            // CURRENCY (see CraftingDecision.GuildUpgrade's own doc
+            // comment for why the two must never share vocabulary) - no
+            // AcquisitionSource represents it, so it is single and
+            // non-interactive, same as CURRENCY/HAVE.
+            if (node.Decision == CraftingDecision.GuildUpgrade)
+            {
+                specs.Add(new PillSpec("GUILD UPGRADE", null, PillKind.Locked));
                 return specs;
             }
 
