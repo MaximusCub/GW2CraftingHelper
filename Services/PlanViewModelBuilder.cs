@@ -907,7 +907,11 @@ namespace GW2CraftingHelper.Services
                 // Flag-based target: a LearnedFromItem recipe links to its
                 // own "Recipe: <name>" sheet page; every other recipe links
                 // to the output item's page + "#Acquisition" anchor.
-                string wikiUrl = statusTag == "Missing!"
+                // Review-fix: gated on recipe.IsMissing (the semantic
+                // condition set above, not the display string) rather than
+                // statusTag == "Missing!" - a rename or localization of the
+                // display tag can no longer silently drop every wiki link.
+                string wikiUrl = recipe.IsMissing == true
                     ? WikiLinkBuilder.BuildRequiredRecipeUrl(name, recipe.IsLearnedFromItem)
                     : null;
 

@@ -39,6 +39,19 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("https://wiki.guildwars2.com/wiki/Bolt_of_Damask", url);
         }
 
+        [Fact]
+        public void BuildItemPageUrl_NonAsciiName_Utf8PercentEncoded()
+        {
+            // Repo rule: ASCII-only in source, so the non-ASCII character is
+            // a \u escape rather than a literal. Exercises the axis
+            // EncodeTitle's hand-rolled "Recipe:_" prefix special case
+            // invites a future maintainer to break: Uri.EscapeDataString
+            // percent-encodes multi-byte UTF-8 characters correctly today.
+            string url = WikiLinkBuilder.BuildItemPageUrl("Caf\u00e9");
+
+            Assert.Equal("https://wiki.guildwars2.com/wiki/Caf%C3%A9", url);
+        }
+
         // --- BuildItemAcquisitionUrl ---
 
         [Fact]

@@ -46,14 +46,22 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int ComputeCaptionSplitIndex(CraftingTreeNode node)
         {
+            // Review-fix: Children[0]/Children[index] are dereferenced via
+            // ?. below rather than assumed non-null - CraftingTreeBuilder
+            // never appends a null child today, but this method already
+            // defends against upstream invariant drift elsewhere (see the
+            // "unreachable in production" tail comment below), and an
+            // unguarded null entry here would NRE out of the tree render
+            // path, taking out the whole Recipe Tree section rather than
+            // just one caption.
             if (node?.Children == null || node.Children.Count == 0 ||
-                !node.IsReferenceBranch || !node.Children[0].IsCostComponent)
+                !node.IsReferenceBranch || node.Children[0]?.IsCostComponent != true)
             {
                 return -1;
             }
 
             int index = 0;
-            while (index < node.Children.Count && node.Children[index].IsCostComponent)
+            while (index < node.Children.Count && node.Children[index]?.IsCostComponent == true)
             {
                 index++;
             }

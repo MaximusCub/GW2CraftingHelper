@@ -266,7 +266,12 @@ namespace GW2CraftingHelper.Views
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 4),
+                // Review-fix: y=2 (not 4) inside this 24px _statusPanel -
+                // matches the coin row's own precedent
+                // (LayoutCoinSegments(_coinPanel, segments, 0, 2, font), y=2
+                // in the same 24px height), leaving DefaultFont14 the same
+                // clearance the coin row already relies on.
+                Location = new Point(0, 2),
                 Parent = _statusPanel
             };
             // Capture Blish's own real default rather than guessing/

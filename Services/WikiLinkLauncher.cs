@@ -45,11 +45,31 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
+            // Review-fix: every current caller only ever passes a
+            // WikiLinkBuilder result (always BaseUrl-prefixed), but this is
+            // the module's first shell-out and Process.Start(string) on
+            // net48 resolves through ShellExecute (UseShellExecute
+            // defaults to true), which will happily launch a local
+            // executable, a UNC path, or a file:/custom-scheme handler.
+            // Guarding here keeps the safety property at the launch site
+            // rather than depending on every present and future caller.
+            if (!url.StartsWith("https://", StringComparison.Ordinal))
+            {
+                return;
+            }
+
             Task.Run(() =>
             {
                 try
                 {
-                    Process.Start(url);
+                    // Review-fix: dispose the handle ShellExecute hands
+                    // back on a successful launch - discarding it undisposed
+                    // leaks a process handle per click in a long-running
+                    // overlay. The ShellExecute path can return null here;
+                    // `using` tolerates that.
+                    using (Process.Start(url))
+                    {
+                    }
                 }
                 catch (Exception ex)
                 {

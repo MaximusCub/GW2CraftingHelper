@@ -911,6 +911,15 @@ namespace GW2CraftingHelper.Views.Rendering
             // cursor leaves this row after a press, so a drag that starts
             // here, wanders off, and is released back over this row later
             // (from an unrelated gesture) cannot replay a stale arm.
+            //
+            // Review-fix note: unlike toggleHandler below, this handler
+            // does NOT exclude clicks landing on a pill (pillPanels is not
+            // yet in scope at this point in the build - it is declared
+            // below by RenderDecisionPills). This divergence is intentional
+            // and considered harmless: decision pills carry no right-click
+            // meaning of their own, so a right-click that lands on one
+            // still falls through to this row's wiki-link handler rather
+            // than doing nothing.
             if (WikiLinkBuilder.HasWikiPage(node.Name))
             {
                 string nodeName = node.Name;
