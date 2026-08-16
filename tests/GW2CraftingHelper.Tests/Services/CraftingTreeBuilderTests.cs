@@ -409,6 +409,88 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(treeNode.Children);
         }
 
+        // ---- guildupgrade-ingredients fix: "GuildUpgrade" ingredient type ----
+        // (Guild Decoration recipes' claimed-guild-hall-upgrade requirement,
+        // GW2 API ingredient type - see the real recipe 12002 -> item 80471
+        // shape captured in ref/recipes_seed.json). Deliberately NOT bucketed
+        // as CraftingDecision.Currency (see that enum's own doc comment): a
+        // guild upgrade id is not a wallet currency id, and the two id spaces
+        // numerically overlap in real recipe data.
+
+        [Fact]
+        public void GuildUpgradeNode_DecisionIsGuildUpgrade_WithGenericLabelAndHint_NoRawId()
+        {
+            var node = Leaf(829, 5, "GuildUpgrade");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.GuildUpgrade, treeNode.Decision);
+            Assert.Equal(829, treeNode.ItemId); // internal only - never rendered, see repo invariant
+            Assert.Equal(5, treeNode.Quantity);
+            Assert.False(treeNode.IsReferenceBranch);
+            Assert.Empty(treeNode.Children);
+            Assert.Null(treeNode.SubtreeCost);
+            // The displayed name must never leak the raw id (repo invariant:
+            // IDs are internal-only) - unlike the Currency branch's
+            // Gw2Constants.ResolveCurrencyName fallback, this never even
+            // attempts a currency-domain lookup.
+            Assert.Equal("Guild upgrade (unresolved)", treeNode.Name);
+            Assert.DoesNotContain("829", treeNode.Name);
+            Assert.False(string.IsNullOrEmpty(treeNode.AcquisitionHint));
+        }
+
+        [Fact]
+        public void GuildUpgradeNode_NeverResolvesViaCurrencyMetadata_EvenWhenIdCollides()
+        {
+            // Adversarial case: currencyMetadata happens to carry an entry
+            // for the SAME numeric id as this GuildUpgrade ingredient (the
+            // exact cross-domain collision Gw2Constants.KnownCurrencyNames'
+            // own doc comment documents as real in the current seed - e.g.
+            // GuildUpgrade id 73 also falls in the currency-id range). The
+            // fix must never consult currencyMetadata for a GuildUpgrade
+            // node at all - CurrencyDisplayResolver.ResolveName is only
+            // ever called from the Currency branch, never this one.
+            var node = Leaf(73, 1, "GuildUpgrade");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+            var currencyMetadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 73, new CurrencyMetadata { CurrencyId = 73, Name = "Unrelated Wallet Currency", IconUrl = "wrong.png" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, currencyMetadata: currencyMetadata);
+
+            Assert.Equal(CraftingDecision.GuildUpgrade, treeNode.Decision);
+            Assert.Equal("Guild upgrade (unresolved)", treeNode.Name);
+            Assert.NotEqual("Unrelated Wallet Currency", treeNode.Name);
+        }
+
+        [Fact]
+        public void IgnoredItemIds_GuildUpgradeNode_NeverCollapsedByIgnore()
+        {
+            // Mirrors IgnoredItemIds_CurrencyNode_NeverCollapsedByIgnore
+            // above: Ignore is scoped to Item nodes only (M34-B2b) - a
+            // GuildUpgrade node sharing the same numeric id must keep its
+            // normal GuildUpgrade treatment, never collapse to Have.
+            var node = Leaf(829, 5, "GuildUpgrade");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+            var ignoredItemIds = new HashSet<int> { 829 };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, ignoredItemIds: ignoredItemIds);
+
+            Assert.Equal(CraftingDecision.GuildUpgrade, treeNode.Decision);
+            Assert.False(treeNode.IsIgnored);
+        }
+
         [Fact]
         public void MultiLevel_Tree_CorrectStructure()
         {
