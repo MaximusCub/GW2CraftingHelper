@@ -4411,3 +4411,105 @@ mirrors. Repo invariants otherwise not in play - no pricing-comparability,
 ID-display, or coin-icon-ordering code was touched.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+## AUDIT ROW 20/38 review-fix round 5: stale ARCHITECTURE.md invariant + fallback-winning test gap (2026-08-16)
+
+A fifth adversarial pass over the AUDIT ROW 20/38 TP price-side fallback
+change raised two findings, both fixed.
+
+**Finding 1 (Must Fix, stale doc / contradicted invariant)**:
+`docs/ARCHITECTURE.md`'s section 8 ("Solver decision rules") still
+stated the buy-order/sell-listing basis is "threaded through every
+comparison, matching whichever basis the user selected in the UI - the
+solver never silently mixes the two," with no mention of the same-item
+cross-side fallback this branch added to `PlanSolver.GetUnitPrice`. This
+file is the canonical solver-semantics doc; the round-1 fix here already
+updated `KNOWN-ISSUES.md` and `GetUnitPrice`'s own doc comment but never
+swept `ARCHITECTURE.md`, so a future contributor reading that clause in
+isolation would have reasonable grounds to treat the fallback as a
+basis-mixing bug and revert it.
+
+**Fix**: reworded the clause to state the basis is *preferred per item*
+(not force-applied regardless of data), describe the same-item
+other-side fallback `GetUnitPrice` performs when the preferred side has
+no listings, and cross-reference `KNOWN-ISSUES.md`'s "AUDIT ROW 20/38"
+section by name. Also made explicit what the fallback is *not* - the
+solver still never compares one item's buy-order price against a
+*different* item's sell-listing price, and an item with listings on its
+preferred side never touches the other side - so the "no silent
+cross-item mixing" guarantee the old clause was trying to state is
+preserved, just scoped correctly to cross-item rather than cross-side.
+Docs-only change; no production code touched.
+
+**Finding 2 (Must Fix, test gap)**: every existing test where the
+fallback-priced buy option is compared against a craft or vendor
+alternative has the fallback LOSING
+(`BuyOrderBasis_CraftWinsOverFallbackPricedBuy_DecisionFlagStaysFalse`,
+`BuyOrderBasis_VendorWinsOverFallbackPricedBuy_DecisionFlagStaysFalse`);
+the tests where the fallback-priced buy is chosen
+(`BuyOrderBasis_NoBuyOrders_FallsBackToInstantBuyPrice`,
+`LeafBuyNode_PriceSideFellBack_ReachesCraftingTreeNode`) all use a
+recipe-less leaf, so `BuyFromTp` wins by default (nothing else to
+compare against), not by beating a real alternative on cost. A later
+change that gated the fallback to recipe-less nodes only (e.g. "only
+fall back when there's no craft option to fall through to instead")
+would revert every affected node with a recipe back to force-craft, and
+the whole suite - including all four fallback tests above - would stay
+green, because none of them puts a cheaper fallback-priced buy in a
+three-way comparison it has to *win*.
+
+**Fix**: added one real-`PlanSolver.Solve`-path `[Fact]`,
+`PlanSolverPriceBasisAndOverrideTests.
+BuyOrderBasis_FallbackPricedBuyWinsOverCraft_SourceIsBuyFromTp` - a
+craftable node (`Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)))`) whose
+own preferred TP side is empty (`SellInstant = 0`) but whose other side
+has a real, cheaper listing (`BuyInstant = 100`), against a single
+recipe whose only ingredient prices at 200 under the same basis
+(`SellInstant = 200`). Asserts `Decisions[0].Source ==
+AcquisitionSource.BuyFromTp`, `Plan.TotalCoinCost == 100`, and
+`Decisions[0].PriceSideFellBack == true` - pinning that the
+fallback-priced buy must WIN the comparison, not merely be available
+when nothing else is. Placed directly after the two existing
+fallback-LOSES tests (`BuyOrderBasis_CraftWinsOverFallbackPricedBuy_...`,
+`BuyOrderBasis_VendorWinsOverFallbackPricedBuy_...`) so the three form a
+visible loses/loses/wins group. No production code changed - this was a
+test-only gap, same as round 4's finding 1.
+
+**Self-review findings** (Code Reviewer Mode pass over this diff):
+confirmed the new test's craft-cost arithmetic is independent of the
+fallback path on the ingredient side - item 2's preferred side
+(`SellInstant = 200`) is populated directly, so the craft branch's own
+cost (200) is not itself fallback-priced, isolating the assertion to
+just the root node's buy-vs-craft comparison; confirmed 100 < 200 so
+`PickCheapest`'s decision is unambiguous, no tie-break logic exercised;
+confirmed the new test does not touch `VendorBatchSolver`'s merged-ceil
+batching (no vendor offers passed at all - `solver.Solve(tree, prices,
+null, PriceBasis.BuyOrder)`); confirmed the `ARCHITECTURE.md` reword
+does not touch any other prose in section 8 (`git diff` scoped to the
+one bullet) and introduces no new contradiction with the "per-item"
+framing already used elsewhere in that section (the "Currencies ...
+never to the displayed real coin cost" sentence immediately after it is
+carried through verbatim, just re-flowed). Nice-to-have (not applied -
+would be an unrequested diff with no coverage gain beyond what's
+already pinned): the new test could additionally assert
+`Decisions[0].CanBuyTp`/`CanCraft` alongside `PriceSideFellBack` to make
+"both options were genuinely live, buy won on cost" explicit rather
+than implicit in the fixture's prices - existing sibling tests in this
+file assert only the fields under test (see round 4's identical
+nice-to-have on the same file), so adding it here alone would break
+with the file's own established convention.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` clean, 0
+errors, 0 warnings. Tests: 1383 passed, 0 failed (baseline 1382 from
+round 4; +1 net new, the single `[Fact]` listed above - confirmed via
+`dotnet test
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`). No Blish
+HUD/BlishHUD.exe references added to tests; the edited test file remains
+Blish-free and exercises the real `PlanSolver.Solve` production code
+path, not a contract mirror. Repo invariants otherwise not in play - no
+pricing-comparability, ID-display, or coin-icon-ordering code was
+touched; `Services/ModuleLog.cs`, `Services/PlanContentHeightMath.cs`,
+`Services/PlanRelayoutMath.cs`, scroll machinery, and
+`VendorBatchSolver`'s merged-ceil batching math were not touched.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]

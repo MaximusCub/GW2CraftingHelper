@@ -129,6 +129,35 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void BuyOrderBasis_FallbackPricedBuyWinsOverCraft_SourceIsBuyFromTp()
+        {
+            // AUDIT ROW 20/38 review-fix (test gap): the sibling
+            // *_WinsOverFallbackPricedBuy_DecisionFlagStaysFalse tests above
+            // only cover the fallback-priced buy LOSING the comparison -
+            // every one of them still passes if the fallback were removed
+            // entirely (buyTotalCost -> null, craft/vendor still wins). This
+            // pins the other outcome: item 1's preferred side (buy orders /
+            // SellInstant) is empty, so its buy option is only priced via
+            // the same-item other-side fallback (BuyInstant = 100); that
+            // fallback-priced buy (100) is cheaper than the only recipe
+            // (1x item 2 at SellInstant 200) and must WIN the three-way
+            // comparison, not just lose it gracefully.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 200, SellInstant = 200 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, null, PriceBasis.BuyOrder);
+
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Decisions[0].Source);
+            Assert.Equal(100, result.Plan.TotalCoinCost);
+            Assert.True(result.Decisions[0].PriceSideFellBack);
+        }
+
+        [Fact]
         public void BuyOrderBasis_CanFlipBuyVsCraftDecision()
         {
             // Output: instant 100 / order 90. Craft from 2x ingredient:
