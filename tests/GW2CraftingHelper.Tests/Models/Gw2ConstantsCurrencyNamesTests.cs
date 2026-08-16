@@ -87,12 +87,48 @@ namespace GW2CraftingHelper.Tests.Models
             {
                 int id = kvp.Key;
                 string expectedName = kvp.Value;
+                string liveName = LiveApiNameById[id];
 
                 Assert.True(
                     Gw2Constants.KnownCurrencyNames.ContainsKey(id),
-                    $"KnownCurrencyNames is missing id {id} ({LiveApiNameById[id]} per the live API).");
+                    $"KnownCurrencyNames is missing id {id} ({liveName} per the live API).");
                 Assert.Equal(expectedName, Gw2Constants.KnownCurrencyNames[id]);
+
+                // Review fix (audit row 56 PART C): the assertion above only
+                // ever compared KnownCurrencyNames to ExpectedDictName - a
+                // hand-copied duplicate of the very dictionary under test -
+                // so it never actually pinned anything to LiveApiNameById;
+                // a mispaired id (LiveApiNameById fetched/typed for the
+                // wrong currency) would sail through as long as
+                // ExpectedDictName was copied from the same wrong value.
+                // This ties ExpectedDictName to LiveApiNameById directly,
+                // per id: either verbatim equal (mass-noun currencies -
+                // Karma, Unbound Magic, etc., per this class' own doc
+                // comment) or the mechanical pluralization this dict
+                // consistently applies to countable currencies (append "s"
+                // to the head noun - the word immediately before " of " for
+                // a genitive name like "Badge of Honor", otherwise the
+                // whole name).
+                Assert.True(
+                    expectedName == liveName || expectedName == Pluralize(liveName),
+                    $"ExpectedDictName[{id}] = \"{expectedName}\" does not match live API name " +
+                    $"\"{liveName}\" (unchanged) or its pluralized form \"{Pluralize(liveName)}\" - " +
+                    "check for a mispaired id.");
             }
+        }
+
+        // Mirrors KnownCurrencyNames' own established convention (see this
+        // class' doc comment): pluralize the head noun - the word right
+        // before " of " for a genitive name (e.g. "Badge of Honor" ->
+        // "Badges of Honor"), otherwise the whole name (e.g. "Mistborn Key"
+        // -> "Mistborn Keys"). Sufficient for every countable currency name
+        // in LiveApiNameById above - none needs irregular pluralization.
+        private static string Pluralize(string apiName)
+        {
+            int ofIndex = apiName.IndexOf(" of ", System.StringComparison.Ordinal);
+            return ofIndex >= 0
+                ? apiName.Substring(0, ofIndex) + "s" + apiName.Substring(ofIndex)
+                : apiName + "s";
         }
 
         [Fact]
