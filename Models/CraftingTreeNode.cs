@@ -79,6 +79,22 @@ namespace GW2CraftingHelper.Models
         // anywhere in this node's own subtree (the common case).
         public long? DecisionValue { get; set; }
 
+        // currency-ux-package review fix (finding 4, MEASURED): passthrough
+        // of SolverDecision.VendorComponentCostsUnreliable for this node's
+        // committed decision. True only for a BuyFromVendor decision whose
+        // per-occurrence VendorItemCosts/VendorCurrencyCosts (and, by
+        // extension, DecisionValue's own currency component) could not be
+        // proven to still sum to this node's corrected TotalCost after
+        // AllocateVendorNodeCosts merged 2+ tree occurrences into one true
+        // batch (see Decision.VendorComponentCostsUnreliable's own doc
+        // comment). CraftingTreeBuilder already refuses to synthesize
+        // vendor cost-component leaves under this condition
+        // (BuildVendorCostComponentLeaves) for the identical reason;
+        // ValueDetailTooltipBuilder.TryBuild gates on this flag the same
+        // way, so the Feature-3 hover never presents a currency figure it
+        // cannot vouch for.
+        public bool VendorComponentCostsUnreliable { get; set; }
+
         // AUDIT ROW 20/38 (gw2e price-side fallback parity): true when this
         // node's UnitCost above came from an item's NON-preferred TP side
         // because the preferred side (per the plan's PriceBasis) had no

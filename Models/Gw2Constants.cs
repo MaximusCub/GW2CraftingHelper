@@ -114,21 +114,41 @@ namespace GW2CraftingHelper.Models
             { 28, "Magnetite Shards" },
             { 29, "Provisioner Tokens" },
             { 30, "PvP League Tickets" },
+            // currency-ux-package review fix (finding 2, MEASURED): ids 31,
+            // 35, 39, 53, 57, 64, 67, 68, 69 were missing from this table
+            // entirely, so ResolveCurrencyName returned the literal string
+            // "Currency" for all nine - the Settings tab's now-curated
+            // CuratedCurrencyIds list (SettingsTabContent.cs) surfaces every
+            // one of them as a row, so all nine rendered as visually
+            // identical, unlabeled "Currency" rows. Names below are cited
+            // verbatim from CurrencyDecisionDefaults.cs's own inline
+            // comments and cross-checked against the live GW2 API in
+            // docs/research/gw2e-currency-decision-prices.md section 2
+            // (2026-08-16 run) - not invented (repo invariant).
+            { 31, "Proof of Heroics" },
             { 32, "Unbound Magic" },
             { 33, "Ascended Shards of Glory" },
             { 34, "Trade Contracts" },
+            { 35, "Elegy Mosaic" },
             { 36, "Testimony of Desert Heroics" },
+            { 39, "Gaeting Crystal" },
             { 45, "Volatile Magic" },
             { 47, "Racing Medallions" },
             { 49, "Mistborn Keys" },
             { 50, "Festival Tokens" },
+            { 53, "Green Prophet Shard" },
+            { 57, "Blue Prophet Shard" },
             { 58, "War Supplies" },
             { 59, "Unstable Fractal Essence" },
             { 60, "Tyrian Defense Seals" },
             { 61, "Research Notes" },
             { 62, "Unusual Coins" },
             { 63, "Astral Acclaim" },
+            { 64, "Jade Sliver" },
             { 65, "Testimony of Jade Heroics" },
+            { 67, "Canach Coins" },
+            { 68, "Imperial Favor" },
+            { 69, "Tales of Dungeon Delving" },
             { 78, "Fine Rift Essence" },
             { 79, "Rare Rift Essence" },
             { 80, "Masterwork Rift Essence" }

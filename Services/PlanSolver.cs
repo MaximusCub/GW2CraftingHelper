@@ -266,43 +266,95 @@ namespace GW2CraftingHelper.Services
             // depth bound - it walks the ENTIRE chosen-path tree from
             // `tree` down, so `memo`/Decisions/SubtreeCost are already
             // fully correct at every level after this line, however deep.
-            // currency-ux-package review fix (finding 1, MEASURED): capture
-            // each vendor decision's pre-correction (ComparisonValue -
-            // TotalCost) delta - the valued-currency-line coin-equivalent
-            // Evaluate folded in, 0 whenever nothing about this offer was
-            // valued (see Decision.ComparisonValue's own doc comment) -
-            // BEFORE calling AllocateVendorNodeCosts, then re-apply that
-            // same delta on top of the corrected TotalCost once it returns.
-            // AllocateVendorNodeCosts (VendorBatchSolver, DO-NOT-TOUCH:
-            // merged-ceil batching math) corrects TotalCost for every
-            // occurrence of a merged vendor step but has no reason to know
-            // about ComparisonValue at all; done here in the PlanSolver-side
-            // wrapper instead, exactly mirroring how FlagUnreliableVendorComponentCosts
-            // just below already reads that method's outputs after the fact
-            // rather than touching VendorBatchSolver itself. Without this,
-            // ComparisonValue stays frozen at its stale pre-merge value
-            // while TotalCost moves - ValueDetailTooltipBuilder then reads
-            // the mismatched pair as a fabricated currency divergence on
-            // plans that priced nothing but coin.
-            var vendorComparisonDeltas = new Dictionary<int, long>();
-            foreach (var kvp in memo)
-            {
-                var preCorrection = kvp.Value;
-                if (preCorrection.Source == AcquisitionSource.BuyFromVendor &&
-                    preCorrection.ComparisonValue.HasValue && preCorrection.TotalCost.HasValue)
-                {
-                    vendorComparisonDeltas[kvp.Key] = preCorrection.ComparisonValue.Value - preCorrection.TotalCost.Value;
-                }
-            }
-
+            // currency-ux-package review fix (finding 1, MEASURED - review
+            // round 2): the original approach here captured each vendor
+            // decision's PRE-CORRECTION (ComparisonValue - TotalCost) delta
+            // BEFORE calling AllocateVendorNodeCosts, then re-applied that
+            // same ABSOLUTE per-occurrence delta on top of the corrected
+            // (deduplicated) TotalCost once it returned. That double-counted
+            // any valued non-coin currency line: each pre-merge occurrence's
+            // delta already carried the FULL currency-equivalent cost of
+            // that occurrence's own individually-ceil'd purchase, so summing
+            // N occurrences' full deltas onto the one true merged batch
+            // multiplied the currency contribution by N while
+            // AllocateVendorNodeCosts correctly de-duplicated the coin side.
+            // Fixed by re-deriving the currency contribution from the
+            // CORRECTED merged batch shape instead of replaying stale
+            // per-occurrence deltas: step.VendorCurrencyCosts is already
+            // re-scaled to the true aggregate unitsNeeded by
+            // FinalizeVendorBatches above, so its valuation (via the same
+            // currencyValuation.TryGetCopperValue every other solver call
+            // site uses) is computed exactly ONCE per merged step, then that
+            // single total is allocated across occurrences the same way
+            // AllocateVendorNodeCosts allocates TotalCost: quantity-
+            // weighted, with the last occurrence (same first-seen DFS order
+            // from vendorOccurrences) absorbing the exact remainder so
+            // shares always sum to precisely the step total - no drift, no
+            // invented precision. AllocateVendorNodeCosts (VendorBatchSolver,
+            // DO-NOT-TOUCH: merged-ceil batching math) corrects TotalCost
+            // for every occurrence of a merged vendor step but has no reason
+            // to know about ComparisonValue at all; done here in the
+            // PlanSolver-side wrapper instead, exactly mirroring how
+            // FlagUnreliableVendorComponentCosts just below already reads
+            // that method's outputs after the fact rather than touching
+            // VendorBatchSolver itself. Mirrors AllocateVendorNodeCosts' own
+            // guard (step.VendorOfferOutputCount <= 0 means occurrences
+            // disagreed on the winning offer - the Conflict case - so each
+            // occurrence's own memo ComparisonValue is already individually
+            // correct for its own genuinely different purchase and is left
+            // untouched here, exactly as TotalCost is).
             _vendorBatchSolver.AllocateVendorNodeCosts(stepMap, vendorOccurrences, memo);
 
-            foreach (var kvp in vendorComparisonDeltas)
+            foreach (var kvp in vendorOccurrences)
             {
-                if (memo.TryGetValue(kvp.Key, out var corrected) && corrected.TotalCost.HasValue)
+                if (!stepMap.TryGetValue(kvp.Key, out var step) || step.VendorOfferOutputCount <= 0)
                 {
-                    corrected.ComparisonValue = corrected.TotalCost.Value + kvp.Value;
-                    memo[kvp.Key] = corrected;
+                    continue;
+                }
+
+                long totalCurrencyValue = 0L;
+                if (step.VendorCurrencyCosts != null)
+                {
+                    try
+                    {
+                        foreach (var line in step.VendorCurrencyCosts)
+                        {
+                            if (valuation != null && valuation.TryGetCopperValue(line.Id, out long copperPerUnit))
+                            {
+                                totalCurrencyValue = checked(totalCurrencyValue + ((long)line.Count * copperPerUnit));
+                            }
+                        }
+                    }
+                    catch (OverflowException)
+                    {
+                        // Defense in depth, matching RecomputeComparisonValues'
+                        // and EvaluateVendorOffers' own no-crash posture for
+                        // an absurd valuation input: fall back to whatever
+                        // was accumulated before the overflow rather than
+                        // letting an uncaught exception fail the whole
+                        // Solve(). In practice this offer would already have
+                        // been demoted to fallback tier (comparisonValue ==
+                        // totalCost, delta == 0) at Evaluate() time before an
+                        // overflow this large could occur here.
+                    }
+                }
+
+                var occurrences = kvp.Value;
+                long currencyUnitRate = step.Quantity > 0 ? totalCurrencyValue / step.Quantity : 0L;
+                long allocatedCurrency = 0L;
+                for (int i = 0; i < occurrences.Count; i++)
+                {
+                    var (nodeId, quantity) = occurrences[i];
+                    long currencyShare = (i == occurrences.Count - 1)
+                        ? totalCurrencyValue - allocatedCurrency
+                        : currencyUnitRate * quantity;
+                    allocatedCurrency += currencyShare;
+
+                    if (memo.TryGetValue(nodeId, out var decision) && decision.TotalCost.HasValue)
+                    {
+                        decision.ComparisonValue = decision.TotalCost.Value + currencyShare;
+                        memo[nodeId] = decision;
+                    }
                 }
             }
 
@@ -1490,7 +1542,7 @@ namespace GW2CraftingHelper.Services
         /// Decision.ComparisonValue instead of Decision.TotalCost. Required
         /// because RecomputeCraftCosts only re-sums real coin cost; a Craft
         /// node sitting above a vendor-corrected leaf (see the
-        /// vendorComparisonDeltas pass in Solve(), just before
+        /// vendor-currency reallocation pass in Solve(), just before
         /// RecomputeCraftCosts) would otherwise keep the ComparisonValue
         /// Evaluate() committed BEFORE any vendor-batch correction ever ran,
         /// silently drifting from the now-correct TotalCost - exactly the
@@ -1539,8 +1591,8 @@ namespace GW2CraftingHelper.Services
             if (decision.Source != AcquisitionSource.Craft)
             {
                 // Non-Craft leaf: already corrected either by the
-                // vendorComparisonDeltas pass in Solve() (BuyFromVendor) or
-                // never touched by any correction pass at all (BuyFromTp /
+                // vendor-currency reallocation pass in Solve() (BuyFromVendor)
+                // or never touched by any correction pass at all (BuyFromTp /
                 // UnknownSource - TotalCost == ComparisonValue for those
                 // from Evaluate() onward, and neither pass ever changes a
                 // TP-buy's TotalCost).

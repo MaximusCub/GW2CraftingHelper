@@ -59,9 +59,16 @@ namespace GW2CraftingHelper.Models
     /// table this augments: a value here may tip a craft-vs-buy/vendor-vs-TP
     /// comparison, but must never be surfaced as, or folded into, any
     /// displayed gold total (plan.TotalCoinCost, a step's TotalCost, ...).
-    /// See CurrencyValuation.TryGetEffectiveCopperValue - the only consumer
-    /// permitted to read this table - for the user-override/cleared/default
-    /// precedence this table participates in.
+    /// See CurrencyValuation.TryGetEffectiveCopperValue for the
+    /// user-override/cleared/default precedence this table participates in
+    /// (currency-ux-package review fix, finding 3: that method is not read
+    /// by the solver at runtime - it is CurrencyValuation.WithDefaults'
+    /// own implementation detail, which materializes this table's defaults
+    /// into a plain dictionary before the solver ever runs - see
+    /// TryGetEffectiveCopperValue's doc comment for the full seam). Direct
+    /// readers of this table's keys/values are WithDefaults,
+    /// CurrencyDecisionDefaults.TryGetDefault below, and (for the curated
+    /// id list only) SettingsTabContent.BuildCuratedCurrencyIds.
     ///
     /// Entries gw2efficiency's own table marks `undefined` (meaning gw2e
     /// itself assigns that currency no decision value, not zero) are simply

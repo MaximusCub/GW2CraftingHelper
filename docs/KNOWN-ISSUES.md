@@ -4305,9 +4305,11 @@ exactly one seam - the new `ModuleSettings.GetEffectiveCurrencyValuation`,
 whose sole caller is `Module.cs`'s Generate button handler - so every
 existing solver/pipeline test that constructs its own `CurrencyValuation`
 (or omits one, or reads `ModuleSettings.GetCurrencyValuation`'s raw form)
-is completely unaffected. This is why the full 1410-test baseline passes
-byte-for-byte unmodified alongside this feature; no test needed a
-currency-id swap to avoid an unintended default.
+is completely unaffected. This is why Feature 1's own commit left the
+1410-test baseline byte-for-byte unmodified (+25 new tests only, no
+existing test needed a currency-id swap to avoid an unintended default) -
+scoped to Feature 1 alone; see the correction below for the package as a
+whole, since Feature 2 did intentionally rewrite one pre-existing test.
 
 **Feature 2 - plan-scope currency pills (maintainer's own design).**
 Every currency leaf row in the Recipe Tree (ordinary `Currency`-decision
@@ -4390,5 +4392,36 @@ entry in this file notes; the Settings tab's new default/Clear-checkbox
 layout in particular (new pixel columns past the existing `ErrorX`) has
 not been visually confirmed to fit within a real Settings window at
 typical widths.
+
+**Correction (currency-ux-package review fix, finding 6, MEASURED):** two
+claims above are false as written for the package as a whole. (1) The
+"byte-for-byte unmodified" wording above is scoped to Feature 1's own
+commit only and is accurate there, but Feature 2's commit (`c7bac28`)
+intentionally rewrote one pre-existing test - `DecisionPillPlannerTests.cs`
+gained a `+172/-3` diff, and
+`CostComponent_CurrencyType_WithOwnership_ShowsBothBadgesTogether_CurrencyFirst`
+was renamed to `..._WithRowScopeOwnershipOnly_ShowsOnlyCurrencyBadge` with
+its assertions rewritten, because Feature 2 replaces the currency
+component's own row-scope `OWN n` badge with the new plan-scope pill (see
+Feature 2's own paragraph above) - a behavior change absorbed into an
+existing test, not preserved unmodified. (2) The final test count stated
+above (1470) is stale: the review-fix commit `a49ba19` added tests
+without updating this entry (bringing the count to 1478), and a further
+review-fix round (finding 5, adding real-production-path coverage for the
+merged-vendor valued-currency ComparisonValue shape) brings the measured
+count on this branch to 1479. Both corrections per this repo's measured/
+inferred/guess discipline - an entry that overstates baseline preservation
+is worse than none.
+
+**Nice-to-have note (currency-ux-package review fix):** a persisted plan
+snapshot's `PlanSolveContext.CurrencyValuation` stores the POST-`WithDefaults`
+materialized valuation (curated defaults baked in at solve time, not
+re-resolved on load - round-trip verified working). A user who later
+clears a currency default in Settings will still see the OLD default
+applied when that already-saved plan is re-solved locally, until the plan
+is regenerated fresh. This is consistent with how a user-set override
+value already behaves in a saved snapshot (both are frozen at solve time),
+so it is arguably correct snapshot semantics rather than a bug - noted
+here so it is not rediscovered as one.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

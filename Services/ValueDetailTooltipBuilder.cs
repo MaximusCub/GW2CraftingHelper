@@ -22,6 +22,18 @@ namespace GW2CraftingHelper.Services
     /// whole purpose is to surface a decision-only figure): every number
     /// this class formats is for a HOVER TOOLTIP only - it must never be
     /// copied into a displayed total anywhere else in the app.
+    ///
+    /// currency-ux-package review fix (nice-to-have): this hover can never
+    /// fire for the "unpriceable component" trigger the brief lists
+    /// alongside valued currencies. PlanSolver.RecomputeComparisonValues
+    /// sets ComparisonValue = TotalCost for every fallback-tier decision,
+    /// and fallback tier propagates transitively up through every Craft
+    /// ancestor, so an unvalued currency or GuildUpgrade ingredient
+    /// anywhere in a chosen subtree forces delta = 0 for that node AND
+    /// every ancestor above it - TryBuild's delta &lt;= 0 guard below then
+    /// suppresses the hover for the whole chain. Documented here, not
+    /// fixed, so a future reader treats this as a known scope limit of the
+    /// current solver rollup rather than rediscovering it as a bug.
     /// </summary>
     public static class ValueDetailTooltipBuilder
     {
@@ -58,6 +70,20 @@ namespace GW2CraftingHelper.Services
             // "Paid in a non-coin currency" tooltip for that pill) if that
             // construction path ever changes.
             if (node.IsCostComponent)
+            {
+                return false;
+            }
+            // currency-ux-package review fix (finding 4, MEASURED): a
+            // merged vendor decision's VendorComponentCostsUnreliable is
+            // already the documented signal (see that field's own doc
+            // comment, and CraftingTreeBuilder's identical guard on
+            // synthesizing cost-component leaves) that this node's
+            // per-occurrence cost breakdown could not be proven to still
+            // sum correctly after AllocateVendorNodeCosts merged 2+ tree
+            // occurrences - the same conservative posture applied here so
+            // this hover never presents a currency figure it cannot vouch
+            // for on that node.
+            if (node.VendorComponentCostsUnreliable)
             {
                 return false;
             }

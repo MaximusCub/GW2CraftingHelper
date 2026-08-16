@@ -186,6 +186,10 @@ namespace GW2CraftingHelper.Services
             // currency-ux-package (Feature 3): decision-only, see
             // CraftingTreeNode.DecisionValue's own doc comment.
             treeNode.DecisionValue = decision.ComparisonValue;
+            // currency-ux-package review fix (finding 4, MEASURED): see
+            // CraftingTreeNode.VendorComponentCostsUnreliable's own doc
+            // comment.
+            treeNode.VendorComponentCostsUnreliable = decision.VendorComponentCostsUnreliable;
             treeNode.CanCraft = decision.CanCraft;
             treeNode.CanBuyTp = decision.CanBuyTp;
             treeNode.CanBuyVendor = decision.CanBuyVendor;

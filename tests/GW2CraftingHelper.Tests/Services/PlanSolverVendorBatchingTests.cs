@@ -560,5 +560,65 @@ namespace GW2CraftingHelper.Tests.Services
             // TotalCost) must stay exactly the individually-correct 152.
             Assert.Equal(152, result.Decisions[tree.NodeId].TotalCost);
         }
+
+        [Fact]
+        public void MultiOccurrenceMergedVendorOffer_ValuedCurrency_ComparisonValueScalesWithMergedBatch()
+        {
+            // currency-ux-package review fix (finding 1/5, MEASURED): the
+            // review's own reproducer. Two tree occurrences of item 99
+            // (qty 1 each) merge into ONE true vendor batch (a 100-unit
+            // batch costing 150 coin + 100 karma, karma valued at 5 copper
+            // per unit) - the single new code path (vendorComparisonDeltas)
+            // commit a49ba19 was written to fix, but with a VALUED non-coin
+            // currency line, which no test exercised before this one. The
+            // previous approach replayed EACH occurrence's own pre-merge
+            // currency delta (500 copper, the full per-occurrence-ceil'd
+            // batch's karma value) unmodified onto the corrected TotalCost,
+            // yielding a root ComparisonValue of 1150 (150 coin + 500 + 500)
+            // - the true merged currency contribution (100 karma x 5c =
+            // 500) counted TWICE. Correct total is 650 (150 coin + 500
+            // currency-equivalent), matching plan.TotalCoinCost=150 and
+            // plan.CurrencyCosts[karma]=100 exactly.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(99, 1),
+                    Leaf(99, 1)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { MixedVendorOffer(99, 150, 2, 100, outputCount: 100) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation);
+            var plan = result.Plan;
+
+            Assert.Equal(150, plan.TotalCoinCost);
+            var currencyCost = Assert.Single(plan.CurrencyCosts, c => c.CurrencyId == 2);
+            Assert.Equal(100, currencyCost.Amount);
+
+            var rootDecision = result.Decisions[tree.NodeId];
+            Assert.Equal(150, rootDecision.TotalCost);
+            Assert.Equal(650, rootDecision.ComparisonValue);
+
+            // Both merged leaf occurrences must reconcile to the same
+            // corrected totals - the real coin cost sums to 150 (already
+            // covered by the sibling coin-only tests above) and the
+            // decision-only comparison value sums to 650, i.e. real coin
+            // PLUS the true merged currency contribution counted exactly
+            // once, not once per occurrence.
+            long leafTotalCostSum = 0;
+            long leafComparisonSum = 0;
+            foreach (var leaf in tree.Recipes[0].Ingredients)
+            {
+                var leafDecision = result.Decisions[leaf.NodeId];
+                Assert.Equal(AcquisitionSource.BuyFromVendor, leafDecision.Source);
+                leafTotalCostSum += leafDecision.TotalCost.Value;
+                leafComparisonSum += leafDecision.ComparisonValue.Value;
+            }
+            Assert.Equal(150, leafTotalCostSum);
+            Assert.Equal(650, leafComparisonSum);
+        }
     }
 }
