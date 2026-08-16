@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Blish_HUD;
 using Blish_HUD.Controls;
@@ -773,7 +774,8 @@ namespace GW2CraftingHelper.Views
         {
             string levelText = entry.Level.ToString().ToUpperInvariant();
             string tagPart = string.IsNullOrEmpty(entry.Tag) ? string.Empty : $"[{entry.Tag}] ";
-            return $"[{levelText}] {entry.TimestampUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss} {tagPart}{entry.Message}";
+            string timestampText = entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+            return $"[{levelText}] {timestampText} {tagPart}{entry.Message}";
         }
 
         private static Color ColorForLevel(ModuleLogLevel level)
