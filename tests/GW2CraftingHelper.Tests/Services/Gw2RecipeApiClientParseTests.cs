@@ -149,6 +149,86 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ParseRecipe_IngredientMissingBothIdKeys_SkipsIngredientRatherThanEmittingIdZero()
+        {
+            // Review-fix (recipe-ingestion-fix): a row with NEITHER "id" nor
+            // "item_id" previously silently ingested Id = 0 (Newtonsoft's
+            // Value<int>(key) defaults to 0 for a missing key) - a real
+            // item id 0 flows into CraftingPlanPipeline.CollectItemIds as a
+            // genuine Item node and renders an unnamed leaf. The malformed
+            // row must be skipped instead, leaving the recipe's other,
+            // well-formed ingredients intact.
+            var json = @"{
+                ""id"": 1,
+                ""output_item_id"": 10,
+                ""output_item_count"": 1,
+                ""disciplines"": [],
+                ""min_rating"": 0,
+                ""flags"": [],
+                ""ingredients"": [
+                    { ""type"": ""Item"", ""count"": 3 },
+                    { ""type"": ""Item"", ""id"": 46695, ""count"": 1 }
+                ]
+            }";
+
+            var recipe = Gw2RecipeApiClient.ParseRecipe(json);
+
+            Assert.Single(recipe.Ingredients);
+            Assert.Equal(46695, recipe.Ingredients[0].Id);
+        }
+
+        [Fact]
+        public void ParseRecipe_IngredientMissingCount_SkipsIngredientRatherThanEmittingCountZero()
+        {
+            // Same defect class as the id-key case above, for "count":
+            // Value<int>("count") also silently defaulted to 0 for a
+            // missing key.
+            var json = @"{
+                ""id"": 1,
+                ""output_item_id"": 10,
+                ""output_item_count"": 1,
+                ""disciplines"": [],
+                ""min_rating"": 0,
+                ""flags"": [],
+                ""ingredients"": [
+                    { ""type"": ""Item"", ""id"": 99 },
+                    { ""type"": ""Item"", ""id"": 46695, ""count"": 1 }
+                ]
+            }";
+
+            var recipe = Gw2RecipeApiClient.ParseRecipe(json);
+
+            Assert.Single(recipe.Ingredients);
+            Assert.Equal(46695, recipe.Ingredients[0].Id);
+        }
+
+        [Fact]
+        public void ParseRecipe_IngredientWithExplicitZeroCount_StillParsed()
+        {
+            // Guards the narrow scope of the fix above: an explicit
+            // "count": 0 is a present key (not a missing one) and must
+            // still be kept - only a genuinely ABSENT count key is
+            // treated as malformed.
+            var json = @"{
+                ""id"": 1,
+                ""output_item_id"": 10,
+                ""output_item_count"": 1,
+                ""disciplines"": [],
+                ""min_rating"": 0,
+                ""flags"": [],
+                ""ingredients"": [
+                    { ""type"": ""Item"", ""id"": 46695, ""count"": 0 }
+                ]
+            }";
+
+            var recipe = Gw2RecipeApiClient.ParseRecipe(json);
+
+            Assert.Single(recipe.Ingredients);
+            Assert.Equal(46695, recipe.Ingredients[0].Id);
+            Assert.Equal(0, recipe.Ingredients[0].Count);
+        }
+
+        [Fact]
         public void ParseRecipe_NoIngredients_ReturnsEmptyList()
         {
             var json = @"{

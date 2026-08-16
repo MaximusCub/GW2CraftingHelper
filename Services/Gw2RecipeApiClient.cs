@@ -143,25 +143,52 @@ namespace GW2CraftingHelper.Services
             {
                 foreach (var ing in ingredients)
                 {
+                    // KNOWN-ISSUES recipe-ingestion bug class
+                    // (2026-08-15): the versioned schema pinned above
+                    // keys EVERY ingredient's item id as "id" - verified
+                    // live for both a Currency ingredient (recipe
+                    // 14025) and a plain, type-less Item ingredient
+                    // (recipe 7785, versioned) - "item_id" is only the
+                    // UNVERSIONED shape's key. "item_id" is kept as a
+                    // fallback purely for defense (an accidental
+                    // unversioned call, or a future regression); it is
+                    // not required by any row currently in
+                    // ref/recipes_seed.json (checked: every existing
+                    // seed row's ingredients already use "id", since
+                    // that file stores RawIngredient's own C# property
+                    // name, not the raw API key).
+                    //
+                    // Review-fix (recipe-ingestion-fix): Value<int?>(key)
+                    // returns null only when the key is genuinely absent
+                    // (unlike Value<int>(key), which silently returns 0
+                    // for a missing key) - used for both id and count so a
+                    // row missing BOTH "id" and "item_id", or missing
+                    // "count" entirely, is detected and skipped rather
+                    // than silently ingested as item id 0 / count 0. A
+                    // zero-id ingredient is not inert: CraftingPlanPipeline.
+                    // CollectItemIds would add it as a real Item node,
+                    // trigger a /v2/commerce/prices lookup for item 0, and
+                    // render an unnamed leaf in the tree. Unlike the
+                    // offline seeder (tools/GW2CraftingHelper.RecipeSeeder/
+                    // Program.cs), which throws on this same malformed
+                    // shape - an acceptable, loud failure for a developer-
+                    // run batch tool - this client sits on the live plan-
+                    // generation path, so skipping just the one malformed
+                    // ingredient lets the rest of a real recipe still
+                    // render instead of aborting the whole plan over one
+                    // bad row.
+                    int? id = ing.Value<int?>("id") ?? ing.Value<int?>("item_id");
+                    int? count = ing.Value<int?>("count");
+                    if (!id.HasValue || id.Value <= 0 || !count.HasValue)
+                    {
+                        continue;
+                    }
+
                     recipe.Ingredients.Add(new RawIngredient
                     {
                         Type = ing.Value<string>("type") ?? "Item",
-                        // KNOWN-ISSUES recipe-ingestion bug class
-                        // (2026-08-15): the versioned schema pinned above
-                        // keys EVERY ingredient's item id as "id" - verified
-                        // live for both a Currency ingredient (recipe
-                        // 14025) and a plain, type-less Item ingredient
-                        // (recipe 7785, versioned) - "item_id" is only the
-                        // UNVERSIONED shape's key. "item_id" is kept as a
-                        // fallback purely for defense (an accidental
-                        // unversioned call, or a future regression); it is
-                        // not required by any row currently in
-                        // ref/recipes_seed.json (checked: every existing
-                        // seed row's ingredients already use "id", since
-                        // that file stores RawIngredient's own C# property
-                        // name, not the raw API key).
-                        Id = ing.Value<int?>("id") ?? ing.Value<int>("item_id"),
-                        Count = ing.Value<int>("count")
+                        Id = id.Value,
+                        Count = count.Value
                     });
                 }
             }
