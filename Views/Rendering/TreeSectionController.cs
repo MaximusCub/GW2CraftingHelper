@@ -765,12 +765,26 @@ namespace GW2CraftingHelper.Views.Rendering
             // fix, same CoinCurrencyRenderer.RenderValueCellRightAligned entry point); a
             // decision whose real cost is genuinely zero-and-uncosted
             // renders a dash instead of an invented "0".
+            //
+            // W4B: a node whose children are the new synthesized cost-
+            // component leaves (see CraftingTreeBuilder.
+            // BuildVendorCostComponentLeaves - every child of such a node is
+            // a component leaf, never mixed with a reference branch or a
+            // real craft child) shows ONLY the compact gold total here - no
+            // currency segments - since the breakdown those segments used
+            // to cram into this one row now lives one expand-click away as
+            // real child rows. This is the fix for the exact collision the
+            // W4B field case hit (a mixed coin/currency/item vendor cost
+            // rendering as one very long segmented row).
+            bool hasCostComponentChildren = node.Children.Count > 0 && node.Children[0].IsCostComponent;
             CoinCurrencyRenderer.ValueCellHandle costCell = null;
             if (node.SubtreeCost.HasValue)
             {
                 var costFont = GameService.Content.DefaultFont14;
-                var currencyAmounts = CurrencyDisplayResolver.ResolveAmounts(
-                    node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata);
+                var currencyAmounts = hasCostComponentChildren
+                    ? null
+                    : CurrencyDisplayResolver.ResolveAmounts(
+                        node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata);
                 costCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
                     rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
             }
@@ -1097,30 +1111,56 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.Have)
                 {
-                    // Maintainer's final wording pass (2026-08-06): matches
-                    // the OwnedInfo pill's "Needs N - ..." vocabulary below
-                    // instead of the old bare "Fully covered by your
-                    // materials". For a genuinely-owned Have node, Quantity
-                    // is 0 (the node's whole demand was already subtracted
-                    // during reduction), so OwnedQuantityUsed alone already
-                    // is the original total demand.
-                    tooltipText = $"Needs {node.OwnedQuantityUsed} - all covered by your materials";
+                    // W4B: a cost-component leaf's HAVE pill reads
+                    // ComponentOwnedQuantity/Quantity, never
+                    // OwnedQuantityUsed - see CraftingTreeNode.
+                    // ComponentOwnedQuantity's own doc comment for why the
+                    // two are deliberately separate fields (a component
+                    // leaf's Quantity is never reduced for ownership, unlike
+                    // an ordinary node's).
+                    tooltipText = node.IsCostComponent
+                        ? $"Needs {node.Quantity} - already covered by your wallet/inventory"
+                        // Maintainer's final wording pass (2026-08-06): matches
+                        // the OwnedInfo pill's "Needs N - ..." vocabulary below
+                        // instead of the old bare "Fully covered by your
+                        // materials". For a genuinely-owned Have node, Quantity
+                        // is 0 (the node's whole demand was already subtracted
+                        // during reduction), so OwnedQuantityUsed alone already
+                        // is the original total demand.
+                        : $"Needs {node.OwnedQuantityUsed} - all covered by your materials";
                 }
                 else if (spec.Kind == PillKind.OwnedInfo)
                 {
-                    // Field-test finding A's tooltip spelled out what the
-                    // pill text means in full sentences, alongside the tree
-                    // row's own remaining-need "Nx" prefix (node.Quantity);
-                    // the maintainer's final wording pass (2026-08-06, see
-                    // DecisionPillPlanner.AppendOwnershipPills) reworded the
-                    // pill itself to "HAVE {used}/{total} NEEDED" and this
-                    // tooltip to match, without changing what either number
-                    // means - remaining (node.Quantity) is still total minus
-                    // used.
-                    int totalDemand = node.OwnedQuantityUsed + node.Quantity;
-                    tooltipText =
-                        $"Needs {totalDemand} total - {node.OwnedQuantityUsed} covered by your materials, " +
-                        $"{node.Quantity} left to acquire";
+                    if (node.IsCostComponent)
+                    {
+                        // W4B: unlike the ordinary OwnedInfo case below,
+                        // owning some of a cost component never reduces what
+                        // still has to be handed over as part of this
+                        // purchase - Quantity IS the full need, always (see
+                        // CraftingTreeNode.ComponentOwnedQuantity's doc
+                        // comment). Wording avoids "left to acquire" for
+                        // exactly that reason: nothing here is a separate
+                        // shopping trip.
+                        tooltipText =
+                            $"This purchase needs {node.Quantity} - you already have " +
+                            $"{node.ComponentOwnedQuantity} of it";
+                    }
+                    else
+                    {
+                        // Field-test finding A's tooltip spelled out what the
+                        // pill text means in full sentences, alongside the tree
+                        // row's own remaining-need "Nx" prefix (node.Quantity);
+                        // the maintainer's final wording pass (2026-08-06, see
+                        // DecisionPillPlanner.AppendOwnershipPills) reworded the
+                        // pill itself to "HAVE {used}/{total} NEEDED" and this
+                        // tooltip to match, without changing what either number
+                        // means - remaining (node.Quantity) is still total minus
+                        // used.
+                        int totalDemand = node.OwnedQuantityUsed + node.Quantity;
+                        tooltipText =
+                            $"Needs {totalDemand} total - {node.OwnedQuantityUsed} covered by your materials, " +
+                            $"{node.Quantity} left to acquire";
+                    }
                 }
                 else if (spec.Kind == PillKind.AchievementBitDeduped)
                 {
