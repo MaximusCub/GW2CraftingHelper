@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Services.Recipes;
 using Xunit;
@@ -103,6 +105,69 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
                 // still parse untouched by this addition.
                 Assert.True(recipes.ContainsKey(-1591));
                 Assert.True(recipes.ContainsKey(-1));
+
+                // Review-fix (recipe-ingestion-fix, Critical): the reseed
+                // that added the rows above silently dropped recipe
+                // -1591's (Mystic Clover) fractional ExpectedOutputCount
+                // (0.31 -> null) - tools/GW2CraftingHelper.RecipeSeeder's
+                // MergeMysticForgeRecipes never copied the field from
+                // ref/mystic_forge_recipes.json. RecipeService.
+                // GetRecipeCachedAsync consults this seeded row before ever
+                // reaching MysticForgeRecipeData's own correct value (the
+                // seed always wins), so a null here silently defaults
+                // craftsNeeded math to OutputItemCount (1) instead of
+                // ceil(q/0.31) for every legendary chain that forges Mystic
+                // Clovers. Pinned directly so a future reseed can never
+                // drop this again without a red test.
+                Assert.Equal(0.31, recipes[-1591].ExpectedOutputCount);
+            }
+        }
+
+        [Fact]
+        public void LoadRecipeSeed_ShippedSeedFile_PreservesEveryMysticForgeExpectedOutputCount()
+        {
+            // Review-fix (recipe-ingestion-fix, Must Fix): a defensive,
+            // class-level guard (not just the single -1591 pin above) - for
+            // every recipe ref/mystic_forge_recipes.json declares a
+            // fractional ExpectedOutputCount for, the shipped
+            // ref/recipes_seed.json row for that same id must carry the
+            // identical value. Catches the same MergeMysticForgeRecipes
+            // field-drop class for ANY future recipe, not just the one
+            // instance a manual reseed happened to catch this time.
+            string seedPath = FindRepoFile(Path.Combine("ref", "recipes_seed.json"));
+            string mfPath = FindRepoFile(Path.Combine("ref", "mystic_forge_recipes.json"));
+            Assert.False(string.IsNullOrEmpty(seedPath));
+            Assert.False(string.IsNullOrEmpty(mfPath));
+
+            Dictionary<int, RawRecipe> recipes;
+            using (var stream = File.OpenRead(seedPath))
+            {
+                recipes = RecipeCacheSerializer.LoadRecipeSeed(stream);
+            }
+
+            var expectedById = new Dictionary<int, double>();
+            using (var doc = JsonDocument.Parse(File.ReadAllText(mfPath)))
+            {
+                foreach (var entry in doc.RootElement.GetProperty("recipes").EnumerateArray())
+                {
+                    if (entry.TryGetProperty("expectedOutputCount", out var ev) &&
+                        ev.ValueKind != JsonValueKind.Null)
+                    {
+                        expectedById[entry.GetProperty("id").GetInt32()] = ev.GetDouble();
+                    }
+                }
+            }
+
+            // Sanity: the source file must actually declare at least one
+            // fractional override, or this test would pass vacuously.
+            Assert.NotEmpty(expectedById);
+
+            foreach (var kvp in expectedById)
+            {
+                Assert.True(
+                    recipes.ContainsKey(kvp.Key),
+                    $"ref/mystic_forge_recipes.json declares recipe {kvp.Key} but it is missing from the shipped seed.");
+                Assert.Equal(kvp.Value, recipes[kvp.Key].ExpectedOutputCount);
             }
         }
 

@@ -145,7 +145,7 @@
       "id": -1591,
       "outputItemId": 19675,
       "outputItemCount": 1,
-      "expectedOutputCount": null,
+      "expectedOutputCount": 0.31,
       "ingredients": [
         {
           "type": "Item",
