@@ -8,11 +8,13 @@ namespace GW2CraftingHelper.Services
     /// see m34-r2-gw2e-owned-materials.md Section 4.3): gw2efficiency
     /// structurally excludes currency from its tree's quantity/price/craft
     /// decision math (a Currency node's usedQuantity always equals its
-    /// totalQuantity regardless of wallet balance) and only ever nets
-    /// owned currency out at the Shopping List / summary display layer, as
-    /// a separate one-shot "how much of this total do I already have"
-    /// reconciliation. This class is that reconciliation's data source for
-    /// this module - an AccountItemIndex-adjacent lookup over
+    /// totalQuantity regardless of wallet balance). Audit row 56 PART B #3
+    /// (corrected provenance): gw2efficiency nets owned currency out at
+    /// BOTH the Shopping List / summary display layer AND via a per-node
+    /// "owned" pill on the tree itself - it is not summary-layer-only, as
+    /// this comment previously and incorrectly claimed. This class is that
+    /// reconciliation's data source for this module - an
+    /// AccountItemIndex-adjacent lookup over
     /// AccountSnapshot.Wallet, never consulted by InventoryReducer or
     /// PlanSolver, so owned currency can never affect a decision or total
     /// (see CraftingPlanPipelineTests' decisions-identical-with/without-

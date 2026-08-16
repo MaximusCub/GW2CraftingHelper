@@ -889,10 +889,12 @@ namespace GW2CraftingHelper.Views.Rendering
                     rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
             }
 
-            // Child container. Children of a non-Craft decision are gw2e's
-            // ".not-crafted" informational reference branch (what it would
-            // cost to craft instead) - dimmed, and the flag does not stack
-            // on already-dimmed branches.
+            // Child container. Children of a non-Craft decision are this
+            // module's own informational reference branch (audit row 56
+            // PART B #3: corrected provenance - gw2e has no equivalent
+            // ".not-crafted" concept; this dimmed "what it would cost to
+            // craft instead" branch is a module original) - dimmed, and the
+            // flag does not stack on already-dimmed branches.
             FlowPanel childFlow = null;
             if (hasChildren)
             {
