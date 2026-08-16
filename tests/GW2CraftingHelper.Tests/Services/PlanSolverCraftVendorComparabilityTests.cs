@@ -417,6 +417,16 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
             Assert.Equal(60, result.Decisions[0].TotalCost);
+
+            // Fourth-site follow-up finding: plan.TotalCoinCost only summed
+            // BuyFromTp/BuyFromVendor steps, so the 50-coin ingredient here
+            // (folded into decision.TotalCost/the Recipe Tree/the Craft
+            // shopping-list row above) never reached the Total Cost summary
+            // - it showed 10 (just item 7's TP buy) instead of the true 60.
+            // Locks the fix routing coin-typed currency ingredients into
+            // totalCoinCost via currencyMap.
+            Assert.Equal(60, result.Plan.TotalCoinCost);
+            Assert.DoesNotContain(result.Plan.CurrencyCosts, c => c.CurrencyId == Gw2Constants.CoinCurrencyId);
         }
 
         [Fact]
