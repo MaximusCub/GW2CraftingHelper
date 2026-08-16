@@ -112,7 +112,12 @@ namespace GW2CraftingHelper.Views
         // doc comment) and a best-effort item-name label (requestLabel, e.g.
         // "Orrax Manifested x1" - see CraftingPlanPipeline.GenerateStructuredAsync's
         // matching parameter) as two new trailing arguments.
-        private readonly Func<IReadOnlyList<PlanRequestItem>, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> _generateAsync;
+        // VOM design: gained a second bool (valueOwnMaterials, grouped
+        // right after useOwn - both are per-plan generation choices),
+        // replacing Module.cs's previous _settings.GetOwnMaterialsMode()
+        // read with this per-plan session value - see the matching
+        // _valueOwnMaterials field's own doc comment.
+        private readonly Func<IReadOnlyList<PlanRequestItem>, bool, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> _generateAsync;
         private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
@@ -139,6 +144,19 @@ namespace GW2CraftingHelper.Views
         // Echo that default here so a fresh plan matches gw2e's own view
         // rather than systematically overpricing every material.
         private PriceBasis _priceBasis = PriceBasis.BuyOrder;
+        // VOM design (Section 5.2/5.3): the "Value own materials"
+        // (decision-invariant reduction + 15% sell-back guard) toggle,
+        // relocated inline from the global ModuleSettings.ValueOwnMaterials
+        // setting (see that field's own doc comment) - now a per-plan
+        // session choice exactly like _useOwnMaterials/_priceBasis above:
+        // never read from/written to ModuleSettings, reset to this default
+        // on every module reload. Default true mirrors
+        // ModuleSettings.ValueOwnMaterials' own default TRUE (gw2e parity -
+        // see that setting's doc comment). Only meaningful while
+        // _useOwnMaterials is also on (see OnOwnMaterialsToggled's
+        // Enabled-sync); the last-chosen value is preserved, not reset,
+        // while disabled, so re-enabling Use Own Materials restores it.
+        private bool _valueOwnMaterials = true;
 
         #endregion // General: shared layout constants, colors, top-region geometry & dependencies
 
@@ -270,6 +288,7 @@ namespace GW2CraftingHelper.Views
         private Panel _inputPanel;
         private Panel _controlsPanel;
         private Checkbox _ownMaterialsCheckbox;
+        private Checkbox _valueOwnMaterialsCheckbox;
         private StandardButton _generateButton;
         private Label _statusLabel;
         private Panel _separator;
@@ -549,7 +568,7 @@ namespace GW2CraftingHelper.Views
 
         #region General: construction & status
         public CraftingPlanView(
-            Func<IReadOnlyList<PlanRequestItem>, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> generateAsync,
+            Func<IReadOnlyList<PlanRequestItem>, bool, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
             IItemSearchProvider itemSearchProvider,
             ModuleSettings settings,
@@ -1852,6 +1871,27 @@ namespace GW2CraftingHelper.Views
                     : PriceBasis.InstantBuy;
             };
 
+            // VOM design (Section 5.2): inline per-plan toggle, next to
+            // Use Own Materials/price basis - disabled (not hidden) when
+            // Use Own Materials is off, since its own effect is fully inert
+            // without a snapshot driving reduction (see
+            // CraftingPlanPipeline's useForceBuyPrePass gate). Placed after
+            // the price-basis dropdown (which ends at x=328), well clear of
+            // the right-anchored Generate button even at this window's
+            // minimum width (930x710 -> ~884px content region).
+            _valueOwnMaterialsCheckbox = new Checkbox()
+            {
+                Text = "Value Own Materials",
+                Checked = _valueOwnMaterials,
+                Enabled = _useOwnMaterials,
+                Location = new Point(350, 7),
+                Parent = _controlsPanel
+            };
+            _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
+            {
+                _valueOwnMaterials = e.Checked;
+            };
+
             _generateButton = new StandardButton()
             {
                 Text = "Generate Plan",
@@ -2400,6 +2440,12 @@ namespace GW2CraftingHelper.Views
                 // Show modal confirmation before regenerating
                 _useOwnMaterials = newValue;
                 _ownMaterialsCheckbox.Enabled = false;
+                // VOM design (Section 5.2): keep the Value Own Materials
+                // checkbox's Enabled state in lockstep with the optimistic
+                // _useOwnMaterials value at every point it changes here -
+                // its own Checked value is preserved either way, only
+                // whether it can be clicked follows Use Own Materials.
+                _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
                 _modalDialog.Show(
                     "This will regenerate the plan. Continue?",
                     () =>
@@ -2414,11 +2460,13 @@ namespace GW2CraftingHelper.Views
                         _ownMaterialsCheckbox.Checked = _useOwnMaterials;
                         _suppressToggle = false;
                         _ownMaterialsCheckbox.Enabled = true;
+                        _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
                     });
                 return;
             }
 
             _useOwnMaterials = newValue;
+            _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
         }
 
         private async Task TriggerGenerate()
@@ -2567,7 +2615,7 @@ namespace GW2CraftingHelper.Views
             try
             {
                 var result = await _generateAsync(
-                    requestItems, _useOwnMaterials, _priceBasis,
+                    requestItems, _useOwnMaterials, _valueOwnMaterials, _priceBasis,
                     CancellationToken.None, null, phaseProgress, requestLabel);
 
                 // Blish HUD's XNA host has no SynchronizationContext, so this

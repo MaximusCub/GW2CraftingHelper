@@ -206,7 +206,11 @@ namespace GW2CraftingHelper.Tests.Services
             CraftingPlanResult result, DateTime generatedAt, int quantity = 1, bool useOwn = false,
             PriceBasis priceBasis = PriceBasis.InstantBuy,
             IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides = null,
-            IReadOnlyList<int> ignoredItemIds = null)
+            IReadOnlyList<int> ignoredItemIds = null,
+            // VOM design: mirrors useOwn/priceBasis above - default true
+            // matches ValueOwnMaterials' own real-world default (see
+            // Views/CraftingPlanView.cs's _valueOwnMaterials field).
+            bool valueOwn = true)
         {
             return new PersistedPlan
             {
@@ -222,6 +226,7 @@ namespace GW2CraftingHelper.Tests.Services
                 RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = quantity } },
                 UseOwnMaterials = useOwn,
                 PriceBasis = priceBasis,
+                ValueOwnMaterials = valueOwn,
                 Result = result,
                 // W3D review-fix: PersistedPlan.NodeOverrides/IgnoredItemIds
                 // are empty (never null) on every real persist path (see
@@ -309,13 +314,17 @@ namespace GW2CraftingHelper.Tests.Services
                 priceBasis: PriceBasis.BuyOrder);
 
             var timestamp = new DateTime(2026, 8, 9, 14, 22, 0, DateTimeKind.Local);
-            _store.Save(Wrap(result, timestamp, quantity: 3, useOwn: true, priceBasis: PriceBasis.BuyOrder));
+            _store.Save(Wrap(result, timestamp, quantity: 3, useOwn: true, priceBasis: PriceBasis.BuyOrder, valueOwn: false));
 
             var loaded = _store.LoadLatest();
             Assert.NotNull(loaded);
             Assert.Equal(timestamp, loaded.GeneratedAt);
             Assert.True(loaded.UseOwnMaterials);
             Assert.Equal(PriceBasis.BuyOrder, loaded.PriceBasis);
+            // VOM design: ValueOwnMaterials round-trips independently of
+            // UseOwnMaterials - false here specifically to prove it is not
+            // just silently mirroring useOwn's own true value above.
+            Assert.False(loaded.ValueOwnMaterials);
             Assert.NotNull(loaded.RequestItems);
             Assert.Single(loaded.RequestItems);
             Assert.Equal(1, loaded.RequestItems[0].ItemId);
@@ -499,6 +508,30 @@ namespace GW2CraftingHelper.Tests.Services
             // incompatible SchemaVersion.
             File.WriteAllText(filePath,
                 "{ \"SchemaVersion\": 0, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string capturedMessage = null;
+            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.NotNull(capturedMessage);
+        }
+
+        [Fact]
+        public void LoadLatest_VomSchemaVersion1File_ReturnsNullAndLogsWarn()
+        {
+            // VOM design (Section 5.4): CurrentSchemaVersion bumped 1 -> 2
+            // for the new PersistedPlan.ValueOwnMaterials field. A
+            // genuinely realistic old file - SchemaVersion 1 (the actual
+            // previous CurrentSchemaVersion, not the synthetic "0" the
+            // pre-existing LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn
+            // test above uses) - must be rejected exactly the same way,
+            // degrading to Module's "no restored plan" fresh-start path,
+            // not silently defaulting ValueOwnMaterials to false.
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": 1, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
             string capturedMessage = null;
             var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);

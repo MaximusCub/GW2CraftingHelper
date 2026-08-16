@@ -92,6 +92,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         internal static bool IsStructurallyValid(PersistedPlan plan, out string reason)
         {
+            // VOM design (Section 5.4/6, step 8): PersistedPlan.ValueOwnMaterials
+            // (a non-nullable bool, same shape as the pre-existing UseOwnMaterials/
+            // PriceBasis above) is intentionally NOT checked here - a plain bool
+            // can never produce the null-dereference class of bug this validator
+            // exists to catch, so it needs no entry, same as its two siblings.
             reason = null;
             var result = plan?.Result;
             var craftingPlan = result?.Plan;

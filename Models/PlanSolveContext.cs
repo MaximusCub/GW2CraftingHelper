@@ -44,9 +44,15 @@ namespace GW2CraftingHelper.Models
         /// The own-materials valuation mode in effect at GENERATION time,
         /// snapshotted here for the same reason as CurrencyValuation: a
         /// local override re-solve must keep pricing owned materials the
-        /// way the original Generate did, not whatever the setting reads
-        /// right now. A freshly toggled setting applies starting with the
-        /// next full Generate.
+        /// way the original Generate did, not whatever CraftingPlanView's
+        /// per-plan "Value Own Materials" checkbox currently shows (VOM
+        /// design Section 5.2 - this is a per-plan session choice, not a
+        /// live-read global setting, exactly like PriceBasis above). A
+        /// freshly toggled checkbox applies starting with the next full
+        /// Generate. Valued now covers both the pre-existing 15% sell-back
+        /// force-buy guard AND the decision-invariant reduction guide fed
+        /// into InventoryReducer.Reduce (see that method's zeroOwnedDecisions
+        /// doc comment) - Free behaves exactly as before this design.
         /// </summary>
         public OwnMaterialsMode OwnMaterialsMode { get; set; }
 

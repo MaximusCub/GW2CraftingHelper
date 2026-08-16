@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Services
     /// already-owned component's cost being free never masks a bad
     /// marginal-craft trade. This module implements exactly that rule; it
     /// is the CALLER's responsibility to pass a genuine zero-owned tree,
-    /// which is exactly what CraftingPlanPipeline's Step 6.5 does - it
+    /// which is exactly what CraftingPlanPipeline's Step 5.5 does - it
     /// invokes ComputeForceBuyOnlyNodeIds against `tree`, the pipeline's
     /// ORIGINAL, UNREDUCED tree (InventoryReducer.Reduce only ever mutates
     /// a clone, never `tree` itself), never the post-reduction tree the
@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Services
     /// their post-reduction craft cost look cheap regardless of what a
     /// FRESH purchase would cost, which is exactly the masking gw2e's
     /// zero-owned baseline is designed to prevent. See the pipeline's own
-    /// Step 6.5 comment and the passing
+    /// Step 5.5 comment and the passing
     /// Structured_ValuedMode_ForceBuyPrePass_UsesZeroOwnedBaseline test
     /// (CraftingPlanPipelineTests.cs) for confirmation this module is wired
     /// against the correct (unreduced) tree at runtime.
