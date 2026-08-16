@@ -56,17 +56,29 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Same vendor-sourced item reached via two tree branches must
             // sum its currency cost into the single aggregated PlanStep row,
-            // not just the last-seen occurrence's amount.
+            // not just the last-seen occurrence's amount. Item 3 (which
+            // consumes item 2, the vendor-fallback-tier item under test)
+            // intentionally has NO TP price: craft/vendor comparability-
+            // parity fix's transitive-taint propagation (adversarial-review
+            // follow-up - Decision.HasUnvaluedCurrency) now correctly
+            // demotes item 3's own craft-via-item-2 recipe to fallback-tier
+            // too, since it consumes item 2's own fallback (unvalued
+            // currency) vendor decision - so a real TP price for item 3
+            // would make item 3 buy from the TP instead of crafting via
+            // item 2, and item 2 would then only be reached via ONE tree
+            // occurrence instead of the two this test needs. With no TP
+            // price, item 3 still crafts via item 2 as the last resort
+            // (nothing else available - same established pattern already
+            // used elsewhere in this suite for a fallback-tier decision),
+            // so this test's real subject (VendorCurrencyCosts merging
+            // across two tree occurrences) still applies.
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
                     Leaf(2, 1),
                     Craftable(3, 1,
                         Option(20, 1, 1,
                             Leaf(2, 1)))));
-            var prices = new Dictionary<int, ItemPrice>
-            {
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100000 } }
-            };
+            var prices = new Dictionary<int, ItemPrice>();
             var offer = new VendorOffer
             {
                 OfferId = "test-dedup-currency",
@@ -101,6 +113,10 @@ namespace GW2CraftingHelper.Tests.Services
             // Two occurrences of the same vendor-sourced item, each with a
             // currency count near int.MaxValue, sum past int.MaxValue -
             // must clamp, not silently wrap to a negative/garbage count.
+            // Item 3 intentionally has NO TP price - see the identical note
+            // in VendorCurrencyCosts_MergedAcrossDeduplicatedOccurrences
+            // above (craft/vendor comparability-parity fix's transitive
+            // taint propagation).
             const int nearMax = 1_200_000_000;
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
@@ -108,10 +124,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Craftable(3, 1,
                         Option(20, 1, 1,
                             Leaf(2, 1)))));
-            var prices = new Dictionary<int, ItemPrice>
-            {
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100000 } }
-            };
+            var prices = new Dictionary<int, ItemPrice>();
             var offer = new VendorOffer
             {
                 OfferId = "test-overflow-currency",

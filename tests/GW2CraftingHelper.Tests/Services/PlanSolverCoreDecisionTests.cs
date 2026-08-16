@@ -161,14 +161,20 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CurrencyIngredient_AppearsInCurrencyCostsNotSteps()
         {
-            // Item 1: craft from 2x item 2 + 50x currency 99
+            // Item 1: craft from 2x item 2 + 50x currency 99. Craft-
+            // comparability-parity fix: an unvalued currency ingredient
+            // makes this recipe fallback-tier (see
+            // PlanSolverCraftVendorComparabilityTests), so item 1
+            // intentionally has NO buy price here - nothing comparable
+            // exists, so the fallback craft is used as the last resort and
+            // this test's real subject (currency surfaces in CurrencyCosts,
+            // never as a step; TotalCoinCost excludes it) still applies.
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
                     Leaf(2, 2),
                     Leaf(99, 50, "Currency")));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 10000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
             };
             var solver = new PlanSolver();
@@ -606,13 +612,20 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void CurrencyIngredient_Unvalued_ContributesZeroToDecisionAndCost()
+        public void CurrencyIngredient_Unvalued_ComparableBuyWins_RegardlessOfFakeZeroCost()
         {
-            // No CurrencyValuation supplied (null -> CurrencyValuation.None
-            // internally): the currency ingredient must be inert - same
-            // behavior as before this fix, never inventing an exchange
-            // rate. Craft (50 real coin, decision value 50) beats the 1000
-            // buy price regardless of the unvalued 3-unit currency cost.
+            // Craft-comparability-parity fix (supersedes the old
+            // "CurrencyIngredient_Unvalued_ContributesZeroToDecisionAndCost"
+            // name/assertion, which encoded the bug this fixes): No
+            // CurrencyValuation supplied, so the currency ingredient is
+            // unvalued - this now makes the recipe FALLBACK-tier (mirrors
+            // VendorBatchSolver.EvaluateVendorOffers' comparable/fallback
+            // split; see PlanSolverCraftVendorComparabilityTests for the
+            // dedicated coverage). A fallback-tier craft must never beat a
+            // real, comparable buy price, even though its own priced
+            // ingredients alone (ignoring the unknown currency) look far
+            // cheaper (50) than the 1000 buy price - that illusory
+            // cheapness is exactly the hidden-cost bug this fix closes.
             var evOption = new RecipeOption
             {
                 RecipeId = 10,
@@ -632,10 +645,14 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(tree, prices).Plan;
+            var result = solver.Solve(tree, prices);
+            var plan = result.Plan;
 
-            var craftStep = plan.Steps.Single(s => s.Source == AcquisitionSource.Craft);
-            Assert.Equal(50, craftStep.TotalCost);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(1000, plan.TotalCoinCost);
+            // M33 guarantee preserved: the CRAFT pill still shows even
+            // though the automatic decision picked buy instead.
+            Assert.True(result.Decisions[0].CanCraft);
         }
     }
 }

@@ -646,7 +646,14 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CurrencyNode_ResolvesKnownNames()
         {
-            // Two known currencies: Spirit Shards (23) and Laurels (3)
+            // Two known currencies: Spirit Shards (23) and Laurels (3). Both
+            // are unvalued (no CurrencyValuation supplied), which makes
+            // this recipe fallback-tier (craft/vendor comparability-parity
+            // fix - see PlanSolverCraftVendorComparabilityTests); item 1
+            // intentionally has NO buy price here, so the fallback craft is
+            // still used as the last resort and this test's real subject
+            // (currency child name resolution under a real Craft decision)
+            // still applies.
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
                     Leaf(2, 3),
@@ -654,7 +661,6 @@ namespace GW2CraftingHelper.Tests.Services
                     Leaf(3, 10, "Currency")));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
             };
             var metadata = Meta(
