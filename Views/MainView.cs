@@ -628,19 +628,21 @@ namespace GW2CraftingHelper.Views
         /// of sync with each other.
         /// <para>
         /// Layout risk (reported, not silently patched around): adding the
-        /// capture date to every status string (RefreshNowAsync's
-        /// "Updated"/"Cache Cleared" strings, StatusText.ForRefreshFailure's
-        /// callers) plus this method's own "(Nh Nm ago)" suffix can produce
-        /// a run long enough to approach or exceed the free space in
-        /// _headerPanel before _clearButton's left edge at the window's
-        /// clamped 930x710 minimum size (Module.cs's
-        /// ResizableTabbedWindow.HandleWindowResize). Truncating here would
-        /// cut the tail of the string, which is exactly where the date/time
-        /// now lives - worst on the failure statuses a user most needs to
-        /// date. This method intentionally does not truncate; if the free
-        /// run at minimum size proves too tight in practice, the fix
-        /// belongs in the header layout (e.g. widening the label's run or
-        /// shortening the button row), not in this label's text.
+        /// capture date to every status string (RefreshNowAsync's "Updated"
+        /// string, the _clearButton.Click handler's "Cache Cleared" string at
+        /// ~line 247, StatusText.ForRefreshFailure's callers) plus this
+        /// method's own "(Nh Nm ago)" suffix can produce a run long enough to
+        /// approach or exceed the free space in _headerPanel before
+        /// _clearButton's left edge at the window's clamped 930x710 minimum
+        /// size (Views/ResizableTabbedWindow.cs's HandleWindowResize; the
+        /// Point(930, 710) minimum-size argument itself is passed from
+        /// Module.cs). Truncating here would cut the tail of the string,
+        /// which is exactly where the date/time now lives - worst on the
+        /// failure statuses a user most needs to date. This method
+        /// intentionally does not truncate; if the free run at minimum size
+        /// proves too tight in practice, the fix belongs in the header layout
+        /// (e.g. widening the label's run or shortening the button row), not
+        /// in this label's text.
         /// </para>
         /// </summary>
         private void ApplyStatusDisplay()

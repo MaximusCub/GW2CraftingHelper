@@ -770,6 +770,14 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        // Timestamp culture policy (applies to every user-facing timestamp
+        // in this module, not just the line below): formatted with
+        // CultureInfo.InvariantCulture rather than the ambient
+        // CurrentCulture, because the module's UI strings are English-only.
+        // Invariant keeps month abbreviations and the AM/PM designator
+        // stable - under de-DE, "h:mm tt" yields an EMPTY AM/PM designator,
+        // so "2:14" would be ambiguous with "14:14" - and stops ':' from
+        // being culture-substituted inside "HH:mm:ss".
         private static string FormatLine(ModuleLogEntry entry)
         {
             string levelText = entry.Level.ToString().ToUpperInvariant();
