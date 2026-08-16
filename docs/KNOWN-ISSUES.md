@@ -2468,9 +2468,10 @@ pre-authorized safe fallback: a small green "OK" pill via the existing
 pills and the shopping source tag already use), colored to match
 `PillColors.PillKind.Selected`'s green (#1F8F0C) rather than adding a new
 `PillKind` for this single non-tree use. **A live desktop check of this
-one glyph decision remains open** - if a future session confirms
-`✓` renders cleanly in this font, swapping it in is a one-line change
-in `SummarySectionRenderer.FullCoverageMarkerText`.
+one glyph decision remains open** - if a future session confirms the
+check-mark glyph (the escaped form, backslash-u-2713 - see the
+ASCII-only-source rule) renders cleanly in this font, swapping it in is
+a one-line change in `SummarySectionRenderer.FullCoverageMarkerText`.
 
 **6. Footnote row (user-mandated).** A new `PlanRowType.SummaryFootnote`
 row, always exactly one, always last (after the pre-existing multi-item
@@ -2523,14 +2524,21 @@ of. Currency rows resize via a plain `AddRelayout` closure instead, with
 no divider - the header row's dark background alone delineates the
 table, matching gw2e's own header-only table styling.
 
-**9. Review self-catch: a raw Unicode check-mark character was
-initially pasted into two comments while drafting item 5's rationale,
-in direct violation of the repo's ASCII-only-source rule** (`CLAUDE.md`:
-"Source files must contain only ASCII characters... If Unicode must be
-shown at runtime... represent it using escapes"). Caught by a full
-non-ASCII grep sweep of every touched file before commit and fixed to
-the `✓` escaped form; the sweep is now part of this package's own
-adversarial-review record for future reference.
+**9. Review self-catch, then a second self-catch on the first
+(adversarial-review fix round): a raw Unicode check-mark character was
+never shipped in any `.cs` source file - `Views/Rendering/
+SummarySectionRenderer.cs`'s own glyph-decision comment (see item 5)
+has always used the properly-escaped textual form (backslash-u-2713),
+verified by a non-ASCII grep of every touched `.cs` file before commit
+(zero hits). The raw character instead leaked TWICE into this very
+markdown file's own prose while drafting items 5 and 9 above - a
+record about catching a Unicode paste that itself contained a Unicode
+paste, which was also factually wrong about what the `.cs` file
+contains (it does not, and never did, carry a checkmark glyph in any
+form - `SummarySectionRenderer.FullCoverageMarkerText` ships the ASCII
+`"OK"` text badge per item 5). Caught in a later adversarial-review
+pass and replaced with plain ASCII description; this file itself now
+carries zero non-ASCII bytes, matching its pre-W4A state.
 
 **10. Tests (Blish-free, real `PlanViewModelBuilder.Build` production
 path).** `PlanViewModelBuilderSummaryTests.cs`,
@@ -2556,13 +2564,126 @@ scaling). No Blish HUD/`Gw2Sharp` references in any new/changed test; no
 fake file I/O; every assertion drives the real `PlanViewModelBuilder.
 Build(CraftingPlanResult)` entry point.
 
+**11. Adversarial-review fix round (2026-08-15) - 7 findings fixed from
+an independent code review of this package (5 file-scoped, 2 process-
+level).** All fixed in the same `wt-cost` worktree/branch, small logical
+commits, before any push/PR:
+
+- **Footnote height desync (Critical-adjacent Must Fix,
+  `Views/Rendering/SummarySectionRenderer.cs` `Render`).** The renderer
+  kept only the LAST `SummaryFootnote` row (`footnoteRow = row`,
+  overwriting) while `SummarySectionLayoutMath.BodyHeight` sums
+  `FallbackTextRowHeight` per footnote row it counts - the two agreed by
+  coincidence only because exactly one footnote row is ever emitted
+  today. Fixed by collecting into a `footnoteRows` List (mirrors the
+  pre-existing `noteRows` pattern) and rendering every entry, so the
+  renderer and the height math can never desync regardless of how many
+  footnote rows a future change emits.
+- **Ellipsized currency-name tooltip swallowed (Must Fix,
+  `CreateCurrencyTableRow`, both the build path and its `AddReellipsis`
+  closure).** The M32 lesson (this file's own "Field-test UX wave"
+  finding D) is that a label captures the mouse before a tooltip on a
+  control underneath it is ever reached; the currency table's `nameLabel`
+  sat directly on top of its own truncated text with the tooltip stamped
+  only on the containing `rowPanel`, so hovering the visibly-truncated
+  name showed nothing. Fixed by stamping `BasicTooltipText` on
+  `nameLabel` AND `rowPanel` in both places. This is a repo-wide pattern
+  (confirmed by grep: `Views/Rendering/DisciplinesSectionRenderer.cs`:193/
+  220, `UsedMaterialsSectionRenderer.cs`:89/121, and
+  `ShoppingListSectionRenderer.cs`:227/284 all stamp the tooltip on the
+  row panel only, never on the name label sitting over the truncated
+  text) - per the "fix the class, not the instance" directive, the sweep
+  is reported here, but those three files are pre-existing, untouched by
+  this branch, and outside this package's scope (only the
+  `SummarySectionRenderer.cs` instance introduced by W4A is fixed here);
+  the same one-line fix applies to each and is left as a follow-up.
+- **Formula-band operators never drawn (Must Fix,
+  `CreateFormulaBand`).** The band read as three same-shaped tiles with
+  no visible "-"/"=" relationship between them - exactly the "two-tile
+  split-column band" ambiguity the redesign exists to remove, arguably
+  worse (now two such unlabelled bands instead of one). Fixed by drawing
+  a small dim `Label` centered on each tile boundary (no tooltip, so it
+  never steals hover from a neighboring caption) - `"-"` between every
+  pair but the last, `"="` for the last, matching the spec's formula
+  text exactly. Never drawn for a collapsed 1-tile band.
+- **Band 2's middle tile shared Band 1's caption despite legitimately
+  differing (Must Fix, `Services/PlanViewModelBuilder.cs`
+  `BuildProfitFormulaBand`).** For a multi-item batch with an unsellable
+  root, Band 1's and Band 2's "Total Materials Value" tiles can hold
+  DIFFERENT numbers (see item 2 above) with only a tooltip to
+  disambiguate - two identically-labeled tiles showing different numbers
+  reads as a bug, not a scoping nuance, especially in a section whose
+  whole point is now to read as a balancing formula. Fixed by giving the
+  multi-item case its own caption, `"Materials Value (sellable)"` (new
+  `MaterialsValueSellableLabel` const); single-item plans are unaffected
+  (still `"Total Materials Value"`, matching Band 1 exactly, per the
+  proven identity).
+- **The multi-item divergence itself was asserted only in
+  prose/comments, never by a running test (Must Fix,
+  `tests/.../PlanViewModelBuilderMultiItemTests.cs`).** New
+  `MultiItemRequest_UnsellableRootPresent_ProfitBandMiddleTileDivergesFromCostBand`
+  models a batch where `CraftingProfit` is set the way
+  `ApplyBatchSellSideEconomics` would actually produce it for a
+  partially-unsellable root mix (sellable-root-only cost, never the
+  whole-batch `TotalCoinCost`) and asserts Band 1's and Band 2's middle
+  tiles both hold their own correct-but-different values, plus the new
+  distinct caption above.
+- **`CurrencyNumberColumnWidth`'s fixed 60px floor had no widest-value
+  pre-scan, unlike the sibling `ShoppingColumnMath` (Must Fix,
+  `Services/SummarySectionLayoutMath.cs` +
+  `Views/Rendering/SummarySectionRenderer.cs`).** The class doc comment's
+  claim that Required/Have/Needed have "no realistic risk of a value
+  needing more than a handful of digits" stopped being true the moment
+  the Have column was unclamped to the real wallet holding (item 4
+  above) - Karma routinely reaches 6-7 digits, which can plausibly
+  exceed 60px, and `CreateRightAlignedLabel` grows leftward from the
+  column's own right edge, so an unreserved overlong value would
+  visually intrude into its left neighbor rather than clip. Fixed the
+  same way `ShoppingColumnMath.ComputeEdges` already solves this: a new
+  `EffectiveCurrencyNumberColumnWidth(widestNumberWidth)` widens the
+  reserved band past the 60px floor when needed, and
+  `ComputeCurrencyColumnEdges` gained an optional `widestNumberWidth`
+  parameter (defaults to 0, reproducing the exact prior fixed-60px
+  geometry for every existing caller/test) that the renderer now feeds
+  from a per-render pre-scan of the section's own Required/Have/Needed
+  strings - mirrors `ShoppingListSectionRenderer.Render`'s own
+  `maxEachWidth`/`maxTotalWidth` pre-scan shape exactly. Five new
+  `SummarySectionLayoutMathTests.cs` cases cover the floor/widen
+  boundary and prove the default-parameter path is byte-identical to
+  the pre-fix geometry.
+- **`docs/KNOWN-ISSUES.md` (this file) contained two raw Unicode
+  check-mark characters despite claiming, in the very sentence
+  containing one of them, that the check-mark had been reduced to its
+  escaped form (process-level Must Fix, not a `.cs` file).** Neither
+  ever shipped in source - `SummarySectionRenderer.cs` has always used
+  the properly-escaped textual form in its own comment, verified again
+  by a fresh non-ASCII grep of every touched `.cs` file (zero hits) as
+  part of this round. The raw characters existed only in this markdown
+  file's own prose (items 5 and 9 above) - a record about catching a
+  Unicode paste that itself contained a Unicode paste, and factually
+  wrong about what the `.cs` file contains. Both instances rewritten in
+  plain ASCII; item 9's text above corrected to describe the reality
+  precisely. This file now contains zero non-ASCII bytes again, matching
+  its pre-W4A state.
+
+Re-validated after all seven fixes above: `dotnet build -p:Platform=x64`
+clean, 0 errors - a fresh warning check against the touched files found
+none from `SummarySectionRenderer.cs`/`SummarySectionLayoutMath.cs`, and
+the pre-existing StyleCop warnings elsewhere in `PlanViewModelBuilder.cs`
+all sit on lines outside this round's diff. `Services/
+PlanContentHeightMath.cs`/`PlanRelayoutMath.cs`/`Services/ModuleLog.cs`
+remain zero diff; `Views/Rendering/TreeSectionController.cs` was not
+touched. Full validation numbers below.
+
 Validation: `dotnet build -p:Platform=x64` clean (0 errors; zero new
-warnings from any touched/new file). Module test suite green - 1297
-passed (was 1273 before this package; +24 net new tests: several
-consolidated/renamed pre-existing Summary-section tests plus the new
-`SummarySectionLayoutMathTests.cs` file). No new Blish HUD references in
-tests; every new/changed test exercises real production code paths with
-no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
+warnings from any touched/new file, across both the original pass and
+the review-fix round). Module test suite green - 1303 passed, 0 failed
+(was 1273 before this whole package; +30 net new tests: +24 from the
+original pass, +6 from the review-fix round above - 1 multi-item
+divergence test plus 5 `SummarySectionLayoutMathTests.cs` cases for the
+widened-column geometry). No new Blish HUD references in tests; every
+new/changed test exercises real production code paths with no
+contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
 internal-only (the currency table's Label is now the resolved NAME only,
 never the id). Coin amounts still render icon-right-of-number throughout
 (both formula bands reuse `CoinCurrencyRenderer.BuildCoinSegments`/
@@ -2574,7 +2695,9 @@ Required Recipes) is untouched.
 
 No live desktop verification was performed for this package (browser/game
 automation was out of scope for this session) - item 5's glyph choice and
-the overall visual layout are unverified live and should get a look in a
-real Blish HUD session before this is considered fully done.
+the overall visual layout (including the review-fix round's new formula-
+band operators and widened currency columns) are unverified live and
+should get a look in a real Blish HUD session before this is considered
+fully done.
 
 [PENDING - the orchestrator fills in PASS/FAIL]
