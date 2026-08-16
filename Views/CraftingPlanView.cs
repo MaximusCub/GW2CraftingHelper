@@ -708,6 +708,18 @@ namespace GW2CraftingHelper.Views
             _currentPlan = vm;
             _planGeneratedAt = generatedAt;
 
+            // Culture policy (applies to every ToString(..., CultureInfo.
+            // InvariantCulture) timestamp in this file, not just this one):
+            // this module's UI/log strings are English-only, so timestamp
+            // formatting is pinned to InvariantCulture rather than the
+            // ambient CurrentCulture - matching MainView.cs, Module.cs,
+            // SettingsTabContent.cs and LogTabContent.cs. This file's three
+            // sites predate that policy (they originated the "MMM d, yyyy
+            // h:mm tt" format string) and were converted to match it rather
+            // than left on CurrentCulture, which would go on to produce a
+            // blank AM/PM designator under several locales (e.g. de-DE's
+            // short time pattern has no AM/PM marker) and would disagree
+            // with the Log tab's own InvariantCulture timestamps.
             _statusBoard.SeedRestored(
                 $"Generated {generatedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)} - prices may have changed - Regenerate");
             RenderFromBoard(_statusBoard.Snapshot());
