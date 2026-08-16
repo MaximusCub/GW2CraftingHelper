@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.6.6" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.Text.Json" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <!-- Unlike tests/GW2CraftingHelper.Tests.csproj (which references the
+       Library-typed GW2CraftingHelper.csproj), this project transitively
+       references an Exe-typed project (GW2CraftingHelper.RecipeSeeder.csproj,
+       which itself references GW2CraftingHelper.csproj with
+       SetPlatform=Platform=x64). Adding SetPlatform metadata HERE as well
+       causes NuGet to resolve a net48/win-x64 RID restore target that does
+       not exist (NETSDK1047); omitting Platform entirely fails
+       GW2CraftingHelper.csproj's own Platform-conditioned PropertyGroups
+       (it has no AnyCPU output path). The only combination that restores
+       and builds cleanly is passing -p:Platform=x64 on the OUTER dotnet
+       build/test invocation (ambient, not per-reference SetPlatform) - e.g.
+       dotnet test tests/GW2CraftingHelper.RecipeSeeder.Tests/GW2CraftingHelper.RecipeSeeder.Tests.csproj -p:Platform=x64 -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\tools\GW2CraftingHelper.RecipeSeeder\GW2CraftingHelper.RecipeSeeder.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -20,6 +20,20 @@ namespace GW2CraftingHelper.RecipeSeeder
         private const int BatchSize = 200;
         private const int MaxConcurrency = 4;
 
+        // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): mirrors
+        // Gw2RecipeApiClient.SchemaVersion (Services/Gw2RecipeApiClient.cs)
+        // exactly, including the rationale for pinning a literal date
+        // instead of "v=latest" - see that constant's doc comment. Kept as
+        // its own separate constant rather than referencing the main
+        // assembly's copy: this tool already duplicates BaseUrl the same
+        // way, and the two callers (live runtime client vs. offline seeder)
+        // are allowed to re-pin independently if one is updated without the
+        // other. Without this, the seeder's own /v2/recipes id list and
+        // batch detail fetches silently omit every currency-ingredient-era
+        // recipe (~188 recipes, e.g. 14025/Amalgamated Rift Essence) from
+        // the seed files it writes - the exact bug this fix closes.
+        private const string SchemaVersion = "2026-08-15";
+
         private static int Main(string[] args)
         {
             return MainAsync(args).GetAwaiter().GetResult();
@@ -231,10 +245,17 @@ namespace GW2CraftingHelper.RecipeSeeder
             return 0;
         }
 
-        private static async Task<List<int>> FetchAllRecipeIdsAsync(
+        // Review-fix (recipe-ingestion-fix): internal (not private) + the
+        // matching InternalsVisibleTo in this project's .csproj so
+        // GW2CraftingHelper.RecipeSeeder.Tests can assert the schema-
+        // version query parameter on the actual outgoing request, mirroring
+        // Gw2RecipeApiClientHttpTests' StubHandler coverage of the runtime
+        // client's own identical fix.
+        internal static async Task<List<int>> FetchAllRecipeIdsAsync(
             HttpClient httpClient)
         {
-            string json = await httpClient.GetStringAsync($"{BaseUrl}/recipes");
+            string json = await httpClient.GetStringAsync(
+                $"{BaseUrl}/recipes?v={SchemaVersion}");
             return JsonSerializer.Deserialize<List<int>>(json);
         }
 
@@ -292,12 +313,14 @@ namespace GW2CraftingHelper.RecipeSeeder
             return result;
         }
 
-        private static async Task<List<RawRecipe>> FetchRecipeBatchAsync(
+        // Review-fix (recipe-ingestion-fix): internal, see
+        // FetchAllRecipeIdsAsync's matching doc comment above.
+        internal static async Task<List<RawRecipe>> FetchRecipeBatchAsync(
             HttpClient httpClient, List<int> ids)
         {
             string idsParam = string.Join(",",
                 ids.Select(id => id.ToString(CultureInfo.InvariantCulture)));
-            string url = $"{BaseUrl}/recipes?ids={idsParam}";
+            string url = $"{BaseUrl}/recipes?ids={idsParam}&v={SchemaVersion}";
 
             for (int attempt = 0; attempt < 3; attempt++)
             {
@@ -355,7 +378,25 @@ namespace GW2CraftingHelper.RecipeSeeder
                             {
                                 Type = ing.TryGetProperty("type", out var t)
                                     ? t.GetString() ?? "Item" : "Item",
-                                Id = ing.GetProperty("item_id").GetInt32(),
+                                // KNOWN-ISSUES recipe-ingestion bug class
+                                // (2026-08-15): mirrors
+                                // Gw2RecipeApiClient.ParseRecipe's own "id"-
+                                // with-"item_id"-fallback fix. This one is
+                                // not just a shape mismatch but a crash: with
+                                // the schema version now pinned above, EVERY
+                                // ingredient (Currency or Item) keys its item
+                                // id as "id" - the old unconditional
+                                // GetProperty("item_id") throws
+                                // KeyNotFoundException-style
+                                // System.Text.Json.JsonException on any such
+                                // row (e.g. every ingredient of recipe 14025)
+                                // instead of silently mis-parsing it, since
+                                // GetProperty (unlike Newtonsoft's
+                                // Value<T>(key)) throws on a missing
+                                // property rather than returning a default.
+                                Id = ing.TryGetProperty("id", out var idProp)
+                                    ? idProp.GetInt32()
+                                    : ing.GetProperty("item_id").GetInt32(),
                                 Count = ing.GetProperty("count").GetInt32()
                             });
                         }
@@ -415,6 +456,18 @@ namespace GW2CraftingHelper.RecipeSeeder
                             Id = id,
                             OutputItemId = outId.GetInt32(),
                             OutputItemCount = outCount.GetInt32(),
+                            // Review-fix (recipe-ingestion-fix): this field
+                            // was previously never copied from the source
+                            // JSON, silently dropping every hand-authored
+                            // fractional EV override (e.g. recipe -1591,
+                            // Mystic Clover, 0.31 - see
+                            // ref/mystic_forge_recipes.json) on every reseed.
+                            // TryGetProperty (not GetProperty) because most
+                            // rows omit this field entirely (ordinary 1:1
+                            // recipes have no EV override).
+                            ExpectedOutputCount = entry.TryGetProperty("expectedOutputCount", out var evProp) && evProp.ValueKind != JsonValueKind.Null
+                                ? evProp.GetDouble()
+                                : (double?)null,
                             Disciplines = new List<string> { "MysticForge" },
                             MinRating = 0,
                             Flags = new List<string>()

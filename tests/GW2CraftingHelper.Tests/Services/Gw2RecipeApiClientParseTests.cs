@@ -51,28 +51,181 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ParseRecipe_IngredientsWithExplicitType_PreservesType()
+        public void ParseRecipe_RealVersionedCurrencyRecipe_UsesIdKeyForEveryIngredientType()
         {
-            // Hypothetical recipe with explicit "type" on ingredients
-            // (e.g. Mystic Forge local data or future API change).
+            // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): replaces
+            // a contract-mirror test that fabricated a "hypothetical"
+            // explicit-type shape keyed on "item_id" - which is NOT what
+            // the real API sends for a typed ingredient and is exactly the
+            // wrong shape that let the original bug (unconditional
+            // ing.Value<int>("item_id")) go undetected. This is the REAL,
+            // byte-for-byte captured response body from
+            // `curl "https://api.guildwars2.com/v2/recipes/14025?v=2026-08-15"`
+            // (recipe 14025, Amalgamated Rift Essence -> item 100930; this
+            // exact recipe was the one invisible to unversioned
+            // /v2/recipes/14025, which 404s outright, and to unversioned
+            // /v2/recipes' own id list). Every ingredient - Currency AND
+            // Item alike - keys its item id as "id", never "item_id":
+            // proof that the versioned schema's ingredient shape uses "id"
+            // universally, not just for Currency ingredients.
             var json = @"{
-                ""id"": 9999,
-                ""output_item_id"": 100,
+                ""id"": 14025,
+                ""type"": ""Refinement"",
+                ""output_item_id"": 100930,
+                ""output_item_count"": 1,
+                ""time_to_craft_ms"": 1500,
+                ""disciplines"": [
+                    ""Leatherworker"", ""Armorsmith"", ""Chef"", ""Tailor"",
+                    ""Artificer"", ""Weaponsmith"", ""Scribe"", ""Huntsman"",
+                    ""Jeweler""
+                ],
+                ""min_rating"": 400,
+                ""flags"": [""LearnedFromItem""],
+                ""ingredients"": [
+                    { ""type"": ""Currency"", ""id"": 78, ""count"": 250 },
+                    { ""type"": ""Currency"", ""id"": 80, ""count"": 100 },
+                    { ""type"": ""Currency"", ""id"": 79, ""count"": 50 },
+                    { ""type"": ""Item"",     ""id"": 19721, ""count"": 50 }
+                ],
+                ""chat_link"": ""[&Cck2AAA=]""
+            }";
+
+            var recipe = Gw2RecipeApiClient.ParseRecipe(json);
+
+            Assert.Equal(14025, recipe.Id);
+            Assert.Equal(100930, recipe.OutputItemId);
+            Assert.Equal(1, recipe.OutputItemCount);
+            Assert.Equal(400, recipe.MinRating);
+            Assert.Contains("LearnedFromItem", recipe.Flags);
+            Assert.Equal(9, recipe.Disciplines.Count);
+            Assert.Equal(4, recipe.Ingredients.Count);
+
+            Assert.Equal("Currency", recipe.Ingredients[0].Type);
+            Assert.Equal(78, recipe.Ingredients[0].Id);
+            Assert.Equal(250, recipe.Ingredients[0].Count);
+
+            Assert.Equal("Currency", recipe.Ingredients[1].Type);
+            Assert.Equal(80, recipe.Ingredients[1].Id);
+            Assert.Equal(100, recipe.Ingredients[1].Count);
+
+            Assert.Equal("Currency", recipe.Ingredients[2].Type);
+            Assert.Equal(79, recipe.Ingredients[2].Id);
+            Assert.Equal(50, recipe.Ingredients[2].Count);
+
+            Assert.Equal("Item", recipe.Ingredients[3].Type);
+            Assert.Equal(19721, recipe.Ingredients[3].Id);
+            Assert.Equal(50, recipe.Ingredients[3].Count);
+        }
+
+        [Fact]
+        public void ParseRecipe_LegacyItemIdKey_StillParsesAsFallback()
+        {
+            // The fallback half of the same fix: a hypothetical row using
+            // the OLD unversioned "item_id" key (e.g. an accidental
+            // unversioned call, or a future regression) must still parse
+            // rather than silently defaulting Id to 0. Unlike the test
+            // above, this shape is deliberately hypothetical/defensive -
+            // no currently-shipped seed row or live versioned response
+            // uses "item_id" (verified: every ref/recipes_seed.json
+            // ingredient row already uses "id").
+            var json = @"{
+                ""id"": 1,
+                ""output_item_id"": 10,
                 ""output_item_count"": 1,
                 ""disciplines"": [],
                 ""min_rating"": 0,
                 ""flags"": [],
                 ""ingredients"": [
-                    { ""type"": ""Currency"", ""item_id"": 23, ""count"": 5 },
-                    { ""type"": ""Item"",     ""item_id"": 200, ""count"": 3 }
+                    { ""type"": ""Currency"", ""item_id"": 23, ""count"": 5 }
                 ]
             }";
 
             var recipe = Gw2RecipeApiClient.ParseRecipe(json);
 
-            Assert.Equal(2, recipe.Ingredients.Count);
+            Assert.Single(recipe.Ingredients);
             Assert.Equal("Currency", recipe.Ingredients[0].Type);
-            Assert.Equal("Item", recipe.Ingredients[1].Type);
+            Assert.Equal(23, recipe.Ingredients[0].Id);
+            Assert.Equal(5, recipe.Ingredients[0].Count);
+        }
+
+        [Fact]
+        public void ParseRecipe_IngredientMissingBothIdKeys_SkipsIngredientRatherThanEmittingIdZero()
+        {
+            // Review-fix (recipe-ingestion-fix): a row with NEITHER "id" nor
+            // "item_id" previously silently ingested Id = 0 (Newtonsoft's
+            // Value<int>(key) defaults to 0 for a missing key) - a real
+            // item id 0 flows into CraftingPlanPipeline.CollectItemIds as a
+            // genuine Item node and renders an unnamed leaf. The malformed
+            // row must be skipped instead, leaving the recipe's other,
+            // well-formed ingredients intact.
+            var json = @"{
+                ""id"": 1,
+                ""output_item_id"": 10,
+                ""output_item_count"": 1,
+                ""disciplines"": [],
+                ""min_rating"": 0,
+                ""flags"": [],
+                ""ingredients"": [
+                    { ""type"": ""Item"", ""count"": 3 },
+                    { ""type"": ""Item"", ""id"": 46695, ""count"": 1 }
+                ]
+            }";
+
+            var recipe = Gw2RecipeApiClient.ParseRecipe(json);
+
+            Assert.Single(recipe.Ingredients);
+            Assert.Equal(46695, recipe.Ingredients[0].Id);
+        }
+
+        [Fact]
+        public void ParseRecipe_IngredientMissingCount_SkipsIngredientRatherThanEmittingCountZero()
+        {
+            // Same defect class as the id-key case above, for "count":
+            // Value<int>("count") also silently defaulted to 0 for a
+            // missing key.
+            var json = @"{
+                ""id"": 1,
+                ""output_item_id"": 10,
+                ""output_item_count"": 1,
+                ""disciplines"": [],
+                ""min_rating"": 0,
+                ""flags"": [],
+                ""ingredients"": [
+                    { ""type"": ""Item"", ""id"": 99 },
+                    { ""type"": ""Item"", ""id"": 46695, ""count"": 1 }
+                ]
+            }";
+
+            var recipe = Gw2RecipeApiClient.ParseRecipe(json);
+
+            Assert.Single(recipe.Ingredients);
+            Assert.Equal(46695, recipe.Ingredients[0].Id);
+        }
+
+        [Fact]
+        public void ParseRecipe_IngredientWithExplicitZeroCount_StillParsed()
+        {
+            // Guards the narrow scope of the fix above: an explicit
+            // "count": 0 is a present key (not a missing one) and must
+            // still be kept - only a genuinely ABSENT count key is
+            // treated as malformed.
+            var json = @"{
+                ""id"": 1,
+                ""output_item_id"": 10,
+                ""output_item_count"": 1,
+                ""disciplines"": [],
+                ""min_rating"": 0,
+                ""flags"": [],
+                ""ingredients"": [
+                    { ""type"": ""Item"", ""id"": 46695, ""count"": 0 }
+                ]
+            }";
+
+            var recipe = Gw2RecipeApiClient.ParseRecipe(json);
+
+            Assert.Single(recipe.Ingredients);
+            Assert.Equal(46695, recipe.Ingredients[0].Id);
+            Assert.Equal(0, recipe.Ingredients[0].Count);
         }
 
         [Fact]

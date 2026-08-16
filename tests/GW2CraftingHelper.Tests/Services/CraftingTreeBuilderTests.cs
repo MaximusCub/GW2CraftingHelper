@@ -29,13 +29,14 @@ namespace GW2CraftingHelper.Tests.Services
             RecipeNode tree,
             Dictionary<int, ItemPrice> prices,
             Dictionary<int, ItemMetadata> metadata,
-            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null)
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers = null,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null)
         {
             var solver = new PlanSolver();
             var solveResult = solver.Solve(tree, prices, vendorOffers);
 
             var builder = new CraftingTreeBuilder();
-            return builder.BuildTree(tree, solveResult.Decisions, metadata);
+            return builder.BuildTree(tree, solveResult.Decisions, metadata, currencyMetadata: currencyMetadata);
         }
 
         [Fact]
@@ -703,6 +704,74 @@ namespace GW2CraftingHelper.Tests.Services
             var currencyChild = root.Children.First(
                 c => c.Decision == CraftingDecision.Currency);
             Assert.Equal("Currency", currencyChild.Name);
+        }
+
+        [Fact]
+        public void CurrencyNode_WithCurrencyMetadata_PrefersLiveNameOverStaticMap()
+        {
+            // Review-fix (recipe-ingestion-fix, Must Fix): CraftingTreeBuilder
+            // now resolves Currency leaf names through CurrencyDisplayResolver
+            // (live CurrencyMetadataService data preferred, Gw2Constants
+            // static map as fallback) instead of calling
+            // Gw2Constants.ResolveCurrencyName directly - the same chain
+            // PlanViewModelBuilder's Summary/shopping rows already use. Id 61
+            // ("Research Note" live) is deliberately used here: it is one of
+            // the ids the 2026-08-15 audit found the static map had
+            // literally never carried an entry for.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 3),
+                    Leaf(61, 5, "Currency")));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+            };
+            var metadata = Meta(
+                (1, "Root", "r.png"),
+                (2, "Mat", "m.png"));
+            var currencyMetadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 61, new CurrencyMetadata { CurrencyId = 61, Name = "Research Note", IconUrl = "note.png" } }
+            };
+
+            var root = BuildViaRealSolver(tree, prices, metadata, currencyMetadata: currencyMetadata);
+
+            var currencyChild = root.Children.First(c => c.Decision == CraftingDecision.Currency);
+            Assert.Equal("Research Note", currencyChild.Name);
+        }
+
+        [Fact]
+        public void CurrencyNode_CurrencyMetadataMissingThisId_FallsBackToStaticMap()
+        {
+            // The other half of the wiring: when currencyMetadata is
+            // supplied but has no entry for this particular id (e.g. the
+            // live /v2/currencies fetch is still in flight for a currency
+            // this recipe needs, or the id is genuinely absent live),
+            // CurrencyDisplayResolver falls back to Gw2Constants exactly as
+            // it did before this node existed - not to "Currency" just
+            // because SOME metadata dictionary was passed.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 3),
+                    Leaf(3, 10, "Currency")));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+            };
+            var metadata = Meta(
+                (1, "Root", "r.png"),
+                (2, "Mat", "m.png"));
+            var currencyMetadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 61, new CurrencyMetadata { CurrencyId = 61, Name = "Research Note", IconUrl = "note.png" } }
+            };
+
+            var root = BuildViaRealSolver(tree, prices, metadata, currencyMetadata: currencyMetadata);
+
+            var currencyChild = root.Children.First(c => c.Decision == CraftingDecision.Currency);
+            Assert.Equal("Laurels", currencyChild.Name);
         }
 
         [Fact]
