@@ -2383,3 +2383,123 @@ BasicTooltipText strings on Blish controls; hover text is covered by the
 live desktop gate).
 
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+## W4B: Vendor cost-component leaves (2026-08-15)
+
+User-designed after live field observation: an "Amalgamated Rift Essence"
+node inside an Endless Summer plan showed a vendor offer costing 3 wallet
+currencies PLUS Globs of Ectoplasm (a TP-valued item). `CraftingPlanPipeline.
+AugmentWithVendorCostPricesAsync` already TP-values an offer's Item cost
+lines and folds them into one effective coin price - correct math, but the
+tree row's right side then rendered a very long run (gold-including-
+hidden-ectos + 3 currency segments) that collided with the row layout and
+hid that part of the "gold" total was actually paid in items, not coins.
+Implemented in the isolated `wt-w4b` worktree (stacked on the unmerged
+`tree-tooltips` branch, `4095fd2`) on branch `w4b-vendor-cost-leaves`.
+
+**Design.** For any vendor-acquired display-tree node whose winning offer's
+price mixes 2+ cost KINDS (coin / non-coin currency / TP-valued item),
+`CraftingTreeBuilder.BuildVendorCostComponentLeaves` now synthesizes
+DISPLAY-ONLY child leaves - one per non-coin-currency cost line and one
+per TP-valued item cost line - instead of the "what it would cost to craft
+instead" reference branch that node would otherwise get (component leaves
+take precedence; a vendor-only item with no recipe at all, the common
+real-world case, was never going to get a reference branch anyway). A
+single-kind offer (the overwhelming majority - plain coin, or all-currency,
+or all-item-folded-to-coin) is completely unaffected: no leaves, exactly
+today's rendering. A raw coin component never gets its own leaf even when
+it is one of the 2+ kinds - it stays folded into the parent's compact total
+exactly as before, the simplest presentation that still keeps every VISIBLE
+leaf's number consistent with the parent. The collapsed parent's cost cell
+now shows ONLY that compact gold total (`Views/Rendering/
+TreeSectionController.cs` skips the currency-segment run whenever the row's
+own children are component leaves) - the collision is gone, and the
+breakdown is one click away via the existing expander machinery.
+
+**Data plumbing (all additive, no existing math touched).** The item cost
+component's TP-valued gold amount did not previously survive past
+`VendorBatchSolver.EvaluateVendorOffers` (an Item cost line was folded
+straight into `coinCost` and discarded as a discrete number) - the
+merged-ceil batching arithmetic itself (DO-NOT-TOUCH) is unchanged; a new
+`VendorItemCostLine` (`ItemId`/`Quantity`/`GoldValue`) is captured at the
+EXACT SAME multiplication site that already fed `coinCost`, scaled by the
+same `unitsNeeded`, and threaded through `VendorOfferEvaluation` ->
+`PlanSolver.Decision.VendorItemCosts` -> `SolverDecision.VendorItemCosts`
+(mirroring the existing `VendorCurrencyCosts` passthrough exactly) -> the
+display leaf's own `SubtreeCost`. A leaf's gold amount is therefore
+literally the same number already folded into the parent's total, never
+independently recomputed. `SolverDecision.VendorHasRawCoin` (also additive)
+records only whether the winning offer had a genuine raw coin line, so the
+"2+ kinds" gate can tell "coin" apart from "item money that became coin"
+without re-deriving it from `TotalCost`.
+
+**Synthetic node ids.** Each leaf gets a deterministic, stable, always-
+NEGATIVE `NodeId` (`-(parentNodeId * 1000 + componentIndex + 1)`) -
+`RecipeNodeIds.Assign` only ever produces small non-negative ids, so
+collision is structurally impossible, and the id is stable across a
+`ResolveWithOverrides` re-solve of the same tree (the parent's own NodeId
+is preserved verbatim, and a leaf's `componentIndex` is a fixed position in
+a list built from the same winning offer's own `CostLines`), so expansion
+state survives a decision-pill click elsewhere in the tree.
+
+**Decision pills stay decision-free.** Component leaves are facts about a
+price, not an acquisition choice: `DecisionPillPlanner.BuildPillSpecs`
+checks `CraftingTreeNode.IsCostComponent` FIRST and returns only an
+informational HAVE / "HAVE x/y NEEDED" pill (or none) - never a CRAFT/TP/
+VENDOR pill, never Ignore, never `Source`-bearing (so it can never be
+clicked into an override). The HAVE data itself comes from a NEW,
+deliberately separate field, `ComponentOwnedQuantity` - unlike the existing
+`OwnedQuantityUsed` (which means "already subtracted from Quantity"), a
+component leaf's `Quantity`/cost are NEVER reduced for ownership; owning
+some of a cost component is purely informational, read from the account
+snapshot's wallet (`AccountCurrencyIndex`) and inventory
+(`AccountItemIndex`) via two new pipeline-computed, cosmetic-only
+dictionaries (`ownedCurrencyAmounts`, already existed; the new
+`OwnedVendorItemAmounts`) that - like their existing `OwnedCurrencyAmounts`
+sibling - are never consulted by `InventoryReducer` or `PlanSolver`, so
+they cannot affect a decision or a total. `CraftingPlanPipeline` also
+widens its one bulk item-metadata fetch to include every vendor Item cost
+component id (`AddVendorItemComponentIds`) - those ids are never real tree
+ingredients, so without this an item leaf would show "Unknown Item"
+instead of "Glob of Ectoplasm".
+
+**Verified separation from the solver.** `CraftingPlanPipeline.
+CollectPresetOverrides`/`BuildPresetOverrides` and `PlanSolver.Evaluate`'s
+override lookup both walk `RecipeNode`/`RecipeOption` (the SOLVER tree)
+exclusively - a component leaf corresponds to no `RecipeNode` at all and is
+never fed back into either, so Craft All/Buy All/Best Path and a plain
+per-node override click are provably unaffected (a dedicated pipeline test
+builds a preset override map and re-solves with component leaves present,
+asserting the leaves survive untouched and every produced override key is
+`>= 0`, i.e. a real solver id, never a synthetic negative one).
+
+`Models/CraftingTreeNode.cs` gained `IsCostComponent`/`ComponentOwnedQuantity`
+- both additive with `false`/`0` defaults, so an old `plan.json` simply
+deserializes every existing node with no component leaves (renders exactly
+as it did before this milestone) until the plan is regenerated;
+`PlanStructuralValidator.IsValidCraftingTreeNode`'s existing recursive
+`Children` walk already covers a component leaf with zero changes needed.
+
+New tests (all Blish-free, real production paths - no Blish/BlishHUD/
+Gw2Sharp references, no fake file I/O): `VendorBatchSolver`/`PlanSolver`
+level tests proving `VendorItemCosts`/`VendorHasRawCoin` populate correctly
+for mixed offers and stay null/false for single-kind ones
+(`PlanSolverVendorOfferTests`); `CraftingTreeBuilder` tests covering leaf
+labels/amounts/flags, parent-total-equals-leaf-value consistency, blank
+currency-leaf cost, no leaves for every single-kind offer shape (coin-only,
+currency-only, item-only, coin+currency-with-currency-leaf-only), HAVE-pill
+coverage (full/partial/none) from owned-amount dictionaries, currency-leaf
+name/icon from live `CurrencyMetadata` with the offline fallback, and
+stable/collision-free synthetic ids across two builds of the same tree
+(`CraftingTreeBuilderTests`); pill-vocabulary tests proving a component
+leaf never gets a decision/Ignore pill and only ever the informational
+HAVE/OwnedInfo pair (`DecisionPillPlannerTests`); end-to-end pipeline tests
+through a real `VendorOfferStore` + `AccountSnapshot` proving the metadata
+widening, the owned-amount wiring, a `ResolveWithOverrides` round-trip
+preserving leaf NodeIds/values, and the preset-override separation
+(`CraftingPlanPipelineTests`); and a real `PlanStore` save/load round trip
+proving component leaves survive gzip-compressed persistence and pass
+`PlanStructuralValidator` unchanged (`PlanStoreTests`). Full module suite:
+1273 baseline + 30 new W4B tests, all green.
+
+Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
