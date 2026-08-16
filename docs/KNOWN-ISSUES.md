@@ -4284,7 +4284,7 @@ Fix, purely additive/informational, no solver or pricing change,
 `VendorBatchSolver` untouched:
 
 - `ref/daily_cooldown_items.json` (new, mirrors
-  `ref/acquisition_hints_seed.json`'s precedent): 12 wiki-verified
+  `ref/acquisition_hints_seed.json`'s precedent): 15 wiki-verified
   entries, each with an item id, a per-day cap, and a
   `wiki.guildwars2.com` citation. Curated by fetching each candidate
   item's RAW wikitext (`index.php?title=...&action=raw`) via
@@ -4302,22 +4302,66 @@ Fix, purely additive/informational, no solver or pricing change,
   Elder Spirit Residue, Spool of Silk Weaving Thread, Spool of Thick
   Elonian Cord - each confirmed via its own item page's raw wikitext
   ("This item can only be acquired once per day per account...",
-  `timegate = y`, `[[Category:Time gated recipes]]`). Charged Quartz
-  Crystal (the task's other named example) checked out as directly
-  capped. The task's "obsidian refinement" example did NOT verify - the
-  wiki's own Obsidian Refinement subsection explicitly has no
-  time-gating note ("unlike the Ectoplasm Refinement section above it")
-  and Vision Crystal's own recipe carries no `timegate` flag - so no
-  obsidian-refinement entry was added, per the task's own "do NOT
-  include entries you could not verify" instruction. The remaining
-  seven entries (Heat Stone, Clay Pot, Vial of Maize Balm, Gossamer
-  Stuffing, Grow Lamp, Plate of Meaty Plant Food, Plate of Piquant Plant
-  Food) came from the wiki's own `Category:Time gated recipes` listing
-  and each carries an explicit "once per day per account" acquisition
-  sentence in its own raw wikitext. Four further category members
-  (the Dragon Hatchling Doll parts) carry `timegate = y` but no explicit
-  prose sentence on their own pages - excluded rather than inferred, to
-  stay strictly within "verified," not "probably true by convention."
+  `timegate = y`, `[[Category:Time gated recipes]]`). The task's
+  "obsidian refinement" example did NOT verify - the wiki's own Obsidian
+  Refinement subsection explicitly has no time-gating note ("unlike the
+  Ectoplasm Refinement section above it") and Vision Crystal's own
+  recipe carries no `timegate` flag - so no obsidian-refinement entry
+  was added, per the task's own "do NOT include entries you could not
+  verify" instruction. The remaining eleven entries (Heat Stone, Clay
+  Pot, Vial of Maize Balm, Gossamer Stuffing, Grow Lamp, Plate of Meaty
+  Plant Food, Plate of Piquant Plant Food, plus the four Dragon Hatchling
+  Doll parts below) came from the wiki's own
+  `Category:Time gated recipes` listing.
+  - **Review fix (audit row 56 PART C, finding 1):** the first cut of
+    this seed excluded four `Category:Time gated recipes` members - the
+    Dragon Hatchling Doll parts (Adornments 79795, Eye 79726, Frame
+    79817, Hide 79790) - on the stated grounds that they "carry
+    `timegate = y` but no explicit prose sentence on their own pages,"
+    while keeping Gossamer Stuffing (79763), a fifth Dragon Hatchling
+    Doll component from the same category. Re-checking each item's raw
+    wikitext (`index.php?action=raw`) shows Gossamer Stuffing's own page
+    has exactly the same evidence shape as the four excluded parts -
+    only `| timegate = y` plus `[[Category:Time gated recipes]]`, no
+    separate prose sentence either - so the exclusion line was not a
+    real distinction, it just never re-checked the one entry it had
+    already decided to keep. All four omitted items are real and
+    reachable (live API recipes 11885/11878/11888/11889, confirmed
+    outputs in `ref/recipes_seed.json`), and a Gift of Aurene plan crafts
+    all five Dragon Hatchling Doll parts together - warning on 1 of 5 and
+    staying silent on the other 4 read as "the other 4 are
+    unconstrained," which is worse than warning on none. Fixed by adding
+    all four at `perDayCap 1` (the cap `timegate = y` itself signals, same
+    as every other entry in this seed) rather than dropping Gossamer
+    Stuffing for consistency, since all five are genuinely capped.
+  - **Review fix (audit row 56 PART C, finding 2):** the first cut also
+    seeded Charged Quartz Crystal (43772, the task's other named
+    example) at `perDayCap 1` - real per the wiki, but dead data in this
+    module: `AppendDailyCooldownNotices` only ever inspects
+    `AcquisitionSource.Craft` steps, and Charged Quartz Crystal is made
+    at a Place of Power, not via any recipe this module resolves - it is
+    not a recipe OUTPUT anywhere in `ref/recipes_seed.json` or
+    `ref/mystic_forge_recipes.json` (`GET /v2/recipes/search?output=43772`
+    also returns `[]`), and it has no `ref/acquisition_hints_seed.json`
+    entry either. A plan needing 30 of them surfaces as a
+    shopping/unknown leaf with no cooldown warning at all, while the
+    seed entry made it look covered. Removed the entry;
+    `DailyCooldownItemServiceTests` now pins its absence as a regression
+    guard. **General limitation this exposes, not fully fixed here:**
+    the notice pass only ever covers items reachable via a Craft step -
+    any gated item whose recipe the account has not learned, or that is
+    produced by a non-recipe mechanic (Place of Power, achievement
+    reward, etc.), resolves to a non-Craft row today and gets no
+    cooldown notice regardless of whether it is in this seed. Extending
+    the pass to also cover `ShoppingUnknown`/non-craft rows is a real
+    follow-up, out of scope for this fix.
+  - **`itemName`/`note` fields are maintainer-only documentation.**
+    `DailyCooldownItemService.Load` never reads either field (see its
+    own `DailyCooldownEntry` shape) and no test pins them - they exist
+    purely to make the JSON file human-readable during curation/review
+    and can drift from the live API silently if an item is ever renamed.
+    Spot-checked against `GET /v2/items` for all entries as of this
+    review; not otherwise enforced.
 - `Models/DailyCooldownItem.cs` / `Services/DailyCooldownItemService.cs`
   (new): loader, byte-for-byte the same shape/never-throws contract as
   `AcquisitionHintService.Load`.
@@ -4398,17 +4442,76 @@ craft-cooldown notice coexisting in one section).
    also has a per-node "owned" pill on the tree itself. Both comments
    corrected in place; no behavior change.
 
+### PART C: code-review fixes (post-merge review round)
+
+1. **`ref/daily_cooldown_items.json` coverage/consistency fixes** - see
+   the corrections inline in PART A above: added the four Dragon
+   Hatchling Doll parts (finding 1), removed the dead Charged Quartz
+   Crystal entry (finding 2), documented the Craft-step-only limitation
+   this exposes, and noted `itemName`/`note` are maintainer-only
+   documentation fields. Seed count: 15 (was 12: +4 Dragon Hatchling
+   Doll parts, -1 Charged Quartz Crystal). `DailyCooldownItemServiceTests`
+   extended (same `[Fact]` methods, more assertions - no test count
+   change) to pin the four new ids at `perDayCap 1` and pin 43772's
+   absence as a regression guard.
+2. **`Gw2ConstantsCurrencyNamesTests` was a contract-mirror test.** Its
+   sole non-trivial assertion compared `Gw2Constants.KnownCurrencyNames`
+   against `ExpectedDictName`, a hand-copied duplicate of that same
+   production dictionary - `LiveApiNameById` (the "real snapshot" the
+   file's doc comment sells) was only ever interpolated into a failure
+   message, never asserted against, so the test would have passed
+   unchanged even if every `LiveApiNameById` value were wrong. Fixed by
+   asserting `ExpectedDictName[id]` against `LiveApiNameById[id]` for
+   every pinned id (equal, or the dict's established pluralization of
+   it) alongside the existing equality check, so a future entry added
+   with a mispaired id now fails instead of sailing through. No
+   production code changed; the underlying data was independently
+   re-verified against a live fetch and found correct.
+3. **Dead singular-day branch removed.** `PlanViewModelBuilder.
+   AppendDailyCooldownNotices`'s `day{(days == 1 ? "" : "s")}` was
+   unreachable - the loop `continue`s whenever `step.Quantity <=
+   cooldown.PerDayCap`, so every emitted notice already has `days =
+   Ceiling(qty / cap) >= 2`. Simplified to the always-true plural form;
+   no behavior change (existing tests already only assert the plural
+   wording).
+4. **`Services/AccountCurrencyIndex.cs` doc comment precision.** The
+   PART B #3 correction above (gw2e nets owned currency out via a
+   per-node pill, not summary-layer-only) is now explicit that the pill
+   is *display* only - gw2e's own quantity engine never nets owned
+   currency into a decision either (matching this class and
+   `docs/research/gw2e-convergence-matrix.md`'s `calculateTreeQuantity.
+   ts` finding), so the correction cannot be misread as gw2e netting
+   currency into decision math.
+5. **`CraftingPlanResultBuilders.MakeResult`'s `dailyCooldownItems`
+   parameter moved to the end of the parameter list**, matching
+   `CraftingPlanPipeline`'s own constructor convention (which appends it
+   after `moduleLog` for exactly this reason) - it previously sat
+   between `acquisitionHints` and `timegatedItems`, a positional hazard
+   for any future caller not using named arguments. All 119 existing
+   `MakeResult(...)` call sites use named arguments, so this is a
+   no-op for current callers.
+6. **`docs/gw2e-considerations.md` Section 12 / `docs/research/gw2e-
+   convergence-matrix.md` row 46 marked resolved**, pointing at the
+   PART B #3 fix - both previously still described the
+   `TreeSectionController` provenance comment as an open
+   recommendation after it had already been corrected.
+7. **Dangling `FindRepoFile` comment in `DailyCooldownItemServiceTests.cs`
+   moved** to sit with the `using static` it documents, rather than
+   floating disconnected at the end of the class body.
+
 Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
 C:/Dev/Blish/wt-cooldowns/GW2CraftingHelper.csproj -p:Platform=x64` -
 0 errors, warning count/content unchanged from baseline (all new
 warnings, if any, are the project's pre-existing StyleCop noise
-pattern, not introduced by this change). Tests: `"/mnt/c/Program
+pattern, not introduced by this change; confirmed no new warning in
+any file this round touched). Tests: `"/mnt/c/Program
 Files/dotnet/dotnet.exe" test
 C:/Dev/Blish/wt-cooldowns/tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` -
-1429 passed, 0 failed (1410 baseline + 14 PART A + 5 PART B, no test
-removed or modified). No Blish HUD/BlishHUD.exe reference in any test
-file; every new test exercises a real production entry point
-(`DailyCooldownItemService.Load`, `PlanViewModelBuilder.Build`,
+1429 passed, 0 failed (1410 baseline + 14 PART A + 5 PART B; PART C
+added assertions to existing `[Fact]`s rather than new ones, so the
+total is unchanged). No Blish HUD/BlishHUD.exe reference in any test
+file; every new/changed assertion exercises a real production entry
+point (`DailyCooldownItemService.Load`, `PlanViewModelBuilder.Build`,
 `Gw2Constants.KnownCurrencyNames`/`ResolveCurrencyName` directly), no
 contract mirrors, no fake file I/O (the shipped-seed-file test reads
 the real `ref/daily_cooldown_items.json` from disk via the existing
