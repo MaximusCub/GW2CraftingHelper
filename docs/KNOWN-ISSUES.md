@@ -4269,3 +4269,155 @@ repo's test-runnable surface, same constraint every UI-adjacent entry
 in this file notes.
 
 Gate: not yet run live - queued for the next batched desktop session. Merged after five adversarial review rounds, a targeted fix pass, and an independent verification review resolved every finding (zero blocking, 1383/1383 suite), under the maintainer's standing merge directive (2026-08-16). Solver behavior is fully covered by the suite; the deferred item is visual confirmation of the caveat tooltips only.
+
+## AUDIT ROW 56: daily craft-cooldown notices + three small fixes (2026-08-16)
+
+### PART A: daily craft-cooldown notices
+
+Server-enforced daily crafting cooldowns (as distinct from the existing
+M34-B1 #3 vendor PURCHASE cap notices - see `TimegatedItem`/
+`TimegatedCapType`) were entirely unmodeled: a plan telling the user to
+craft e.g. 30 Lump of Mithrillium via `AcquisitionSource.Craft` omitted
+the ~30 real-world days that recipe's own daily reset actually requires.
+
+Fix, purely additive/informational, no solver or pricing change,
+`VendorBatchSolver` untouched:
+
+- `ref/daily_cooldown_items.json` (new, mirrors
+  `ref/acquisition_hints_seed.json`'s precedent): 12 wiki-verified
+  entries, each with an item id, a per-day cap, and a
+  `wiki.guildwars2.com` citation. Curated by fetching each candidate
+  item's RAW wikitext (`index.php?title=...&action=raw`) via
+  `api.php`/`index.php`, not by trusting the task's own suggested item
+  list at face value - that research turned up a real correction: the
+  task's suggested set (Deldrimor Steel Ingot, Spiritwood Plank, Elonian
+  Leather Square, Bolt of Damask, Xunlai Electrum Ingot) are the
+  ascended-refinement STEP-2 outputs, and the wiki confirms those five
+  are explicitly NOT recipe-capped ("The step 2 materials are not
+  time-gated and can be traded on the Trading Post" -
+  `wiki.guildwars2.com/wiki/Crafting_material#Ascended_crafting_materials`).
+  The real daily cap lives one tier earlier, on the STEP-1 precursor
+  each of those five (four of them; Xunlai Electrum Ingot shares
+  Deldrimor's own precursor) consumes: Lump of Mithrillium, Glob of
+  Elder Spirit Residue, Spool of Silk Weaving Thread, Spool of Thick
+  Elonian Cord - each confirmed via its own item page's raw wikitext
+  ("This item can only be acquired once per day per account...",
+  `timegate = y`, `[[Category:Time gated recipes]]`). Charged Quartz
+  Crystal (the task's other named example) checked out as directly
+  capped. The task's "obsidian refinement" example did NOT verify - the
+  wiki's own Obsidian Refinement subsection explicitly has no
+  time-gating note ("unlike the Ectoplasm Refinement section above it")
+  and Vision Crystal's own recipe carries no `timegate` flag - so no
+  obsidian-refinement entry was added, per the task's own "do NOT
+  include entries you could not verify" instruction. The remaining
+  seven entries (Heat Stone, Clay Pot, Vial of Maize Balm, Gossamer
+  Stuffing, Grow Lamp, Plate of Meaty Plant Food, Plate of Piquant Plant
+  Food) came from the wiki's own `Category:Time gated recipes` listing
+  and each carries an explicit "once per day per account" acquisition
+  sentence in its own raw wikitext. Four further category members
+  (the Dragon Hatchling Doll parts) carry `timegate = y` but no explicit
+  prose sentence on their own pages - excluded rather than inferred, to
+  stay strictly within "verified," not "probably true by convention."
+- `Models/DailyCooldownItem.cs` / `Services/DailyCooldownItemService.cs`
+  (new): loader, byte-for-byte the same shape/never-throws contract as
+  `AcquisitionHintService.Load`.
+- `CraftingPlanResult.DailyCooldownItems` / `PlanSolveContext.
+  DailyCooldownItems` (new fields) wired through `CraftingPlanPipeline`
+  at every site `AcquisitionHints` already flows through (both
+  `GenerateStructured*Async` result-builds + their `PlanSolveContext`
+  snapshots, plus `ResolveWithOverrides`) - loaded once in `Module.cs`
+  with the same try/catch-degrades-to-null seed-load convention as the
+  acquisition hints seed immediately above it.
+- `PlanViewModelBuilder.AppendDailyCooldownNotices` (new, called from
+  `BuildCraftingStepsSection`): an additive pass over the section's
+  already-filtered Craft-source steps. A step whose aggregate `Quantity`
+  exceeds the seed's `PerDayCap` for that item id gets one
+  `PlanRowType.TimegatedNotice` row appended - reusing that row's exact
+  plain-`Label`-text shape (the same generic `TextRowRenderer` branch
+  the pre-existing vendor-cap notices already render through, see
+  `CraftStepsSectionRenderer.Render`), never the `TimegatedItem`
+  model/`Plan.TimegatedItems` list itself, so a recipe-level cooldown
+  can never be confused with (or accidentally validated by
+  `PlanStructuralValidator` as) a vendor purchase cap. Wording: `"{item}
+  is timegated - {cap} per day per account - crafting {qty} will take
+  about {days} day(s)"`, `days = Ceiling(qty / cap)`.
+
+Tests (new): `DailyCooldownItemServiceTests` (7 cases, mirrors
+`AcquisitionHintServiceTests` including a shipped-seed-file pin) and
+`PlanViewModelBuilderDailyCooldownTests` (7 cases: exceeds-cap,
+at-cap/no-notice, not-in-seed, null-seed-no-throw, non-Craft-step
+never triggers, non-divisible-quantity rounds up, and a vendor-cap +
+craft-cooldown notice coexisting in one section).
+
+### PART B: three small fixes
+
+1. **Magenta missing-texture icons.** `Views/MainView.cs`'s
+   `CreateItemRow`/`CreateWalletRow` (Snapshot tab - the reported case
+   was the Spirit Shards wallet row) and `Views/SuggestionPanel.cs`'s
+   search-suggestion rows all fell back to `ContentService.Textures.
+   Error` - Blish's alarming magenta missing-texture placeholder -
+   whenever `IconUrl` was empty, conflating an ordinary data gap with a
+   genuine texture-load failure. All three now call the existing
+   `Views/Rendering/IconControls.CreateItemIcon` helper (which already
+   degrades an empty `iconUrl` to a neutral dark-grey empty-slot square,
+   used everywhere else in the crafting-plan tree/rows), removing the
+   duplicated inline icon-loading logic entirely rather than patching it
+   three times. `Module.cs`'s own `ContentService.Textures.Error`
+   fallback (module icon texture failed to *load*, a real failure) is a
+   different case and was left untouched.
+2. **`Gw2Constants.KnownCurrencyNames` audit.** Verified every existing
+   entry against a live `GET /v2/currencies?ids=all&v=2022-03-23` fetch
+   (2026-08-16). The six ids the task flagged as pre-ingestion
+   mispairs (36, 49, 50, 58, 59, 60) are already correctly paired on the
+   current master - the `recipe-ingestion-fix` PR (#113) already fixed
+   them. The one real remaining gap: id 68 (Imperial Favor, a Cantha
+   vendor currency) was missing from the dict entirely, so any plan
+   costing it fell back to the generic "Currency" label via
+   `ResolveCurrencyName` - added as `{ 68, "Imperial Favors" }`,
+   matching the dict's own established singular-API-name -> pluralized-
+   display-name convention (confirmed exceptionless across all ~44
+   pre-existing entries before extending it). New test:
+   `Gw2ConstantsCurrencyNamesTests` (5 cases) pins 19 ids' exact display
+   strings against a real, verbatim-captured `/v2/currencies` snapshot
+   (not invented), including an explicit "id 60 is Tyrian Defense Seal,
+   not Imperial Favor - real Imperial Favor is id 68" regression guard
+   for the exact bug class this audit found.
+   - **Not fixed, flagged for a follow-up pass:** `ref/vendor_offers.json`
+     references ~19 further currency ids with no `KnownCurrencyNames`
+     entry at all (31, 35, 46, 52-54, 57, 64, 66, 69, 70, 72, 73, 75-77,
+     81-83 - Legendary Insight and Ancient Coin among them). Each would
+     need its own real-vs-mass-noun pluralization judgment call the task
+     did not ask for and this pass did not verify community-standard
+     wording for; left as a known completeness gap rather than guessed.
+3. **Two stale/incorrect gw2efficiency-provenance doc comments.**
+   `Views/Rendering/TreeSectionController.cs`'s dimmed-reference-branch
+   comment claimed the branch was "gw2e's `.not-crafted` informational
+   reference branch" - gw2efficiency has no such concept; it is a module
+   original. `Services/AccountCurrencyIndex.cs` claimed gw2efficiency
+   "only ever nets owned currency out at the summary layer" - gw2e
+   also has a per-node "owned" pill on the tree itself. Both comments
+   corrected in place; no behavior change.
+
+Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-cooldowns/GW2CraftingHelper.csproj -p:Platform=x64` -
+0 errors, warning count/content unchanged from baseline (all new
+warnings, if any, are the project's pre-existing StyleCop noise
+pattern, not introduced by this change). Tests: `"/mnt/c/Program
+Files/dotnet/dotnet.exe" test
+C:/Dev/Blish/wt-cooldowns/tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` -
+1429 passed, 0 failed (1410 baseline + 14 PART A + 5 PART B, no test
+removed or modified). No Blish HUD/BlishHUD.exe reference in any test
+file; every new test exercises a real production entry point
+(`DailyCooldownItemService.Load`, `PlanViewModelBuilder.Build`,
+`Gw2Constants.KnownCurrencyNames`/`ResolveCurrencyName` directly), no
+contract mirrors, no fake file I/O (the shipped-seed-file test reads
+the real `ref/daily_cooldown_items.json` from disk via the existing
+`RepoFileLocator` helper). IDs remain internal-only - the new craft-
+cooldown notice text never surfaces an item id, only its resolved name.
+No live desktop verification was performed - `Views/MainView.cs`,
+`Views/SuggestionPanel.cs`, and `Views/Rendering/TreeSectionController.cs`
+are all Blish-bound and outside this repo's test-runnable surface; the
+icon-placeholder fix in particular (a Snapshot-tab render change) has
+not been visually confirmed in a live client.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
