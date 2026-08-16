@@ -362,12 +362,21 @@ namespace GW2CraftingHelper.Services
                 CoinValue = totalMaterialsValue,
                 TooltipText = totalMaterialsValueTooltip
             });
+
+            // Review fix (round 2): FormulaResultIsExact false exactly when
+            // profit < 0 - see that field's own doc comment. This is the
+            // ONLY row in either band where it is ever set false; both
+            // Band 1's collapsed/expanded tiles and this band's Sell
+            // Value/Total Materials Value tiles keep the true default
+            // (nothing to falsify - the field is only read on a band's
+            // last tile).
             section.Rows.Add(new PlanRowViewModel
             {
                 RowType = PlanRowType.ProfitFormulaTile,
                 Label = profit >= 0 ? "Profit if Sold" : "Loss if Sold",
                 CoinValue = Math.Abs(profit),
-                TooltipText = ProfitTooltip + profitQualifier
+                TooltipText = ProfitTooltip + profitQualifier,
+                FormulaResultIsExact = profit >= 0
             });
         }
 

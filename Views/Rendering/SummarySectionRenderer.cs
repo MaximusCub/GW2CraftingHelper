@@ -164,6 +164,19 @@ namespace GW2CraftingHelper.Views.Rendering
         /// unlabelled-relationship bands instead of one. Never drawn for a
         /// collapsed 1-tile band (tileCount == 1): there is nothing to
         /// relate a single tile to.
+        ///
+        /// Review fix (round 2): the final boundary's symbol is no longer
+        /// an unconditional "=". It reads the rightmost tile's own
+        /// PlanRowViewModel.FormulaResultIsExact (see that field's doc
+        /// comment) and draws NeutralResultSeparator instead of "=" when
+        /// false - the profit band's loss case, where the rightmost tile
+        /// deliberately shows Math.Abs(profit) under a "Loss if Sold"
+        /// caption, so "left - middle = <abs loss>" would be an
+        /// arithmetically false equation as drawn. Every other boundary
+        /// (there is only ever one non-final boundary, tileCount == 3)
+        /// keeps its unconditional "-": the left two tiles' own
+        /// subtraction is never in question, only whether the FINAL
+        /// result tile's displayed value is the true right-hand side.
         /// </summary>
         private void CreateFormulaBand(List<PlanRowViewModel> tileRows, FlowPanel parent, int panelWidth)
         {
@@ -174,6 +187,14 @@ namespace GW2CraftingHelper.Views.Rendering
             const int totalMargin = 40;
             const int minTileWidth = 80;
             const int operatorY = 30;
+
+            // Review fix (round 2): drawn at the final boundary instead of
+            // "=" when the rightmost tile's FormulaResultIsExact is false -
+            // see this method's own doc comment. Deliberately not "-"
+            // (would misread as a second subtraction) and not "=" (would
+            // repeat the exact claim this fix removes); a colon reads as
+            // plain, non-asserting punctuation grouping the two sides.
+            const string NeutralResultSeparator = ":";
             var geometry = PlanRelayoutMath.ComputeCostTileGeometry(panelWidth, tileCount, totalMargin, minTileWidth);
 
             var rowPanel = new Panel()
@@ -215,18 +236,23 @@ namespace GW2CraftingHelper.Views.Rendering
             }
 
             // One operator per boundary BETWEEN two tiles (tileCount - 1 of
-            // them): "-" for every boundary except the last, "=" for the
-            // last (the formula always reads "A - B = C" for the only
-            // uncollapsed tile count this band ever has, 3). Centered on
-            // the boundary x (where tile i+1 begins - tiles are laid out
-            // contiguously with no gap, per ComputeCostTileGeometry).
+            // them): "-" for every boundary except the last. The last
+            // boundary reads "A - B = C" (true equation) for every band
+            // except the profit band's loss case, where it reads
+            // NeutralResultSeparator instead - see this method's own doc
+            // comment (round-2 review fix). Centered on the boundary x
+            // (where tile i+1 begins - tiles are laid out contiguously
+            // with no gap, per ComputeCostTileGeometry).
             List<Label> operatorLabels = null;
             if (tileCount > 1)
             {
                 operatorLabels = new List<Label>(tileCount - 1);
                 for (int i = 1; i < tileCount; i++)
                 {
-                    string symbol = i == tileCount - 1 ? "=" : "-";
+                    bool isFinalBoundary = i == tileCount - 1;
+                    string symbol = isFinalBoundary
+                        ? (tileRows[i].FormulaResultIsExact ? "=" : NeutralResultSeparator)
+                        : "-";
                     int boundaryX = geometry.StartX + i * geometry.TileWidth;
                     int symbolWidth = (int)System.Math.Ceiling(amountFont.MeasureString(symbol).Width);
                     var operatorLabel = new Label()

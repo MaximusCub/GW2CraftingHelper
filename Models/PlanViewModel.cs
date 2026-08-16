@@ -243,6 +243,24 @@ namespace GW2CraftingHelper.Models
         // other row type.
         public string TooltipText { get; set; }
 
+        // W4A review-fix-round-2: true (default) when the formula band's
+        // "=" operator drawn immediately to this tile's left is an honest
+        // statement (left tile - middle tile literally equals this tile's
+        // displayed CoinValue). SummarySectionRenderer.CreateFormulaBand
+        // only ever draws "=" before the LAST tile in a band, and only
+        // reads this field on that tile - it being false on every other
+        // tile is harmless (unread there). The one case this is ever
+        // false: the profit band's loss tile, whose Label/CoinValue
+        // deliberately show "Loss if Sold" / Math.Abs(profit) (the
+        // pre-existing sign convention - PlanViewModelBuilder.
+        // BuildProfitFormulaBand). With that convention the drawn
+        // equation ("Sell Value - Total Materials Value = <abs loss>")
+        // is arithmetically FALSE for a negative profit, since the true
+        // right-hand side is negative. When false, the renderer
+        // substitutes a neutral, non-equality punctuation mark for that
+        // one boundary instead of "=".
+        public bool FormulaResultIsExact { get; set; } = true;
+
         // W3C (per-character discipline display, gw2efficiency parity):
         // which of the account's characters have this DisciplineRow's
         // discipline, and at what rating - e.g. "Anna (500), Bob
