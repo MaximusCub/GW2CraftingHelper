@@ -76,6 +76,24 @@ namespace GW2CraftingHelper.Models
         public int? CraftsNeeded { get; set; }
         public int? RecipeOutputCount { get; set; }
 
+        // Review fix (finding 1, MEASURED): the basis CraftsNeeded above
+        // was ACTUALLY derived from - RecipeService.BuildNodeAsync computes
+        // CraftsNeeded = ceil(Quantity / ExpectedOutputCount), never
+        // ceil(Quantity / RecipeOutputCount) - see RecipeOption.
+        // ExpectedOutputCount's own doc comment. For an integer-yield
+        // recipe ExpectedOutputCount == RecipeOutputCount exactly (a no-op
+        // ratio of 1.0); only a Mystic-Clover-style fractional-EV recipe
+        // (e.g. outputItemCount=1, expectedOutputCount=0.31) diverges.
+        // CraftsNeeded and RecipeOutputCount are on DIFFERENT bases for
+        // that case - ExcessCraftOutputCalculator MUST recover "produced"
+        // from CraftsNeeded * RecipeExpectedOutputCount, not
+        // CraftsNeeded * RecipeOutputCount, or it fabricates a large
+        // integer surplus for a recipe whose expected output was already
+        // probability-adjusted to land at (approximately) Quantity. Set
+        // only for Decision == Craft nodes, same gate as CraftsNeeded/
+        // RecipeOutputCount.
+        public double? RecipeExpectedOutputCount { get; set; }
+
         public long? UnitCost { get; set; }
         public long? SubtreeCost { get; set; }
 

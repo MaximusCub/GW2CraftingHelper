@@ -225,6 +225,10 @@ namespace GW2CraftingHelper.Services
                     // why this can exceed treeNode.Quantity.
                     treeNode.CraftsNeeded = recipe.CraftsNeeded;
                     treeNode.RecipeOutputCount = recipe.OutputCount;
+                    // Review fix (finding 1): the SAME basis CraftsNeeded
+                    // above was derived from - see CraftingTreeNode.
+                    // RecipeExpectedOutputCount's own doc comment.
+                    treeNode.RecipeExpectedOutputCount = recipe.ExpectedOutputCount;
                     // Propagate insideReferenceBranch as-is (not reset to
                     // false): a Craft decision reached WHILE already inside
                     // a reference branch is still hypothetical content, and

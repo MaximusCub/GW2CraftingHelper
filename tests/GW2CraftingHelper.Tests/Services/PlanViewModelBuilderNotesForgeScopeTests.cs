@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Tests.Services
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
         [Fact]
-        public void NonEmptyForgeOutputIds_ProducesExactlyOneLine_RegardlessOfCount()
+        public void NonEmptyForgeOutputIds_ProducesExactlyThreeLines_RegardlessOfCount()
         {
             var result = MakeResult(
                 probabilisticForgeOutputItemIds: new List<int> { 1, 2, 3 });
@@ -27,10 +27,18 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
-            Assert.Single(section.Rows);
-            Assert.Equal(PlanRowType.NoteLine, section.Rows[0].RowType);
-            Assert.Contains("Mystic Clover", section.Rows[0].Label);
-            Assert.Contains("precursor forging", section.Rows[0].Label);
+            // Review fix (finding 4, MEASURED): the single ~243-char row
+            // overflowed NotesSectionRenderer's fixed 28px row and clipped
+            // the "never models and never shows" caveat - split, verbatim,
+            // into 3 NoteLine rows. Still exactly ONE logical note
+            // regardless of forgeOutputIds.Count (see the "Notes (N)"
+            // assertion below, which counts logical entries, not rows).
+            Assert.Equal(3, section.Rows.Count);
+            Assert.All(section.Rows, r => Assert.Equal(PlanRowType.NoteLine, r.RowType));
+            string combined = string.Join(" ", section.Rows.Select(r => r.Label));
+            Assert.Contains("Mystic Clover", combined);
+            Assert.Contains("precursor forging", combined);
+            Assert.Equal("Notes (1)", section.Title);
         }
 
         [Fact]

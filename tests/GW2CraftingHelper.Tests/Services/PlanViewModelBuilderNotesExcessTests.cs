@@ -60,18 +60,30 @@ namespace GW2CraftingHelper.Tests.Services
             var total = section.Rows.Last();
             Assert.Equal("Total reclaimable value", total.Label);
             Assert.Equal(590, total.CoinValue);
+
+            // Review fix (nice-to-have): "Notes (N)" counts real entries
+            // (2 excess items), not section.Rows.Count (which is 3 once the
+            // "Total reclaimable value" rollup row is included).
+            Assert.Equal("Notes (2)", section.Title);
         }
 
         [Fact]
         public void PerItemRows_SortedAlphabeticallyByResolvedName()
         {
+            // Review fix (finding 3, MEASURED): different quantities so
+            // this actually exercises the claimed "alphabetical by
+            // resolved item name" contract - both fixtures previously used
+            // ExcessQuantity = 1, which passed even when the code sorted on
+            // the whole composed Label ("Excess: 12x Zircon Ore" sorts
+            // before "Excess: 3x Apple" under a naive Label-Ordinal sort,
+            // since '1' < '3').
             var meta = MetaFor((10, "Zircon Ore", "z.png"), (20, "Apple", "a.png"));
             var result = MakeResult(
                 metadata: meta,
                 excessCraftOutputs: new List<ExcessCraftOutput>
                 {
-                    new ExcessCraftOutput { ItemId = 10, ExcessQuantity = 1, ReclaimValue = 10 },
-                    new ExcessCraftOutput { ItemId = 20, ExcessQuantity = 1, ReclaimValue = 10 }
+                    new ExcessCraftOutput { ItemId = 10, ExcessQuantity = 12, ReclaimValue = 10 },
+                    new ExcessCraftOutput { ItemId = 20, ExcessQuantity = 3, ReclaimValue = 10 }
                 });
 
             var vm = _builder.Build(result);
@@ -79,6 +91,60 @@ namespace GW2CraftingHelper.Tests.Services
             var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
             Assert.Contains("Apple", section.Rows[0].Label);
             Assert.Contains("Zircon Ore", section.Rows[1].Label);
+        }
+
+        [Fact]
+        public void UnpricedNonAccountBoundEntry_LabeledNoSellPrice()
+        {
+            // Review fix (finding 5, MEASURED): an unpriced row (no live
+            // sell price, and NOT account-bound) must be visibly
+            // distinguished from a genuinely worthless one - it previously
+            // rendered identically to a real 0-value row.
+            var meta = MetaFor((10, "Mystery Widget", "widget.png"));
+            var result = MakeResult(
+                metadata: meta,
+                excessCraftOutputs: new List<ExcessCraftOutput>
+                {
+                    new ExcessCraftOutput
+                    {
+                        ItemId = 10,
+                        ExcessQuantity = 4,
+                        ReclaimValue = null,
+                        IsAccountBound = false
+                    }
+                });
+
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
+            Assert.Single(section.Rows);
+            Assert.Equal(0, section.Rows[0].CoinValue);
+            Assert.Contains("no sell price", section.Rows[0].Label);
+            Assert.DoesNotContain("account-bound", section.Rows[0].Label);
+        }
+
+        [Fact]
+        public void TotalRow_QualifiedWhenAnyContributorUnpriced()
+        {
+            // Review fix (finding 5, MEASURED): the total must not silently
+            // understate itself when it folded in an unpriced (defaulted
+            // to 0) contributor.
+            var meta = MetaFor((10, "Iron Ingot", "iron.png"), (20, "Mystery Widget", "widget.png"));
+            var result = MakeResult(
+                metadata: meta,
+                excessCraftOutputs: new List<ExcessCraftOutput>
+                {
+                    new ExcessCraftOutput { ItemId = 10, ExcessQuantity = 12, ReclaimValue = 500 },
+                    new ExcessCraftOutput { ItemId = 20, ExcessQuantity = 4, ReclaimValue = null }
+                });
+
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
+            var total = section.Rows.Last();
+            Assert.Contains("Total reclaimable value", total.Label);
+            Assert.Contains("excludes unpriced items", total.Label);
+            Assert.Equal(500, total.CoinValue);
         }
 
         [Fact]
