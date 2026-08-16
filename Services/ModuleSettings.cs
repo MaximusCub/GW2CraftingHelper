@@ -286,13 +286,47 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Reads the persisted currency valuations. Returns
-        /// CurrencyValuation.None when nothing has been configured or the
-        /// stored value cannot be parsed.
+        /// Reads the RAW persisted currency valuations - user-set overrides
+        /// and explicit clears only, with no CurrencyDecisionDefaults
+        /// default folded in. Returns CurrencyValuation.None when nothing
+        /// has been configured or the stored value cannot be parsed. Used
+        /// by the Settings tab (SettingsTabContent), which must be able to
+        /// tell "the user typed this" apart from "this is just the curated
+        /// default" - see GetEffectiveCurrencyValuation for the solver-
+        /// facing counterpart that DOES fold defaults in.
         /// </summary>
         public CurrencyValuation GetCurrencyValuation()
         {
             return CurrencyValuationSerializer.Deserialize(CurrencyValuationsJson.Value);
+        }
+
+        /// <summary>
+        /// currency-ux-package (Feature 1): the solver-facing counterpart
+        /// of GetCurrencyValuation - same raw persisted overrides/clears,
+        /// PLUS every CurrencyDecisionDefaults entry that is neither
+        /// explicitly overridden nor explicitly cleared, via
+        /// CurrencyValuation.TryGetEffectiveCopperValue (the one place the
+        /// three-state precedence is implemented). This is the ONLY
+        /// production call site that should ever see defaults applied -
+        /// Module.cs is this method's sole caller, threading the result
+        /// into CraftingPlanPipeline.GenerateStructuredAsync. Every other
+        /// consumer of a CurrencyValuation (a directly-constructed test
+        /// instance, or GetCurrencyValuation's raw read above) sees only
+        /// what was actually persisted, by design - defaults are applied
+        /// exactly once, here, rather than inside the solver itself, so a
+        /// bare PlanSolver.Solve/CraftingPlanPipeline call with an
+        /// explicit CurrencyValuation (as most of this repo's solver tests
+        /// make) is never silently reshaped by a curated default it never
+        /// asked for.
+        /// </summary>
+        public CurrencyValuation GetEffectiveCurrencyValuation()
+        {
+            // currency-ux-package review fix (finding 5, MEASURED): the
+            // merge itself now lives on CurrencyValuation.WithDefaults (a
+            // Blish-free Models type, therefore unit-testable) instead of
+            // being inlined here - this class stays the sole production
+            // caller, unchanged in every other respect.
+            return CurrencyValuation.WithDefaults(GetCurrencyValuation());
         }
 
         /// <summary>

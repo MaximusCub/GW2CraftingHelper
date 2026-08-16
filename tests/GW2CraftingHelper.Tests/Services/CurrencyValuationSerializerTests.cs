@@ -115,5 +115,82 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Same(CurrencyValuation.None, result);
         }
+
+        // --- currency-ux-package (Feature 1): "Cleared" round-trip ---
+
+        [Fact]
+        public void SerializeThenDeserialize_RoundTripsClearedIds()
+        {
+            var valuation = new CurrencyValuation(
+                new Dictionary<int, long> { { 2, 5 } },
+                new[] { 23 });
+
+            string json = CurrencyValuationSerializer.Serialize(valuation);
+            var roundTripped = CurrencyValuationSerializer.Deserialize(json);
+
+            Assert.True(roundTripped.TryGetCopperValue(2, out long karmaValue));
+            Assert.Equal(5, karmaValue);
+            Assert.True(roundTripped.IsCleared(23));
+            Assert.False(roundTripped.TryGetCopperValue(23, out _));
+        }
+
+        [Fact]
+        public void Serialize_ClearedOnlyNoValues_DoesNotReturnEmptyString()
+        {
+            // Nothing to persist only when BOTH sets are empty - a cleared
+            // currency with no explicit values at all must still persist
+            // (an empty string would silently resurrect the default next
+            // load, defeating the whole point of Clear).
+            var valuation = new CurrencyValuation(new Dictionary<int, long>(), new[] { 2 });
+
+            string json = CurrencyValuationSerializer.Serialize(valuation);
+
+            Assert.NotEqual(string.Empty, json);
+            var roundTripped = CurrencyValuationSerializer.Deserialize(json);
+            Assert.True(roundTripped.IsCleared(2));
+        }
+
+        [Fact]
+        public void Deserialize_OldFlatFormat_StillWorks_WithNoClearedIds()
+        {
+            // Pre-Feature-1 persisted shape: a bare {"id":value,...} object,
+            // no "Values"/"Cleared" properties - must keep working with no
+            // migration step.
+            var json = "{\"2\":5,\"23\":1200}";
+
+            var result = CurrencyValuationSerializer.Deserialize(json);
+
+            Assert.True(result.TryGetCopperValue(2, out long karmaValue));
+            Assert.Equal(5, karmaValue);
+            Assert.True(result.TryGetCopperValue(23, out long spiritShardValue));
+            Assert.Equal(1200, spiritShardValue);
+            Assert.Empty(result.ClearedCurrencyIds);
+        }
+
+        [Fact]
+        public void Deserialize_ClearedIdAlsoHasExplicitValue_ExplicitValueWins()
+        {
+            // A currency id present in BOTH "Values" and "Cleared" is a
+            // self-contradictory persisted state (CurrencyValuation's own
+            // constructor rejects it outright) - the serializer must
+            // resolve it, explicit value winning, before ever constructing.
+            var json = "{\"Values\":{\"2\":5},\"Cleared\":[2]}";
+
+            var result = CurrencyValuationSerializer.Deserialize(json);
+
+            Assert.True(result.TryGetCopperValue(2, out long karmaValue));
+            Assert.Equal(5, karmaValue);
+            Assert.False(result.IsCleared(2));
+        }
+
+        [Fact]
+        public void Deserialize_ClearedCoinCurrencyId_Skipped()
+        {
+            var json = $"{{\"Values\":{{}},\"Cleared\":[{Gw2Constants.CoinCurrencyId}]}}";
+
+            var result = CurrencyValuationSerializer.Deserialize(json);
+
+            Assert.False(result.IsCleared(Gw2Constants.CoinCurrencyId));
+        }
     }
 }

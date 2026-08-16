@@ -453,6 +453,25 @@ namespace GW2CraftingHelper
                 acquisitionHints = null;
             }
 
+            // Daily craft-cooldown seed: wiki-verified recipes whose
+            // crafting action itself is server-capped (audit row 56). Same
+            // static-local-file loading shape as the acquisition hints seed
+            // just above - no async fetch needed.
+            IReadOnlyDictionary<int, DailyCooldownItem> dailyCooldownItems = null;
+            try
+            {
+                using (var cooldownStream = ContentsManager.GetFileStream("daily_cooldown_items.json"))
+                {
+                    dailyCooldownItems = DailyCooldownItemService.Load(cooldownStream);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Info("Daily cooldown items unavailable: [{0}] {1}", ex.GetType().Name, ex.Message);
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Daily cooldown items unavailable: [{ex.GetType().Name}] {ex.Message}");
+                dailyCooldownItems = null;
+            }
+
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir, onStoreError);
             recipeOverlay.Load(currentGw2BuildId: null);
 
@@ -483,7 +502,8 @@ namespace GW2CraftingHelper
                 reducer: new InventoryReducer(),
                 accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager),
                 currencyMetadataService: new CurrencyMetadataService(_httpClient),
-                acquisitionHints: acquisitionHints);
+                acquisitionHints: acquisitionHints,
+                dailyCooldownItems: dailyCooldownItems);
 
             try
             {
@@ -565,7 +585,15 @@ namespace GW2CraftingHelper
                         ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan", $"Gw2Mumble unavailable, active character unknown: {ex.GetType().Name} - {ex.Message}");
                     }
 
-                    var currencyValuation = _settings.GetCurrencyValuation();
+                    // currency-ux-package (Feature 1): the EFFECTIVE
+                    // valuation (user overrides + CurrencyDecisionDefaults'
+                    // curated defaults, minus anything explicitly cleared -
+                    // see ModuleSettings.GetEffectiveCurrencyValuation's own
+                    // doc comment) - not the raw GetCurrencyValuation the
+                    // Settings tab itself reads, which must stay default-
+                    // free so it can tell a real user override apart from
+                    // an applied default.
+                    var currencyValuation = _settings.GetEffectiveCurrencyValuation();
                     // VOM design (Section 5.2): superseded
                     // _settings.GetOwnMaterialsMode() - the per-plan
                     // valueOwnMaterials parameter above now drives this

@@ -1,8 +1,8 @@
 using Blish_HUD;
-using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Blish_HUD.Input;
 using GW2CraftingHelper.Contracts;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
@@ -217,24 +217,13 @@ namespace GW2CraftingHelper.Views
                     Parent = _rowContainer
                 };
 
-                // Item icon
-                AsyncTexture2D icon;
-                if (!string.IsNullOrEmpty(item.IconUrl))
-                {
-                    icon = GameService.Content.GetRenderServiceTexture(item.IconUrl);
-                }
-                else
-                {
-                    icon = new AsyncTexture2D(ContentService.Textures.Error);
-                }
-
-                new Panel()
-                {
-                    Size = new Point(IconSize, IconSize),
-                    Location = new Point(2, (RowHeight - IconSize) / 2),
-                    BackgroundTexture = icon,
-                    Parent = row
-                };
+                // Item icon. A missing IconUrl is a data gap, never a
+                // genuine load failure - IconControls.CreateItemIcon
+                // degrades it to a neutral empty-slot square instead of
+                // Blish's alarming magenta missing-texture placeholder
+                // (audit row 56 PART B #1, sibling of the same fix in
+                // MainView.cs's snapshot/wallet rows).
+                IconControls.CreateItemIcon(row, item.IconUrl, 2, (RowHeight - IconSize) / 2, IconSize);
 
                 // Item name
                 new Label()

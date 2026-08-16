@@ -33,16 +33,47 @@ namespace GW2CraftingHelper.Views
         // rate would misrepresent that. Leaving this row blank (the
         // default) keeps AA out of price comparisons entirely, same as any
         // other unset currency.
-        private static readonly int[] CuratedCurrencyIds =
+        // currency-ux-package review fix (finding 2, MEASURED): ids with no
+        // CurrencyDecisionDefaults entry but still worth surfacing for a
+        // user to value by hand - see CurrencyDecisionDefaults' own doc
+        // comment for why each is absent from that table: Astral Acclaim's
+        // per-item deal quality varies too much for any single suggested
+        // rate, and the three Rift Essence tiers have no row at all in
+        // gw2efficiency's own source table.
+        private static readonly int[] CuratedCurrencyIdsWithoutDefault =
         {
-            2,  // Karma
-            3,  // Laurels
-            23, // Spirit Shards
+            63, // Astral Acclaim
             78, // Fine Rift Essence
             79, // Rare Rift Essence
-            80, // Masterwork Rift Essence
-            63  // Astral Acclaim
+            80  // Masterwork Rift Essence
         };
+
+        // currency-ux-package review fix (finding 2, MEASURED): previously
+        // a hand-picked 7-id list, of which only 3 (Karma/Laurels/Spirit
+        // Shards) actually had a CurrencyDecisionDefaults entry.
+        // ModuleSettings.GetEffectiveCurrencyValuation applies EVERY entry
+        // in that table to every real solve regardless of whether a
+        // Settings row exists for it, so a defaulted currency with no row
+        // here was invisible and unclearable - no way to inspect it, know
+        // it was silently tipping a vendor-vs-TP comparison, or turn it
+        // off (Feature 1's own three-state requirement: set / default /
+        // cleared, each visible and each reachable). CurrencyDecisionDefaults
+        // is now the single source of truth for which defaulted ids get a
+        // row - adding a new default there automatically gets a Settings
+        // row here too, with no second list to remember to keep in sync.
+        private static readonly int[] CuratedCurrencyIds = BuildCuratedCurrencyIds();
+
+        private static int[] BuildCuratedCurrencyIds()
+        {
+            var ids = new SortedSet<int>(CurrencyDecisionDefaults.DefaultCopperPerUnit.Keys);
+            foreach (int id in CuratedCurrencyIdsWithoutDefault)
+            {
+                ids.Add(id);
+            }
+            var result = new int[ids.Count];
+            ids.CopyTo(result);
+            return result;
+        }
 
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
         private static readonly Color ErrorTextColor = new Color(255, 100, 100);
@@ -63,8 +94,19 @@ namespace GW2CraftingHelper.Views
         private class CurrencyRow
         {
             public int CurrencyId;
+            public bool HasDefault;
+            public long DefaultCopperPerUnit;
             public TextBox Input;
             public Label ErrorLabel;
+
+            // currency-ux-package (Feature 1): null for a currency with no
+            // CurrencyDecisionDefaults entry (nothing to show/clear - see
+            // AddCurrencyRow). DefaultStateLabel reflects the currently-
+            // persisted default/cleared/overridden state; ClearCheckbox is
+            // the user's in-memory intent for the NEXT Save (see
+            // SaveValuations) - both null together, never independently.
+            public Label DefaultStateLabel;
+            public Checkbox ClearCheckbox;
         }
 
         // M37 (KNOWN-ISSUES #24): one row per Homestead Refinement material
@@ -165,6 +207,12 @@ namespace GW2CraftingHelper.Views
             AddSectionHeader("Currency Valuations", panelWidth);
             AddInfoLine("Coin value per unit of each currency, used to compare vendor offers.", panelWidth);
             AddInfoLine("Leave a currency unset to keep it out of price comparisons.", panelWidth);
+            // currency-ux-package (Feature 1): a currency with a curated
+            // default (see CurrencyDecisionDefaults) is used automatically
+            // even when its box is left blank - "unset" now means "use the
+            // default, if any", not "excluded". Use Clear to suppress a
+            // default entirely.
+            AddInfoLine("Some currencies show a default estimate and are valued automatically unless cleared.", panelWidth);
 
             foreach (int currencyId in CuratedCurrencyIds)
             {
@@ -801,11 +849,31 @@ namespace GW2CraftingHelper.Views
             };
         }
 
+        // currency-ux-package review fix (finding 6, MEASURED): the
+        // default/cleared indicator and its Clear checkbox previously sat
+        // on the SAME line as ErrorLabel (x=454), only 20px to its right at
+        // x=474 - ErrorLabel is AutoSizeWidth and its "Must be a positive
+        // whole number" text comfortably overruns that gap, painting
+        // through the default label and potentially the Clear checkbox
+        // (the only control that can persist a cleared state). Moved to
+        // their own line below the name/input/hint/error line instead of
+        // trying to out-guess AutoSizeWidth text metrics - see
+        // CurrencyRowHeight/CurrencyDefaultLineY below. Both columns start
+        // well left of the old ErrorX-relative positions (aligned under
+        // the input box, not past the hint/error columns), so a
+        // realistically narrow Settings panel is far less likely to clip
+        // the Clear checkbox off the right edge than the old x>=624 layout
+        // was.
+        private const int CurrencyRowHeight = 54;
+        private const int CurrencyDefaultLineY = 32;
+        private const int CurrencyDefaultStateX = NameColumnX + NameColumnWidth;
+        private const int CurrencyClearCheckboxX = CurrencyDefaultStateX + 190;
+
         private void AddCurrencyRow(int currencyId, int panelWidth)
         {
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, RowHeight),
+                Size = new Point(panelWidth, CurrencyRowHeight),
                 Parent = _rootPanel
             };
 
@@ -846,12 +914,70 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
+            bool hasDefault = CurrencyDecisionDefaults.TryGetDefault(currencyId, out long defaultCopperPerUnit);
+
+            Label defaultStateLabel = null;
+            Checkbox clearCheckbox = null;
+            if (hasDefault)
+            {
+                defaultStateLabel = new Label()
+                {
+                    Text = "",
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    TextColor = InfoTextColor,
+                    Location = new Point(CurrencyDefaultStateX, CurrencyDefaultLineY),
+                    // Feature 1 spec: visibly labeled as an estimate, with
+                    // attribution/editable/clearable spelled out on hover.
+                    BasicTooltipText = "Adapted from gw2efficiency, decision-only estimate. Editable above; use Clear to suppress it.",
+                    Parent = rowPanel
+                };
+
+                clearCheckbox = new Checkbox()
+                {
+                    Text = "Clear",
+                    Location = new Point(CurrencyClearCheckboxX, CurrencyDefaultLineY),
+                    BasicTooltipText = "Suppress this currency's default estimate - it will not be valued unless you enter your own amount.",
+                    Parent = rowPanel
+                };
+            }
+
             _rows.Add(new CurrencyRow
             {
                 CurrencyId = currencyId,
+                HasDefault = hasDefault,
+                DefaultCopperPerUnit = defaultCopperPerUnit,
                 Input = input,
-                ErrorLabel = errorLabel
+                ErrorLabel = errorLabel,
+                DefaultStateLabel = defaultStateLabel,
+                ClearCheckbox = clearCheckbox
             });
+        }
+
+        /// <summary>
+        /// currency-ux-package (Feature 1): refreshes one row's default/
+        /// cleared indicator label and Clear checkbox from the given
+        /// (already-loaded or just-saved) valuation - shared by
+        /// LoadCurrentValuations and SaveValuations so the two can never
+        /// disagree about how to render the same state.
+        /// </summary>
+        private static void RefreshCurrencyRowDefaultState(CurrencyRow row, CurrencyValuation valuation)
+        {
+            if (!row.HasDefault)
+            {
+                return;
+            }
+
+            bool isCleared = valuation.IsCleared(row.CurrencyId);
+            bool hasOverride = valuation.TryGetCopperValue(row.CurrencyId, out _);
+
+            row.ClearCheckbox.Checked = isCleared;
+            row.DefaultStateLabel.Text = isCleared
+                ? "default cleared"
+                : hasOverride
+                    ? $"(default was {row.DefaultCopperPerUnit})"
+                    : $"default: {row.DefaultCopperPerUnit}";
+            row.DefaultStateLabel.TextColor = isCleared ? WarningTextColor : InfoTextColor;
         }
 
         private void AddSaveRow(int panelWidth)
@@ -891,6 +1017,7 @@ namespace GW2CraftingHelper.Views
                     ? copperPerUnit.ToString(CultureInfo.InvariantCulture)
                     : "";
                 row.ErrorLabel.Text = "";
+                RefreshCurrencyRowDefaultState(row, valuation);
             }
         }
 
@@ -900,12 +1027,22 @@ namespace GW2CraftingHelper.Views
             // an invalid row is left untouched below rather than silently
             // dropped: the status label tells the user invalid entries are
             // "not saved", which must mean unchanged, not cleared. Only a
-            // row the user deliberately blanks is removed.
+            // row the user deliberately blanks is removed. currency-ux-
+            // package (Feature 1): cleared is seeded the same way, for the
+            // same reason - a row nobody touched this Save must keep
+            // whatever cleared/default state it already had persisted.
+            var persisted = _settings.GetCurrencyValuation();
+            // .NET Framework 4.8's Dictionary<TKey,TValue> has no
+            // constructor overload accepting IReadOnlyDictionary<TKey,
+            // TValue> (only IDictionary<TKey,TValue>) - CopperPerUnit is
+            // exposed as the former, so this is a manual copy rather than
+            // a one-line constructor call.
             var entries = new Dictionary<int, long>();
-            foreach (var kvp in _settings.GetCurrencyValuation().CopperPerUnit)
+            foreach (var kvp in persisted.CopperPerUnit)
             {
                 entries[kvp.Key] = kvp.Value;
             }
+            var cleared = new HashSet<int>(persisted.ClearedCurrencyIds);
 
             int invalidCount = 0;
 
@@ -916,15 +1053,32 @@ namespace GW2CraftingHelper.Views
                 string text = row.Input.Text;
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    // Blank box = unset; the currency is simply excluded
-                    // from the saved valuation, not an error.
+                    // Blank box = no explicit override. Feature 1: this no
+                    // longer means "excluded from comparison" outright - a
+                    // currency with a curated default is still valued via
+                    // that default unless the Clear checkbox is checked,
+                    // which is the ONLY thing that persists a genuine
+                    // suppression (see CurrencyValuation's own doc comment
+                    // on the three-state precedence).
                     entries.Remove(row.CurrencyId);
+                    if (row.HasDefault && row.ClearCheckbox != null && row.ClearCheckbox.Checked)
+                    {
+                        cleared.Add(row.CurrencyId);
+                    }
+                    else
+                    {
+                        cleared.Remove(row.CurrencyId);
+                    }
                     continue;
                 }
 
                 if (SettingsInputParser.TryParseCopperValue(text, out long copperPerUnit))
                 {
                     entries[row.CurrencyId] = copperPerUnit;
+                    // An explicit value always wins over a stale cleared
+                    // marker - CurrencyValuation's constructor rejects a
+                    // currency id that is both valued and cleared at once.
+                    cleared.Remove(row.CurrencyId);
                 }
                 else
                 {
@@ -936,20 +1090,23 @@ namespace GW2CraftingHelper.Views
                 }
             }
 
+            CurrencyValuation saved;
             try
             {
-                _settings.SetCurrencyValuation(new CurrencyValuation(entries));
+                saved = new CurrencyValuation(entries, cleared);
+                _settings.SetCurrencyValuation(saved);
             }
             catch (Exception ex)
             {
-                // Defensive: entries is seeded from the already-valid
-                // persisted valuation and only ever updated with
-                // SettingsInputParser-validated positive values on
-                // non-coin currency ids, so CurrencyValuation's
-                // constructor should never actually reject it. Still
-                // guarded so a future change to either side degrades to a
-                // visible status message instead of an unhandled
-                // exception on the UI thread.
+                // Defensive: entries/cleared are seeded from the already-
+                // valid persisted valuation and only ever updated with
+                // SettingsInputParser-validated positive values (removing
+                // the same id from `cleared` in the same step) on non-coin
+                // currency ids, so CurrencyValuation's constructor should
+                // never actually reject this. Still guarded so a future
+                // change to either side degrades to a visible status
+                // message instead of an unhandled exception on the UI
+                // thread.
                 Logger.Warn(ex, "Failed to save currency valuations");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "settings", $"Failed to save currency valuations: {ex.GetType().Name} - {ex.Message}");
                 if (_statusLabel != null)
@@ -958,6 +1115,11 @@ namespace GW2CraftingHelper.Views
                     _statusLabel.TextColor = ErrorTextColor;
                 }
                 return;
+            }
+
+            foreach (var row in _rows)
+            {
+                RefreshCurrencyRowDefaultState(row, saved);
             }
 
             if (_statusLabel == null) return;

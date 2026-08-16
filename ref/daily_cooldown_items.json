@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-16T00:00:00Z",
+  "source": "wiki.guildwars2.com (manual research: api.php raw wikitext per item page, cross-checked against Category:Time gated recipes)",
+  "items": [
+    {
+      "itemId": 46742,
+      "itemName": "Lump of Mithrillium",
+      "perDayCap": 1,
+      "note": "Ascended metal refinement step 1 - precursor for Deldrimor Steel Ingot and Xunlai Electrum Ingot (those two outputs are themselves NOT recipe-capped; the cap is on this ingredient).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Lump_of_Mithrillium",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 46744,
+      "itemName": "Glob of Elder Spirit Residue",
+      "perDayCap": 1,
+      "note": "Ascended wood refinement step 1 - precursor for Spiritwood Plank (not itself recipe-capped).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Glob_of_Elder_Spirit_Residue",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 46740,
+      "itemName": "Spool of Silk Weaving Thread",
+      "perDayCap": 1,
+      "note": "Ascended cloth refinement step 1 - precursor for Bolt of Damask (not itself recipe-capped).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Spool_of_Silk_Weaving_Thread",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 46745,
+      "itemName": "Spool of Thick Elonian Cord",
+      "perDayCap": 1,
+      "note": "Ascended leather refinement step 1 - precursor for Elonian Leather Square (not itself recipe-capped).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Spool_of_Thick_Elonian_Cord",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 67015,
+      "itemName": "Heat Stone",
+      "perDayCap": 1,
+      "note": "Crafting component for Pet Plantling / Mawdrey line.",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Heat_Stone",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 66913,
+      "itemName": "Clay Pot",
+      "perDayCap": 1,
+      "note": "Crafting component for Mysterious Vine / Cultivated Vine / Mawdrey back items.",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Clay_Pot",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 67377,
+      "itemName": "Vial of Maize Balm",
+      "perDayCap": 1,
+      "note": "Halloween consumable, Tricks and Treats collection.",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Vial_of_Maize_Balm",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 79763,
+      "itemName": "Gossamer Stuffing",
+      "perDayCap": 1,
+      "note": "Crafting component for Dragon Hatchling Doll, Gift of Aurene collection.",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gossamer_Stuffing",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 79795,
+      "itemName": "Dragon Hatchling Doll Adornments",
+      "perDayCap": 1,
+      "note": "Crafting component for Dragon Hatchling Doll, Gift of Aurene collection - same evidence pattern as Gossamer Stuffing (timegate = y + Category:Time gated recipes, no separate prose sentence on its own page).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Dragon_Hatchling_Doll_Adornments",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 79726,
+      "itemName": "Dragon Hatchling Doll Eye",
+      "perDayCap": 1,
+      "note": "Crafting component for Dragon Hatchling Doll, Gift of Aurene collection - same evidence pattern as Gossamer Stuffing (timegate = y + Category:Time gated recipes, no separate prose sentence on its own page).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Dragon_Hatchling_Doll_Eye",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 79817,
+      "itemName": "Dragon Hatchling Doll Frame",
+      "perDayCap": 1,
+      "note": "Crafting component for Dragon Hatchling Doll, Gift of Aurene collection - same evidence pattern as Gossamer Stuffing (timegate = y + Category:Time gated recipes, no separate prose sentence on its own page).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Dragon_Hatchling_Doll_Frame",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 79790,
+      "itemName": "Dragon Hatchling Doll Hide",
+      "perDayCap": 1,
+      "note": "Crafting component for Dragon Hatchling Doll, Gift of Aurene collection - same evidence pattern as Gossamer Stuffing (timegate = y + Category:Time gated recipes, no separate prose sentence on its own page).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Dragon_Hatchling_Doll_Hide",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 66993,
+      "itemName": "Grow Lamp",
+      "perDayCap": 1,
+      "note": "Crafting component for Skyscale Toys achievement line.",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Grow_Lamp",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 66917,
+      "itemName": "Plate of Meaty Plant Food",
+      "perDayCap": 1,
+      "note": "Crafting component for Mysterious Vine / Cultivated Vine / Mawdrey back items.",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Plate_of_Meaty_Plant_Food",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 66923,
+      "itemName": "Plate of Piquant Plant Food",
+      "perDayCap": 1,
+      "note": "Crafting component for Mysterious Vine / Cultivated Vine / Mawdrey back items.",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Plate_of_Piquant_Plant_Food",
+      "lastVerified": "2026-08-16"
+    }
+  ]
+}

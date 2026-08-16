@@ -715,7 +715,7 @@ namespace GW2CraftingHelper.Tests.Services
         // ---- W4B (2026-08-15): "CURRENCY" badge on the blank-cost-cell
         // (currency-type) component shape - explains at a glance why no
         // gold value is shown, gw2efficiency's own grey Currency-badge
-        // pattern. May coexist with the OWN badge on the same leaf. ----
+        // pattern. ----
 
         [Fact]
         public void CostComponent_CurrencyType_BlankCostCell_ShowsCurrencyBadge()
@@ -731,19 +731,188 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(specs[0].Source);
         }
 
+        // currency-ux-package (Feature 2, supersedes the old "...
+        // ShowsBothBadgesTogether..." test name/assertion below): a
+        // currency-type component's row-scope "OWN n" badge is gone
+        // outright now - see AppendCurrencyOwnershipPill's own doc comment
+        // for why row-scope ComponentOwnedQuantity is no longer used at
+        // all for a currency leaf. Without plan-scope
+        // currencyPlanTotals/ownedCurrencyAmounts (both omitted here, the
+        // pre-Feature-2 call shape), the leaf shows ONLY its CURRENCY
+        // badge - see the *_WithPlanScopeOwnership tests below for the new
+        // pill's actual appended shape.
         [Fact]
-        public void CostComponent_CurrencyType_WithOwnership_ShowsBothBadgesTogether_CurrencyFirst()
+        public void CostComponent_CurrencyType_WithRowScopeOwnershipOnly_ShowsOnlyCurrencyBadge()
         {
             var node = Node(
                 CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 5,
                 componentOwnedQuantity: 3, subtreeCost: null);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
+            Assert.Single(specs);
+            Assert.Equal("CURRENCY", specs[0].Text);
+            Assert.Equal(PillKind.Locked, specs[0].Kind);
+        }
+
+        // --- currency-ux-package (Feature 2): plan-scope currency pill ---
+
+        [Fact]
+        public void CostComponent_CurrencyType_WithPlanScopeOwnership_PartialCoverage_AppendsHaveTotalPill()
+        {
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 5,
+                componentOwnedQuantity: 3, subtreeCost: null);
+            var totals = new Dictionary<int, long> { { node.ItemId, 100 } };
+            var owned = new Dictionary<int, int> { { node.ItemId, 40 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, owned);
+
             Assert.Equal(2, specs.Count);
             Assert.Equal("CURRENCY", specs[0].Text);
             Assert.Equal(PillKind.Locked, specs[0].Kind);
-            Assert.Equal("OWN 3", specs[1].Text);
+            Assert.Equal("HAVE 40/100 TOTAL", specs[1].Text);
             Assert.Equal(PillKind.OwnedInfo, specs[1].Kind);
+            Assert.Null(specs[1].Source);
+        }
+
+        [Fact]
+        public void CostComponent_CurrencyType_WithPlanScopeOwnership_FullCoverage_CollapsesToPlainHavePill()
+        {
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 5,
+                componentOwnedQuantity: 3, subtreeCost: null);
+            var totals = new Dictionary<int, long> { { node.ItemId, 100 } };
+            var owned = new Dictionary<int, int> { { node.ItemId, 100 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, owned);
+
+            Assert.Equal(2, specs.Count);
+            Assert.Equal("HAVE", specs[1].Text);
+            Assert.Equal(PillKind.Have, specs[1].Kind);
+        }
+
+        [Fact]
+        public void CurrencyDecision_WithPlanScopeOwnership_AppendsHaveTotalPillAfterCurrencyBadge()
+        {
+            var node = Node(CraftingDecision.Currency, quantity: 50);
+            var totals = new Dictionary<int, long> { { node.ItemId, 500 } };
+            var owned = new Dictionary<int, int> { { node.ItemId, 200 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, owned);
+
+            Assert.Equal(2, specs.Count);
+            Assert.Equal("CURRENCY", specs[0].Text);
+            Assert.Equal("HAVE 200/500 TOTAL", specs[1].Text);
+            Assert.Equal(PillKind.OwnedInfo, specs[1].Kind);
+        }
+
+        [Fact]
+        public void CurrencyDecision_NoWalletSnapshot_OmitsHaveTotalPillEntirely()
+        {
+            // ownedCurrencyAmounts null (no snapshot at all) - "have" is
+            // genuinely unknown, not zero, so the pill must be omitted
+            // rather than implying 0 owned.
+            var node = Node(CraftingDecision.Currency, quantity: 50);
+            var totals = new Dictionary<int, long> { { node.ItemId, 500 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, ownedCurrencyAmounts: null);
+
+            Assert.Single(specs);
+            Assert.Equal("CURRENCY", specs[0].Text);
+        }
+
+        [Fact]
+        public void CurrencyDecision_SnapshotPresentButThisCurrencyAbsent_OmitsHaveTotalPill()
+        {
+            // A snapshot exists but has no entry at all for THIS currency
+            // id - same "unknown, not zero" reasoning as the null-snapshot
+            // case above.
+            var node = Node(CraftingDecision.Currency, quantity: 50);
+            var totals = new Dictionary<int, long> { { node.ItemId, 500 } };
+            var owned = new Dictionary<int, int> { { 999, 10 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, owned);
+
+            Assert.Single(specs);
+            Assert.Equal("CURRENCY", specs[0].Text);
+        }
+
+        [Fact]
+        public void CurrencyDecision_ZeroOwned_ShowsHaveZeroTotalPill()
+        {
+            // A snapshot exists and explicitly reports 0 for this currency -
+            // distinct from "unknown" above - still shows the pill.
+            var node = Node(CraftingDecision.Currency, quantity: 50);
+            var totals = new Dictionary<int, long> { { node.ItemId, 500 } };
+            var owned = new Dictionary<int, int> { { node.ItemId, 0 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, owned);
+
+            Assert.Equal(2, specs.Count);
+            Assert.Equal("HAVE 0/500 TOTAL", specs[1].Text);
+        }
+
+        [Fact]
+        public void CurrencyDecision_ZeroOwnedNoPlanTotal_OmitsHaveTotalPillEntirely()
+        {
+            // currency-ux-package review fix (finding 3, MEASURED): the old
+            // `long planTotal = 0; currencyPlanTotals?.TryGetValue(...)`
+            // default made "this id has no plan total at all" (reachable
+            // whenever ownedCurrencyAmounts is widened - via
+            // CraftingPlanPipeline.BuildOwnedCurrencyAmounts's own vendor-
+            // offer scan - beyond plan.CurrencyCosts, which is exactly
+            // where currencyPlanTotals comes from) indistinguishable from
+            // "the plan genuinely needs zero of this currency". With
+            // have=0 too, `0 &gt;= 0` rendered a plain blue "HAVE" (full
+            // coverage) pill - this test is the have=0/no-plan-total case
+            // the existing CurrencyDecision_ZeroOwned_ShowsHaveZeroTotalPill
+            // above does not cover (that one always supplies planTotal=500).
+            var node = Node(CraftingDecision.Currency, quantity: 50);
+            var totals = new Dictionary<int, long>(); // no entry at all for node.ItemId
+            var owned = new Dictionary<int, int> { { node.ItemId, 0 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, owned);
+
+            Assert.Single(specs);
+            Assert.Equal("CURRENCY", specs[0].Text);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Have);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
+        }
+
+        [Fact]
+        public void CurrencyDecision_HaveExceedsButNoPlanTotal_OmitsHaveTotalPillEntirely()
+        {
+            // Same gap as above, with a non-zero `have` too (rules out any
+            // reliance on have's own zero-ness rather than the missing
+            // plan total being what gates the pill).
+            var node = Node(CraftingDecision.Currency, quantity: 50);
+            var totals = new Dictionary<int, long>();
+            var owned = new Dictionary<int, int> { { node.ItemId, 999 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, owned);
+
+            Assert.Single(specs);
+            Assert.Equal("CURRENCY", specs[0].Text);
+        }
+
+        [Fact]
+        public void CostComponent_ItemType_WithPlanScopeArgs_StillShowsOwnBadgeUnchanged()
+        {
+            // Feature 2 scope: an ITEM-type cost component (non-null
+            // SubtreeCost) keeps its row-scope "OWN n" badge unchanged,
+            // even when plan-scope currency args are supplied (they are
+            // simply irrelevant to an item-type leaf).
+            var node = Node(
+                CraftingDecision.BuyFromVendor, isCostComponent: true, quantity: 5,
+                componentOwnedQuantity: 3, subtreeCost: 100);
+            var totals = new Dictionary<int, long> { { node.ItemId, 500 } };
+            var owned = new Dictionary<int, int> { { node.ItemId, 500 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, owned);
+
+            Assert.Single(specs);
+            Assert.Equal("OWN 3", specs[0].Text);
+            Assert.Equal(PillKind.OwnedInfo, specs[0].Kind);
         }
 
         [Fact]

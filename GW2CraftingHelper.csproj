@@ -94,6 +94,7 @@
     <Compile Include="Models\PlanStep.cs" />
     <Compile Include="Models\CurrencyCost.cs" />
     <Compile Include="Models\CurrencyValuation.cs" />
+    <Compile Include="Models\CurrencyDecisionDefaults.cs" />
     <Compile Include="Models\HomesteadEfficiencyTiers.cs" />
     <Compile Include="Models\CraftingPlan.cs" />
     <Compile Include="Models\TimegatedItem.cs" />
@@ -121,6 +122,8 @@
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />
     <Compile Include="Services\AcquisitionHintService.cs" />
+    <Compile Include="Models\DailyCooldownItem.cs" />
+    <Compile Include="Services\DailyCooldownItemService.cs" />
     <Compile Include="Services\CraftingTreeBuilder.cs" />
     <Compile Include="Services\CraftingPlanPipeline.cs" />
     <Compile Include="Services\SellSideEconomics.cs" />
@@ -199,6 +202,7 @@
     <Compile Include="Models\CraftingTreeNode.cs" />
     <Compile Include="Models\VendorItemCostLine.cs" />
     <Compile Include="Services\DecisionPillPlanner.cs" />
+    <Compile Include="Services\ValueDetailTooltipBuilder.cs" />
     <Compile Include="Contracts\IItemSearchProvider.cs" />
     <Compile Include="Services\StaticItemSearchProvider.cs" />
     <Compile Include="Services\CraftableItemSearchProvider.cs" />
@@ -335,6 +339,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ref\acquisition_hints_seed.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ref\daily_cooldown_items.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

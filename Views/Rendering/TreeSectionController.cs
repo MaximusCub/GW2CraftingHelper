@@ -889,10 +889,12 @@ namespace GW2CraftingHelper.Views.Rendering
                     rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
             }
 
-            // Child container. Children of a non-Craft decision are gw2e's
-            // ".not-crafted" informational reference branch (what it would
-            // cost to craft instead) - dimmed, and the flag does not stack
-            // on already-dimmed branches.
+            // Child container. Children of a non-Craft decision are this
+            // module's own informational reference branch (audit row 56
+            // PART B #3: corrected provenance - gw2e has no equivalent
+            // ".not-crafted" concept; this dimmed "what it would cost to
+            // craft instead" branch is a module original) - dimmed, and the
+            // flag does not stack on already-dimmed branches.
             FlowPanel childFlow = null;
             if (hasChildren)
             {
@@ -1073,7 +1075,11 @@ namespace GW2CraftingHelper.Views.Rendering
         private List<Panel> RenderDecisionPills(
             Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
         {
-            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+            // currency-ux-package (Feature 2): plan-scope currency facts
+            // for the new HAVE/TOTAL pill - see PlanViewModel.
+            // CurrencyPlanTotals/OwnedCurrencyAmounts' own doc comments.
+            var plan = _getCurrentPlan();
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, plan?.CurrencyPlanTotals, plan?.OwnedCurrencyAmounts);
             var font = GameService.Content.DefaultFont12;
             var pillPanels = new List<Panel>(specs.Count);
             int x = pillColX;
@@ -1261,14 +1267,45 @@ namespace GW2CraftingHelper.Views.Rendering
                     // tooltip at all.
                     tooltipText = $"Current source: {spec.Text}";
                 }
+                else if ((spec.Kind == PillKind.Have || spec.Kind == PillKind.OwnedInfo) &&
+                    (node.Decision == CraftingDecision.Currency ||
+                     (node.IsCostComponent && !node.SubtreeCost.HasValue)))
+                {
+                    // currency-ux-package (Feature 2): the plan-scope
+                    // HAVE/TOTAL pill (DecisionPillPlanner.
+                    // AppendCurrencyOwnershipPill) reuses the SAME
+                    // PillKind.Have/OwnedInfo the ordinary item-ownership
+                    // pills use (matching item-pill vocabulary, per the
+                    // maintainer's design), so it must be intercepted here,
+                    // BEFORE the ordinary Have/OwnedInfo branches below,
+                    // which would otherwise apply ITEM-ownership wording
+                    // (node.OwnedQuantityUsed) that means nothing for a
+                    // currency leaf. The pill text alone is plan-scope only
+                    // ("HAVE {have}/{planTotal} TOTAL" - deliberately no
+                    // per-row allocation, see AppendCurrencyOwnershipPill's
+                    // own doc comment); the tooltip adds what the pill text
+                    // cannot: this row's own need (node.Quantity).
+                    int have = 0;
+                    plan?.OwnedCurrencyAmounts?.TryGetValue(node.ItemId, out have);
+                    long planTotal = 0;
+                    plan?.CurrencyPlanTotals?.TryGetValue(node.ItemId, out planTotal);
+                    long shortfall = planTotal > have ? planTotal - have : 0;
+                    tooltipText = shortfall > 0
+                        ? $"Plan needs {planTotal} total, you have {have} - short {shortfall}. This row needs {node.Quantity}."
+                        : $"Plan needs {planTotal} total, you have {have} - fully covered. This row needs {node.Quantity}.";
+                }
                 else if (spec.Kind == PillKind.Have)
                 {
-                    // W4B (2026-08-15): a cost-component leaf can no longer
-                    // reach this branch - BuildPillSpecs' IsCostComponent
-                    // short-circuit now emits only the "OWN n"/"CURRENCY"
-                    // badges (never PillKind.Have) for a component leaf, so
-                    // this tooltip only ever needs the ordinary-node wording
-                    // below.
+                    // W4B (2026-08-15): an ITEM cost-component leaf can
+                    // never reach this branch (BuildPillSpecs' IsCostComponent
+                    // short-circuit emits only the "OWN n"/"CURRENCY"
+                    // badges for one, never PillKind.Have) - a CURRENCY
+                    // cost-component leaf (or an ordinary currency leaf)
+                    // CAN reach PillKind.Have now (currency-ux-package
+                    // Feature 2's full-coverage collapse), but is always
+                    // intercepted by the currency-specific branch just
+                    // above first, so this tooltip only ever needs the
+                    // ordinary-item wording below.
                     //
                     // Maintainer's final wording pass (2026-08-06): matches
                     // the OwnedInfo pill's "Needs N - ..." vocabulary below
@@ -1321,6 +1358,29 @@ namespace GW2CraftingHelper.Views.Rendering
                     // owned, this exact occurrence is just already required
                     // elsewhere in the tree.
                     tooltipText = "Already counted elsewhere in the tree - this item is obtained once, not needed again here";
+                }
+
+                // currency-ux-package (Feature 3): appends the value-detail
+                // hover (real gold vs. decision-only optimization price,
+                // plus a vendor cap line when applicable) onto the
+                // committed CRAFT/VENDOR pill's existing tooltip, only when
+                // ValueDetailTooltipBuilder finds a real divergence -
+                // Selected (multi-option winner) and Locked (sole option)
+                // are the only two kinds a committed CRAFT/VENDOR pill can
+                // ever have (see BuildPillSpecs' own "the selected pill
+                // always matches node.Decision" guarantee), so gating on
+                // node.Decision here (rather than re-checking spec.Text)
+                // cannot accidentally attach this to an unrelated pill -
+                // every other Kind's node.Decision is never Craft/
+                // BuyFromVendor (Currency/GuildUpgrade/Have/etc. all use
+                // their own distinct CraftingDecision values).
+                if ((spec.Kind == PillKind.Selected || spec.Kind == PillKind.Locked) &&
+                    (node.Decision == CraftingDecision.Craft || node.Decision == CraftingDecision.BuyFromVendor) &&
+                    ValueDetailTooltipBuilder.TryBuild(node, plan?.VendorCapsByItemId, out string valueDetailText))
+                {
+                    tooltipText = tooltipText == null
+                        ? valueDetailText
+                        : tooltipText + "\n\n" + valueDetailText;
                 }
 
                 if (tooltipText != null)
