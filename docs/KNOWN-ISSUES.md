@@ -3974,11 +3974,13 @@ field with no `"GuildUpgrade"` concept) and are unrelated.
 contract-mirror/fake-logic tests, no Blish HUD references.
 
 Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS, 0
-errors, 0 warnings on every file this fix touched (`Models/
-CraftingDecision.cs`, `Services/CraftingTreeBuilder.cs`,
-`Services/PlanSolver.cs`, `Services/RecipeService.cs`,
-`Services/VendorBatchSolver.cs`, `Services/DecisionPillPlanner.cs`,
-`Views/Rendering/TreeSectionController.cs`). Tests: `dotnet test
+errors. Pre-existing StyleCop analyzer warnings unchanged in nature
+(measured via a forced full rebuild; an incremental no-op build prints
+0 warnings and must not be quoted as the warning count). The only
+warnings on lines this fix added are two instances (SA1513/SA1515,
+`Views/Rendering/TreeSectionController.cs:1146-1147`) of the
+comment-placement pattern that already warns three times in the same
+else-if chain. Tests: `dotnet test
 tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` - 1396 total,
 0 failed.
 
