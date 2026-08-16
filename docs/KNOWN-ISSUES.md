@@ -2754,4 +2754,68 @@ cannot feed back into `solveResult.Decisions`, so this fix cannot affect a
 solver decision, only the cosmetic HAVE pill a display leaf reads
 afterward.
 
+**Pre-gate addendum (2026-08-15): "OWN n"/"CURRENCY" badge wording pass.**
+Maintainer field-testing found the component leaves' informational HAVE/
+"HAVE x/y NEEDED" pill (Section "Decision pills stay decision-free" above)
+misleading: that vocabulary means "your stock covers this need and reduced
+the plan cost" everywhere else in the tree, but a component leaf's
+ownership never reduces this line's cost (see `ComponentOwnedQuantity`'s
+own doc comment) - it is purely informational.
+`DecisionPillPlanner.BuildPillSpecs`'s `IsCostComponent` branch now shows a
+subdued "OWN n" badge instead (n = the raw `ComponentOwnedQuantity` holding, no full-vs-partial
+split since coverage never changes the cost either way), rendered only
+when n > 0 (no "OWN 0" clutter) - reusing `PillKind.OwnedInfo` (the same
+muted-gold kind the ordinary partial-ownership annotation already uses, no
+new color). Also added: a "CURRENCY" badge (`PillKind.Locked`, the SAME
+kind/text the plain currency-ingredient leaf's own pill already uses a few
+lines above in `BuildPillSpecs`) on the currency-type component shape
+(`SubtreeCost` never set - the "deliberately blank cost cell"
+`BuildVendorCostComponentLeaves`' currency-line branch produces),
+explaining at a glance why no gold value is shown - gw2efficiency's own grey Currency-
+badge pattern. The two badges are independent and may both appear on one
+leaf; `TreeSectionController.RenderDecisionPills` needed no layout change
+- both badge strings are short ("CURRENCY" plus "OWN n") and comfortably
+fit the existing 240px pill-column budget together (the pill column
+already fits the old, longer "HAVE x/y NEEDED" text alongside a source
+pill - see the `RealSolver_*`/`PartialOwnership_*` tests above), so
+`PlanRelayoutMath.ComputeVisiblePillCount` (untouched) never needs to drop
+either one in practice.
+
+Regular (non-component) currency-ingredient leaves already carried the
+identical "CURRENCY" / `PillKind.Locked` badge before this pass (the
+`CraftingDecision.Currency` short-circuit in `BuildPillSpecs`) - the
+vocabulary-consistency extension this addendum considered for those leaves
+was therefore already in place with zero additional diff.
+
+Tooltips follow the existing pattern exactly (`BasicTooltipText` stamped on
+all three of `outer`/`inner`/`label` together in
+`TreeSectionController.RenderDecisionPills`, per that method's own "tooltip resolved once... then
+stamped onto outer/inner/label together" comment - a tooltip on `outer`
+alone is swallowed by `inner`/`label`, which cover almost the entire pill).
+"OWN n"'s tooltip: "You own {n} - informational only, does not change the
+plan cost". "CURRENCY"'s tooltip (component-leaf case only; the ordinary
+currency-ingredient leaf's ambient "Only available source" default is
+unchanged): "Paid in a non-coin currency - no gold value to show here".
+The now-dead `IsCostComponent` branch of the `PillKind.Have` tooltip (a
+component leaf can no longer reach that `Kind` at all) was simplified back
+to the plain-node wording only.
+
+Updated: `Models/CraftingTreeNode.cs` (`IsCostComponent`'s and
+`ComponentOwnedQuantity`'s doc comments), `Services/CraftingTreeBuilder.cs`
+(`ResolveOwnedQuantity`'s doc comment), `Services/DecisionPillPlanner.cs`,
+`Views/Rendering/TreeSectionController.cs`. `DO-NOT-TOUCH` files (`Services/
+ModuleLog.cs`, `Services/PlanContentHeightMath.cs`, `Services/
+PlanRelayoutMath.cs`, scroll machinery, `VendorBatchSolver`'s merged-ceil
+vendor batching math) were not touched. `DecisionPillPlannerTests` updated:
+3 existing cost-component tests renamed/adjusted for the new "OWN n"
+wording (no more full/partial HAVE split), plus 3 new tests covering the
+CURRENCY-badge threshold (blank vs. non-null `SubtreeCost`) and the two
+badges coexisting in emission order (CURRENCY first, then OWN). Full module
+suite: 1312 passed (1309 baseline + 3 net new).
+`dotnet build -p:Platform=x64` clean (0 errors). No new Blish HUD
+references in tests; the extended/added tests exercise the real
+`DecisionPillPlanner.BuildPillSpecs` production code, no contract-mirror/
+fake-logic tests. Item/currency/vendor IDs remain internal-only (badge text
+is `"OWN n"`/`"CURRENCY"` only, never an id).
+
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
