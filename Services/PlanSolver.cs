@@ -350,7 +350,20 @@ namespace GW2CraftingHelper.Services
                         : currencyUnitRate * quantity;
                     allocatedCurrency += currencyShare;
 
-                    if (memo.TryGetValue(nodeId, out var decision) && decision.TotalCost.HasValue)
+                    // currency-ux-package regression fix (MEASURED): mirrors
+                    // RecomputeComparisonValues' own fallback-tier guard at
+                    // its `decision.HasUnvaluedCurrency ? ... : comparisonValue`
+                    // line - a fallback-tier offer (ANY unvalued non-coin
+                    // line, see VendorBatchSolver Evaluate) deliberately
+                    // commits ComparisonValue == TotalCost with no valuation
+                    // folded in. Without this guard this pass overwrote that
+                    // with a fabricated partial figure (only the valued lines
+                    // folded in, the unvalued line silently dropped), which
+                    // then made the value-detail tooltip's divergence check
+                    // fire and render a precise-looking optimization price
+                    // for an offer that was never actually valued.
+                    if (memo.TryGetValue(nodeId, out var decision) && decision.TotalCost.HasValue &&
+                        !decision.HasUnvaluedCurrency)
                     {
                         decision.ComparisonValue = decision.TotalCost.Value + currencyShare;
                         memo[nodeId] = decision;

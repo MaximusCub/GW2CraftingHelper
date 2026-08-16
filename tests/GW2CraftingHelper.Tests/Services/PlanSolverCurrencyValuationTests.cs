@@ -330,5 +330,68 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(100, result.Decisions[0].TotalCost);
             Assert.Equal(result.Decisions[0].TotalCost, result.Decisions[0].ComparisonValue);
         }
+
+        [Fact]
+        public void MixedCoinValuedUnvaluedFallbackOffer_ComparisonValueMatchesTotalCost_NoTooltip()
+        {
+            // Regression test (MEASURED): a fallback-tier vendor offer
+            // (coin 100 + valued currency 2 x50 @1 copper/unit + unvalued
+            // currency 3 x1000) used to have its ComparisonValue overwritten
+            // by the vendorOccurrences post-selection pass in PlanSolver
+            // (the pass immediately after AllocateVendorNodeCosts) with a
+            // fabricated partial figure of 150 (100 real coin + 50 valued
+            // currency, silently dropping the unvalued line) even though
+            // Evaluate's own fallback-tier commit deliberately set
+            // ComparisonValue == TotalCost (100) with no valuation folded
+            // in - identical to every other fallback-tier commit site (see
+            // RecomputeComparisonValues' own `decision.HasUnvaluedCurrency ?
+            // ... : comparisonValue` gate). No TP price and no recipe exist
+            // for item 1, so the vendor offer is the sole option and must
+            // land in fallback tier (any unvalued non-coin line forces the
+            // WHOLE offer to fallback - see VendorBatchSolver.Evaluate).
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var offer = new VendorOffer
+            {
+                OfferId = "test-mixed-coin-valued-unvalued",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 100 },
+                    new CostLine { Type = "Currency", Id = 2, Count = 50 },
+                    new CostLine { Type = "Currency", Id = 3, Count = 1000 }
+                },
+                MerchantName = "Mixed Vendor",
+                Locations = new List<string>()
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 1 } });
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation);
+            var decision = result.Decisions[0];
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, decision.Source);
+            Assert.Equal(100, decision.TotalCost);
+            Assert.Equal(100, decision.ComparisonValue);
+            Assert.Equal(decision.TotalCost, decision.ComparisonValue);
+
+            // The tooltip builder's divergence check must consequently
+            // never fire for this fallback-tier vendor step: SubtreeCost
+            // and DecisionValue are sourced straight from TotalCost/
+            // ComparisonValue by CraftingTreeBuilder, so with the two equal
+            // the delta <= 0 guard suppresses the hover.
+            var treeNode = new CraftingTreeBuilder().BuildTree(
+                tree, result.Decisions, new Dictionary<int, ItemMetadata>());
+
+            bool tooltipBuilt = ValueDetailTooltipBuilder.TryBuild(treeNode, null, out string tooltipText);
+
+            Assert.False(tooltipBuilt);
+            Assert.Null(tooltipText);
+        }
     }
 }
