@@ -32,7 +32,32 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var recipes = RecipeCacheSerializer.LoadRecipeSeed(stream);
 
-                Assert.Equal(14736, recipes.Count);
+                // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): was
+                // 14736 before this fix re-ran the seeder with the schema
+                // version pinned (see Gw2RecipeApiClient.SchemaVersion) -
+                // +230 net new recipes: ~188 were previously invisible to
+                // every unversioned /v2/recipes call (the currency-
+                // ingredient-era bug this fix closes, e.g. 14025 below),
+                // the remainder is ordinary game-content growth accrued
+                // since this seed was last regenerated (build 195497,
+                // 2026-02-20 -> build 205505, 2026-08-16 - about six
+                // months of real GW2 patches).
+                Assert.Equal(14966, recipes.Count);
+
+                // Amalgamated Rift Essence (recipe 14025 -> item 100930):
+                // the concrete recipe that was invisible to every
+                // unversioned recipe call before this fix - unversioned
+                // /v2/recipes/14025 404s outright even though the recipe
+                // fully exists. Currency ingredients key their id as "id"
+                // (not "item_id" - the bug this fix closes).
+                Assert.True(recipes.ContainsKey(14025));
+                var riftEssence = recipes[14025];
+                Assert.Equal(100930, riftEssence.OutputItemId);
+                Assert.Equal(4, riftEssence.Ingredients.Count);
+                Assert.Equal(3, riftEssence.Ingredients.Count(i => i.Type == "Currency"));
+                var ectoIngredient = riftEssence.Ingredients.Single(i => i.Type == "Item");
+                Assert.Equal(19721, ectoIngredient.Id);
+                Assert.Equal(50, ectoIngredient.Count);
 
                 // Infinite Trebuchet Blueprint achievement recipe.
                 Assert.True(recipes.ContainsKey(-1592));
@@ -93,7 +118,25 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var searches = RecipeCacheSerializer.LoadSearchSeed(stream);
 
-                Assert.Equal(15774, searches.Count);
+                // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): was
+                // 15774 before this fix - see the matching count-drift
+                // comment in LoadRecipeSeed_ShippedSeedFile_... above for
+                // the full breakdown.
+                Assert.Equal(16022, searches.Count);
+
+                // Amalgamated Rift Essence's search entry (item 100930):
+                // previously a STALE NEGATIVE entry ("100930": []) - the
+                // seeder had genuinely discovered every other recipe
+                // producing this item was invisible, so it correctly (for
+                // the data it could see) recorded "no known recipe". Now a
+                // real mapping. Note this is populated ONLY because the
+                // seeder walks the full /v2/recipes id list, not because
+                // live /v2/recipes/search?output=100930 works - that
+                // upstream search endpoint has its own, separate index gap
+                // and returns empty even versioned (see
+                // Gw2RecipeApiClient.SearchByOutputAsync's own doc comment).
+                Assert.True(searches.ContainsKey(100930));
+                Assert.Contains(14025, searches[100930]);
 
                 Assert.True(searches.ContainsKey(103980));
                 Assert.Contains(-1592, searches[103980]);
