@@ -275,6 +275,58 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void MultiItemRequest_UnsellableRootPresent_ProfitBandMiddleTileDivergesFromCostBand()
+        {
+            // Review fix: pins the exact scenario BuildProfitFormulaBand's
+            // own doc comment (and docs/KNOWN-ISSUES.md's W4A item 2)
+            // describes but that no running test previously modeled - a
+            // batch with an unsellable requested root, where
+            // SellSideEconomics.ApplyBatchSellSideEconomics subtracts only
+            // the SELLABLE roots' own craft cost from CraftingProfit, never
+            // Plan.TotalCoinCost (which also covers the unsellable root).
+            // totalCoinCost 900 stands in for "600 for the sellable root +
+            // 300 for an unsellable root bought outright"; CraftingProfit
+            // 550 stands in for the sellable root's own economics only
+            // (1200 sell revenue - 600 own craft cost - 50 materials
+            // opportunity cost) - never derived from totalCoinCost at all,
+            // exactly like the real ApplyBatchSellSideEconomics call this
+            // test stands in for.
+            var result = MakeResult(
+                totalCoinCost: 900, requestedItems: TwoRequestedItems(), multiItemRoots: TwoRoots());
+            result.MaterialOpportunityCost = 50;
+            result.NetSaleValue = 1200;
+            result.CraftingProfit = 550;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            long costBandTotalMaterialsValue = rows
+                .First(r => r.RowType == PlanRowType.CostFormulaTile && r.Label == "Total Materials Value")
+                .CoinValue;
+            var profitTiles = rows.Where(r => r.RowType == PlanRowType.ProfitFormulaTile).ToList();
+
+            // Band 1: whole-batch figure, untouched by the divergence -
+            // 900 (TotalCoinCost) + 50 (MaterialOpportunityCost).
+            Assert.Equal(950L, costBandTotalMaterialsValue);
+
+            // Band 2: sellable-portion-only figure, derived strictly from
+            // the two stored fields (NetSaleValue - CraftingProfit), never
+            // from TotalCoinCost - 1200 - 550.
+            Assert.Equal(650L, profitTiles[1].CoinValue);
+
+            // The whole point of the scenario: the two bands legitimately
+            // disagree here.
+            Assert.NotEqual(costBandTotalMaterialsValue, profitTiles[1].CoinValue);
+
+            // Review fix (caption divergence, finding #4): a multi-item
+            // batch's Band 2 middle tile carries a distinct caption rather
+            // than reusing Band 1's "Total Materials Value" - two
+            // identically-labeled tiles holding different numbers would
+            // read as a bug, not a legitimate scoping difference.
+            Assert.Equal("Materials Value (sellable)", profitTiles[1].Label);
+        }
+
+        [Fact]
         public void MultiItemRequest_NoteRowText_DescribesTradableOnlyRollupNotGw2eCraftOnlyBanner()
         {
             // M37 review fix: the batch rollup has NO craft-vs-buy filter

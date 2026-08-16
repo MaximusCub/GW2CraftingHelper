@@ -150,6 +150,16 @@ namespace GW2CraftingHelper.Services
         internal const string FootnoteText =
             "Prices are Trading Post data - actual purchase and sale prices are likely to vary.";
 
+        // Review fix: distinct caption for Band 2's middle tile in a
+        // multi-item batch - see BuildProfitFormulaBand's own doc comment
+        // for why the two bands' "Total Materials Value" can legitimately
+        // hold DIFFERENT numbers for a batch with a partially-unsellable
+        // root. A tooltip-only distinction was not enough: two
+        // identically-captioned tiles ~56px apart showing different
+        // numbers reads as a bug, not a scoping nuance, in a section whose
+        // whole point is to read as a balancing formula at a glance.
+        internal const string MaterialsValueSellableLabel = "Materials Value (sellable)";
+
         private PlanSectionViewModel BuildSummarySection(CraftingPlanResult result, bool isMultiItem)
         {
             var section = new PlanSectionViewModel
@@ -280,8 +290,12 @@ namespace GW2CraftingHelper.Services
         /// mix the two bands can legitimately differ (Band 1 prices the
         /// WHOLE batch, Band 2 only the batch's sellable portion, matching
         /// what CraftingProfit itself measures) - the tooltip below flags
-        /// that case rather than silently showing a formula that would not
-        /// visually balance.
+        /// that case, AND (review fix) the tile's own Label changes to
+        /// MaterialsValueSellableLabel for a multi-item batch so the
+        /// divergence is visible without a mouseover: two tiles sharing
+        /// the "Total Materials Value" caption but showing different
+        /// numbers would read as a bug in the plan, not as a legitimate
+        /// scoping difference.
         /// </summary>
         private static void BuildProfitFormulaBand(PlanSectionViewModel section, CraftingPlanResult result, bool isMultiItem)
         {
@@ -325,6 +339,15 @@ namespace GW2CraftingHelper.Services
                 ? TotalMaterialsValueTooltip + " (this band only covers items with a live sell price)"
                 : TotalMaterialsValueTooltip;
 
+            // Review fix: a multi-item batch gets its own caption for this
+            // tile (see this method's own doc comment) - single-item plans
+            // keep the plain "Total Materials Value" label, matching Band
+            // 1 exactly (the identity proven above guarantees the two
+            // numbers always agree there).
+            string totalMaterialsValueLabel = isMultiItem
+                ? MaterialsValueSellableLabel
+                : "Total Materials Value";
+
             section.Rows.Add(new PlanRowViewModel
             {
                 RowType = PlanRowType.ProfitFormulaTile,
@@ -335,7 +358,7 @@ namespace GW2CraftingHelper.Services
             section.Rows.Add(new PlanRowViewModel
             {
                 RowType = PlanRowType.ProfitFormulaTile,
-                Label = "Total Materials Value",
+                Label = totalMaterialsValueLabel,
                 CoinValue = totalMaterialsValue,
                 TooltipText = totalMaterialsValueTooltip
             });
