@@ -108,12 +108,23 @@ namespace GW2CraftingHelper.Services
 
         // --- Currency table column geometry ---
         //
-        // Required/Have/Needed are always short plain integers (or "-" for
-        // no-wallet-data) - unlike the Shopping List's Each/Total columns
-        // (ShoppingColumnMath), there are no coin icons and no realistic
-        // risk of a value needing more than a handful of digits, so fixed
-        // column widths (rather than a per-render widest-value pre-scan)
-        // are the simple, sufficient choice here.
+        // Required/Have/Needed columns reserve CurrencyNumberColumnWidth by
+        // default, widened per-render when an actual value needs more room
+        // (EffectiveCurrencyNumberColumnWidth/ComputeCurrencyColumnEdges'
+        // widestNumberWidth parameter below) - mirrors ShoppingColumnMath.
+        // ComputeEdges' "clamp to a fixed minimum, widen from an actual
+        // per-render widest-value measurement" shape.
+        //
+        // Review fix (W4A adversarial pass): the fixed-60px-only version of
+        // this comment claimed Required/Have/Needed have "no realistic risk
+        // of a value needing more than a handful of digits" - untrue once
+        // the W4A spec UNCLAMPED the Have column to the real wallet
+        // holding (PlanViewModelBuilder.BuildCurrencyTableRows): Karma
+        // (Gw2Constants id 2) routinely reaches 6-7 digits in a real
+        // player's wallet, which can plausibly exceed the 60px floor. Since
+        // CreateRightAlignedLabel grows a label LEFTWARD from the column's
+        // own right edge, an unreserved overlong value would visually
+        // intrude into its left neighbor's column rather than clip.
 
         /// <summary>Left x of the currency icon.</summary>
         public const int CurrencyIconX = 8;
@@ -152,21 +163,40 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// The reserved width actually used for each of the Required/Have/
+        /// Needed columns this render: CurrencyNumberColumnWidth, widened
+        /// to fit widestNumberWidth (the widest of this render's actual
+        /// Required/Have/Needed strings, measured by the caller via
+        /// BitmapFont.MeasureString - Blish-bound, so not done here) when
+        /// that exceeds the fixed floor.
+        /// </summary>
+        public static int EffectiveCurrencyNumberColumnWidth(int widestNumberWidth)
+        {
+            return widestNumberWidth > CurrencyNumberColumnWidth ? widestNumberWidth : CurrencyNumberColumnWidth;
+        }
+
+        /// <summary>
         /// Right-to-left column layout for the currency table's Required/
         /// Have/Needed numeric columns plus the trailing full-coverage
-        /// marker, all derived from panelWidth alone (no data-dependent
-        /// pre-scan - see the class doc comment above). Mirrors
+        /// marker, derived from panelWidth plus (optionally) this render's
+        /// actual widest Required/Have/Needed value width. Mirrors
         /// ShoppingColumnMath.ComputeEdges' "derive right-to-left off a
-        /// fixed right edge" shape so header and data rows built from the
-        /// same panelWidth always agree by construction.
+        /// fixed right edge, using an effective (floor-or-measured) column
+        /// width" shape so header and data rows built from the same
+        /// panelWidth/widestNumberWidth pair always agree by construction.
+        /// widestNumberWidth defaults to 0 (i.e. the fixed
+        /// CurrencyNumberColumnWidth floor, unchanged pre-review-fix
+        /// behavior) for callers - existing tests among them - that don't
+        /// need to pass a data-driven width.
         /// </summary>
-        public static CurrencyColumnEdges ComputeCurrencyColumnEdges(int panelWidth)
+        public static CurrencyColumnEdges ComputeCurrencyColumnEdges(int panelWidth, int widestNumberWidth = 0)
         {
+            int numberColumnWidth = EffectiveCurrencyNumberColumnWidth(widestNumberWidth);
             int rightEdge = panelWidth - 8;
             int markerX = rightEdge - CurrencyMarkerWidth;
             int neededRightEdge = markerX - CurrencyColumnGap;
-            int haveRightEdge = neededRightEdge - CurrencyNumberColumnWidth - CurrencyColumnGap;
-            int requiredRightEdge = haveRightEdge - CurrencyNumberColumnWidth - CurrencyColumnGap;
+            int haveRightEdge = neededRightEdge - numberColumnWidth - CurrencyColumnGap;
+            int requiredRightEdge = haveRightEdge - numberColumnWidth - CurrencyColumnGap;
             return new CurrencyColumnEdges(requiredRightEdge, haveRightEdge, neededRightEdge, markerX);
         }
     }

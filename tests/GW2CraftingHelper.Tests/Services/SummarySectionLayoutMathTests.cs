@@ -185,5 +185,73 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(wide.MarkerX > narrow.MarkerX);
             Assert.True(wide.RequiredRightEdge > narrow.RequiredRightEdge);
         }
+
+        // --- Review fix: EffectiveCurrencyNumberColumnWidth / widened
+        // ComputeCurrencyColumnEdges (a large unclamped Have value, e.g. a
+        // 6-7 digit Karma balance, must not intrude into the Required
+        // column - see the class doc comment above the currency-table
+        // geometry region) ---
+
+        [Fact]
+        public void EffectiveCurrencyNumberColumnWidth_BelowFloor_ReturnsFixedFloor()
+        {
+            Assert.Equal(
+                SummarySectionLayoutMath.CurrencyNumberColumnWidth,
+                SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(10));
+        }
+
+        [Fact]
+        public void EffectiveCurrencyNumberColumnWidth_Zero_ReturnsFixedFloor()
+        {
+            Assert.Equal(
+                SummarySectionLayoutMath.CurrencyNumberColumnWidth,
+                SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(0));
+        }
+
+        [Fact]
+        public void EffectiveCurrencyNumberColumnWidth_AboveFloor_ReturnsMeasuredWidth()
+        {
+            // A plausible width for a 7-digit Karma balance rendered at
+            // DefaultFont14 - comfortably past the 60px fixed floor.
+            Assert.Equal(90, SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(90));
+        }
+
+        [Fact]
+        public void ComputeCurrencyColumnEdges_NoWidestNumberWidthArg_MatchesFixedFloorBehavior()
+        {
+            // Default parameter (0) must reproduce the exact pre-review-fix
+            // fixed-60px geometry - existing callers/tests that only ever
+            // pass panelWidth must see byte-identical edges.
+            var withDefault = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
+            var explicitZero = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800, 0);
+
+            Assert.Equal(explicitZero.RequiredRightEdge, withDefault.RequiredRightEdge);
+            Assert.Equal(explicitZero.HaveRightEdge, withDefault.HaveRightEdge);
+            Assert.Equal(explicitZero.NeededRightEdge, withDefault.NeededRightEdge);
+            Assert.Equal(explicitZero.MarkerX, withDefault.MarkerX);
+        }
+
+        [Fact]
+        public void ComputeCurrencyColumnEdges_WidestNumberWidthExceedsFloor_WidensRequiredAndHaveColumns()
+        {
+            const int panelWidth = 800;
+            var fixedFloor = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth);
+            var widened = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth, 120);
+
+            // Right-to-left layout: NeededRightEdge/MarkerX sit to the
+            // right of the widened Have/Required bands, so they are
+            // unaffected. Widening those bands pushes HaveRightEdge and
+            // RequiredRightEdge further LEFT (smaller x) to make room for
+            // the wider reserved space to their own right.
+            Assert.Equal(fixedFloor.NeededRightEdge, widened.NeededRightEdge);
+            Assert.Equal(fixedFloor.MarkerX, widened.MarkerX);
+            Assert.True(widened.HaveRightEdge < fixedFloor.HaveRightEdge);
+            Assert.True(widened.RequiredRightEdge < fixedFloor.RequiredRightEdge);
+
+            // Exact widening amount: both columns grow by (120 - 60).
+            int extra = 120 - SummarySectionLayoutMath.CurrencyNumberColumnWidth;
+            Assert.Equal(fixedFloor.HaveRightEdge - extra, widened.HaveRightEdge);
+            Assert.Equal(fixedFloor.RequiredRightEdge - 2 * extra, widened.RequiredRightEdge);
+        }
     }
 }
