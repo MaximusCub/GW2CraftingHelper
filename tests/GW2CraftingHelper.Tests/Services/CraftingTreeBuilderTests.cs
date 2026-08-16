@@ -589,6 +589,60 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(treeNode.IsIgnored);
         }
 
+        // ---- Class-level follow-up (adversarial review, guildupgrade-
+        // ingredients): line 177's non-Item branch used to read
+        // `!= "Item"`, silently labeling ANY unrecognized ingredient type
+        // as CraftingDecision.Currency via CurrencyDisplayResolver - the
+        // exact wrong-domain mislabel the GuildUpgrade branch above exists
+        // to avoid, just one catch-all wider. It is now scoped to the
+        // literal string "Currency"; anything else falls through to the
+        // Unknown-with-hint leaf. These tests use a made-up type string
+        // ("MysteryIngredientType") to prove the general fallthrough, not
+        // just the "GuildUpgrade" instance covered above.
+
+        [Fact]
+        public void UnrecognizedIngredientType_DecisionIsUnknown_NeverMislabeledCurrency()
+        {
+            var node = Leaf(829, 5, "MysteryIngredientType");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.NotEqual(CraftingDecision.Currency, treeNode.Decision);
+            Assert.NotEqual(CraftingDecision.GuildUpgrade, treeNode.Decision);
+        }
+
+        [Fact]
+        public void UnrecognizedIngredientType_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides()
+        {
+            // Mirrors CurrencyNode_NeverResolvesIconOrRarityViaItemMetadata_
+            // EvenWhenIdCollides and GuildUpgradeNode_
+            // NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides
+            // above - `metadata` happens to carry a genuine entry for the
+            // same numeric id as this unrecognized-type ingredient. Both
+            // IconUrl and Rarity must stay clear of the item-keyed lookup
+            // set earlier in BuildNode, even though this type falls through
+            // to the generic Unknown leaf rather than a dedicated branch.
+            var node = Leaf(829, 5, "MysteryIngredientType");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = new Dictionary<int, ItemMetadata>
+            {
+                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Null(treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
+        }
+
         [Fact]
         public void MultiLevel_Tree_CorrectStructure()
         {

@@ -19,10 +19,19 @@ namespace GW2CraftingHelper.Models
     /// <item><see cref="Craft"/> &lt;- <see cref="Models.AcquisitionSource.Craft"/></item>
     /// <item><see cref="BuyFromTp"/> &lt;- <see cref="Models.AcquisitionSource.BuyFromTp"/></item>
     /// <item><see cref="BuyFromVendor"/> &lt;- <see cref="Models.AcquisitionSource.BuyFromVendor"/></item>
-    /// <item><see cref="Currency"/> &lt;- set directly for non-"Item"/non-"GuildUpgrade"
-    /// ingredient nodes, never via <see cref="Models.AcquisitionSource.Currency"/>.</item>
+    /// <item><see cref="Currency"/> &lt;- set directly for "Currency"-typed ingredient
+    /// nodes only, never via <see cref="Models.AcquisitionSource.Currency"/>. Class-level
+    /// follow-up (guildupgrade-ingredients, adversarial review): this branch used to
+    /// catch ANY non-"Item"/non-"GuildUpgrade" ingredient node, silently mislabeling an
+    /// unrecognized ingredient type as a wallet currency - see
+    /// <see cref="Services.CraftingTreeBuilder"/>'s Currency branch, now scoped to the
+    /// literal string "Currency".</item>
     /// <item><see cref="Unknown"/> &lt;- <see cref="Models.AcquisitionSource.UnknownSource"/>,
-    /// or a missing decision lookup (no solver entry for this node at all).</item>
+    /// or a missing decision lookup (no solver entry for this node at all) - which now also
+    /// covers an ingredient type that is neither "Item", "Currency", nor "GuildUpgrade": such
+    /// a node is never priced by <see cref="Services.PlanSolver"/> (Item-positive guards
+    /// throughout), so it never gets a decision entry and falls through to this same
+    /// no-entry case.</item>
     /// <item><see cref="Have"/> &lt;- no <see cref="Models.AcquisitionSource"/> counterpart;
     /// display-only (owned/zeroed or manually-ignored).</item>
     /// <item><see cref="GuildUpgrade"/> &lt;- set directly for a "GuildUpgrade"-typed

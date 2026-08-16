@@ -229,5 +229,128 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, result.Decisions[0].TotalCost);
             Assert.Empty(result.Plan.CurrencyCosts);
         }
+
+        // ---- Class-level follow-up (adversarial review, guildupgrade-
+        // ingredients): the fix above must not be scoped to the literal
+        // string "GuildUpgrade" - PlanSolver.Evaluate's top guard and
+        // ingredient loop, Collect's top guard, and RecomputeCraftCosts'
+        // top guard and ingredient loop are all Item-positive
+        // (IngredientType != "Item"), not an enumerated deny-list of known
+        // types, so ANY ingredient type the GW2 API returns that this
+        // module does not specifically recognize - not just "GuildUpgrade"
+        // - is unpriceable by construction. These tests use a made-up type
+        // string ("MysteryIngredientType") that is neither "Item",
+        // "Currency", nor "GuildUpgrade" to prove the general guard, not
+        // just the one concrete instance the earlier tests above cover.
+
+        [Fact]
+        public void UnrecognizedIngredientType_NeverPricedAsItem_EvenWhenTpPriceExistsForSameId()
+        {
+            // Mirrors GuildUpgradeIngredient_NeverPricedAsItem_
+            // EvenWhenTpPriceExistsForSameId above, but for a wholly
+            // unrecognized ingredient type - proving the class-level fix,
+            // not just the "GuildUpgrade" instance.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 1, "Item"),
+                    Leaf(829, 5, "MysteryIngredientType")));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
+                { 829, new ItemPrice { ItemId = 829, BuyInstant = 99999 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, null);
+
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.True(result.Decisions[0].CanCraft);
+            // Real cost is item 2's price ALONE - the unrecognized-type
+            // ingredient must contribute exactly zero, never 829's TP
+            // price.
+            Assert.Equal(100, result.Decisions[0].TotalCost);
+
+            Assert.Equal(2, result.Plan.Steps.Count);
+            Assert.Contains(result.Plan.Steps, s =>
+                s.Source == AcquisitionSource.Craft && s.ItemId == 1 && s.TotalCost == 100);
+            Assert.Contains(result.Plan.Steps, s =>
+                s.Source == AcquisitionSource.BuyFromTp && s.ItemId == 2 && s.TotalCost == 100);
+            Assert.DoesNotContain(result.Plan.Steps, s => s.ItemId == 829);
+        }
+
+        [Fact]
+        public void UnrecognizedIngredientType_NeverPricedAsVendorOffer_EvenWhenVendorOfferExistsForSameId()
+        {
+            // Mirrors GuildUpgradeIngredient_NeverPricedAsVendorOffer_
+            // EvenWhenVendorOfferExistsForSameId above - the mechanism that
+            // was actually reachable in a real pipeline run pre-fix
+            // (VendorBatchSolver.EvaluateVendorOffers keys vendorOffers by
+            // the raw ingredient id with no "Item"-type gate at all), now
+            // proven closed for ANY unrecognized type, not just
+            // "GuildUpgrade".
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 1, "Item"),
+                    Leaf(829, 5, "MysteryIngredientType")));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 829, new List<VendorOffer> { CoinVendorOffer(829, 1, outputCount: 1) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.True(result.Decisions[0].CanCraft);
+            Assert.Equal(100, result.Decisions[0].TotalCost);
+            Assert.DoesNotContain(result.Plan.Steps, s => s.ItemId == 829);
+        }
+
+        [Fact]
+        public void UnrecognizedIngredientType_NeverPricedAsCurrency_EvenWhenValuationExistsForSameId()
+        {
+            // Mirrors GuildUpgradeIngredient_NeverPricedAsCurrency_
+            // EvenWhenValuationExistsForSameId above.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 1, "Item"),
+                    Leaf(829, 5, "MysteryIngredientType")));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 829, 5 } });
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, null, valuation);
+
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.Equal(100, result.Decisions[0].TotalCost); // not 125
+        }
+
+        [Fact]
+        public void UnrecognizedIngredientType_NeverAppearsInPlanCurrencyCosts()
+        {
+            // Mirrors GuildUpgradeIngredient_NeverAppearsInPlanCurrencyCosts
+            // above - proves Collect's Item-positive guard too, not just
+            // Evaluate's.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 1, "Item"),
+                    Leaf(829, 5, "MysteryIngredientType")));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, null);
+
+            Assert.Empty(result.Plan.CurrencyCosts);
+        }
     }
 }

@@ -174,7 +174,23 @@ namespace GW2CraftingHelper.Services
             // rarity concept at all (mirrors BuildVendorCostComponentLeaves'
             // currency-component leaves just below, which never set Rarity
             // either).
-            if (node.IngredientType != "Item")
+            //
+            // Class-level follow-up (guildupgrade-ingredients, adversarial
+            // review): this branch is scoped to the LITERAL string
+            // "Currency" now, not "any non-Item type" - it previously read
+            // `!= "Item"` and silently labeled ANY unrecognized ingredient
+            // type (a type this module does not specifically know how to
+            // display) as CraftingDecision.Currency, naming it via
+            // CurrencyDisplayResolver on the strength of nothing but "not
+            // an Item" - the exact wrong-domain mislabel this fix's own
+            // GuildUpgrade branch above was written to avoid, just one
+            // catch-all wider. An ingredient type that is neither "Item",
+            // "GuildUpgrade", nor "Currency" now falls through to the
+            // Unknown-with-hint leaf just below instead (matching
+            // PlanSolver's identical Item-positive fix in Evaluate/Collect/
+            // RecomputeCraftCosts, so a type this builder cannot display
+            // meaningfully also carries no memo entry to look up there).
+            if (node.IngredientType == "Currency")
             {
                 treeNode.Decision = CraftingDecision.Currency;
                 treeNode.Name = CurrencyDisplayResolver.ResolveName(node.Id, currencyMetadata);
@@ -187,6 +203,27 @@ namespace GW2CraftingHelper.Services
             if (!decisions.TryGetValue(node.NodeId, out var decision))
             {
                 treeNode.Decision = CraftingDecision.Unknown;
+                if (node.IngredientType != "Item")
+                {
+                    // Class-level follow-up (guildupgrade-ingredients,
+                    // adversarial review): an ingredient type this builder
+                    // does not specifically recognize (not "Item",
+                    // "GuildUpgrade", or "Currency") reaches here with no
+                    // memo entry - PlanSolver's Evaluate never prices it
+                    // (see that method's Item-positive top guard). IconUrl/
+                    // Rarity were already populated above from `metadata`
+                    // keyed on the raw ingredient id in the ITEM domain -
+                    // the exact same wrong-domain leak the GuildUpgrade and
+                    // Currency branches above already close for their own
+                    // known types must be closed here too, since a same-
+                    // numbered genuine item entry reaching `metadata` via
+                    // one of CraftingPlanPipeline's other routes (step item
+                    // ids, used-material ids, vendor cost-component ids)
+                    // cannot be ruled out - see the GuildUpgrade branch's
+                    // own doc comment above for the full explanation.
+                    treeNode.IconUrl = null;
+                    treeNode.Rarity = null;
+                }
                 ApplyAcquisitionHint(treeNode, hints);
                 return treeNode;
             }
