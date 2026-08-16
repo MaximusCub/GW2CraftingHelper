@@ -139,6 +139,14 @@ namespace GW2CraftingHelper.Services
                     : (long?)null;
             }
 
+            // AUDIT ROW 20/38: SolverDecision.PriceSideFellBack is already
+            // gated to BuyFromTp-only by PlanSolver's Commit (see that
+            // field's doc comment), but the guard is repeated here to match
+            // this method's own explicit-Source convention (VendorCurrencyCosts
+            // just above) rather than lean on the upstream invariant alone.
+            treeNode.PriceSideFellBack = decision.Source == AcquisitionSource.BuyFromTp &&
+                decision.PriceSideFellBack;
+
             if (decision.Source == AcquisitionSource.Craft)
             {
                 var recipe = node.Recipes.FirstOrDefault(r => r.RecipeId == decision.RecipeId);

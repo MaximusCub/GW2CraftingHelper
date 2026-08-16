@@ -66,6 +66,15 @@ namespace GW2CraftingHelper.Models
         public long? UnitCost { get; set; }
         public long? SubtreeCost { get; set; }
 
+        // AUDIT ROW 20/38 (gw2e price-side fallback parity): true only for
+        // a BuyFromTp node whose UnitCost above came from the item's NON-
+        // preferred TP side because the preferred side (per the plan's
+        // PriceBasis) had no listings - see SolverDecision.PriceSideFellBack
+        // and PlanSolver.GetUnitPrice's fallback overload. Always false for
+        // every other Decision. The recipe-tree renderer reads this to add
+        // a "other side shown" caveat to the unit-price tooltip.
+        public bool PriceSideFellBack { get; set; }
+
         // Non-coin currency cost of a BuyFromVendor decision (see
         // SolverDecision.VendorCurrencyCosts). Null for every other
         // Decision, and also null for a BuyFromVendor decision whose offer

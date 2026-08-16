@@ -22,7 +22,8 @@ namespace GW2CraftingHelper.Services
                 TargetQuantity = isMultiItem ? 0 : result.Plan.TargetQuantity,
                 TreeRoot = isMultiItem ? null : result.CraftingTree,
                 MultiItemRoots = isMultiItem ? result.MultiItemRoots : null,
-                CurrencyMetadata = result.CurrencyMetadata
+                CurrencyMetadata = result.CurrencyMetadata,
+                PriceBasis = result.PriceBasis
             };
 
             if (isMultiItem)

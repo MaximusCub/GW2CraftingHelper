@@ -742,6 +742,21 @@ namespace GW2CraftingHelper.Views.Rendering
                     }
                 }
             }
+            // AUDIT ROW 20/38 (gw2e price-side fallback parity, DISPLAY
+            // CAVEAT): this node's TP unit price came from the item's
+            // NON-preferred side because the preferred side had no
+            // listings (CraftingTreeBuilder.BuildNode/
+            // SolverDecision.PriceSideFellBack) - flag it so the number
+            // shown doesn't read as an ordinary preferred-side price.
+            // Deliberately outside the node.Quantity > 1 gate above: this
+            // caveat is about WHICH TP side priced the node, not about a
+            // qty=1 row already showing its own total as the unit price.
+            if (node.Decision == CraftingDecision.BuyFromTp && node.PriceSideFellBack)
+            {
+                extraTooltipLines.Add(_getCurrentPlan()?.PriceBasis == PriceBasis.BuyOrder
+                    ? "Buy-order price unavailable - instant-buy price shown"
+                    : "Instant-buy price unavailable - buy-order price shown");
+            }
             if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
             {
                 extraTooltipLines.Add(node.AcquisitionHint);
