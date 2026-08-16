@@ -336,7 +336,7 @@ namespace GW2CraftingHelper.Views.Rendering
             CreateCurrencyTableHeaderRow(parent, panelWidth, widestNumberWidth);
             for (int i = 0; i < rows.Count; i++)
             {
-                CreateCurrencyTableRow(rows[i], parent, panelWidth, widestNumberWidth, i == rows.Count - 1);
+                CreateCurrencyTableRow(rows[i], parent, panelWidth, widestNumberWidth);
             }
         }
 
@@ -426,7 +426,7 @@ namespace GW2CraftingHelper.Views.Rendering
         // source tag already use), never a raw Unicode character.
         private const string FullCoverageMarkerText = "OK";
 
-        private void CreateCurrencyTableRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, int widestNumberWidth, bool isLast)
+        private void CreateCurrencyTableRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, int widestNumberWidth)
         {
             const int rowHeight = CurrencyRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
@@ -504,8 +504,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // divider defect DO-NOT-TOUCH #6 exists to keep away from, for
             // a visual element the W4A spec never explicitly asked for -
             // the header row's dark background already delineates the
-            // table. isLast is accepted (matching every other row
-            // builder's signature) but intentionally unused.
+            // table. See docs/KNOWN-ISSUES.md's W4A section, item 8, for
+            // the full rationale.
             _sink.AddRelayout(w =>
             {
                 rowPanel.Size = new Point(w, rowHeight);

@@ -149,21 +149,30 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- ComputeCurrencyColumnEdges ---
 
+        // Review fix (invariant: no contract-mirror tests): the previous
+        // version of this test recomputed ComputeCurrencyColumnEdges' exact
+        // formula from the same public constants it was verifying, so it
+        // could never fail unless both sides moved together. Expected
+        // values below are hard-coded pixel numbers for two panel widths -
+        // a conscious re-baseline point. If a deliberate geometry change
+        // moves these, recompute by hand from SummarySectionLayoutMath.cs's
+        // CurrencyMarkerWidth/CurrencyColumnGap/CurrencyNumberColumnWidth
+        // constants (widestNumberWidth defaults to 0) and update the
+        // literals here.
         [Fact]
         public void ComputeCurrencyColumnEdges_DerivesRightToLeftFromPanelWidth()
         {
-            const int panelWidth = 800;
-            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth);
+            var edges800 = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
+            Assert.Equal(596, edges800.RequiredRightEdge);
+            Assert.Equal(670, edges800.HaveRightEdge);
+            Assert.Equal(744, edges800.NeededRightEdge);
+            Assert.Equal(758, edges800.MarkerX);
 
-            int expectedMarkerX = panelWidth - 8 - SummarySectionLayoutMath.CurrencyMarkerWidth;
-            int expectedNeededRightEdge = expectedMarkerX - SummarySectionLayoutMath.CurrencyColumnGap;
-            int expectedHaveRightEdge = expectedNeededRightEdge - SummarySectionLayoutMath.CurrencyNumberColumnWidth - SummarySectionLayoutMath.CurrencyColumnGap;
-            int expectedRequiredRightEdge = expectedHaveRightEdge - SummarySectionLayoutMath.CurrencyNumberColumnWidth - SummarySectionLayoutMath.CurrencyColumnGap;
-
-            Assert.Equal(expectedMarkerX, edges.MarkerX);
-            Assert.Equal(expectedNeededRightEdge, edges.NeededRightEdge);
-            Assert.Equal(expectedHaveRightEdge, edges.HaveRightEdge);
-            Assert.Equal(expectedRequiredRightEdge, edges.RequiredRightEdge);
+            var edges1200 = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200);
+            Assert.Equal(996, edges1200.RequiredRightEdge);
+            Assert.Equal(1070, edges1200.HaveRightEdge);
+            Assert.Equal(1144, edges1200.NeededRightEdge);
+            Assert.Equal(1158, edges1200.MarkerX);
         }
 
         [Fact]

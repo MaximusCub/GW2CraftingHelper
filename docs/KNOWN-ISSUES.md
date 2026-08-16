@@ -2779,3 +2779,17 @@ performed for this round either, same caveat as item 11's own closing
 paragraph above.
 
 [PENDING - the orchestrator fills in PASS/FAIL]
+
+Follow-ups (recorded during a later polish pass, not yet implemented):
+
+- Follow-up: delete `PlanContentHeightMath.SummaryBodyHeight`, its tests
+  (`PlanContentHeightMathTests.cs` ~348-390), and `PlanRowType.CoinTotal`
+  once the DO-NOT-TOUCH freeze on `PlanContentHeightMath` lifts - all
+  three are dead for production since `CraftingPlanView` routes Summary
+  to `SummarySectionLayoutMath`.
+- Follow-up (user decision pending): the Summary currency table now
+  shows the RAW wallet holding in Have, while the shopping list still
+  clamps its per-currency owned amount to the required amount
+  (`CurrencyDisplayResolver.ResolveAmounts`) - the same currency can
+  show two different owned numbers in one window; decide whether to
+  unclamp the shopping list to match.
