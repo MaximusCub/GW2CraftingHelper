@@ -500,7 +500,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(10, itemLeaf.Quantity); // unchanged by ownership
 
             var currencyLeaf = result.CraftingTree.Children.Single(c => c.ItemId == 23);
-            Assert.Equal(6, currencyLeaf.ComponentOwnedQuantity); // clamped to need (own 999, need 6)
+            Assert.Equal(999, currencyLeaf.ComponentOwnedQuantity); // raw holding (own 999, need 6) - never clamped
         }
 
         [Fact]

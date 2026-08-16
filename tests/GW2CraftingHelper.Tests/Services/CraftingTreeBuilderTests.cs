@@ -1172,7 +1172,7 @@ namespace GW2CraftingHelper.Tests.Services
             var (node, _) = BuildMixedVendorNode(ownedVendorItemAmounts: ownedItems);
             var itemLeaf = node.Children.Single(c => c.ItemId == 42);
 
-            Assert.Equal(10, itemLeaf.ComponentOwnedQuantity); // clamped to need
+            Assert.Equal(999, itemLeaf.ComponentOwnedQuantity); // raw holding, never clamped to need
             // Quantity/cost themselves are UNCHANGED by ownership.
             Assert.Equal(10, itemLeaf.Quantity);
             Assert.Equal(100, itemLeaf.SubtreeCost);

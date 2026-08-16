@@ -325,7 +325,7 @@ namespace GW2CraftingHelper.Services
                         // method's own doc comment.
                         SubtreeCost = line.GoldValue,
                         UnitCost = line.Quantity > 0 ? line.GoldValue / line.Quantity : (long?)null,
-                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.ItemId, line.Quantity, ownedVendorItemAmounts)
+                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.ItemId, ownedVendorItemAmounts)
                     });
                 }
             }
@@ -354,7 +354,7 @@ namespace GW2CraftingHelper.Services
                         Quantity = line.Count,
                         Decision = CraftingDecision.BuyFromVendor,
                         IsCostComponent = true,
-                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.Id, line.Count, ownedCurrencyAmounts)
+                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.Id, ownedCurrencyAmounts)
                     });
                 }
             }
@@ -386,21 +386,26 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Informational "OWN n" badge coverage for a W4B cost-component
-        /// leaf - min(owned, needed), 0 when there is no ownership data for
-        /// this id at all. Never influences Quantity/SubtreeCost above -
-        /// purely what DecisionPillPlanner reads to decide between showing
-        /// the badge (owned > 0) or no pill at all (owned == null/0) - see
+        /// Informational "OWN n" badge value for a W4B cost-component
+        /// leaf - the RAW holding (never clamped to the line's need), 0
+        /// when there is no ownership data for this id at all. The badge
+        /// states a wallet/inventory fact ("you own n"), not a coverage
+        /// allocation, so clamping to the component quantity would
+        /// misstate the holding (gate finding 2026-08-16: a 300-essence
+        /// wallet rendered "OWN 250" against a 250-cost line). Never
+        /// influences Quantity/SubtreeCost above - purely what
+        /// DecisionPillPlanner reads to decide between showing the badge
+        /// (owned > 0) or no pill at all (owned == null/0) - see
         /// CraftingTreeNode.ComponentOwnedQuantity's own doc comment.
         /// </summary>
         private static int ResolveOwnedQuantity(
-            int id, int needed, IReadOnlyDictionary<int, int> ownedAmounts)
+            int id, IReadOnlyDictionary<int, int> ownedAmounts)
         {
             if (ownedAmounts == null || !ownedAmounts.TryGetValue(id, out int owned))
             {
                 return 0;
             }
-            return Math.Min(owned, needed);
+            return owned;
         }
 
         /// <summary>
