@@ -4616,5 +4616,4 @@ I/O. IDs remain internal-only - the new/changed hint text never
 surfaces an item id. No live desktop verification was performed (same
 Blish-bound surface as PART A/B/C).
 
-Gate: PASS - build 0 errors, full suite 1431/1431 passed, no repo
-invariant violations found in review.
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
