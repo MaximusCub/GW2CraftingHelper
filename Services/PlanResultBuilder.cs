@@ -320,6 +320,20 @@ namespace GW2CraftingHelper.Services
             var seenRecipeIds = new HashSet<int>();
             var requiredRecipes = new List<RequiredRecipe>();
 
+            // design-plan-notes.md (Notes section, gambling-forge scope):
+            // output item ids of every Mystic-Clover-style fractional-yield
+            // Mystic Forge combine (ExpectedOutputCount < OutputCount - see
+            // RecipeOption.ExpectedOutputCount's own doc comment) chosen
+            // anywhere in this plan. Deduplicated by output item id, same
+            // "one line regardless of count" contract PlanViewModelBuilder
+            // applies when turning this into a single NoteLine. Does NOT
+            // detect true multi-outcome gambles (precursor forging etc.) -
+            // those never reach the solved tree at all (docs/gw2e-
+            // considerations.md #17), so there is nothing here to find for
+            // them.
+            var seenForgeOutputItemIds = new HashSet<int>();
+            var probabilisticForgeOutputItemIds = new List<int>();
+
             foreach (var step in craftSteps)
             {
                 if (!seenRecipeIds.Add(step.RecipeId))
@@ -330,6 +344,14 @@ namespace GW2CraftingHelper.Services
                 if (!recipeOptionIndex.TryGetValue(step.RecipeId, out var option))
                 {
                     continue;
+                }
+
+                if (option.Disciplines.Contains("MysticForge") &&
+                    option.ExpectedOutputCount > 0 &&
+                    option.ExpectedOutputCount < option.OutputCount &&
+                    seenForgeOutputItemIds.Add(step.ItemId))
+                {
+                    probabilisticForgeOutputItemIds.Add(step.ItemId);
                 }
 
                 bool isAutoLearned = option.Flags.Contains("AutoLearned");
@@ -390,6 +412,7 @@ namespace GW2CraftingHelper.Services
                 UsedMaterials = usedMaterials ?? new List<UsedMaterial>(),
                 RequiredDisciplines = requiredDisciplines,
                 RequiredRecipes = requiredRecipes,
+                ProbabilisticForgeOutputItemIds = probabilisticForgeOutputItemIds,
                 DebugLog = debugLog
             };
         }

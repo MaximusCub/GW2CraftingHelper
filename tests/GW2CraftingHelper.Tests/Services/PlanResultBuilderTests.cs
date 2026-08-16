@@ -19,6 +19,23 @@ namespace GW2CraftingHelper.Tests.Services
             List<string> disciplines, int minRating, List<string> flags,
             params RecipeNode[] ingredients)
         {
+            return TreeWithCraftStep(
+                itemId, recipeId, outputCount, disciplines, minRating, flags,
+                expectedOutputCount: null, ingredients);
+        }
+
+        // design-plan-notes.md (Notes section, gambling-forge scope):
+        // expectedOutputCount overload - every pre-existing call site above
+        // routes through the 6-arg overload, which passes null (preserving
+        // the exact prior behavior: RecipeOption.ExpectedOutputCount left
+        // at its C# default 0.0). Only the forge-scope test below needs a
+        // real ExpectedOutputCount < OutputCount to exercise
+        // PlanResultBuilder's Mystic-Clover-style detection.
+        private static RecipeNode TreeWithCraftStep(
+            int itemId, int recipeId, int outputCount,
+            List<string> disciplines, int minRating, List<string> flags,
+            double? expectedOutputCount, params RecipeNode[] ingredients)
+        {
             var option = new RecipeOption
             {
                 RecipeId = recipeId,
@@ -26,7 +43,8 @@ namespace GW2CraftingHelper.Tests.Services
                 CraftsNeeded = 1,
                 Disciplines = disciplines ?? new List<string>(),
                 MinRating = minRating,
-                Flags = flags ?? new List<string>()
+                Flags = flags ?? new List<string>(),
+                ExpectedOutputCount = expectedOutputCount ?? 0
             };
 
             foreach (var ing in ingredients)
@@ -522,6 +540,90 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.RequiredDisciplines);
             Assert.Single(result.RequiredRecipes);
             Assert.False(result.RequiredRecipes[0].IsMissing);
+        }
+
+        [Fact]
+        public void ProbabilisticForgeOutputItemIds_MysticCloverStyleYield_PopulatesOutputItemId()
+        {
+            // design-plan-notes.md (Notes section, gambling-forge scope):
+            // a MysticForge recipe whose ExpectedOutputCount (2.5) is below
+            // OutputCount (3) is the documented Mystic-Clover-style
+            // fractional-yield signal - see RecipeOption.ExpectedOutputCount's
+            // own doc comment.
+            var tree = TreeWithCraftStep(
+                1, -100, outputCount: 3,
+                disciplines: new List<string> { "MysticForge" }, minRating: 0, flags: new List<string>(),
+                expectedOutputCount: 2.5, Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Single(result.ProbabilisticForgeOutputItemIds);
+            Assert.Equal(1, result.ProbabilisticForgeOutputItemIds[0]);
+        }
+
+        [Fact]
+        public void ProbabilisticForgeOutputItemIds_WholeNumberYield_NotFlagged()
+        {
+            // ExpectedOutputCount == OutputCount (the common, non-fractional
+            // case - most MysticForge recipes) must NOT be flagged.
+            var tree = TreeWithCraftStep(
+                1, -100, outputCount: 3,
+                disciplines: new List<string> { "MysticForge" }, minRating: 0, flags: new List<string>(),
+                expectedOutputCount: 3, Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Empty(result.ProbabilisticForgeOutputItemIds);
+        }
+
+        [Fact]
+        public void ProbabilisticForgeOutputItemIds_NonMysticForgeCraftStep_NotFlagged()
+        {
+            // A regular crafting-discipline recipe with a fractional
+            // ExpectedOutputCount (should not happen in real data, but the
+            // detection must be gated on MysticForge membership, not on
+            // ExpectedOutputCount alone).
+            var tree = TreeWithCraftStep(
+                1, 10, outputCount: 3,
+                disciplines: new List<string> { "Weaponsmith" }, minRating: 400, flags: new List<string>(),
+                expectedOutputCount: 2, Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Empty(result.ProbabilisticForgeOutputItemIds);
         }
 
         [Fact]
