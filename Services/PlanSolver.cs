@@ -202,11 +202,33 @@ namespace GW2CraftingHelper.Services
             // caller that doesn't know about this setting keeps excluding
             // every Homestead Refinement offer above tier 0, exactly
             // matching the live-defect fix's intended default behavior.
-            HomesteadEfficiencyTiers homesteadTiers = null)
+            HomesteadEfficiencyTiers homesteadTiers = null,
+            // source-selection-simplification (maintainer-approved
+            // redesign, docs/gw2e-considerations.md): per-character
+            // crafting discipline data (the SAME snapshot passthrough
+            // PlanResultBuilder.Build and CraftingPlanResult.
+            // CharacterDisciplines already carry) - used ONLY to decide
+            // whether a Craft decision that would otherwise win the
+            // AUTOMATIC buy-vs-craft-vs-vendor comparison is actually
+            // craftable by this account (see CraftCompetencyEvaluator and
+            // the craftExcludedFromAutoPick competency branch below). Null
+            // (the default, and every pre-existing caller/test) reproduces
+            // this method's pre-existing behavior exactly - competency is
+            // UNKNOWN, never penalizes craft, matching the "no snapshot
+            // data = never penalize" contract CraftCompetencyEvaluator.
+            // AccountCanCraft documents on its own bestRatingByDiscipline
+            // parameter.
+            IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
             var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
             var memo = new Dictionary<int, Decision>();
+
+            // Built once per solve (not per node/recipe) - see
+            // CraftCompetencyEvaluator.BuildBestRatingByDiscipline's own doc
+            // comment for why this precomputed dictionary, not the raw
+            // list, is what Evaluate's recipe loop actually consults.
+            var bestRatingByDiscipline = CraftCompetencyEvaluator.BuildBestRatingByDiscipline(characterDisciplines);
 
             // Pre-pass: assign unique NodeIds to every node in the tree.
             // Assignment is deterministic (DFS order), so NodeIds - and any
@@ -218,7 +240,7 @@ namespace GW2CraftingHelper.Services
             }
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds, tiers);
+            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds, tiers, bestRatingByDiscipline);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -538,7 +560,13 @@ namespace GW2CraftingHelper.Services
             ISet<int> forceBuyOnlyNodeIds = null,
             Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
             ISet<int> ignoredItemIds = null,
-            HomesteadEfficiencyTiers homesteadTiers = null)
+            HomesteadEfficiencyTiers homesteadTiers = null,
+            // source-selection-simplification: precomputed account best-
+            // rating-per-discipline lookup (see Solve's own
+            // characterDisciplines parameter and CraftCompetencyEvaluator).
+            // Threaded through the recursion unchanged - built exactly once
+            // per Solve() call, never per node.
+            IReadOnlyDictionary<string, int> bestRatingByDiscipline = null)
         {
             // Item-positive guard (not an enumerated deny-list): only an
             // "Item" node is ever priced here. The ingredient loop below
@@ -652,10 +680,17 @@ namespace GW2CraftingHelper.Services
             long? bestComparableCraftCost = null;
             long? bestComparableCraftRealCost = null;
             int bestComparableRecipeId = 0;
+            // source-selection-simplification: the winning recipe OBJECT
+            // (not just its id) alongside bestComparableRecipeId, so the
+            // competency check after this loop can read its Disciplines/
+            // MinRating without a second lookup - see craftExcludedFromAutoPick
+            // below.
+            RecipeOption bestComparableOption = null;
 
             long? bestFallbackCraftCost = null;
             long? bestFallbackCraftRealCost = null;
             int bestFallbackRecipeId = 0;
+            RecipeOption bestFallbackOption = null;
 
             foreach (var recipe in node.Recipes)
             {
@@ -780,7 +815,7 @@ namespace GW2CraftingHelper.Services
 
                     long? ingredientCost = Evaluate(
                         ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation,
-                        forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds, tiers);
+                        forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds, tiers, bestRatingByDiscipline);
                     craftCost += ingredientCost ?? 0L;
                     var ingredientDecision = memo[ingredient.NodeId];
                     craftRealCost += ingredientDecision.TotalCost ?? 0L;
@@ -856,6 +891,7 @@ namespace GW2CraftingHelper.Services
                         bestFallbackCraftCost = craftRealCost;
                         bestFallbackCraftRealCost = craftRealCost;
                         bestFallbackRecipeId = recipe.RecipeId;
+                        bestFallbackOption = recipe;
                     }
                 }
                 else
@@ -867,6 +903,7 @@ namespace GW2CraftingHelper.Services
                         bestComparableCraftCost = craftCost;
                         bestComparableCraftRealCost = craftRealCost;
                         bestComparableRecipeId = recipe.RecipeId;
+                        bestComparableOption = recipe;
                     }
                 }
             }
@@ -905,6 +942,42 @@ namespace GW2CraftingHelper.Services
             // gw2e's own manual pill always beating its automatic pre-pass.
             bool craftExcludedFromAutoPick = forceBuyOnlyNodeIds != null &&
                 forceBuyOnlyNodeIds.Contains(node.NodeId);
+
+            // source-selection-simplification (maintainer-approved
+            // redesign, docs/gw2e-considerations.md): a Craft source should
+            // only win the AUTOMATIC pick when some character can actually
+            // craft it. Checked against whichever recipe would actually be
+            // used if craft auto-wins - comparable-tier preferred, same
+            // priority costDiagnostics itself already uses just above -
+            // never the OTHER tier's recipe. Folded into the SAME
+            // craftExcludedFromAutoPick flag the force-buy pre-pass uses:
+            // identical effect (craft never wins PickCheapest/the terminal
+            // fallback race below), so this is purely additive to an
+            // existing, already-proven seam - canCraft (the CRAFT pill's
+            // own feasibility flag) and the manual-override branch above
+            // are BOTH computed from the unmodified bestComparable/
+            // bestFallback values and never read this flag, so CRAFT stays
+            // clickable and a manual override to Craft is unaffected. A
+            // null bestRatingByDiscipline (no snapshot discipline data at
+            // all) makes AccountCanCraft always return true - competency
+            // UNKNOWN never penalizes craft, preserving pre-existing
+            // behavior exactly for every caller that doesn't pass
+            // characterDisciplines. Also gated on (canBuyTp || canBuyVendor):
+            // a genuine "next-best source" must actually exist to default
+            // to - a node whose ONLY feasible acquisition path is Craft
+            // must still auto-pick Craft regardless of competency (nothing
+            // else to fall back to; excluding it here would drop this
+            // node's cost out of the plan entirely - UnknownSource, null
+            // TotalCost - even though it has a real, priced recipe, which
+            // corrupts totals rather than merely changing a default).
+            RecipeOption autoPickCraftOption = bestComparableOption ?? bestFallbackOption;
+            if (autoPickCraftOption != null &&
+                (canBuyTp || canBuyVendor) &&
+                !CraftCompetencyEvaluator.AccountCanCraft(
+                    autoPickCraftOption.Disciplines, autoPickCraftOption.MinRating, bestRatingByDiscipline))
+            {
+                craftExcludedFromAutoPick = true;
+            }
 
             // cost = real coin (Decision.TotalCost / display); comparisonValue
             // = parent-comparison value (Decision.ComparisonValue). Commit

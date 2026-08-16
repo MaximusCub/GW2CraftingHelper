@@ -215,6 +215,19 @@ namespace GW2CraftingHelper.Services
                 RecipeNodeIds.Assign(tree);
             }
 
+            // source-selection-simplification: computed here (before every
+            // Solve() call this method makes, including the zero-owned
+            // guide solve below) rather than at its original later use
+            // site, so PlanSolver.Evaluate's competency check sees the SAME
+            // discipline data at every solve of this generation - including
+            // the zero-owned guide solve, which must already reflect any
+            // competency-driven default flip so InventoryReducer never
+            // discounts ingredients for a Craft path the real solve below
+            // will end up abandoning. See PlanResultBuilder.Build's
+            // characterDisciplines doc comment for the prefer-explicit-
+            // argument-over-snapshot rationale this mirrors.
+            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
+
             // Step 5.5/5.6 (M34-B2a #3 / VOM design Candidate A - review-fix:
             // merged into one `if` block, was two adjacent identical
             // `if (useForceBuyPrePass)` blocks - see GenerateStructuredMultiAsync's
@@ -256,7 +269,8 @@ namespace GW2CraftingHelper.Services
                     tree, prices, vendorOffers, priceBasis,
                     overrides: null, currencyValuation: valuation,
                     forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
-                    homesteadTiers: tiers);
+                    homesteadTiers: tiers,
+                    characterDisciplines: effectiveCharacterDisciplines);
                 zeroOwnedDecisions = zeroOwnedSolve.Decisions;
             }
 
@@ -295,7 +309,8 @@ namespace GW2CraftingHelper.Services
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
                 assignNodeIds: !useForceBuyPrePass,
-                homesteadTiers: tiers);
+                homesteadTiers: tiers,
+                characterDisciplines: effectiveCharacterDisciplines);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -379,16 +394,11 @@ namespace GW2CraftingHelper.Services
             // decision/total EXCEPT the Build() tiebreak below (see
             // PlanResultBuilder.Build's characterDisciplines doc comment -
             // it can only relabel which equally-good discipline is
-            // reported, never change a decision or a total).
-            // W3C review-fix (mustFix): prefer the explicit
-            // characterDisciplines argument over snapshot?.CharacterDisciplines
-            // so Build()'s tiebreak sees the SAME list whether or not
-            // `snapshot` itself was nulled out to disable reduction (see
-            // this method's characterDisciplines parameter doc comment).
-            // Falls back to snapshot?.CharacterDisciplines when the caller
-            // did not supply the argument, preserving every pre-existing
-            // caller's behavior.
-            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
+            // reported, never change a decision or a total) and the
+            // solver's own competency-aware default (source-selection-
+            // simplification - see the Solve() calls above, which already
+            // consumed effectiveCharacterDisciplines, computed earlier in
+            // this method so every solve of this generation sees it).
             var result = resultBuilder.Build(
                 plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
             result.CurrencyMetadata = currencyMetadata;
@@ -715,6 +725,13 @@ namespace GW2CraftingHelper.Services
                 RecipeNodeIds.Assign(tree);
             }
 
+            // source-selection-simplification: see the single-item
+            // overload's matching computation for the full rationale -
+            // computed here (before every Solve() call below, including
+            // the zero-owned guide solve) so every solve of this batch
+            // generation sees the same discipline data.
+            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
+
             // Step 5.5/5.6 (M34-B2a #3 / VOM design Candidate A - review-fix:
             // merged into one `if` block, was two adjacent identical
             // `if (useForceBuyPrePass)` blocks): see the single-item
@@ -733,7 +750,8 @@ namespace GW2CraftingHelper.Services
                     tree, prices, vendorOffers, priceBasis,
                     overrides: null, currencyValuation: valuation,
                     forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
-                    homesteadTiers: tiers);
+                    homesteadTiers: tiers,
+                    characterDisciplines: effectiveCharacterDisciplines);
                 zeroOwnedDecisions = zeroOwnedSolve.Decisions;
             }
 
@@ -770,7 +788,8 @@ namespace GW2CraftingHelper.Services
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
                 assignNodeIds: !useForceBuyPrePass,
-                homesteadTiers: tiers);
+                homesteadTiers: tiers,
+                characterDisciplines: effectiveCharacterDisciplines);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -840,10 +859,9 @@ namespace GW2CraftingHelper.Services
             // AccountSnapshot.CharacterDisciplines' doc comment) - see the
             // single-item GenerateStructuredAsync's matching assignment
             // above for the full rationale, including the Build()
-            // tiebreak-only use.
-            // W3C review-fix (mustFix): see the single-item overload's
-            // matching effectiveCharacterDisciplines computation.
-            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
+            // tiebreak-only use. effectiveCharacterDisciplines was computed
+            // earlier in this method (source-selection-simplification), so
+            // every Solve() call above already consumed it too.
             var result = resultBuilder.Build(
                 plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
             result.CurrencyMetadata = currencyMetadata;
@@ -995,7 +1013,8 @@ namespace GW2CraftingHelper.Services
                     forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
                     assignNodeIds: false,
                     ignoredItemIds: ignoredItemIds,
-                    homesteadTiers: context.HomesteadTiers);
+                    homesteadTiers: context.HomesteadTiers,
+                    characterDisciplines: context.CharacterDisciplines);
 
                 var accountIndex = GetOrBuildAccountItemIndex(context);
                 var reduced = _reducer.Reduce(
@@ -1027,7 +1046,8 @@ namespace GW2CraftingHelper.Services
                 forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
                 assignNodeIds: false,
                 ignoredItemIds: ignoredItemIds,
-                homesteadTiers: context.HomesteadTiers);
+                homesteadTiers: context.HomesteadTiers,
+                characterDisciplines: context.CharacterDisciplines);
 
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(
