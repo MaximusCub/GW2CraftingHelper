@@ -3852,3 +3852,100 @@ Follow-ups (recorded during a later polish pass, not yet implemented):
   (`CurrencyDisplayResolver.ResolveAmounts`) - the same currency can
   show two different owned numbers in one window; decide whether to
   unclamp the shopping list to match.
+
+## AUDIT ROW 20/38: TP price-side fallback parity (2026-08-16)
+
+**Bug**: `PlanSolver.GetUnitPrice` returned 0 whenever the selected
+price basis's preferred TP side (buy orders / `SellInstant`, or
+instant-buy / `BuyInstant`) had no listings for an item, even when that
+SAME item's OTHER side had a real, usable price. `GetBuyCost`'s
+`unitPrice > 0` check then treated the item as fully unpriceable,
+dropping the BuyFromTp option entirely - an item with an empty
+preferred side became unpurchasable in the plan, forcing it to Craft
+(if a recipe existed) or Unknown. Confirmed against gw2efficiency's own
+live bundle (verified twice first-hand): preferred side first, cross-
+side fallback to the same item's other side when the preferred side is
+missing/zero, unpriced only when BOTH sides are empty.
+
+**Fix**: `PlanSolver.GetUnitPrice` gained a 3-arg overload
+`(ItemPrice price, PriceBasis priceBasis, out bool priceSideFellBack)`
+that tries the basis-preferred side first and falls back to the item's
+other side only when the preferred side is 0; the existing 2-arg
+overload now delegates to it (`out _`), so its two other callers -
+`CraftingPlanPipeline.CollectPresetOverrides`'s Buy-All feasibility
+check and `VendorBatchSolver`'s per-item TP-valued cost-line pricing -
+gain the fallback automatically with no call-site changes. `GetBuyCost`
+(the only caller inside `PlanSolver.Evaluate`) captures the out param
+into a local `buyPriceSideFellBack`, which `Commit` folds into a new
+`Decision.PriceSideFellBack` field gated to `src ==
+AcquisitionSource.BuyFromTp` (always false for Craft/BuyFromVendor/
+UnknownSource commits). The merged-ceil vendor batching math itself
+(`VendorBatchSolver`'s `FinalizeVendorBatches`/`AllocateVendorNodeCosts`)
+was not touched - only the per-item unit price it already multiplies
+by can now be a fallback-side number.
+
+**Display caveat**: `Decision.PriceSideFellBack` is surfaced on the
+public `SolverDecision`, read by `CraftingTreeBuilder.BuildNode` onto a
+new `CraftingTreeNode.PriceSideFellBack` (again BuyFromTp-gated, mirror-
+ing the existing `VendorCurrencyCosts` Source-gate pattern in that
+method rather than trusting the upstream invariant alone), and consumed
+by `Views/Rendering/TreeSectionController.cs`'s recipe-tree row tooltip.
+A fallen-back BuyFromTp node's tooltip gains one extra line - "Buy-order
+price unavailable - instant-buy price shown" or the reverse, chosen by
+a new `CraftingPlanResult.PriceBasis` passthrough on `PlanViewModel`
+(`PlanViewModelBuilder.Build`) - shown regardless of the existing
+`Quantity > 1` unit-price-line gate, since the caveat concerns which TP
+side priced the node rather than whether a separate per-unit line is
+useful. The shopping list row tooltip (`PlanViewModelBuilder.
+BuildShoppingListSection`) does **not** yet carry this caveat - it
+would need `PriceSideFellBack` threaded through `PlanStep` and
+`PlanSolver.Collect`'s per-step-key merge across possibly-multiple tree
+occurrences, which was out of scope for this pass (the task's own
+"and/or" wording permitted covering just the recipe-tree tooltip).
+Recorded here as an open follow-up, not implemented.
+
+**Tests** (`PlanSolverPriceBasisAndOverrideTests.cs`, all exercise the
+real `PlanSolver.Solve` entry point):
+`BuyOrderBasis_NoBuyOrders_FallsBackToInstantBuyPrice` (replaces the old
+`BuyOrderBasis_NoBuyOrders_ItemNotPriceable`, which asserted exactly the
+bug this fix removes) covers fallback-chosen;
+`BuyOrderBasis_BothSidesEmpty_ItemNotPriceable` covers both-sides-empty
+staying unpriceable; `BuyOrderBasis_UsesBuyOrderPrice` gained
+`PriceSideFellBack == false` assertions for the no-fallback-when-
+primary-present case; and
+`BuyOrderBasis_VendorItemBarter_BarterItemFallsBackToOtherSide` proves
+the same fallback reaches `VendorBatchSolver`'s per-item TP-valued
+cost-line pricing through the shared `GetUnitPrice` route.
+
+**Self-review findings** (Code Reviewer Mode pass over the diff):
+confirmed `PlanStructuralValidator.cs`'s NRE-semantics comment at ~272
+(referencing `GetUnitPrice`'s unchecked `price.SellInstant`/
+`price.BuyInstant` field access) stays accurate - the new 3-arg overload
+still dereferences both fields on a non-null-checked `price`, so a null
+dictionary VALUE still NREs exactly as documented; confirmed the only
+production `PlanViewModel` construction site is
+`PlanViewModelBuilder.Build`, so the new `PriceBasis` passthrough field
+is never left at its `InstantBuy` default by a different code path;
+confirmed `RenderTreeNode` is the sole, single recursive tree-row
+renderer (no duplicate copy survives in `CraftingPlanView.cs` after the
+WP-25 extraction), so the new tooltip line automatically covers nested/
+reference-branch rows with no extra wiring; grepped existing test
+fixtures across `tests/GW2CraftingHelper.Tests/Services/*.cs` for any
+other `SellInstant = 0`/`BuyInstant = 0` single-sided fixture that might
+have silently depended on the old "empty side = fully unpriceable"
+behavior - none found outside the file this change already updated.
+Nice-to-have (not applied - out of scope, see the shopping-list caveat
+above): the shopping-list row tooltip parity gap.
+
+Build: `dotnet build -p:Platform=x64` clean, 0 errors (StyleCop warning
+count unchanged from before this change - none on touched lines were
+new). Tests: 1371 passed, 0 failed (baseline 1369; +2 net new after one
+rename swapped a bug-asserting test for its fixed-behavior replacement).
+No Blish HUD/BlishHUD.exe references added to tests. IDs remain
+internal-only; coin icons unaffected (this change is pricing/tooltip
+logic only, no coin-rendering code touched). No live desktop
+verification was performed for this pass - `TreeSectionController.cs`
+is Blish-bound and outside this session's test-runnable surface, same
+constraint prior UI-adjacent entries in this file note.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
