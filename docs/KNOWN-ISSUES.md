@@ -3881,1012 +3881,159 @@ Follow-ups (recorded during a later polish pass, not yet implemented):
 
 ## GuildUpgrade ingredient costing/display fix (2026-08-16)
 
-Orchestrator-checksummed audit finding (confirmed via live API): the
-versioned GW2 API returns ingredient `{type:"GuildUpgrade", id:<upgradeId>,
-count:N}` on Guild Decoration recipes (e.g. recipe 12002 -> item 80471,
-guild upgrade id 829, ~70 occurrences in a 600-recipe sample, 678 across the
-full current seed). The "Recipe-ingestion bug class" entry above first
-surfaced this as a cosmetic display gap; this audit found it was actually
-a real mis-costing bug too - see that entry's own RESOLVED note.
+Orchestrator-checksummed audit finding (confirmed via live API): the versioned
+GW2 API returns ingredient `{type:"GuildUpgrade", id:<upgradeId>, count:N}` on
+Guild Decoration recipes (e.g. recipe 12002 -> item 80471, guild upgrade id
+829; 678 occurrences across 225 distinct ids in the current seed). The
+"Recipe-ingestion bug class" entry above first surfaced this as a cosmetic
+display gap; a deeper audit found it was a real mis-costing bug too,
+reachable via `PlanSolver.Evaluate`'s vendor-offer path
+(`VendorBatchSolver.EvaluateVendorOffers` keys `vendorOffers` by the raw
+ingredient id with no `"Item"`-type gate) - latent in the current seed (no
+`GuildUpgrade` id collides with a vendor-offer `outputItemId`, seed `Item`
+id, or `KnownCurrencyNames` key) but not enforced by any guard before this
+fix.
 
-**Root cause (two independent sites):**
+**Delivered behavior.** A `GuildUpgrade`-typed ingredient, and any OTHER
+ingredient type this module does not specifically recognize (a future GW2
+API type), is now handled consistently and safely at every site that
+touches ingredient types, on an Item-positive basis
+(`IngredientType != "Item"`) rather than an enumerated deny-list - so a type
+the module has never seen is unpriceable and undisplayable-as-an-item by
+construction, not by luck:
 
-1. `Services/CraftingTreeBuilder.cs`'s non-`"Item"` branch labeled ANY
-   non-Item ingredient `CraftingDecision.Currency` and resolved a
-   **currency** name from the id via `Gw2Constants.ResolveCurrencyName` -
-   wrong domain (a guild upgrade id and a wallet currency id are distinct
-   id spaces with no defined relationship to each other; resolving one as
-   if it were the other on the strength of a numeric match would silently
-   show the wrong name on any collision).
-2. `Services/PlanSolver.cs`'s ingredient loop (`Evaluate`) special-cased
-   only `IngredientType == "Currency"`, so a `GuildUpgrade` ingredient fell
-   through and was evaluated exactly like a normal item node. **Correction
-   to this entry's own first draft of this root cause:** the TP
-   item-pricing path is not actually reachable this way -
-   `CraftingPlanPipeline.CollectItemIds` only ever collects `"Item"`-typed
-   ids into the set that becomes `context.Prices`, so `GetBuyCost`'s
-   TP-price-table lookup could never contain a `GuildUpgrade` id in
-   production. The path that WAS reachable: `Evaluate` also calls
-   `VendorBatchSolver.EvaluateVendorOffers` against the full `vendorOffers`
-   dataset (53,536 offers in the current seed), keyed directly by the
-   ingredient's raw id (`vendorOffers.TryGetValue(node.Id, ...)`, matched
-   against each offer's `outputItemId`) with no `"Item"`-type gate anywhere
-   in that method - so a `GuildUpgrade` id that happened to also be a real
-   vendor offer's `outputItemId` would be priced off that unrelated offer
-   and could win as a genuine `BuyFromVendor` `PlanStep`, silently
-   inflating (or deflating) the containing recipe's real coin total.
-   **Severity: latent-but-reachable-via-vendor-offers, not cosmetic** -
-   measured against `ref/recipes_seed.json`: none of the 225 distinct
-   `GuildUpgrade` ingredient ids collide with a vendor offer
-   `outputItemId`, a seed `Item` ingredient/output id, or a
-   `KnownCurrencyNames` key, so the mis-cost was never realized in the
-   current seed - but nothing in the pre-fix code enforced that absence of
-   collision, so it was one seed update away from firing. (The defects
-   that WERE realized pre-fix were the CURRENCY mislabel from site 1 above
-   and the missing fallback-tier demotion - see "Fix" below.)
-
-**Fix (matches the approved direction exactly):**
-
-- `Models/CraftingDecision.cs` gained a new `GuildUpgrade` member,
-  deliberately **appended last** (after `Unknown`, not inserted earlier) -
-  this enum has no `StringEnumConverter` and round-trips through
-  `PersistedPlan`/`plan.json` as a raw ordinal int, so inserting it anywhere
-  earlier would have silently reassigned `Unknown`'s on-disk integer and
-  misread every previously-persisted plan on load. Caught during this
-  fix's own Code Reviewer Mode self-review pass, not by a test.
-- `CraftingTreeBuilder.BuildNode` gained an explicit `"GuildUpgrade"` branch
-  (checked before the generic non-`"Item"` branch): sets
-  `Decision = CraftingDecision.GuildUpgrade`, a generic ID-free display name
-  (`"Guild upgrade (unresolved)"` - IDs are never displayed, repo
-  invariant), and an acquisition-hint-style `AcquisitionHint` explanation.
-  Never calls `Gw2Constants.ResolveCurrencyName`/`CurrencyDisplayResolver`
-  and never consults `currencyMetadata` - confirmed via a dedicated
-  id-collision test (`GuildUpgradeNode_NeverResolvesViaCurrencyMetadata_
-  EvenWhenIdCollides`). Review-fix: the branch also now explicitly clears
-  `IconUrl`/`Rarity` (both already populated above, keyed on the raw
-  ingredient id, before this branch runs). The original draft of this fix
-  left them alone on the reasoning that no live metadata source exists for
-  a guild-upgrade id - `CollectTreeItemIds` only ever fetches `ItemMetadata`
-  for `"Item"`-typed ids - but the `metadata` dict handed to this builder is
-  populated from more than `CollectTreeItemIds` alone
-  (`CraftingPlanPipeline`'s `metadataIds` also unions step item ids, the
-  target item id, used-material ids, and vendor cost-component ids, none of
-  which that guard constrains), so a same-numbered genuine item entry
-  reaching `metadata` by one of those other routes could not actually be
-  ruled out by code inspection. Explicitly nulling both fields makes the
-  no-wrong-domain-icon/rarity invariant true by construction instead of by
-  the current seed's luck (measured: no seed `GuildUpgrade` id collides
-  with a seed `Item` id today, but nothing enforced that).
-- `PlanSolver.Evaluate`'s ingredient loop gained an explicit `"GuildUpgrade"`
-  branch (checked before the `"Currency"` branch): unconditionally sets
-  `hasUnvaluedCurrency = true` and contributes zero to both `craftCost` and
-  `craftRealCost` - **never** attempting a `currencyValuation` lookup on the
-  ingredient's id, even when the user's `CurrencyValuation` happens to hold
-  an entry for that exact numeric id (the same cross-domain collision risk
-  as the display side). This reuses the EXACT SAME fallback-tier machinery
-  an unvalued real `Currency` ingredient already drives (`Decision.
-  HasUnvaluedCurrency`, the comparable/fallback recipe-tier split, and its
-  existing transitive propagation up through Craft ancestors) rather than
-  inventing a parallel mechanism - per instruction, and verified by a
-  dedicated nested-Craft-ancestor test
-  (`GuildUpgradeIngredient_TransitivelyDemotesAncestorCraft_
-  TpWinsDespiteCheaperRealCraftCost`) that the existing propagation code
-  needed zero changes to cover the new ingredient type correctly.
-- `PlanSolver.Collect` gained an explicit `"GuildUpgrade"` branch (checked
-  before `"Currency"`): returns immediately without touching `currencyMap`
-  - a `GuildUpgrade` ingredient must never surface in `plan.CurrencyCosts`,
-  the Summary currency table, or any wallet lookup keyed off that table
-  (confirmed empty in every new test). It also never generates a shopping/
-  craft-step `PlanStep` (no memo entry ever exists for it, since
-  `Evaluate`'s ingredient loop never calls `Evaluate` on it directly).
-- `PlanSolver.RecomputeCraftCosts` gained matching `"GuildUpgrade"` guards
-  (top-of-method + ingredient loop) for consistency with the other three
-  sites, though the top-of-method guard is defense-in-depth only given the
-  current call graph (a `GuildUpgrade` node never has a memo entry to
-  recompute from).
-- `DecisionPillPlanner.BuildPillSpecs` gained a distinct single, non-
-  interactive `"GUILD UPGRADE"` locked pill (mirrors the `CURRENCY` pill's
-  shape, reuses `PillKind.Locked` - no new pill color/kind needed).
+- `Models/CraftingDecision.cs` has two new members, `GuildUpgrade` and
+  `UnrecognizedIngredient`, both appended LAST (this enum has no
+  `StringEnumConverter` and round-trips through `plan.json` as a raw
+  ordinal int - inserting either earlier would misread previously-persisted
+  plans). Its XML doc comment is the one canonical explanation of the
+  id-space rationale (a guild upgrade id, a wallet currency id, and an item
+  id are three distinct id spaces with no defined relationship to each
+  other) - other sites below point back to it instead of repeating the
+  rationale.
+- `Services/CraftingTreeBuilder.cs`'s `BuildNode` has three ordered leaf
+  branches before the ordinary decision lookup: `"GuildUpgrade"` (generic
+  "Guild upgrade (unresolved)" label plus an `AcquisitionHint`
+  explanation), `"Currency"` (name/icon resolved through
+  `CurrencyDisplayResolver`, not item metadata), and a catch-all for
+  anything else (`"Unrecognized ingredient type"` label). All three
+  explicitly clear `IconUrl`/`Rarity` (and, for the catch-all,
+  `Name`/`AcquisitionHint`/`AcquisitionBadge` too) rather than leaving them
+  at the generic item-keyed lookup every node gets by default -
+  `metadata`/`hints` can carry a colliding entry for the same raw id via
+  routes other than the Item-only ingestion path. Each of the three gets
+  its own `CraftingDecision` value (never shares `Unknown` with a genuine
+  no-source Item node), because `DecisionPillPlanner` cannot otherwise tell
+  them apart from a real "no feasible source" Item leaf and would attach a
+  live, interactive IGNORE pill keyed on a non-item id.
+- `Services/PlanSolver.cs`'s `Evaluate`, `Collect`, and `RecomputeCraftCosts`
+  all guard on `IngredientType != "Item"`. Currency ingredients keep their
+  existing valuation-aware pricing; every other non-Item type (GuildUpgrade,
+  or an unrecognized type) contributes zero to `craftCost`/`craftRealCost`,
+  never touches `currencyValuation`/`GetBuyCost`/vendor offers, never
+  accumulates into `plan.CurrencyCosts`, and demotes its containing recipe
+  to the fallback tier via the existing `HasUnvaluedCurrency` machinery
+  (propagated transitively through Craft ancestors, unchanged).
+- `Services/RecipeService.cs`'s `BuildNodeAsync` guards the same way
+  (`ingredientType != "Item"`), so a null or empty `IngredientType` - a
+  defensive case, not reachable with today's seed data, but a real
+  historical shape (commit e81b7e4) - is treated as an unexpanded leaf
+  consistently with how `PlanSolver`/`CraftingTreeBuilder` will handle that
+  same node, instead of being expanded as if it were a real item.
+- `Services/VendorBatchSolver.cs`'s `EvaluateVendorOffers` cost-line
+  classification loop has a final `else` alongside its `Currency`/`Item`
+  branches: an unrecognized `CostLine.Type` marks the offer unpriceable
+  (`priceable = false; break;`) instead of silently contributing nothing
+  and letting the offer win at an understated price. The merged-ceil
+  batching math below the loop is unchanged.
+- `Services/DecisionPillPlanner.cs` gives `GuildUpgrade`/`Currency`/
+  `UnrecognizedIngredient` each a single, non-interactive locked pill
+  (`GUILD UPGRADE`/`CURRENCY`/`UNRECOGNIZED`) - never the `IGNORE` toggle.
 - `Views/Rendering/TreeSectionController.cs` (Blish-bound, untestable
-  directly) widened two existing `Decision == Unknown` tooltip branches to
-  also cover `Decision == GuildUpgrade`, so the `AcquisitionHint`
-  explanation the tree builder now always sets actually renders (both the
-  row tooltip and the pill tooltip) instead of silently falling to the
-  generic "Only available source" text a locked pill gets by default.
+  directly) gives the `Unknown`/`GuildUpgrade`/`UnrecognizedIngredient`/
+  `Currency` locked pills real, honest tooltips instead of the generic
+  "Only available source" text a locked pill gets by default (accurate
+  only when there genuinely is exactly one feasible source).
 
-**Sweep (repo rule: fix the class, not the instance):** grepped every
-`IngredientType`/`"Currency"`/`"Item"` comparison in `Services/`/`Models/`
-(`AchievementBitDedupPrePass`, `CraftingPlanPipeline`'s override/id-
-collection helpers, `InventoryReducer`, `RecipeService.BuildNodeAsync`'s
-leaf-handling guard) - every one of them is already `"Item"`-gated
-(`== "Item"` or `!= "Item"`), so a `"GuildUpgrade"` node was already routed
-correctly as a non-consumable, non-recipe-expanding leaf at every one of
-those sites with zero changes needed. `Services/VendorBatchSolver.cs` and
-`Services/CraftingPlanPipeline.cs`'s vendor-offer-currency-id collectors
-compare a DIFFERENT field (`VendorOffer.CostLines[].Type`, the vendor-offer
-data model) that has no `"GuildUpgrade"` concept at all - confirmed
-unrelated, not touched.
+**Sweep (repo rule: fix the class, not the instance).** Every
+`IngredientType`/`RawIngredient.Type`/`CostLine.Type` comparison in
+`Services/`/`Models/` was grepped and checked against this Item-positive
+shape: `AchievementBitDedupPrePass`, `CraftingPlanPipeline`'s
+override/id-collection helpers, and `InventoryReducer` were already
+`"Item"`-gated with no changes needed; `CraftingPlanPipeline`'s
+vendor-offer-currency-id collectors compare `CostLine.Type` (a different
+field with no `"GuildUpgrade"` concept) and are unrelated.
 
-**Tests (11 net new, real production code paths, no Blish references):**
-`PlanSolverGuildUpgradeTests.cs` (new file, 5 tests: never-priced-as-item,
-never-priced-as-currency-even-with-a-colliding-valuation-id, never-in-
-CurrencyCosts, transitive fallback-tier propagation through a Craft
-ancestor, and a degenerate GuildUpgrade-only recipe still crafts at zero
-cost); `CraftingTreeBuilderTests.cs` (+3: decision/name/hint shape, never
-resolves via currencyMetadata even on an id collision, Ignore-toggle
-scoping parity with the Currency case); `DecisionPillPlannerTests.cs` (+2:
-pill shape, no Ignore/OwnedInfo pills); `AmalgamatedRiftEssenceIngestionTests.cs`
-(the existing GuildUpgrade test rewritten in place to assert the fixed
-behavior instead of documenting the old gap as intentional, plus 1 new test
-using the exact real recipe 12002 -> item 80471 shape from
-`ref/recipes_seed.json`, the audit's own reference case).
+**Tests:** 1396 total (0 failed), spanning `PlanSolverGuildUpgradeTests.cs`,
+`CraftingTreeBuilderTests.cs`, `DecisionPillPlannerTests.cs`,
+`AmalgamatedRiftEssenceIngestionTests.cs`, `RecipeServiceTests.cs`, and
+`PlanSolverVendorOfferTests.cs` - real production code paths
+(`PlanSolver.Solve`, `CraftingTreeBuilder.BuildTree`,
+`RecipeService.BuildTreeAsync` end-to-end against real `RecipeNode`/
+`ItemPrice`/`VendorOffer`/`CurrencyValuation`/`ItemMetadata` fixtures), no
+contract-mirror/fake-logic tests, no Blish HUD references.
 
-Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
-errors, only pre-existing StyleCop warnings, none on touched lines). Tests:
-`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` -
-1380 total (1369 baseline + 11 net new) - PASS, 0 failed.
-
-**Self-review findings (Code Reviewer Mode, fixed before commit):** the
-`CraftingDecision` enum-ordinal/persistence risk above (Must Fix, fixed);
-a stale `CraftingTreeNode.AcquisitionHint` doc comment that undersold its
-now-two population sources (Nice to Have, fixed); a missing transitive-
-propagation regression test for a nested `GuildUpgrade` descendant (Nice
-to Have widened to Must Fix given the audit's explicit "be consistent with
-that machinery" instruction - added). No Critical findings. Out of scope,
-confirmed unaffected and left untouched per the milestone's DO-NOT-TOUCH
-list: `Services/ModuleLog.cs`, `Services/PlanContentHeightMath.cs` (a
-`GuildUpgrade` node's `Decision != CraftingDecision.Craft` already dims its
-subtree exactly like `Currency`/`Have`/`Unknown` do today, with zero code
-change needed there), `Services/PlanRelayoutMath.cs`, scroll machinery,
-`VendorBatchSolver`'s merged-ceil batching math.
-
-**Remaining / deferred (adversarial review addition, 2026-08-16):** this
-fix makes a GuildUpgrade ingredient safe to price and display - never
-mis-costed, never mislabeled as a wallet currency - but does not resolve
-what the ingredient actually IS. Two pieces of the original "Recipe-
-ingestion bug class" out-of-scope finding above remain unimplemented: (1)
-the upgrade's real name - the leaf still renders the generic, ID-free
-"Guild upgrade (unresolved)" label rather than the actual guild upgrade
-name (would need a GW2 API `/v2/guildupgrades` lookup, a new metadata
-service, and a name cache, none of which exist yet); (2) verifying the
-active character's claimed guild actually owns/has-unlocked that upgrade
-(would need the `/v2/guild/:id/upgrades` endpoint plus a guild-membership/
-permission check this module has no concept of today). `Models/
-CraftingDecision.cs`'s `GuildUpgrade` doc comment, `CraftingTreeBuilder.
-BuildNode`'s `"GuildUpgrade"` branch, and the branch's own
-`AcquisitionHint` text all point back to this document for this
-remainder - this bullet is that pointer's target. Left for a future
-milestone, same as the original finding.
-
-## GuildUpgrade ingredient costing/display fix - adversarial review follow-up (2026-08-16)
-
-A second, adversarial pass (Code Reviewer Mode, per this repo's mandatory
-Edit -> Review -> Fix loop) over the fix above found three defects: one
-false empirical claim used as the fix's own stated justification (repeated
-at four production sites plus two test-comment sites), one wrong mechanism
-named for the real mis-costing bug this document itself records, and one
-gap the fix's reasoning left open for icon/rarity instead of name. None
-required touching DO-NOT-TOUCH code (`Services/ModuleLog.cs`, `Services/
-PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`, scroll
-machinery, `VendorBatchSolver`'s merged-ceil batching math).
-
-**Fixed (mustFix): the fix's own stated justification - a claimed numeric
-overlap between GuildUpgrade ids and `KnownCurrencyNames`' keys - was
-false, and cited a doc comment that says nothing about guild upgrades.**
-The claim ("the two id spaces numerically overlap in the real seed -
-several GuildUpgrade ids, e.g. 73-87, fall inside `KnownCurrencyNames`'
-own 2-80 range") appeared in `Models/CraftingDecision.cs`, `Services/
-CraftingTreeBuilder.cs`, `Services/PlanSolver.cs`, this document's own
-"Root cause" item 1 above, and comments in
-`tests/GW2CraftingHelper.Tests/Services/CraftingTreeBuilderTests.cs`.
-Independently re-measured (not just re-checked against the finding) with
-a script over `ref/recipes_seed.json` and `Models/Gw2Constants.cs`: 678
-GuildUpgrade ingredient occurrences over 225 distinct ids, min 73 / max
-1309; exactly one id (73) is `<= 80`, and 84/85/86/87 are all present but
-all `> 80`, outside the claimed 2-80 span; `KnownCurrencyNames` has 44
-keys total (2-7, 9-16, 18-20, 22-30, 32-34, 36, 45, 47, 49, 50, 58-63, 65,
-78-80) and the intersection with the 225 GuildUpgrade ids is empty. The
-cited doc comment (`Models/Gw2Constants.cs` ~62-88) is entirely about the
-2026-08-15 currency-name-drift audit and never mentions guild upgrades.
-The fix is correct on domain grounds alone and needed no invented overlap
-to justify it - every site now states the real reasoning instead: a guild
-upgrade id and a wallet currency id are distinct id spaces with no
-defined relationship to each other, so resolving one as the other on the
-strength of a numeric match would risk silently showing the wrong name,
-price, icon, or rarity on any collision.
-
-**Fixed (mustFix): this document's own "Root cause" item 2 above (and the
-"RESOLVED" note it overrode on the original "Recipe-ingestion bug class"
-finding) named the wrong mechanism for the real mis-costing bug.** Both
-stated the ingredient "fell through to the item-pricing path (`GetBuyCost`
-looked up its numeric id in the TP price table)". That path is
-unreachable in production: `CraftingPlanPipeline.CollectItemIds` only
-ever collects `"Item"`-typed ids, so `context.Prices` can never carry a
-`GuildUpgrade` id there. The path that WAS reachable: `PlanSolver.
-Evaluate`'s ingredient loop falls through to a recursive `Evaluate` call
-on the ingredient node for any type it does not special-case, which
-reaches `VendorBatchSolver.EvaluateVendorOffers` - keyed by the raw
-ingredient id (`vendorOffers.TryGetValue(node.Id, ...)`) against
-`outputItemId`, with no `"Item"`-type gate anywhere in that method - so a
-colliding vendor-offer `outputItemId` could have produced a real,
-wrongly-priced `BuyFromVendor` step pre-fix. Independently re-measured:
-none of the 225 seed `GuildUpgrade` ids collide with a seed `Item`
-ingredient/output id (16,024 distinct), a vendor offer `outputItemId`
-(14,959 distinct across 53,536 offers), or a `KnownCurrencyNames` key -
-so this was latent, not realized, on this branch; the realized defects
-were the CURRENCY mislabel and the missing fallback-tier demotion.
-Severity corrected to latent-but-reachable-via-vendor-offers (not
-cosmetic) in both places this document stated the wrong mechanism. Added
-a dedicated regression test that seeds a colliding vendor offer directly
-(`GuildUpgradeIngredient_NeverPricedAsVendorOffer_EvenWhenVendorOfferExistsForSameId`
-in `PlanSolverGuildUpgradeTests.cs`) - the previous suite exercised only
-the (unreachable) TP-price collision, never the vendor-offer one that was
-actually live.
-
-**Fixed (mustFix): the same wrong-domain leak the fix eliminated for the
-display Name was left open for IconUrl/Rarity.**
-`CraftingTreeBuilder.BuildNode` sets `IconUrl`/`Rarity` from the
-`metadata` dictionary keyed on the raw ingredient id for every node
-(including the GuildUpgrade one) before the GuildUpgrade branch runs, and
-that branch overrode only `Name`. `Views/Rendering/
-TreeSectionController.cs` feeds `Rarity` to the icon frame color and the
-row's name color, and renders `IconUrl` directly, so a numeric collision
-would show an unrelated item's icon and rarity-colored name under the
-"Guild upgrade (unresolved)" label - the same class of bug this fix
-exists to eliminate, just for icon/rarity instead of name. The branch's
-own comment argued this was safe because "`metadata` never carries a
-genuine entry for this id", citing `CollectTreeItemIds`'s `"Item"`-only
-fetch guard - true of that one contributor, but `CraftingPlanPipeline`'s
-`metadataIds` also unions step item ids, the target item id, used-material
-ids, and vendor cost-component ids, none of which that guard constrains,
-so the claim was never actually enforced anywhere (unrealized today only
-because no seed `GuildUpgrade` id happens to collide with a seed `Item`
-id). Fixed by explicitly setting `IconUrl = null; Rarity = null;` in the
-branch, making the invariant true by construction instead of by the
-current seed's luck. Covered by a new test that seeds a colliding
-`ItemMetadata` entry directly
-(`GuildUpgradeNode_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides`
-in `CraftingTreeBuilderTests.cs`).
-
-**Tests**: 2 new regression tests (the vendor-offer-collision test in
-`PlanSolverGuildUpgradeTests.cs`; the IconUrl/Rarity metadata-collision
-test in `CraftingTreeBuilderTests.cs`), for 1382 total (1380 from the
-base pass + 2). No new test file, `.csproj` unchanged. The false-claim
-corrections in both files' doc comments do not change any assertion's
-behavior.
-
-Validation: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` -
-PASS (0 errors, only pre-existing StyleCop warnings, none on touched
-lines). Tests: `dotnet test tests/GW2CraftingHelper.Tests/
-GW2CraftingHelper.Tests.csproj` - 1382 total (1380 baseline + 2 net new)
-- PASS, 0 failed. No new Blish HUD references in tests; both new tests
-exercise real production code paths (`PlanSolver.Solve`,
-`CraftingTreeBuilder.BuildTree` end-to-end, real `RecipeNode`/
-`VendorOffer`/`ItemMetadata` fixtures), no contract-mirror/fake-logic
-tests. Item/currency/vendor IDs remain internal-only (the GuildUpgrade id
-is never displayed by either new test's assertions, matching every
-existing test in these files). Pricing logic continues to preserve
-multiple sources and avoid inventing currency exchange rates.
-
-**Out of scope, not touched:** the same false overlap claim also appears
-verbatim in commit `8ed76e6`'s own commit message (this milestone's first
-commit) - rewriting published commit history was not requested by this
-task and this repo's workflow avoids amend/rebase by default; it may also
-be recorded in this project's orchestrator-side session memory/journal
-logs outside the repository, which are conversation records rather than
-project source and are out of this fix's scope.
-
-## GuildUpgrade ingredient costing/display fix - Currency sibling icon/rarity leak (2026-08-16)
-
-A third adversarial pass over the fix above found that the icon/rarity
-leak closed for the `GuildUpgrade` branch in the follow-up pass immediately
-above was left wide open one branch below it, in the same method, for the
-`Currency` branch - an incomplete class sweep (repo rule: fix the class,
-not the instance). No DO-NOT-TOUCH code was touched (`Services/
-ModuleLog.cs`, `Services/PlanContentHeightMath.cs`, `Services/
-PlanRelayoutMath.cs`, scroll machinery, `VendorBatchSolver`'s merged-ceil
-batching math).
-
-**Fixed (mustFix): `CraftingTreeBuilder.BuildNode`'s Currency branch set
-only `Name`, leaving `IconUrl`/`Rarity` at whatever the generic
-item-keyed `ResolveIcon`/`ResolveRarity` lookup (against `metadata`,
-keyed on the raw ingredient id) had already populated them with above.**
-A wallet currency id is the same distinct-id-space situation as a guild
-upgrade id: no defined relationship to item ids, so a numeric collision is
-possible and not merely hypothetical - `ref/vendor_offers.json` contains a
-vendor offer with `outputItemId: 24`, and 24 is also a
-`KnownCurrencyNames` key ("Pristine Fractal Relics"). Any plan whose steps
-buy item 24 unions 24 into `CraftingPlanPipeline`'s `metadataIds` (via
-`plan.Steps.Select(s => s.ItemId)`), so `metadata[24]` becomes that
-Wintersday item's `ItemMetadata` and a Pristine Fractal Relics currency
-leaf elsewhere in the same tree would render that item's icon and
-rarity-colored name (`Views/Rendering/TreeSectionController.cs` feeds
-`node.Rarity` to `RarityColors.GetRarityBorderColor`/
-`GetRarityNameColor` and renders `node.IconUrl` directly, for every node
-including Currency ones). Fixed by resolving `IconUrl` through
-`CurrencyDisplayResolver.ResolveIconUrl` (currency-domain, keyed on
-`currencyMetadata`, null when no live metadata has an icon for this id -
-never a guess) instead of the item-keyed result, and explicitly clearing
-`Rarity` to null - currencies have no rarity concept at all, matching
-`BuildVendorCostComponentLeaves`'s own currency-component leaves just
-below in the same file, which already never set `Rarity` for a currency
-leaf.
-
-**Sweep (repo rule: fix the class, not the instance):** re-read all of
-`BuildNode`'s early-return branches (Have/Ignore/GuildUpgrade/Currency/
-Unknown) and `BuildVendorCostComponentLeaves`'s two leaf kinds for the
-same item-metadata-onto-non-item-id pattern. The Have/Ignore/Unknown
-branches and the vendor-item-cost-component leaves all resolve icon/
-rarity for a genuine `"Item"`-typed id (a real item id in every case),
-so the generic `ResolveIcon`/`ResolveRarity` lookup is correct there and
-was left unchanged. The vendor-currency-cost-component leaves already
-used `CurrencyDisplayResolver.ResolveIconUrl` and never set `Rarity`
-(the exact shape this fix now gives the plain Currency branch too). No
-further sibling leaks found.
-
-**Tests (2 new, real production code paths, no Blish references):**
-`CurrencyNode_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides`
-(mirrors `GuildUpgradeNode_NeverResolvesIconOrRarityViaItemMetadata_
-EvenWhenIdCollides`, seeding a colliding `ItemMetadata` entry for id 24
-directly and asserting both `IconUrl` and `Rarity` stay null) and
-`CurrencyNode_IconResolvedFromCurrencyMetadata_NotItemMetadata` (positive
-case: `IconUrl` now comes from `currencyMetadata`, not the item-keyed
-lookup). Both were verified to fail (not merely differ) against the
-pre-fix code before the fix was applied, confirming they actually
-exercise the regression. `.csproj` unchanged (no new files); no Blish HUD
-references; both tests call `CraftingTreeBuilder.BuildTree` directly with
-real `RecipeNode`/`ItemMetadata`/`CurrencyMetadata` fixtures, no
-contract-mirror/fake-logic tests. Item/currency ids remain internal-only
-(never asserted into a displayed string). Pricing logic is untouched;
-this fix is display-only (icon/rarity), matching the class of bug it
-closes.
-
-Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
-errors, only pre-existing StyleCop warnings, none on
-`Services/CraftingTreeBuilder.cs` or the touched test file). Tests:
-`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
-- 1384 total (1382 baseline + 2 net new) - PASS, 0 failed.
-
-**Self-review findings (Code Reviewer Mode, fixed before commit):** none
-Critical or Must Fix beyond the finding itself. Nice to have, not applied
-(scope discipline - the finding was narrowly about `CraftingTreeBuilder`):
-`Services/PlanViewModelBuilder.cs` has several other `IconUrl = iconUrl`
-assignments that were grepped and spot-checked as part of the sweep above;
-none showed the same item-metadata-keyed-onto-a-non-item-id shape (each
-resolves icon for a genuine item context), so none were changed - flagging
-here rather than silently expanding scope.
-
-## GuildUpgrade ingredient costing/display fix - residual class-gap follow-up (2026-08-16)
-
-A fourth adversarial pass (external orchestrator review of the three
-sections above) found three defects: the earlier "GuildUpgrade" fixes
-were still instance-scoped rather than class-scoped at their own root
-cause, this document's Gate-line contract was broken by accumulating
-three independently-pending Gate lines instead of one, and the RESOLVED
-marker on the original deferred finding overclaimed what was actually
-fixed. No DO-NOT-TOUCH code was touched (`Services/ModuleLog.cs`,
-`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`,
-scroll machinery, `VendorBatchSolver`'s merged-ceil batching math).
-
-**Fixed (Critical - repo rule "fix the class, not the instance"): every
-prior guard in this saga was scoped to the literal string
-`"GuildUpgrade"`, leaving the wrong-domain catch-all that caused the
-original bug in place for any OTHER non-Item ingredient type.**
-`PlanSolver.Evaluate`'s top guard and ingredient loop, `PlanSolver.
-Collect`'s top guard, and `PlanSolver.RecomputeCraftCosts`' top guard and
-ingredient loop all special-cased `"Currency"` and `"GuildUpgrade"`
-explicitly and let ANY other type fall through - in `Evaluate`'s
-ingredient loop specifically, straight into a recursive `Evaluate` call
-that reaches `GetBuyCost` and `VendorBatchSolver.EvaluateVendorOffers`
-(which keys `vendorOffers` by the raw ingredient id with no type gate at
-all) - the exact reachable mis-costing mechanism this document's own
-"Root cause" write-up above identifies as the real bug, just not closed
-for the general case. `CraftingTreeBuilder.BuildNode` had the same shape
-in the display direction: its non-`"GuildUpgrade"` branch read
-`IngredientType != "Item"`, so any unrecognized type was labeled
-`CraftingDecision.Currency` and named via `CurrencyDisplayResolver` -
-the wrong-domain mislabel this whole fix exists to eliminate, reintroduced
-one catch-all wider. Verified end-to-end that an unknown type reaches
-these sites: `Gw2RecipeApiClient` passes the API's `type` string through
-verbatim with no allow-list, and `RecipeService` makes any non-`"Item"`
-type a leaf with no further gating - so a future GW2 API ingredient type
-this module has never seen (not just "GuildUpgrade") would have silently
-reached the same mis-costing/mislabeling paths.
-
-Fixed by inverting every guard to be `"Item"`-positive instead of an
-enumerated deny-list, per the minimal, no-new-abstraction direction: in
-`PlanSolver`, `Evaluate`'s top guard is now `IngredientType != "Item"` ->
-unpriceable (was `== "Currency" || == "GuildUpgrade"`); its ingredient
-loop now checks `"Currency"` first (the one type with real, valuation-
-aware pricing logic), then treats ANY other non-`"Item"` type via the
-same `hasUnvaluedCurrency` fallback-tier machinery `"GuildUpgrade"` used
-alone before (contributes zero to both `craftCost` and `craftRealCost`,
-demotes the recipe to fallback tier, never consults `currencyValuation`/
-`GetBuyCost`/vendor offers). `Collect` and `RecomputeCraftCosts` got the
-matching Item-positive inversion at both their top guards and (for
-`RecomputeCraftCosts`) its own ingredient loop, for the same reason -
-consistency across all three sites was already this saga's stated goal,
-just not carried through to the guard's actual condition. In
-`CraftingTreeBuilder.BuildNode`, the Currency branch is now scoped to the
-literal `"Currency"` string; anything that is none of `"Item"`,
-`"GuildUpgrade"`, or `"Currency"` falls through to the pre-existing
-Unknown-with-hint leaf instead - which, as an adversarial-review follow-up
-caught during this fix's own Code Reviewer Mode pass, still needed the
-same IconUrl/Rarity-clearing treatment the GuildUpgrade and Currency
-branches already have (that leaf previously only served genuine `"Item"`
-nodes with no decision, where the item-keyed icon/rarity lookup is
-correct; serving it to a non-Item type too meant the same wrong-domain
-icon/rarity leak those two branches already closed for their own types
-was reopened for anything landing here) - fixed by clearing both fields
-whenever the falling-through node's `IngredientType != "Item"`.
-
-**Tests (6 net new, real production code paths, no Blish references):**
-`PlanSolverGuildUpgradeTests.cs` (+4: item-price collision, vendor-offer
-collision, currency-valuation collision, and never-in-CurrencyCosts, all
-using a made-up `"MysteryIngredientType"` ingredient type instead of the
-literal string `"GuildUpgrade"`, proving the general guard rather than
-re-proving the one instance the existing suite already covered);
-`CraftingTreeBuilderTests.cs` (+2: decision is `Unknown` not `Currency`
-for an unrecognized type, and IconUrl/Rarity stay null on that same
-fallthrough even when `metadata` collides on the raw id). `.csproj`
-unchanged (no new test files). Item/currency/vendor ids remain
-internal-only in every new assertion; no Blish HUD references; all six
-tests call `PlanSolver.Solve`/`CraftingTreeBuilder.BuildTree` directly
-against real `RecipeNode`/`ItemPrice`/`VendorOffer`/`CurrencyValuation`/
-`ItemMetadata` fixtures, no contract-mirror/fake-logic tests.
-
-**Fixed (Must Fix - deliverable-contract violation): this document
-accumulated three separate sections above, each independently ending in
-the literal line `Gate: [PENDING - the orchestrator fills in PASS/FAIL]`,
-even though each fix task is specified as appending exactly ONE such
-section.** A naive string replace targeting that literal line would have
-matched all three, marking earlier, already-superseded write-ups with
-whatever PASS/FAIL verdict was meant only for the most recent one - or,
-after this section's own append, four. Fixed by stripping the trailing
-`Gate:` line from all three prior sections (all now superseded by this
-one, which incorporates everything from all three plus the class-level
-fix above) and leaving exactly one PENDING `Gate:` line in the document
-as of this commit - the one at the end of this section. (The document
-also carries several pre-existing, already-filled `Gate: PASS ...`
-lines from earlier, unrelated milestones; those are untouched and out
-of scope - a naive replace targeting the literal string `Gate:` rather
-than the specific PENDING placeholder would still have matched them
-too.) Nothing else in those three sections was altered besides the
-"Remaining / deferred" bullet noted below and the removal of each stale
-`Gate:` line itself. NOTE this "exactly one" claim describes only the
-state as of this commit, not a standing document-wide fact: it is an
-invariant every later-appended section is individually responsible for
-re-establishing (by stripping whichever line was previously at EOF
-before adding its own) each time a further adversarial pass appends
-another section below this one - see the fix recorded near the end of
-this document for a case where a later commit dropped that
-responsibility and left two PENDING lines standing at once, and the
-follow-up commit that restored the invariant.
-
-**Fixed (Must Fix - dropped backlog item / dangling forward reference):
-the "RESOLVED (2026-08-16)" marker on the original out-of-scope
-"Recipe-ingestion bug class" GuildUpgrade finding overclaimed its own
-scope.** Only the mis-costing bug and the wrong-domain "Currency"
-mislabel were actually resolved by the fix it points to; resolving a
-GuildUpgrade ingredient's real upgrade name and verifying the active
-character's guild actually owns/has-unlocked it were never implemented -
-the leaf still renders the generic "Guild upgrade (unresolved)" label,
-exactly as `CraftingTreeBuilder.BuildNode`'s own `"GuildUpgrade"` branch
-comment, `Models/CraftingDecision.cs`'s `GuildUpgrade` doc comment, and
-the branch's own `AcquisitionHint` text all still say - all three point
-readers at this document for that remainder, which the RESOLVED marker
-gave no trace of. Fixed by re-labeling the marker "PARTIALLY RESOLVED"
-with an explicit scope note, and adding a "Remaining / deferred" bullet
-to the "GuildUpgrade ingredient costing/display fix" section above
-(immediately before this one) that records both unimplemented pieces
-explicitly, so the deferred work now has a real entry instead of existing
-only as comments pointing at a document that claimed it was done.
-
-Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
-errors, only pre-existing StyleCop warnings, none new on
-`Services/PlanSolver.cs`, `Services/CraftingTreeBuilder.cs`,
-`Models/CraftingDecision.cs` (the pre-existing `SA1413` warning on its
-enum body only shifted line number, from the added doc-comment lines
-above it), or either touched test file. Tests: `dotnet test
-tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` - 1390
-total (1384 baseline + 6 net new) - PASS, 0 failed.
-
-**Self-review findings (Code Reviewer Mode, fixed before commit):** the
-`CraftingTreeBuilder` Unknown-leaf icon/rarity leak noted inline above
-(Must Fix, caught during this fix's own review and fixed in the same
-commit, not left for a fifth pass); `Models/CraftingDecision.cs`'s
-`Currency` doc-comment entry (Must Fix) still literally described the
-just-eliminated bug ("set directly for non-\"Item\"/non-\"GuildUpgrade\"
-ingredient nodes") - fixed to match the now-`"Currency"`-scoped branch, and
-the `Unknown` entry's doc comment extended to note it now also covers an
-unrecognized ingredient type; confirmed the reordered `Currency`-before-
-general-non-Item checks in `PlanSolver`'s three ingredient loops preserve
-the coin-currency (`Gw2Constants.CoinCurrencyId`) fast path and the
-valuation-overflow fallback exactly as before (no behavior change for
-real Currency ingredients, only for the ones that previously fell through
-uncaught). No Critical findings beyond the one fixed above. Nice to have,
-not applied (scope discipline): the "Remaining / deferred" bullet added
-above could eventually become its own tracked milestone item rather than
-a bullet inside a fix write-up, but restructuring this document's own
-organization was not part of this task's scope.
-
-## GuildUpgrade ingredient costing/display fix - unrecognized-type class sweep completion + Gate-line claim fix (2026-08-16)
-
-A fifth adversarial pass (external orchestrator review of the section
-immediately above) found two defects: the unrecognized-ingredient-type
-fallthrough's class sweep was only 2/5 complete, and this document's own
-previous section made a false factual claim about how many `Gate:` lines
-the document contains. No DO-NOT-TOUCH code was touched
-(`Services/ModuleLog.cs`, `Services/PlanContentHeightMath.cs`,
-`Services/PlanRelayoutMath.cs`, scroll machinery, `VendorBatchSolver`'s
-merged-ceil batching math).
-
-**Fixed (Must Fix - class sweep left 3/5 fields leaking): the
-unrecognized-ingredient-type fallthrough in `CraftingTreeBuilder.
-BuildNode` (the `!decisions.TryGetValue(...)` branch) only cleared
-IconUrl and Rarity for a non-`"Item"` node - Name, AcquisitionHint, and
-AcquisitionBadge were still resolved from the ITEM-domain `metadata`/
-`hints` dictionaries keyed on the raw ingredient id, the exact same
-wrong-domain leak class the branch's own comment claimed to close.**
-Verified: with a colliding `metadata`/`hints` entry, a
-`{Id=829, IngredientType="MysteryIngredientType"}` node rendered an
-unrelated item's Name, AcquisitionHint, and AcquisitionBadge - the badge
-in particular becomes the literal pill text `DecisionPillPlanner.
-BuildPillSpecs` renders, making the wrong-domain value the single most
-visible thing on the row. Separately, with no collision, `ResolveName`'s
-"Unknown Item" fallback mislabeled a non-item as an item - the same
-mislabel class the sibling `GuildUpgrade` branch's "Guild upgrade
-(unresolved)" label exists to avoid one branch above. The existing test
-`UnrecognizedIngredientType_NeverResolvesIconOrRarityViaItemMetadata_
-EvenWhenIdCollides` seeded `Name = "Unrelated Item"` into the colliding
-fixture and never asserted on Name, so the leak sat inside the fixture of
-the test meant to prove it closed. Fixed by resetting `Name` to a
-generic, ID-free label (`"Unrecognized ingredient (unresolved)"`,
-matching the `GuildUpgrade` branch's shape) and skipping
-`ApplyAcquisitionHint` entirely for non-`"Item"` nodes in this branch
-(it looks `hints` up by the same raw-id/ITEM-domain key `metadata` uses,
-so a partial fix leaving it in place would have kept the
-AcquisitionHint/AcquisitionBadge leak open). Extended the existing test
-to also seed a colliding `hints` entry and assert Name, AcquisitionHint,
-and AcquisitionBadge all stay clear of it, alongside the pre-existing
-IconUrl/Rarity assertions.
-
-**Fixed (Must Fix - false claim in the deliverable record): the section
-immediately above claimed stripping the three stale Gate lines left
-"exactly one `Gate:` line in the entire document."** Measured:
-`grep -c '^Gate:' docs/KNOWN-ISSUES.md` returned 5, not 1 - four
-pre-existing, already-filled `Gate: PASS 2026-08-16 ...` lines from
-earlier, unrelated milestones plus the one `PENDING` line the claim was
-actually describing. The functional contract (exactly one `PENDING` Gate
-line, file ending with the exact required line) was met; the stated fact
-about the literal string `Gate:` was not, and it was wrong about the
-precise hazard the paragraph exists to eliminate - a naive replace
-targeting `Gate:` (rather than the specific `PENDING` placeholder) still
-matches five lines, not one. Fixed by correcting the claim to "exactly
-one PENDING `Gate:` line" and adding a parenthetical noting the
-pre-existing filled Gate lines are untouched and out of scope.
-
-**Tests (0 net new; 1 existing test extended, real production code
-paths, no Blish references):**
-`CraftingTreeBuilderTests.cs`'s
-`UnrecognizedIngredientType_NeverResolvesIconOrRarityViaItemMetadata_
-EvenWhenIdCollides` now also seeds a colliding `AcquisitionHint` entry
-and asserts Name, AcquisitionHint, and AcquisitionBadge, in addition to
-its pre-existing IconUrl/Rarity assertions. `.csproj` unchanged (no new
-test files). Item/currency ids remain internal-only in the assertion;
-no Blish HUD references; the test calls `CraftingTreeBuilder.BuildTree`
-directly against real `RecipeNode`/`ItemMetadata`/`AcquisitionHint`
-fixtures, no contract-mirror/fake-logic test.
-
-Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
-errors, only pre-existing StyleCop warnings, none new on
-`Services/CraftingTreeBuilder.cs` or the touched test file). Tests:
-`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
-- 1390 total (unchanged - existing test extended, not a new one) - PASS,
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS, 0
+errors, 0 warnings on every file this fix touched (`Models/
+CraftingDecision.cs`, `Services/CraftingTreeBuilder.cs`,
+`Services/PlanSolver.cs`, `Services/RecipeService.cs`,
+`Services/VendorBatchSolver.cs`, `Services/DecisionPillPlanner.cs`,
+`Views/Rendering/TreeSectionController.cs`). Tests: `dotnet test
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` - 1396 total,
 0 failed.
 
-**Self-review findings (Code Reviewer Mode, fixed before commit):** none
-beyond the two fixed above - the non-`"Item"` branch's early `return`
-was checked to confirm it cannot fall through into the `ApplyAcquisitionHint`
-call meant only for genuine `"Item"` nodes with no decision; the `"Item"`
-path through this same branch (a real item with no recipe/price, the
-`AcquisitionSource.UnknownSource` case) was confirmed unchanged - it
-still resolves Name/IconUrl/Rarity from `metadata` and still calls
-`ApplyAcquisitionHint`. Nice to have, not applied (scope discipline): the
-five-field class sweep is now complete for this one fallthrough branch,
-but no other site in this file was audited for the same collision
-pattern - out of scope for this targeted fix.
+**Remaining / deferred.** This fix makes a `GuildUpgrade` ingredient (and
+any other unrecognized ingredient type) safe to price and display - never
+mis-costed, never mislabeled as a wallet currency or a real item - but does
+not resolve what a `GuildUpgrade` ingredient actually IS. Two pieces remain
+unimplemented: (1) the upgrade's real name and icon - the leaf still
+renders the generic, ID-free "Guild upgrade (unresolved)" label; the live
+GW2 API's `/v2/guild/upgrades/{id}` endpoint is the candidate future source
+for both, needing a new metadata service and name/icon cache, neither of
+which exist yet; (2) verifying the active character's claimed guild
+actually owns/has-unlocked that upgrade, which would need the
+authenticated `/v2/guild/:id/upgrades` endpoint plus a guild-membership/
+permission concept this module has none of today. Separately,
+`RecipeService.BuildNodeAsync` computes every ingredient's node `Quantity`
+uniformly as `craftsNeeded * ingredient.Count`, correct for a consumable
+Item but not obviously correct for a `GuildUpgrade` requirement, which
+behaves like a one-time claimed prerequisite rather than a
+per-craft-multiplied consumable; invisible today since no UI surfaces a
+`GuildUpgrade` node's `Quantity`, but a future real name/requirement
+display will need to decide how (or whether) to show that scaled number
+rather than assuming it means "N needed per craft" the way it does for a
+real item. `Models/CraftingDecision.cs`'s `GuildUpgrade` doc comment,
+`CraftingTreeBuilder.BuildNode`'s `"GuildUpgrade"` branch, and the
+branch's own `AcquisitionHint` text all point back to this document for
+this remainder.
 
-## GuildUpgrade ingredient costing/display fix - Evaluate doc-comment invariant + decision-lookup guard hoist (2026-08-16)
+**Review history** (eight adversarial passes; most-recent fix per topic
+only - see git log for full per-commit detail):
 
-A sixth adversarial pass (external orchestrator review of the section
-immediately above) found two defects: `PlanSolver.Evaluate`'s own doc
-comment stated a false memo-entry invariant, and
-`CraftingTreeBuilder.BuildNode`'s non-`"Item"` catch-all (hoisted into
-its own branch by the previous section) was still nested inside the
-`!decisions.TryGetValue(...)` branch instead of sitting before the
-lookup like its `GuildUpgrade`/`Currency` siblings. No DO-NOT-TOUCH code
-was touched (`Services/ModuleLog.cs`,
-`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`,
-scroll machinery, `VendorBatchSolver`'s merged-ceil batching math).
-
-**Fixed (Must Fix - false invariant in the one doc comment that states
-the memo contract): `Evaluate`'s doc comment claimed "EVERY non-currency,
-non-guild-upgrade ingredient of EVERY recipe on this node is evaluated
-(and therefore gets its own memo entry)".** The code it documents is
-Item-positive (`if (ingredient.IngredientType != "Item") { hasUnvaluedCurrency
-= true; continue; }`), so any ingredient type other than `"Item"` -
-`"Currency"`, `"GuildUpgrade"`, or an unrecognized fourth type - gets no
-memo entry, not just Currency and GuildUpgrade. A reader trusting the old
-wording could write `memo[ingredient.NodeId]` for an unrecognized-type
-ingredient and get a `KeyNotFoundException` - the exact instance-vs-class
-drift the two preceding class-sweep commits (`c9ebc32`, `e42125e`) exist
-to eliminate, left standing in the one comment that states the contract
-itself. Swept the rest of `PlanSolver.cs` for the same phrasing
-(`grep -n "non-currency, non-guild-upgrade\|gets its own memo\|EVERY.*
-ingredient.*evaluated"`) - no other hit; `Collect`'s and
-`RecomputeCraftCosts`' own doc comments make no equivalent per-ingredient
-memo-entry claim, so this was a single instance, not a second site of the
-same class. Fixed by rewording to "EVERY `"Item"` ingredient ... is
-evaluated" and adding an explicit sentence naming Currency, GuildUpgrade,
-and an unrecognized type as the three cases that get no memo entry,
-pointing at the Item-positive top guard and the `hasUnvaluedCurrency`
-recipe-loop skip as the two places that enforce it.
-
-**Fixed (Must Fix - guard silently conditional on solver behavior, not
-enforced by this method's own construction): the non-`"Item"` catch-all
-in `BuildNode` sat inside the `!decisions.TryGetValue(node.NodeId, out
-var decision)` branch, unlike the sibling `"GuildUpgrade"` and
-`"Currency"` branches immediately above it, which return before the
-decisions lookup runs at all.** Today this is not reachable -
-`Evaluate`'s Item-positive top guard plus its recipe-loop skip mean no
-non-`"Item"` node is ever memoized - but the guard's correctness rested
-entirely on that external fact holding, the same unenforced-by-construction
-shape this branch's own five preceding fixes on this file exist to
-eliminate for the icon/rarity/name/hint/badge leaks. Had a memo entry
-ever existed for such a `NodeId` (a future `PlanSolver` change, a shared
-`NodeId` collision), the node would have fallen through to the
-decision-found path below it and rendered with the ITEM-domain
-Name/IconUrl/Rarity/AcquisitionHint/AcquisitionBadge this whole class of
-fix exists to strip, reopening the leak from first principles rather than
-by any actual behavior change in `PlanSolver`. Fixed by hoisting the
-`node.IngredientType != "Item"` catch-all to its own branch immediately
-after the `"Currency"` branch, before the `decisions` lookup, matching
-where `GuildUpgrade` and `Currency` sit - it now returns unconditionally
-for a non-`"Item"` node regardless of whether a memo entry exists,
-exactly like its two siblings.
-
-**Tests (1 net new, real production code paths, no Blish references):**
-added `CraftingTreeBuilderTests.
-UnrecognizedIngredientType_IgnoresStaleMemoEntry_EvenWhenOneExistsForThisNodeId`,
-which hands `CraftingTreeBuilder.BuildTree` a `decisions` dictionary that
-DOES contain a `BuyFromTp` entry for the unrecognized-type node's own
-`NodeId` (a scenario the real solver cannot produce today, proving the
-guard by this method's own construction rather than by relying on that
-external fact) and asserts the node still renders `CraftingDecision.
-Unknown` with the generic label, null IconUrl/Rarity, and null
-SubtreeCost/UnitCost - never the `BuyFromTp` decision or its cost. No new
-test files (`.csproj` unchanged). Item/currency ids remain internal-only
-in the assertions; no Blish HUD references; the test calls
-`CraftingTreeBuilder.BuildTree` directly against a real `RecipeNode`/
-`SolverDecision`/`ItemMetadata` fixture, no contract-mirror/fake-logic
-test.
-
-Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
-errors, only pre-existing StyleCop warnings, none new on
-`Services/PlanSolver.cs`, `Services/CraftingTreeBuilder.cs`, or the
-touched test file). Tests:
-`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
-- 1391 total (1390 + 1 new) - PASS, 0 failed.
-
-**Self-review findings (Code Reviewer Mode, fixed before commit):** none
-beyond the two fixed above - re-read the full hoisted branch after the
-move to confirm it still returns unconditionally (no accidental
-fallthrough into the `decisions` lookup below it), and confirmed the
-`"Item"`-with-no-decision path immediately below (a real item with no
-recipe/price, the `AcquisitionSource.UnknownSource` case) is unchanged -
-it still falls through to `ApplyAcquisitionHint` exactly as before,
-since that call sits in its own now-unconditional-on-non-Item-only
-branch. Nice to have, not applied (scope discipline): the hoisted branch
-and the decision-not-found branch immediately below it both assign
-`treeNode.Decision = CraftingDecision.Unknown` for different reasons (one
-unconditionally for a non-`"Item"` type, one only when no memo entry
-exists for an `"Item"` type); a shared local could deduplicate the two
-four-line assignments, but the branches' preconditions are different
-enough, and the duplication small enough, that introducing a new
-abstraction for it is not justified under this repo's "avoid
-infrastructure unless required" efficiency principle - out of scope for
-this targeted fix.
-
-## GuildUpgrade ingredient costing/display fix - pill-layer instance-vs-class gap closed (2026-08-16)
-
-A seventh adversarial pass (external orchestrator review) found the
-instance-vs-class gap this whole fix series exists to eliminate,
-reintroduced one layer up, in the pill rendering: an unrecognized-
-ingredient-type leaf rendered a LIVE, clickable IGNORE pill keyed on a
-non-item id. No DO-NOT-TOUCH code was touched (`Services/ModuleLog.cs`,
-`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`,
-scroll machinery, `VendorBatchSolver`'s merged-ceil batching math).
-
-**Fixed (Critical - live clickable IGNORE pill reachable on a non-item
-id, the exact bug class this fix series exists to close):
-`CraftingTreeBuilder.BuildNode`'s non-`"Item"` catch-all set
-`CraftingDecision.Unknown`, the SAME value a genuine no-source `"Item"`
-node gets. `DecisionPillPlanner.BuildPillSpecs` cannot tell the two
-`Unknown` cases apart by `Decision` alone, so the unrecognized-type leaf
-took the `options.Count == 0` branch and got `AppendOwnershipPills`'
-unconditional interactive `IGNORE` pill.** `TreeSectionController`'s pill
-click handler reads `node.ItemId` and adds it to the tree-wide
-`_ignoredItemIds` set (`PlanSolver.Evaluate`/`Collect` key strictly by
-numeric item id), so clicking that IGNORE pill either did nothing (no
-`"Item"` node in the tree shares the raw id) or silently zeroed the cost
-of an unrelated genuine `"Item"` node elsewhere in the tree that happened
-to share the same number - persisting past restart via
-`PersistedPlan.IgnoredItemIds`. Separately, the toggle was permanently
-dead either way: `BuildNode`'s Have/`IsIgnored` collapse is scoped to
-`IngredientType == "Item"`, so this node itself can never flip state -
-the user would click a control that visibly does nothing, forever, on
-top of the silent cross-domain zeroing risk. Latent today (the current
-seed data carries only `Item`/`GuildUpgrade`/`Currency` ingredient types,
-and `Gw2RecipeApiClient` defaults a missing type to `"Item"`), but the
-API's ingredient-type string passes through with no allow-list, so a
-future fourth GW2 ingredient type reaches this path directly. Fixed by
-giving this leaf its own `CraftingDecision.UnrecognizedIngredient` value
-(appended LAST in the enum - see its own doc comment for why the ordinal
-position matters) instead of sharing `Unknown`, and adding a matching
-single-locked-pill, no-`IGNORE` short-circuit for it in
-`DecisionPillPlanner.BuildPillSpecs` - the same treatment `Currency` and
-`GuildUpgrade` already get, returning before the `options.Count == 0`
-branch is ever reached. `TreeSectionController`'s Locked-pill tooltip
-switch also gained a matching branch (mirroring its existing
-`Unknown`/`GuildUpgrade` arms) so the new `"UNRECOGNIZED"` pill does not
-fall into the generic-but-misleading `"Only available source"` tooltip
-text (there is no available source here at all).
-
-**Tests (3 net new, 1 renamed for accuracy; real production code paths,
-no Blish references):**
-- `DecisionPillPlannerTests.UnrecognizedIngredient_SingleLockedPill_NotInteractive`
-  and `UnrecognizedIngredient_NeverGetsIgnorePill_EvenWithOwnedQuantityUsed`
-  - direct mirrors of the existing `GuildUpgrade_*` pair, exercising
-  `DecisionPillPlanner.BuildPillSpecs` directly, closing the exact test
-  gap the review named (`GuildUpgrade` had this pair, the unrecognized-
-  type case did not).
-- `CraftingTreeBuilderTests.UnrecognizedIngredientType_NeverGetsIgnorePill_EvenThoughDecisionLooksLikeNoSource`
-  - the direct end-to-end regression test for the finding itself: feeds a
-  `"MysteryIngredientType"` leaf through the real `CraftingTreeBuilder.
-  BuildTree`, then the real `DecisionPillPlanner.BuildPillSpecs` on the
-  resulting node, and asserts exactly one `Locked` `"UNRECOGNIZED"` pill
-  with no `IGNORE` pill anywhere in the result - closing the second gap
-  the review named (the builder's own tests asserted Name/IconUrl/Rarity/
-  AcquisitionHint/AcquisitionBadge but never the resulting pill shape).
-- `UnrecognizedIngredientType_DecisionIsUnknown_NeverMislabeledCurrency`
-  renamed to `UnrecognizedIngredientType_DecisionIsUnrecognizedIngredient_
-  NeverMislabeled` and its assertion updated from `CraftingDecision.
-  Unknown` to `CraftingDecision.UnrecognizedIngredient` (plus a new
-  `Assert.NotEqual(CraftingDecision.Unknown, ...)`), since the decision
-  value itself changed; the two other pre-existing `MysteryIngredientType`
-  tests (`..._NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides`,
-  `..._IgnoresStaleMemoEntry_EvenWhenOneExistsForThisNodeId`) had their
-  `CraftingDecision.Unknown` assertions updated to `CraftingDecision.
-  UnrecognizedIngredient` for the same reason; their actual coverage
-  (Name/IconUrl/Rarity/AcquisitionHint/AcquisitionBadge/SubtreeCost/
-  UnitCost isolation from item-domain collisions) is unchanged. No new
-  test files (`.csproj` unchanged). Item ids remain internal-only in the
-  assertions; no Blish HUD references; every new/changed assertion calls
-  real `CraftingTreeBuilder.BuildTree` and/or `DecisionPillPlanner.
-  BuildPillSpecs` directly, no contract-mirror/fake-logic test.
-
-Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
-errors, no new warnings on any touched file: `Models/CraftingDecision.cs`,
-`Services/CraftingTreeBuilder.cs`, `Services/DecisionPillPlanner.cs`,
-`Views/Rendering/TreeSectionController.cs`). Tests:
-`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
-- 1394 total (1391 + 3 new) - PASS, 0 failed.
-
-**Self-review findings (Code Reviewer Mode, fixed before commit):**
-swept every switch/case and `if (node.Decision == ...)` site over
-`CraftingDecision` project-wide (`grep -rn "case CraftingDecision\."` and
-`CraftingDecision\."`) to confirm no other site silently treats
-`UnrecognizedIngredient` as `Unknown` or falls into a stale default arm -
-`DecisionPillPlanner`'s `AcquisitionSource` switch (`Craft`/`BuyFromTp`/
-`BuyFromVendor` only, with a defensive `default`) is unreachable for this
-value since the new branch returns first, and `PlanContentHeightMath`'s/
-`TreeSectionController`'s own `!= CraftingDecision.Craft` dimming checks
-already treat every non-`Craft` decision uniformly, so they need no
-change. Confirmed no `Enum.IsDefined`/range-validation guard exists
-anywhere on `CraftingTreeNode.Decision` deserialization (matching the
-precedent already set when `GuildUpgrade` was appended in an earlier
-section of this same fix series) - appending `UnrecognizedIngredient`
-strictly additively at the end of the enum is consistent with that
-precedent and does not reopen it. Nice to have, not applied (scope
-discipline): `DecisionPillPlanner`'s `Currency`/`GuildUpgrade`/
-`UnrecognizedIngredient` branches are now three near-identical four-line
-single-locked-pill blocks; a shared private helper
-(`AddSingleLockedPill(specs, text)`) could deduplicate them, but the
-duplication is small, pre-existing (`Currency`/`GuildUpgrade` already
-duplicated each other before this fix), and introducing a new
-abstraction for it is not justified under this repo's "avoid
-infrastructure unless required" efficiency principle for a targeted
-fix - out of scope here, same call made in the immediately preceding
-section for a structurally identical case.
-
-## GuildUpgrade ingredient costing/display fix - orchestrator fix-loop: Gate-line duplication, RecipeService type-guard drift, vendor cost-line classification sibling closed (2026-08-16)
-
-An eighth adversarial pass (external orchestrator review of the whole
-saga above) found three defects: this document's own Gate-line contract
-was broken again by the two immediately preceding sections, a fourth
-Item-positive guard site (`RecipeService.BuildNodeAsync`) was left out
-of the class sweep the rest of this saga performed, and the vendor
-cost-line classification loop this saga never touched has the
-structurally identical silently-drop-unrecognized-type shape the whole
-saga exists to close, in a different domain (`VendorOffer.CostLines[].Type`
-rather than `RecipeNode.IngredientType`/`RawIngredient.Type`). No
-DO-NOT-TOUCH code was touched (`Services/ModuleLog.cs`,
-`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`,
-scroll machinery); `VendorBatchSolver`'s merged-ceil batching math
-(the `unitsNeeded`/scaling arithmetic below the cost-line loop) was
-also left untouched, per the finding's own explicit carve-out - only
-the cost-line classification loop above it was in scope.
-
-**Fixed (Must Fix - deliverable-contract violation, recurrence of the
-defect the "residual class-gap follow-up" section above already fixed
-once): the "pill-layer instance-vs-class gap closed" section immediately
-above this one appended its own `Gate: [PENDING - the orchestrator fills
-in PASS/FAIL]` line without stripping the one already sitting at the end
-of the "Evaluate doc-comment invariant..." section before it, leaving
-two PENDING lines standing in the document at once.** The two sections
-between the original "residual class-gap follow-up" fix and this one
-("unrecognized-type class sweep completion...", "Evaluate doc-comment
-invariant...") had each correctly stripped their own predecessor's Gate
-line before appending a new one, so the single-PENDING-line invariant
-actually held for two more appends after the original fix before the
-"pill-layer" section's append broke it again. A naive string replace
-targeting the literal PENDING marker would have stamped whatever verdict
-was meant only for the latest section onto the superseded one as well -
-the exact hazard the "residual class-gap follow-up" section's own fix
-already exists to prevent. That earlier fix's own wording stated the
-outcome as a standing fact about the document ("leaving exactly one
-PENDING `Gate:` line in the entire document") rather than a per-append
-responsibility every later section must independently uphold, which is
-plausibly why the lapse went uncaught for two appends before it
-recurred. Fixed by stripping the stale `Gate:` line from the "Evaluate
-doc-comment invariant..." section (superseded by the "pill-layer"
-section appended after it) and reworking the earlier "residual
-class-gap follow-up" section's wording from a standing document-wide
-claim to an explicitly commit-scoped one ("...in the document as of
-this commit"), with a new sentence pointing readers at this section as
-the place a later violation was found and fixed - so a future reader of
-that earlier section is told the invariant needs active per-append
-maintenance rather than reading it as a fact that holds forever.
-Exactly one PENDING `Gate:` line now remains in the document: the one
-at the end of this section.
-
-**Fixed (Must Fix - class sweep left a fourth Item-positive guard site
-untouched, reintroducing the exact instance-vs-class drift this whole
-saga exists to eliminate): `RecipeService.BuildNodeAsync`'s guard read
-`if (!string.IsNullOrEmpty(ingredientType) && ingredientType != "Item")`
-- unlike every sibling guard this saga already converted
-(`PlanSolver.Evaluate`/`Collect`/`RecomputeCraftCosts`,
-`CraftingTreeBuilder.BuildNode`, all now flatly `!= "Item"`), a null or
-empty `ingredientType` fell through this guard's `IsNullOrEmpty` clause
-and was treated AS an item - its recipes were searched and its subtree
-fully expanded, exactly like a genuine `"Item"` node.** That is now
-inconsistent with every downstream site: `PlanSolver.Evaluate`'s
-Item-positive top guard treats that same null-typed node as unpriceable
-the moment it is reached (contributes zero to `craftCost`/
-`craftRealCost`, demotes to fallback tier, generates no shopping steps
-for the whole subtree `RecipeService` bothered to build), and
-`CraftingTreeBuilder.BuildNode` renders it as the generic "Unrecognized
-ingredient (unresolved)" leaf with no recursion into the children
-`RecipeService` attached beneath it - so the mismatch does not crash or
-mis-price anything today, it silently discards a real, wiki-verified
-subtree's worth of cost and shopping-list detail. Not reachable with
-today's data (`ref/recipes_seed.json`: 48237 Item / 678 GuildUpgrade /
-195 Currency, 0 missing type; `Gw2RecipeApiClient.cs` defaults a missing
-API `type` string to `"Item"`; `MysticForgeRecipeData.cs` rejects an
-empty `type` outright during ingestion), but `RawIngredient.Type` is a
-plain `string` property with no default, and `RecipeCacheSerializer`
-deserializes seed/overlay `RawRecipe`/`RawIngredient` rows straight
-through `System.Text.Json` with no default-value handling - commit
-e81b7e4 (2026-02-14) shows this exact field WAS null-valued before the
-API-client default was added, so the shape is a real historical
-regression risk, not a hypothetical one. Fixed by inverting the guard to
-match every sibling site: `if (ingredientType != "Item")`, so null,
-empty, and any other non-`"Item"` string all short-circuit to an
-unexpanded leaf node the same way `"Currency"`/`"GuildUpgrade"`/an
-unrecognized type already do, keeping `RecipeService`'s tree-shape
-decision in sync with what `PlanSolver` and `CraftingTreeBuilder` will
-do with that same node afterward.
-
-**Fixed (Must Fix - class, not instance: structurally identical
-unrecognized-cost-line-type sibling in the vendor domain, left open by
-the "Currency sibling icon/rarity leak" section's own exclusion note
-above, which answered only the specific `GuildUpgrade`-vs-`CostLine.Type`
-instance and not the general class): `VendorBatchSolver.EvaluateVendorOffers`'s
-cost-line fold handled `cost.Type == "Currency"` and `else if == "Item"`
-with no final `else` - an unrecognized `CostLine.Type` fell through both
-branches, contributing nothing to `coinCost` and never touching
-`priceable`, so the offer was costed as though that line did not exist
-at all.** Concretely: a vendor offer whose only real cost is an
-unrecognized-type line would price at 0 coin and can win `BuyFromVendor`
-over a correctly-priced TP alternative - an understated, fabricated-low
-price, not a crash, which is the harder-to-notice failure mode.
-`VendorOfferLoader.Load` performs no type validation at load (only a
-null-stream check) and `ref/vendor_offers.json` is tool-scraped from the
-wiki, the same ingestion shape that let `"GuildUpgrade"` reach the
-recipe-ingredient side of this saga in the first place, so a future
-third `CostLine.Type` (today only `"Currency"`/`"Item"` appear in
-practice) reaches this loop directly. Fixed by adding a final `else`
-that mirrors the Item-with-no-price branch immediately above it:
-`priceable = false; break;` - the whole offer is excluded rather than
-priced as if the unrecognized line were absent. The merged-ceil batching
-math below this loop (`unitsNeeded` and everything that scales off it)
-was not touched, per this finding's own explicit DO-NOT-TOUCH carve-out
-- this fix only changes which offers reach that math, never how it
-computes once an offer is deemed priceable.
-
-**Tests (2 net new, real production code paths, no Blish references):**
-`RecipeServiceTests.NullTypedIngredient_BecomesLeaf_RecipeNeverExpanded`
-- feeds `RecipeService.BuildTreeAsync` a real recipe (via
-`InMemoryRecipeApiClient`) whose second ingredient has `Type = null`,
-asserting it lands as an unexpanded leaf (`IsLeaf`, empty `Recipes`) with
-its id/quantity intact rather than being recipe-expanded as an item.
-`PlanSolverVendorOfferTests.VendorOfferWithUnrecognizedCostLineType_TreatedAsUnpriceable_NeverWinsOverTp`
-- gives `PlanSolver.Solve` a real `VendorOffer` whose only `CostLine` has
-an unrecognized `Type` and a real TP price for the same item, asserting
-the plan falls back to `BuyFromTp` at the real price rather than
-`BuyFromVendor` at the fabricated zero. No new test files (`.csproj`
-unchanged - `RecipeServiceTests.cs` and `PlanSolverVendorOfferTests.cs`
-both already existed and are already registered). Item/currency ids
-remain internal-only in both assertions; no Blish HUD references; both
-tests call `RecipeService.BuildTreeAsync`/`PlanSolver.Solve` directly
-against real fixtures (`InMemoryRecipeApiClient`, `RawRecipe`/
-`RawIngredient`, `VendorOffer`/`CostLine`, `ItemPrice`), no
-contract-mirror/fake-logic test.
-
-Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
-errors, only pre-existing StyleCop warnings, none new on
-`Services/RecipeService.cs` or `Services/VendorBatchSolver.cs`). Tests:
-`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
-- 1396 total (1394 + 2 new) - PASS, 0 failed.
-
-**Self-review findings (Code Reviewer Mode, fixed before commit):** swept
-`Services/PlanSolver.cs` and `Services/CraftingTreeBuilder.cs` again for
-any other `IsNullOrEmpty`-style guard on `IngredientType` that the
-earlier class sweeps might have missed alongside `RecipeService`'s (
-`grep -n "IsNullOrEmpty.*[Ii]ngredient\|[Ii]ngredientType.*IsNullOrEmpty"`)
-- no other hit; `RecipeService.BuildNodeAsync` was the only remaining
-non-Item-positive site. Confirmed the `RecipeService` guard change does
-not alter behavior for the two paths that matter most: a genuine
-`"Item"` node still proceeds to `visiting.Add`/recipe search exactly as
-before (guard condition for `"Item"` is `false` either way, old and
-new), and a `"Currency"`/`"GuildUpgrade"`/other-non-empty-non-Item type
-still short-circuits exactly as before (old guard's `!= "Item"` clause
-already caught those; only the null/empty case changed). Confirmed
-`VendorBatchSolver`'s new `else` branch is unreachable for both
-currently-real `CostLine.Type` values (`"Currency"`, `"Item"`) via the
-full test-suite run showing no change in any pre-existing vendor-offer
-test's outcome, and reachable exactly once for the new test's
-deliberately-unrecognized type. Checked whether `CraftingPlanPipeline`'s
-three other `cost.Type ==` loops (`Currency`/`Item` id-prefetch
-collectors for TP prices and currency/item metadata) have the same
-silent-drop hazard - they do not: an unrecognized type there simply adds
-nothing to a prefetch `HashSet`, which is the correct behavior for a
-"gather ids to look up" loop and not the "does this line count toward
-the price" gate `VendorBatchSolver`'s loop is, so those sites were
-correctly left untouched rather than being swept as siblings that do not
-actually share the bug's precondition. No Critical findings. Nice to
-have, not applied (scope discipline): the `RecipeService` test above
-covers `Type = null` but not `Type = ""` (empty string) - the fixed
-guard treats both identically (`!= "Item"` is true for both), and the
-prior guard's own `IsNullOrEmpty` check already proves the code author's
-awareness of the empty-string case, so a second near-duplicate test
-asserting the same code path for a different falsy input was judged
-redundant rather than additive coverage; out of scope for this targeted
-fix. `DecisionPillPlanner`'s `Currency`/`GuildUpgrade`/
-`UnrecognizedIngredient` three-way duplication (noted as a deferred nice
-to have in the immediately preceding section) remains deferred for the
-same reason given there - not part of this finding set, no new
-duplication introduced by this section's own changes.
+1. Initial fix: root-caused the CraftingTreeBuilder mislabel and the
+   PlanSolver.Evaluate special-case gap; added the `GuildUpgrade` enum
+   member/branches; 11 tests.
+2. Adversarial follow-up: corrected a false id-overlap justification and a
+   wrong mis-costing mechanism (vendor-offer path, not TP-price path);
+   closed the GuildUpgrade branch's IconUrl/Rarity leak; 2 tests.
+3. Closed the same IconUrl/Rarity leak for the plain Currency branch (a
+   real seed collision on id 24); 2 tests.
+4. Inverted every guard from an enumerated deny-list to Item-positive
+   (class, not instance); fixed a triplicated Gate line; corrected the
+   original finding's RESOLVED marker to PARTIALLY RESOLVED; 6 tests.
+5. Completed the unrecognized-type leaf's five-field sweep
+   (Name/AcquisitionHint/AcquisitionBadge, not just IconUrl/Rarity);
+   corrected a false "one Gate: line" claim to "one PENDING Gate: line";
+   1 test extended.
+6. Fixed a false memo-contract doc comment on `Evaluate`; hoisted the
+   unrecognized-type catch-all before the decisions lookup so it holds by
+   construction; 1 test.
+7. Gave the unrecognized-type leaf its own `UnrecognizedIngredient`
+   decision (it was sharing `Unknown`, which meant it got a live,
+   clickable IGNORE pill keyed on a non-item id); 3 tests plus 1 rename.
+8. Orchestrator fix-loop: fixed a recurring Gate-line duplication; closed
+   the fourth Item-positive guard site (`RecipeService.BuildNodeAsync`);
+   closed the structurally identical unrecognized-`CostLine.Type` gap in
+   `VendorBatchSolver`; 2 tests.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
