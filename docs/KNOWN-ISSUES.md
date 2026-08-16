@@ -4591,3 +4591,117 @@ infrastructure unless required" efficiency principle - out of scope for
 this targeted fix.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+## GuildUpgrade ingredient costing/display fix - pill-layer instance-vs-class gap closed (2026-08-16)
+
+A seventh adversarial pass (external orchestrator review) found the
+instance-vs-class gap this whole fix series exists to eliminate,
+reintroduced one layer up, in the pill rendering: an unrecognized-
+ingredient-type leaf rendered a LIVE, clickable IGNORE pill keyed on a
+non-item id. No DO-NOT-TOUCH code was touched (`Services/ModuleLog.cs`,
+`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`,
+scroll machinery, `VendorBatchSolver`'s merged-ceil batching math).
+
+**Fixed (Critical - live clickable IGNORE pill reachable on a non-item
+id, the exact bug class this fix series exists to close):
+`CraftingTreeBuilder.BuildNode`'s non-`"Item"` catch-all set
+`CraftingDecision.Unknown`, the SAME value a genuine no-source `"Item"`
+node gets. `DecisionPillPlanner.BuildPillSpecs` cannot tell the two
+`Unknown` cases apart by `Decision` alone, so the unrecognized-type leaf
+took the `options.Count == 0` branch and got `AppendOwnershipPills`'
+unconditional interactive `IGNORE` pill.** `TreeSectionController`'s pill
+click handler reads `node.ItemId` and adds it to the tree-wide
+`_ignoredItemIds` set (`PlanSolver.Evaluate`/`Collect` key strictly by
+numeric item id), so clicking that IGNORE pill either did nothing (no
+`"Item"` node in the tree shares the raw id) or silently zeroed the cost
+of an unrelated genuine `"Item"` node elsewhere in the tree that happened
+to share the same number - persisting past restart via
+`PersistedPlan.IgnoredItemIds`. Separately, the toggle was permanently
+dead either way: `BuildNode`'s Have/`IsIgnored` collapse is scoped to
+`IngredientType == "Item"`, so this node itself can never flip state -
+the user would click a control that visibly does nothing, forever, on
+top of the silent cross-domain zeroing risk. Latent today (the current
+seed data carries only `Item`/`GuildUpgrade`/`Currency` ingredient types,
+and `Gw2RecipeApiClient` defaults a missing type to `"Item"`), but the
+API's ingredient-type string passes through with no allow-list, so a
+future fourth GW2 ingredient type reaches this path directly. Fixed by
+giving this leaf its own `CraftingDecision.UnrecognizedIngredient` value
+(appended LAST in the enum - see its own doc comment for why the ordinal
+position matters) instead of sharing `Unknown`, and adding a matching
+single-locked-pill, no-`IGNORE` short-circuit for it in
+`DecisionPillPlanner.BuildPillSpecs` - the same treatment `Currency` and
+`GuildUpgrade` already get, returning before the `options.Count == 0`
+branch is ever reached. `TreeSectionController`'s Locked-pill tooltip
+switch also gained a matching branch (mirroring its existing
+`Unknown`/`GuildUpgrade` arms) so the new `"UNRECOGNIZED"` pill does not
+fall into the generic-but-misleading `"Only available source"` tooltip
+text (there is no available source here at all).
+
+**Tests (3 net new, 1 renamed for accuracy; real production code paths,
+no Blish references):**
+- `DecisionPillPlannerTests.UnrecognizedIngredient_SingleLockedPill_NotInteractive`
+  and `UnrecognizedIngredient_NeverGetsIgnorePill_EvenWithOwnedQuantityUsed`
+  - direct mirrors of the existing `GuildUpgrade_*` pair, exercising
+  `DecisionPillPlanner.BuildPillSpecs` directly, closing the exact test
+  gap the review named (`GuildUpgrade` had this pair, the unrecognized-
+  type case did not).
+- `CraftingTreeBuilderTests.UnrecognizedIngredientType_NeverGetsIgnorePill_EvenThoughDecisionLooksLikeNoSource`
+  - the direct end-to-end regression test for the finding itself: feeds a
+  `"MysteryIngredientType"` leaf through the real `CraftingTreeBuilder.
+  BuildTree`, then the real `DecisionPillPlanner.BuildPillSpecs` on the
+  resulting node, and asserts exactly one `Locked` `"UNRECOGNIZED"` pill
+  with no `IGNORE` pill anywhere in the result - closing the second gap
+  the review named (the builder's own tests asserted Name/IconUrl/Rarity/
+  AcquisitionHint/AcquisitionBadge but never the resulting pill shape).
+- `UnrecognizedIngredientType_DecisionIsUnknown_NeverMislabeledCurrency`
+  renamed to `UnrecognizedIngredientType_DecisionIsUnrecognizedIngredient_
+  NeverMislabeled` and its assertion updated from `CraftingDecision.
+  Unknown` to `CraftingDecision.UnrecognizedIngredient` (plus a new
+  `Assert.NotEqual(CraftingDecision.Unknown, ...)`), since the decision
+  value itself changed; the two other pre-existing `MysteryIngredientType`
+  tests (`..._NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides`,
+  `..._IgnoresStaleMemoEntry_EvenWhenOneExistsForThisNodeId`) had their
+  `CraftingDecision.Unknown` assertions updated to `CraftingDecision.
+  UnrecognizedIngredient` for the same reason; their actual coverage
+  (Name/IconUrl/Rarity/AcquisitionHint/AcquisitionBadge/SubtreeCost/
+  UnitCost isolation from item-domain collisions) is unchanged. No new
+  test files (`.csproj` unchanged). Item ids remain internal-only in the
+  assertions; no Blish HUD references; every new/changed assertion calls
+  real `CraftingTreeBuilder.BuildTree` and/or `DecisionPillPlanner.
+  BuildPillSpecs` directly, no contract-mirror/fake-logic test.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
+errors, no new warnings on any touched file: `Models/CraftingDecision.cs`,
+`Services/CraftingTreeBuilder.cs`, `Services/DecisionPillPlanner.cs`,
+`Views/Rendering/TreeSectionController.cs`). Tests:
+`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+- 1394 total (1391 + 3 new) - PASS, 0 failed.
+
+**Self-review findings (Code Reviewer Mode, fixed before commit):**
+swept every switch/case and `if (node.Decision == ...)` site over
+`CraftingDecision` project-wide (`grep -rn "case CraftingDecision\."` and
+`CraftingDecision\."`) to confirm no other site silently treats
+`UnrecognizedIngredient` as `Unknown` or falls into a stale default arm -
+`DecisionPillPlanner`'s `AcquisitionSource` switch (`Craft`/`BuyFromTp`/
+`BuyFromVendor` only, with a defensive `default`) is unreachable for this
+value since the new branch returns first, and `PlanContentHeightMath`'s/
+`TreeSectionController`'s own `!= CraftingDecision.Craft` dimming checks
+already treat every non-`Craft` decision uniformly, so they need no
+change. Confirmed no `Enum.IsDefined`/range-validation guard exists
+anywhere on `CraftingTreeNode.Decision` deserialization (matching the
+precedent already set when `GuildUpgrade` was appended in an earlier
+section of this same fix series) - appending `UnrecognizedIngredient`
+strictly additively at the end of the enum is consistent with that
+precedent and does not reopen it. Nice to have, not applied (scope
+discipline): `DecisionPillPlanner`'s `Currency`/`GuildUpgrade`/
+`UnrecognizedIngredient` branches are now three near-identical four-line
+single-locked-pill blocks; a shared private helper
+(`AddSingleLockedPill(specs, text)`) could deduplicate them, but the
+duplication is small, pre-existing (`Currency`/`GuildUpgrade` already
+duplicated each other before this fix), and introducing a new
+abstraction for it is not justified under this repo's "avoid
+infrastructure unless required" efficiency principle for a targeted
+fix - out of scope here, same call made in the immediately preceding
+section for a structurally identical case.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]

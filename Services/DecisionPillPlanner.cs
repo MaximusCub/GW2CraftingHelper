@@ -67,10 +67,13 @@ namespace GW2CraftingHelper.Services
         /// One pill per feasible acquisition source: 2-3 pills means a real
         /// choice, exactly 1 pill means the source is locked - the pill
         /// count itself is the affordance. HAVE/CURRENCY/GUILD UPGRADE/
-        /// UNKNOWN are always single, non-interactive pills (no
-        /// AcquisitionSource value represents "force use owned materials"
-        /// or "resolve this guild upgrade", so there is nothing to
-        /// override to).
+        /// UNRECOGNIZED are always single, non-interactive pills (no
+        /// AcquisitionSource value represents "force use owned materials",
+        /// "resolve this guild upgrade", or "acquire this unrecognized
+        /// ingredient type", so there is nothing to override to). UNKNOWN
+        /// (a genuine no-source "Item" node) is the sole exception among the
+        /// "locked" group - see AppendOwnershipPills for why it alone also
+        /// gets the interactive IGNORE toggle.
         ///
         /// The selected pill (Kind == Selected, or the sole Locked pill
         /// when there is only one option) always matches node.Decision -
@@ -172,6 +175,25 @@ namespace GW2CraftingHelper.Services
             if (node.Decision == CraftingDecision.GuildUpgrade)
             {
                 specs.Add(new PillSpec("GUILD UPGRADE", null, PillKind.Locked));
+                return specs;
+            }
+            // Adversarial-review fix (guildupgrade-ingredients, second
+            // pass): a distinct locked pill from UNKNOWN below - see
+            // CraftingDecision.UnrecognizedIngredient's own doc comment for
+            // why the two must not share a Decision value. Before this fix,
+            // an unrecognized-ingredient-type leaf shared CraftingDecision.
+            // Unknown with a genuine no-source "Item" node, fell into the
+            // options.Count == 0 branch below, and picked up an interactive
+            // IGNORE pill via AppendOwnershipPills - clickable, but keyed by
+            // TreeSectionController on this node's raw non-item ItemId, so
+            // it either did nothing (no matching "Item" node shares that id)
+            // or silently zeroed an unrelated "Item" node's cost tree-wide
+            // (a matching id does exist elsewhere). Short-circuiting here,
+            // same as GuildUpgrade/Currency above, means this leaf can never
+            // reach that branch and never gets the IGNORE pill at all.
+            if (node.Decision == CraftingDecision.UnrecognizedIngredient)
+            {
+                specs.Add(new PillSpec("UNRECOGNIZED", null, PillKind.Locked));
                 return specs;
             }
 

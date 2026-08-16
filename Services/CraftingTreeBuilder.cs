@@ -185,11 +185,12 @@ namespace GW2CraftingHelper.Services
             // an Item" - the exact wrong-domain mislabel this fix's own
             // GuildUpgrade branch above was written to avoid, just one
             // catch-all wider. An ingredient type that is neither "Item",
-            // "GuildUpgrade", nor "Currency" now falls through to the
-            // Unknown-with-hint leaf just below instead (matching
-            // PlanSolver's identical Item-positive fix in Evaluate/Collect/
-            // RecomputeCraftCosts, so a type this builder cannot display
-            // meaningfully also carries no memo entry to look up there).
+            // "GuildUpgrade", nor "Currency" now falls through to its own
+            // dedicated CraftingDecision.UnrecognizedIngredient leaf just
+            // below instead (matching PlanSolver's identical Item-positive
+            // fix in Evaluate/Collect/RecomputeCraftCosts, so a type this
+            // builder cannot display meaningfully also carries no memo
+            // entry to look up there).
             if (node.IngredientType == "Currency")
             {
                 treeNode.Decision = CraftingDecision.Currency;
@@ -232,9 +233,33 @@ namespace GW2CraftingHelper.Services
             // acquisition text, and its badge (the literal pill text
             // DecisionPillPlanner renders), on a node this builder never
             // identified as that item.
+            //
+            // Adversarial-review fix (guildupgrade-ingredients, second
+            // pass): this used to set CraftingDecision.Unknown here, the
+            // SAME value a genuine no-source "Item" node gets when
+            // `decisions` has no entry for it below. CraftingTreeNode.ItemId
+            // on THIS node is a raw non-item id (a currency-adjacent or
+            // future-API id, not a real item id), but
+            // DecisionPillPlanner.BuildPillSpecs cannot tell the two Unknown
+            // cases apart - both took its "no feasible source" branch and
+            // got the interactive IGNORE pill, keyed by TreeSectionController
+            // on this same non-item ItemId. Clicking it did nothing for THIS
+            // node (CraftingTreeBuilder's Have/IsIgnored collapse above is
+            // scoped to IngredientType == "Item" and can never match this
+            // node's own type again), yet silently added that raw id to the
+            // tree-wide ignoredItemIds set PlanSolver keys purely by numeric
+            // item id - zeroing the cost of any genuine "Item" node
+            // elsewhere in the tree that happened to share the same number,
+            // and persisting past restart via PersistedPlan.IgnoredItemIds.
+            // A dedicated CraftingDecision.UnrecognizedIngredient value (see
+            // that enum member's own doc comment) gives this leaf its own
+            // signal so DecisionPillPlanner can route it to the same
+            // single-locked-pill, no-IGNORE short-circuit Currency and
+            // GuildUpgrade already get above, instead of falling into the
+            // no-options branch that assumes a genuine "Item" node.
             if (node.IngredientType != "Item")
             {
-                treeNode.Decision = CraftingDecision.Unknown;
+                treeNode.Decision = CraftingDecision.UnrecognizedIngredient;
                 treeNode.Name = "Unrecognized ingredient (unresolved)";
                 treeNode.IconUrl = null;
                 treeNode.Rarity = null;

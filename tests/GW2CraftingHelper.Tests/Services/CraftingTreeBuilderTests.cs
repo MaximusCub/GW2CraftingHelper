@@ -595,13 +595,25 @@ namespace GW2CraftingHelper.Tests.Services
         // as CraftingDecision.Currency via CurrencyDisplayResolver - the
         // exact wrong-domain mislabel the GuildUpgrade branch above exists
         // to avoid, just one catch-all wider. It is now scoped to the
-        // literal string "Currency"; anything else falls through to the
-        // Unknown-with-hint leaf. These tests use a made-up type string
-        // ("MysteryIngredientType") to prove the general fallthrough, not
-        // just the "GuildUpgrade" instance covered above.
+        // literal string "Currency"; anything else falls through to its own
+        // dedicated CraftingDecision.UnrecognizedIngredient leaf. These
+        // tests use a made-up type string ("MysteryIngredientType") to
+        // prove the general fallthrough, not just the "GuildUpgrade"
+        // instance covered above.
+        //
+        // Second adversarial-review pass: this leaf used to share
+        // CraftingDecision.Unknown with a genuine no-source "Item" node,
+        // which meant it also picked up DecisionPillPlanner's interactive
+        // IGNORE pill - keyed by TreeSectionController on this node's raw
+        // non-item ItemId, reopening the exact instance-vs-class id-space
+        // gap this whole fix exists to close, one layer up in the pill
+        // rendering. See CraftingDecision.UnrecognizedIngredient's own doc
+        // comment for the full explanation; UnrecognizedIngredientType_
+        // NeverGetsIgnorePill_EvenThoughDecisionLooksLikeNoSource below is
+        // the direct regression test for that finding.
 
         [Fact]
-        public void UnrecognizedIngredientType_DecisionIsUnknown_NeverMislabeledCurrency()
+        public void UnrecognizedIngredientType_DecisionIsUnrecognizedIngredient_NeverMislabeled()
         {
             var node = Leaf(829, 5, "MysteryIngredientType");
             node.NodeId = 0;
@@ -611,9 +623,37 @@ namespace GW2CraftingHelper.Tests.Services
             var builder = new CraftingTreeBuilder();
             var treeNode = builder.BuildTree(node, decisions, metadata);
 
-            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Equal(CraftingDecision.UnrecognizedIngredient, treeNode.Decision);
             Assert.NotEqual(CraftingDecision.Currency, treeNode.Decision);
             Assert.NotEqual(CraftingDecision.GuildUpgrade, treeNode.Decision);
+            Assert.NotEqual(CraftingDecision.Unknown, treeNode.Decision);
+        }
+
+        [Fact]
+        public void UnrecognizedIngredientType_NeverGetsIgnorePill_EvenThoughDecisionLooksLikeNoSource()
+        {
+            // Direct regression test for the reintroduced instance-vs-class
+            // gap: DecisionPillPlanner.BuildPillSpecs must route this node
+            // to the same single-locked-pill short-circuit Currency and
+            // GuildUpgrade get, never the options.Count == 0 branch that
+            // appends the interactive IGNORE pill for a genuine no-source
+            // "Item" node. Exercises the real production path end to end -
+            // CraftingTreeBuilder.BuildTree feeding directly into
+            // DecisionPillPlanner.BuildPillSpecs on the resulting node.
+            var node = Leaf(829, 5, "MysteryIngredientType");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+            var specs = DecisionPillPlanner.BuildPillSpecs(treeNode);
+
+            Assert.Single(specs);
+            Assert.Equal("UNRECOGNIZED", specs[0].Text);
+            Assert.Equal(PillKind.Locked, specs[0].Kind);
+            Assert.Null(specs[0].Source);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Ignore);
         }
 
         [Fact]
@@ -628,11 +668,12 @@ namespace GW2CraftingHelper.Tests.Services
             // Name, IconUrl, Rarity, AcquisitionHint and AcquisitionBadge
             // must ALL stay clear of the item-keyed lookups set earlier in
             // BuildNode / ApplyAcquisitionHint, even though this type falls
-            // through to the generic Unknown leaf rather than a dedicated
-            // branch - a collision leaking any one of the five would put an
-            // unrelated item's data (including its badge, the literal pill
-            // text DecisionPillPlanner renders) on a node this builder
-            // never identified as that item.
+            // through to its own dedicated UnrecognizedIngredient leaf
+            // rather than the ITEM-domain decision-found path - a collision
+            // leaking any one of the five would put an unrelated item's
+            // data (including its badge, the literal pill text
+            // DecisionPillPlanner renders) on a node this builder never
+            // identified as that item.
             var node = Leaf(829, 5, "MysteryIngredientType");
             node.NodeId = 0;
             var decisions = new Dictionary<int, SolverDecision>();
@@ -648,7 +689,7 @@ namespace GW2CraftingHelper.Tests.Services
             var builder = new CraftingTreeBuilder();
             var treeNode = builder.BuildTree(node, decisions, metadata, hints);
 
-            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Equal(CraftingDecision.UnrecognizedIngredient, treeNode.Decision);
             Assert.Equal("Unrecognized ingredient (unresolved)", treeNode.Name);
             Assert.Null(treeNode.IconUrl);
             Assert.Null(treeNode.Rarity);
@@ -670,10 +711,11 @@ namespace GW2CraftingHelper.Tests.Services
             // - cannot occur via the real solver right now. This test
             // proves the guard holds by this method's OWN construction
             // regardless: even when handed a decision for this exact
-            // NodeId, the node must still take the Unknown/"Unrecognized
-            // ingredient" leaf, never the decision-found path's ITEM-domain
-            // Name/IconUrl/Rarity - the same guarantee the GuildUpgrade and
-            // Currency branches already give their own known types.
+            // NodeId, the node must still take the UnrecognizedIngredient/
+            // "Unrecognized ingredient" leaf, never the decision-found
+            // path's ITEM-domain Name/IconUrl/Rarity - the same guarantee
+            // the GuildUpgrade and Currency branches already give their own
+            // known types.
             var node = Leaf(829, 5, "MysteryIngredientType");
             node.NodeId = 0;
             var decisions = new Dictionary<int, SolverDecision>
@@ -688,7 +730,7 @@ namespace GW2CraftingHelper.Tests.Services
             var builder = new CraftingTreeBuilder();
             var treeNode = builder.BuildTree(node, decisions, metadata);
 
-            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.Equal(CraftingDecision.UnrecognizedIngredient, treeNode.Decision);
             Assert.NotEqual(CraftingDecision.BuyFromTp, treeNode.Decision);
             Assert.Equal("Unrecognized ingredient (unresolved)", treeNode.Name);
             Assert.Null(treeNode.IconUrl);

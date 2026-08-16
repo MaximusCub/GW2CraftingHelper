@@ -1128,6 +1128,20 @@ namespace GW2CraftingHelper.Views.Rendering
                             ? node.AcquisitionHint
                             : "Requires a claimed Guild Hall upgrade";
                     }
+                    // Adversarial-review fix (guildupgrade-ingredients,
+                    // second pass): the UNRECOGNIZED pill (node.Decision ==
+                    // UnrecognizedIngredient - an ingredient type this
+                    // module does not recognize at all) is the same
+                    // "no available source" situation as UNKNOWN/GUILD
+                    // UPGRADE above, not "exactly one feasible source" -
+                    // without this branch it fell into the misleading
+                    // "Only available source" default below.
+                    else if (node.Decision == CraftingDecision.UnrecognizedIngredient)
+                    {
+                        tooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
+                            ? node.AcquisitionHint
+                            : "Unrecognized ingredient type - no known acquisition source";
+                    }
                     else
                     {
                         tooltipText = "Only available source";

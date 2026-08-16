@@ -205,6 +205,44 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
         }
 
+        // ---- guildupgrade-ingredients fix, second adversarial-review
+        // pass: "UnrecognizedIngredient" is its own Decision value now,
+        // distinct from Unknown, specifically so it takes this same locked
+        // single-pill short-circuit instead of falling into the
+        // options.Count == 0 branch below and picking up the interactive
+        // IGNORE pill - see CraftingDecision.UnrecognizedIngredient's own
+        // doc comment for the full explanation of the bug this closes. ----
+
+        [Fact]
+        public void UnrecognizedIngredient_SingleLockedPill_NotInteractive()
+        {
+            var node = Node(CraftingDecision.UnrecognizedIngredient);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.Equal("UNRECOGNIZED", specs[0].Text);
+            Assert.Equal(PillKind.Locked, specs[0].Kind);
+            Assert.Null(specs[0].Source);
+        }
+
+        [Fact]
+        public void UnrecognizedIngredient_NeverGetsIgnorePill_EvenWithOwnedQuantityUsed()
+        {
+            // Mirrors GuildUpgrade_NeverGetsIgnorePill_EvenWithOwnedQuantityUsed.
+            // This is the direct regression test for the reintroduced
+            // instance-vs-class gap: before the fix, this Decision value
+            // did not exist and this node shared CraftingDecision.Unknown
+            // with a genuine no-source "Item" node, so it fell into the
+            // options.Count == 0 branch and got a live, clickable IGNORE
+            // pill keyed on a non-item id.
+            var node = Node(CraftingDecision.UnrecognizedIngredient, ownedQuantityUsed: 5);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Single(specs);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Ignore);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
+        }
+
         // --- (F,F,F): no feasible source at all ---
 
         [Fact]
