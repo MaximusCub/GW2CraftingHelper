@@ -116,6 +116,7 @@
     <Compile Include="Models\ItemMetadata.cs" />
     <Compile Include="Models\CurrencyMetadata.cs" />
     <Compile Include="Models\CraftingPlanResult.cs" />
+    <Compile Include="Models\ExcessCraftOutput.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />

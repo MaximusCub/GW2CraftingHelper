@@ -11,6 +11,18 @@ namespace GW2CraftingHelper.Models
         RequiredDisciplines,
         RequiredRecipes,
 
+        // Plan Notes (single flat advisory section, Option 1 of
+        // design-plan-notes.md): excess/reclaim, competency gaps, and the
+        // Mystic-Clover-yield forge-scope caveat, in that fixed order - see
+        // PlanViewModelBuilder.BuildNotesSection. Always last (Build()'s
+        // section 7) since every note kind is a caveat ABOUT facts shown in
+        // an earlier section. No PlanContentHeightMath case is added for
+        // this type on purpose - it falls through to that method's existing
+        // default arm (rows.Count * FallbackTextRowHeight), which is
+        // already correct as long as every NoteLine row renders at exactly
+        // that height (see NotesSectionRenderer's own doc comment).
+        Notes,
+
         // Not a member of PlanViewModel.Sections (the tree renders from
         // PlanViewModel.TreeRoot, not a row list) - used only as a
         // dictionary key so its header expansion persists like every
@@ -92,7 +104,19 @@ namespace GW2CraftingHelper.Models
         // W4A: the Total Cost section's single subdued trading-post
         // pricing-basis footnote row, always present exactly once at the
         // bottom of the section.
-        SummaryFootnote
+        SummaryFootnote,
+
+        // design-plan-notes.md (Notes section, Option 1): the one shared
+        // row shape for every line in PlanSectionType.Notes - excess/
+        // reclaim, competency, and forge-scope lines all use this single
+        // member rather than one row type per note kind. Label carries the
+        // full self-describing sentence; CoinValue is 0 for a plain-text
+        // line (competency, forge-scope) and > 0 for an excess-item or
+        // total line - NotesSectionRenderer draws a right-aligned coin cell
+        // only when CoinValue > 0, mirroring CoinCurrencyRenderer's own
+        // "hasCoin = copper > 0" convention. Never carries StatusTag/
+        // BadgeText (no pills in this section, per the brief).
+        NoteLine
     }
 
     public class PlanViewModel

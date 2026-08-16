@@ -63,6 +63,19 @@ namespace GW2CraftingHelper.Models
         public bool CanBuyVendor { get; set; }
 
         public int? RecipeId { get; set; }
+
+        // design-plan-notes.md (Notes section, excess/reclaim): batch shape
+        // of the chosen recipe at this exact tree occurrence (gw2e-
+        // considerations.md #4) - CraftsNeeded * RecipeOutputCount is what
+        // this craft actually produces, which can exceed Quantity (this
+        // node's own real demand) when the batch doesn't divide evenly. Set
+        // only for Decision == Craft nodes (CraftingTreeBuilder.BuildNode,
+        // straight from the chosen RecipeOption); null for every other
+        // decision. Read by ExcessCraftOutputCalculator to aggregate
+        // sellable/stranded surplus - never fed back into any cost or total.
+        public int? CraftsNeeded { get; set; }
+        public int? RecipeOutputCount { get; set; }
+
         public long? UnitCost { get; set; }
         public long? SubtreeCost { get; set; }
 
