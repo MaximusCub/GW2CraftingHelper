@@ -4424,9 +4424,24 @@ fix below, not a regression):
   `UnreducedTree` whenever the pre-pass ran, roughly doubling the
   tree-shaped portion of a Valued-mode-with-snapshot plan's persisted
   JSON (Metadata/Prices/VendorOffers are unaffected - same reference,
-  not duplicated). Not measured against a real large tree; accepted as
-  the cost of correctness on this path, not optimized.
-- `MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostIsWholeTreeSum`:
+  not duplicated). It also carries `AccountItems` - the raw owned-item
+  list `ResolveWithOverrides` rebuilds its `AccountItemIndex` from -
+  which the original entry above omitted entirely; for a real account
+  this list is plausibly thousands of entries, dwarfing the tree-shaped
+  cost. **Post-review fix**: `AccountItems` is now projected down to
+  the three fields `AccountItemIndex`'s constructor actually reads
+  (`ItemId`/`Count`/`Source`) before being captured -
+  `SnapshotItemEntry.Name`/`IconUrl` (a full render-service URL) were
+  dead weight nobody downstream of `PlanSolveContext` reads. Still
+  O(account item count)
+  bytes, not O(tree size); not measured against a real large account,
+  and gzip in `PlanStore.Save` mitigates on-disk size but not
+  serialize/deserialize CPU. Accepted as the cost of correctness on
+  this path, not further optimized.
+- `MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostNullForBoughtRootOwnedIngredient`
+  (**post-review rename** - the original name,
+  `..._MaterialOpportunityCostIsWholeTreeSum`, no longer matched what the
+  test asserts once the fix below landed):
   `MaterialOpportunityCost` changed from a non-zero phantom credit to
   `null` throughout (standalone and batch) - the bought root's owned
   craft ingredient is no longer phantom-consumed, directly closing the
@@ -4500,6 +4515,39 @@ No cross-call memoization exists in `PlanSolver` today (a fresh
 `Dictionary` every call), so this cost is linear in tree size and would
 scale accordingly on a substantially larger tree than tested here.
 
+**Perf spot-check #2 (post-review, VOM finding #3)**: the spot-check
+above measures only the GENERATION path (async, off the UI thread). The
+more latency-sensitive path is `ResolveWithOverrides`, reached
+synchronously on the MAIN thread by every override pill click (see
+`Module.cs`'s own doc comment on that wiring). Measured the same way
+(temporary, non-committed `--profile-resolve` flag added to
+`tools/GW2CraftingHelper.Harness`, reverted immediately after
+measurement - `git status` confirmed clean before this milestone's
+final commit), 200 iterations, same Exordium tree, Valued mode +
+snapshot (so every click re-runs the guideSolve + re-reduction path -
+see `PlanSolveContext.UnreducedTree`'s doc comment):
+
+- `ResolveWithOverrides` median: ~15-16ms per click (empty-but-non-item
+  snapshot and a 5000-synthetic-item snapshot measured the same,
+  post-cache - see below). Roughly 2-3x a single generation-path
+  `Solve()` call's own ~5-6ms, consistent with the design doing a
+  guideSolve + `_reducer.Reduce` + the real `Solve()` per click, on top
+  of the pre-existing force-buy-diagnostics solve already inside
+  `GenerateStructuredAsync` (not repeated per click).
+- `AccountItemIndex`'s own constructor, isolated: ~2.05ms per build for
+  5000 synthetic entries (`Bank`-sourced, one call per iteration) - a
+  real account's item list is plausibly this size (see finding #2's
+  cost note above). **Fix applied**: `CraftingPlanPipeline` now caches
+  the built `AccountItemIndex` keyed by reference equality on the
+  `PlanSolveContext` (see `GetOrBuildAccountItemIndex`'s doc comment) -
+  a restored/generated context's `AccountItems` list never changes
+  underneath it, so every click after the first against the same
+  context skips this ~2ms rebuild entirely, rather than paying it on
+  every single pill click. Not measured as a percentage of total click
+  latency across a range of account sizes; the isolated 2.05ms figure
+  above is the concrete number the cache removes from the repeat-click
+  path.
+
 **Known residual (post-review, not guarded/tested)**: the decision-
 invariance guarantee above is narrower than earlier drafts of this
 entry (and `InventoryReducer`'s own doc comments) claimed. The guide
@@ -4526,11 +4574,16 @@ themselves - a real design change, not a small guard.
 Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - clean,
 0 errors (StyleCop warning count unchanged from before this milestone -
 every edited file already carried pre-existing warnings of the same
-codes, no new ones introduced by this change's own lines). Tests: 1420
+codes, no new ones introduced by this change's own lines). Tests: 1425
 passed, 0 failed (`dotnet test
-tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`) - 1410
-baseline + 10 new (7 `InventoryReducerTests` + 2
-`CraftingPlanPipelineTests` + 1 `PlanStoreTests`). No Blish HUD/
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`)
+(**post-review correction**: this entry originally claimed 1420
+passed / 10 new, written before commit 582a44a and never refreshed -
+measured on HEAD it is 1410 baseline + 15 new: 10 `InventoryReducerTests`
+[5 flat + 5 `Sourced_`, including the two StaleRecipeIdInGuide pins] + 3
+`CraftingPlanPipelineTests` [including
+`Structured_FreeMode_CompetingRecipeOptions_PrimaryOptionOwnedStockFlipsChoice`]
++ 1 `MultiItemPlanTests` + 1 `PlanStoreTests` = 1425). No Blish HUD/
 BlishHUD.exe references in any test file; every test exercises a real
 production entry point (`InventoryReducer.Reduce`,
 `CraftingPlanPipeline.GenerateStructuredAsync`/
@@ -4545,5 +4598,31 @@ x=350, clear of the price-basis dropdown ending at x=328 and the
 right-anchored Generate button even at the window's 930x710 minimum
 size) was verified by inspection of `ComputeTopRegionLayout`'s
 constants only, not a live screenshot.
+
+**Post-review fix pass (VOM findings #1-3 + nice-to-haves)**: fixed the
+`PlanStructuralValidator` gap for `UnreducedTree`/`AccountItems` (finding
+#1, three new `PlanStoreTests` facts pinning the `UnreducedTree.Recipes`-
+null case, the `AccountItems` null-entry case, and the bonus
+`UnreducedTree`-set-but-`AccountItems`-null pair check); projected
+`PlanSolveContext.AccountItems` down to the three fields
+`AccountItemIndex` actually reads before capture, and corrected this
+entry's own "Cost note" to mention `AccountItems` at all (finding #2);
+measured and documented the `ResolveWithOverrides` UI-thread click path
+(see the new Perf spot-check #2 above) and added an `AccountItemIndex`
+cache keyed by `PlanSolveContext` reference equality so a repeat click
+against the same restored/generated plan skips rebuilding it (finding
+#3). Nice-to-haves also taken: renamed the now-misleadingly-named
+`MultiItemPlanTests` fact; corrected this section's own stale test count
+(above); fixed the one non-ASCII byte in `InventoryReducerTests.cs`;
+seeded `CraftingPlanView._valueOwnMaterials` from
+`ModuleSettings.ValueOwnMaterials` at construction so a user's prior
+choice survives a module reload instead of always resetting to Valued;
+widened the "Value Own Materials" checkbox's tooltip to also mention the
+15% force-buy guard and the `MaterialOpportunityCost` deduction it
+gates; added a comment on `ResolveWithOverrides`' stale
+`context.Tree`/`UsedMaterials`/`OwnedQuantityUsedByNodeId` after a
+re-reducing re-solve. Build: `dotnet build GW2CraftingHelper.csproj
+-p:Platform=x64` - clean, 0 errors. Tests: 1428 passed, 0 failed (1425
++ the 3 new `PlanStoreTests` facts above).
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
