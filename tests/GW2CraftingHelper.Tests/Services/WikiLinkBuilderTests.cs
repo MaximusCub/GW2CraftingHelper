@@ -112,5 +112,98 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal("https://wiki.guildwars2.com/wiki/Recipe:_Zojja%27s_Claymore", url);
         }
+
+        // --- Sentinel/placeholder names (fix-pass: dead-link suppression) ---
+        // Every one of these is a real, literal name-resolution fallback
+        // used elsewhere in the module (see WikiLinkBuilder's SentinelNames
+        // doc comment for each source) - none of them names a real wiki
+        // page, so every BuildXxxUrl method must return null for all four
+        // rather than construct a guaranteed-404 URL.
+
+        [Theory]
+        [InlineData("Unknown Item")]
+        [InlineData("Guild upgrade (unresolved)")]
+        [InlineData("Unrecognized ingredient type")]
+        [InlineData("Currency")]
+        public void BuildItemPageUrl_SentinelName_ReturnsNull(string sentinelName)
+        {
+            Assert.Null(WikiLinkBuilder.BuildItemPageUrl(sentinelName));
+        }
+
+        [Theory]
+        [InlineData("Unknown Item")]
+        [InlineData("Guild upgrade (unresolved)")]
+        [InlineData("Unrecognized ingredient type")]
+        [InlineData("Currency")]
+        public void BuildItemAcquisitionUrl_SentinelName_ReturnsNull(string sentinelName)
+        {
+            Assert.Null(WikiLinkBuilder.BuildItemAcquisitionUrl(sentinelName));
+        }
+
+        [Theory]
+        [InlineData("Unknown Item")]
+        [InlineData("Guild upgrade (unresolved)")]
+        [InlineData("Unrecognized ingredient type")]
+        [InlineData("Currency")]
+        public void BuildRecipeSheetUrl_SentinelName_ReturnsNull(string sentinelName)
+        {
+            Assert.Null(WikiLinkBuilder.BuildRecipeSheetUrl(sentinelName));
+        }
+
+        [Theory]
+        [InlineData("Unknown Item")]
+        [InlineData("Guild upgrade (unresolved)")]
+        [InlineData("Unrecognized ingredient type")]
+        [InlineData("Currency")]
+        public void BuildRequiredRecipeUrl_SentinelName_ReturnsNull_RegardlessOfLearnedFlag(string sentinelName)
+        {
+            Assert.Null(WikiLinkBuilder.BuildRequiredRecipeUrl(sentinelName, isLearnedFromItem: true));
+            Assert.Null(WikiLinkBuilder.BuildRequiredRecipeUrl(sentinelName, isLearnedFromItem: false));
+        }
+
+        [Fact]
+        public void BuildItemPageUrl_SentinelNameWithSurroundingWhitespace_StillReturnsNull()
+        {
+            Assert.Null(WikiLinkBuilder.BuildItemPageUrl("  Unknown Item  "));
+        }
+
+        // --- HasWikiPage (cheap render-path pre-check) ---
+
+        [Fact]
+        public void HasWikiPage_RealName_ReturnsTrue()
+        {
+            Assert.True(WikiLinkBuilder.HasWikiPage("Bolt of Damask"));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void HasWikiPage_NullOrBlank_ReturnsFalse(string itemName)
+        {
+            Assert.False(WikiLinkBuilder.HasWikiPage(itemName));
+        }
+
+        [Theory]
+        [InlineData("Unknown Item")]
+        [InlineData("Guild upgrade (unresolved)")]
+        [InlineData("Unrecognized ingredient type")]
+        [InlineData("Currency")]
+        public void HasWikiPage_SentinelName_ReturnsFalse(string sentinelName)
+        {
+            Assert.False(WikiLinkBuilder.HasWikiPage(sentinelName));
+        }
+
+        [Fact]
+        public void HasWikiPage_AgreesWithBuildItemPageUrl_ForRealName()
+        {
+            // The whole point of the pre-check is that callers can trust it
+            // to predict BuildItemPageUrl's null-vs-non-null outcome
+            // without paying for the real URL construction - assert the two
+            // never disagree for a realistic input.
+            Assert.Equal(
+                WikiLinkBuilder.BuildItemPageUrl("Bolt of Damask") != null,
+                WikiLinkBuilder.HasWikiPage("Bolt of Damask"));
+        }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Services
 {
@@ -22,6 +23,18 @@ namespace GW2CraftingHelper.Services
     /// environment, etc.); a wiki-link click must never crash or otherwise
     /// disrupt the Blish HUD overlay it was clicked from.
     /// </para>
+    /// <para>
+    /// Fix-pass (UI-thread stall): both call sites are mouse-event handlers
+    /// dispatched from the game update loop, and ShellExecuteEx blocks the
+    /// calling thread until the shell hands the URL off - a cold browser
+    /// start, DDE negotiation, or a "choose an app" prompt can stall that
+    /// call for hundreds of ms to seconds, freezing the whole overlay
+    /// (scroll/relayout included) for as long as it runs. The actual
+    /// Process.Start call is therefore offloaded to a background thread via
+    /// Task.Run; the try/catch stays INSIDE the task (not wrapped around
+    /// Task.Run itself) so a launch failure is still caught and logged here
+    /// rather than becoming an unobserved task exception.
+    /// </para>
     /// </summary>
     public static class WikiLinkLauncher
     {
@@ -32,19 +45,22 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            try
+            Task.Run(() =>
             {
-                Process.Start(url);
-            }
-            catch (Exception ex)
-            {
-                // Services/ convention (see grep across this directory): no
-                // Blish_HUD.Logger dependency here - ModuleLog.Shared is
-                // this module's own Blish-free logging sink, already used
-                // for the same "warn and keep going" shape elsewhere (e.g.
-                // MainView.RefreshNowAsync's failure branch).
-                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "wiki", $"Failed to open wiki link: {ex.GetType().Name} - {ex.Message}");
-            }
+                try
+                {
+                    Process.Start(url);
+                }
+                catch (Exception ex)
+                {
+                    // Services/ convention (see grep across this directory): no
+                    // Blish_HUD.Logger dependency here - ModuleLog.Shared is
+                    // this module's own Blish-free logging sink, already used
+                    // for the same "warn and keep going" shape elsewhere (e.g.
+                    // MainView.RefreshNowAsync's failure branch).
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "wiki", $"Failed to open wiki link: {ex.GetType().Name} - {ex.Message}");
+                }
+            });
         }
     }
 }

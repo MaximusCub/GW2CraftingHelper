@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Services
 {
@@ -28,6 +29,30 @@ namespace GW2CraftingHelper.Services
         private const string RecipeNamespacePrefix = "Recipe:_";
         private const string AcquisitionAnchor = "#Acquisition";
 
+        // Fix-pass (dead-link placeholder names): every one of these is a
+        // literal, exact-string name-resolution fallback used elsewhere in
+        // this module when the real name could not be resolved -
+        // CraftingTreeBuilder.ResolveName ("Unknown Item"), the
+        // GuildUpgrade branch ("Guild upgrade (unresolved)"), the
+        // non-Item/non-Currency branch ("Unrecognized ingredient type"),
+        // Gw2Constants.ResolveCurrencyName's unknown-id fallback
+        // ("Currency"), and PlanViewModelBuilder.ResolveName ("Unknown
+        // Item" again). None of these describe a real wiki page - a row
+        // carrying one of them still advertises "Right-click: Open wiki
+        // page" and, on click, opens a guaranteed-404 URL while stealing
+        // focus into the browser. Centralized here (rather than at each of
+        // the several call sites that build a link from a resolved name)
+        // so every BuildXxxUrl method below returns null for these names
+        // and every caller's existing "wikiUrl != null" gate suppresses
+        // both the click handler and the tooltip hint together.
+        private static readonly HashSet<string> SentinelNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Unknown Item",
+            "Guild upgrade (unresolved)",
+            "Unrecognized ingredient type",
+            "Currency"
+        };
+
         /// <summary>
         /// The item's own wiki page, e.g. "Zojja's Claymore" -&gt;
         /// ".../wiki/Zojja%27s_Claymore".
@@ -55,6 +80,15 @@ namespace GW2CraftingHelper.Services
         /// only meaningful for a recipe unlocked via LearnedFromItem (a
         /// consumable recipe sheet), which is the only kind of recipe that
         /// has one.
+        /// <para>
+        /// Assumes the sheet page title is always exactly "Recipe: " plus
+        /// the output item's name - true for the overwhelming majority of
+        /// GW2 recipe sheets, but not a documented site-wide guarantee.
+        /// This module has no in-module data source to validate the sheet
+        /// title against the real wiki, so an output item whose sheet page
+        /// is titled differently still produces a URL here and 404s when
+        /// followed.
+        /// </para>
         /// </summary>
         public static string BuildRecipeSheetUrl(string outputItemName)
         {
@@ -76,9 +110,24 @@ namespace GW2CraftingHelper.Services
                 : BuildItemAcquisitionUrl(outputItemName);
         }
 
+        /// <summary>
+        /// Cheap pre-check for whether <paramref name="itemName"/> would
+        /// resolve to a real wiki link (non-blank and not one of the
+        /// <see cref="SentinelNames"/> placeholder fallbacks) - without the
+        /// Trim/Replace/Uri.EscapeDataString work EncodeTitle does to
+        /// actually construct a URL. Intended for a hot render path (e.g.
+        /// one call per tree row, rebuilt on every lazy expand) that only
+        /// needs to know whether to show the click affordance at all; the
+        /// real URL is then built lazily, only inside the click handler.
+        /// </summary>
+        public static bool HasWikiPage(string itemName)
+        {
+            return !string.IsNullOrWhiteSpace(itemName) && !SentinelNames.Contains(itemName.Trim());
+        }
+
         private static string EncodeTitle(string name)
         {
-            if (string.IsNullOrWhiteSpace(name))
+            if (!HasWikiPage(name))
             {
                 return "";
             }

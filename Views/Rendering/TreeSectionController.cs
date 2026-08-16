@@ -862,9 +862,12 @@ namespace GW2CraftingHelper.Views.Rendering
 
             // UI-bundle milestone, Feature C (receipt/what-if captions):
             // sanctioned tooltip fallback - see the class-level doc comment
-            // on the captionText parameter above. Inserted at the front so
-            // it reads first, ahead of any unit-price/caveat lines already
-            // in extraTooltipLines.
+            // on the captionText parameter above. Inserted at the front,
+            // ahead of any unit-price/caveat lines already in
+            // extraTooltipLines - but on a row whose label got ellipsized,
+            // UpdateTreeRowTooltip itself prepends the full item name ahead
+            // of everything already in extraTooltipLines, so on those rows
+            // the caption reads second, after the name line, not first.
             if (!string.IsNullOrEmpty(captionText))
             {
                 extraTooltipLines.Insert(0, captionText);
@@ -873,18 +876,55 @@ namespace GW2CraftingHelper.Views.Rendering
             // UI-bundle milestone, Feature A (wiki links): this module's
             // FIRST external-URL launch (deliberate maintainer decision) -
             // a context action (right-click), not a visible icon, per the
-            // maintainer's pre-authorized placement discretion. Right-click
-            // cannot collide with this row's own left-click expand/collapse
-            // toggle (wired below, only when hasChildren) and is naturally
-            // low-accidental-click-risk for a click that steals focus into
-            // the default browser. Every tree row gets this, item leaf or
-            // internal node alike - a wiki page that does not exist for an
-            // internal-only concept (e.g. a synthesized cost-component
-            // "currency" name) just 404s rather than crashing anything.
-            string wikiUrl = WikiLinkBuilder.BuildItemPageUrl(node.Name);
-            if (wikiUrl != null)
+            // maintainer's pre-authorized placement discretion. Every tree
+            // row gets this, item leaf or internal node alike - a wiki page
+            // that does not exist for an internal-only concept (e.g. a
+            // synthesized cost-component "currency" name) just 404s rather
+            // than crashing anything; WikiLinkBuilder.HasWikiPage/
+            // BuildItemPageUrl additionally suppress the affordance
+            // entirely for the known placeholder names (see
+            // WikiLinkBuilder's SentinelNames), which never resolve to a
+            // real page at all.
+            //
+            // Fix-pass (render-path allocation): HasWikiPage is a cheap
+            // non-whitespace + not-a-placeholder-name check - the actual
+            // URL (Trim + Replace + Uri.EscapeDataString, a closure, and a
+            // delegate) is built lazily inside the press/release handlers
+            // below instead of eagerly for every tree row on every build
+            // and every lazy expand, since most rows are never
+            // right-clicked at all.
+            //
+            // Fix-pass (right-click-as-camera-drag): GW2's own right-drag
+            // is the camera-rotate gesture, and firing on button-DOWN alone
+            // (the previous behavior) meant a drag begun over this row -
+            // input Blish otherwise swallows here today - opened the
+            // browser and yanked focus out of a fullscreen game the
+            // instant the button went down, with no way to abort. Firing
+            // on RightMouseButtonReleased alone is NOT a fix: Blish routes
+            // the release event to whichever row is under the cursor at
+            // release time, so a drag that started on a DIFFERENT row
+            // would open THIS row's page instead. Pairing press+release on
+            // this SAME rowPanel closes that: press arms a per-row flag,
+            // and only this row's own Released handler (which only fires
+            // when the release also lands on this row) can consume it.
+            // MouseLeft additionally disarms the flag the moment the
+            // cursor leaves this row after a press, so a drag that starts
+            // here, wanders off, and is released back over this row later
+            // (from an unrelated gesture) cannot replay a stale arm.
+            if (WikiLinkBuilder.HasWikiPage(node.Name))
             {
-                rowPanel.RightMouseButtonPressed += (_, __) => WikiLinkLauncher.Open(wikiUrl);
+                string nodeName = node.Name;
+                bool wikiLinkArmed = false;
+                rowPanel.RightMouseButtonPressed += (_, __) => wikiLinkArmed = true;
+                rowPanel.MouseLeft += (_, __) => wikiLinkArmed = false;
+                rowPanel.RightMouseButtonReleased += (_, __) =>
+                {
+                    if (wikiLinkArmed)
+                    {
+                        wikiLinkArmed = false;
+                        WikiLinkLauncher.Open(WikiLinkBuilder.BuildItemPageUrl(nodeName));
+                    }
+                };
                 extraTooltipLines.Add("Right-click: Open wiki page");
             }
 
