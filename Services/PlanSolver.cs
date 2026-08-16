@@ -101,17 +101,20 @@ namespace GW2CraftingHelper.Services
 
             // Craft/vendor comparability-parity fix (adversarial-review
             // follow-up): true when THIS committed decision is fallback-tier
-            // (an unvalued currency somewhere - directly on a chosen
-            // recipe/vendor offer, or transitively via a chosen ingredient's
-            // own fallback-tier decision). A recipe consuming an ingredient
-            // whose decision carries this flag is itself demoted to
-            // fallback-tier (see the recipe loop's ingredient pass in
-            // Evaluate) - without this propagation, a currency cost hidden
-            // two-plus Craft levels deep would silently "launder" back into
-            // a fully-comparable-looking ComparisonValue one level up,
-            // reopening the exact asymmetry this fix exists to close. Never
-            // surfaced on the public SolverDecision - purely an internal
-            // tier-tracking aid, same scope as ComparisonValue itself.
+            // - an unvalued currency, a GuildUpgrade ingredient, or any
+            // other non-Item ingredient type this module cannot price (see
+            // CraftingDecision's XML doc for the id-space rationale) -
+            // directly on a chosen recipe/vendor offer, or transitively via
+            // a chosen ingredient's own fallback-tier decision. A recipe
+            // consuming an ingredient whose decision carries this flag is
+            // itself demoted to fallback-tier (see the recipe loop's
+            // ingredient pass in Evaluate) - without this propagation, an
+            // unpriceable cost hidden two-plus Craft levels deep would
+            // silently "launder" back into a fully-comparable-looking
+            // ComparisonValue one level up, reopening the exact asymmetry
+            // this fix exists to close. Never surfaced on the public
+            // SolverDecision - purely an internal tier-tracking aid, same
+            // scope as ComparisonValue itself.
             public bool HasUnvaluedCurrency;
 
             // Winning vendor offer's batch shape (Source == BuyFromVendor
@@ -379,10 +382,15 @@ namespace GW2CraftingHelper.Services
         /// callers summing ingredient costs for a parent craft are summing
         /// comparison values, which is required for the parent's own
         /// craft-vs-buy comparison to be correct (see Decision.ComparisonValue).
-        /// EVERY non-currency ingredient of EVERY recipe on this node is
+        /// EVERY "Item" ingredient of EVERY recipe on this node is
         /// evaluated (and therefore gets its own memo entry) regardless of
         /// whether this node ends up bought, crafted via a different
-        /// recipe, or unpriceable itself - see the recipe loop below.
+        /// recipe, or unpriceable itself - see the recipe loop below. Any
+        /// non-"Item" ingredient (Currency, GuildUpgrade, or an
+        /// unrecognized type) is never Evaluate()-called and therefore
+        /// never gets a memo entry - see the Item-positive guard at the
+        /// top of this method and the hasUnvaluedCurrency skip in the
+        /// recipe loop below.
         /// </summary>
         private long? Evaluate(
             RecipeNode node,
@@ -397,7 +405,14 @@ namespace GW2CraftingHelper.Services
             ISet<int> ignoredItemIds = null,
             HomesteadEfficiencyTiers homesteadTiers = null)
         {
-            if (node.IngredientType == "Currency")
+            // Item-positive guard (not an enumerated deny-list): only an
+            // "Item" node is ever priced here. The ingredient loop below
+            // never recurses into a non-Item ingredient (it goes through
+            // hasUnvaluedCurrency instead), so this is defense-in-depth for
+            // a future direct caller - see CraftingDecision's XML doc for
+            // the id-space rationale and HasUnvaluedCurrency's doc comment
+            // above for how the fallback tier absorbs an unpriceable type.
+            if (node.IngredientType != "Item")
             {
                 return null;
             }
@@ -609,6 +624,22 @@ namespace GW2CraftingHelper.Services
                         {
                             hasUnvaluedCurrency = true;
                         }
+                        continue;
+                    }
+
+                    if (ingredient.IngredientType != "Item")
+                    {
+                        // Non-Item ingredient (Currency handled above;
+                        // GuildUpgrade/unrecognized types land here) - never
+                        // priced via currencyValuation/GetBuyCost/vendor
+                        // offers, since its id space has no defined
+                        // relationship to any of those (see CraftingDecision's
+                        // XML doc for the id-space rationale). Demotes the
+                        // recipe to the fallback tier via the same machinery
+                        // an unvalued Currency ingredient uses above, and
+                        // contributes zero to both craftCost and
+                        // craftRealCost.
+                        hasUnvaluedCurrency = true;
                         continue;
                     }
 
@@ -977,6 +1008,17 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
+            if (node.IngredientType != "Item")
+            {
+                // Non-Item node (Currency handled above; GuildUpgrade/
+                // unrecognized types land here): never accumulates into
+                // currencyMap and carries no memo entry (see Evaluate's
+                // ingredient loop), so no decision/step-generation code
+                // below ever runs for it - see CraftingDecision's XML doc
+                // for the id-space rationale.
+                return;
+            }
+
             // M37 (KNOWN-ISSUES #26 fix-pass finding): a Quantity == 0
             // "Item" node draws no demand of its own and must never
             // generate a shopping/craft step - matches
@@ -1297,7 +1339,10 @@ namespace GW2CraftingHelper.Services
         private static long? RecomputeCraftCosts(
             RecipeNode node, Dictionary<int, Decision> memo, ISet<int> ignoredItemIds)
         {
-            if (node.IngredientType == "Currency")
+            // Item-positive guard mirroring Evaluate's own top guard - a
+            // non-Item ingredient type carries no memo entry (see Evaluate's
+            // ingredient loop), so this is defense-in-depth consistency.
+            if (node.IngredientType != "Item")
             {
                 return null;
             }
@@ -1342,6 +1387,14 @@ namespace GW2CraftingHelper.Services
                         {
                             craftRealCost += ingredient.Quantity;
                         }
+                        continue;
+                    }
+                    if (ingredient.IngredientType != "Item")
+                    {
+                        // Non-Item ingredient (Currency handled above) -
+                        // never a real coin contribution; skip rather than
+                        // recurse into a node known upfront to carry no memo
+                        // entry (see Evaluate's ingredient loop).
                         continue;
                     }
                     craftRealCost += RecomputeCraftCosts(ingredient, memo, ignoredItemIds) ?? 0L;

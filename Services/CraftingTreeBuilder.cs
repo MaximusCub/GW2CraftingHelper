@@ -95,22 +95,81 @@ namespace GW2CraftingHelper.Services
                 return treeNode;
             }
 
-            // Currency nodes are leaf nodes. Review-fix
-            // (recipe-ingestion-fix, Must Fix): prefer the live-fetched
-            // CurrencyMetadataService name via CurrencyDisplayResolver -
-            // the same live-preferred/static-fallback chain
-            // PlanViewModelBuilder's Summary-section and shopping-row
-            // currency costs already use (KNOWN-ISSUES #16) - over calling
-            // Gw2Constants.ResolveCurrencyName directly, so a future id the
-            // static table has wrong or lacks (see KnownCurrencyNames' own
-            // doc comment on the 2026-08-15 audit) still resolves correctly
-            // whenever currencyMetadata is available, rather than only
-            // ever depending on this file staying manually in sync with
-            // the live API.
-            if (node.IngredientType != "Item")
+            // GuildUpgrade nodes are leaf nodes: the GW2 API tags a Guild
+            // Decoration recipe's claimed-guild-hall-upgrade requirement
+            // with ingredient type "GuildUpgrade" (e.g. recipe 12002 ->
+            // item 80471, upgrade id 829) - a distinct id space from both
+            // item and wallet-currency ids, with no defined relationship
+            // to either (see CraftingDecision's XML doc for the full
+            // collision rationale). IconUrl/Rarity are cleared explicitly
+            // rather than left at the item-keyed lookup above: `metadata`
+            // can carry a colliding entry via routes other than the
+            // Item-only CollectTreeItemIds fetch (CraftingPlanPipeline
+            // also unions step/target/used-material/vendor-cost-component
+            // ids into it). IDs are never displayed (repo invariant), so
+            // this uses a generic label plus an AcquisitionHint instead of
+            // resolving a name. Full guild-decoration support (real
+            // upgrade name, ownership verification) is out of scope - see
+            // docs/KNOWN-ISSUES.md.
+            if (node.IngredientType == "GuildUpgrade")
+            {
+                treeNode.Decision = CraftingDecision.GuildUpgrade;
+                treeNode.Name = "Guild upgrade (unresolved)";
+                treeNode.IconUrl = null;
+                treeNode.Rarity = null;
+                treeNode.AcquisitionHint =
+                    "Requires a claimed Guild Hall upgrade. This module does not " +
+                    "yet resolve guild upgrade names or verify ownership.";
+                return treeNode;
+            }
+
+            // Currency nodes are leaf nodes. Name/IconUrl resolve through
+            // CurrencyDisplayResolver (live-preferred, static-fallback -
+            // matches PlanViewModelBuilder's Summary/shopping-row currency
+            // costs, KNOWN-ISSUES #16) rather than the item-keyed lookup
+            // above: a wallet currency id is a distinct id space from item
+            // ids, with a real seed collision (item/currency id 24 is both
+            // a vendor-offer outputItemId and the KnownCurrencyNames key
+            // "Pristine Fractal Relics" - see CraftingDecision's XML doc
+            // for the full rationale). Rarity is always null - currencies
+            // have no rarity concept. Scoped to the literal string
+            // "Currency" only; any other non-Item type falls through to
+            // its own UnrecognizedIngredient branch below rather than
+            // being labeled Currency on the strength of "not an Item".
+            if (node.IngredientType == "Currency")
             {
                 treeNode.Decision = CraftingDecision.Currency;
                 treeNode.Name = CurrencyDisplayResolver.ResolveName(node.Id, currencyMetadata);
+                treeNode.IconUrl = CurrencyDisplayResolver.ResolveIconUrl(node.Id, currencyMetadata);
+                treeNode.Rarity = null;
+                return treeNode;
+            }
+
+            // Any ingredient type that is neither "Item", "GuildUpgrade",
+            // nor "Currency" lands here, hoisted before the decisions
+            // lookup below (matching where the GuildUpgrade/Currency
+            // branches sit) so this is correct by this method's own
+            // construction, not merely because PlanSolver's Evaluate never
+            // memoizes a non-Item node today. Name/IconUrl/Rarity/
+            // AcquisitionHint/AcquisitionBadge are all reset or skipped -
+            // every one of them would otherwise resolve from the
+            // ITEM-domain `metadata`/`hints` dictionaries keyed on this
+            // same raw id, the cross-domain collision risk CraftingDecision's
+            // XML doc explains for GuildUpgrade/Currency. Gets its own
+            // CraftingDecision.UnrecognizedIngredient value rather than
+            // sharing Unknown with a genuine no-source "Item" node:
+            // DecisionPillPlanner cannot tell the two Unknown cases apart,
+            // and a shared value previously routed this node to the
+            // no-options branch's live, interactive IGNORE pill - keyed on
+            // this node's non-item ItemId, a no-op click that could
+            // silently zero an unrelated "Item" node sharing the same
+            // numeric id elsewhere in the tree.
+            if (node.IngredientType != "Item")
+            {
+                treeNode.Decision = CraftingDecision.UnrecognizedIngredient;
+                treeNode.Name = "Unrecognized ingredient type";
+                treeNode.IconUrl = null;
+                treeNode.Rarity = null;
                 return treeNode;
             }
 
