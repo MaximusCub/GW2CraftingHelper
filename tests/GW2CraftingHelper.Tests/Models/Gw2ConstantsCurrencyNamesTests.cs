@@ -76,7 +76,7 @@ namespace GW2CraftingHelper.Tests.Models
             { 60, "Tyrian Defense Seals" },
             { 63, "Astral Acclaim" },
             { 65, "Testimony of Jade Heroics" },
-            { 68, "Imperial Favors" },
+            { 68, "Imperial Favor" },
             { 78, "Fine Rift Essence" }
         };
 
@@ -144,7 +144,7 @@ namespace GW2CraftingHelper.Tests.Models
         public void KnownCurrencyNames_Id60_IsTyrianDefenseSeal_NotImperialFavor()
         {
             // The specific PRE-ingestion mispairing this audit found: id 60
-            // was labeled "Imperial Favors" but the live API's id 60 is
+            // was labeled "Imperial Favor" but the live API's id 60 is
             // Tyrian Defense Seal - real Imperial Favor is id 68. Both
             // halves of that regression are pinned in one assertion.
             Assert.Equal("Tyrian Defense Seals", Gw2Constants.KnownCurrencyNames[60]);
@@ -155,13 +155,13 @@ namespace GW2CraftingHelper.Tests.Models
         public void KnownCurrencyNames_Id68_ImperialFavor_Present()
         {
             Assert.True(Gw2Constants.KnownCurrencyNames.ContainsKey(68));
-            Assert.Equal("Imperial Favors", Gw2Constants.KnownCurrencyNames[68]);
+            Assert.Equal("Imperial Favor", Gw2Constants.KnownCurrencyNames[68]);
         }
 
         [Fact]
-        public void ResolveCurrencyName_Id68_ReturnsImperialFavors_NotGenericFallback()
+        public void ResolveCurrencyName_Id68_ReturnsImperialFavor_NotGenericFallback()
         {
-            Assert.Equal("Imperial Favors", Gw2Constants.ResolveCurrencyName(68));
+            Assert.Equal("Imperial Favor", Gw2Constants.ResolveCurrencyName(68));
         }
 
         [Fact]
