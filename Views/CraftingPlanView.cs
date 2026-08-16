@@ -10,6 +10,7 @@ using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -708,7 +709,7 @@ namespace GW2CraftingHelper.Views
             _planGeneratedAt = generatedAt;
 
             _statusBoard.SeedRestored(
-                $"Generated {generatedAt:MMM d, yyyy h:mm tt} - prices may have changed - Regenerate");
+                $"Generated {generatedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)} - prices may have changed - Regenerate");
             RenderFromBoard(_statusBoard.Snapshot());
 
             if (_contentPanel == null || _contentPanel.Parent == null) return;
@@ -2602,7 +2603,7 @@ namespace GW2CraftingHelper.Views
                     // later tab revisit) pulls this text straight from the
                     // board instead. See PlanStripStatusBoard.Finish's own
                     // doc comment.
-                    _statusBoard.Finish(myGen, $"Plan generated - {_planGeneratedAt:MMM d, yyyy h:mm tt}");
+                    _statusBoard.Finish(myGen, $"Plan generated - {_planGeneratedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}");
 
                     // Plan CONTENT still requires a live panel to render
                     // into - unlike the strip status above, this part of
@@ -3067,7 +3068,7 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            string tsText = $"Generated: {_planGeneratedAt:MMM d, yyyy h:mm tt}";
+            string tsText = $"Generated: {_planGeneratedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
             var tsFont = GameService.Content.DefaultFont14;
             var tsMeasured = tsFont.MeasureString(tsText);
             int tsWidth = (int)System.Math.Ceiling(tsMeasured.Width);
