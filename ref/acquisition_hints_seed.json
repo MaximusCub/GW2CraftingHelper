@@ -44,6 +44,13 @@
       "badge": "WVW",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_Battle",
       "lastVerified": "2026-07-20"
+    },
+    {
+      "itemId": 43772,
+      "hint": "Made at a Place of Power from 25 Quartz Crystals. Limited to 1 per day per account; account bound, not tradable.",
+      "badge": "DAILY",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Charged_Quartz_Crystal",
+      "lastVerified": "2026-08-16"
     }
   ]
 }
