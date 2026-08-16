@@ -277,36 +277,6 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Appends the two owned-materials pills (M34-B2b) shared by every
-        /// non-Have/non-Currency return path in BuildPillSpecs: the
-        /// non-interactive "HAVE N/M NEEDED" annotation (only when this
-        /// node's own demand was actually partly covered by real inventory -
-        /// see CraftingTreeNode.OwnedQuantityUsed's doc comment) and the
-        /// interactive "IGNORE" toggle (offered on every real item node
-        /// regardless of ownership, matching gw2e's own always-offered
-        /// "Ignore" pill - Section 3.2 of the r2 report). A node this method
-        /// is called for is, by construction, never already ignored (an
-        /// ignored node's Decision is Have, handled separately above), so
-        /// the toggle always starts from its "IGNORE" (not yet active) text.
-        ///
-        /// Field-test finding A: the pill used to read "USING N OWNED"
-        /// showing only the covered count, while node.Quantity (the tree
-        /// row's own "Nx" prefix) already shows the REMAINING need after
-        /// that coverage was subtracted - e.g. "120x ... USING 130 OWNED"
-        /// read as a paradox (130 owned covering only 120 needed?) when the
-        /// true original demand was actually 250. Spelling out the total
-        /// (OwnedQuantityUsed + Quantity, per CraftingTreeNode's own "Quantity
-        /// + OwnedQuantityUsed recovers the node's original pre-reduction
-        /// demand" contract) removed the ambiguity without changing what
-        /// either number means - but the fixed text ("USING {used} OF
-        /// {total} OWNED") still put OWNED immediately beside the total, and
-        /// the maintainer's final wording pass (2026-08-06) found testers
-        /// misreading {total} itself as an owned count. "HAVE {used}/{total}
-        /// NEEDED" keeps both numbers but drops OWNED from beside the total
-        /// and reuses the vocabulary of the existing full-coverage HAVE
-        /// pill instead of inventing a third one.
-        /// </summary>
-        /// <summary>
         /// currency-ux-package (Feature 2, maintainer's own design):
         /// appends the plan-scope "HAVE {have}/{planTotal} TOTAL" pill
         /// shared by every currency leaf (ordinary and cost-component
@@ -345,8 +315,28 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            long planTotal = 0;
-            currencyPlanTotals?.TryGetValue(currencyId, out planTotal);
+            // currency-ux-package review fix (finding 3, MEASURED): a real,
+            // positive plan total is required before either pill variant is
+            // emitted - `currencyPlanTotals` (plan.CurrencyCosts) and
+            // `ownedCurrencyAmounts` (CraftingPlanPipeline.BuildOwnedCurrencyAmounts,
+            // deliberately widened beyond plan.CurrencyCosts to every vendor
+            // offer in the tree - see that method's own doc comment) have
+            // different key sets by construction: a currency leaf reachable
+            // only through a non-chosen reference branch (never walked by
+            // Collect, so never in plan.CurrencyCosts) can have an entry in
+            // ownedCurrencyAmounts with no corresponding plan total at all.
+            // The old `long planTotal = 0; TryGetValue(...)` default made
+            // that case indistinguishable from "plan genuinely needs zero of
+            // this currency" - with have=0 too, `0 &gt;= 0` rendered a plain
+            // blue "HAVE" (full coverage) pill and a "fully covered" tooltip
+            // for a currency the plan never asked for and the wallet may not
+            // even hold, on any currency id vendor-offer-widening surfaced.
+            if (currencyPlanTotals == null ||
+                !currencyPlanTotals.TryGetValue(currencyId, out long planTotal) ||
+                planTotal <= 0)
+            {
+                return;
+            }
 
             if (have >= planTotal)
             {
@@ -358,6 +348,36 @@ namespace GW2CraftingHelper.Services
             }
         }
 
+        /// <summary>
+        /// Appends the two owned-materials pills (M34-B2b) shared by every
+        /// non-Have/non-Currency return path in BuildPillSpecs: the
+        /// non-interactive "HAVE N/M NEEDED" annotation (only when this
+        /// node's own demand was actually partly covered by real inventory -
+        /// see CraftingTreeNode.OwnedQuantityUsed's doc comment) and the
+        /// interactive "IGNORE" toggle (offered on every real item node
+        /// regardless of ownership, matching gw2e's own always-offered
+        /// "Ignore" pill - Section 3.2 of the r2 report). A node this method
+        /// is called for is, by construction, never already ignored (an
+        /// ignored node's Decision is Have, handled separately above), so
+        /// the toggle always starts from its "IGNORE" (not yet active) text.
+        ///
+        /// Field-test finding A: the pill used to read "USING N OWNED"
+        /// showing only the covered count, while node.Quantity (the tree
+        /// row's own "Nx" prefix) already shows the REMAINING need after
+        /// that coverage was subtracted - e.g. "120x ... USING 130 OWNED"
+        /// read as a paradox (130 owned covering only 120 needed?) when the
+        /// true original demand was actually 250. Spelling out the total
+        /// (OwnedQuantityUsed + Quantity, per CraftingTreeNode's own "Quantity
+        /// + OwnedQuantityUsed recovers the node's original pre-reduction
+        /// demand" contract) removed the ambiguity without changing what
+        /// either number means - but the fixed text ("USING {used} OF
+        /// {total} OWNED") still put OWNED immediately beside the total, and
+        /// the maintainer's final wording pass (2026-08-06) found testers
+        /// misreading {total} itself as an owned count. "HAVE {used}/{total}
+        /// NEEDED" keeps both numbers but drops OWNED from beside the total
+        /// and reuses the vocabulary of the existing full-coverage HAVE
+        /// pill instead of inventing a third one.
+        /// </summary>
         private static void AppendOwnershipPills(List<PillSpec> specs, CraftingTreeNode node)
         {
             if (node.OwnedQuantityUsed > 0)

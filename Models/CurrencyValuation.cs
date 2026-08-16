@@ -157,5 +157,49 @@ namespace GW2CraftingHelper.Models
             }
             return CurrencyDecisionDefaults.TryGetDefault(currencyId, out copperPerUnit);
         }
+
+        /// <summary>
+        /// currency-ux-package review fix (finding 5, MEASURED): the
+        /// Blish-free counterpart of the merge previously inlined directly
+        /// inside ModuleSettings.GetEffectiveCurrencyValuation - that class
+        /// is Blish-coupled and therefore untestable per repo invariant,
+        /// which left the merge that turns persisted state + defaults into
+        /// the CurrencyValuation the solver actually receives completely
+        /// unverified, including the non-obvious invariant this method
+        /// depends on (no id can land in both the merged value set and
+        /// ClearedCurrencyIds, which would throw from this class's own
+        /// constructor above - see TryGetEffectiveCopperValue, which never
+        /// returns true for an id while IsCleared(id) is also true, so that
+        /// invariant holds by construction here). Same split this repo
+        /// already uses for CurrencyValuationSerializer.
+        ///
+        /// Returns a new CurrencyValuation containing every entry
+        /// EFFECTIVELY visible to the solver from <paramref name="persisted"/>
+        /// - user overrides plus, for every id in
+        /// CurrencyDecisionDefaults.DefaultCopperPerUnit that is neither
+        /// overridden nor cleared, that curated default value.
+        /// ClearedCurrencyIds passes through unchanged.
+        /// </summary>
+        public static CurrencyValuation WithDefaults(CurrencyValuation persisted)
+        {
+            persisted = persisted ?? None;
+
+            var candidateIds = new HashSet<int>(persisted.CopperPerUnit.Keys);
+            foreach (int currencyId in CurrencyDecisionDefaults.DefaultCopperPerUnit.Keys)
+            {
+                candidateIds.Add(currencyId);
+            }
+
+            var merged = new Dictionary<int, long>();
+            foreach (int currencyId in candidateIds)
+            {
+                if (persisted.TryGetEffectiveCopperValue(currencyId, out long copperPerUnit))
+                {
+                    merged[currencyId] = copperPerUnit;
+                }
+            }
+
+            return new CurrencyValuation(merged, persisted.ClearedCurrencyIds);
+        }
     }
 }

@@ -4268,6 +4268,8 @@ history - `TreeSectionController.cs` is Blish-bound and outside this
 repo's test-runnable surface, same constraint every UI-adjacent entry
 in this file notes.
 
+Gate: not yet run live - queued for the next batched desktop session. Merged after five adversarial review rounds, a targeted fix pass, and an independent verification review resolved every finding (zero blocking, 1383/1383 suite), under the maintainer's standing merge directive (2026-08-16). Solver behavior is fully covered by the suite; the deferred item is visual confirmation of the caveat tooltips only.
+
 ## Currency UX package: defaults, plan-scope pills, value-detail hover (2026-08-16)
 
 Three maintainer-approved currency-UX features shipped as one coherent
@@ -4276,7 +4278,7 @@ package on branch `currency-ux-package`, in three feature-sized commits.
 **Feature 1 - default currency decision values.** Ships gw2efficiency's
 `CURRENCY_DECISION_PRICES` table (MIT-licensed, attributed - see
 `Models/CurrencyDecisionDefaults.cs`'s header comment and
-`scratchpad/gw2e-currency-decision-prices.md`'s full provenance writeup
+`docs/research/gw2e-currency-decision-prices.md`'s full provenance writeup
 from the extraction run) as curated default decision-only currency
 valuations - a maintainer-ratified, one-time waiver of the "no invented
 data" rule for this specific table only. `CurrencyValuation` gained a
@@ -4390,5 +4392,3 @@ not been visually confirmed to fit within a real Settings window at
 typical widths.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
-
-Gate: not yet run live - queued for the next batched desktop session. Merged after five adversarial review rounds, a targeted fix pass, and an independent verification review resolved every finding (zero blocking, 1383/1383 suite), under the maintainer's standing merge directive (2026-08-16). Solver behavior is fully covered by the suite; the deferred item is visual confirmation of the caveat tooltips only.

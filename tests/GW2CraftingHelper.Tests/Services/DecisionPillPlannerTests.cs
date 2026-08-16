@@ -853,6 +853,49 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void CurrencyDecision_ZeroOwnedNoPlanTotal_OmitsHaveTotalPillEntirely()
+        {
+            // currency-ux-package review fix (finding 3, MEASURED): the old
+            // `long planTotal = 0; currencyPlanTotals?.TryGetValue(...)`
+            // default made "this id has no plan total at all" (reachable
+            // whenever ownedCurrencyAmounts is widened - via
+            // CraftingPlanPipeline.BuildOwnedCurrencyAmounts's own vendor-
+            // offer scan - beyond plan.CurrencyCosts, which is exactly
+            // where currencyPlanTotals comes from) indistinguishable from
+            // "the plan genuinely needs zero of this currency". With
+            // have=0 too, `0 &gt;= 0` rendered a plain blue "HAVE" (full
+            // coverage) pill - this test is the have=0/no-plan-total case
+            // the existing CurrencyDecision_ZeroOwned_ShowsHaveZeroTotalPill
+            // above does not cover (that one always supplies planTotal=500).
+            var node = Node(CraftingDecision.Currency, quantity: 50);
+            var totals = new Dictionary<int, long>(); // no entry at all for node.ItemId
+            var owned = new Dictionary<int, int> { { node.ItemId, 0 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, owned);
+
+            Assert.Single(specs);
+            Assert.Equal("CURRENCY", specs[0].Text);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Have);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
+        }
+
+        [Fact]
+        public void CurrencyDecision_HaveExceedsButNoPlanTotal_OmitsHaveTotalPillEntirely()
+        {
+            // Same gap as above, with a non-zero `have` too (rules out any
+            // reliance on have's own zero-ness rather than the missing
+            // plan total being what gates the pill).
+            var node = Node(CraftingDecision.Currency, quantity: 50);
+            var totals = new Dictionary<int, long>();
+            var owned = new Dictionary<int, int> { { node.ItemId, 999 } };
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(node, totals, owned);
+
+            Assert.Single(specs);
+            Assert.Equal("CURRENCY", specs[0].Text);
+        }
+
+        [Fact]
         public void CostComponent_ItemType_WithPlanScopeArgs_StillShowsOwnBadgeUnchanged()
         {
             // Feature 2 scope: an ITEM-type cost component (non-null

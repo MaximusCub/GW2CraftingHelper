@@ -316,24 +316,12 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public CurrencyValuation GetEffectiveCurrencyValuation()
         {
-            var persisted = GetCurrencyValuation();
-
-            var candidateIds = new HashSet<int>(persisted.CopperPerUnit.Keys);
-            foreach (int currencyId in CurrencyDecisionDefaults.DefaultCopperPerUnit.Keys)
-            {
-                candidateIds.Add(currencyId);
-            }
-
-            var merged = new Dictionary<int, long>();
-            foreach (int currencyId in candidateIds)
-            {
-                if (persisted.TryGetEffectiveCopperValue(currencyId, out long copperPerUnit))
-                {
-                    merged[currencyId] = copperPerUnit;
-                }
-            }
-
-            return new CurrencyValuation(merged, persisted.ClearedCurrencyIds);
+            // currency-ux-package review fix (finding 5, MEASURED): the
+            // merge itself now lives on CurrencyValuation.WithDefaults (a
+            // Blish-free Models type, therefore unit-testable) instead of
+            // being inlined here - this class stays the sole production
+            // caller, unchanged in every other respect.
+            return CurrencyValuation.WithDefaults(GetCurrencyValuation());
         }
 
         /// <summary>

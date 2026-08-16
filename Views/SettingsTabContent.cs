@@ -33,16 +33,47 @@ namespace GW2CraftingHelper.Views
         // rate would misrepresent that. Leaving this row blank (the
         // default) keeps AA out of price comparisons entirely, same as any
         // other unset currency.
-        private static readonly int[] CuratedCurrencyIds =
+        // currency-ux-package review fix (finding 2, MEASURED): ids with no
+        // CurrencyDecisionDefaults entry but still worth surfacing for a
+        // user to value by hand - see CurrencyDecisionDefaults' own doc
+        // comment for why each is absent from that table: Astral Acclaim's
+        // per-item deal quality varies too much for any single suggested
+        // rate, and the three Rift Essence tiers have no row at all in
+        // gw2efficiency's own source table.
+        private static readonly int[] CuratedCurrencyIdsWithoutDefault =
         {
-            2,  // Karma
-            3,  // Laurels
-            23, // Spirit Shards
+            63, // Astral Acclaim
             78, // Fine Rift Essence
             79, // Rare Rift Essence
-            80, // Masterwork Rift Essence
-            63  // Astral Acclaim
+            80  // Masterwork Rift Essence
         };
+
+        // currency-ux-package review fix (finding 2, MEASURED): previously
+        // a hand-picked 7-id list, of which only 3 (Karma/Laurels/Spirit
+        // Shards) actually had a CurrencyDecisionDefaults entry.
+        // ModuleSettings.GetEffectiveCurrencyValuation applies EVERY entry
+        // in that table to every real solve regardless of whether a
+        // Settings row exists for it, so a defaulted currency with no row
+        // here was invisible and unclearable - no way to inspect it, know
+        // it was silently tipping a vendor-vs-TP comparison, or turn it
+        // off (Feature 1's own three-state requirement: set / default /
+        // cleared, each visible and each reachable). CurrencyDecisionDefaults
+        // is now the single source of truth for which defaulted ids get a
+        // row - adding a new default there automatically gets a Settings
+        // row here too, with no second list to remember to keep in sync.
+        private static readonly int[] CuratedCurrencyIds = BuildCuratedCurrencyIds();
+
+        private static int[] BuildCuratedCurrencyIds()
+        {
+            var ids = new SortedSet<int>(CurrencyDecisionDefaults.DefaultCopperPerUnit.Keys);
+            foreach (int id in CuratedCurrencyIdsWithoutDefault)
+            {
+                ids.Add(id);
+            }
+            var result = new int[ids.Count];
+            ids.CopyTo(result);
+            return result;
+        }
 
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
         private static readonly Color ErrorTextColor = new Color(255, 100, 100);
@@ -848,20 +879,31 @@ namespace GW2CraftingHelper.Views
             };
         }
 
-        // currency-ux-package (Feature 1): dedicated columns for the
-        // default/cleared indicator and its Clear checkbox, positioned
-        // after the shared HintX/ErrorX columns every other row type in
-        // this file also uses - deliberately NOT reusing/widening ErrorX
-        // itself, so Homestead/Log/Snapshot rows (which share that
-        // constant) are unaffected by this section's wider layout.
-        private const int CurrencyDefaultStateX = ErrorX + 20;
-        private const int CurrencyClearCheckboxX = CurrencyDefaultStateX + 150;
+        // currency-ux-package review fix (finding 6, MEASURED): the
+        // default/cleared indicator and its Clear checkbox previously sat
+        // on the SAME line as ErrorLabel (x=454), only 20px to its right at
+        // x=474 - ErrorLabel is AutoSizeWidth and its "Must be a positive
+        // whole number" text comfortably overruns that gap, painting
+        // through the default label and potentially the Clear checkbox
+        // (the only control that can persist a cleared state). Moved to
+        // their own line below the name/input/hint/error line instead of
+        // trying to out-guess AutoSizeWidth text metrics - see
+        // CurrencyRowHeight/CurrencyDefaultLineY below. Both columns start
+        // well left of the old ErrorX-relative positions (aligned under
+        // the input box, not past the hint/error columns), so a
+        // realistically narrow Settings panel is far less likely to clip
+        // the Clear checkbox off the right edge than the old x>=624 layout
+        // was.
+        private const int CurrencyRowHeight = 54;
+        private const int CurrencyDefaultLineY = 32;
+        private const int CurrencyDefaultStateX = NameColumnX + NameColumnWidth;
+        private const int CurrencyClearCheckboxX = CurrencyDefaultStateX + 190;
 
         private void AddCurrencyRow(int currencyId, int panelWidth)
         {
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, RowHeight),
+                Size = new Point(panelWidth, CurrencyRowHeight),
                 Parent = _rootPanel
             };
 
@@ -914,7 +956,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     TextColor = InfoTextColor,
-                    Location = new Point(CurrencyDefaultStateX, 7),
+                    Location = new Point(CurrencyDefaultStateX, CurrencyDefaultLineY),
                     // Feature 1 spec: visibly labeled as an estimate, with
                     // attribution/editable/clearable spelled out on hover.
                     BasicTooltipText = "Adapted from gw2efficiency, decision-only estimate. Editable above; use Clear to suppress it.",
@@ -924,7 +966,7 @@ namespace GW2CraftingHelper.Views
                 clearCheckbox = new Checkbox()
                 {
                     Text = "Clear",
-                    Location = new Point(CurrencyClearCheckboxX, 7),
+                    Location = new Point(CurrencyClearCheckboxX, CurrencyDefaultLineY),
                     BasicTooltipText = "Suppress this currency's default estimate - it will not be valued unless you enter your own amount.",
                     Parent = rowPanel
                 };

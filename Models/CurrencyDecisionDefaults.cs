@@ -14,12 +14,40 @@ namespace GW2CraftingHelper.Models
     /// src/static/currencyDecisionPrices.ts -
     /// https://github.com/gw2efficiency/recipe-calculation
     /// License: MIT, Copyright (c) 2016 queicherius (David Reess).
+    ///
+    /// currency-ux-package review fix (nice-to-have): the MIT license
+    /// requires the permission notice below be included with substantial
+    /// portions of the licensed work, not just the copyright line -
+    /// included here verbatim (source: the upstream repo's own LICENCE
+    /// file) alongside the attribution above, since this table IS a
+    /// substantial, verbatim-adapted portion of that work.
+    ///
+    /// Permission is hereby granted, free of charge, to any person
+    /// obtaining a copy of this software and associated documentation
+    /// files (the "Software"), to deal in the Software without
+    /// restriction, including without limitation the rights to use, copy,
+    /// modify, merge, publish, distribute, sublicense, and/or sell copies
+    /// of the Software, and to permit persons to whom the Software is
+    /// furnished to do so, subject to the following conditions:
+    ///
+    /// The above copyright notice and this permission notice shall be
+    /// included in all copies or substantial portions of the Software.
+    ///
+    /// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    /// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    /// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    /// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+    /// BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+    /// ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+    /// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    /// SOFTWARE.
     /// Extracted and cross-checked entry-by-entry against the live GW2 API
     /// (api.guildwars2.com/v2/currencies?ids=all) 2026-08-16 - every key
     /// below is the OFFICIAL GW2 wallet currency id (numerically identical
     /// to gw2efficiency's own table; no id remapping was needed - see
-    /// scratchpad/gw2e-currency-decision-prices.md for the full provenance
-    /// writeup, byte offsets, and live cross-check this run performed).
+    /// docs/research/gw2e-currency-decision-prices.md for the full
+    /// provenance writeup, byte offsets, and live cross-check this run
+    /// performed).
     ///
     /// Maintainer decision (currency-ux-package): shipping this curated
     /// table as defaults is an explicit, one-time waiver of the repo's
@@ -37,14 +65,18 @@ namespace GW2CraftingHelper.Models
     ///
     /// Entries gw2efficiency's own table marks `undefined` (meaning gw2e
     /// itself assigns that currency no decision value, not zero) are simply
-    /// absent below, matching gw2e exactly. Among currencies this module
-    /// currently surfaces in Settings, that means Transmutation Charges
-    /// (18), PvP League Tickets (30), and Racing Medallions (47) have no
-    /// entry here. Astral Acclaim (63) and the three Rift Essence tiers
-    /// (78/79/80) have no row at all in gw2e's table (it does not reach
-    /// those ids) and so are also absent - the Settings tab and the solver
-    /// alike must leave them blank/unvalued rather than invent a rate for
-    /// them (see SettingsTabContent's own Astral Acclaim info line).
+    /// absent below, matching gw2e exactly. Among the currencies this
+    /// module knows by name (Gw2Constants.KnownCurrencyNames - a broader
+    /// set than what SettingsTabContent.CuratedCurrencyIds actually
+    /// surfaces as a row; neither of these two named ids is curated for
+    /// that or any other reason), that means Transmutation Charges (18),
+    /// PvP League Tickets (30), and Racing Medallions (47) have no entry
+    /// here. Astral Acclaim (63)
+    /// and the three Rift Essence tiers (78/79/80) have no row at all in
+    /// gw2e's table (it does not reach those ids) and so are also absent -
+    /// the Settings tab and the solver alike must leave them blank/unvalued
+    /// rather than invent a rate for them (see SettingsTabContent's own
+    /// Astral Acclaim info line).
     /// </summary>
     public static class CurrencyDecisionDefaults
     {

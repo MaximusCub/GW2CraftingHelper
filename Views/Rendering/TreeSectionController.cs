@@ -1374,7 +1374,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // their own distinct CraftingDecision values).
                 if ((spec.Kind == PillKind.Selected || spec.Kind == PillKind.Locked) &&
                     (node.Decision == CraftingDecision.Craft || node.Decision == CraftingDecision.BuyFromVendor) &&
-                    ValueDetailTooltipBuilder.TryBuild(node, _getCurrentPlan()?.VendorCapsByItemId, out string valueDetailText))
+                    ValueDetailTooltipBuilder.TryBuild(node, plan?.VendorCapsByItemId, out string valueDetailText))
                 {
                     tooltipText = tooltipText == null
                         ? valueDetailText

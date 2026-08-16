@@ -305,6 +305,53 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void MultiOccurrenceBulkVendorOffer_NoCurrencyValued_ComparisonValueMatchesTotalCostEverywhere()
+        {
+            // currency-ux-package review fix (finding 1, MEASURED): same
+            // shape as MultiOccurrenceBulkVendorOffer_CoinCost_
+            // AggregatesBeforeCeiling above (5 occurrences of item 99
+            // totalling 179 units, one 3-for-3 coin-only vendor offer, no
+            // currency anywhere in the plan) - the exact reproducer that
+            // used to yield rootTotalCost=180 / rootComparisonValue=186
+            // and a fabricated "Currencies: 0g 0s 6c" ValueDetailTooltipBuilder
+            // line on a purely coin-priced plan. AllocateVendorNodeCosts
+            // corrects each merged leaf's TotalCost but (by design,
+            // DO-NOT-TOUCH: VendorBatchSolver's own merged-ceil batching
+            // math) never touches ComparisonValue itself; PlanSolver's own
+            // vendorComparisonDeltas/RecomputeComparisonValues passes must
+            // keep the two in lockstep instead. Asserts ComparisonValue ==
+            // TotalCost on every merged leaf AND the Craft root above it -
+            // the leaf-level correction and the Craft-ancestor rollup are
+            // two independently fixable bugs, both covered here.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(99, 4),
+                    Leaf(99, 4),
+                    Leaf(99, 4),
+                    Leaf(99, 83),
+                    Leaf(99, 84)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var rootDecision = result.Decisions[tree.NodeId];
+
+            Assert.Equal(180, rootDecision.TotalCost);
+            Assert.Equal(rootDecision.TotalCost, rootDecision.ComparisonValue);
+
+            foreach (var leaf in tree.Recipes[0].Ingredients)
+            {
+                var leafDecision = result.Decisions[leaf.NodeId];
+                Assert.Equal(AcquisitionSource.BuyFromVendor, leafDecision.Source);
+                Assert.Equal(leafDecision.TotalCost, leafDecision.ComparisonValue);
+            }
+        }
+
+        [Fact]
         public void MultiOccurrenceBulkVendorOffer_CoinUnitCost_UsesOfferRate_NotAggregateAverage()
         {
             // MustFix review finding (PlanSolver.cs:1062): the coin "Each"

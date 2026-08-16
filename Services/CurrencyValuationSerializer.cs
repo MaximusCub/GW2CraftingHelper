@@ -53,10 +53,18 @@ namespace GW2CraftingHelper.Services
             {
                 values[kvp.Key] = kvp.Value;
             }
+            // currency-ux-package review fix (nice-to-have): ClearedCurrencyIds
+            // is a HashSet<int>, whose enumeration order is not guaranteed
+            // stable across otherwise-identical instances - sorted here so
+            // the persisted "Cleared" array (and therefore the whole
+            // persisted string) is deterministic/diffable across saves that
+            // clear the same set of currencies.
+            var cleared = new List<int>(valuation.ClearedCurrencyIds);
+            cleared.Sort();
             var model = new PersistedModel
             {
                 Values = values,
-                Cleared = new List<int>(valuation.ClearedCurrencyIds)
+                Cleared = cleared
             };
             return JsonConvert.SerializeObject(model);
         }

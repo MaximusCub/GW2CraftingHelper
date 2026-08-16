@@ -113,8 +113,11 @@ namespace GW2CraftingHelper.Services
             // silently "launder" back into a fully-comparable-looking
             // ComparisonValue one level up, reopening the exact asymmetry
             // this fix exists to close. Never surfaced on the public
-            // SolverDecision - purely an internal tier-tracking aid, same
-            // scope as ComparisonValue itself.
+            // SolverDecision - purely an internal tier-tracking aid.
+            // currency-ux-package review fix (nice-to-have): this used to
+            // say "same scope as ComparisonValue itself", but
+            // SolverDecision.ComparisonValue is now public (Feature 3) -
+            // this field alone stays PlanSolver-internal.
             public bool HasUnvaluedCurrency;
 
             // Winning vendor offer's batch shape (Source == BuyFromVendor
@@ -263,7 +266,45 @@ namespace GW2CraftingHelper.Services
             // depth bound - it walks the ENTIRE chosen-path tree from
             // `tree` down, so `memo`/Decisions/SubtreeCost are already
             // fully correct at every level after this line, however deep.
+            // currency-ux-package review fix (finding 1, MEASURED): capture
+            // each vendor decision's pre-correction (ComparisonValue -
+            // TotalCost) delta - the valued-currency-line coin-equivalent
+            // Evaluate folded in, 0 whenever nothing about this offer was
+            // valued (see Decision.ComparisonValue's own doc comment) -
+            // BEFORE calling AllocateVendorNodeCosts, then re-apply that
+            // same delta on top of the corrected TotalCost once it returns.
+            // AllocateVendorNodeCosts (VendorBatchSolver, DO-NOT-TOUCH:
+            // merged-ceil batching math) corrects TotalCost for every
+            // occurrence of a merged vendor step but has no reason to know
+            // about ComparisonValue at all; done here in the PlanSolver-side
+            // wrapper instead, exactly mirroring how FlagUnreliableVendorComponentCosts
+            // just below already reads that method's outputs after the fact
+            // rather than touching VendorBatchSolver itself. Without this,
+            // ComparisonValue stays frozen at its stale pre-merge value
+            // while TotalCost moves - ValueDetailTooltipBuilder then reads
+            // the mismatched pair as a fabricated currency divergence on
+            // plans that priced nothing but coin.
+            var vendorComparisonDeltas = new Dictionary<int, long>();
+            foreach (var kvp in memo)
+            {
+                var preCorrection = kvp.Value;
+                if (preCorrection.Source == AcquisitionSource.BuyFromVendor &&
+                    preCorrection.ComparisonValue.HasValue && preCorrection.TotalCost.HasValue)
+                {
+                    vendorComparisonDeltas[kvp.Key] = preCorrection.ComparisonValue.Value - preCorrection.TotalCost.Value;
+                }
+            }
+
             _vendorBatchSolver.AllocateVendorNodeCosts(stepMap, vendorOccurrences, memo);
+
+            foreach (var kvp in vendorComparisonDeltas)
+            {
+                if (memo.TryGetValue(kvp.Key, out var corrected) && corrected.TotalCost.HasValue)
+                {
+                    corrected.ComparisonValue = corrected.TotalCost.Value + kvp.Value;
+                    memo[kvp.Key] = corrected;
+                }
+            }
 
             // W4B review-fix (Critical): AllocateVendorNodeCosts above
             // corrects decision.TotalCost for every occurrence of a merged
@@ -278,6 +319,17 @@ namespace GW2CraftingHelper.Services
             // selection.
             FlagUnreliableVendorComponentCosts(stepMap, vendorOccurrences, memo);
             RecomputeCraftCosts(tree, memo, ignoredItemIds);
+
+            // currency-ux-package review fix (finding 1, MEASURED): mirrors
+            // RecomputeCraftCosts immediately above, but for ComparisonValue
+            // instead of TotalCost - RecomputeCraftCosts re-sums every Craft
+            // ancestor's real coin cost bottom-up from corrected leaves
+            // without ever touching ComparisonValue, so a Craft node above a
+            // vendor-corrected leaf kept the same stale pair the vendor-leaf
+            // delta pass above exists to fix. Must run after both
+            // AllocateVendorNodeCosts (leaves) and RecomputeCraftCosts
+            // (TotalCost) so it walks fully corrected inputs.
+            RecomputeComparisonValues(tree, memo, ignoredItemIds, valuation);
 
             // Pass 2d (M34 fix - wave-validator finding): stepMap's
             // Craft-type PlanStep entries are NOT touched by anything
@@ -1428,6 +1480,137 @@ namespace GW2CraftingHelper.Services
             decision.TotalCost = craftRealCost;
             memo[node.NodeId] = decision;
             return craftRealCost;
+        }
+
+        /// <summary>
+        /// currency-ux-package review fix (finding 1, MEASURED): the
+        /// ComparisonValue twin of RecomputeCraftCosts immediately above -
+        /// same walk shape (chosen-path only, bottom-up, Item-positive
+        /// guard, ignoredItemIds short-circuit), but re-derives
+        /// Decision.ComparisonValue instead of Decision.TotalCost. Required
+        /// because RecomputeCraftCosts only re-sums real coin cost; a Craft
+        /// node sitting above a vendor-corrected leaf (see the
+        /// vendorComparisonDeltas pass in Solve(), just before
+        /// RecomputeCraftCosts) would otherwise keep the ComparisonValue
+        /// Evaluate() committed BEFORE any vendor-batch correction ever ran,
+        /// silently drifting from the now-correct TotalCost - exactly the
+        /// stale pair ValueDetailTooltipBuilder was reading as a fabricated
+        /// currency divergence.
+        ///
+        /// Mirrors Evaluate's own recipe-ingredient loop for a comparable
+        /// recipe (coin-typed Currency ingredients contribute directly; a
+        /// valued non-coin Currency ingredient folds in its coin-equivalent
+        /// via <paramref name="currencyValuation"/>; a non-Item ingredient
+        /// contributes nothing) - EXCEPT it never needs to compute
+        /// hasUnvaluedCurrency itself, since decision.HasUnvaluedCurrency
+        /// already carries Evaluate's own tier decision (including
+        /// transitive propagation from a fallback-tier descendant, per that
+        /// field's doc comment) for the chosen recipe. A fallback-tier
+        /// decision's ComparisonValue is always set equal to its (already
+        /// corrected) TotalCost, exactly matching Evaluate's own fallback
+        /// commit sites (bestFallbackCraftCost == bestFallbackCraftRealCost)
+        /// - no valuation is ever folded in there, so none is re-folded in
+        /// here either. Descendants are still visited unconditionally so
+        /// their OWN ComparisonValue gets corrected regardless of this
+        /// node's tier; only the value aggregated INTO this node's own
+        /// result is gated on the tier.
+        /// </summary>
+        private static long? RecomputeComparisonValues(
+            RecipeNode node, Dictionary<int, Decision> memo, ISet<int> ignoredItemIds,
+            CurrencyValuation currencyValuation)
+        {
+            if (node.IngredientType != "Item")
+            {
+                return null;
+            }
+
+            if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+            {
+                return memo.TryGetValue(node.NodeId, out var ignoredDecision)
+                    ? ignoredDecision.ComparisonValue
+                    : 0L;
+            }
+
+            if (!memo.TryGetValue(node.NodeId, out var decision))
+            {
+                return null;
+            }
+
+            if (decision.Source != AcquisitionSource.Craft)
+            {
+                // Non-Craft leaf: already corrected either by the
+                // vendorComparisonDeltas pass in Solve() (BuyFromVendor) or
+                // never touched by any correction pass at all (BuyFromTp /
+                // UnknownSource - TotalCost == ComparisonValue for those
+                // from Evaluate() onward, and neither pass ever changes a
+                // TP-buy's TotalCost).
+                return decision.ComparisonValue;
+            }
+
+            var chosenRecipe = node.Recipes.FirstOrDefault(r => r.RecipeId == decision.RecipeId);
+            long comparisonValue = 0L;
+            if (chosenRecipe != null)
+            {
+                foreach (var ingredient in chosenRecipe.Ingredients)
+                {
+                    if (ingredient.IngredientType == "Currency")
+                    {
+                        if (ingredient.Id == Gw2Constants.CoinCurrencyId)
+                        {
+                            comparisonValue += ingredient.Quantity;
+                            continue;
+                        }
+
+                        // Mirrors Evaluate's valuationCopper accumulation -
+                        // only ever folded in for a comparable-tier recipe.
+                        // decision.HasUnvaluedCurrency already reflects
+                        // whether this chosen recipe stayed comparable
+                        // (including transitive propagation), so no
+                        // per-line hasUnvaluedCurrency tracking is needed
+                        // here the way Evaluate itself needs it.
+                        if (!decision.HasUnvaluedCurrency &&
+                            currencyValuation != null &&
+                            currencyValuation.TryGetCopperValue(ingredient.Id, out long copperPerUnit))
+                        {
+                            try
+                            {
+                                comparisonValue = checked(comparisonValue + (long)ingredient.Quantity * copperPerUnit);
+                            }
+                            catch (OverflowException)
+                            {
+                                // Unreachable in practice: an overflowing
+                                // valuation would already have demoted this
+                                // recipe to fallback tier at Evaluate() time
+                                // (decision.HasUnvaluedCurrency), which the
+                                // guard above already excludes. Defense in
+                                // depth only, matching Evaluate's own
+                                // no-crash posture rather than letting an
+                                // uncaught exception fail the whole Solve().
+                            }
+                        }
+                        continue;
+                    }
+
+                    if (ingredient.IngredientType != "Item")
+                    {
+                        continue;
+                    }
+
+                    // Always recurse regardless of THIS node's own tier, so
+                    // a nested Craft descendant's ComparisonValue is
+                    // corrected too - only the aggregation below (used for
+                    // THIS node's own result) is gated on HasUnvaluedCurrency.
+                    comparisonValue += RecomputeComparisonValues(ingredient, memo, ignoredItemIds, currencyValuation) ?? 0L;
+                }
+            }
+
+            // Fallback tier never folds in valuation - identical to the
+            // (already corrected) TotalCost, mirroring Evaluate's own
+            // fallback commit sites. See this method's own summary.
+            long finalValue = decision.HasUnvaluedCurrency ? (decision.TotalCost ?? 0L) : comparisonValue;
+            decision.ComparisonValue = finalValue;
+            memo[node.NodeId] = decision;
+            return finalValue;
         }
 
         /// <summary>

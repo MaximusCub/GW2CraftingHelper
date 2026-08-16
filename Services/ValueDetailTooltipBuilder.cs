@@ -48,6 +48,19 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+            // currency-ux-package review fix (nice-to-have): a currency-type
+            // vendor cost-component leaf also has Decision == BuyFromVendor
+            // and is kept out today only because BuildVendorCostComponentLeaves
+            // happens not to set DecisionValue on that construction path -
+            // an incidental, not structural, guarantee. Explicit guard so
+            // this can never silently attach to a CURRENCY badge (which
+            // has no cost cell at all - see TreeSectionController's own
+            // "Paid in a non-coin currency" tooltip for that pill) if that
+            // construction path ever changes.
+            if (node.IsCostComponent)
+            {
+                return false;
+            }
             if (!node.DecisionValue.HasValue || !node.SubtreeCost.HasValue)
             {
                 return false;
