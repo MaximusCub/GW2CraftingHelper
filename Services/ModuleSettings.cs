@@ -18,23 +18,28 @@ namespace GW2CraftingHelper.Services
 
         // gw2efficiency-style "value own materials" (M28; M34-B2a #3
         // upgraded this from a display-only opportunity-cost tweak into a
-        // real force-buy pre-pass - see OwnedMaterialsForceBuyPrePass):
-        // when enabled, a node is force-excluded from crafting whenever
-        // buying it outright costs less than 85% of its own components'
-        // fresh buy cost (gw2efficiency's getCheaperToBuyItemIds), and the
-        // plan's profit figure is reduced by owned materials' sell
-        // opportunity cost. Default TRUE to match gw2efficiency's own
-        // "valueOwnItems" default (m34-r2-gw2e-owned-materials.md Section
-        // 3.1: valueOwnItems defaults true whenever the separate "use own
-        // materials" master toggle - CraftingPlanView's own checkbox,
-        // default off - is on). This setting's force-buy effect only
-        // applies when an account snapshot is actually driving reduction
-        // (CraftingPlanPipeline's own, deliberately narrower gate - see its
-        // Step 6.5 comment) - with no snapshot it stays fully inert, same
-        // as the profit-display opportunity-cost figure it also drives.
-        // Now surfaced as a checkbox in the Settings tab (see
-        // SettingsTabContent) - previously flip-only-via-JSON like
-        // ScrollDiagnosticsEnabled below.
+        // real force-buy pre-pass - see OwnedMaterialsForceBuyPrePass;
+        // the VOM design (Candidate A) further upgraded it into a full
+        // decision-invariant reduction - see InventoryReducer's
+        // zeroOwnedDecisions doc comment): when enabled, a node is
+        // force-excluded from crafting whenever buying it outright costs
+        // less than 85% of its own components' fresh buy cost
+        // (gw2efficiency's getCheaperToBuyItemIds), owned stock only ever
+        // discounts the recipe option a zero-owned baseline would actually
+        // choose (never a never-chosen branch), and the plan's profit
+        // figure is reduced by owned materials' sell opportunity cost.
+        //
+        // SUPERSEDED (VOM design Section 5): this setting is kept defined
+        // ONLY for backward compatibility with an already-persisted
+        // settings.json value (mirroring the ScrollDiagnosticsEnabled
+        // precedent below) - it is no longer read on the live Module.cs
+        // call path. The real control is now Views/CraftingPlanView.cs's
+        // per-plan `_valueOwnMaterials` checkbox (session state, exactly
+        // like its `_useOwnMaterials`/`_priceBasis` neighbors - never
+        // read from/written to this setting), because the whole point of
+        // moving it inline is that it is a per-generation choice like
+        // those two. The Settings tab now shows an info line instead of a
+        // live checkbox for this setting - see SettingsTabContent.
         public SettingEntry<bool> ValueOwnMaterials { get; private set; }
 
         // M37 (KNOWN-ISSUES #24, gw2e parity): per-material Homestead
@@ -302,6 +307,13 @@ namespace GW2CraftingHelper.Services
         /// Maps the ValueOwnMaterials toggle onto the pipeline's
         /// OwnMaterialsMode enum. Defaults to Valued (see ValueOwnMaterials'
         /// own doc comment for why).
+        ///
+        /// SUPERSEDED (VOM design Section 5): no longer called on the live
+        /// Module.cs path - the per-plan CraftingPlanView checkbox
+        /// (`_valueOwnMaterials`) now drives OwnMaterialsMode directly at
+        /// the call site instead. Left in place (dead code, harmless) since
+        /// nothing else calls it and removing a public method is a wider
+        /// change than this design requires.
         /// </summary>
         public OwnMaterialsMode GetOwnMaterialsMode()
         {
