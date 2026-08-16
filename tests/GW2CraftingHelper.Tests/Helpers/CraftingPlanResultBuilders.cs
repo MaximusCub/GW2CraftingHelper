@@ -24,11 +24,11 @@ namespace GW2CraftingHelper.Tests.Helpers
             List<RequiredRecipe> requiredRecipes = null,
             Dictionary<int, CurrencyMetadata> currencyMetadata = null,
             Dictionary<int, AcquisitionHint> acquisitionHints = null,
-            Dictionary<int, DailyCooldownItem> dailyCooldownItems = null,
             List<TimegatedItem> timegatedItems = null,
             List<PlanRequestItem> requestedItems = null,
             List<CraftingTreeNode> multiItemRoots = null,
-            List<SnapshotCharacterDiscipline> characterDisciplines = null)
+            List<SnapshotCharacterDiscipline> characterDisciplines = null,
+            Dictionary<int, DailyCooldownItem> dailyCooldownItems = null)
         {
             return new CraftingPlanResult
             {
