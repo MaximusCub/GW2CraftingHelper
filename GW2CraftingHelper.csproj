@@ -116,8 +116,10 @@
     <Compile Include="Models\ItemMetadata.cs" />
     <Compile Include="Models\CurrencyMetadata.cs" />
     <Compile Include="Models\CraftingPlanResult.cs" />
+    <Compile Include="Models\ExcessCraftOutput.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
+    <Compile Include="Services\ExcessCraftOutputCalculator.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />
@@ -140,6 +142,7 @@
     <Compile Include="Views\Rendering\CoinCurrencyRenderer.cs" />
     <Compile Include="Views\Rendering\ISectionRelayoutSink.cs" />
     <Compile Include="Views\Rendering\DisciplinesSectionRenderer.cs" />
+    <Compile Include="Views\Rendering\NotesSectionRenderer.cs" />
     <Compile Include="Views\Rendering\PillColors.cs" />
     <Compile Include="Views\Rendering\UsedMaterialsSectionRenderer.cs" />
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />

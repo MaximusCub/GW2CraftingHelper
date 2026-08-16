@@ -169,5 +169,34 @@ namespace GW2CraftingHelper.Models
         /// never fed into solving or any total.
         /// </summary>
         public IReadOnlyList<SnapshotCharacterDiscipline> CharacterDisciplines { get; set; }
+
+        /// <summary>
+        /// design-plan-notes.md (Notes section, excess/reclaim): per-item
+        /// crafting surplus, aggregated across every Decision == Craft
+        /// occurrence in CraftingTree/MultiItemRoots - see
+        /// Services/ExcessCraftOutputCalculator.Apply, the sole producer.
+        /// Cosmetic display data only (same "advisory, never fed back into
+        /// a decision or total" contract as MaterialOpportunityCost above -
+        /// see that field's own doc comment); null until the calculator
+        /// runs, empty (not null) when the tree has no surplus at all.
+        /// </summary>
+        public List<ExcessCraftOutput> ExcessCraftOutputs { get; set; }
+
+        /// <summary>
+        /// design-plan-notes.md (Notes section, gambling-forge scope):
+        /// output item ids of every chosen recipe that is a Mystic-Clover-
+        /// style fractional-yield Mystic Forge combine (Disciplines
+        /// contains "MysticForge" and ExpectedOutputCount &lt; OutputCount -
+        /// see RecipeOption.ExpectedOutputCount's own doc comment).
+        /// Populated by PlanResultBuilder.Build alongside RequiredRecipes,
+        /// from the same recipeOptionIndex walk. Deliberately does NOT
+        /// cover true multi-outcome gambles (precursor forging etc.) -
+        /// those never reach the solved tree at all (docs/gw2e-
+        /// considerations.md #17) so there is nothing here to detect for
+        /// them; PlanViewModelBuilder's note wording must not conflate the
+        /// two. Empty list (not null) when no such recipe was chosen,
+        /// matching RequiredDisciplines/RequiredRecipes' own convention.
+        /// </summary>
+        public List<int> ProbabilisticForgeOutputItemIds { get; set; }
     }
 }

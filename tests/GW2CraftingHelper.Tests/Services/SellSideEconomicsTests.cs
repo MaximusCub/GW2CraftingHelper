@@ -83,6 +83,41 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ComputePerItemEconomics_FractionalEvRoot_UsesExpectedOutputCountNotNominalOutputCount()
+        {
+            // Review fix (finding 8, MEASURED): a Mystic-Clover-style root
+            // recipe (nominal OutputCount 1, but ExpectedOutputCount 0.31 -
+            // fractional EV) crafted 249 times to satisfy a 77-unit
+            // request. The pre-fix nominal basis (CraftsNeeded *
+            // OutputCount = 249 * 1 = 249) fabricated a 172-unit fake
+            // surplus; the corrected EV basis (249 * 0.31 = 77.19, floored
+            // to 77) matches the requested quantity almost exactly, which
+            // is what a probability-adjusted expected yield should do.
+            var option = Option(9, outputCount: 1, craftsNeeded: 249);
+            option.ExpectedOutputCount = 0.31;
+            var itemRoot = Craftable(50, 77, option);
+            itemRoot.NodeId = 5;
+
+            var solveResult = new SolveResult
+            {
+                Plan = new CraftingPlan(),
+                Decisions = new Dictionary<int, SolverDecision>
+                {
+                    { 5, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 9, TotalCost = 500 } }
+                }
+            };
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 50, new ItemPrice { SellInstant = 100 } }
+            };
+
+            var economics = SellSideEconomics.ComputePerItemEconomics(
+                itemRoot, itemId: 50, requestedQuantity: 77, solveResult, prices);
+
+            Assert.Equal(77, economics.SellableQuantity);
+        }
+
+        [Fact]
         public void ApplyBatchSellSideEconomics_MixedSellableAndUnsellableRoots_SumsOnlySellableIntoBatchTotals()
         {
             // Two requested roots under the synthetic multi-item wrapper:

@@ -63,6 +63,37 @@ namespace GW2CraftingHelper.Models
         public bool CanBuyVendor { get; set; }
 
         public int? RecipeId { get; set; }
+
+        // design-plan-notes.md (Notes section, excess/reclaim): batch shape
+        // of the chosen recipe at this exact tree occurrence (gw2e-
+        // considerations.md #4) - CraftsNeeded * RecipeOutputCount is what
+        // this craft actually produces, which can exceed Quantity (this
+        // node's own real demand) when the batch doesn't divide evenly. Set
+        // only for Decision == Craft nodes (CraftingTreeBuilder.BuildNode,
+        // straight from the chosen RecipeOption); null for every other
+        // decision. Read by ExcessCraftOutputCalculator to aggregate
+        // sellable/stranded surplus - never fed back into any cost or total.
+        public int? CraftsNeeded { get; set; }
+        public int? RecipeOutputCount { get; set; }
+
+        // Review fix (finding 1, MEASURED): the basis CraftsNeeded above
+        // was ACTUALLY derived from - RecipeService.BuildNodeAsync computes
+        // CraftsNeeded = ceil(Quantity / ExpectedOutputCount), never
+        // ceil(Quantity / RecipeOutputCount) - see RecipeOption.
+        // ExpectedOutputCount's own doc comment. For an integer-yield
+        // recipe ExpectedOutputCount == RecipeOutputCount exactly (a no-op
+        // ratio of 1.0); only a Mystic-Clover-style fractional-EV recipe
+        // (e.g. outputItemCount=1, expectedOutputCount=0.31) diverges.
+        // CraftsNeeded and RecipeOutputCount are on DIFFERENT bases for
+        // that case - ExcessCraftOutputCalculator MUST recover "produced"
+        // from CraftsNeeded * RecipeExpectedOutputCount, not
+        // CraftsNeeded * RecipeOutputCount, or it fabricates a large
+        // integer surplus for a recipe whose expected output was already
+        // probability-adjusted to land at (approximately) Quantity. Set
+        // only for Decision == Craft nodes, same gate as CraftsNeeded/
+        // RecipeOutputCount.
+        public double? RecipeExpectedOutputCount { get; set; }
+
         public long? UnitCost { get; set; }
         public long? SubtreeCost { get; set; }
 

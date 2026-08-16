@@ -160,7 +160,13 @@ namespace GW2CraftingHelper.Services
                     ItemId = entry.Id,
                     Name = entry.Name,
                     IconUrl = entry.Icon,
-                    Rarity = entry.Rarity
+                    Rarity = entry.Rarity,
+                    // design-plan-notes.md (Notes section, excess/reclaim
+                    // account-bound exclusion): null-tolerant even though
+                    // the production Gw2ItemApiClient parser never returns
+                    // a null Flags list - a test fixture or future client
+                    // implementation might.
+                    IsAccountBound = entry.Flags != null && entry.Flags.Contains("AccountBound")
                 };
                 _cache[entry.Id] = meta;
             }
