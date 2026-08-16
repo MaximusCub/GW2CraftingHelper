@@ -183,6 +183,9 @@ namespace GW2CraftingHelper.Services
 
             treeNode.Decision = MapSource(decision.Source);
             treeNode.SubtreeCost = decision.TotalCost;
+            // currency-ux-package (Feature 3): decision-only, see
+            // CraftingTreeNode.DecisionValue's own doc comment.
+            treeNode.DecisionValue = decision.ComparisonValue;
             treeNode.CanCraft = decision.CanCraft;
             treeNode.CanBuyTp = decision.CanBuyTp;
             treeNode.CanBuyVendor = decision.CanBuyVendor;

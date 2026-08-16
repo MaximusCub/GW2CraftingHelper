@@ -200,6 +200,7 @@
     <Compile Include="Models\CraftingTreeNode.cs" />
     <Compile Include="Models\VendorItemCostLine.cs" />
     <Compile Include="Services\DecisionPillPlanner.cs" />
+    <Compile Include="Services\ValueDetailTooltipBuilder.cs" />
     <Compile Include="Contracts\IItemSearchProvider.cs" />
     <Compile Include="Services\StaticItemSearchProvider.cs" />
     <Compile Include="Services\CraftableItemSearchProvider.cs" />

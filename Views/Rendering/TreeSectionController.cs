@@ -1358,6 +1358,29 @@ namespace GW2CraftingHelper.Views.Rendering
                     tooltipText = "Already counted elsewhere in the tree - this item is obtained once, not needed again here";
                 }
 
+                // currency-ux-package (Feature 3): appends the value-detail
+                // hover (real gold vs. decision-only optimization price,
+                // plus a vendor cap line when applicable) onto the
+                // committed CRAFT/VENDOR pill's existing tooltip, only when
+                // ValueDetailTooltipBuilder finds a real divergence -
+                // Selected (multi-option winner) and Locked (sole option)
+                // are the only two kinds a committed CRAFT/VENDOR pill can
+                // ever have (see BuildPillSpecs' own "the selected pill
+                // always matches node.Decision" guarantee), so gating on
+                // node.Decision here (rather than re-checking spec.Text)
+                // cannot accidentally attach this to an unrelated pill -
+                // every other Kind's node.Decision is never Craft/
+                // BuyFromVendor (Currency/GuildUpgrade/Have/etc. all use
+                // their own distinct CraftingDecision values).
+                if ((spec.Kind == PillKind.Selected || spec.Kind == PillKind.Locked) &&
+                    (node.Decision == CraftingDecision.Craft || node.Decision == CraftingDecision.BuyFromVendor) &&
+                    ValueDetailTooltipBuilder.TryBuild(node, _getCurrentPlan()?.VendorCapsByItemId, out string valueDetailText))
+                {
+                    tooltipText = tooltipText == null
+                        ? valueDetailText
+                        : tooltipText + "\n\n" + valueDetailText;
+                }
+
                 if (tooltipText != null)
                 {
                     outer.BasicTooltipText = tooltipText;

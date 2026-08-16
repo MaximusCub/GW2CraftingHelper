@@ -375,6 +375,32 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void VendorCapsByItemId_PopulatedFromPlanTimegatedItems()
+        {
+            var result = MakeResult(timegatedItems: new List<TimegatedItem>
+            {
+                new TimegatedItem { ItemId = 5, CapType = TimegatedCapType.Daily, CapValue = 3, NeededCount = 10 }
+            });
+
+            var vm = _builder.Build(result);
+
+            Assert.NotNull(vm.VendorCapsByItemId);
+            Assert.True(vm.VendorCapsByItemId.TryGetValue(5, out var cap));
+            Assert.Equal(TimegatedCapType.Daily, cap.CapType);
+            Assert.Equal(3, cap.CapValue);
+        }
+
+        [Fact]
+        public void VendorCapsByItemId_NoTimegatedItems_IsNull()
+        {
+            var result = MakeResult();
+
+            var vm = _builder.Build(result);
+
+            Assert.Null(vm.VendorCapsByItemId);
+        }
+
+        [Fact]
         public void CurrencyTable_HaveIsUnclamped_ExceedsRequired()
         {
             // W4A (user-mandated): the pre-W4A behavior clamped this to

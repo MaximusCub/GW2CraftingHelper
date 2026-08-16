@@ -153,6 +153,15 @@ namespace GW2CraftingHelper.Models
         // must treat it that way (omit the pill entirely, not show HAVE 0).
         public IReadOnlyDictionary<int, long> CurrencyPlanTotals { get; set; }
         public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
+
+        // currency-ux-package (Feature 3, maintainer-ratified #21
+        // resolution): passthrough of CraftingPlan.TimegatedItems
+        // (informational-only vendor purchase caps - see that class's own
+        // doc comment), re-indexed by ItemId so the Recipe Tree's
+        // value-detail tooltip can look up a BuyFromVendor node's winning
+        // offer cap in O(1) instead of scanning the list per row. Null
+        // when the plan has no timegated items at all.
+        public IReadOnlyDictionary<int, TimegatedItem> VendorCapsByItemId { get; set; }
     }
 
     /// <summary>

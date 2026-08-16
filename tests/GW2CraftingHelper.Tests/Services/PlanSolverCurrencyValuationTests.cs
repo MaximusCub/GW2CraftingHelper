@@ -280,5 +280,55 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(3, plan.CurrencyCosts[0].CurrencyId);
             Assert.Equal(50, plan.CurrencyCosts[0].Amount);
         }
+
+        // --- currency-ux-package (Feature 3): SolverDecision.ComparisonValue ---
+
+        [Fact]
+        public void ComparisonValue_RollsUpThroughAncestorCraft_MatchesDecisionOnlyExpectation()
+        {
+            // Same shape as ValuedVendorDescendant_CraftStillWinsWhenGenuinelyCheaper
+            // above: B's vendor decision has a real coin cost of 0 but a
+            // ComparisonValue of 250 (50 karma valued at 5 copper/unit); A's
+            // craft decision must roll that same 250 up into its own
+            // ComparisonValue (real cost 0, since B is the only ingredient
+            // and contributes 0 real coin) - ComparisonValue is never equal
+            // to TotalCost for either node here.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 2000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, 3, 50) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 3, 5 } });
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation);
+
+            // DFS NodeIds: item1(craft)=0, item2(vendor)=1.
+            Assert.Equal(0, result.Decisions[1].TotalCost);
+            Assert.Equal(250, result.Decisions[1].ComparisonValue);
+            Assert.Equal(0, result.Decisions[0].TotalCost);
+            Assert.Equal(250, result.Decisions[0].ComparisonValue);
+        }
+
+        [Fact]
+        public void ComparisonValue_NoCurrencyContribution_EqualsTotalCost()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices);
+
+            Assert.Equal(100, result.Decisions[0].TotalCost);
+            Assert.Equal(result.Decisions[0].TotalCost, result.Decisions[0].ComparisonValue);
+        }
     }
 }

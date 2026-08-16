@@ -370,6 +370,11 @@ namespace GW2CraftingHelper.Services
                     Source = kvp.Value.Source,
                     RecipeId = kvp.Value.RecipeId,
                     TotalCost = kvp.Value.TotalCost,
+                    // currency-ux-package (Feature 3): public passthrough of
+                    // the private Decision.ComparisonValue this memo entry
+                    // already carried - see SolverDecision.ComparisonValue's
+                    // own doc comment for the decision-only invariant.
+                    ComparisonValue = kvp.Value.ComparisonValue,
                     VendorCurrencyCosts = kvp.Value.VendorCurrencyCosts,
                     VendorItemCosts = kvp.Value.VendorItemCosts,
                     VendorHasRawCoin = kvp.Value.VendorHasRawCoin,

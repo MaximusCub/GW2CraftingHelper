@@ -31,7 +31,11 @@ namespace GW2CraftingHelper.Services
                 // Summary section's currency table), so this passthrough
                 // needs no branching.
                 CurrencyPlanTotals = BuildCurrencyPlanTotals(result.Plan.CurrencyCosts),
-                OwnedCurrencyAmounts = result.OwnedCurrencyAmounts
+                OwnedCurrencyAmounts = result.OwnedCurrencyAmounts,
+                // currency-ux-package (Feature 3): same whole-plan-source
+                // reasoning as CurrencyPlanTotals above - result.Plan is
+                // already the single combined Plan for a multi-item batch.
+                VendorCapsByItemId = BuildVendorCapsByItemId(result.Plan.TimegatedItems)
             };
 
             if (isMultiItem)
@@ -475,6 +479,31 @@ namespace GW2CraftingHelper.Services
                 totals[cc.CurrencyId] = cc.Amount;
             }
             return totals;
+        }
+
+        /// <summary>
+        /// currency-ux-package (Feature 3): re-indexes the plan's
+        /// informational timegated-cap notices by ItemId for
+        /// PlanViewModel.VendorCapsByItemId - pure passthrough/reindex of
+        /// an already-computed list (VendorBatchSolver.FinalizeVendorBatches
+        /// owns the actual cap computation, untouched here), one entry per
+        /// item id by construction (TimegatedItem is already a per-item
+        /// merged notice).
+        /// </summary>
+        private static IReadOnlyDictionary<int, TimegatedItem> BuildVendorCapsByItemId(
+            List<TimegatedItem> timegatedItems)
+        {
+            if (timegatedItems == null || timegatedItems.Count == 0)
+            {
+                return null;
+            }
+
+            var byItemId = new Dictionary<int, TimegatedItem>(timegatedItems.Count);
+            foreach (var item in timegatedItems)
+            {
+                byItemId[item.ItemId] = item;
+            }
+            return byItemId;
         }
 
         private PlanSectionViewModel BuildUsedMaterialsSection(CraftingPlanResult result)
