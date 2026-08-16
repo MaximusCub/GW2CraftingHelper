@@ -219,6 +219,12 @@ namespace GW2CraftingHelper.Services
                 if (recipe != null)
                 {
                     treeNode.RecipeId = recipe.RecipeId;
+                    // design-plan-notes.md (Notes section, excess/reclaim):
+                    // batch shape of THIS occurrence's chosen recipe - see
+                    // CraftingTreeNode.CraftsNeeded's own doc comment for
+                    // why this can exceed treeNode.Quantity.
+                    treeNode.CraftsNeeded = recipe.CraftsNeeded;
+                    treeNode.RecipeOutputCount = recipe.OutputCount;
                     // Propagate insideReferenceBranch as-is (not reset to
                     // false): a Craft decision reached WHILE already inside
                     // a reference branch is still hypothetical content, and
