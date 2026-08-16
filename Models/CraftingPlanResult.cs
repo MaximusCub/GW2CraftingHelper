@@ -104,6 +104,18 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyDictionary<int, AcquisitionHint> AcquisitionHints { get; set; }
 
         /// <summary>
+        /// Wiki-verified daily-craft-cooldown data for recipes whose crafting
+        /// action itself is server-capped, keyed by item id (see
+        /// DailyCooldownItemService / ref/daily_cooldown_items.json).
+        /// Additive, informational only - PlanViewModelBuilder reads this to
+        /// append a "this will take N days" notice to the Crafting Steps
+        /// section for any Craft-source step whose aggregate quantity
+        /// exceeds the cap; never affects the solve itself. Null when the
+        /// module was not wired with this seed data.
+        /// </summary>
+        public IReadOnlyDictionary<int, DailyCooldownItem> DailyCooldownItems { get; set; }
+
+        /// <summary>
         /// Owned amount per currency id referenced by Plan.CurrencyCosts
         /// (M34-B2a #4 - see AccountCurrencyIndex). Cosmetic display data
         /// only, computed strictly after solving from the account wallet

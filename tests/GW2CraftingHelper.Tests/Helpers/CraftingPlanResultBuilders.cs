@@ -27,7 +27,8 @@ namespace GW2CraftingHelper.Tests.Helpers
             List<TimegatedItem> timegatedItems = null,
             List<PlanRequestItem> requestedItems = null,
             List<CraftingTreeNode> multiItemRoots = null,
-            List<SnapshotCharacterDiscipline> characterDisciplines = null)
+            List<SnapshotCharacterDiscipline> characterDisciplines = null,
+            Dictionary<int, DailyCooldownItem> dailyCooldownItems = null)
         {
             return new CraftingPlanResult
             {
@@ -49,6 +50,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                 DebugLog = new List<string>(),
                 CurrencyMetadata = currencyMetadata,
                 AcquisitionHints = acquisitionHints,
+                DailyCooldownItems = dailyCooldownItems,
                 RequestedItems = requestedItems,
                 MultiItemRoots = multiItemRoots,
                 // W3C: defaults to null (not an empty list) - matches

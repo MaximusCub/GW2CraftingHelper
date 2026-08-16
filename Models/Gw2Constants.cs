@@ -147,6 +147,11 @@ namespace GW2CraftingHelper.Models
             { 64, "Jade Sliver" },
             { 65, "Testimony of Jade Heroics" },
             { 67, "Canach Coins" },
+            // Audit row 56 PART B #2: id 68 was missing entirely (verified
+            // against https://api.guildwars2.com/v2/currencies?ids=all
+            // 2026-08-16; live name is the singular "Imperial Favor" - a
+            // plan costing this Cantha vendor currency previously fell back
+            // to the generic "Currency" display name via ResolveCurrencyName.
             { 68, "Imperial Favor" },
             { 69, "Tales of Dungeon Delving" },
             { 78, "Fine Rift Essence" },

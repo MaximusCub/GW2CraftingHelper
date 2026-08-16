@@ -142,7 +142,7 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Shipped seed file (pins the real file against silent drift) ---
 
         [Fact]
-        public void Load_ShippedSeedFile_ParsesSixEntriesWithHintAndBadge()
+        public void Load_ShippedSeedFile_ParsesSevenEntriesWithHintAndBadge()
         {
             string path = FindRepoFile(Path.Combine("ref", "acquisition_hints_seed.json"));
             Assert.False(
@@ -153,12 +153,28 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 var hints = AcquisitionHintService.Load(stream);
 
-                Assert.Equal(6, hints.Count);
+                Assert.Equal(7, hints.Count);
                 foreach (var hint in hints.Values)
                 {
                     Assert.False(string.IsNullOrEmpty(hint.Hint));
                     Assert.False(string.IsNullOrEmpty(hint.Badge));
                 }
+
+                // Review fix (finding 1, post-PART-C follow-up): Charged
+                // Quartz Crystal (43772) is made at a Place of Power, not
+                // via any recipe this module resolves, so it can never be a
+                // DailyCooldownItemService.Load Craft-step entry (see
+                // DailyCooldownItemServiceTests' own 43772-absence guard).
+                // It still resolves to a ShoppingUnknown leaf with zero
+                // timegate signal without this hint - e.g. a plan for one
+                // Grow Lamp (66993) needs 10x Charged Quartz Crystal and
+                // previously emitted no notice at all. This reuses the
+                // existing ShoppingUnknown hint/badge path
+                // (PlanViewModelBuilder.ResolveHintText/ResolveBadgeText)
+                // with no new code.
+                Assert.True(hints.ContainsKey(43772));
+                Assert.Equal("DAILY", hints[43772].Badge);
+                Assert.Contains("1 per day per account", hints[43772].Hint);
             }
         }
 
