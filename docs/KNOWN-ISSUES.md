@@ -3409,10 +3409,15 @@ recipes, and needs real design work (a new ingredient-type concept, not
 a one-line fix) - left for a future milestone.
 
 **RESOLVED (2026-08-16):** this finding under-described the real
-severity - a live-API audit found a GuildUpgrade ingredient falls through
-`PlanSolver`'s item-pricing path and is priced as whatever TP ITEM shares
-its numeric id, a genuine mis-costing bug, not just a display gap. See
-"GuildUpgrade ingredient costing/display fix" below for the fix (the
+severity, though not quite the way first written here either (see the
+correction below) - a live-API audit found a GuildUpgrade ingredient does
+NOT reach the item-pricing path described above (that observation held up:
+`CollectItemIds`' `"Item"`-only gate means it never is), but it DOES reach
+`PlanSolver`'s vendor-offer evaluation, which prices offers by raw
+ingredient id with no `"Item"`-type gate at all - a genuine mis-costing
+bug (latent-but-reachable-via-vendor-offers in the current seed, not
+merely cosmetic), not just a display gap. See "GuildUpgrade ingredient
+costing/display fix" below for the corrected mechanism and the fix (the
 renamed test above is now
 `GuildUpgradeIngredient_NeverPricedAsItemOrCurrency_DisplaysAsUnresolvedGuildUpgrade`).
 
@@ -3878,17 +3883,36 @@ a real mis-costing bug too - see that entry's own RESOLVED note.
 1. `Services/CraftingTreeBuilder.cs`'s non-`"Item"` branch labeled ANY
    non-Item ingredient `CraftingDecision.Currency` and resolved a
    **currency** name from the id via `Gw2Constants.ResolveCurrencyName` -
-   wrong domain (a guild upgrade id is not a wallet currency id, and the
-   two id spaces numerically overlap in the real seed - several
-   GuildUpgrade ids, e.g. 73-87, fall inside `KnownCurrencyNames`' own
-   2-80 range).
+   wrong domain (a guild upgrade id and a wallet currency id are distinct
+   id spaces with no defined relationship to each other; resolving one as
+   if it were the other on the strength of a numeric match would silently
+   show the wrong name on any collision).
 2. `Services/PlanSolver.cs`'s ingredient loop (`Evaluate`) special-cased
    only `IngredientType == "Currency"`, so a `GuildUpgrade` ingredient fell
-   through to the item-pricing path (`Evaluate` called directly on it,
-   `GetBuyCost` looked up its numeric id in the TP price table) and was
-   priced as whatever TP **item** happened to share that numeric id - wrong
-   cost, wrong shopping list, silently inflating (or deflating) the
-   containing recipe's real coin total.
+   through and was evaluated exactly like a normal item node. **Correction
+   to this entry's own first draft of this root cause:** the TP
+   item-pricing path is not actually reachable this way -
+   `CraftingPlanPipeline.CollectItemIds` only ever collects `"Item"`-typed
+   ids into the set that becomes `context.Prices`, so `GetBuyCost`'s
+   TP-price-table lookup could never contain a `GuildUpgrade` id in
+   production. The path that WAS reachable: `Evaluate` also calls
+   `VendorBatchSolver.EvaluateVendorOffers` against the full `vendorOffers`
+   dataset (53,536 offers in the current seed), keyed directly by the
+   ingredient's raw id (`vendorOffers.TryGetValue(node.Id, ...)`, matched
+   against each offer's `outputItemId`) with no `"Item"`-type gate anywhere
+   in that method - so a `GuildUpgrade` id that happened to also be a real
+   vendor offer's `outputItemId` would be priced off that unrelated offer
+   and could win as a genuine `BuyFromVendor` `PlanStep`, silently
+   inflating (or deflating) the containing recipe's real coin total.
+   **Severity: latent-but-reachable-via-vendor-offers, not cosmetic** -
+   measured against `ref/recipes_seed.json`: none of the 225 distinct
+   `GuildUpgrade` ingredient ids collide with a vendor offer
+   `outputItemId`, a seed `Item` ingredient/output id, or a
+   `KnownCurrencyNames` key, so the mis-cost was never realized in the
+   current seed - but nothing in the pre-fix code enforced that absence of
+   collision, so it was one seed update away from firing. (The defects
+   that WERE realized pre-fix were the CURRENCY mislabel from site 1 above
+   and the missing fallback-tier demotion - see "Fix" below.)
 
 **Fix (matches the approved direction exactly):**
 
@@ -3907,10 +3931,21 @@ a real mis-costing bug too - see that entry's own RESOLVED note.
   Never calls `Gw2Constants.ResolveCurrencyName`/`CurrencyDisplayResolver`
   and never consults `currencyMetadata` - confirmed via a dedicated
   id-collision test (`GuildUpgradeNode_NeverResolvesViaCurrencyMetadata_
-  EvenWhenIdCollides`). No live metadata source exists for a guild-upgrade
-  id today: `CollectTreeItemIds` only ever fetches `ItemMetadata` for
-  `"Item"`-typed ids, so the `metadata` dict never carries a genuine entry
-  for one either - confirmed by code inspection, not assumed.
+  EvenWhenIdCollides`). Review-fix: the branch also now explicitly clears
+  `IconUrl`/`Rarity` (both already populated above, keyed on the raw
+  ingredient id, before this branch runs). The original draft of this fix
+  left them alone on the reasoning that no live metadata source exists for
+  a guild-upgrade id - `CollectTreeItemIds` only ever fetches `ItemMetadata`
+  for `"Item"`-typed ids - but the `metadata` dict handed to this builder is
+  populated from more than `CollectTreeItemIds` alone
+  (`CraftingPlanPipeline`'s `metadataIds` also unions step item ids, the
+  target item id, used-material ids, and vendor cost-component ids, none of
+  which that guard constrains), so a same-numbered genuine item entry
+  reaching `metadata` by one of those other routes could not actually be
+  ruled out by code inspection. Explicitly nulling both fields makes the
+  no-wrong-domain-icon/rarity invariant true by construction instead of by
+  the current seed's luck (measured: no seed `GuildUpgrade` id collides
+  with a seed `Item` id today, but nothing enforced that).
 - `PlanSolver.Evaluate`'s ingredient loop gained an explicit `"GuildUpgrade"`
   branch (checked before the `"Currency"` branch): unconditionally sets
   `hasUnvaluedCurrency = true` and contributes zero to both `craftCost` and
@@ -3993,5 +4028,125 @@ list: `Services/ModuleLog.cs`, `Services/PlanContentHeightMath.cs` (a
 subtree exactly like `Currency`/`Have`/`Unknown` do today, with zero code
 change needed there), `Services/PlanRelayoutMath.cs`, scroll machinery,
 `VendorBatchSolver`'s merged-ceil batching math.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+## GuildUpgrade ingredient costing/display fix - adversarial review follow-up (2026-08-16)
+
+A second, adversarial pass (Code Reviewer Mode, per this repo's mandatory
+Edit -> Review -> Fix loop) over the fix above found three defects: one
+false empirical claim used as the fix's own stated justification (repeated
+at four production sites plus two test-comment sites), one wrong mechanism
+named for the real mis-costing bug this document itself records, and one
+gap the fix's reasoning left open for icon/rarity instead of name. None
+required touching DO-NOT-TOUCH code (`Services/ModuleLog.cs`, `Services/
+PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`, scroll
+machinery, `VendorBatchSolver`'s merged-ceil batching math).
+
+**Fixed (mustFix): the fix's own stated justification - a claimed numeric
+overlap between GuildUpgrade ids and `KnownCurrencyNames`' keys - was
+false, and cited a doc comment that says nothing about guild upgrades.**
+The claim ("the two id spaces numerically overlap in the real seed -
+several GuildUpgrade ids, e.g. 73-87, fall inside `KnownCurrencyNames`'
+own 2-80 range") appeared in `Models/CraftingDecision.cs`, `Services/
+CraftingTreeBuilder.cs`, `Services/PlanSolver.cs`, this document's own
+"Root cause" item 1 above, and comments in
+`tests/GW2CraftingHelper.Tests/Services/CraftingTreeBuilderTests.cs`.
+Independently re-measured (not just re-checked against the finding) with
+a script over `ref/recipes_seed.json` and `Models/Gw2Constants.cs`: 678
+GuildUpgrade ingredient occurrences over 225 distinct ids, min 73 / max
+1309; exactly one id (73) is `<= 80`, and 84/85/86/87 are all present but
+all `> 80`, outside the claimed 2-80 span; `KnownCurrencyNames` has 44
+keys total (2-7, 9-16, 18-20, 22-30, 32-34, 36, 45, 47, 49, 50, 58-63, 65,
+78-80) and the intersection with the 225 GuildUpgrade ids is empty. The
+cited doc comment (`Models/Gw2Constants.cs` ~62-88) is entirely about the
+2026-08-15 currency-name-drift audit and never mentions guild upgrades.
+The fix is correct on domain grounds alone and needed no invented overlap
+to justify it - every site now states the real reasoning instead: a guild
+upgrade id and a wallet currency id are distinct id spaces with no
+defined relationship to each other, so resolving one as the other on the
+strength of a numeric match would risk silently showing the wrong name,
+price, icon, or rarity on any collision.
+
+**Fixed (mustFix): this document's own "Root cause" item 2 above (and the
+"RESOLVED" note it overrode on the original "Recipe-ingestion bug class"
+finding) named the wrong mechanism for the real mis-costing bug.** Both
+stated the ingredient "fell through to the item-pricing path (`GetBuyCost`
+looked up its numeric id in the TP price table)". That path is
+unreachable in production: `CraftingPlanPipeline.CollectItemIds` only
+ever collects `"Item"`-typed ids, so `context.Prices` can never carry a
+`GuildUpgrade` id there. The path that WAS reachable: `PlanSolver.
+Evaluate`'s ingredient loop falls through to a recursive `Evaluate` call
+on the ingredient node for any type it does not special-case, which
+reaches `VendorBatchSolver.EvaluateVendorOffers` - keyed by the raw
+ingredient id (`vendorOffers.TryGetValue(node.Id, ...)`) against
+`outputItemId`, with no `"Item"`-type gate anywhere in that method - so a
+colliding vendor-offer `outputItemId` could have produced a real,
+wrongly-priced `BuyFromVendor` step pre-fix. Independently re-measured:
+none of the 225 seed `GuildUpgrade` ids collide with a seed `Item`
+ingredient/output id (16,024 distinct), a vendor offer `outputItemId`
+(14,959 distinct across 53,536 offers), or a `KnownCurrencyNames` key -
+so this was latent, not realized, on this branch; the realized defects
+were the CURRENCY mislabel and the missing fallback-tier demotion.
+Severity corrected to latent-but-reachable-via-vendor-offers (not
+cosmetic) in both places this document stated the wrong mechanism. Added
+a dedicated regression test that seeds a colliding vendor offer directly
+(`GuildUpgradeIngredient_NeverPricedAsVendorOffer_EvenWhenVendorOfferExistsForSameId`
+in `PlanSolverGuildUpgradeTests.cs`) - the previous suite exercised only
+the (unreachable) TP-price collision, never the vendor-offer one that was
+actually live.
+
+**Fixed (mustFix): the same wrong-domain leak the fix eliminated for the
+display Name was left open for IconUrl/Rarity.**
+`CraftingTreeBuilder.BuildNode` sets `IconUrl`/`Rarity` from the
+`metadata` dictionary keyed on the raw ingredient id for every node
+(including the GuildUpgrade one) before the GuildUpgrade branch runs, and
+that branch overrode only `Name`. `Views/Rendering/
+TreeSectionController.cs` feeds `Rarity` to the icon frame color and the
+row's name color, and renders `IconUrl` directly, so a numeric collision
+would show an unrelated item's icon and rarity-colored name under the
+"Guild upgrade (unresolved)" label - the same class of bug this fix
+exists to eliminate, just for icon/rarity instead of name. The branch's
+own comment argued this was safe because "`metadata` never carries a
+genuine entry for this id", citing `CollectTreeItemIds`'s `"Item"`-only
+fetch guard - true of that one contributor, but `CraftingPlanPipeline`'s
+`metadataIds` also unions step item ids, the target item id, used-material
+ids, and vendor cost-component ids, none of which that guard constrains,
+so the claim was never actually enforced anywhere (unrealized today only
+because no seed `GuildUpgrade` id happens to collide with a seed `Item`
+id). Fixed by explicitly setting `IconUrl = null; Rarity = null;` in the
+branch, making the invariant true by construction instead of by the
+current seed's luck. Covered by a new test that seeds a colliding
+`ItemMetadata` entry directly
+(`GuildUpgradeNode_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides`
+in `CraftingTreeBuilderTests.cs`).
+
+**Tests**: 2 new regression tests (the vendor-offer-collision test in
+`PlanSolverGuildUpgradeTests.cs`; the IconUrl/Rarity metadata-collision
+test in `CraftingTreeBuilderTests.cs`), for 1382 total (1380 from the
+base pass + 2). No new test file, `.csproj` unchanged. The false-claim
+corrections in both files' doc comments do not change any assertion's
+behavior.
+
+Validation: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` -
+PASS (0 errors, only pre-existing StyleCop warnings, none on touched
+lines). Tests: `dotnet test tests/GW2CraftingHelper.Tests/
+GW2CraftingHelper.Tests.csproj` - 1382 total (1380 baseline + 2 net new)
+- PASS, 0 failed. No new Blish HUD references in tests; both new tests
+exercise real production code paths (`PlanSolver.Solve`,
+`CraftingTreeBuilder.BuildTree` end-to-end, real `RecipeNode`/
+`VendorOffer`/`ItemMetadata` fixtures), no contract-mirror/fake-logic
+tests. Item/currency/vendor IDs remain internal-only (the GuildUpgrade id
+is never displayed by either new test's assertions, matching every
+existing test in these files). Pricing logic continues to preserve
+multiple sources and avoid inventing currency exchange rates.
+
+**Out of scope, not touched:** the same false overlap claim also appears
+verbatim in commit `8ed76e6`'s own commit message (this milestone's first
+commit) - rewriting published commit history was not requested by this
+task and this repo's workflow avoids amend/rebase by default; it may also
+be recorded in this project's orchestrator-side session memory/journal
+logs outside the repository, which are conversation records rather than
+project source and are out of this fix's scope.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

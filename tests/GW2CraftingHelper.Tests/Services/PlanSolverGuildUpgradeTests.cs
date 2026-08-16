@@ -3,6 +3,7 @@ using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
 using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
+using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
@@ -13,14 +14,20 @@ namespace GW2CraftingHelper.Tests.Services
     /// 80471, guild upgrade id 829, ref/recipes_seed.json). Before this fix,
     /// PlanSolver.Evaluate's ingredient loop only special-cased
     /// IngredientType == "Currency", so a GuildUpgrade ingredient fell
-    /// through to the item-pricing path and was priced as whatever TP ITEM
-    /// happened to share that numeric id - wrong domain, wrong cost. These
-    /// tests exercise the real PlanSolver.Solve() entry point (not a
-    /// contract mirror) and prove a GuildUpgrade ingredient is NEVER priced
-    /// as an item or a currency, even when a coincidentally-matching TP
-    /// price or CurrencyValuation entry exists for the exact same numeric
-    /// id - the domain-collision case Gw2Constants.KnownCurrencyNames' own
-    /// doc comment documents as real in the current seed.
+    /// through and was evaluated exactly like a normal item node. The TP
+    /// item-pricing route was never actually reachable in production
+    /// (CraftingPlanPipeline.CollectItemIds only ever collects "Item"-typed
+    /// ids, so the TP price table can never carry a GuildUpgrade id there);
+    /// the route that WAS reachable is VendorBatchSolver.EvaluateVendorOffers,
+    /// which keys vendorOffers by the raw ingredient id with no "Item"-type
+    /// gate at all. These tests exercise the real PlanSolver.Solve() entry
+    /// point (not a contract mirror) and prove a GuildUpgrade ingredient is
+    /// NEVER priced as an item, a vendor offer, or a currency, even when a
+    /// coincidentally-matching TP price, vendor offer, or CurrencyValuation
+    /// entry exists for the exact same numeric id - GuildUpgrade ids and
+    /// wallet currency ids are simply distinct id spaces with no defined
+    /// relationship to each other, so any of these collisions is possible
+    /// in principle even though none is present in the current seed.
     /// </summary>
     public class PlanSolverGuildUpgradeTests
     {
@@ -29,9 +36,13 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Root (item 1) crafts from 1x item 2 (TP price 100) + 5x
             // GuildUpgrade id 829. A TP price is deliberately seeded for id
-            // 829 too - the exact "shares that numeric id" collision the
-            // pre-fix bug exploited. If the fix regressed, the root's craft
-            // cost would include 829's bogus 99999-copper "price".
+            // 829 too - belt-and-braces coverage of PlanSolver.Evaluate's
+            // own GetBuyCost path in isolation (in a real pipeline run,
+            // CollectItemIds' "Item"-only gate means context.Prices could
+            // never actually carry a GuildUpgrade id this way - see the
+            // vendor-offer test below for the mechanism that WAS reachable
+            // pre-fix). If this branch regressed, the root's craft cost
+            // would include 829's bogus 99999-copper "price".
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
                     Leaf(2, 1, "Item"),
@@ -63,6 +74,48 @@ namespace GW2CraftingHelper.Tests.Services
                 s.Source == AcquisitionSource.BuyFromTp && s.ItemId == 2 && s.TotalCost == 100);
             // The GuildUpgrade ingredient must never generate its own
             // shopping-list row (it is not a purchasable item).
+            Assert.DoesNotContain(result.Plan.Steps, s => s.ItemId == 829);
+        }
+
+        [Fact]
+        public void GuildUpgradeIngredient_NeverPricedAsVendorOffer_EvenWhenVendorOfferExistsForSameId()
+        {
+            // The mechanism that was ACTUALLY reachable in a real pipeline
+            // run pre-fix (docs/KNOWN-ISSUES.md's corrected "Root cause"
+            // note): VendorBatchSolver.EvaluateVendorOffers keys
+            // vendorOffers by the raw ingredient id with no "Item"-type
+            // gate at all, unlike the TP price table above (which
+            // CollectItemIds only ever populates for "Item"-typed ids). A
+            // vendor offer is deliberately seeded for id 829 too - the
+            // exact "shares that numeric id" collision that would let an
+            // unrelated vendor's offer silently win as a real
+            // BuyFromVendor step if the fix regressed.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Leaf(2, 1, "Item"),
+                    Leaf(829, 5, "GuildUpgrade")));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 829, new List<VendorOffer> { CoinVendorOffer(829, 1, outputCount: 1) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+
+            // Only source available for the root is the fallback-tier
+            // craft, same as the item-pricing test above - a colliding
+            // vendor offer must not let the GuildUpgrade ingredient
+            // resolve to BuyFromVendor.
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.True(result.Decisions[0].CanCraft);
+            // Real cost is item 2's price ALONE - the GuildUpgrade
+            // ingredient must contribute exactly zero, never the
+            // colliding vendor offer's price.
+            Assert.Equal(100, result.Decisions[0].TotalCost);
             Assert.DoesNotContain(result.Plan.Steps, s => s.ItemId == 829);
         }
 

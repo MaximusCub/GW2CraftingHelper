@@ -414,8 +414,10 @@ namespace GW2CraftingHelper.Tests.Services
         // GW2 API ingredient type - see the real recipe 12002 -> item 80471
         // shape captured in ref/recipes_seed.json). Deliberately NOT bucketed
         // as CraftingDecision.Currency (see that enum's own doc comment): a
-        // guild upgrade id is not a wallet currency id, and the two id spaces
-        // numerically overlap in real recipe data.
+        // guild upgrade id and a wallet currency id are distinct id spaces
+        // with no defined relationship to each other, and treating one as
+        // the other on the strength of a numeric match would risk silently
+        // showing the wrong name, price, icon, or rarity on any collision.
 
         [Fact]
         public void GuildUpgradeNode_DecisionIsGuildUpgrade_WithGenericLabelAndHint_NoRawId()
@@ -441,19 +443,22 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Guild upgrade (unresolved)", treeNode.Name);
             Assert.DoesNotContain("829", treeNode.Name);
             Assert.False(string.IsNullOrEmpty(treeNode.AcquisitionHint));
+            Assert.Null(treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
         }
 
         [Fact]
         public void GuildUpgradeNode_NeverResolvesViaCurrencyMetadata_EvenWhenIdCollides()
         {
             // Adversarial case: currencyMetadata happens to carry an entry
-            // for the SAME numeric id as this GuildUpgrade ingredient (the
-            // exact cross-domain collision Gw2Constants.KnownCurrencyNames'
-            // own doc comment documents as real in the current seed - e.g.
-            // GuildUpgrade id 73 also falls in the currency-id range). The
-            // fix must never consult currencyMetadata for a GuildUpgrade
-            // node at all - CurrencyDisplayResolver.ResolveName is only
-            // ever called from the Currency branch, never this one.
+            // for the SAME numeric id as this GuildUpgrade ingredient - a
+            // guild upgrade id and a wallet currency id are distinct id
+            // spaces with no defined relationship to each other, so a
+            // numeric match is possible in principle even though none is
+            // present in the current seed. The fix must never consult
+            // currencyMetadata for a GuildUpgrade node at all -
+            // CurrencyDisplayResolver.ResolveName is only ever called from
+            // the Currency branch, never this one.
             var node = Leaf(73, 1, "GuildUpgrade");
             node.NodeId = 0;
             var decisions = new Dictionary<int, SolverDecision>();
@@ -469,6 +474,39 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(CraftingDecision.GuildUpgrade, treeNode.Decision);
             Assert.Equal("Guild upgrade (unresolved)", treeNode.Name);
             Assert.NotEqual("Unrelated Wallet Currency", treeNode.Name);
+        }
+
+        [Fact]
+        public void GuildUpgradeNode_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides()
+        {
+            // Adversarial-review finding: `metadata` (the ItemMetadata
+            // dict every OTHER node's IconUrl/Rarity is looked up from,
+            // keyed by raw ingredient id) happens to carry a genuine entry
+            // for the SAME numeric id as this GuildUpgrade ingredient. The
+            // dict handed to CraftingTreeBuilder is not populated by
+            // CollectTreeItemIds alone - CraftingPlanPipeline's
+            // metadataIds also unions step item ids, the target item id,
+            // used-material ids, and vendor cost-component ids - so this
+            // shape is not merely hypothetical. Both IconUrl and Rarity
+            // must stay null so an unrelated item's icon and rarity color
+            // can never render under the "Guild upgrade (unresolved)"
+            // label - the same wrong-domain class the Name fix above
+            // already closes.
+            var node = Leaf(829, 5, "GuildUpgrade");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = new Dictionary<int, ItemMetadata>
+            {
+                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.GuildUpgrade, treeNode.Decision);
+            Assert.Equal("Guild upgrade (unresolved)", treeNode.Name);
+            Assert.Null(treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
         }
 
         [Fact]

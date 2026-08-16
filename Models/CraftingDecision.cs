@@ -28,9 +28,10 @@ namespace GW2CraftingHelper.Models
     /// <item><see cref="GuildUpgrade"/> &lt;- set directly for a "GuildUpgrade"-typed
     /// ingredient node (a Guild Decoration recipe's claimed-upgrade requirement, GW2 API
     /// ingredient type), never via <see cref="Models.AcquisitionSource"/>. Deliberately
-    /// separate from <see cref="Currency"/>: a guild upgrade id is not a wallet currency id
-    /// (the two id spaces numerically overlap in real recipe data - see
-    /// <see cref="Models.Gw2Constants.KnownCurrencyNames"/>'s own doc comment) and must
+    /// separate from <see cref="Currency"/>: a guild upgrade id and a wallet currency id
+    /// are distinct id spaces with no defined relationship to each other - resolving one
+    /// as if it were the other on the strength of a numeric match would risk silently
+    /// showing the wrong name or price on any collision - and must
     /// never be priced or named as one - see <see cref="Services.CraftingTreeBuilder"/>'s
     /// "GuildUpgrade" branch and <see cref="Services.PlanSolver"/>'s matching ingredient-loop
     /// branch. Full guild-decoration crafting support (resolving the upgrade's real name,

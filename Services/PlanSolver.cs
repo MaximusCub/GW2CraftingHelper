@@ -567,11 +567,12 @@ namespace GW2CraftingHelper.Services
                         // CurrencyValuation might coincidentally hold an
                         // entry for this exact numeric id - GuildUpgrade
                         // ids and wallet currency ids are two unrelated id
-                        // spaces that DO overlap numerically in real recipe
-                        // data (see Gw2Constants.KnownCurrencyNames' own
-                        // doc comment), so consulting currencyValuation
-                        // here would silently misprice this ingredient
-                        // using an unrelated currency's rate. Demotes the
+                        // spaces with no defined relationship to each
+                        // other, so a numeric match would be coincidental,
+                        // and consulting currencyValuation here on the
+                        // strength of one would silently misprice this
+                        // ingredient using an unrelated currency's rate on
+                        // any such collision. Demotes the
                         // recipe to the fallback tier unconditionally -
                         // exactly the same machinery a genuinely unvalued
                         // Currency ingredient uses below - and contributes
