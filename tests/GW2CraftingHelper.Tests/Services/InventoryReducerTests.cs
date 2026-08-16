@@ -167,7 +167,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Item 1 (qty 10) -> recipe 10 (output 2) -> leaf item 2 (qty 25)
             // craftsNeeded = ceil(10/2) = 5, so ingredient qty = 25 (perCraft = 5)
-            // Own 4 of item 1 → qty becomes 6, newCrafts = ceil(6/2) = 3
+            // Own 4 of item 1 -> qty becomes 6, newCrafts = ceil(6/2) = 3
             // ingredient qty = 5 * 3 = 15
             var tree = Craftable(1, 10, 10, 2, Leaf(2, 25));
             var pool = new Dictionary<int, int> { { 1, 4 } };

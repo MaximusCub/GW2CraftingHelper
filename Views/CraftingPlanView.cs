@@ -149,10 +149,15 @@ namespace GW2CraftingHelper.Views
         // relocated inline from the global ModuleSettings.ValueOwnMaterials
         // setting (see that field's own doc comment) - now a per-plan
         // session choice exactly like _useOwnMaterials/_priceBasis above:
-        // never read from/written to ModuleSettings, reset to this default
-        // on every module reload. Default true mirrors
-        // ModuleSettings.ValueOwnMaterials' own default TRUE (gw2e parity -
-        // see that setting's doc comment). Only meaningful while
+        // never WRITTEN back to ModuleSettings, and never re-read from it
+        // after construction. This field initializer's `true` is only the
+        // fallback for a null `settings` (unreachable via the module's own
+        // single construction site); the constructor overwrites it with
+        // `settings.ValueOwnMaterials.Value` (post-review fix) so an
+        // already-persisted user choice still applies to the first plan of
+        // a fresh session, matching ModuleSettings.ValueOwnMaterials' own
+        // default TRUE (gw2e parity - see that setting's doc comment) when
+        // nothing was ever persisted. Only meaningful while
         // _useOwnMaterials is also on (see OnOwnMaterialsToggled's
         // Enabled-sync); the last-chosen value is preserved, not reset,
         // while disabled, so re-enabling Use Own Materials restores it.
@@ -581,6 +586,20 @@ namespace GW2CraftingHelper.Views
             _settings = settings;
             _statusBoard = statusBoard ?? throw new ArgumentNullException(nameof(statusBoard));
             _resolveOverridesSync = resolveOverridesSync;
+
+            // Post-review fix: seed the per-plan default from the
+            // still-persisted ModuleSettings.ValueOwnMaterials value
+            // (kept around for exactly this - see that setting's own doc
+            // comment) instead of the field initializer's hardcoded
+            // `true`, so a user who deliberately turned the old global
+            // "Value own materials" checkbox off is not silently switched
+            // back to Valued mode on module reload. Session-only from
+            // here on, same as _useOwnMaterials/_priceBasis above -
+            // never written back to settings.
+            if (settings != null)
+            {
+                _valueOwnMaterials = settings.ValueOwnMaterials.Value;
+            }
 
             // M38 WP-25: wires TreeSectionController's collaborator
             // delegates. PreserveScrollAcross/SetStatus/RenderPlan/
@@ -1922,7 +1941,18 @@ namespace GW2CraftingHelper.Views
                 // them, whenever a different recipe option is cheaper at
                 // fresh market prices. Off uses whatever you already own
                 // first, even down a pricier path.
-                BasicTooltipText = "Compare recipe options at fresh market prices, as if you owned nothing - may recommend buying materials you already have instead of using them, if a different option is cheaper. Off: always uses what you already own first."
+                //
+                // Post-review fix (VOM finding #5): the tooltip used to
+                // describe only this recipe-option/market-price half of
+                // the toggle. It also gates the 15% force-buy sell-back
+                // guard and the MaterialOpportunityCost deduction from
+                // CraftingProfit (SettingsTabContent's own info line for
+                // the now-relocated global setting already mentions the
+                // guard - see AddInfoLine's "decision-invariant reduction
+                // + 15% sell-back guard" text) - both of which change
+                // numbers this same plan displays, so the live control's
+                // own tooltip should say so too.
+                BasicTooltipText = "Compare recipe options at fresh market prices, as if you owned nothing - may recommend buying materials you already have instead of using them, if a different option is cheaper. Also force-buys materials where buying beats crafting by more than 15%, and deducts owned materials' sell value from Crafting Profit. Off: always uses what you already own first, treated as free."
             };
             _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
             {

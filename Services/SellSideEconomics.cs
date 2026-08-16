@@ -265,7 +265,7 @@ namespace GW2CraftingHelper.Services
         /// path's own updated behavior exactly (ApplySellSideEconomics'
         /// MaterialOpportunityCost is likewise now decision-aware via the
         /// same guided reduction) - see
-        /// MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostIsWholeTreeSum.
+        /// MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostNullForBoughtRootOwnedIngredient.
         /// </summary>
         internal static void ApplyBatchSellSideEconomics(
             CraftingPlanResult result,

@@ -1162,7 +1162,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// phantom credit for a bought root.
         /// </summary>
         [Fact]
-        public async Task GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostIsWholeTreeSum()
+        public async Task GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostNullForBoughtRootOwnedIngredient()
         {
             var pipeline = BuildBuyVsCraftPipeline();
 
