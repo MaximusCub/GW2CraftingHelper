@@ -1253,6 +1253,114 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task LoadLatest_NullRecipesListOnSolveContextUnreducedTree_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // VOM finding #1 fix: UnreducedTree is walked by
+            // ResolveWithOverrides' guideSolve (_solver.Solve) and
+            // re-reduction (_reducer.Reduce) on EVERY override re-solve
+            // once the force-buy pre-pass ran at generation time (Valued
+            // mode + a non-null snapshot - see PlanSolveContext.
+            // UnreducedTree's own doc comment), the exact same
+            // unconditional node.Recipes walk as Tree above (which the two
+            // tests above this one already cover). Before this fix, a
+            // plan.json with "UnreducedTree":{"Recipes":null} sailed
+            // through PlanStructuralValidator untouched and NREd on the
+            // very first override pill click of a restored plan.
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy, ownMaterialsMode: OwnMaterialsMode.Valued);
+            Assert.NotNull(result.SolveContext);
+            Assert.NotNull(result.SolveContext.UnreducedTree);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                jObj["Result"]["SolveContext"]["UnreducedTree"]["Recipes"] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.UnreducedTree.Recipes is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullEntryInSolveContextAccountItems_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // VOM finding #1 fix: AccountItemIndex's constructor (Services/
+            // AccountItemIndex.cs) null-checks the LIST but not each entry
+            // ("entry.Count"/"entry.Source" with no per-entry guard) - a
+            // null ENTRY NREs identically to the UnreducedTree gap above,
+            // reachable the same way (any override re-solve once the
+            // force-buy pre-pass ran).
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy, ownMaterialsMode: OwnMaterialsMode.Valued);
+            Assert.NotNull(result.SolveContext);
+            Assert.NotEmpty(result.SolveContext.AccountItems);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                ((JArray)jObj["Result"]["SolveContext"]["AccountItems"])[0] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SolveContext.AccountItems[0] is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_SolveContextUnreducedTreeSetButAccountItemsNull_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            // VOM finding #1 bonus fix: UnreducedTree and AccountItems are
+            // always populated TOGETHER at generation time (both gated on
+            // useForceBuyPrePass). Without this check, a restored file with
+            // UnreducedTree set but AccountItems null degraded SILENTLY
+            // instead of crashing or being rejected: AccountItemIndex(null)
+            // builds an empty index, so a subsequent override re-solve
+            // re-prices every owned material as if none were owned.
+            var pipeline = BuildOwnMaterialsPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy, ownMaterialsMode: OwnMaterialsMode.Valued);
+            Assert.NotNull(result.SolveContext);
+            Assert.NotNull(result.SolveContext.UnreducedTree);
+            Assert.NotEmpty(result.SolveContext.AccountItems);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                jObj["Result"]["SolveContext"]["AccountItems"] = JValue.CreateNull();
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains(
+                "SolveContext.UnreducedTree is set but SolveContext.AccountItems is null",
+                lastMessage());
+        }
+
+        [Fact]
         public async Task LoadLatest_NullEntryInPlanSteps_ReturnsNullAndLogsWarnExactlyOnce()
         {
             // Plan.Steps is read unconditionally by

@@ -337,6 +337,43 @@ namespace GW2CraftingHelper.Services
             // Craft All/Buy All presets this doc comment already covers.
             if (!NoNullEntries(context.UsedMaterials, "SolveContext.UsedMaterials", out reason)) return false;
 
+            // VOM finding #1 fix: UnreducedTree is walked by
+            // ResolveWithOverrides' guideSolve (_solver.Solve) and
+            // re-reduction (_reducer.Reduce) on EVERY override re-solve of
+            // a restored plan whenever it is set (see
+            // PlanSolveContext.UnreducedTree's own doc comment) - the exact
+            // same unconditional Recipes/Ingredients walk as Tree above.
+            // Null is valid here (the force-buy pre-pass didn't run at
+            // generation time), so only validate when present.
+            if (context.UnreducedTree != null &&
+                !IsValidRecipeNode(context.UnreducedTree, 0, "SolveContext.UnreducedTree", out reason))
+            {
+                return false;
+            }
+
+            // AccountItemIndex's constructor (Services/AccountItemIndex.cs)
+            // null-checks the LIST but not each entry - "entry.Count" on a
+            // null entry NREs on the very first ResolveWithOverrides call
+            // that re-reduces (see the UnreducedTree check above). A null
+            // list itself is fine: AccountItemIndex(null) treats it as "no
+            // owned items".
+            if (!NoNullEntries(context.AccountItems, "SolveContext.AccountItems", out reason)) return false;
+
+            // UnreducedTree and AccountItems are always set together at
+            // generation time (both gated on useForceBuyPrePass - see
+            // CraftingPlanPipeline's two matching UnreducedTree/AccountItems
+            // assignments). A restored file with UnreducedTree set but
+            // AccountItems null would otherwise degrade SILENTLY instead of
+            // crashing: AccountItemIndex(null) builds an empty index, so
+            // every re-reduction re-prices owned materials as if none were
+            // owned. Reject the file instead, same as any other
+            // null-dereference class this validator exists to catch.
+            if (context.UnreducedTree != null && context.AccountItems == null)
+            {
+                reason = "SolveContext.UnreducedTree is set but SolveContext.AccountItems is null";
+                return false;
+            }
+
             return true;
         }
 
