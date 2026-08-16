@@ -4038,4 +4038,4 @@ only - see git log for full per-commit detail):
    closed the structurally identical unrecognized-`CostLine.Type` gap in
    `VendorBatchSolver`; 2 tests.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: not yet run live - queued for the next batched desktop session. Merged after five adversarial review rounds, a targeted fix pass, and an independent verification review resolved every finding (zero blocking), under the maintainer's standing merge directive (2026-08-16). Solver behavior is fully covered by the suite; the deferred item is visual confirmation of the new labels/tooltips only.
