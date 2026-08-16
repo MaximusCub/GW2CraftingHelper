@@ -86,6 +86,7 @@
     <Compile Include="Services\CoinSegmentMath.cs" />
     <Compile Include="Services\PlanContentHeightMath.cs" />
     <Compile Include="Services\PlanRelayoutMath.cs" />
+    <Compile Include="Services\SummarySectionLayoutMath.cs" />
     <Compile Include="Services\ItemRowRequestBuilder.cs" />
     <Compile Include="Services\IPriceApiClient.cs" />
     <Compile Include="Services\TradingPostService.cs" />

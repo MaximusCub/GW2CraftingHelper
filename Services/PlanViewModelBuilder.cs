@@ -132,6 +132,34 @@ namespace GW2CraftingHelper.Services
             return $"{firstName} and {rest} other" + (rest > 1 ? "s" : "");
         }
 
+        // W4A (Total Cost section redesign) tooltip bodies - shared between
+        // the collapsed and uncollapsed cost-band branches below (both
+        // still show an "Actual Cost to Craft" tile with the identical
+        // meaning) and reused verbatim by the tests, so the exact wording
+        // lives in exactly one place.
+        internal const string TotalMaterialsValueTooltip =
+            "Full market value of everything this craft consumes - coins you spend plus the sell value of your own materials used.";
+        internal const string YourMaterialsUsedTooltip =
+            "Instant-sell value (after 15% TP fees) of materials you already own that this plan consumes - what you give up by using them instead of selling them.";
+        internal const string ActualCostTooltip =
+            "What you still pay out of pocket - materials you already own are subtracted before pricing.";
+        internal const string SellValueTooltip =
+            "Instant-sell revenue after 15% TP fees.";
+        internal const string ProfitTooltip =
+            "Sell Value minus Total Materials Value.";
+        internal const string FootnoteText =
+            "Prices are Trading Post data - actual purchase and sale prices are likely to vary.";
+
+        // Review fix: distinct caption for Band 2's middle tile in a
+        // multi-item batch - see BuildProfitFormulaBand's own doc comment
+        // for why the two bands' "Total Materials Value" can legitimately
+        // hold DIFFERENT numbers for a batch with a partially-unsellable
+        // root. A tooltip-only distinction was not enough: two
+        // identically-captioned tiles ~56px apart showing different
+        // numbers reads as a bug, not a scoping nuance, in a section whose
+        // whole point is to read as a balancing formula at a glance.
+        internal const string MaterialsValueSellableLabel = "Materials Value (sellable)";
+
         private PlanSectionViewModel BuildSummarySection(CraftingPlanResult result, bool isMultiItem)
         {
             var section = new PlanSectionViewModel
@@ -141,106 +169,9 @@ namespace GW2CraftingHelper.Services
                 IsDefaultExpanded = true
             };
 
-            // CoinTotal row
-            string basisSuffix = result.PriceBasis == PriceBasis.BuyOrder
-                ? " (buy-order prices)"
-                : "";
-            section.Rows.Add(new PlanRowViewModel
-            {
-                RowType = PlanRowType.CoinTotal,
-                Label = "Total" + basisSuffix,
-                CoinValue = result.Plan.TotalCoinCost
-            });
-
-            // Own-materials opportunity cost (Valued mode only, and only
-            // when it is actually non-zero - a material with no
-            // instant-sell price contributes nothing worth surfacing).
-            if (result.MaterialOpportunityCost.HasValue && result.MaterialOpportunityCost.Value > 0)
-            {
-                section.Rows.Add(new PlanRowViewModel
-                {
-                    RowType = PlanRowType.CoinTotal,
-                    Label = "Own materials (sell value forgone)",
-                    CoinValue = result.MaterialOpportunityCost.Value
-                });
-            }
-
-            // Sell-side rows: only when the target(s) have a live sell
-            // price. M37 (KNOWN-ISSUES #25): in multi-item mode,
-            // NetSaleValue/CraftingProfit are the BATCH sum across every
-            // requested item that has one (see
-            // SellSideEconomics.ApplyBatchSellSideEconomics) - labels
-            // are worded as a batch total, and the single-item "Nx"
-            // overproduction qualifier is dropped since there is no single
-            // requested quantity to compare a batch sum against.
-            if (result.NetSaleValue.HasValue)
-            {
-                string sellLabel;
-                if (isMultiItem)
-                {
-                    sellLabel = "Sell value (batch total, after 15% TP fees)";
-                }
-                else
-                {
-                    sellLabel = result.SellableQuantity > result.Plan.TargetQuantity
-                        ? $"Sell value ({result.SellableQuantity}x, after 15% TP fees)"
-                        : "Sell value (after 15% TP fees)";
-                }
-                section.Rows.Add(new PlanRowViewModel
-                {
-                    RowType = PlanRowType.CoinTotal,
-                    Label = sellLabel,
-                    CoinValue = result.NetSaleValue.Value
-                });
-
-                long profit = result.CraftingProfit ?? 0L;
-                bool hasCurrencyCosts = result.Plan.CurrencyCosts != null &&
-                                        result.Plan.CurrencyCosts.Count > 0;
-                string qualifier;
-                if (isMultiItem)
-                {
-                    qualifier = hasCurrencyCosts ? " (batch total, coin costs only)" : " (batch total)";
-                }
-                else
-                {
-                    qualifier = hasCurrencyCosts ? " (coin costs only)" : "";
-                }
-                section.Rows.Add(new PlanRowViewModel
-                {
-                    RowType = PlanRowType.CoinTotal,
-                    Label = (profit >= 0 ? "Profit if sold" : "Loss if sold") + qualifier,
-                    CoinValue = Math.Abs(profit)
-                });
-            }
-
-            // CurrencyCost rows
-            if (result.Plan.CurrencyCosts != null)
-            {
-                foreach (var cc in result.Plan.CurrencyCosts)
-                {
-                    string currencyName = CurrencyDisplayResolver.ResolveName(cc.CurrencyId, result.CurrencyMetadata);
-                    string iconUrl = CurrencyDisplayResolver.ResolveIconUrl(cc.CurrencyId, result.CurrencyMetadata);
-
-                    // M34-B2a #4: owned/needed split, cosmetic only - null
-                    // when no wallet snapshot was available (distinct from
-                    // "0 owned").
-                    int? ownedQuantity = null;
-                    if (result.OwnedCurrencyAmounts != null &&
-                        result.OwnedCurrencyAmounts.TryGetValue(cc.CurrencyId, out int owned))
-                    {
-                        ownedQuantity = Math.Min(owned, (int)cc.Amount);
-                    }
-
-                    section.Rows.Add(new PlanRowViewModel
-                    {
-                        RowType = PlanRowType.CurrencyCost,
-                        Label = $"{cc.Amount}x {currencyName}",
-                        Quantity = (int)cc.Amount,
-                        IconUrl = iconUrl,
-                        CurrencyOwnedQuantity = ownedQuantity
-                    });
-                }
-            }
+            BuildCostFormulaBand(section, result);
+            BuildProfitFormulaBand(section, result, isMultiItem);
+            BuildCurrencyTableRows(section, result);
 
             // M35 (gw2efficiency parity - multi-item plans): echoes gw2e's
             // own Cost Breakdown banner concept for a multi-item batch (M34
@@ -267,7 +198,243 @@ namespace GW2CraftingHelper.Services
                 });
             }
 
+            // W4A (user-mandated): a single subdued footnote, always
+            // present, at the very bottom of the section.
+            section.Rows.Add(new PlanRowViewModel
+            {
+                RowType = PlanRowType.SummaryFootnote,
+                Label = FootnoteText
+            });
+
             return section;
+        }
+
+        /// <summary>
+        /// W4A formula band 1 ("Total Materials Value - Your Materials Used
+        /// = Actual Cost to Craft"). COLLAPSE RULE (user-mandated): when
+        /// MaterialOpportunityCost is null or 0 (Value-own-materials off,
+        /// or nothing owned consumed) the formula's middle term does not
+        /// exist, so the band collapses to a single "Actual Cost to Craft"
+        /// tile instead of a meaningless 3-term formula. Actual Cost to
+        /// Craft is exactly the pre-W4A "Total" row (result.Plan.
+        /// TotalCoinCost, unchanged math) - the "(buy-order prices)" basis
+        /// qualifier that used to live in that row's Label now lives in
+        /// this tile's tooltip instead (spec: "keep it somewhere sensible",
+        /// and a formula-band caption needs to stay short).
+        /// </summary>
+        private static void BuildCostFormulaBand(PlanSectionViewModel section, CraftingPlanResult result)
+        {
+            long actualCost = result.Plan.TotalCoinCost;
+            string actualCostTooltip = result.PriceBasis == PriceBasis.BuyOrder
+                ? ActualCostTooltip + " (buy-order prices)"
+                : ActualCostTooltip;
+            var actualCostTile = new PlanRowViewModel
+            {
+                RowType = PlanRowType.CostFormulaTile,
+                Label = "Actual Cost to Craft",
+                CoinValue = actualCost,
+                TooltipText = actualCostTooltip
+            };
+
+            bool hasMaterialsUsed = result.MaterialOpportunityCost.HasValue && result.MaterialOpportunityCost.Value > 0;
+            if (hasMaterialsUsed)
+            {
+                long materialsUsed = result.MaterialOpportunityCost.Value;
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CostFormulaTile,
+                    Label = "Total Materials Value",
+                    CoinValue = actualCost + materialsUsed,
+                    TooltipText = TotalMaterialsValueTooltip
+                });
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CostFormulaTile,
+                    Label = "Your Materials Used",
+                    CoinValue = materialsUsed,
+                    TooltipText = YourMaterialsUsedTooltip
+                });
+            }
+
+            // Collapsed case: this is the band's only tile. Uncollapsed:
+            // it is the formula's rightmost ("= Actual Cost to Craft")
+            // term, added last either way.
+            section.Rows.Add(actualCostTile);
+        }
+
+        /// <summary>
+        /// W4A formula band 2 ("Sell Value (after fees) - Total Materials
+        /// Value = Profit if Sold"), only when result.NetSaleValue.HasValue -
+        /// mirroring band 1, but never present without it (the profit
+        /// formula is meaningless with no sell price at all).
+        ///
+        /// IDENTITY VERIFICATION (task-mandated): SellSideEconomics proves
+        /// CraftingProfit == NetSaleValue - Plan.TotalCoinCost -
+        /// (MaterialOpportunityCost ?? 0) for a SINGLE-ITEM plan
+        /// (ApplySellSideEconomics, line ~66) but explicitly NOT for a
+        /// multi-item batch (ApplyBatchSellSideEconomics subtracts only the
+        /// SELLABLE roots' own cost, never Plan.TotalCoinCost, which also
+        /// includes every unsellable requested root - see
+        /// CraftingPlanResult.CraftingProfit's own doc comment, "NOT
+        /// Plan.TotalCoinCost"). Band 1's "Total Materials Value" (Plan.
+        /// TotalCoinCost + MaterialOpportunityCost) would therefore NOT
+        /// balance this band's visible formula for a multi-item batch with
+        /// any unsellable requested root - the middle tile is instead
+        /// derived as NetSaleValue - CraftingProfit, reusing ONLY the two
+        /// already-stored, already-correct fields (never recomputing
+        /// CraftingProfit itself, never touching Plan.TotalCoinCost here).
+        /// This is algebraically IDENTICAL to Band 1's Total Materials
+        /// Value for every single-item plan (the identity above rearranges
+        /// to exactly that), so the two bands always show the same number
+        /// there; for a multi-item batch with a partially-unsellable root
+        /// mix the two bands can legitimately differ (Band 1 prices the
+        /// WHOLE batch, Band 2 only the batch's sellable portion, matching
+        /// what CraftingProfit itself measures) - the tooltip below flags
+        /// that case, AND (review fix) the tile's own Label changes to
+        /// MaterialsValueSellableLabel for a multi-item batch so the
+        /// divergence is visible without a mouseover: two tiles sharing
+        /// the "Total Materials Value" caption but showing different
+        /// numbers would read as a bug in the plan, not as a legitimate
+        /// scoping difference.
+        /// </summary>
+        private static void BuildProfitFormulaBand(PlanSectionViewModel section, CraftingPlanResult result, bool isMultiItem)
+        {
+            if (!result.NetSaleValue.HasValue)
+            {
+                return;
+            }
+
+            long netSaleValue = result.NetSaleValue.Value;
+            long profit = result.CraftingProfit ?? 0L;
+            long totalMaterialsValue = netSaleValue - profit;
+
+            string sellQualifier;
+            if (isMultiItem)
+            {
+                sellQualifier = " (batch total across every requested item with a live sell price)";
+            }
+            else
+            {
+                sellQualifier = result.SellableQuantity > result.Plan.TargetQuantity
+                    ? $" ({result.SellableQuantity}x, overproduction)"
+                    : "";
+            }
+
+            bool hasCurrencyCosts = result.Plan.CurrencyCosts != null && result.Plan.CurrencyCosts.Count > 0;
+            string profitQualifier;
+            if (isMultiItem)
+            {
+                profitQualifier = hasCurrencyCosts ? " (batch total, coin costs only)" : " (batch total)";
+            }
+            else
+            {
+                profitQualifier = hasCurrencyCosts ? " (coin costs only)" : "";
+            }
+
+            // See this method's own doc comment - only a multi-item batch
+            // can make this band's Total Materials Value diverge from Band
+            // 1's own (whole-plan) figure, so only that case gets the extra
+            // disambiguating clause.
+            string totalMaterialsValueTooltip = isMultiItem
+                ? TotalMaterialsValueTooltip + " (this band only covers items with a live sell price)"
+                : TotalMaterialsValueTooltip;
+
+            // Review fix: a multi-item batch gets its own caption for this
+            // tile (see this method's own doc comment) - single-item plans
+            // keep the plain "Total Materials Value" label, matching Band
+            // 1 exactly (the identity proven above guarantees the two
+            // numbers always agree there).
+            string totalMaterialsValueLabel = isMultiItem
+                ? MaterialsValueSellableLabel
+                : "Total Materials Value";
+
+            section.Rows.Add(new PlanRowViewModel
+            {
+                RowType = PlanRowType.ProfitFormulaTile,
+                Label = "Sell Value",
+                CoinValue = netSaleValue,
+                TooltipText = SellValueTooltip + sellQualifier
+            });
+            section.Rows.Add(new PlanRowViewModel
+            {
+                RowType = PlanRowType.ProfitFormulaTile,
+                Label = totalMaterialsValueLabel,
+                CoinValue = totalMaterialsValue,
+                TooltipText = totalMaterialsValueTooltip
+            });
+
+            // Review fix (round 2): FormulaResultIsExact false exactly when
+            // profit < 0 - see that field's own doc comment. This is the
+            // ONLY row in either band where it is ever set false; both
+            // Band 1's collapsed/expanded tiles and this band's Sell
+            // Value/Total Materials Value tiles keep the true default
+            // (nothing to falsify - the field is only read on a band's
+            // last tile).
+            section.Rows.Add(new PlanRowViewModel
+            {
+                RowType = PlanRowType.ProfitFormulaTile,
+                Label = profit >= 0 ? "Profit if Sold" : "Loss if Sold",
+                CoinValue = Math.Abs(profit),
+                TooltipText = ProfitTooltip + profitQualifier,
+                FormulaResultIsExact = profit >= 0
+            });
+        }
+
+        /// <summary>
+        /// W4A currency table rows, replacing the pre-W4A plain-text
+        /// CurrencyCost rows: Label is now just the resolved currency name
+        /// (the Required amount moved to its own Quantity-driven column,
+        /// rendered by SummarySectionRenderer's c-table), rows are sorted
+        /// alphabetically by that name (user-mandated), and
+        /// CurrencyOwnedQuantity is now the RAW unclamped wallet holding -
+        /// see that field's own updated doc comment. CurrencyNeededQuantity/
+        /// CurrencyFullyCovered are derived from it here so the c-table
+        /// renderer stays a dumb read of already-computed fields.
+        /// </summary>
+        private static void BuildCurrencyTableRows(PlanSectionViewModel section, CraftingPlanResult result)
+        {
+            if (result.Plan.CurrencyCosts == null || result.Plan.CurrencyCosts.Count == 0)
+            {
+                return;
+            }
+
+            var currencyRows = new List<PlanRowViewModel>(result.Plan.CurrencyCosts.Count);
+            foreach (var cc in result.Plan.CurrencyCosts)
+            {
+                string currencyName = CurrencyDisplayResolver.ResolveName(cc.CurrencyId, result.CurrencyMetadata);
+                string iconUrl = CurrencyDisplayResolver.ResolveIconUrl(cc.CurrencyId, result.CurrencyMetadata);
+                int required = (int)cc.Amount;
+
+                // W4A (user-mandated): UNCLAMPED - the real wallet holding,
+                // even when it exceeds what the plan needs. Null (not 0)
+                // when no wallet snapshot was available at all.
+                int? owned = null;
+                if (result.OwnedCurrencyAmounts != null &&
+                    result.OwnedCurrencyAmounts.TryGetValue(cc.CurrencyId, out int ownedRaw))
+                {
+                    owned = ownedRaw;
+                }
+                int? needed = owned.HasValue ? Math.Max(0, required - owned.Value) : (int?)null;
+                bool fullyCovered = owned.HasValue && owned.Value >= required;
+
+                currencyRows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CurrencyCost,
+                    Label = currencyName,
+                    Quantity = required,
+                    IconUrl = iconUrl,
+                    CurrencyOwnedQuantity = owned,
+                    CurrencyNeededQuantity = needed,
+                    CurrencyFullyCovered = fullyCovered
+                });
+            }
+
+            // OrderBy (stable), not List.Sort (unstable) - two different
+            // unknown currency ids both fall back to the same generic
+            // "Currency" display name (CurrencyDisplayResolver), and an
+            // unstable sort could reorder that tied pair nondeterministically
+            // run to run.
+            section.Rows.AddRange(currencyRows.OrderBy(r => r.Label, StringComparer.Ordinal));
         }
 
         private PlanSectionViewModel BuildUsedMaterialsSection(CraftingPlanResult result)

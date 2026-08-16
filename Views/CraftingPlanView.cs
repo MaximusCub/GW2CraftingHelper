@@ -3371,7 +3371,20 @@ namespace GW2CraftingHelper.Views
             // leaving it to Blish's per-frame AutoSize convergence. Pure
             // function of the same section data just rendered above, so it
             // cannot drift from what was actually built.
-            contentFlow.Size = new Point(panelWidth, PlanContentHeightMath.SectionBodyHeight(section.SectionType, section.Rows));
+            //
+            // W4A (Total Cost section redesign): Summary is special-cased
+            // to its own SummarySectionLayoutMath.BodyHeight instead of
+            // PlanContentHeightMath.SectionBodyHeight -
+            // Services/PlanContentHeightMath.cs is DO-NOT-TOUCH for that
+            // package, so its own private SummaryBodyHeight method (and its
+            // existing test coverage) is left completely unmodified and is
+            // simply no longer reached for a real Summary section. See
+            // SummarySectionLayoutMath's own doc comment for the full
+            // rationale.
+            int bodyHeight = section.SectionType == PlanSectionType.Summary
+                ? SummarySectionLayoutMath.BodyHeight(section.Rows)
+                : PlanContentHeightMath.SectionBodyHeight(section.SectionType, section.Rows);
+            contentFlow.Size = new Point(panelWidth, bodyHeight);
         }
 
         /// <summary>

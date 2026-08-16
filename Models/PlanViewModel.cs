@@ -20,6 +20,19 @@ namespace GW2CraftingHelper.Models
 
     public enum PlanRowType
     {
+        // W4A (Total Cost section redesign): CoinTotal itself is no longer
+        // emitted by PlanViewModelBuilder.BuildSummarySection (superseded
+        // by CostFormulaTile/ProfitFormulaTile below) - kept as an enum
+        // member ONLY because Services/PlanContentHeightMath.cs (DO-NOT-
+        // TOUCH for this package) still references it by name in its own
+        // private SummaryBodyHeight method. That method is itself now
+        // unreachable for a real Summary section (Views/CraftingPlanView.cs
+        // routes PlanSectionType.Summary through
+        // Services/SummarySectionLayoutMath.BodyHeight instead - see that
+        // class's doc comment) but is left byte-for-byte unmodified per the
+        // W4A task brief, so removing this member would break its
+        // compilation. Do not resurrect this as a real row type without
+        // first re-reading that class's doc comment.
         CoinTotal,
         CurrencyCost,
         UsedMaterial,
@@ -56,7 +69,30 @@ namespace GW2CraftingHelper.Models
         // inaccurate for a craft-agnostic, tradable-only rollup; see
         // docs/KNOWN-ISSUES.md #25's divergence record. Rendered via
         // the same plain-text row pattern as TimegatedNotice.
-        MultiItemNote
+        MultiItemNote,
+
+        // W4A (Total Cost section redesign): one tile of the Total Cost
+        // section's first formula band - "Total Materials Value - Your
+        // Materials Used = Actual Cost to Craft" - collapsing to a single
+        // "Actual Cost to Craft" tile (one row of this type) when there is
+        // no materials-used middle term to subtract (PlanViewModelBuilder.
+        // BuildSummarySection's collapse rule). Rendered as an equal-width
+        // stat tile, same shape the pre-W4A CoinTotal band used - see
+        // SummarySectionRenderer.
+        CostFormulaTile,
+
+        // W4A: one tile of the Total Cost section's second formula band -
+        // "Sell Value - Total Materials Value = Profit/Loss if Sold" -
+        // present only when the plan has a live sell price
+        // (CraftingPlanResult.NetSaleValue.HasValue). Always exactly 3 rows
+        // of this type when present - no collapse rule, the profit formula
+        // is meaningless with fewer than 3 terms.
+        ProfitFormulaTile,
+
+        // W4A: the Total Cost section's single subdued trading-post
+        // pricing-basis footnote row, always present exactly once at the
+        // bottom of the section.
+        SummaryFootnote
     }
 
     public class PlanViewModel
@@ -169,13 +205,61 @@ namespace GW2CraftingHelper.Models
         // Null/empty under the same condition as CurrencyCosts.
         public List<CurrencyAmountViewModel> UnitCurrencyCosts { get; set; }
 
-        // Owned/needed split for a CurrencyCost row (M34-B2a #4, gw2e
-        // parity - see AccountCurrencyIndex): min(Quantity, wallet amount)
-        // of this currency the account already holds; the renderer derives
-        // "still needed" as Quantity - CurrencyOwnedQuantity. Null (not 0)
-        // when no wallet snapshot was available at all, distinct from "0
-        // owned" - only ever set on CurrencyCost rows.
+        // Owned split for a CurrencyCost row (M34-B2a #4, gw2e parity - see
+        // AccountCurrencyIndex): the account's wallet holding of this
+        // currency. Null (not 0) when no wallet snapshot was available at
+        // all, distinct from "0 owned" - only ever set on CurrencyCost
+        // rows. W4A (Total Cost section redesign, user-mandated): this is
+        // now the RAW, UNCLAMPED wallet amount (was min(Quantity, wallet
+        // amount) pre-W4A) - the redesigned currency table's "Have" column
+        // shows the real holding even when it exceeds what the plan needs,
+        // rather than silently capping it at Quantity. CurrencyNeededQuantity
+        // below is the (still-clamped-to-zero) gap derived from this value.
         public int? CurrencyOwnedQuantity { get; set; }
+
+        // W4A: still-to-acquire gap for a CurrencyCost row in the
+        // redesigned currency table's "Needed" column - max(0, Quantity -
+        // CurrencyOwnedQuantity). Null (not 0) whenever CurrencyOwnedQuantity
+        // is null (no wallet snapshot) - mirrors that field's own null
+        // contract, never a fabricated gap. Only ever set on CurrencyCost
+        // rows.
+        public int? CurrencyNeededQuantity { get; set; }
+
+        // W4A: true when CurrencyOwnedQuantity is present AND covers the
+        // full Required amount (CurrencyOwnedQuantity >= Quantity) - drives
+        // the currency table's green full-coverage marker. Always false
+        // when no wallet snapshot exists (CurrencyOwnedQuantity null) -
+        // "unknown" must never render as "covered". Only ever set on
+        // CurrencyCost rows.
+        public bool CurrencyFullyCovered { get; set; }
+
+        // W4A (Total Cost section redesign, user-mandated mouseover
+        // tooltips): the exact-meaning tooltip text for a CostFormulaTile/
+        // ProfitFormulaTile row's header caption. Set directly on the
+        // caption Label control itself, never on the tile's containing
+        // Panel (M32 lesson: a label captures the mouse before a container
+        // tooltip underneath it would ever be reached - see
+        // SummarySectionRenderer.CreateFormulaBand). Null/unused for every
+        // other row type.
+        public string TooltipText { get; set; }
+
+        // W4A review-fix-round-2: true (default) when the formula band's
+        // "=" operator drawn immediately to this tile's left is an honest
+        // statement (left tile - middle tile literally equals this tile's
+        // displayed CoinValue). SummarySectionRenderer.CreateFormulaBand
+        // only ever draws "=" before the LAST tile in a band, and only
+        // reads this field on that tile - it being false on every other
+        // tile is harmless (unread there). The one case this is ever
+        // false: the profit band's loss tile, whose Label/CoinValue
+        // deliberately show "Loss if Sold" / Math.Abs(profit) (the
+        // pre-existing sign convention - PlanViewModelBuilder.
+        // BuildProfitFormulaBand). With that convention the drawn
+        // equation ("Sell Value - Total Materials Value = <abs loss>")
+        // is arithmetically FALSE for a negative profit, since the true
+        // right-hand side is negative. When false, the renderer
+        // substitutes a neutral, non-equality punctuation mark for that
+        // one boundary instead of "=".
+        public bool FormulaResultIsExact { get; set; } = true;
 
         // W3C (per-character discipline display, gw2efficiency parity):
         // which of the account's characters have this DisciplineRow's
