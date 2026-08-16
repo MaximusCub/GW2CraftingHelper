@@ -129,6 +129,12 @@ namespace GW2CraftingHelper.Models
             { 62, "Unusual Coins" },
             { 63, "Astral Acclaim" },
             { 65, "Testimony of Jade Heroics" },
+            // Audit row 56 PART B #2: was missing entirely (verified against
+            // https://api.guildwars2.com/v2/currencies?ids=all&v=2022-03-23,
+            // 2026-08-16 - live name "Imperial Favor", id 68) - a plan
+            // costing this Cantha vendor currency previously fell back to
+            // the generic "Currency" display name via ResolveCurrencyName.
+            { 68, "Imperial Favors" },
             { 78, "Fine Rift Essence" },
             { 79, "Rare Rift Essence" },
             { 80, "Masterwork Rift Essence" }
