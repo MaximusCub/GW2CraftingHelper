@@ -5255,7 +5255,7 @@ solver-adjacent tree-node model, out of scope for this milestone's
 Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - clean,
 0 errors (StyleCop warning count unchanged from before this milestone;
 no new warning codes introduced by any edited/added file's own lines).
-Tests: 1549 passed, 0 failed (baseline 1519 + 30 new: 15
+Tests: 1576 passed, 0 failed after two review-fix commits (84538e6, cc99f3f; initially 1549 = baseline 1519 + 30 new: 15
 `WikiLinkBuilderTests` + 12 `ReceiptCaptionHelperTests` + 2
 `PlanResultBuilderTests` [`RequiredRecipes_LearnedFromItemFlag`/
 `_NoLearnedFromItemFlag_DefaultsFalse`] + 4

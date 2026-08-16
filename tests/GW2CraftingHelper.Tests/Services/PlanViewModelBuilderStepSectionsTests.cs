@@ -415,7 +415,11 @@ namespace GW2CraftingHelper.Tests.Services
                     IsAutoLearned = true,
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    IsMissing = null
+                    // Verification-fix: true, not null - the real-data shape
+                    // (an AutoLearned recipe below the character rating is
+                    // IsAutoLearned AND IsMissing) is the axis this test must
+                    // pin; null passed vacuously under any gate.
+                    IsMissing = true
                 }
             });
             var vm = _builder.Build(result);

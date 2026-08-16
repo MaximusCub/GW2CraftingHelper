@@ -907,11 +907,15 @@ namespace GW2CraftingHelper.Services
                 // Flag-based target: a LearnedFromItem recipe links to its
                 // own "Recipe: <name>" sheet page; every other recipe links
                 // to the output item's page + "#Acquisition" anchor.
-                // Review-fix: gated on recipe.IsMissing (the semantic
-                // condition set above, not the display string) rather than
-                // statusTag == "Missing!" - a rename or localization of the
-                // display tag can no longer silently drop every wiki link.
-                string wikiUrl = recipe.IsMissing == true
+                // Review-fix: gated on the semantic flags (not the display
+                // string) so a tag rename cannot silently drop every wiki
+                // link. Verification-fix: IsAutoLearned excluded explicitly -
+                // an auto-learned recipe can be IsMissing (rating below
+                // threshold) yet has nothing to unlock via the wiki, so it
+                // must keep getting no affordance, exactly as the spec
+                // comment above states (the statusTag chain checks
+                // Auto-learned first for the same reason).
+                string wikiUrl = !recipe.IsAutoLearned && recipe.IsMissing == true
                     ? WikiLinkBuilder.BuildRequiredRecipeUrl(name, recipe.IsLearnedFromItem)
                     : null;
 
