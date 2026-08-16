@@ -226,8 +226,16 @@ namespace GW2CraftingHelper.Services
         private static void BuildCostFormulaBand(PlanSectionViewModel section, CraftingPlanResult result)
         {
             long actualCost = result.Plan.TotalCoinCost;
+
+            // Nice-to-have (soften unconditional basis claim): the old
+            // suffix (" (buy-order prices)") read as an unqualified claim
+            // that every item in this total priced on the buy-order side.
+            // AUDIT ROW 20/38's per-item TP price-side fallback means that
+            // is not always true - an item with no buy orders at all
+            // still prices via its instant-buy side and folds into this
+            // same total. The suffix now says so instead of overclaiming.
             string actualCostTooltip = result.PriceBasis == PriceBasis.BuyOrder
-                ? ActualCostTooltip + " (buy-order prices)"
+                ? ActualCostTooltip + " (buy-order prices, or instant-buy where an item has none)"
                 : ActualCostTooltip;
             var actualCostTile = new PlanRowViewModel
             {

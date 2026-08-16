@@ -805,18 +805,35 @@ namespace GW2CraftingHelper.Views.Rendering
             // - a leaf's Decision is always BuyFromVendor too, so this is
             // an explicit "not a leaf" carve-out, checked first) gets a
             // distinct sentence naming the component instead of the row.
+            //
+            // Nice-to-have (null-plan fallback): _getCurrentPlan() is a
+            // real nullable return (see its other ?. call sites in this
+            // file), so it is hoisted to a local once here rather than
+            // called twice per branch. When it IS null, neither ternary
+            // below can know the actual PriceBasis - the old inline
+            // `_getCurrentPlan()?.PriceBasis == PriceBasis.BuyOrder`
+            // silently read that as false and picked the InstantBuy-
+            // unavailable wording, which is an unearned claim about which
+            // side fell back. A null plan instead gets a basis-agnostic
+            // sentence that states only the fact this code does know (the
+            // node's price came from the other TP side).
+            var currentPlan = _getCurrentPlan();
             if (node.PriceSideFellBack &&
                 (node.Decision == CraftingDecision.BuyFromTp || node.IsCostComponent))
             {
-                extraTooltipLines.Add(_getCurrentPlan()?.PriceBasis == PriceBasis.BuyOrder
-                    ? "Buy-order price unavailable - instant-buy price shown"
-                    : "Instant-buy price unavailable - buy-order price shown");
+                extraTooltipLines.Add(currentPlan == null
+                    ? "Other trading post price side shown"
+                    : currentPlan.PriceBasis == PriceBasis.BuyOrder
+                        ? "Buy-order price unavailable - instant-buy price shown"
+                        : "Instant-buy price unavailable - buy-order price shown");
             }
             else if (node.PriceSideFellBack && node.Decision == CraftingDecision.BuyFromVendor)
             {
-                extraTooltipLines.Add(_getCurrentPlan()?.PriceBasis == PriceBasis.BuyOrder
-                    ? "A vendor cost item's buy-order price is unavailable - its instant-buy price is used"
-                    : "A vendor cost item's instant-buy price is unavailable - its buy-order price is used");
+                extraTooltipLines.Add(currentPlan == null
+                    ? "A vendor cost item's other trading post price side shown"
+                    : currentPlan.PriceBasis == PriceBasis.BuyOrder
+                        ? "A vendor cost item's buy-order price is unavailable - its instant-buy price is used"
+                        : "A vendor cost item's instant-buy price is unavailable - its buy-order price is used");
             }
 
             if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))

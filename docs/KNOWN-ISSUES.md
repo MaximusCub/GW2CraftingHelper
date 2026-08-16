@@ -4046,6 +4046,22 @@ an automated before/after warning-count diff over `git diff
 --name-only` would make "no new StyleCop warnings" a mechanically
 verified claim instead of a manually-run one each round.
 
+- Follow-up (shopping-list caveat asymmetry): the missing-caveat gap
+  above is not symmetric between the two bases. Under
+  `PriceBasis.InstantBuy`, if an item's `BuyInstant` side has zero
+  listings, the same per-item fallback swaps in its `SellInstant` (buy-
+  order) price instead - a price no seller is currently offering, only
+  what buyers are bidding. The shopping list still renders that item as
+  a flat `Buy` row at that coin figure with no caveat, which reads as an
+  instantly-fillable price when it is not one - a buy order posted at
+  that figure still has to wait for a seller to fill it, and the true
+  instant-fill cost (if any seller exists at all) could be higher. The
+  reverse direction (`PriceBasis.BuyOrder` falling back to `BuyInstant`)
+  does not have this problem the same way: the fallback number there IS
+  an instantly-fillable price, just not the preferred one. Recorded as
+  an explicit follow-up alongside the general shopping-list gap above,
+  not implemented, out of scope for this change.
+
 Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -t:Rebuild`
 - clean, 0 errors. StyleCop warning-code histogram for both files this
 final round touched (`Views/Rendering/TreeSectionController.cs`,
