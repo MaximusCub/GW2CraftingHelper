@@ -73,6 +73,15 @@ namespace GW2CraftingHelper.Services
                         continue;
                     }
 
+                    // Picks the CHEAPEST qualifying offer, not merely the
+                    // first one found - two or more seasonal offers can
+                    // legitimately exist for the same output item (e.g. the
+                    // three seeded ecto offers, one per Halloween candy
+                    // color, each independently priced by its own candy's
+                    // TP value) - mirrors RecipeSheetSavingsCalculator's own
+                    // "cheapest priceable offer wins" precedent.
+                    VendorOffer bestOffer = null;
+                    long bestUnitCost = 0;
                     foreach (var offer in offers)
                     {
                         if (offer == null ||
@@ -94,20 +103,27 @@ namespace GW2CraftingHelper.Services
                             continue;
                         }
 
+                        if (bestOffer == null || offerUnitCost < bestUnitCost)
+                        {
+                            bestOffer = offer;
+                            bestUnitCost = offerUnitCost;
+                        }
+                    }
+
+                    if (bestOffer != null)
+                    {
                         tips.Add(new SeasonalVendorTip
                         {
                             ItemId = step.ItemId,
-                            Festival = offer.SeasonalFestival,
-                            MerchantName = offer.MerchantName,
-                            CostLines = offer.CostLines,
-                            OutputCount = offer.OutputCount,
-                            OfferUnitCost = offerUnitCost,
+                            Festival = bestOffer.SeasonalFestival,
+                            MerchantName = bestOffer.MerchantName,
+                            CostLines = bestOffer.CostLines,
+                            OutputCount = bestOffer.OutputCount,
+                            OfferUnitCost = bestUnitCost,
                             PlanUnitPrice = step.UnitCost,
-                            DailyCap = offer.DailyCap,
-                            WeeklyCap = offer.WeeklyCap
+                            DailyCap = bestOffer.DailyCap,
+                            WeeklyCap = bestOffer.WeeklyCap
                         });
-                        // First qualifying offer is enough - one tip per item.
-                        break;
                     }
                 }
             }

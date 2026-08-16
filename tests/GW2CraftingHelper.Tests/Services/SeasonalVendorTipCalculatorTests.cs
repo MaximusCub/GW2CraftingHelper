@@ -163,6 +163,35 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void MultipleQualifyingOffers_PicksCheapest()
+        {
+            // Same shape as the three real seeded ecto offers: three
+            // Halloween offers for item 19721, each 1x a different candy
+            // color for 5 ecto - each candy variant has its own TP price,
+            // so the offers are NOT interchangeable in coin terms.
+            var step = new PlanStep { ItemId = 19721, Quantity = 10, UnitCost = 100, Source = AcquisitionSource.BuyFromTp };
+            var result = MakeResult(step);
+            var cheap = HalloweenOffer(19721, 5, 111, 1); // 30/5 = 6/unit
+            var expensive = HalloweenOffer(19721, 5, 222, 1); // 90/5 = 18/unit
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 19721, new List<VendorOffer> { expensive, cheap } }
+            };
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 111, new ItemPrice { SellInstant = 30 } },
+                { 222, new ItemPrice { SellInstant = 90 } }
+            };
+
+            SeasonalVendorTipCalculator.Apply(
+                result, vendorOffers, prices, PriceBasis.BuyOrder,
+                new List<string> { Gw2Constants.HalloweenFestivalName });
+
+            var tip = Assert.Single(result.SeasonalVendorTips);
+            Assert.Equal(6, tip.OfferUnitCost);
+        }
+
+        [Fact]
         public void NullResult_NoOp()
         {
             SeasonalVendorTipCalculator.Apply(null, null, null, PriceBasis.BuyOrder, null);
