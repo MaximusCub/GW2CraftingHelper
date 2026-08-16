@@ -2502,4 +2502,139 @@ proving component leaves survive gzip-compressed persistence and pass
 `PlanStructuralValidator` unchanged (`PlanStoreTests`). Full module suite:
 1273 baseline + 30 new W4B tests, all green.
 
+**Review-fix round (2026-08-15) - 7 findings from an adversarial review (2
+Critical, 4 Must Fix, 1 Must Fix flagged for explicit justification), all
+addressed.** The two Critical findings were the same defect surfacing twice:
+`VendorItemCosts`/`VendorCurrencyCosts` are captured PRE-merge, per tree
+occurrence, by `VendorBatchSolver.EvaluateVendorOffers` - but when the same
+vendor item is needed via 2+ tree occurrences that merge into one true
+batched purchase (the exact shape the merge-then-ceil machinery exists for),
+`AllocateVendorNodeCosts` reallocates each occurrence's corrected
+`TotalCost` share WITHOUT re-deriving those raw component numbers the same
+way. A component leaf built from them could show a value that no longer
+summed to (and could even exceed) its own parent's corrected total - a
+reproduced, concrete regression of the exact "two sections of the same page
+disagree" defect class the batching correction passes exist to prevent, one
+level lower.
+
+- *Fix (Critical x2, `Services/VendorBatchSolver.cs` lines 767/743,
+  `Services/CraftingTreeBuilder.cs` line 283).* Added
+  `SolverDecision.VendorComponentCostsUnreliable` (additive bool, default
+  false) and a new `PlanSolver.FlagUnreliableVendorComponentCosts` pass,
+  run immediately after `AllocateVendorNodeCosts` in `PlanSolver.Solve`: it
+  marks every occurrence of a step that genuinely merged 2+ tree occurrences
+  (`vendorOccurrences[stepKey].Count > 1` AND
+  `step.VendorOfferOutputCount > 0`, the same gate `AllocateVendorNodeCosts`
+  itself uses to decide whether a step was actually corrected).
+  `CraftingTreeBuilder.BuildVendorCostComponentLeaves` now short-circuits to
+  "no leaves" whenever this flag is set, regardless of kind count - the
+  node still shows its own correctly reallocated `SubtreeCost`, just without
+  an unprovable item/currency breakdown. Deliberately kept OUT of
+  `VendorBatchSolver.cs` (DO-NOT-TOUCH: merged-ceil batching math) - the new
+  pass lives in `PlanSolver.cs`, reads `AllocateVendorNodeCosts`'s own
+  already-public inputs/outputs (`vendorOccurrences`, `stepMap`) strictly
+  after it returns, and writes only the new auxiliary flag; `VendorBatchSolver.cs`'s
+  `AllocateVendorNodeCosts` method body is byte-for-byte unchanged (only its
+  doc comment gained a cross-reference). A single-occurrence vendor buy is
+  unaffected (nothing was actually reallocated there, so the original
+  numbers stay accurate) - every pre-existing W4B leaf test keeps passing
+  unmodified. New test: `CraftingTreeBuilderTests.
+  MultiOccurrence_MergedMixedVendorOffer_SuppressesComponentLeaves_ParentStaysConsistent`
+  reproduces the exact two-occurrence bulk-offer shape from the finding
+  (batch size 15, two 6-unit occurrences merging to one true batch) and
+  asserts both occurrences get no leaves while their reallocated
+  `SubtreeCost` values still sum exactly to the real merged `PlanStep`
+  total.
+
+- *Fix (Must Fix, `Services/CraftingTreeBuilder.cs` line 155): reference
+  branch silently dropped when a vendor node also got component leaves.*
+  The two no longer compete for the same `Children` slot - a vendor node
+  whose offer both mixed 2+ cost kinds AND has a known recipe now STACKS
+  them: component leaves first (so `TreeSectionController`'s
+  `Children[0].IsCostComponent` cost-cell-suppression check keeps working
+  unmodified), then the reference branch's own recipe ingredients appended
+  as additional, ordinary children. Verified safe to mix: `IsReferenceBranch`
+  is purely informational today (not read by any renderer - grepped), and
+  per-child dimming already comes from the PARENT's `Decision != Craft`
+  uniformly, not from any per-child reference-branch flag, so a mixed
+  `Children` list renders exactly as consistently dimmed as either kind
+  alone. `CraftingTreeNode.IsReferenceBranch`'s doc comment updated to
+  record the now-possible mixed case. New test: `CraftingTreeBuilderTests.
+  MixedOfferNode_AlsoHasRecipe_StacksComponentLeavesThenReferenceBranch`.
+
+- *Fix (Must Fix, `Services/VendorBatchSolver.cs` line 300): missing
+  `Count > 0` guard on the Item cost-line capture.* A zero/negative-count
+  Item cost line (malformed wiki-scraped seed data) could invent a phantom
+  "item" cost KIND, flipping an otherwise single-kind offer into
+  leaf-synthesis mode with a 0-quantity/0-gold ghost leaf. Guarded the raw
+  `itemCostRaw` capture with `cost.Count > 0`, mirroring the raw-coin
+  branch's own identical guard a few lines above it; `coinCost` itself is
+  untouched (a Count of 0 already contributed nothing to it). New test:
+  `PlanSolverVendorOfferTests.ZeroCountItemCostLine_DoesNotPopulateVendorItemCosts`.
+
+- *Fix (Must Fix, `Services/CraftingPlanPipeline.cs` line 859):
+  `ResolveWithOverrides` metadata gap for a non-baseline-winning vendor
+  offer.* `ResolveWithOverrides` never re-fetches metadata (by design - it
+  is purely local, no network calls); the pre-existing
+  `AddVendorItemComponentIds` only scanned the BASELINE winning decisions'
+  `VendorItemCosts`, so a node whose original decision was Craft - later
+  manually overridden to `BuyFromVendor`, an ordinary and commonly-used
+  interaction - could surface an item component leaf whose id was never
+  widened into `PlanSolveContext.Metadata`, rendering "Unknown Item" with
+  no icon until the whole plan was regenerated. Added
+  `AddAllVendorOfferItemComponentIds`, called at both generation entry
+  points (`GenerateStructuredAsync`/`GenerateStructuredMultiAsync`) right
+  alongside the existing decisions-only widening: it scans every `Item`
+  cost line on EVERY vendor offer already fetched for the tree (not just
+  the winning one), using data already resident in memory from the
+  existing `vendorOffers` fetch - no extra network round trip, and
+  `ResolveWithOverrides` itself needed no change. New test:
+  `CraftingPlanPipelineTests.
+  MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadata`.
+
+- *Fix (Must Fix, `tests/.../CraftingTreeBuilderTests.cs` line 1160):
+  missing 3-distinct-currency single-kind coverage.* Added
+  `SingleKindVendorOffer_ThreeDistinctCurrencies_NoItemNoCoin_CountsAsSingleKind_NoLeaves`,
+  locking down that `kindCount` counts by
+  `decision.VendorCurrencyCosts.Count > 0` (a boolean per KIND) rather than
+  per distinct currency id, so an offer spanning 3 different non-coin
+  currencies still gets no leaves - a deliberate design choice that was
+  previously unverified by any test.
+
+- *Justified, not changed (`Services/VendorBatchSolver.cs` line 333):
+  the `itemsScalable`/`continue` overflow guard added inside
+  `EvaluateVendorOffers`.* Flagged as new control flow inside a DO-NOT-TOUCH
+  method. Kept as-is: it is structurally identical to - and only extends to
+  a second cost dimension - the pre-existing `scalable`/`continue` guard a
+  few lines below it for currency lines (same file, same loop, same
+  overflow-safety shape, predates this feature), so it introduces no new
+  KIND of control flow. It can only fire when a single occurrence's scaled
+  Item-cost quantity exceeds `int.MaxValue` - unreachable with real GW2
+  data. Rewriting it as a clamp instead (silently truncating the
+  represented cost) would be the actual behavior change, and a strictly
+  worse one - a clamped value is silently wrong, while skipping the offer
+  fails safe exactly like its currency sibling already does. Documented
+  inline with this reasoning for future reviewers.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors); full module
+test suite green - 1308 passed (1273 baseline + 30 original W4B + 5 new
+review-fix tests: 3 in `CraftingTreeBuilderTests`, 1 in
+`CraftingPlanPipelineTests`, 1 in `PlanSolverVendorOfferTests`). No new
+Blish HUD references in tests; every new test exercises real production
+code (`PlanSolver.Solve`, `CraftingTreeBuilder.BuildTree`,
+`CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`) with
+no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
+internal-only. `VendorBatchSolver.cs`'s DO-NOT-TOUCH merged-ceil methods
+(`EvaluateVendorOffers`, `FinalizeVendorBatches`, `AllocateVendorNodeCosts`,
+`MergeVendorCurrencyCosts`, `VendorBatchesEqual`, `ScaleCostLines`) had
+their dollar-amount arithmetic (coin costs, ceil/batch selection,
+allocation shares) left byte-for-byte unchanged throughout this round - the
+only edits inside that file are a `Count > 0` capture guard and doc
+comments, both confirmed by diff review to touch no cost computation.
+Performance note: the new `AddAllVendorOfferItemComponentIds` scan runs
+once per plan generation (not a render/UI hot path) over `vendorOffers`
+data already resident in memory from the pre-existing fetch; its only
+allocation is additional entries in the `metadataIds` HashSet that was
+already being built, no new collection type.
+
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
