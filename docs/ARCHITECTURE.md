@@ -392,6 +392,13 @@ inventing a new one. The load-bearing rules:
   (as recipe ingredients) contribute to the craft-vs-buy *decision* via an
   optional per-unit valuation, but never to the displayed real coin cost -
   an unvalued currency never has an invented exchange rate.
+- **Craft/vendor comparability parity:** a recipe with an unvalued
+  Currency-type ingredient is fallback-tier - never comparable with a real
+  TP/vendor coin price in `PickCheapest` - exactly like a vendor offer
+  carrying an unvalued non-coin currency line already is
+  (`VendorBatchSolver.EvaluateVendorOffers`). Still offered (`CanCraft`
+  stays true) and used as a last resort when nothing comparable exists at
+  all. See KNOWN-ISSUES' "Craft/vendor comparability parity fix" entry.
 - **Mystic Clover-style EV pricing:** fractional-output Mystic Forge
   recipes have their ingredient quantities pre-scaled upstream (by
   `RecipeService`, kept in sync by `InventoryReducer`) to the expected
