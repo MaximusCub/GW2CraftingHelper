@@ -3096,6 +3096,129 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task Structured_ValuedMode_ForceBuyPrePass_NoPhantomUsedMaterialsOrOpportunityCost()
+        {
+            // VOM design (Candidate A) - direct proof of the audited row-31
+            // "phantom UsedMaterials" bug fix, using the exact same fixture
+            // as Structured_ValuedMode_ForceBuyPrePass_UsesZeroOwnedBaseline
+            // above (item 1 is force-buy-flagged; owns 4 of 5 needed of
+            // item 2). Before this milestone, InventoryReducer.Reduce ran
+            // BEFORE the force-buy decision existed and walked item 1's
+            // primary recipe regardless, phantom-consuming all 4 owned
+            // units of item 2 even though item 1 is never crafted - so item
+            // 2 would show QuantityUsed=4 in UsedMaterials and
+            // MaterialOpportunityCost would deduct that phantom value from
+            // CraftingProfit. Now: InventoryReducer.Reduce is guided by the
+            // zero-owned decision pass, sees item 1's decision is
+            // BuyFromTp, and never touches item 2's pool at all.
+            var pipeline = BuildForceBuyPipeline(out _);
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
+            Assert.Empty(result.UsedMaterials);
+            Assert.Null(result.MaterialOpportunityCost);
+        }
+
+        [Fact]
+        public async Task Structured_ValuedMode_CompetingRecipeOptions_DecisionInvariant_OwnedStockNeverFlipsChoice()
+        {
+            // Decision invariance (the core VOM design guarantee): two
+            // recipe options for item 1, option A (recipe 10) needs 5x item
+            // 2 (30 each = 150 zero-owned), option B (recipe 20) needs 5x
+            // item 3 (20 each = 100 zero-owned) - option B is objectively
+            // cheaper at zero-owned market prices, so a zero-owned baseline
+            // picks option B. Owning ALL 5 units of option A's ingredient
+            // (item 2) must NOT flip the decision toward option A (which
+            // the pre-VOM primary-option heuristic - node.Recipes[0] always
+            // gets discounted, regardless of price - would have done, since
+            // option A is listed first): the guided reduction only lets the
+            // option the zero-owned pass actually chose (option B) consume
+            // owned stock, so an un-chosen option can never look
+            // artificially cheaper than a genuinely cheaper alternative.
+            var recipeApi = new InMemoryRecipeApiClient();
+            // Both recipe ids must be in the SAME search result so
+            // RecipeService discovers them as competing options on one
+            // node - AddSearchResult(1, 10) alone would give item 1 only
+            // ONE recipe option, defeating the whole point of this test.
+            recipeApi.AddSearchResult(1, 10, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 5 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 5 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            // Item 1 itself: buying outright is far pricier than either
+            // craft option, so the solver always crafts - only WHICH
+            // option is in question.
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 30); // option A: 5x30=150
+            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 20); // option B: 5x20=100 (cheaper)
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient A", "a.png");
+            itemApi.AddItem(3, "Ingredient B", "b.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var snapshot = new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry { ItemId = 2, Count = 5, Source = AccountItemIndex.SourceMaterialStorage }
+                }
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, snapshot, CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
+
+            // Option B (RecipeId 20, the zero-owned-cheaper option) wins,
+            // NOT option A - even though item 2 (option A's ingredient) is
+            // fully owned and option A is listed first.
+            Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
+            Assert.Contains(result.Plan.Steps, s => s.ItemId == 1 && s.RecipeId == 20);
+            Assert.DoesNotContain(result.Plan.Steps, s => s.ItemId == 1 && s.RecipeId == 10);
+            // Item 2's owned stock is never consumed (option A was never
+            // chosen), so it does not appear in UsedMaterials at all.
+            Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
+            // Item 3 (option B's ingredient) is bought fresh at full price.
+            Assert.Equal(100, result.Plan.TotalCoinCost);
+        }
+
+        [Fact]
         public async Task Structured_FreeMode_SameOwnershipScenario_CraftsFromReducedRemainder()
         {
             // Control for the test above: Free mode never runs the
