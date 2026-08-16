@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using GW2CraftingHelper.Services;
 using Xunit;
+// FindRepoFile comes from Helpers/RepoFileLocator.cs.
 using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
 
 namespace GW2CraftingHelper.Tests.Services
@@ -146,9 +147,35 @@ namespace GW2CraftingHelper.Tests.Services
                 // own header/ref/daily_cooldown_items.json entry).
                 Assert.True(items.ContainsKey(46742));
                 Assert.Equal(1, items[46742].PerDayCap);
+
+                // Review fix (audit row 56 PART C, finding 1): the four
+                // Dragon Hatchling Doll parts carry the identical evidence
+                // pattern as Gossamer Stuffing (already-seeded, id 79763) -
+                // timegate = y + Category:Time gated recipes, no separate
+                // prose sentence - so consistency requires seeding all five
+                // rather than silently warning on only one of the five
+                // components a Gift of Aurene plan crafts.
+                foreach (int dragonDollPartId in new[] { 79795, 79726, 79817, 79790 })
+                {
+                    Assert.True(
+                        items.ContainsKey(dragonDollPartId),
+                        $"Dragon Hatchling Doll part {dragonDollPartId} should be seeded alongside Gossamer Stuffing (79763) - same wiki evidence pattern.");
+                    Assert.Equal(1, items[dragonDollPartId].PerDayCap);
+                }
+
+                // Review fix (audit row 56 PART C, finding 2): Charged
+                // Quartz Crystal (43772) is made at a Place of Power, not
+                // via any recipe this module resolves - it is not a recipe
+                // OUTPUT anywhere in ref/recipes_seed.json or
+                // ref/mystic_forge_recipes.json, so the notice pass (keyed
+                // strictly on AcquisitionSource.Craft steps) can never fire
+                // for it. Removed from the seed as dead data that read as
+                // covered when it was not - see docs/KNOWN-ISSUES.md's
+                // Craft-step-only limitation note.
+                Assert.False(
+                    items.ContainsKey(43772),
+                    "Charged Quartz Crystal (43772) is not a Craft-step recipe output in this module and can never trigger a notice - it should not be in the shipped seed.");
             }
         }
-
-        // FindRepoFile comes from Helpers/RepoFileLocator.cs.
     }
 }

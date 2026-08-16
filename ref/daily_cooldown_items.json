@@ -36,14 +36,6 @@
       "lastVerified": "2026-08-16"
     },
     {
-      "itemId": 43772,
-      "itemName": "Charged Quartz Crystal",
-      "perDayCap": 1,
-      "note": "Crafted at a Place of Power from 25 Quartz Crystal; used for celestial-stat equipment.",
-      "sourceUrl": "https://wiki.guildwars2.com/wiki/Charged_Quartz_Crystal",
-      "lastVerified": "2026-08-16"
-    },
-    {
       "itemId": 67015,
       "itemName": "Heat Stone",
       "perDayCap": 1,
@@ -73,6 +65,38 @@
       "perDayCap": 1,
       "note": "Crafting component for Dragon Hatchling Doll, Gift of Aurene collection.",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Gossamer_Stuffing",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 79795,
+      "itemName": "Dragon Hatchling Doll Adornments",
+      "perDayCap": 1,
+      "note": "Crafting component for Dragon Hatchling Doll, Gift of Aurene collection - same evidence pattern as Gossamer Stuffing (timegate = y + Category:Time gated recipes, no separate prose sentence on its own page).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Dragon_Hatchling_Doll_Adornments",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 79726,
+      "itemName": "Dragon Hatchling Doll Eye",
+      "perDayCap": 1,
+      "note": "Crafting component for Dragon Hatchling Doll, Gift of Aurene collection - same evidence pattern as Gossamer Stuffing (timegate = y + Category:Time gated recipes, no separate prose sentence on its own page).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Dragon_Hatchling_Doll_Eye",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 79817,
+      "itemName": "Dragon Hatchling Doll Frame",
+      "perDayCap": 1,
+      "note": "Crafting component for Dragon Hatchling Doll, Gift of Aurene collection - same evidence pattern as Gossamer Stuffing (timegate = y + Category:Time gated recipes, no separate prose sentence on its own page).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Dragon_Hatchling_Doll_Frame",
+      "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 79790,
+      "itemName": "Dragon Hatchling Doll Hide",
+      "perDayCap": 1,
+      "note": "Crafting component for Dragon Hatchling Doll, Gift of Aurene collection - same evidence pattern as Gossamer Stuffing (timegate = y + Category:Time gated recipes, no separate prose sentence on its own page).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Dragon_Hatchling_Doll_Hide",
       "lastVerified": "2026-08-16"
     },
     {
