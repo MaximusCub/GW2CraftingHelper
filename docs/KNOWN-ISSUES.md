@@ -4489,4 +4489,105 @@ five-field class sweep is now complete for this one fallthrough branch,
 but no other site in this file was audited for the same collision
 pattern - out of scope for this targeted fix.
 
+## GuildUpgrade ingredient costing/display fix - Evaluate doc-comment invariant + decision-lookup guard hoist (2026-08-16)
+
+A sixth adversarial pass (external orchestrator review of the section
+immediately above) found two defects: `PlanSolver.Evaluate`'s own doc
+comment stated a false memo-entry invariant, and
+`CraftingTreeBuilder.BuildNode`'s non-`"Item"` catch-all (hoisted into
+its own branch by the previous section) was still nested inside the
+`!decisions.TryGetValue(...)` branch instead of sitting before the
+lookup like its `GuildUpgrade`/`Currency` siblings. No DO-NOT-TOUCH code
+was touched (`Services/ModuleLog.cs`,
+`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`,
+scroll machinery, `VendorBatchSolver`'s merged-ceil batching math).
+
+**Fixed (Must Fix - false invariant in the one doc comment that states
+the memo contract): `Evaluate`'s doc comment claimed "EVERY non-currency,
+non-guild-upgrade ingredient of EVERY recipe on this node is evaluated
+(and therefore gets its own memo entry)".** The code it documents is
+Item-positive (`if (ingredient.IngredientType != "Item") { hasUnvaluedCurrency
+= true; continue; }`), so any ingredient type other than `"Item"` -
+`"Currency"`, `"GuildUpgrade"`, or an unrecognized fourth type - gets no
+memo entry, not just Currency and GuildUpgrade. A reader trusting the old
+wording could write `memo[ingredient.NodeId]` for an unrecognized-type
+ingredient and get a `KeyNotFoundException` - the exact instance-vs-class
+drift the two preceding class-sweep commits (`c9ebc32`, `e42125e`) exist
+to eliminate, left standing in the one comment that states the contract
+itself. Swept the rest of `PlanSolver.cs` for the same phrasing
+(`grep -n "non-currency, non-guild-upgrade\|gets its own memo\|EVERY.*
+ingredient.*evaluated"`) - no other hit; `Collect`'s and
+`RecomputeCraftCosts`' own doc comments make no equivalent per-ingredient
+memo-entry claim, so this was a single instance, not a second site of the
+same class. Fixed by rewording to "EVERY `"Item"` ingredient ... is
+evaluated" and adding an explicit sentence naming Currency, GuildUpgrade,
+and an unrecognized type as the three cases that get no memo entry,
+pointing at the Item-positive top guard and the `hasUnvaluedCurrency`
+recipe-loop skip as the two places that enforce it.
+
+**Fixed (Must Fix - guard silently conditional on solver behavior, not
+enforced by this method's own construction): the non-`"Item"` catch-all
+in `BuildNode` sat inside the `!decisions.TryGetValue(node.NodeId, out
+var decision)` branch, unlike the sibling `"GuildUpgrade"` and
+`"Currency"` branches immediately above it, which return before the
+decisions lookup runs at all.** Today this is not reachable -
+`Evaluate`'s Item-positive top guard plus its recipe-loop skip mean no
+non-`"Item"` node is ever memoized - but the guard's correctness rested
+entirely on that external fact holding, the same unenforced-by-construction
+shape this branch's own five preceding fixes on this file exist to
+eliminate for the icon/rarity/name/hint/badge leaks. Had a memo entry
+ever existed for such a `NodeId` (a future `PlanSolver` change, a shared
+`NodeId` collision), the node would have fallen through to the
+decision-found path below it and rendered with the ITEM-domain
+Name/IconUrl/Rarity/AcquisitionHint/AcquisitionBadge this whole class of
+fix exists to strip, reopening the leak from first principles rather than
+by any actual behavior change in `PlanSolver`. Fixed by hoisting the
+`node.IngredientType != "Item"` catch-all to its own branch immediately
+after the `"Currency"` branch, before the `decisions` lookup, matching
+where `GuildUpgrade` and `Currency` sit - it now returns unconditionally
+for a non-`"Item"` node regardless of whether a memo entry exists,
+exactly like its two siblings.
+
+**Tests (1 net new, real production code paths, no Blish references):**
+added `CraftingTreeBuilderTests.
+UnrecognizedIngredientType_IgnoresStaleMemoEntry_EvenWhenOneExistsForThisNodeId`,
+which hands `CraftingTreeBuilder.BuildTree` a `decisions` dictionary that
+DOES contain a `BuyFromTp` entry for the unrecognized-type node's own
+`NodeId` (a scenario the real solver cannot produce today, proving the
+guard by this method's own construction rather than by relying on that
+external fact) and asserts the node still renders `CraftingDecision.
+Unknown` with the generic label, null IconUrl/Rarity, and null
+SubtreeCost/UnitCost - never the `BuyFromTp` decision or its cost. No new
+test files (`.csproj` unchanged). Item/currency ids remain internal-only
+in the assertions; no Blish HUD references; the test calls
+`CraftingTreeBuilder.BuildTree` directly against a real `RecipeNode`/
+`SolverDecision`/`ItemMetadata` fixture, no contract-mirror/fake-logic
+test.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
+errors, only pre-existing StyleCop warnings, none new on
+`Services/PlanSolver.cs`, `Services/CraftingTreeBuilder.cs`, or the
+touched test file). Tests:
+`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+- 1391 total (1390 + 1 new) - PASS, 0 failed.
+
+**Self-review findings (Code Reviewer Mode, fixed before commit):** none
+beyond the two fixed above - re-read the full hoisted branch after the
+move to confirm it still returns unconditionally (no accidental
+fallthrough into the `decisions` lookup below it), and confirmed the
+`"Item"`-with-no-decision path immediately below (a real item with no
+recipe/price, the `AcquisitionSource.UnknownSource` case) is unchanged -
+it still falls through to `ApplyAcquisitionHint` exactly as before,
+since that call sits in its own now-unconditional-on-non-Item-only
+branch. Nice to have, not applied (scope discipline): the hoisted branch
+and the decision-not-found branch immediately below it both assign
+`treeNode.Decision = CraftingDecision.Unknown` for different reasons (one
+unconditionally for a non-`"Item"` type, one only when no memo entry
+exists for an `"Item"` type); a shared local could deduplicate the two
+four-line assignments, but the branches' preconditions are different
+enough, and the duplication small enough, that introducing a new
+abstraction for it is not justified under this repo's "avoid
+infrastructure unless required" efficiency principle - out of scope for
+this targeted fix.
+
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

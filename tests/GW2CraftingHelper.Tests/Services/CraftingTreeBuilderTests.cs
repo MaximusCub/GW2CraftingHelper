@@ -657,6 +657,47 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void UnrecognizedIngredientType_IgnoresStaleMemoEntry_EvenWhenOneExistsForThisNodeId()
+        {
+            // Class-level follow-up (guildupgrade-ingredients, adversarial
+            // review): the non-"Item" catch-all above sits BEFORE the
+            // decisions lookup now, matching where the GuildUpgrade and
+            // Currency branches sit, rather than only inside the "no
+            // decision found" branch. PlanSolver's Evaluate never actually
+            // memoizes a non-"Item" node today (see that method's
+            // Item-positive top guard), so this scenario - a `decisions`
+            // entry present for a "MysteryIngredientType" node's own NodeId
+            // - cannot occur via the real solver right now. This test
+            // proves the guard holds by this method's OWN construction
+            // regardless: even when handed a decision for this exact
+            // NodeId, the node must still take the Unknown/"Unrecognized
+            // ingredient" leaf, never the decision-found path's ITEM-domain
+            // Name/IconUrl/Rarity - the same guarantee the GuildUpgrade and
+            // Currency branches already give their own known types.
+            var node = Leaf(829, 5, "MysteryIngredientType");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>
+            {
+                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } }
+            };
+            var metadata = new Dictionary<int, ItemMetadata>
+            {
+                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.Unknown, treeNode.Decision);
+            Assert.NotEqual(CraftingDecision.BuyFromTp, treeNode.Decision);
+            Assert.Equal("Unrecognized ingredient (unresolved)", treeNode.Name);
+            Assert.Null(treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
+            Assert.Null(treeNode.SubtreeCost);
+            Assert.Null(treeNode.UnitCost);
+        }
+
+        [Fact]
         public void MultiLevel_Tree_CorrectStructure()
         {
             // Root -> Craft(recipe 10) -> Intermediate -> Craft(recipe 20) -> Leaf(Buy)

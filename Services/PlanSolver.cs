@@ -379,11 +379,15 @@ namespace GW2CraftingHelper.Services
         /// callers summing ingredient costs for a parent craft are summing
         /// comparison values, which is required for the parent's own
         /// craft-vs-buy comparison to be correct (see Decision.ComparisonValue).
-        /// EVERY non-currency, non-guild-upgrade ingredient of EVERY recipe
-        /// on this node is evaluated (and therefore gets its own memo
-        /// entry) regardless of whether this node ends up bought, crafted
-        /// via a different recipe, or unpriceable itself - see the recipe
-        /// loop below.
+        /// EVERY "Item" ingredient of EVERY recipe on this node is
+        /// evaluated (and therefore gets its own memo entry) regardless of
+        /// whether this node ends up bought, crafted via a different
+        /// recipe, or unpriceable itself - see the recipe loop below. Any
+        /// non-"Item" ingredient (Currency, GuildUpgrade, or an
+        /// unrecognized type) is never Evaluate()-called and therefore
+        /// never gets a memo entry - see the Item-positive guard at the
+        /// top of this method and the hasUnvaluedCurrency skip in the
+        /// recipe loop below.
         /// </summary>
         private long? Evaluate(
             RecipeNode node,
