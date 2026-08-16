@@ -119,6 +119,7 @@
     <Compile Include="Models\ExcessCraftOutput.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
+    <Compile Include="Services\ExcessCraftOutputCalculator.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />
