@@ -198,6 +198,14 @@ namespace GW2CraftingHelper.Services
                     : (long?)null;
             }
 
+            // AUDIT ROW 20/38: SolverDecision.PriceSideFellBack is already
+            // gated to BuyFromTp-only by PlanSolver's Commit (see that
+            // field's doc comment), but the guard is repeated here to match
+            // this method's own explicit-Source convention (VendorCurrencyCosts
+            // just above) rather than lean on the upstream invariant alone.
+            treeNode.PriceSideFellBack = decision.Source == AcquisitionSource.BuyFromTp &&
+                decision.PriceSideFellBack;
+
             if (decision.Source == AcquisitionSource.Craft)
             {
                 var recipe = node.Recipes.FirstOrDefault(r => r.RecipeId == decision.RecipeId);
@@ -248,6 +256,42 @@ namespace GW2CraftingHelper.Services
                     ? BuildVendorCostComponentLeaves(
                         node.NodeId, decision, metadata, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts)
                     : null;
+
+                // AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap, round 3;
+                // widened round 7): a BuyFromVendor node's own coin cost
+                // (SubtreeCost/UnitCost) always includes every barter item's
+                // value, whether or not that item also got a component leaf
+                // - so the parent needs this flag regardless of
+                // componentLeaves. Round 3 only set it when componentLeaves
+                // was null (the common pure-item-barter offer, kindCount==1:
+                // itemCount>0, currencyCount==0, VendorHasRawCoin==false -
+                // see BuildVendorCostComponentLeaves' own kindCount gate -
+                // and a multi-kind offer suppressed by
+                // VendorComponentCostsUnreliable), leaving a 2+-kind offer
+                // that DID get leaves with a hard-false parent flag even
+                // though the caveat belongs on the coin total either way.
+                // That leaf-only carrier is unreachable whenever the node
+                // renders collapsed (PlanContentHeightMath.IsNodeExpanded:
+                // `!dimmed && depth < 2`, and any non-Craft ancestor forces
+                // childDimmed for everything beneath it) - exactly the
+                // common case for a vendor node nested a couple of levels
+                // down. OR across every VendorItemCosts line rather than
+                // reading just one: any one barter item having fallen back
+                // is enough to want the caveat on the node whose own coin
+                // cost already includes it. The per-line flag stays
+                // meaningful even when VendorComponentCostsUnreliable makes
+                // the line's Quantity/GoldValue stale (SolverDecision.
+                // VendorComponentCostsUnreliable's own doc comment) - which
+                // TP side priced that item is independent of the later
+                // batch-cost reallocation - so reading it here is safe. The
+                // leaf keeps its own flag too (unchanged) - the tooltip gate
+                // already tolerates both being true, they render as separate
+                // rows, no double-render.
+                if (decision.Source == AcquisitionSource.BuyFromVendor &&
+                    decision.VendorItemCosts != null)
+                {
+                    treeNode.PriceSideFellBack = decision.VendorItemCosts.Any(line => line.PriceSideFellBack);
+                }
 
                 // Reference branch: gw2e's "what it would cost to craft
                 // instead" - informational, not an actual crafting step, so
@@ -400,7 +444,17 @@ namespace GW2CraftingHelper.Services
                         // method's own doc comment.
                         SubtreeCost = line.GoldValue,
                         UnitCost = line.Quantity > 0 ? line.GoldValue / line.Quantity : (long?)null,
-                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.ItemId, ownedVendorItemAmounts)
+                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.ItemId, ownedVendorItemAmounts),
+                        // AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap):
+                        // this leaf's UnitCost above came from the barter
+                        // item's own TP price (VendorItemCostLine.GoldValue -
+                        // see VendorBatchSolver.EvaluateVendorOffers), which
+                        // can itself have fallen back to the item's NON-
+                        // preferred TP side. Threaded through unchanged so
+                        // TreeSectionController's existing fell-back-price
+                        // tooltip caveat can also catch this leaf, not just
+                        // a plain BuyFromTp node.
+                        PriceSideFellBack = line.PriceSideFellBack
                     });
                 }
             }

@@ -124,6 +124,13 @@ namespace GW2CraftingHelper.Models
         // rows. Null under the same conditions as the source field - the
         // resolver's own null-safe fallbacks handle that case.
         public IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadata { get; set; }
+
+        // AUDIT ROW 20/38 (gw2e price-side fallback parity): passthrough of
+        // CraftingPlanResult.PriceBasis so the recipe-tree renderer can word
+        // a fallen-back node's unit-price tooltip caveat with the correct
+        // side names ("buy-order price unavailable" vs. "instant-buy price
+        // unavailable") instead of a basis-agnostic message.
+        public PriceBasis PriceBasis { get; set; }
     }
 
     /// <summary>

@@ -21,25 +21,140 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var instant = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.InstantBuy).Plan;
-            var order = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.BuyOrder).Plan;
+            var instant = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.InstantBuy);
+            var order = solver.Solve(Leaf(1, 2), prices, null, PriceBasis.BuyOrder);
 
-            Assert.Equal(200, instant.TotalCoinCost);
-            Assert.Equal(120, order.TotalCoinCost);
+            Assert.Equal(200, instant.Plan.TotalCoinCost);
+            Assert.Equal(120, order.Plan.TotalCoinCost);
+            // AUDIT ROW 20/38: preferred side present on both sides ->
+            // used directly, no same-item other-side fallback triggered.
+            Assert.False(instant.Decisions[0].PriceSideFellBack);
+            Assert.False(order.Decisions[0].PriceSideFellBack);
         }
 
         [Fact]
-        public void BuyOrderBasis_NoBuyOrders_ItemNotPriceable()
+        public void BuyOrderBasis_NoBuyOrders_FallsBackToInstantBuyPrice()
         {
+            // AUDIT ROW 20/38 (gw2e price-side fallback parity): the
+            // preferred side (buy orders / SellInstant) is empty, but this
+            // SAME item's other side (instant-buy / BuyInstant) has a real
+            // listing - gw2e falls back to it instead of treating the item
+            // as unpriceable. Previously this returned UnknownSource.
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } }
             };
             var solver = new PlanSolver();
 
-            var plan = solver.Solve(Leaf(1, 1), prices, null, PriceBasis.BuyOrder).Plan;
+            var result = solver.Solve(Leaf(1, 1), prices, null, PriceBasis.BuyOrder);
 
-            Assert.Equal(AcquisitionSource.UnknownSource, plan.Steps[0].Source);
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
+            Assert.Equal(100, result.Plan.TotalCoinCost);
+            Assert.True(result.Decisions[0].PriceSideFellBack);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_BothSidesEmpty_ItemNotPriceable()
+        {
+            // AUDIT ROW 20/38: both TP sides empty stays unpriceable - the
+            // fallback only ever tries this SAME item's other side, never
+            // invents a price from nothing.
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 0 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(Leaf(1, 1), prices, null, PriceBasis.BuyOrder);
+
+            Assert.Equal(AcquisitionSource.UnknownSource, result.Plan.Steps[0].Source);
+            Assert.False(result.Decisions[0].PriceSideFellBack);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_CraftWinsOverFallbackPricedBuy_DecisionFlagStaysFalse()
+        {
+            // AUDIT ROW 20/38: buyPriceSideFellBack is computed unconditionally
+            // for every node's own TP price (item 1's preferred side, buy
+            // orders / SellInstant, is empty here - the buy-side total only
+            // exists via this same item's other-side fallback to BuyInstant).
+            // Craft still wins the three-way comparison (20 < 100), so
+            // Commit's `src == AcquisitionSource.BuyFromTp` gate must keep
+            // the flag false on the winning Craft decision even though the
+            // losing buy option internally fell back.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 0, SellInstant = 20 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, null, PriceBasis.BuyOrder);
+
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.Equal(20, result.Plan.TotalCoinCost);
+            Assert.False(result.Decisions[0].PriceSideFellBack);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_VendorWinsOverFallbackPricedBuy_DecisionFlagStaysFalse()
+        {
+            // AUDIT ROW 20/38 review-fix (test gap): sibling of
+            // BuyOrderBasis_CraftWinsOverFallbackPricedBuy_DecisionFlagStaysFalse
+            // above, but exercising the OTHER half of Commit's
+            // `src == AcquisitionSource.BuyFromTp` gate - a BuyFromVendor
+            // win, not a Craft win. Item 1's preferred side (buy orders /
+            // SellInstant) is empty, so buyPriceSideFellBack is computed
+            // true for the (losing) TP option; the vendor coin offer (40)
+            // beats both the fallback-priced buy (100) and the leaf's lack
+            // of a craft option outright, so the gate must keep the flag
+            // false on the winning BuyFromVendor decision.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 40) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.BuyOrder);
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, result.Decisions[0].Source);
+            Assert.Equal(40, result.Plan.TotalCoinCost);
+            Assert.False(result.Decisions[0].PriceSideFellBack);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_FallbackPricedBuyWinsOverCraft_SourceIsBuyFromTp()
+        {
+            // AUDIT ROW 20/38 review-fix (test gap): the sibling
+            // *_WinsOverFallbackPricedBuy_DecisionFlagStaysFalse tests above
+            // only cover the fallback-priced buy LOSING the comparison -
+            // every one of them still passes if the fallback were removed
+            // entirely (buyTotalCost -> null, craft/vendor still wins). This
+            // pins the other outcome: item 1's preferred side (buy orders /
+            // SellInstant) is empty, so its buy option is only priced via
+            // the same-item other-side fallback (BuyInstant = 100); that
+            // fallback-priced buy (100) is cheaper than the only recipe
+            // (1x item 2 at SellInstant 200) and must WIN the three-way
+            // comparison, not just lose it gracefully.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 200, SellInstant = 200 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, null, PriceBasis.BuyOrder);
+
+            Assert.Equal(AcquisitionSource.BuyFromTp, result.Decisions[0].Source);
+            Assert.Equal(100, result.Plan.TotalCoinCost);
+            Assert.True(result.Decisions[0].PriceSideFellBack);
         }
 
         [Fact]
@@ -87,6 +202,47 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 200, SellInstant = 100 } },
                 { 42, new ItemPrice { ItemId = 42, BuyInstant = 10, SellInstant = 4 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var order = solver.Solve(Leaf(1, 1), prices, vendorOffers, PriceBasis.BuyOrder).Plan;
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, order.Steps[0].Source);
+            Assert.Equal(20, order.TotalCoinCost);
+        }
+
+        [Fact]
+        public void BuyOrderBasis_VendorItemBarter_BarterItemFallsBackToOtherSide()
+        {
+            // AUDIT ROW 20/38: PlanSolver.GetUnitPrice is the single site
+            // VendorBatchSolver's Item-cost-line pricing routes through, so
+            // the same-item other-side fallback must reach it too. Barter
+            // item 42's preferred side (buy orders / SellInstant) is empty
+            // here - only its BuyInstant side has a listing - so the offer
+            // must still price (5 x 4 = 20) rather than be dropped as
+            // unpriceable, same total as the sibling
+            // BuyOrderBasis_VendorItemBarter_PricedAtBasis test above where
+            // both sides were populated directly.
+            var offer = new VendorOffer
+            {
+                OfferId = "test-barter-basis-fallback",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "Item", Id = 42, Count = 5 }
+                },
+                MerchantName = "Barter Vendor",
+                Locations = new List<string>()
+            };
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200, SellInstant = 100 } },
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 4, SellInstant = 0 } }
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {

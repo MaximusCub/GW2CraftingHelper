@@ -18,5 +18,16 @@ namespace GW2CraftingHelper.Models
         public int ItemId { get; set; }
         public int Quantity { get; set; }
         public long GoldValue { get; set; }
+
+        // AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap): true when this
+        // line's per-unit TP price (folded into GoldValue above) came from
+        // this SAME item's NON-preferred TP side because the preferred
+        // side had no listings - see PlanSolver.GetUnitPrice's 3-arg
+        // overload, which VendorBatchSolver.EvaluateVendorOffers now calls
+        // for every Item cost line. CraftingTreeBuilder.
+        // BuildVendorCostComponentLeaves reads this to flag the resulting
+        // component leaf's own PriceSideFellBack, the same way a plain
+        // BuyFromTp node's fallback is already flagged.
+        public bool PriceSideFellBack { get; set; }
     }
 }

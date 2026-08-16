@@ -74,5 +74,15 @@ namespace GW2CraftingHelper.Services
         public bool CanCraft { get; internal set; }
         public bool CanBuyTp { get; internal set; }
         public bool CanBuyVendor { get; internal set; }
+
+        // AUDIT ROW 20/38 (gw2e price-side fallback parity): true only when
+        // Source is BuyFromTp and this node's committed unit price came
+        // from the item's NON-preferred TP side because the preferred side
+        // (per the solve's PriceBasis) had no listings - see
+        // PlanSolver.GetUnitPrice's fallback overload. Always false for
+        // every other Source. CraftingTreeBuilder reads this to flag the
+        // matching CraftingTreeNode so the recipe-tree unit-price tooltip
+        // can tell the user which side was actually used.
+        public bool PriceSideFellBack { get; internal set; }
     }
 }
