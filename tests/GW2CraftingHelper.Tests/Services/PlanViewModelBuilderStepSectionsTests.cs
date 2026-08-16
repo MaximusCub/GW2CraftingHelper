@@ -330,6 +330,100 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("", section.Rows[0].StatusTag);
         }
 
+        // --- UI-bundle milestone, Feature A (wiki links) ---
+
+        [Fact]
+        public void RequiredRecipes_Missing_NotLearnedFromItem_WikiUrlLinksToAcquisitionAnchor()
+        {
+            var meta = MetaFor((1, "Bolt of Damask", "bolt.png"));
+            var result = MakeResult(metadata: meta, requiredRecipes: new List<RequiredRecipe>
+            {
+                new RequiredRecipe
+                {
+                    RecipeId = 10,
+                    OutputItemId = 1,
+                    IsAutoLearned = false,
+                    IsLearnedFromItem = false,
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    IsMissing = true
+                }
+            });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredRecipes);
+            Assert.Equal(
+                "https://wiki.guildwars2.com/wiki/Bolt_of_Damask#Acquisition",
+                section.Rows[0].WikiUrl);
+        }
+
+        [Fact]
+        public void RequiredRecipes_Missing_LearnedFromItem_WikiUrlLinksToRecipeSheet()
+        {
+            var meta = MetaFor((1, "Bolt of Damask", "bolt.png"));
+            var result = MakeResult(metadata: meta, requiredRecipes: new List<RequiredRecipe>
+            {
+                new RequiredRecipe
+                {
+                    RecipeId = 10,
+                    OutputItemId = 1,
+                    IsAutoLearned = false,
+                    IsLearnedFromItem = true,
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    IsMissing = true
+                }
+            });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredRecipes);
+            Assert.Equal(
+                "https://wiki.guildwars2.com/wiki/Recipe:_Bolt_of_Damask",
+                section.Rows[0].WikiUrl);
+        }
+
+        [Fact]
+        public void RequiredRecipes_Learned_NoWikiUrl()
+        {
+            var result = MakeResult(requiredRecipes: new List<RequiredRecipe>
+            {
+                new RequiredRecipe
+                {
+                    RecipeId = 10,
+                    OutputItemId = 1,
+                    IsAutoLearned = false,
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    IsMissing = false
+                }
+            });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredRecipes);
+            Assert.Null(section.Rows[0].WikiUrl);
+        }
+
+        [Fact]
+        public void RequiredRecipes_AutoLearned_NoWikiUrl()
+        {
+            var result = MakeResult(requiredRecipes: new List<RequiredRecipe>
+            {
+                new RequiredRecipe
+                {
+                    RecipeId = 10,
+                    OutputItemId = 1,
+                    IsAutoLearned = true,
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    IsMissing = null
+                }
+            });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.RequiredRecipes);
+            Assert.Null(section.Rows[0].WikiUrl);
+        }
+
         [Fact]
         public void RequiredRecipes_OutputName_FromMetadata()
         {

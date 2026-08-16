@@ -104,6 +104,23 @@ namespace GW2CraftingHelper.Views.Rendering
 
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
+            // UI-bundle milestone, Feature A (wiki links): a context action
+            // (right-click), not a visible icon - the row already packs an
+            // icon/name/optional sublabel/right-aligned status tag into a
+            // fixed height with no spare column, and the maintainer
+            // pre-authorized either placement (see the milestone spec).
+            // Right-click also cannot collide with the row's existing
+            // interactions (this row has none - unlike the Recipe Tree,
+            // Required Recipes rows are not expand/collapse toggles), and
+            // is naturally low-accidental-click-risk for a click that
+            // steals focus into the default browser.
+            if (!string.IsNullOrEmpty(row.WikiUrl))
+            {
+                string wikiUrl = row.WikiUrl;
+                rowPanel.RightMouseButtonPressed += (_, __) => WikiLinkLauncher.Open(wikiUrl);
+                rowPanel.BasicTooltipText = "Right-click: Open wiki page";
+            }
+
             IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, hasSublabel ? 1 : 0);
 
             var font = GameService.Content.DefaultFont14;

@@ -898,6 +898,19 @@ namespace GW2CraftingHelper.Services
                 string sublabel = FormatDisciplineSublabel(
                     recipe.Disciplines, recipe.MinRating, planDiscNames);
 
+                // UI-bundle milestone, Feature A (wiki links): scoped to
+                // "Required Recipes Missing!" rows only, per the spec's own
+                // wording (contrast Feature A's tree-row affordance, which
+                // the spec calls out for "each item row" with no such
+                // scoping) - a row the user has nothing left to unlock for
+                // (Learned/Auto-learned) gets no wiki affordance at all.
+                // Flag-based target: a LearnedFromItem recipe links to its
+                // own "Recipe: <name>" sheet page; every other recipe links
+                // to the output item's page + "#Acquisition" anchor.
+                string wikiUrl = statusTag == "Missing!"
+                    ? WikiLinkBuilder.BuildRequiredRecipeUrl(name, recipe.IsLearnedFromItem)
+                    : null;
+
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.RecipeRow,
@@ -905,7 +918,8 @@ namespace GW2CraftingHelper.Services
                     Sublabel = sublabel,
                     IconUrl = iconUrl,
                     Rarity = rarity,
-                    StatusTag = statusTag
+                    StatusTag = statusTag,
+                    WikiUrl = wikiUrl
                 });
             }
 
