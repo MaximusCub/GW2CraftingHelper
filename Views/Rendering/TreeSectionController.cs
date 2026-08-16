@@ -756,12 +756,24 @@ namespace GW2CraftingHelper.Views.Rendering
             // cost-component leaf (node.IsCostComponent) whose own TP-
             // valued barter price fell back the same way - see
             // VendorItemCostLine.PriceSideFellBack and
-            // CraftingTreeBuilder.BuildVendorCostComponentLeaves. A plain
-            // BuyFromVendor node (not a cost component) never sets this
-            // flag (CraftingTreeNode.PriceSideFellBack's own doc comment),
-            // so the added IsCostComponent check cannot fire for the
-            // ordinary vendor-node case, only this item-barter-leaf case.
-            if ((node.Decision == CraftingDecision.BuyFromTp || node.IsCostComponent) &&
+            // CraftingTreeBuilder.BuildVendorCostComponentLeaves.
+            //
+            // Review-fix round 3 (DISPLAY CAVEAT gap): also covers a plain
+            // BuyFromVendor node with no cost-component leaves at all (a
+            // pure item-barter offer, kindCount==1 - the common case - or
+            // any offer VendorComponentCostsUnreliable suppressed leaf
+            // synthesis for) - CraftingTreeBuilder.BuildNode now sets that
+            // node's own PriceSideFellBack (OR across VendorItemCosts) in
+            // exactly this case, so `node.Decision ==
+            // CraftingDecision.BuyFromVendor` on its own already covers
+            // both this case and the cost-component leaf above (a leaf's
+            // own Decision is always BuyFromVendor too - see
+            // BuildVendorCostComponentLeaves) - IsCostComponent is kept as
+            // an explicit disjunct anyway to document both producers by
+            // name rather than rely on that overlap implicitly.
+            if ((node.Decision == CraftingDecision.BuyFromTp ||
+                 node.Decision == CraftingDecision.BuyFromVendor ||
+                 node.IsCostComponent) &&
                 node.PriceSideFellBack)
             {
                 extraTooltipLines.Add(_getCurrentPlan()?.PriceBasis == PriceBasis.BuyOrder

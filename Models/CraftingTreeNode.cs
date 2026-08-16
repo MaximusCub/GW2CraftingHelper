@@ -69,18 +69,26 @@ namespace GW2CraftingHelper.Models
         // AUDIT ROW 20/38 (gw2e price-side fallback parity): true when this
         // node's UnitCost above came from an item's NON-preferred TP side
         // because the preferred side (per the plan's PriceBasis) had no
-        // listings - see PlanSolver.GetUnitPrice's fallback overload. Two
-        // distinct producers, both gated the same way at their own source:
+        // listings - see PlanSolver.GetUnitPrice's fallback overload. Three
+        // distinct producers, all gated the same way at their own source:
         // (1) a plain BuyFromTp node, from SolverDecision.PriceSideFellBack
         // (CraftingTreeBuilder.BuildNode gates this to Decision ==
         // BuyFromTp only); (2) a BuyFromVendor cost-component leaf
         // (IsCostComponent) representing a TP-valued Item barter line, from
         // VendorItemCostLine.PriceSideFellBack (review-fix,
         // BuildVendorCostComponentLeaves) - the leaf's OWN price, not the
-        // parent vendor node's. Always false for every other node,
-        // including the parent BuyFromVendor node itself and any currency
-        // cost-component leaf. The recipe-tree renderer reads this to add
-        // an "other side shown" caveat to the unit-price tooltip.
+        // parent vendor node's; (3) review-fix round 3 (DISPLAY CAVEAT gap):
+        // a BuyFromVendor node that got NO cost-component leaves at all
+        // (kindCount < 2, or VendorComponentCostsUnreliable suppressed
+        // synthesis) - the OR of every VendorItemCosts line's own
+        // PriceSideFellBack, since there is no leaf to carry the caveat
+        // instead (CraftingTreeBuilder.BuildNode, right after componentLeaves
+        // is computed). Always false for every other node, including a
+        // currency cost-component leaf and a BuyFromVendor node that DID get
+        // component leaves (case (3) never fires there - the leaves
+        // themselves carry it per case (2)). The recipe-tree renderer reads
+        // this to add an "other side shown" caveat to the unit-price
+        // tooltip.
         public bool PriceSideFellBack { get; set; }
 
         // Non-coin currency cost of a BuyFromVendor decision (see

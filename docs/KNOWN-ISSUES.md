@@ -3948,8 +3948,6 @@ verification was performed for this pass - `TreeSectionController.cs`
 is Blish-bound and outside this session's test-runnable surface, same
 constraint prior UI-adjacent entries in this file note.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
-
 ## AUDIT ROW 20/38 review-fix: test gap + doc-comment fix (2026-08-16)
 
 Adversarial re-review of the AUDIT ROW 20/38 TP price-side fallback
@@ -4035,8 +4033,6 @@ internal-only; coin icons unaffected (no coin-rendering code touched).
 No live desktop verification performed for this pass - purely a
 solver/builder-layer test and doc-comment fix, no UI-adjacent behavior
 changed.
-
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
 
 ## AUDIT ROW 20/38 review-fix round 2: PriceBasis pass-through test gap + vendor-barter DISPLAY CAVEAT (2026-08-16)
 
@@ -4179,5 +4175,139 @@ purely solver/builder-layer plus a display-controller code change
 verified through the builder-layer tests above (`TreeSectionController`
 is Blish-bound and outside this session's test-runnable surface, same
 constraint prior UI-adjacent entries in this file note).
+
+## AUDIT ROW 20/38 review-fix round 3: kindCount==1 DISPLAY CAVEAT gap + gate-line consolidation (2026-08-16)
+
+A third adversarial pass over the AUDIT ROW 20/38 TP price-side fallback
+change (three sections above) found two further issues, both fixed
+here.
+
+**Finding 1 (Must Fix, DISPLAY CAVEAT gap)**:
+`CraftingTreeBuilder.BuildVendorCostComponentLeaves` returns null (no
+leaves synthesized at all) whenever a winning `BuyFromVendor` offer's
+cost KIND count is under 2 - the common case of a pure item-barter offer
+(`itemCount>0`, `currencyCount==0`, `VendorHasRawCoin==false`, so
+`kindCount==1`). The `PriceSideFellBack` fact set on each
+`VendorItemCostLine` rides exclusively on those leaves, and the parent
+node's own flag was hard-`false` by design (`BuildNode` gated it to
+`decision.Source == AcquisitionSource.BuyFromTp` only). Net effect: a
+pure-item-barter vendor offer priced entirely off the non-preferred TP
+side rendered its coin cost (cost column, and the "Unit price: ..."
+tooltip line at `Quantity > 1`) with no caveat anywhere -
+`PlanSolverPriceBasisAndOverrideTests.
+BuyOrderBasis_VendorItemBarter_BarterItemFallsBackToOtherSide` (round 1)
+already built exactly this fixture and asserted `TotalCoinCost == 20`
+without ever asserting the display side of it. The same hole reopened
+for a multi-kind offer whenever `decision.VendorComponentCostsUnreliable`
+is true (leaf synthesis suppressed for a merged, reallocated vendor
+step - W4B review-fix, previous milestone) - only the 2-kind case was
+covered by the existing `CraftingTreeBuilderTests` suite, so neither gap
+failed a test.
+
+**Fix**: `CraftingTreeBuilder.BuildNode` now carries an aggregate "any
+barter item fell back" bit onto the `BuyFromVendor` node itself,
+computed as the OR across every `decision.VendorItemCosts` line's own
+`PriceSideFellBack`, and sets it on `treeNode.PriceSideFellBack` whenever
+`componentLeaves == null` (covering both the plain `kindCount < 2` case
+and the `VendorComponentCostsUnreliable` case with the same one-line
+check, since both already produce a null `componentLeaves`). The
+per-line flag stays meaningful even when
+`VendorComponentCostsUnreliable` makes the line's `Quantity`/`GoldValue`
+stale - which TP side priced that item is independent of the later
+batch-cost reallocation. `CraftingTreeNode.PriceSideFellBack`'s doc
+comment gained a third documented producer alongside the existing plain-
+`BuyFromTp`-node and cost-component-leaf cases.
+`TreeSectionController`'s tooltip gate (previously `node.Decision ==
+CraftingDecision.BuyFromTp || node.IsCostComponent`) widened to also
+include `node.Decision == CraftingDecision.BuyFromVendor`, since that is
+the only way the new parent-node flag can ever reach the renderer (a
+cost-component leaf's own `Decision` is always `BuyFromVendor` too, so
+this single addition also happens to subsume the existing
+`IsCostComponent` disjunct - kept anyway, undisturbed, to name both
+producers explicitly rather than rely on that overlap implicitly).
+
+The `VendorBatchSolver` merged-ceil batching math itself
+(`FinalizeVendorBatches`/`AllocateVendorNodeCosts`/the `unitsNeeded`
+scaling arithmetic) was not touched - this fix only reads an
+already-computed per-line boolean that a prior round already threaded
+onto `VendorItemCostLine`.
+
+**Tests** (`CraftingTreeBuilderTests.cs`, both exercise real
+`PlanSolver.Solve`/`CraftingTreeBuilder.BuildTree` production code
+paths via the file's existing `BuildViaRealSolver` helper - no
+contract-mirror or fake-logic tests):
+
+- `SingleKindVendorOffer_ItemOnly_FallsBackToOtherSide_ParentFlagsPriceSideFellBack`
+  - the exact `kindCount==1` gap: a pure item-barter offer whose only
+  cost line's preferred TP side is empty; asserts the offer still gets
+  no leaves (unchanged - only 1 kind) but the parent node's own
+  `PriceSideFellBack` is now true. The sibling non-fallback test
+  (`SingleKindVendorOffer_ItemOnly_NoLeaves`) gained an explicit
+  `Assert.False(node.PriceSideFellBack)` alongside it as the negative
+  case.
+- `MultiOccurrence_MergedVendorOffer_ItemFallsBackToOtherSide_ParentFlagsPriceSideFellBack`
+  - the `VendorComponentCostsUnreliable` carve-out: reuses the existing
+  `MultiOccurrence_MergedMixedVendorOffer_SuppressesComponentLeaves_ParentStaysConsistent`
+  fixture shape (two tree occurrences merging into one true vendor
+  batch) with the barter item's preferred TP side emptied out; asserts
+  both occurrences' nodes carry `PriceSideFellBack == true` even though
+  neither gets a component leaf.
+
+**Finding 2 (Nice to Have, gate-line ambiguity)**: the three review
+rounds above each ended their own section with the literal orchestrator
+gate line (`Gate: [PENDING - the orchestrator fills in PASS/FAIL]`),
+leaving three pending markers in one file for what is really one branch
+under review - ambiguous which gate a reader or a future stamping pass
+was meant to fill in. Fixed by dropping the gate line from all three
+prior sections and keeping exactly one, on this section, at the true end
+of the file.
+
+**Self-review findings** (Code Reviewer Mode pass over this diff):
+confirmed the new `BuildNode` block is gated on `componentLeaves ==
+null` specifically (not merely "no children"), so it can never fire for
+a 2+-kind offer that DID get component leaves - the parent's own flag
+stays `false` there exactly as before, and the leaf-level flag (case 2)
+remains the sole carrier for that shape, no double-counting; confirmed
+`decision.VendorItemCosts` is null-guarded before `.Any(...)` is called,
+so a `BuyFromVendor` decision with only currency/coin cost lines (no
+item lines at all - `SingleKindVendorOffer_CurrencyOnly_NoLeaves`/
+`_CoinOnly_NoLeaves`) takes the null-guard branch and leaves the flag at
+its prior `false`, never throwing on a null list; confirmed the widened
+`TreeSectionController` gate cannot regress the pre-existing
+`BuyFromTp`/cost-component-leaf cases (both disjuncts kept verbatim, an
+OR only ever adds reachable `true` cases, never removes one); grepped
+`docs/KNOWN-ISSUES.md` for any other stray
+`Gate: [PENDING` occurrence after the consolidation - exactly one
+remains (this section's own, below). Nice-to-have (not applied - out of
+scope, minimal-diff per the finding's own "minimal fix" framing): the
+`kindCount < 2` and `VendorComponentCostsUnreliable` carve-outs could
+be split into two distinct booleans on `SolverDecision` (e.g. a single
+precomputed `VendorItemPriceSideFellBack` set once in
+`VendorBatchSolver`/`PlanSolver` rather than re-derived by an `.Any()`
+scan in the tree builder every time a node is built); left as the
+inline scan since `VendorItemCosts` lists are always small (single
+digits of cost lines per real vendor offer, same assumption
+`SyntheticComponentNodeId`'s own doc comment already relies on) and
+adding a new `SolverDecision` field was exactly the kind of new
+abstraction the finding's own "minimal fix" wording steered away from.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` clean, 0
+errors (grepped the full warning list for the three touched production
+files - `CraftingTreeBuilder.cs`, `Models/CraftingTreeNode.cs`,
+`Views/Rendering/TreeSectionController.cs` - zero hits, so no new
+StyleCop warnings on touched lines). Tests: 1380 passed, 0 failed
+(baseline 1378 from the previous section; +2 net new, exactly the two
+`[Fact]` tests listed above - confirmed via `dotnet test
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`). No Blish
+HUD/BlishHUD.exe references added to tests; the edited test file remains
+Blish-free and exercises real `PlanSolver`/`CraftingTreeBuilder`
+production code paths, not contract mirrors. IDs remain internal-only;
+coin icons unaffected (no coin-rendering code touched -
+`PriceSideFellBack` is a boolean flag, not a price value). No live
+desktop verification performed for this pass - purely solver/builder-
+layer plus a display-controller code change verified through the
+builder-layer tests above (`TreeSectionController` is Blish-bound and
+outside this session's test-runnable surface, same constraint every
+prior UI-adjacent entry in this file notes).
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

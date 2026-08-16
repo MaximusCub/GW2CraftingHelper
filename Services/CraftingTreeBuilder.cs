@@ -198,6 +198,32 @@ namespace GW2CraftingHelper.Services
                         node.NodeId, decision, metadata, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts)
                     : null;
 
+                // AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap, round 3):
+                // a BuyFromVendor node with no component leaves has nowhere
+                // to carry a fallen-back barter item's TP-side caveat - each
+                // VendorItemCostLine's own PriceSideFellBack (set above,
+                // read by BuildVendorCostComponentLeaves) simply never
+                // reaches a leaf when componentLeaves is null. That happens
+                // for both the common pure-item-barter offer (kindCount==1:
+                // itemCount>0, currencyCount==0, VendorHasRawCoin==false -
+                // see BuildVendorCostComponentLeaves' own kindCount gate)
+                // and a multi-kind offer suppressed by
+                // VendorComponentCostsUnreliable. OR across every
+                // VendorItemCosts line rather than reading just one: any one
+                // barter item having fallen back is enough to want the
+                // caveat on the node whose own coin cost already includes
+                // it. The per-line flag stays meaningful even when
+                // VendorComponentCostsUnreliable makes the line's
+                // Quantity/GoldValue stale (SolverDecision.
+                // VendorComponentCostsUnreliable's own doc comment) - which
+                // TP side priced that item is independent of the later
+                // batch-cost reallocation - so reading it here is safe.
+                if (componentLeaves == null && decision.Source == AcquisitionSource.BuyFromVendor &&
+                    decision.VendorItemCosts != null)
+                {
+                    treeNode.PriceSideFellBack = decision.VendorItemCosts.Any(line => line.PriceSideFellBack);
+                }
+
                 // Reference branch: gw2e's "what it would cost to craft
                 // instead" - informational, not an actual crafting step, so
                 // it is built from recipe[0] (the deterministic first

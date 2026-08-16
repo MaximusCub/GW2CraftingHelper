@@ -1234,6 +1234,46 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
             Assert.Empty(node.Children);
             Assert.Equal(50, node.SubtreeCost);
+            Assert.False(node.PriceSideFellBack);
+        }
+
+        /// <summary>
+        /// AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap, round 3): the
+        /// sibling of the test above, but the barter item's preferred TP
+        /// side (BuyInstant, under the default InstantBuy basis) is empty -
+        /// its price only exists via this same item's other-side fallback
+        /// to SellInstant. This is exactly the fixture shape
+        /// PlanSolverPriceBasisAndOverrideTests.
+        /// BuyOrderBasis_VendorItemBarter_BarterItemFallsBackToOtherSide
+        /// already proves at the SolverDecision level (kindCount==1 - a
+        /// pure item-barter offer, itemCount&gt;0/currencyCount==0/no raw
+        /// coin - so BuildVendorCostComponentLeaves still returns null, no
+        /// leaf is synthesized to carry the leaf-level PriceSideFellBack).
+        /// The parent node itself must carry the caveat instead, or this
+        /// vendor offer's coin cost renders with no fallback indicator
+        /// anywhere.
+        /// </summary>
+        [Fact]
+        public void SingleKindVendorOffer_ItemOnly_FallsBackToOtherSide_ParentFlagsPriceSideFellBack()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 0, SellInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(1, new[] { (42, 5) }, currencyCostLines: null);
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var metadata = Meta((1, "Vendor Item", "v.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.Empty(node.Children); // still only 1 kind - no leaves either way
+            Assert.Equal(50, node.SubtreeCost); // 5 * fallen-back SellInstant 10
+            Assert.True(node.PriceSideFellBack);
         }
 
         [Fact]
@@ -1498,6 +1538,65 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(leafA.SubtreeCost.HasValue);
             Assert.True(leafB.SubtreeCost.HasValue);
             Assert.Equal(step.TotalCost, leafA.SubtreeCost.Value + leafB.SubtreeCost.Value);
+        }
+
+        /// <summary>
+        /// AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap, round 3): same
+        /// merged-occurrence fixture as
+        /// MultiOccurrence_MergedMixedVendorOffer_SuppressesComponentLeaves_ParentStaysConsistent
+        /// above (VendorComponentCostsUnreliable suppresses leaf synthesis
+        /// for both occurrences), but item 42's preferred TP side
+        /// (BuyInstant, the default InstantBuy basis) is empty here - its
+        /// price only exists via this same item's other-side fallback to
+        /// SellInstant. With no component leaf to carry
+        /// VendorItemCostLine.PriceSideFellBack, each occurrence's own
+        /// parent node must carry the caveat instead - the second gap the
+        /// finding named alongside the plain kindCount==1 case above.
+        /// </summary>
+        [Fact]
+        public void MultiOccurrence_MergedVendorOffer_ItemFallsBackToOtherSide_ParentFlagsPriceSideFellBack()
+        {
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Craftable(2, 1, Option(11, 1, 1, Leaf(500, 6))),
+                    Craftable(3, 1, Option(12, 1, 1, Leaf(500, 6)))));
+
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 0, SellInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(
+                500, new[] { (42, 3) }, new[] { (23, 5) }, coinCost: 0, outputCount: 15);
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 500, new List<VendorOffer> { offer } }
+            };
+            var metadata = Meta(
+                (1, "Root", "r.png"),
+                (2, "Sub A", "a.png"),
+                (3, "Sub B", "b.png"),
+                (42, "Glob of Ectoplasm", "ecto.png"));
+
+            var solver = new PlanSolver();
+            var solveResult = solver.Solve(tree, prices, vendorOffers);
+
+            var builder = new CraftingTreeBuilder();
+            var root = builder.BuildTree(tree, solveResult.Decisions, metadata);
+
+            var subA = root.Children.Single(c => c.ItemId == 2);
+            var subB = root.Children.Single(c => c.ItemId == 3);
+            var leafA = subA.Children.Single(c => c.ItemId == 500);
+            var leafB = subB.Children.Single(c => c.ItemId == 500);
+
+            // Same merge/suppression shape as the sibling test above -
+            // still no leaves, this test is purely about the parent flag.
+            Assert.Empty(leafA.Children);
+            Assert.Empty(leafB.Children);
+
+            var step = solveResult.Plan.Steps.Single(s => s.ItemId == 500);
+            Assert.Equal(30, step.TotalCost); // same total as the non-fallback sibling - only the TP side differs
+            Assert.True(leafA.PriceSideFellBack);
+            Assert.True(leafB.PriceSideFellBack);
         }
 
         /// <summary>
