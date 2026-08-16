@@ -658,3 +658,61 @@ elsewhere (M37/KNOWN-ISSUES #24) - added to close that coverage gap, not
 because anything about it is unresolved. Entries 7 and 11 had wording
 corrected in place (a novelty overclaim and an invalidated follow-up
 pointer, respectively) without changing their underlying verdicts.
+
+---
+
+## Orchestrator checksum verdicts and decisions (2026-08-16)
+
+1. ADOPT-row checksum outcomes: Row 5 GuildUpgrade CONFIRMED by the
+   orchestrator's own live API fetch (recipe 12002 returns a
+   GuildUpgrade-typed ingredient) and repo reads - queued for
+   implementation. Row 17 resolved by the shipped comparability fix
+   (conservative direction; entry 22 ratified conservative by the
+   maintainer). Row 20/38 TP other-side fallback CONFIRMED twice
+   first-hand (research agent + the orchestrator's own fetch of
+   gw2efficiency's live application.js: preferred side first, same-item
+   cross-side fallback when missing/zero, unpriced only when both sides
+   empty) - queued. Row 31 InventoryReducer price-blind ordering
+   CONFIRMED (Reduce before Solve in CraftingPlanPipeline) - queued with
+   a design round; the design will also deliver a "Value own materials"
+   toggle matching gw2e's valueOwnItems (default true) semantics, per
+   the maintainer. Row 56 craft-cooldowns gap CONFIRMED - queued. Row 59
+   achievement-gated recipes DEMOTED: three of the audit's four named
+   examples (The North Wind 73037, Ydalir 69817, Glint's Bastion 75482)
+   are achievement REWARDS auto-granted on collection completion, not
+   recipes; the ~283 count is unverifiable from primary sources;
+   Zap-class LearnedFromItem precursor recipes are ordinary /v2/recipes
+   members already covered by the seed regeneration; the genuine
+   residue is Mystic-Forge-only legendary FINAL assemblies (e.g. Bolt
+   30699), re-scoped as a possible expansion of the existing
+   mystic_forge_recipes.json curated seed (wiki {{Recipe}} templates are
+   machine-parseable) - awaiting an explicit maintainer go.
+
+2. Maintainer decisions on this log's entries (2026-08-15/16
+   walkthrough): #1 ADOPT gw2e's currency decision-value table as
+   shipped defaults (decision-only, overridable and clearable, labeled
+   estimates with attribution; the no-invented-data rule is explicitly
+   waived for this table by the maintainer); a derived-from-real-data
+   valuation engine is backlogged. #4 keep exact-amount buy billing;
+   surface craft-batch excess and its net reclaim value in the planned
+   Crafting Plan Notes section. #6 keep vendor-wins-ties (vendor
+   guarantees exact quantity at fixed price; craft-then-sell reclaim
+   carries market risk and effort). #8 keep the opportunity-cost
+   display; gw2e has no display-framing option (their Value Own
+   Materials toggle is decision-behavior, not display - see verdict on
+   row 31 above). #11 REPLACED by the maintainer's own design: currency
+   leaves get a plan-scope "HAVE {have}/{planTotal} TOTAL" pill (both
+   numbers plan-level facts, truthful at every occurrence, no per-row
+   allocation), collapsing to plain HAVE at full coverage - supersedes
+   both gw2e's per-node pill and our aggregate-only status quo. #13 keep
+   root-plus-children expansion. #14 ADOPT a per-row wiki link
+   (placement at the implementer's discretion first pass). #19
+   guild-decoration support backlogged. #20 ratified demoted (cooldown
+   toggle is a follow-on once row 56's data exists). #21 ratified
+   preserve, with cap info folded into the planned price-detail
+   tooltip. #22 ratified conservative. New maintainer-requested
+   convergence item: duplicate gw2e's crafting-pill value-detail
+   tooltip (rows: crafting gold price / currencies estimated
+   opportunity cost with explanatory note / optimization price; shown
+   only when the two diverge) - spec extracted verbatim from their
+   componentTree.html template.
