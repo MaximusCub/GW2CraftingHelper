@@ -21,6 +21,23 @@ namespace GW2CraftingHelper.Services
         private readonly CurrencyMetadataService _currencyMetadataService;
         private readonly IReadOnlyDictionary<int, AcquisitionHint> _acquisitionHints;
 
+        // VOM finding #3 fix: ResolveWithOverrides rebuilds an
+        // AccountItemIndex from context.AccountItems - an immutable,
+        // GENERATION-time snapshot (see PlanSolveContext.AccountItems' own
+        // doc comment) - on EVERY override pill click, even though repeat
+        // clicks against the same restored/generated plan pass the exact
+        // same list reference every time. Caches the last-built index keyed
+        // by reference equality on the context object itself (this pipeline
+        // instance is a single Module-wide singleton shared across every
+        // open plan tab - see Module.cs's construction site - so a
+        // different plan/tab simply misses and rebuilds once, same as
+        // today). Safe without locking: ResolveWithOverrides only ever runs
+        // synchronously on the UI thread (see its own doc comment); the
+        // concurrent, background-thread generation path never touches these
+        // fields (its own AccountItemIndex is a local variable, unrelated).
+        private PlanSolveContext _cachedAccountIndexContext;
+        private AccountItemIndex _cachedAccountIndex;
+
         // W3B: rich per-generation logging sink. Optional constructor
         // injection (defaults to the app-wide ModuleLog.Shared singleton -
         // see Module.cs's construction site, which never passes this) so
@@ -432,7 +449,7 @@ namespace GW2CraftingHelper.Services
                 // non-null, so accountIndex is guaranteed set here too) -
                 // see PlanSolveContext.UnreducedTree's own doc comment.
                 UnreducedTree = useForceBuyPrePass ? tree : null,
-                AccountItems = useForceBuyPrePass ? snapshot.Items : null,
+                AccountItems = useForceBuyPrePass ? ProjectAccountItemsForSolveContext(snapshot.Items) : null,
                 ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null
             };
             sw.Stop();
@@ -872,7 +889,7 @@ namespace GW2CraftingHelper.Services
                 // matching assignment (PlanSolveContext.UnreducedTree's own
                 // doc comment).
                 UnreducedTree = useForceBuyPrePass ? tree : null,
-                AccountItems = useForceBuyPrePass ? snapshot.Items : null,
+                AccountItems = useForceBuyPrePass ? ProjectAccountItemsForSolveContext(snapshot.Items) : null,
                 ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null
             };
             sw.Stop();
@@ -960,7 +977,7 @@ namespace GW2CraftingHelper.Services
                     ignoredItemIds: ignoredItemIds,
                     homesteadTiers: context.HomesteadTiers);
 
-                var accountIndex = new AccountItemIndex(context.AccountItems);
+                var accountIndex = GetOrBuildAccountItemIndex(context);
                 var reduced = _reducer.Reduce(
                     context.UnreducedTree, accountIndex, context.ActiveCharacterName,
                     guideSolve.Decisions);
@@ -1034,6 +1051,20 @@ namespace GW2CraftingHelper.Services
                     context.RequestedItems, context.PriceBasis,
                     usedMaterials, context.OwnMaterialsMode);
             }
+            // Post-review note (VOM finding #6, not fixed here): `context`
+            // itself is carried forward verbatim, so context.Tree/
+            // UsedMaterials/OwnedQuantityUsedByNodeId stay the GENERATION-
+            // time values even when the UnreducedTree branch above just
+            // computed fresh solveTree/usedMaterials/ownedQuantityUsedByNodeId
+            // for THIS call's `result`. Harmless for repeat re-solves (each
+            // one re-derives its own fresh locals from context.UnreducedTree
+            // again), but BuildPresetOverrides (Craft All/Buy All) walks
+            // context.Tree directly - since reduction prunes
+            // (node.Recipes.Clear() at Quantity 0), a preset built from this
+            // stale context.Tree after an override re-reduces the tree can
+            // legitimately have a different node set than the fresh
+            // solveTree just computed, so it can emit overrides for pruned
+            // nodes and miss nodes that reappeared.
             result.SolveContext = context;
 
             if (result.DebugLog == null)
@@ -1348,6 +1379,60 @@ namespace GW2CraftingHelper.Services
                 result[kvp.Key.NodeId] = kvp.Value;
             }
             return result;
+        }
+
+        /// <summary>
+        /// VOM finding #3 fix: returns the AccountItemIndex built from
+        /// <paramref name="context"/>.AccountItems, reusing the last one
+        /// built for this exact context reference (see the matching
+        /// _cachedAccountIndex/_cachedAccountIndexContext field doc comment
+        /// for why reference equality is safe here) instead of rebuilding
+        /// an identical index on every override click.
+        /// </summary>
+        private AccountItemIndex GetOrBuildAccountItemIndex(PlanSolveContext context)
+        {
+            if (!ReferenceEquals(_cachedAccountIndexContext, context))
+            {
+                _cachedAccountIndex = new AccountItemIndex(context.AccountItems);
+                _cachedAccountIndexContext = context;
+            }
+            return _cachedAccountIndex;
+        }
+
+        /// <summary>
+        /// VOM finding #2 fix: PlanSolveContext.AccountItems is persisted
+        /// verbatim into plan.json (PlanSolveContext is serialized as part
+        /// of PersistedPlan.Result.SolveContext - see PlanStoreHelpers' own
+        /// doc comment), but ResolveWithOverrides' re-reduction only ever
+        /// builds an AccountItemIndex from it (Services/AccountItemIndex.cs)
+        /// - a constructor that reads ONLY ItemId/Count/Source. SnapshotItemEntry's
+        /// Name and (render-service URL) IconUrl are pure dead weight in this
+        /// context, plausibly the bulk of a real account's item list in
+        /// bytes. Projects down to the three fields actually consulted
+        /// before the whole list is captured, so a full account snapshot
+        /// (thousands of entries) isn't serialized/deserialized/gzipped on
+        /// every override pill click for nothing. Null input yields null
+        /// (matches AccountItems' own "unpopulated when the pre-pass didn't
+        /// run" contract).
+        /// </summary>
+        private static IReadOnlyList<SnapshotItemEntry> ProjectAccountItemsForSolveContext(
+            IReadOnlyList<SnapshotItemEntry> items)
+        {
+            if (items == null)
+            {
+                return null;
+            }
+            var projected = new List<SnapshotItemEntry>(items.Count);
+            foreach (var entry in items)
+            {
+                projected.Add(new SnapshotItemEntry
+                {
+                    ItemId = entry.ItemId,
+                    Count = entry.Count,
+                    Source = entry.Source
+                });
+            }
+            return projected;
         }
 
         /// <summary>
