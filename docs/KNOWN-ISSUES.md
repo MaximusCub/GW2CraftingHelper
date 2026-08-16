@@ -3268,4 +3268,4 @@ row, or accept the risk as-is - awaiting the user's call.
   `CopyToClipboard`; a horizontal scroll on the Log tab's content panel is
   the real fix if that tab is revisited.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS 2026-08-16 (orchestrator live sandbox session, combined wave-4 staging build). Verified: Log tab rows render "[INFO] 2026-08-15 21:14:10" ISO-dated; a freshly-produced failure status renders "Refresh failed - GW2 API access not ready - Aug 15, 2026 9:32 PM (25d ago)" with no clipping at the default window width; plan strip and W3D banner dated. Note: a status string persisted by a PRE-fix build renders in the old time-only format until the next status write - expected, not a defect.
