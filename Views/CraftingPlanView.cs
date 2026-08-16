@@ -112,7 +112,12 @@ namespace GW2CraftingHelper.Views
         // doc comment) and a best-effort item-name label (requestLabel, e.g.
         // "Orrax Manifested x1" - see CraftingPlanPipeline.GenerateStructuredAsync's
         // matching parameter) as two new trailing arguments.
-        private readonly Func<IReadOnlyList<PlanRequestItem>, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> _generateAsync;
+        // VOM design: gained a second bool (valueOwnMaterials, grouped
+        // right after useOwn - both are per-plan generation choices),
+        // replacing Module.cs's previous _settings.GetOwnMaterialsMode()
+        // read with this per-plan session value - see the matching
+        // _valueOwnMaterials field's own doc comment.
+        private readonly Func<IReadOnlyList<PlanRequestItem>, bool, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> _generateAsync;
         private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
         private readonly IItemSearchProvider _itemSearchProvider;
@@ -139,6 +144,24 @@ namespace GW2CraftingHelper.Views
         // Echo that default here so a fresh plan matches gw2e's own view
         // rather than systematically overpricing every material.
         private PriceBasis _priceBasis = PriceBasis.BuyOrder;
+        // VOM design (Section 5.2/5.3): the "Value own materials"
+        // (decision-invariant reduction + 15% sell-back guard) toggle,
+        // relocated inline from the global ModuleSettings.ValueOwnMaterials
+        // setting (see that field's own doc comment) - now a per-plan
+        // session choice exactly like _useOwnMaterials/_priceBasis above:
+        // never WRITTEN back to ModuleSettings, and never re-read from it
+        // after construction. This field initializer's `true` is only the
+        // fallback for a null `settings` (unreachable via the module's own
+        // single construction site); the constructor overwrites it with
+        // `settings.ValueOwnMaterials.Value` (post-review fix) so an
+        // already-persisted user choice still applies to the first plan of
+        // a fresh session, matching ModuleSettings.ValueOwnMaterials' own
+        // default TRUE (gw2e parity - see that setting's doc comment) when
+        // nothing was ever persisted. Only meaningful while
+        // _useOwnMaterials is also on (see OnOwnMaterialsToggled's
+        // Enabled-sync); the last-chosen value is preserved, not reset,
+        // while disabled, so re-enabling Use Own Materials restores it.
+        private bool _valueOwnMaterials = true;
 
         #endregion // General: shared layout constants, colors, top-region geometry & dependencies
 
@@ -270,6 +293,7 @@ namespace GW2CraftingHelper.Views
         private Panel _inputPanel;
         private Panel _controlsPanel;
         private Checkbox _ownMaterialsCheckbox;
+        private Checkbox _valueOwnMaterialsCheckbox;
         private StandardButton _generateButton;
         private Label _statusLabel;
         private Panel _separator;
@@ -549,7 +573,7 @@ namespace GW2CraftingHelper.Views
 
         #region General: construction & status
         public CraftingPlanView(
-            Func<IReadOnlyList<PlanRequestItem>, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> generateAsync,
+            Func<IReadOnlyList<PlanRequestItem>, bool, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
             IItemSearchProvider itemSearchProvider,
             ModuleSettings settings,
@@ -562,6 +586,20 @@ namespace GW2CraftingHelper.Views
             _settings = settings;
             _statusBoard = statusBoard ?? throw new ArgumentNullException(nameof(statusBoard));
             _resolveOverridesSync = resolveOverridesSync;
+
+            // Post-review fix: seed the per-plan default from the
+            // still-persisted ModuleSettings.ValueOwnMaterials value
+            // (kept around for exactly this - see that setting's own doc
+            // comment) instead of the field initializer's hardcoded
+            // `true`, so a user who deliberately turned the old global
+            // "Value own materials" checkbox off is not silently switched
+            // back to Valued mode on module reload. Session-only from
+            // here on, same as _useOwnMaterials/_priceBasis above -
+            // never written back to settings.
+            if (settings != null)
+            {
+                _valueOwnMaterials = settings.ValueOwnMaterials.Value;
+            }
 
             // M38 WP-25: wires TreeSectionController's collaborator
             // delegates. PreserveScrollAcross/SetStatus/RenderPlan/
@@ -685,7 +723,22 @@ namespace GW2CraftingHelper.Views
             CraftingPlanResult result,
             DateTime generatedAt,
             IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides,
-            IReadOnlyList<int> ignoredItemIds)
+            IReadOnlyList<int> ignoredItemIds,
+            // Post-review fix (VOM finding #4): "Value Own Materials"
+            // checkbox state at the GENERATION time this plan was
+            // persisted (PersistedPlan.ValueOwnMaterials) - restoring it
+            // here is the whole reason that field was added to the schema
+            // (see PersistedPlan.ValueOwnMaterials' own doc comment); it
+            // previously round-tripped to disk and back but was never fed
+            // into the live checkbox, so every restored session silently
+            // reset to the checkbox's construction-time default (true)
+            // regardless of what the user had actually chosen. See
+            // _valueOwnMaterials/_valueOwnMaterialsCheckbox below for where
+            // this is applied. UseOwnMaterials/PriceBasis have the same
+            // pre-existing gap (their live controls are not restored
+            // either) but that is out of scope for this fix - see
+            // docs/KNOWN-ISSUES.md.
+            bool valueOwnMaterials)
         {
             if (result == null) return;
 
@@ -707,6 +760,15 @@ namespace GW2CraftingHelper.Views
             _lastDebugLog = result.DebugLog;
             _currentPlan = vm;
             _planGeneratedAt = generatedAt;
+
+            // Post-review fix (VOM finding #4): restore the checkbox's
+            // backing field AND its displayed Checked state - see this
+            // method's valueOwnMaterials parameter doc comment.
+            _valueOwnMaterials = valueOwnMaterials;
+            if (_valueOwnMaterialsCheckbox != null)
+            {
+                _valueOwnMaterialsCheckbox.Checked = valueOwnMaterials;
+            }
 
             // Culture policy (applies to every ToString(..., CultureInfo.
             // InvariantCulture) timestamp in this file, not just this one):
@@ -1823,7 +1885,13 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, 7),
                 Parent = _controlsPanel
             };
-            _ownMaterialsCheckbox.CheckedChanged += OnOwnMaterialsToggled;
+            // Review-fix: CheckedChanged is wired further down, AFTER
+            // _valueOwnMaterialsCheckbox is constructed below - not here.
+            // OnOwnMaterialsToggled dereferences _valueOwnMaterialsCheckbox
+            // unconditionally in all three of its Enabled-sync sites; wiring
+            // the handler before that field exists would leave a live
+            // handler that NREs on the very first click if construction of
+            // any control between here and there ever throws.
 
             // Price basis selector; applies on the next Generate.
             new Label()
@@ -1851,6 +1919,51 @@ namespace GW2CraftingHelper.Views
                     ? PriceBasis.BuyOrder
                     : PriceBasis.InstantBuy;
             };
+
+            // VOM design (Section 5.2): inline per-plan toggle, next to
+            // Use Own Materials/price basis - disabled (not hidden) when
+            // Use Own Materials is off, since its own effect is fully inert
+            // without a snapshot driving reduction (see
+            // CraftingPlanPipeline's useForceBuyPrePass gate). Placed after
+            // the price-basis dropdown (which ends at x=328), well clear of
+            // the right-anchored Generate button even at this window's
+            // minimum width (930x710 -> ~884px content region).
+            _valueOwnMaterialsCheckbox = new Checkbox()
+            {
+                Text = "Value Own Materials",
+                Checked = _valueOwnMaterials,
+                Enabled = _useOwnMaterials,
+                Location = new Point(350, 7),
+                Parent = _controlsPanel,
+                // Review-fix: with this ON, owned materials are priced at
+                // market rate up front - the plan may then tell you to buy
+                // ingredients you already have on hand instead of using
+                // them, whenever a different recipe option is cheaper at
+                // fresh market prices. Off uses whatever you already own
+                // first, even down a pricier path.
+                //
+                // Post-review fix (VOM finding #5): the tooltip used to
+                // describe only this recipe-option/market-price half of
+                // the toggle. It also gates the 15% force-buy sell-back
+                // guard and the MaterialOpportunityCost deduction from
+                // CraftingProfit (SettingsTabContent's own info line for
+                // the now-relocated global setting already mentions the
+                // guard - see AddInfoLine's "decision-invariant reduction
+                // + 15% sell-back guard" text) - both of which change
+                // numbers this same plan displays, so the live control's
+                // own tooltip should say so too.
+                BasicTooltipText = "Compare recipe options at fresh market prices, as if you owned nothing - may recommend buying materials you already have instead of using them, if a different option is cheaper. Also force-buys materials where buying beats crafting by more than 15%, and deducts owned materials' sell value from Crafting Profit. Off: always uses what you already own first, treated as free."
+            };
+            _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
+            {
+                _valueOwnMaterials = e.Checked;
+            };
+
+            // Review-fix: wired here (after _valueOwnMaterialsCheckbox
+            // above is fully constructed), not immediately after
+            // _ownMaterialsCheckbox's own construction - see the comment at
+            // that construction site.
+            _ownMaterialsCheckbox.CheckedChanged += OnOwnMaterialsToggled;
 
             _generateButton = new StandardButton()
             {
@@ -2400,6 +2513,12 @@ namespace GW2CraftingHelper.Views
                 // Show modal confirmation before regenerating
                 _useOwnMaterials = newValue;
                 _ownMaterialsCheckbox.Enabled = false;
+                // VOM design (Section 5.2): keep the Value Own Materials
+                // checkbox's Enabled state in lockstep with the optimistic
+                // _useOwnMaterials value at every point it changes here -
+                // its own Checked value is preserved either way, only
+                // whether it can be clicked follows Use Own Materials.
+                _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
                 _modalDialog.Show(
                     "This will regenerate the plan. Continue?",
                     () =>
@@ -2414,11 +2533,13 @@ namespace GW2CraftingHelper.Views
                         _ownMaterialsCheckbox.Checked = _useOwnMaterials;
                         _suppressToggle = false;
                         _ownMaterialsCheckbox.Enabled = true;
+                        _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
                     });
                 return;
             }
 
             _useOwnMaterials = newValue;
+            _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
         }
 
         private async Task TriggerGenerate()
@@ -2567,7 +2688,7 @@ namespace GW2CraftingHelper.Views
             try
             {
                 var result = await _generateAsync(
-                    requestItems, _useOwnMaterials, _priceBasis,
+                    requestItems, _useOwnMaterials, _valueOwnMaterials, _priceBasis,
                     CancellationToken.None, null, phaseProgress, requestLabel);
 
                 // Blish HUD's XNA host has no SynchronizationContext, so this

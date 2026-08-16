@@ -553,7 +553,12 @@ namespace GW2CraftingHelper
                 // through to the pipeline - see
                 // CraftingPlanPipeline.GenerateStructuredAsync's matching
                 // parameters.
-                (items, useOwn, priceBasis, ct, progress, phaseProgress, requestLabel) =>
+                // VOM design (Section 5.2): gained valueOwnMaterials
+                // (grouped right after useOwn - both per-plan generation
+                // choices from CraftingPlanView's own controls panel),
+                // replacing the _settings.GetOwnMaterialsMode() read below
+                // with this parameter-derived value.
+                (items, useOwn, valueOwnMaterials, priceBasis, ct, progress, phaseProgress, requestLabel) =>
                 {
                     string activeChar = null;
                     try
@@ -589,7 +594,14 @@ namespace GW2CraftingHelper
                     // free so it can tell a real user override apart from
                     // an applied default.
                     var currencyValuation = _settings.GetEffectiveCurrencyValuation();
-                    var ownMaterialsMode = _settings.GetOwnMaterialsMode();
+                    // VOM design (Section 5.2): superseded
+                    // _settings.GetOwnMaterialsMode() - the per-plan
+                    // valueOwnMaterials parameter above now drives this
+                    // directly, matching how priceBasis/useOwn are also
+                    // per-plan rather than read from ModuleSettings.
+                    var ownMaterialsMode = valueOwnMaterials
+                        ? OwnMaterialsMode.Valued
+                        : OwnMaterialsMode.Free;
                     var homesteadTiers = _settings.GetHomesteadEfficiencyTiers();
 
                     // W3C review-fix (mustFix): per-character discipline
@@ -642,7 +654,7 @@ namespace GW2CraftingHelper
                             homesteadTiers, phaseProgress, requestLabel,
                             characterDisciplines: _currentSnapshot?.CharacterDisciplines);
 
-                    return PersistAfterGenerateAsync(generateTask, items, useOwn, priceBasis, myPersistGen);
+                    return PersistAfterGenerateAsync(generateTask, items, useOwn, priceBasis, valueOwnMaterials, myPersistGen);
                 },
                 _modalDialog,
                 _itemSearchProvider,
@@ -891,7 +903,8 @@ namespace GW2CraftingHelper
                                 _pendingPlanRestore.GeneratedAt,
                                 _pendingPlanRestore.RequestItems,
                                 _pendingPlanRestore.UseOwnMaterials,
-                                _pendingPlanRestore.PriceBasis);
+                                _pendingPlanRestore.PriceBasis,
+                                _pendingPlanRestore.ValueOwnMaterials);
                         }
                     }
 
@@ -901,7 +914,8 @@ namespace GW2CraftingHelper
                             _pendingPlanRestore.Result,
                             _pendingPlanRestore.GeneratedAt,
                             _pendingPlanRestore.NodeOverrides,
-                            _pendingPlanRestore.IgnoredItemIds);
+                            _pendingPlanRestore.IgnoredItemIds,
+                            _pendingPlanRestore.ValueOwnMaterials);
                     }
                 }
             }
@@ -1205,17 +1219,23 @@ namespace GW2CraftingHelper
             public IReadOnlyList<PlanRequestItem> RequestItems { get; }
             public bool UseOwnMaterials { get; }
             public PriceBasis PriceBasis { get; }
+            // VOM design (Section 5.3): mirrors UseOwnMaterials/PriceBasis
+            // above exactly - see PersistedPlan.ValueOwnMaterials' own doc
+            // comment.
+            public bool ValueOwnMaterials { get; }
 
             public PersistedPlanMetadata(
                 DateTime generatedAt,
                 IReadOnlyList<PlanRequestItem> requestItems,
                 bool useOwnMaterials,
-                PriceBasis priceBasis)
+                PriceBasis priceBasis,
+                bool valueOwnMaterials)
             {
                 GeneratedAt = generatedAt;
                 RequestItems = requestItems;
                 UseOwnMaterials = useOwnMaterials;
                 PriceBasis = priceBasis;
+                ValueOwnMaterials = valueOwnMaterials;
             }
         }
 
@@ -1256,6 +1276,7 @@ namespace GW2CraftingHelper
             IReadOnlyList<PlanRequestItem> requestItems,
             bool useOwnMaterials,
             PriceBasis priceBasis,
+            bool valueOwnMaterials,
             int myPersistGen)
         {
             var result = await generateTask;
@@ -1272,7 +1293,7 @@ namespace GW2CraftingHelper
 
             var generatedAt = DateTime.Now;
             var metadata = new PersistedPlanMetadata(
-                generatedAt, requestItems, useOwnMaterials, priceBasis);
+                generatedAt, requestItems, useOwnMaterials, priceBasis, valueOwnMaterials);
             lock (_generateCompletionLock)
             {
                 _lastPersistedPlanMetadata = metadata;
@@ -1293,6 +1314,7 @@ namespace GW2CraftingHelper
                 RequestItems = requestItems,
                 UseOwnMaterials = useOwnMaterials,
                 PriceBasis = priceBasis,
+                ValueOwnMaterials = valueOwnMaterials,
                 Result = result,
                 NodeOverrides = new Dictionary<int, AcquisitionSource>(),
                 IgnoredItemIds = new List<int>()
@@ -1403,6 +1425,7 @@ namespace GW2CraftingHelper
                 RequestItems = metadata.RequestItems,
                 UseOwnMaterials = metadata.UseOwnMaterials,
                 PriceBasis = metadata.PriceBasis,
+                ValueOwnMaterials = metadata.ValueOwnMaterials,
                 Result = result,
                 NodeOverrides = overridesSnapshot,
                 IgnoredItemIds = ignoredSnapshot

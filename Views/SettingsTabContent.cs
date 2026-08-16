@@ -128,7 +128,6 @@ namespace GW2CraftingHelper.Views
         private FlowPanel _rootPanel;
         private Label _statusLabel;
         private Label _homesteadStatusLabel;
-        private Checkbox _valueOwnMaterialsCheckbox;
 
         // M39 (log system, d2-log-system.md Section 5 / tab-roadmap-proposal
         // Section 2.1): the ONE "Diagnostics" checkbox + the two log-file
@@ -231,52 +230,23 @@ namespace GW2CraftingHelper.Views
             AddSaveRow(panelWidth);
         }
 
+        /// <summary>
+        /// VOM design (Section 5.3): the "Value own materials" checkbox
+        /// that used to live here (AddValueOwnMaterialsRow, M34-B2a #3) has
+        /// been relocated inline into Views/CraftingPlanView.cs's controls
+        /// panel, next to Use Own Materials/price basis - it is now a
+        /// per-plan session choice (like those two neighbors), not a
+        /// global setting, since ModuleSettings.ValueOwnMaterials is no
+        /// longer read on the live generation path. This info line
+        /// replaces the old checkbox, matching this section's existing
+        /// "chosen per plan" info lines above.
+        /// </summary>
         private void BuildPlanDefaultsSection(int panelWidth)
         {
             AddSectionHeader("Plan Defaults", panelWidth);
             AddInfoLine("Price basis (Instant Buy / Buy Orders) is chosen per plan in the Crafting Plan tab.", panelWidth);
             AddInfoLine("The \"Use Own Materials\" default is also set per plan in the Crafting Plan tab.", panelWidth);
-            AddValueOwnMaterialsRow(panelWidth);
-        }
-
-        /// <summary>
-        /// M34-B2a #3: the "Value own materials" checkbox previously had no
-        /// in-window affordance at all (ModuleSettings.ValueOwnMaterials
-        /// was only reachable via Blish HUD's own generic settings panel,
-        /// or by hand-editing the persisted JSON). Applies immediately -
-        /// no Save button, matching a plain Blish SettingEntry&lt;bool&gt;
-        /// (unlike the currency valuation rows above, which need text
-        /// parsing/validation before they can be persisted).
-        /// </summary>
-        private void AddValueOwnMaterialsRow(int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, RowHeight),
-                Parent = _rootPanel
-            };
-
-            _valueOwnMaterialsCheckbox = new Checkbox()
-            {
-                Text = "Value own materials",
-                Checked = _settings.ValueOwnMaterials.Value,
-                Location = new Point(NameColumnX, 7),
-                Parent = rowPanel
-            };
-            _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
-            {
-                _settings.ValueOwnMaterials.Value = e.Checked;
-            };
-
-            new Label()
-            {
-                Text = "Force-buy where cheaper than crafting fresh; value owned materials at sell price instead of free",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = InfoTextColor,
-                Location = new Point(NameColumnX + 170, 7),
-                Parent = rowPanel
-            };
+            AddInfoLine("\"Value own materials\" (decision-invariant reduction + 15% sell-back guard) is also chosen per plan in the Crafting Plan tab.", panelWidth);
         }
 
         /// <summary>
