@@ -195,6 +195,50 @@ namespace GW2CraftingHelper.Services
                 RecipeNodeIds.Assign(tree);
             }
 
+            // Step 5.5 (M34-B2a #3): computed against `tree` - the ORIGINAL,
+            // UNREDUCED tree (InventoryReducer.Reduce below only ever
+            // mutates its CLONE, so `tree` still holds the full
+            // pre-ownership demand here) - matching gw2e's own
+            // zero-owned-baseline mechanics exactly (Section 2.2 of the R2
+            // report): otherwise, evaluating this rule on the ALREADY-
+            // reduced tree would make it a near no-op in precisely the
+            // scenario it exists for, since owning a pile of components
+            // already makes their post-reduction craft cost look cheap
+            // regardless of what a FRESH purchase would cost. Moved ahead
+            // of Step 6 (VOM design, Candidate A) so its output can feed
+            // the zero-owned decision pass below, which Step 6's Reduce
+            // call now needs as its guide.
+            ISet<int> forceBuyOnlyNodeIds = null;
+            if (useForceBuyPrePass)
+            {
+                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
+            }
+
+            // Step 5.6 (VOM design, Candidate A - gw2e parity: decisions
+            // computed as if owning nothing): one more throwaway Solve() on
+            // the SAME zero-owned/unreduced `tree` as above, this time WITH
+            // forceBuyOnlyNodeIds applied, so its Decisions dictionary
+            // reflects the exact Craft/Buy/vendor/recipe-option choice a
+            // zero-owned baseline would make. InventoryReducer.Reduce below
+            // uses this as a guide: only the option this decision actually
+            // chose gets to consume owned stock, so owned stock can never
+            // flip a decision toward a chain that was worse at market
+            // prices - it can only make the zero-owned winner an even
+            // stronger winner. Null guide (useForceBuyPrePass false, e.g.
+            // Free mode or no snapshot) leaves InventoryReducer's legacy
+            // primary-option heuristic fully in charge, unchanged.
+            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
+            if (useForceBuyPrePass)
+            {
+                var zeroOwnedSolve = _solver.Solve(
+                    tree, prices, vendorOffers, priceBasis,
+                    overrides: null, currencyValuation: valuation,
+                    forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                    homesteadTiers: tiers);
+                zeroOwnedDecisions = zeroOwnedSolve.Decisions;
+            }
+
             // Step 6: Inventory reduction
             phaseTracker.Start(PlanPhase.SolvingDecisions, "Solving decisions", null);
             progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
@@ -206,29 +250,13 @@ namespace GW2CraftingHelper.Services
             if (snapshot != null && _reducer != null)
             {
                 var index = new AccountItemIndex(snapshot.Items);
-                var reduced = _reducer.Reduce(tree, index, activeCharacterName);
+                var reduced = _reducer.Reduce(tree, index, activeCharacterName, zeroOwnedDecisions);
                 treeUsedForSolve = reduced.ReducedTree;
                 usedMaterials = reduced.UsedMaterials;
                 ownedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
             }
             sw.Stop();
             timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
-
-            // Step 6.5 (M34-B2a #3): computed against `tree` - the ORIGINAL,
-            // UNREDUCED tree (Reduce above only ever mutates its CLONE, so
-            // `tree` still holds the full pre-ownership demand here) -
-            // matching gw2e's own zero-owned-baseline mechanics exactly
-            // (Section 2.2 of the R2 report): otherwise, evaluating this
-            // rule on the ALREADY-reduced tree would make it a near no-op
-            // in precisely the scenario it exists for, since owning a pile
-            // of components already makes their post-reduction craft cost
-            // look cheap regardless of what a FRESH purchase would cost.
-            ISet<int> forceBuyOnlyNodeIds = null;
-            if (useForceBuyPrePass)
-            {
-                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
-            }
 
             // Step 7: Solve. assignNodeIds:false only when the pre-pass
             // above pre-assigned ids to `tree` (and therefore, via cloning,
@@ -648,6 +676,29 @@ namespace GW2CraftingHelper.Services
                 RecipeNodeIds.Assign(tree);
             }
 
+            // Step 5.5/5.6 (M34-B2a #3 / VOM design Candidate A): see the
+            // single-item overload's matching block for the full rationale
+            // - same force-buy pre-pass, same zero-owned decision pass, same
+            // WHOLE wrapper batch at once, moved ahead of Step 6 so its
+            // output can guide InventoryReducer.Reduce below.
+            ISet<int> forceBuyOnlyNodeIds = null;
+            if (useForceBuyPrePass)
+            {
+                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
+            }
+
+            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
+            if (useForceBuyPrePass)
+            {
+                var zeroOwnedSolve = _solver.Solve(
+                    tree, prices, vendorOffers, priceBasis,
+                    overrides: null, currencyValuation: valuation,
+                    forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                    homesteadTiers: tiers);
+                zeroOwnedDecisions = zeroOwnedSolve.Decisions;
+            }
+
             // Step 6: Inventory reduction
             phaseTracker.Start(PlanPhase.SolvingDecisions, "Solving decisions", null);
             progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
@@ -659,20 +710,13 @@ namespace GW2CraftingHelper.Services
             if (snapshot != null && _reducer != null)
             {
                 var index = new AccountItemIndex(snapshot.Items);
-                var reduced = _reducer.Reduce(tree, index, activeCharacterName);
+                var reduced = _reducer.Reduce(tree, index, activeCharacterName, zeroOwnedDecisions);
                 treeUsedForSolve = reduced.ReducedTree;
                 usedMaterials = reduced.UsedMaterials;
                 ownedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
             }
             sw.Stop();
             timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
-
-            ISet<int> forceBuyOnlyNodeIds = null;
-            if (useForceBuyPrePass)
-            {
-                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
-            }
 
             // Step 7: Solve. The wrapper tree is fed through exactly like a
             // single item's tree - see PlanSolver.Collect's own doc comment

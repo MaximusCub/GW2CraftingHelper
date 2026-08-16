@@ -1138,23 +1138,28 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// M37 review finding: InventoryReducer.Reduce walks the WHOLE
-        /// unreduced wrapper tree (GenerateStructuredMultiAsync's own step
-        /// ordering - inventory reduction runs strictly BEFORE
-        /// PlanSolver.Solve) regardless of what the solver will later
-        /// decide per root. Root 1100 ends up BOUGHT (see
-        /// BuildBuyVsCraftPipeline's own doc comment - buy 50 beats craft
-        /// 500 even after any partial-ownership discount, since ingredient
-        /// 1101's own BuyInstant is 100), but owning some of its own craft
-        /// ingredient (1101) still gets consumed by reduction and folded
-        /// into the batch's single, whole-tree MaterialOpportunityCost.
-        /// This is intentional and matches the single-item path's own
-        /// pre-existing "opportunity cost is not gated on target
-        /// sellability/craft decision" behavior (see
-        /// ApplyBatchSellSideEconomics' own doc comment) - not a new gap.
-        /// This test locks in that documented interaction so a future
-        /// refactor of the reduction/solve ordering cannot silently change
-        /// it unnoticed.
+        /// VOM design (Candidate A) re-baseline of an M37 review finding.
+        /// Originally (pre-VOM): InventoryReducer.Reduce walked the WHOLE
+        /// unreduced wrapper tree price-blind, before PlanSolver.Solve ever
+        /// decided per-root Buy vs. Craft, so it phantom-consumed root
+        /// 1100's owned craft ingredient (1101) even though 1100 always
+        /// ends up BOUGHT (see BuildBuyVsCraftPipeline's own doc comment -
+        /// buy 50 beats craft 500 even zero-owned), folding a forgone-value
+        /// deduction into MaterialOpportunityCost for a branch that was
+        /// never actually crafted - precisely the audited row-31 "phantom
+        /// UsedMaterials" bug this milestone fixes (see design-value-own-
+        /// materials.md Section 1).
+        ///
+        /// Now: the guided reduction (InventoryReducer.Reduce's
+        /// zeroOwnedDecisions parameter) sees that 1100's zero-owned
+        /// decision is BuyFromTp, so NO option under 1100 consumes the
+        /// pool - the owned 2 units of item 1101 are never touched at all.
+        /// MaterialOpportunityCost is therefore null throughout (standalone
+        /// 1100, standalone 1200 - which never owned anything of its own -
+        /// and the batch), not "non-zero, folded in regardless of the
+        /// decision." This test now locks in the FIXED interaction instead
+        /// of the bug, so a future regression cannot silently reintroduce
+        /// phantom credit for a bought root.
         /// </summary>
         [Fact]
         public async Task GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostIsWholeTreeSum()
@@ -1180,14 +1185,14 @@ namespace GW2CraftingHelper.Tests.Services
 
             // Root 1100 still buys outright (partial ownership of its own
             // craft ingredient never makes crafting cheaper than its
-            // 50-coin buy price), yet the single-item path's own
-            // MaterialOpportunityCost is still non-null/non-zero - the
-            // owned stock was "used" by reduction regardless of the final
-            // buy decision.
+            // 50-coin buy price). Post-fix, that owned stock is never
+            // consumed at all (1100's branch was never chosen), so
+            // MaterialOpportunityCost is null, not a phantom non-zero
+            // credit against a branch that was never crafted.
             Assert.Equal(CraftingDecision.BuyFromTp, standalone1100.CraftingTree.Decision);
-            Assert.NotNull(standalone1100.MaterialOpportunityCost);
-            Assert.True(standalone1100.MaterialOpportunityCost.Value > 0);
+            Assert.Null(standalone1100.MaterialOpportunityCost);
             Assert.Equal(CraftingDecision.Craft, standalone1200.CraftingTree.Decision);
+            Assert.Null(standalone1200.MaterialOpportunityCost);
 
             var items = new List<PlanRequestItem>
             {
@@ -1202,23 +1207,22 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(CraftingDecision.BuyFromTp, batch.MultiItemRoots[0].Decision);
             Assert.Equal(CraftingDecision.Craft, batch.MultiItemRoots[1].Decision);
 
-            // No shared materials between the two independent roots, so
-            // the batch's single whole-tree MaterialOpportunityCost equals
-            // the two standalone contributions summed - including root
-            // 1100's, even though root 1100 itself was bought, not crafted.
-            Assert.Equal(
-                (standalone1100.MaterialOpportunityCost ?? 0) + (standalone1200.MaterialOpportunityCost ?? 0),
-                batch.MaterialOpportunityCost);
+            // Neither standalone root produced any UsedMaterials post-fix,
+            // so the batch's single whole-tree MaterialOpportunityCost is
+            // also null - not a sum of phantom per-root credits.
+            Assert.Null(batch.MaterialOpportunityCost);
 
-            // Both roots are tradable, so both also contribute their own
+            // Both roots are tradable, so both still contribute their own
             // NetSaleValue to the M37 batch rollup (no craft-vs-buy filter
             // - see GenerateStructuredAsync_MultiItem_OneRootBoughtButTradable_IncludedInSum
-            // above) - and root 1100's forgone-material deduction still
-            // lands in the single batch-wide CraftingProfit figure
-            // alongside it.
+            // above) - unaffected by the MaterialOpportunityCost fix, since
+            // that only ever subtracted from CraftingProfit, never from
+            // NetSaleValue itself.
             Assert.Equal(standalone1100.NetSaleValue.Value + standalone1200.NetSaleValue.Value, batch.NetSaleValue);
+            // No MaterialOpportunityCost to subtract now (ApplyBatchSellSideEconomics
+            // only subtracts it when HasValue) - profit is revenue minus cost alone.
             Assert.Equal(
-                batch.NetSaleValue.Value - batch.Plan.TotalCoinCost - batch.MaterialOpportunityCost.Value,
+                batch.NetSaleValue.Value - batch.Plan.TotalCoinCost,
                 batch.CraftingProfit.Value);
         }
 

@@ -3159,9 +3159,19 @@ namespace GW2CraftingHelper.Tests.Services
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 
             Assert.Equal(CraftingDecision.Craft, resolved.CraftingTree.Decision);
-            // Real (post-reduction) craft cost: only 1 remaining unit of
-            // item 2 needs buying, at 30 each.
-            Assert.Equal(30, resolved.Plan.TotalCoinCost);
+            // VOM design (Candidate A) re-baseline: item 1's zero-owned
+            // decision was BuyFromTp (the force-buy flag), so the guided
+            // InventoryReducer.Reduce that fed initial.SolveContext.Tree
+            // never consumed the owned 4 units of item 2 down item 1's
+            // never-chosen craft branch (the audited row-31 bug this
+            // milestone fixes - previously it did, phantom-discounting the
+            // branch to a misleading 1x30=30). Overriding to Craft here
+            // therefore re-prices the FULL, non-owned-discounted 5x30=150 -
+            // a known, accepted limitation of the override-replays-against-
+            // a-fixed-tree architecture (design section 7.5/risk 6): an
+            // override away from a Buy-decided branch can never retroactively
+            // discount ingredients reduction correctly skipped.
+            Assert.Equal(150, resolved.Plan.TotalCoinCost);
         }
 
         [Fact]

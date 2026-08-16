@@ -51,10 +51,17 @@ namespace GW2CraftingHelper.Services
 
             // Own-materials opportunity cost (gw2efficiency-style "value own
             // materials"): what selling the owned materials that inventory
-            // reduction consumed would have netted after TP fees. Reduction
-            // itself never changes - owned mats are still consumed first at
-            // zero acquisition cost in both modes; this only affects the
-            // profit figure below.
+            // reduction consumed would have netted after TP fees. VOM design
+            // (Candidate A) UPDATE: in Valued mode, reduction is now
+            // decision-aware (InventoryReducer.Reduce's zeroOwnedDecisions
+            // guide - see CraftingPlanPipeline's Step 5.5/5.6 doc comments),
+            // so owned mats are consumed first at zero acquisition cost ONLY
+            // along the branch a zero-owned baseline would actually choose
+            // to craft - not along every node's primary recipe option
+            // regardless of whether it is ever crafted, as before this
+            // milestone. In Free mode (or with no zeroOwnedDecisions guide),
+            // reduction is unchanged - still the legacy primary-option
+            // heuristic.
             long? materialOpportunityCost = ComputeMaterialOpportunityCost(
                 usedMaterials, prices, ownMaterialsMode);
             result.MaterialOpportunityCost = materialOpportunityCost;
@@ -241,20 +248,23 @@ namespace GW2CraftingHelper.Services
         /// sell price - the batch equivalent of the single-item "no sell
         /// price at all" case.
         ///
-        /// Documented nuance (M37 review): MaterialOpportunityCost is a
-        /// SINGLE sum over the batch's whole merged UsedMaterials list
-        /// (Reduce runs on the entire wrapper tree before Solve ever picks
-        /// Buy vs Craft per root - see GenerateStructuredMultiAsync's own
-        /// step ordering) - it is NOT scoped down to only the roots that
-        /// end up contributing to SellableQuantity/NetSaleValue/
-        /// CraftingProfit above. A root the solver decides to buy can
-        /// still have owned ingredient stock recorded as "used" against
-        /// its own never-crafted subtree, and that forgone value is
-        /// deducted from the batch's CraftingProfit regardless. This
-        /// matches the single-item path's own pre-existing behavior
-        /// exactly (ApplySellSideEconomics' MaterialOpportunityCost is
-        /// likewise never gated on the target's own craft/buy decision),
-        /// so it is intentional, not a new gap - see
+        /// Documented nuance (M37 review, UPDATED by the VOM design -
+        /// Candidate A - decision-invariant reduction): MaterialOpportunityCost
+        /// is a SINGLE sum over the batch's whole merged UsedMaterials list
+        /// (Reduce still runs on the entire wrapper tree before Solve ever
+        /// picks Buy vs Craft per root - see GenerateStructuredMultiAsync's
+        /// own step ordering) - it is NOT scoped down to only the roots
+        /// that end up contributing to SellableQuantity/NetSaleValue/
+        /// CraftingProfit above. What changed: UsedMaterials itself is now
+        /// decision-aware (InventoryReducer.Reduce's zeroOwnedDecisions
+        /// guide, fed by a throwaway zero-owned Solve() on the same
+        /// unreduced tree) - a root the solver decides to buy no longer has
+        /// its never-crafted subtree's owned ingredient stock recorded as
+        /// "used" at all, so there is nothing left to deduct from
+        /// CraftingProfit for that root. This matches the single-item
+        /// path's own updated behavior exactly (ApplySellSideEconomics'
+        /// MaterialOpportunityCost is likewise now decision-aware via the
+        /// same guided reduction) - see
         /// MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostIsWholeTreeSum.
         /// </summary>
         internal static void ApplyBatchSellSideEconomics(

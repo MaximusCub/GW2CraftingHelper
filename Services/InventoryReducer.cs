@@ -7,14 +7,27 @@ namespace GW2CraftingHelper.Services
 {
     public class InventoryReducer
     {
-        public ReducedTreeResult Reduce(RecipeNode tree, Dictionary<int, int> ownedItems)
+        public ReducedTreeResult Reduce(
+            RecipeNode tree,
+            Dictionary<int, int> ownedItems,
+            // Value-Own-Materials (VOM) design, Candidate A: the Decisions
+            // dictionary from a throwaway zero-owned PlanSolver.Solve on the
+            // SAME unreduced tree (with forceBuyOnlyNodeIds already applied)
+            // - see CraftingPlanPipeline's Step 6.5/6.6 doc comments. Keyed
+            // by RecipeNode.NodeId, which must already be assigned on
+            // `tree` (RecipeNodeIds.Assign) before this call, since it is
+            // what CloneNode below preserves onto the clone this method
+            // walks. Null (every existing caller/test) reproduces today's
+            // exact i==0-primary-option heuristic - see ReduceNode's own
+            // doc comment.
+            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null)
         {
             var pool = new Dictionary<int, int>(ownedItems);
             var usedRaw = new List<UsedMaterial>();
             var ownedUsageByNode = new Dictionary<RecipeNode, int>();
 
             var clone = CloneNode(tree);
-            ReduceNode(clone, pool, usedRaw, ownedUsageByNode, consumeFromPool: true);
+            ReduceNode(clone, pool, usedRaw, ownedUsageByNode, consumeFromPool: true, zeroOwnedDecisions);
 
             var aggregated = usedRaw
                 .GroupBy(u => u.ItemId)
@@ -38,20 +51,45 @@ namespace GW2CraftingHelper.Services
         /// Reduces <paramref name="node"/> and its descendants against the
         /// shared <paramref name="pool"/>.
         ///
-        /// <paramref name="consumeFromPool"/> (M34-B2a #2, gw2e parity / M1
-        /// Finding 5): true only along the single chosen-recipe-candidate
-        /// chain - the root, then recursively only each node's PRIMARY
-        /// option (node.Recipes[0], the option RecipeService/the upstream
-        /// recipe source puts first). PlanSolver has not run yet at
-        /// reduction time, so which recipe option will actually be chosen is
-        /// unknowable here; gw2efficiency's own tree never has this
-        /// ambiguity because recipe-nesting nests exactly ONE recipe per
-        /// node. Walking every option and letting each one drain the shared
-        /// pool (the pre-fix behavior) would let a recipe option the solver
-        /// never picks steal owned stock from a branch that IS chosen.
-        /// Once false, it stays false for the whole subtree - nothing below
-        /// a non-primary option should ever touch the pool, no matter how
-        /// deep, since the whole branch is hypothetical from here down.
+        /// <paramref name="consumeFromPool"/> decides whether THIS node's
+        /// own Quantity may be discounted (inherited from the caller/parent,
+        /// unchanged by this design) and, together with
+        /// <paramref name="zeroOwnedDecisions"/> below, which recipe
+        /// option's descendants get to consume the pool:
+        ///
+        /// - VOM design (Candidate A), decision-guided mode: when
+        ///   <paramref name="zeroOwnedDecisions"/> is non-null and contains
+        ///   this node's NodeId, the recipe option that decision's
+        ///   Source == Craft &amp;&amp; RecipeId matches is the one whose
+        ///   descendants may consume the pool - every sibling option is left
+        ///   at full zero-owned cost. If the node's zero-owned decision was
+        ///   anything other than Craft (BuyFromTp/BuyFromVendor/
+        ///   UnknownSource), NO option consumes the pool for its
+        ///   descendants: an un-crafted branch never demands its own
+        ///   ingredients, mirroring PlanSolver.Evaluate's own
+        ///   ignoredItemIds/Quantity==0 handling elsewhere in this codebase.
+        ///   Since discounting only ever lowers a cost, and only along the
+        ///   path the zero-owned pass already declared the winner, the real
+        ///   (post-reduction) Solve() can never be pulled toward a path that
+        ///   was worse at market prices - only made an even stronger winner.
+        /// - Legacy heuristic (M34-B2a #2, gw2e parity / M1 Finding 5): used
+        ///   whenever <paramref name="zeroOwnedDecisions"/> is null (every
+        ///   pre-VOM caller/test) OR does not contain this node's NodeId
+        ///   (defensive fallback) - true only along the single
+        ///   chosen-recipe-candidate chain, the root, then recursively only
+        ///   each node's PRIMARY option (node.Recipes[0], the option
+        ///   RecipeService/the upstream recipe source puts first). Without a
+        ///   guide, which recipe option will actually be chosen is
+        ///   unknowable at reduction time; walking every option and letting
+        ///   each one drain the shared pool (the pre-M34-B2a#2 behavior)
+        ///   would let a recipe option the solver never picks steal owned
+        ///   stock from a branch that IS chosen.
+        ///
+        /// Once an option's descendants are excluded from pool consumption,
+        /// that stays false for the whole subtree below it - nothing under a
+        /// non-chosen/non-primary option should ever touch the pool, no
+        /// matter how deep, since the whole branch is hypothetical (or,
+        /// under the guide, provably not the winning path) from here down.
         ///
         /// Every option's CraftsNeeded/ingredient Quantity is still rescaled
         /// here regardless of consumeFromPool - that math reflects THIS
@@ -66,7 +104,8 @@ namespace GW2CraftingHelper.Services
             Dictionary<int, int> pool,
             List<UsedMaterial> used,
             Dictionary<RecipeNode, int> ownedUsageByNode,
-            bool consumeFromPool)
+            bool consumeFromPool,
+            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions)
         {
             // In the current GW2 recipe model, only "Item" nodes are consumable
             // from inventory and can have recipes. Currency nodes are leaves.
@@ -106,6 +145,10 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
+            SolverDecision guideDecision = null;
+            bool hasGuide = zeroOwnedDecisions != null &&
+                zeroOwnedDecisions.TryGetValue(node.NodeId, out guideDecision);
+
             for (int i = 0; i < node.Recipes.Count; i++)
             {
                 var option = node.Recipes[i];
@@ -113,14 +156,18 @@ namespace GW2CraftingHelper.Services
                 int newCraftsNeeded = ComputeCraftsNeeded(node.Quantity, option);
                 option.CraftsNeeded = newCraftsNeeded;
 
-                bool optionConsumes = consumeFromPool && i == 0;
+                bool optionConsumes = hasGuide
+                    ? consumeFromPool &&
+                        guideDecision.Source == AcquisitionSource.Craft &&
+                        option.RecipeId == guideDecision.RecipeId
+                    : consumeFromPool && i == 0;
 
                 foreach (var ingredient in option.Ingredients)
                 {
                     int perCraft = (ingredient.Quantity + origCraftsNeeded - 1) / origCraftsNeeded;
                     ingredient.Quantity = perCraft * newCraftsNeeded;
 
-                    ReduceNode(ingredient, pool, used, ownedUsageByNode, optionConsumes);
+                    ReduceNode(ingredient, pool, used, ownedUsageByNode, optionConsumes, zeroOwnedDecisions);
                 }
             }
         }
@@ -128,7 +175,11 @@ namespace GW2CraftingHelper.Services
         public ReducedTreeResult Reduce(
             RecipeNode tree,
             AccountItemIndex index,
-            string activeCharacterName)
+            string activeCharacterName,
+            // See the other Reduce overload's matching parameter doc
+            // comment - identical semantics, threaded through
+            // ReduceNodeSourced instead of ReduceNode.
+            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null)
         {
             // Build a mutable consumption pool: itemId -> source -> remaining
             var pool = new Dictionary<int, Dictionary<string, int>>();
@@ -136,7 +187,7 @@ namespace GW2CraftingHelper.Services
             var ownedUsageByNode = new Dictionary<RecipeNode, int>();
 
             var clone = CloneNode(tree);
-            ReduceNodeSourced(clone, index, activeCharacterName, pool, usedRaw, ownedUsageByNode, consumeFromPool: true);
+            ReduceNodeSourced(clone, index, activeCharacterName, pool, usedRaw, ownedUsageByNode, consumeFromPool: true, zeroOwnedDecisions);
 
             var aggregated = usedRaw
                 .GroupBy(u => u.ItemId)
@@ -175,11 +226,15 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// See ReduceNode's doc comment for <paramref name="consumeFromPool"/>
-        /// (M34-B2a #2, gw2e parity / M1 Finding 5) - identical reasoning
-        /// applies to this sourced overload: only the primary (first-listed)
-        /// recipe option at each node may recurse with pool consumption
-        /// enabled, so an alternate, un-chosen recipe option never drains
-        /// owned stock a real branch needs.
+        /// / <paramref name="zeroOwnedDecisions"/> - identical reasoning
+        /// applies to this sourced overload (the actual production code
+        /// path, driven by an AccountItemIndex rather than a flat pool):
+        /// with a guide, only the recipe option the zero-owned decision
+        /// actually chose (Source == Craft, matching RecipeId) may recurse
+        /// with pool consumption enabled; without one (null or a NodeId
+        /// missing from the guide), only the primary (first-listed) option
+        /// does, so an alternate, un-chosen recipe option never drains owned
+        /// stock a real branch needs.
         /// </summary>
         private void ReduceNodeSourced(
             RecipeNode node,
@@ -188,7 +243,8 @@ namespace GW2CraftingHelper.Services
             Dictionary<int, Dictionary<string, int>> pool,
             List<UsedMaterial> used,
             Dictionary<RecipeNode, int> ownedUsageByNode,
-            bool consumeFromPool)
+            bool consumeFromPool,
+            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions)
         {
             // In the current GW2 recipe model, only "Item" nodes are consumable
             // from inventory and can have recipes. Currency nodes are leaves.
@@ -260,6 +316,10 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
+            SolverDecision guideDecision = null;
+            bool hasGuide = zeroOwnedDecisions != null &&
+                zeroOwnedDecisions.TryGetValue(node.NodeId, out guideDecision);
+
             for (int i = 0; i < node.Recipes.Count; i++)
             {
                 var option = node.Recipes[i];
@@ -267,14 +327,18 @@ namespace GW2CraftingHelper.Services
                 int newCraftsNeeded = ComputeCraftsNeeded(node.Quantity, option);
                 option.CraftsNeeded = newCraftsNeeded;
 
-                bool optionConsumes = consumeFromPool && i == 0;
+                bool optionConsumes = hasGuide
+                    ? consumeFromPool &&
+                        guideDecision.Source == AcquisitionSource.Craft &&
+                        option.RecipeId == guideDecision.RecipeId
+                    : consumeFromPool && i == 0;
 
                 foreach (var ingredient in option.Ingredients)
                 {
                     int perCraft = (ingredient.Quantity + origCraftsNeeded - 1) / origCraftsNeeded;
                     ingredient.Quantity = perCraft * newCraftsNeeded;
 
-                    ReduceNodeSourced(ingredient, index, activeCharacterName, pool, used, ownedUsageByNode, optionConsumes);
+                    ReduceNodeSourced(ingredient, index, activeCharacterName, pool, used, ownedUsageByNode, optionConsumes, zeroOwnedDecisions);
                 }
             }
         }
