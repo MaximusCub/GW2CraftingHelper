@@ -272,9 +272,26 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
+            // Fourth-site fix (adversarial-review follow-up): a coin-typed
+            // Currency ingredient (Collect's currencyMap accumulation above)
+            // is real copper spent directly in a recipe, with no Buy step of
+            // its own to be caught by the loop above - fold it into
+            // totalCoinCost here so the Total Cost summary agrees with the
+            // Recipe Tree and Craft shopping-list row, which already include
+            // it via decision.TotalCost. Excluded from currencyCosts below
+            // so it never double-displays as a "currency 1" line.
+            if (currencyMap.TryGetValue(Gw2Constants.CoinCurrencyId, out long coinIngredientTotal))
+            {
+                totalCoinCost = checked(totalCoinCost + coinIngredientTotal);
+            }
+
             var currencyCosts = new List<CurrencyCost>();
             foreach (var kvp in currencyMap)
             {
+                if (kvp.Key == Gw2Constants.CoinCurrencyId)
+                {
+                    continue;
+                }
                 currencyCosts.Add(new CurrencyCost { CurrencyId = kvp.Key, Amount = checked(kvp.Value) });
             }
 
@@ -870,23 +887,26 @@ namespace GW2CraftingHelper.Services
         {
             if (node.IngredientType == "Currency")
             {
-                // Adversarial-review follow-up (finding 3's sibling site):
-                // a Currency-type node tagged with the COIN currency id is
+                // Adversarial-review follow-up (fourth-site finding): a
+                // Currency-type node tagged with the COIN currency id is
                 // real copper, already folded into its consuming Craft
                 // decision's TotalCost (see Evaluate's recipe loop and
-                // RecomputeCraftCosts) - it must never ALSO surface as a
-                // plan.CurrencyCosts entry (that list is for non-coin
-                // currencies only; coin already has its own dedicated
-                // display, see the repo's coin-icon display rules), which
-                // would double-count/mis-tag it as "currency 1" instead of
-                // real coin. Mirrors EvaluateVendorOffers' own coin-vs-
-                // currency routing, which never adds a coin cost line to
-                // its currencyCosts list either.
-                if (node.Id == Gw2Constants.CoinCurrencyId)
-                {
-                    return;
-                }
-
+                // RecomputeCraftCosts) - so it accumulates into currencyMap
+                // via the SAME per-occurrence walk as every other currency
+                // below (Collect visits each Currency node exactly once per
+                // tree occurrence, matching how Evaluate/RecomputeCraftCosts
+                // count it exactly once per occurrence too - no double
+                // count). It must still never surface as a plan.CurrencyCosts
+                // "currency 1" line (coin has its own dedicated display, see
+                // the repo's coin-icon display rules) - the currencyMap ->
+                // currencyCosts conversion below routes this key into
+                // totalCoinCost instead and excludes it from currencyCosts.
+                // Without that routing, this coin total would reach the
+                // Recipe Tree and the Craft shopping-list row (both read
+                // from decision.TotalCost) but NOT plan.TotalCoinCost (which
+                // only sums BuyFromTp/BuyFromVendor steps, never Craft steps,
+                // to avoid double-counting nested Buy costs) - a fourth site
+                // silently disagreeing with the other three.
                 if (currencyMap.ContainsKey(node.Id))
                 {
                     currencyMap[node.Id] = checked(currencyMap[node.Id] + node.Quantity);
