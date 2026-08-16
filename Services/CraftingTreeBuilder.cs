@@ -13,11 +13,18 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             IReadOnlyDictionary<int, AcquisitionHint> hints = null,
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId = null,
-            ISet<int> ignoredItemIds = null)
+            ISet<int> ignoredItemIds = null,
+            // Review-fix (recipe-ingestion-fix, Must Fix): optional so
+            // every pre-existing call site (production and test) keeps
+            // compiling and behaving identically - see BuildNode's Currency
+            // leaf naming below for why this closes the whole class of
+            // Gw2Constants.KnownCurrencyNames drift rather than just the
+            // two ids the review caught.
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null)
         {
             return BuildNode(node: root, decisions: decisions, metadata: metadata, hints: hints,
                 insideReferenceBranch: false, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId,
-                ignoredItemIds: ignoredItemIds);
+                ignoredItemIds: ignoredItemIds, currencyMetadata: currencyMetadata);
         }
 
         private static CraftingTreeNode BuildNode(
@@ -27,7 +34,8 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, AcquisitionHint> hints,
             bool insideReferenceBranch,
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
-            ISet<int> ignoredItemIds)
+            ISet<int> ignoredItemIds,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
         {
             var treeNode = new CraftingTreeNode
             {
@@ -77,11 +85,22 @@ namespace GW2CraftingHelper.Services
                 return treeNode;
             }
 
-            // Currency nodes are leaf nodes
+            // Currency nodes are leaf nodes. Review-fix
+            // (recipe-ingestion-fix, Must Fix): prefer the live-fetched
+            // CurrencyMetadataService name via CurrencyDisplayResolver -
+            // the same live-preferred/static-fallback chain
+            // PlanViewModelBuilder's Summary-section and shopping-row
+            // currency costs already use (KNOWN-ISSUES #16) - over calling
+            // Gw2Constants.ResolveCurrencyName directly, so a future id the
+            // static table has wrong or lacks (see KnownCurrencyNames' own
+            // doc comment on the 2026-08-15 audit) still resolves correctly
+            // whenever currencyMetadata is available, rather than only
+            // ever depending on this file staying manually in sync with
+            // the live API.
             if (node.IngredientType != "Item")
             {
                 treeNode.Decision = CraftingDecision.Currency;
-                treeNode.Name = Gw2Constants.ResolveCurrencyName(node.Id);
+                treeNode.Name = CurrencyDisplayResolver.ResolveName(node.Id, currencyMetadata);
                 return treeNode;
             }
 
@@ -121,7 +140,7 @@ namespace GW2CraftingHelper.Services
                     // a reference branch is still hypothetical content, and
                     // must keep suppressing further reference branches
                     // below it - see the cap comment below for why.
-                    treeNode.Children = BuildChildren(recipe, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId, ignoredItemIds);
+                    treeNode.Children = BuildChildren(recipe, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId, ignoredItemIds, currencyMetadata);
                 }
             }
             else if (!insideReferenceBranch &&
@@ -154,7 +173,7 @@ namespace GW2CraftingHelper.Services
                 // reference branches restart at every such alternation
                 // measured as an effectively unbounded hang on a real deep
                 // item (Deldrimor Steel Ingot) during manual verification.
-                treeNode.Children = BuildChildren(node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId, ignoredItemIds: ignoredItemIds);
+                treeNode.Children = BuildChildren(node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId, ignoredItemIds: ignoredItemIds, currencyMetadata: currencyMetadata);
                 treeNode.IsReferenceBranch = true;
             }
 
@@ -200,12 +219,13 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, AcquisitionHint> hints,
             bool insideReferenceBranch,
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
-            ISet<int> ignoredItemIds)
+            ISet<int> ignoredItemIds,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
         {
             var children = new List<CraftingTreeNode>(recipe.Ingredients.Count);
             foreach (var ingredient in recipe.Ingredients)
             {
-                children.Add(BuildNode(ingredient, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId, ignoredItemIds));
+                children.Add(BuildNode(ingredient, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId, ignoredItemIds, currencyMetadata));
             }
             return children;
         }

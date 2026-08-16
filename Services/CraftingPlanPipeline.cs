@@ -340,7 +340,7 @@ namespace GW2CraftingHelper.Services
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(
                 treeUsedForSolve, solveResult.Decisions, metadata, _acquisitionHints,
-                ownedQuantityUsedByNodeId);
+                ownedQuantityUsedByNodeId, currencyMetadata: currencyMetadata);
 
             SellSideEconomics.ApplySellSideEconomics(
                 result, treeUsedForSolve, solveResult, prices,
@@ -740,7 +740,8 @@ namespace GW2CraftingHelper.Services
 
             BuildCraftingTreeResult(
                 result, treeUsedForSolve, solveResult.Decisions, metadata,
-                _acquisitionHints, ownedQuantityUsedByNodeId, ignoredItemIds: null);
+                _acquisitionHints, ownedQuantityUsedByNodeId, ignoredItemIds: null,
+                currencyMetadata: currencyMetadata);
 
             SellSideEconomics.ApplyBatchSellSideEconomics(
                 result, treeUsedForSolve, solveResult, prices, items,
@@ -832,7 +833,8 @@ namespace GW2CraftingHelper.Services
 
             BuildCraftingTreeResult(
                 result, context.Tree, solveResult.Decisions, context.Metadata,
-                context.AcquisitionHints, context.OwnedQuantityUsedByNodeId, ignoredItemIds);
+                context.AcquisitionHints, context.OwnedQuantityUsedByNodeId, ignoredItemIds,
+                currencyMetadata: context.CurrencyMetadata);
 
             // M37 (closes KNOWN-ISSUES #25): a local override/Ignore
             // re-solve must recompute whichever sell-side economics the
@@ -1110,7 +1112,8 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             IReadOnlyDictionary<int, AcquisitionHint> hints,
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
-            ISet<int> ignoredItemIds)
+            ISet<int> ignoredItemIds,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null)
         {
             var treeBuilder = new CraftingTreeBuilder();
 
@@ -1125,7 +1128,7 @@ namespace GW2CraftingHelper.Services
                     {
                         roots.Add(treeBuilder.BuildTree(
                             itemRoot, decisions, metadata, hints,
-                            ownedQuantityUsedByNodeId, ignoredItemIds));
+                            ownedQuantityUsedByNodeId, ignoredItemIds, currencyMetadata));
                     }
                 }
                 result.CraftingTree = null;
@@ -1135,7 +1138,7 @@ namespace GW2CraftingHelper.Services
             {
                 result.CraftingTree = treeBuilder.BuildTree(
                     tree, decisions, metadata, hints,
-                    ownedQuantityUsedByNodeId, ignoredItemIds);
+                    ownedQuantityUsedByNodeId, ignoredItemIds, currencyMetadata);
                 result.MultiItemRoots = null;
             }
         }
