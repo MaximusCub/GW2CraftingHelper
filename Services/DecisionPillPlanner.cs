@@ -88,29 +88,45 @@ namespace GW2CraftingHelper.Services
             // W4B (vendor cost-component leaves): checked BEFORE every
             // other branch below - a component leaf is a fact about a
             // price, not an acquisition decision, so it must NEVER get a
-            // decision pill (CRAFT/TP/VENDOR/CURRENCY/UNKNOWN) or the
-            // Ignore toggle, and it must not fall into the ordinary
-            // Have/OwnedInfo path below (which reads OwnedQuantityUsed - a
-            // field this leaf never populates, since its Quantity is never
-            // reduced for ownership - see CraftingTreeNode.
-            // ComponentOwnedQuantity's own doc comment). Reuses the SAME
-            // Have/OwnedInfo PillKinds and "HAVE"/"HAVE x/y NEEDED" text
-            // vocabulary as the ordinary owned-materials pills below (the
-            // W4B design's explicit "follow the existing pill vocabulary
-            // exactly" instruction), just sourced from
-            // ComponentOwnedQuantity/Quantity instead of
-            // OwnedQuantityUsed/Quantity, and never followed by an Ignore
-            // pill.
+            // decision pill (CRAFT/TP/VENDOR/UNKNOWN) or the Ignore toggle,
+            // and it must not fall into the ordinary Have/OwnedInfo path
+            // below (which reads OwnedQuantityUsed - a field this leaf
+            // never populates, since its Quantity is never reduced for
+            // ownership - see CraftingTreeNode.ComponentOwnedQuantity's own
+            // doc comment).
+            //
+            // Maintainer's field-test finding (2026-08-15): the ordinary
+            // blue HAVE/"HAVE x/y NEEDED" vocabulary means "your stock
+            // covers this need and reduced the plan cost" everywhere else
+            // in the tree; a component leaf's ownership never reduces this
+            // line's cost (it is purely informational - see
+            // ComponentOwnedQuantity's own doc comment), so reusing HAVE
+            // here misled testers. Replaced with a subdued "OWN n" badge -
+            // PillKind.OwnedInfo, the SAME muted-gold kind the ordinary
+            // partial-ownership annotation already uses (no new color) -
+            // showing the raw ComponentOwnedQuantity holding, with no
+            // full-vs-partial distinction (coverage never changes this
+            // line's cost either way, unlike the ordinary Have/OwnedInfo
+            // split). Shown only when there is something to report
+            // (holding > 0) - no "OWN 0" clutter.
+            //
+            // A currency-type component (deliberately blank cost cell -
+            // SubtreeCost never set, see BuildVendorCostComponentLeaves'
+            // currency-line branch) also gets a "CURRENCY" badge -
+            // PillKind.Locked, the SAME kind/text the ordinary currency-
+            // ingredient leaf's own pill uses a few lines below - so a
+            // glance explains why no gold value is shown. The two badges
+            // are independent and may both appear on one leaf.
             if (node.IsCostComponent)
             {
-                if (node.Quantity > 0 && node.ComponentOwnedQuantity >= node.Quantity)
+                if (!node.SubtreeCost.HasValue)
                 {
-                    specs.Add(new PillSpec("HAVE", null, PillKind.Have));
+                    specs.Add(new PillSpec("CURRENCY", null, PillKind.Locked));
                 }
-                else if (node.ComponentOwnedQuantity > 0)
+                if (node.ComponentOwnedQuantity > 0)
                 {
                     specs.Add(new PillSpec(
-                        $"HAVE {node.ComponentOwnedQuantity}/{node.Quantity} NEEDED",
+                        $"OWN {node.ComponentOwnedQuantity}",
                         null,
                         PillKind.OwnedInfo));
                 }

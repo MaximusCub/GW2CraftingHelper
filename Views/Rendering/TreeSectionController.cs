@@ -1084,13 +1084,26 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.Locked)
                 {
+                    // W4B (2026-08-15): a cost-component leaf's "CURRENCY"
+                    // badge (BuildPillSpecs' IsCostComponent short-circuit) -
+                    // its cost cell is deliberately blank because the
+                    // quantity itself IS the cost, in a non-coin currency
+                    // (see CraftingTreeBuilder.
+                    // BuildVendorCostComponentLeaves' currency-line branch) -
+                    // never a "no source"/"no choice" situation like every
+                    // other Locked pill below, so it gets its own tooltip
+                    // before either of those checks run.
+                    if (node.IsCostComponent)
+                    {
+                        tooltipText = "Paid in a non-coin currency - no gold value to show here";
+                    }
                     // The UNKNOWN pill (node.Decision == Unknown - no
                     // feasible source at all) is a different situation from
                     // every other locked pill (exactly one feasible source,
                     // just not a choice): "Only available source" is
                     // misleading there since there IS no available source.
                     // Prefer the seeded wiki hint when one exists.
-                    if (node.Decision == CraftingDecision.Unknown)
+                    else if (node.Decision == CraftingDecision.Unknown)
                     {
                         tooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
                             ? node.AcquisitionHint
@@ -1111,39 +1124,39 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.Have)
                 {
-                    // W4B: a cost-component leaf's HAVE pill reads
-                    // ComponentOwnedQuantity/Quantity, never
-                    // OwnedQuantityUsed - see CraftingTreeNode.
-                    // ComponentOwnedQuantity's own doc comment for why the
-                    // two are deliberately separate fields (a component
-                    // leaf's Quantity is never reduced for ownership, unlike
-                    // an ordinary node's).
-                    tooltipText = node.IsCostComponent
-                        ? $"Needs {node.Quantity} - already covered by your wallet/inventory"
-                        // Maintainer's final wording pass (2026-08-06): matches
-                        // the OwnedInfo pill's "Needs N - ..." vocabulary below
-                        // instead of the old bare "Fully covered by your
-                        // materials". For a genuinely-owned Have node, Quantity
-                        // is 0 (the node's whole demand was already subtracted
-                        // during reduction), so OwnedQuantityUsed alone already
-                        // is the original total demand.
-                        : $"Needs {node.OwnedQuantityUsed} - all covered by your materials";
+                    // W4B (2026-08-15): a cost-component leaf can no longer
+                    // reach this branch - BuildPillSpecs' IsCostComponent
+                    // short-circuit now emits only the "OWN n"/"CURRENCY"
+                    // badges (never PillKind.Have) for a component leaf, so
+                    // this tooltip only ever needs the ordinary-node wording
+                    // below.
+                    //
+                    // Maintainer's final wording pass (2026-08-06): matches
+                    // the OwnedInfo pill's "Needs N - ..." vocabulary below
+                    // instead of the old bare "Fully covered by your
+                    // materials". For a genuinely-owned Have node, Quantity
+                    // is 0 (the node's whole demand was already subtracted
+                    // during reduction), so OwnedQuantityUsed alone already
+                    // is the original total demand.
+                    tooltipText = $"Needs {node.OwnedQuantityUsed} - all covered by your materials";
                 }
                 else if (spec.Kind == PillKind.OwnedInfo)
                 {
                     if (node.IsCostComponent)
                     {
-                        // W4B: unlike the ordinary OwnedInfo case below,
-                        // owning some of a cost component never reduces what
-                        // still has to be handed over as part of this
-                        // purchase - Quantity IS the full need, always (see
-                        // CraftingTreeNode.ComponentOwnedQuantity's doc
-                        // comment). Wording avoids "left to acquire" for
-                        // exactly that reason: nothing here is a separate
-                        // shopping trip.
+                        // W4B (2026-08-15): the "OWN n" badge's own tooltip -
+                        // unlike the ordinary OwnedInfo case below, owning
+                        // some of a cost component never reduces what still
+                        // has to be handed over as part of this purchase, or
+                        // this line's cost (see CraftingTreeNode.
+                        // ComponentOwnedQuantity's own doc comment) - purely
+                        // informational, stated explicitly so it is never
+                        // mistaken for the ordinary "reduced the plan"
+                        // OwnedInfo/HAVE vocabulary used everywhere else in
+                        // the tree.
                         tooltipText =
-                            $"This purchase needs {node.Quantity} - you already have " +
-                            $"{node.ComponentOwnedQuantity} of it";
+                            $"You own {node.ComponentOwnedQuantity} - informational only, " +
+                            "does not change the plan cost";
                     }
                     else
                     {

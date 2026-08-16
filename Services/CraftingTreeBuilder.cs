@@ -386,12 +386,11 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Informational HAVE-pill coverage for a W4B cost-component leaf -
-        /// min(owned, needed), 0 when there is no ownership data for this
-        /// id at all. Never influences Quantity/SubtreeCost above - purely
-        /// what DecisionPillPlanner reads to decide between a plain HAVE
-        /// pill (fully covered), a "HAVE x/y NEEDED" info pill (partially
-        /// covered), or no pill (owned == null/0) - see
+        /// Informational "OWN n" badge coverage for a W4B cost-component
+        /// leaf - min(owned, needed), 0 when there is no ownership data for
+        /// this id at all. Never influences Quantity/SubtreeCost above -
+        /// purely what DecisionPillPlanner reads to decide between showing
+        /// the badge (owned > 0) or no pill at all (owned == null/0) - see
         /// CraftingTreeNode.ComponentOwnedQuantity's own doc comment.
         /// </summary>
         private static int ResolveOwnedQuantity(

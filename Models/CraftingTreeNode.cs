@@ -97,10 +97,14 @@ namespace GW2CraftingHelper.Models
         // old plan.json simply deserializes every existing node with this
         // false (renders exactly as before W4B) until the plan is
         // regenerated. Downstream effects of this flag:
-        // - DecisionPillPlanner.BuildPillSpecs gives it ONLY an
-        //   informational HAVE/"HAVE N/M NEEDED" pill (from
-        //   ComponentOwnedQuantity below) or no pill at all - never a
-        //   decision pill, never Ignore, never override-clickable.
+        // - DecisionPillPlanner.BuildPillSpecs gives it ONLY the
+        //   informational "OWN n" badge (from ComponentOwnedQuantity
+        //   below, shown only when n > 0) and/or a "CURRENCY" badge (when
+        //   this leaf's cost cell is blank), or no pill at all - never a
+        //   decision pill, never Ignore, never override-clickable. (W4B
+        //   2026-08-15: "OWN n" replaced the earlier HAVE/"HAVE N/M
+        //   NEEDED" vocabulary - see DecisionPillPlanner.BuildPillSpecs'
+        //   own doc comment for why.)
         // - It corresponds to no RecipeNode at all (it is never fed back
         //   into PlanSolver.Evaluate/CollectPresetOverrides, which walk the
         //   SOLVER tree exclusively - see CraftingPlanPipeline.
