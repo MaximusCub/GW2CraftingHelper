@@ -626,20 +626,20 @@ namespace GW2CraftingHelper.Views
         /// render, SetSnapshot, SetStatus) so the two can never drift out
         /// of sync with each other.
         /// <para>
-        /// Review fix: the composed text is capped to the run of
-        /// _headerPanel actually free before _clearButton's left edge.
-        /// Adding the capture date to every status string (RefreshNowAsync's
+        /// Layout risk (reported, not silently patched around): adding the
+        /// capture date to every status string (RefreshNowAsync's
         /// "Updated"/"Cache Cleared" strings, StatusText.ForRefreshFailure's
-        /// callers) plus this method's own "(Nh Nm ago)" suffix can together
-        /// exceed that run at the window's clamped 930x710 minimum size
-        /// (Module.cs's ResizableTabbedWindow.HandleWindowResize) - since
-        /// _clearButton/_refreshButton are added to _headerPanel AFTER this
-        /// label, they paint over its tail rather than the label clipping
-        /// itself. _clearButton.Location.X is kept current by
-        /// OnPanelResized on every resize tick, so this reads the
-        /// up-to-date free run whenever text actually changes. Reuses
-        /// LabelHelpers.EllipsizeToWidth, the same truncation the Crafting
-        /// Plan tab's row labels already use - no new truncation logic.
+        /// callers) plus this method's own "(Nh Nm ago)" suffix can produce
+        /// a run long enough to approach or exceed the free space in
+        /// _headerPanel before _clearButton's left edge at the window's
+        /// clamped 930x710 minimum size (Module.cs's
+        /// ResizableTabbedWindow.HandleWindowResize). Truncating here would
+        /// cut the tail of the string, which is exactly where the date/time
+        /// now lives - worst on the failure statuses a user most needs to
+        /// date. This method intentionally does not truncate; if the free
+        /// run at minimum size proves too tight in practice, the fix
+        /// belongs in the header layout (e.g. widening the label's run or
+        /// shortening the button row), not in this label's text.
         /// </para>
         /// </summary>
         private void ApplyStatusDisplay()
@@ -660,8 +660,7 @@ namespace GW2CraftingHelper.Views
                 _statusLabel.TextColor = _defaultStatusColor;
             }
 
-            int maxWidth = _clearButton.Location.X - _statusLabel.Location.X - 10;
-            _statusLabel.Text = LabelHelpers.EllipsizeToWidth(GameService.Content.DefaultFont14, text, maxWidth);
+            _statusLabel.Text = text;
         }
 
         /// <summary>
