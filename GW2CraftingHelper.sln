@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GW2CraftingHelper.RecipeSee
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MysticForgeSeeder", "tools\MysticForgeSeeder\MysticForgeSeeder.csproj", "{EE57408C-A82D-4F51-B3A3-AC15D4627766}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GW2CraftingHelper.RecipeSeeder.Tests", "tests\GW2CraftingHelper.RecipeSeeder.Tests\GW2CraftingHelper.RecipeSeeder.Tests.csproj", "{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -114,6 +116,18 @@ Global
 		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Release|x64.Build.0 = Release|Any CPU
 		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Release|x86.ActiveCfg = Release|Any CPU
 		{EE57408C-A82D-4F51-B3A3-AC15D4627766}.Release|x86.Build.0 = Release|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Debug|x64.Build.0 = Debug|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Debug|x86.Build.0 = Debug|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Release|x64.ActiveCfg = Release|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Release|x64.Build.0 = Release|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Release|x86.ActiveCfg = Release|Any CPU
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -124,6 +138,7 @@ Global
 		{39EBF52C-44AD-4B86-8953-B945FFD24297} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 		{A1B2C3D4-5678-9012-3456-789012345678} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 		{EE57408C-A82D-4F51-B3A3-AC15D4627766} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
+		{A9B2C056-F0A9-4171-A821-D167EC2E5EA7} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {94774E8F-CBB1-4CC2-A4F9-606CEF73C97D}
