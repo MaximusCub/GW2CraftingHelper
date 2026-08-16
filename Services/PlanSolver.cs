@@ -101,17 +101,20 @@ namespace GW2CraftingHelper.Services
 
             // Craft/vendor comparability-parity fix (adversarial-review
             // follow-up): true when THIS committed decision is fallback-tier
-            // (an unvalued currency somewhere - directly on a chosen
-            // recipe/vendor offer, or transitively via a chosen ingredient's
-            // own fallback-tier decision). A recipe consuming an ingredient
-            // whose decision carries this flag is itself demoted to
-            // fallback-tier (see the recipe loop's ingredient pass in
-            // Evaluate) - without this propagation, a currency cost hidden
-            // two-plus Craft levels deep would silently "launder" back into
-            // a fully-comparable-looking ComparisonValue one level up,
-            // reopening the exact asymmetry this fix exists to close. Never
-            // surfaced on the public SolverDecision - purely an internal
-            // tier-tracking aid, same scope as ComparisonValue itself.
+            // - an unvalued currency, a GuildUpgrade ingredient, or any
+            // other non-Item ingredient type this module cannot price (see
+            // CraftingDecision's XML doc for the id-space rationale) -
+            // directly on a chosen recipe/vendor offer, or transitively via
+            // a chosen ingredient's own fallback-tier decision. A recipe
+            // consuming an ingredient whose decision carries this flag is
+            // itself demoted to fallback-tier (see the recipe loop's
+            // ingredient pass in Evaluate) - without this propagation, an
+            // unpriceable cost hidden two-plus Craft levels deep would
+            // silently "launder" back into a fully-comparable-looking
+            // ComparisonValue one level up, reopening the exact asymmetry
+            // this fix exists to close. Never surfaced on the public
+            // SolverDecision - purely an internal tier-tracking aid, same
+            // scope as ComparisonValue itself.
             public bool HasUnvaluedCurrency;
 
             // Winning vendor offer's batch shape (Source == BuyFromVendor
@@ -402,20 +405,13 @@ namespace GW2CraftingHelper.Services
             ISet<int> ignoredItemIds = null,
             HomesteadEfficiencyTiers homesteadTiers = null)
         {
-            // guildupgrade-ingredients fix (class-level follow-up,
-            // adversarial review): only an "Item" node is ever priced by
-            // Evaluate. Currency and GuildUpgrade are never themselves
-            // Evaluate()-called by the ingredient loop below (it treats
-            // every non-Item, non-Currency ingredient type as unpriceable
-            // via hasUnvaluedCurrency and never recurses into it - see that
-            // loop) - this guard is defense-in-depth only, in case a future
-            // caller ever invokes Evaluate directly on one. Item-positive
-            // rather than an enumerated deny-list so any OTHER ingredient
-            // type the GW2 API returns tomorrow (one this module does not
-            // yet specifically recognize) is unpriceable by construction,
-            // not by luck - the original bug here was that "GuildUpgrade"
-            // alone was deny-listed, leaving every other non-Item type to
-            // fall through and be priced as an item/vendor offer.
+            // Item-positive guard (not an enumerated deny-list): only an
+            // "Item" node is ever priced here. The ingredient loop below
+            // never recurses into a non-Item ingredient (it goes through
+            // hasUnvaluedCurrency instead), so this is defense-in-depth for
+            // a future direct caller - see CraftingDecision's XML doc for
+            // the id-space rationale and HasUnvaluedCurrency's doc comment
+            // above for how the fallback tier absorbs an unpriceable type.
             if (node.IngredientType != "Item")
             {
                 return null;
@@ -633,34 +629,16 @@ namespace GW2CraftingHelper.Services
 
                     if (ingredient.IngredientType != "Item")
                     {
-                        // guildupgrade-ingredients fix (class-level
-                        // follow-up, adversarial review): any ingredient
-                        // type that is neither "Item" nor "Currency" -
-                        // "GuildUpgrade" (a Guild Decoration recipe's
-                        // claimed-guild-hall-upgrade requirement) being the
-                        // one this module has actually seen in the wild -
-                        // is never priced as an item (its id is not
-                        // guaranteed to be a TP item id - see
-                        // CollectItemIds' "Item"-only fetch guard) and
-                        // never priced as a currency either, even though
-                        // CurrencyValuation might coincidentally hold an
-                        // entry for this exact numeric id: an unrecognized
-                        // ingredient type's id space has no defined
-                        // relationship to wallet currency ids, so a numeric
-                        // match would be coincidental, and consulting
-                        // currencyValuation (or GetBuyCost/vendorOffers, via
-                        // the Evaluate call below) on the strength of one
-                        // would silently misprice this ingredient using an
-                        // unrelated domain's rate on any such collision -
-                        // the original instance of this bug was scoped only
-                        // to the literal string "GuildUpgrade", leaving
-                        // every OTHER non-Item, non-Currency type to fall
-                        // through into the Evaluate call below and reach
-                        // GetBuyCost/EvaluateVendorOffers unguarded. Demotes
-                        // the recipe to the fallback tier unconditionally -
-                        // exactly the same machinery a genuinely unvalued
-                        // Currency ingredient uses above - and contributes
-                        // zero to both craftCost and craftRealCost.
+                        // Non-Item ingredient (Currency handled above;
+                        // GuildUpgrade/unrecognized types land here) - never
+                        // priced via currencyValuation/GetBuyCost/vendor
+                        // offers, since its id space has no defined
+                        // relationship to any of those (see CraftingDecision's
+                        // XML doc for the id-space rationale). Demotes the
+                        // recipe to the fallback tier via the same machinery
+                        // an unvalued Currency ingredient uses above, and
+                        // contributes zero to both craftCost and
+                        // craftRealCost.
                         hasUnvaluedCurrency = true;
                         continue;
                     }
@@ -1032,24 +1010,12 @@ namespace GW2CraftingHelper.Services
 
             if (node.IngredientType != "Item")
             {
-                // guildupgrade-ingredients fix (class-level follow-up,
-                // adversarial review): unlike a real Currency ingredient
-                // above, any OTHER non-Item ingredient type - "GuildUpgrade"
-                // (a Guild Decoration recipe's claimed-guild-hall-upgrade
-                // requirement) being the one this module has actually seen
-                // in the wild - must NEVER accumulate into currencyMap: it
-                // is not a wallet currency (see Evaluate's ingredient loop
-                // for the pricing side of this same fix) and must never
-                // surface in plan.CurrencyCosts, the Summary currency
-                // table, or any wallet lookup keyed off that table. It
-                // carries no memo entry either (Evaluate's ingredient loop
-                // never calls Evaluate on any non-Item, non-Currency type),
-                // so it also never reaches the ordinary decision/step-
-                // generation code below - this early return is the only
-                // handling any such type needs. The original instance of
-                // this bug deny-listed only the literal string
-                // "GuildUpgrade", leaving every other unrecognized type to
-                // fall through past this point.
+                // Non-Item node (Currency handled above; GuildUpgrade/
+                // unrecognized types land here): never accumulates into
+                // currencyMap and carries no memo entry (see Evaluate's
+                // ingredient loop), so no decision/step-generation code
+                // below ever runs for it - see CraftingDecision's XML doc
+                // for the id-space rationale.
                 return;
             }
 
@@ -1373,13 +1339,9 @@ namespace GW2CraftingHelper.Services
         private static long? RecomputeCraftCosts(
             RecipeNode node, Dictionary<int, Decision> memo, ISet<int> ignoredItemIds)
         {
-            // guildupgrade-ingredients fix (class-level follow-up,
-            // adversarial review): mirrors Evaluate's own Item-positive top
-            // guard - a Currency, GuildUpgrade, or any OTHER non-Item
-            // ingredient type carries no memo entry (see Evaluate's
-            // ingredient loop), so this is defense-in-depth consistency,
-            // not load-bearing on its own (the ingredient-loop skip further
-            // down already never recurses into one).
+            // Item-positive guard mirroring Evaluate's own top guard - a
+            // non-Item ingredient type carries no memo entry (see Evaluate's
+            // ingredient loop), so this is defense-in-depth consistency.
             if (node.IngredientType != "Item")
             {
                 return null;
@@ -1429,17 +1391,10 @@ namespace GW2CraftingHelper.Services
                     }
                     if (ingredient.IngredientType != "Item")
                     {
-                        // guildupgrade-ingredients fix (class-level
-                        // follow-up, adversarial review): never a real coin
-                        // contribution (see Evaluate's ingredient loop) -
-                        // explicit skip for ANY non-Item, non-Currency
-                        // ingredient type ("GuildUpgrade" being the one this
-                        // module has actually seen in the wild), mirroring
-                        // the Currency branch immediately above, rather than
-                        // relying on the recursive call's own top-of-method
-                        // guard to return null (avoids a needless recursive
-                        // call for a type known upfront to carry no memo
-                        // entry).
+                        // Non-Item ingredient (Currency handled above) -
+                        // never a real coin contribution; skip rather than
+                        // recurse into a node known upfront to carry no memo
+                        // entry (see Evaluate's ingredient loop).
                         continue;
                     }
                     craftRealCost += RecomputeCraftCosts(ingredient, memo, ignoredItemIds) ?? 0L;

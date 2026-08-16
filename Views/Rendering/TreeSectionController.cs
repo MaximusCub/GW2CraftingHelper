@@ -1136,11 +1136,23 @@ namespace GW2CraftingHelper.Views.Rendering
                     // UPGRADE above, not "exactly one feasible source" -
                     // without this branch it fell into the misleading
                     // "Only available source" default below.
+                    // CraftingTreeBuilder's UnrecognizedIngredient branch
+                    // returns before ApplyAcquisitionHint ever runs, so
+                    // node.AcquisitionHint is always null here - no ternary
+                    // needed, unlike the Unknown/GuildUpgrade branches above.
                     else if (node.Decision == CraftingDecision.UnrecognizedIngredient)
                     {
-                        tooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
-                            ? node.AcquisitionHint
-                            : "Unrecognized ingredient type - no known acquisition source";
+                        tooltipText = "Unrecognized ingredient type - no known acquisition source";
+                    }
+                    // Adversarial-review fix (guildupgrade-ingredients,
+                    // final pass): the plain CURRENCY pill was falling into
+                    // the same misleading "Only available source" default -
+                    // a currency ingredient is paid from the wallet, not
+                    // sourced from a market/vendor/recipe at all, so there
+                    // is no "source" for this wording to describe.
+                    else if (node.Decision == CraftingDecision.Currency)
+                    {
+                        tooltipText = "Paid from your wallet as a game currency - no purchase or crafting source applies";
                     }
                     else
                     {

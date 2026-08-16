@@ -690,7 +690,7 @@ namespace GW2CraftingHelper.Tests.Services
             var treeNode = builder.BuildTree(node, decisions, metadata, hints);
 
             Assert.Equal(CraftingDecision.UnrecognizedIngredient, treeNode.Decision);
-            Assert.Equal("Unrecognized ingredient (unresolved)", treeNode.Name);
+            Assert.Equal("Unrecognized ingredient type", treeNode.Name);
             Assert.Null(treeNode.IconUrl);
             Assert.Null(treeNode.Rarity);
             Assert.Null(treeNode.AcquisitionHint);
@@ -732,7 +732,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(CraftingDecision.UnrecognizedIngredient, treeNode.Decision);
             Assert.NotEqual(CraftingDecision.BuyFromTp, treeNode.Decision);
-            Assert.Equal("Unrecognized ingredient (unresolved)", treeNode.Name);
+            Assert.Equal("Unrecognized ingredient type", treeNode.Name);
             Assert.Null(treeNode.IconUrl);
             Assert.Null(treeNode.Rarity);
             Assert.Null(treeNode.SubtreeCost);
