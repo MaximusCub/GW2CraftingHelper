@@ -3691,7 +3691,7 @@ of-number throughout (unchanged). No live desktop verification was
 performed for this round either, same caveat as item 11's own closing
 paragraph above.
 
-[PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS 2026-08-16 (orchestrator live sandbox session, combined wave-4 staging build). Verified: cost-band collapse rule (single Actual Cost to Craft tile when opportunity cost is zero - ARE and Zojja plans), currency table alphabetical with icons and correct Required/Have/Needed math, green OK badges on all fully-covered rows, TP-variance footnote, band-caption tooltip renders on hover, coin icons right of numbers. Checkmark-glyph experiment FAILED live (U+2713 renders as an empty tag in the Blish font) - the OK badge is the permanent marker choice.
 
 Follow-ups (recorded during a later polish pass, not yet implemented):
 
