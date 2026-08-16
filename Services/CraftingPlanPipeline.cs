@@ -353,8 +353,10 @@ namespace GW2CraftingHelper.Services
             // W4B: owned-item annotation for vendor cost-component ITEM
             // leaves, cosmetic only - see
             // BuildOwnedVendorItemComponentAmounts' own doc comment.
+            // W4B review-fix (Must Fix): also pass vendorOffers - see that
+            // method's own doc comment for why.
             IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
-                BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions);
+                BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions, vendorOffers);
 
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
@@ -767,8 +769,10 @@ namespace GW2CraftingHelper.Services
             result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
 
             // W4B: see the single-item overload's matching computation.
+            // W4B review-fix (Must Fix): also pass vendorOffers - see that
+            // method's own doc comment for why.
             IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
-                BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions);
+                BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions, vendorOffers);
 
             BuildCraftingTreeResult(
                 result, treeUsedForSolve, solveResult.Decisions, metadata,
@@ -1342,17 +1346,35 @@ namespace GW2CraftingHelper.Services
         /// no such component anywhere, so callers can treat null as "no
         /// data" distinctly from "0 owned", same as
         /// BuildOwnedCurrencyAmounts.
+        ///
+        /// W4B review-fix (Must Fix): widened the same way
+        /// AddAllVendorOfferItemComponentIds widened the metadata scan
+        /// (same commit's own doc comment) - <paramref name="vendorOffers"/>
+        /// is scanned for every Item cost line on ANY offer, not just the
+        /// BASELINE winning decisions AddVendorItemComponentIds alone
+        /// covers. PlanSolveContext.OwnedVendorItemAmounts is, like
+        /// Metadata, captured once at generation time and reused verbatim
+        /// by ResolveWithOverrides (see its own doc comment) - it is never
+        /// recomputed. Without this, a node whose baseline decision was
+        /// Craft (so its vendor offer's item cost component was never
+        /// scanned by the decisions-only overload), manually overridden to
+        /// BuyFromVendor via ResolveWithOverrides, would show its item
+        /// component leaf with correct name/icon (metadata already
+        /// widened) but NO have pill - permanently - even with the item
+        /// sitting in the account, until the whole plan is regenerated.
         /// </summary>
         private static IReadOnlyDictionary<int, int> BuildOwnedVendorItemComponentAmounts(
-            AccountSnapshot snapshot, IReadOnlyDictionary<int, SolverDecision> decisions)
+            AccountSnapshot snapshot, IReadOnlyDictionary<int, SolverDecision> decisions,
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers)
         {
-            if (snapshot == null || decisions == null)
+            if (snapshot == null)
             {
                 return null;
             }
 
             var itemIds = new HashSet<int>();
             AddVendorItemComponentIds(decisions, itemIds);
+            AddAllVendorOfferItemComponentIds(vendorOffers, itemIds);
             if (itemIds.Count == 0)
             {
                 return null;

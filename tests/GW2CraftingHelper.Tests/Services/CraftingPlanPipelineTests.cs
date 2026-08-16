@@ -561,16 +561,20 @@ namespace GW2CraftingHelper.Tests.Services
         /// Ectoplasm") is never scanned by the decisions-only
         /// AddVendorItemComponentIds overload - only
         /// AddAllVendorOfferItemComponentIds (scanning every vendorOffers
-        /// entry, not just the winning decision) can widen metadata for
-        /// it. A manual per-node override forcing item 1 to BuyFromVendor
-        /// via ResolveWithOverrides - an ordinary, commonly-used
-        /// interaction - then surfaces that item's component leaf; without
-        /// the fix it would render "Unknown Item"/null icon forever
-        /// (ResolveWithOverrides never re-fetches metadata - see its own
-        /// doc comment).
+        /// entry, not just the winning decision) can widen metadata AND
+        /// (the parallel Must Fix this test now also covers)
+        /// BuildOwnedVendorItemComponentAmounts' ownership scan for it. A
+        /// manual per-node override forcing item 1 to BuyFromVendor via
+        /// ResolveWithOverrides - an ordinary, commonly-used interaction -
+        /// then surfaces that item's component leaf; without the metadata
+        /// fix it would render "Unknown Item"/null icon forever, and
+        /// without the ownership fix it would show correct name/icon but
+        /// NO have pill forever, even with the item sitting in the account
+        /// (ResolveWithOverrides never re-fetches EITHER - see its own doc
+        /// comment).
         /// </summary>
         [Fact]
-        public async Task MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadata()
+        public async Task MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadataAndOwnership()
         {
             var recipeApi = new InMemoryRecipeApiClient();
             recipeApi.AddSearchResult(1, 10);
@@ -593,6 +597,22 @@ namespace GW2CraftingHelper.Tests.Services
             itemApi.AddItem(1, "Amalgamated Rift Essence", "essence.png");
             itemApi.AddItem(2, "Cheap Ingredient", "cheap.png");
             itemApi.AddItem(42, "Glob of Ectoplasm", "ecto.png");
+
+            // Snapshot has 4 of item 42 in the account - partial coverage
+            // of the 10 (5 * requested qty 2) the override's winning offer
+            // will need. Attached at generation time (while the baseline
+            // decision is still Craft, so item 42 never touches
+            // decisions-scoped ownership either) to prove
+            // BuildOwnedVendorItemComponentAmounts' widened vendorOffers
+            // scan - not just AddVendorItemComponentIds' decisions scan -
+            // is what puts 42 into PlanSolveContext.OwnedVendorItemAmounts.
+            var snapshot = new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry { ItemId = 42, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
+                }
+            };
 
             CraftingPlanPipeline pipeline;
             CraftingPlanResult result;
@@ -626,14 +646,18 @@ namespace GW2CraftingHelper.Tests.Services
                     store,
                     reducer: new InventoryReducer());
 
-                result = await pipeline.GenerateStructuredAsync(1, 2, null, CancellationToken.None,
+                result = await pipeline.GenerateStructuredAsync(1, 2, snapshot, CancellationToken.None,
                     priceBasis: PriceBasis.InstantBuy);
             }
 
             // Baseline: craft wins, so no component leaves exist yet, and
-            // the winning decision never touched VendorItemCosts at all.
+            // the winning decision never touched VendorItemCosts at all -
+            // but OwnedVendorItemAmounts must already carry item 42's
+            // owned count, widened from vendorOffers rather than decisions.
             Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
             Assert.Empty(result.CraftingTree.Children.Where(c => c.IsCostComponent));
+            Assert.NotNull(result.SolveContext.OwnedVendorItemAmounts);
+            Assert.Equal(4, result.SolveContext.OwnedVendorItemAmounts[42]);
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
@@ -646,6 +670,12 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(itemLeaf.IsCostComponent);
             Assert.Equal("Glob of Ectoplasm", itemLeaf.Name);
             Assert.Equal("ecto.png", itemLeaf.IconUrl);
+            // The ownership fix under test: 4 owned out of 10 needed
+            // (5 * requested qty 2) must survive the local re-solve, not
+            // silently reset to 0 because this offer was never the
+            // baseline winner.
+            Assert.Equal(10, itemLeaf.Quantity);
+            Assert.Equal(4, itemLeaf.ComponentOwnedQuantity);
         }
 
         // M38 WP-14: this test used to prove the (now-deleted, test-only)
