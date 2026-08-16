@@ -4410,8 +4410,6 @@ remain Blish-free and exercise real `PlanSolver.Solve`/
 mirrors. Repo invariants otherwise not in play - no pricing-comparability,
 ID-display, or coin-icon-ordering code was touched.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
-
 ## AUDIT ROW 20/38 review-fix round 5: stale ARCHITECTURE.md invariant + fallback-winning test gap (2026-08-16)
 
 A fifth adversarial pass over the AUDIT ROW 20/38 TP price-side fallback
@@ -4509,6 +4507,99 @@ Blish-free and exercises the real `PlanSolver.Solve` production code
 path, not a contract mirror. Repo invariants otherwise not in play - no
 pricing-comparability, ID-display, or coin-icon-ordering code was
 touched; `Services/ModuleLog.cs`, `Services/PlanContentHeightMath.cs`,
+`Services/PlanRelayoutMath.cs`, scroll machinery, and
+`VendorBatchSolver`'s merged-ceil batching math were not touched.
+
+## AUDIT ROW 20/38 review-fix round 6: gate-line duplication + cross-item basis-mixing wording (2026-08-16)
+
+A sixth adversarial pass over the AUDIT ROW 20/38 TP price-side fallback
+change raised two findings, both fixed. This round was docs-only; no
+production or test code was touched.
+
+**Finding 1 (Nice to Have, gate-line duplication)**: rounds 4 and 5 each
+independently re-added the literal orchestrator gate line
+(`Gate: [PENDING - the orchestrator fills in PASS/FAIL]`) at the end of
+their own section, leaving two pending markers in the file (round 4's at
+the old line 4413, round 5's at the true EOF) even though round 3's own
+finding on this exact file (recorded above, "Finding 2 (Nice to Have,
+gate-line ambiguity)") had already established the invariant of keeping
+exactly one. Each of rounds 4 and 5 appended a new section without
+checking whether a prior section still carried the gate line, so the
+consolidation round 3 performed did not survive two more rounds of
+"append a new section" edits.
+
+**Fix**: deleted the gate line from the end of round 4's section, keeping
+only the one at the true end of the file (now at the end of round 5's
+section, immediately above this one). No prose in round 4's section was
+otherwise touched.
+
+**Finding 2 (Must Fix, false invariant)**: `docs/ARCHITECTURE.md`'s
+round-5 reword of the basis-mixing clause stated "the solver never
+compares one item's buy-order price against a different item's
+sell-listing price" - flatly false once the fallback fires. Trace under
+`PriceBasis.BuyOrder`: item A has `SellInstant == 0` so `GetBuyCost`
+prices it from `BuyInstant` (A's sell-listing side); `PlanSolver.Commit`
+then hands that number to `PickCheapest` against
+`bestComparableCraftCost`, which is summed from ingredient B's preferred
+buy-order price (`Services/PlanSolver.cs`, the three-way
+`PickCheapest(buyTotalCost, ..., comparableVendorValue)` call). That is
+exactly one item's sell-listing price being compared against a different
+item's buy-order price inside a single craft-total comparison, the same
+class of cross-item mixing the deleted clause claimed never happens. The
+surrounding framing - "preferred per item," "an item with listings on
+its preferred side never uses the other side" - is accurate on its own
+terms (it is a true statement about same-item pricing) and was kept;
+only the absolute cross-item clause needed rewording.
+
+**Fix**: reworded the clause to scope the "no mixing" guarantee to a
+single item's own price (never priced on a mixed basis) rather than to
+any comparison anywhere in the tree, and added an explicit sentence
+stating a total summed across items - e.g. a craft cost built from
+several ingredients - can combine sides when a fallback fires on one of
+them. Docs-only change; no other prose in the section 8 bullet was
+touched (`git diff` scoped to the one clause plus a rewrap of the
+following sentence that had grown past the paragraph's established line
+length after the edit).
+
+**Self-review findings** (Code Reviewer Mode pass over this diff):
+grepped `docs/ARCHITECTURE.md` for any other occurrence of
+"basis-mixing"/"never compares one item's"/"mixed basis"/"cross-item"/
+"cross-side" after the reword - exactly one hit, the reworded clause
+itself, so no stale duplicate of the false invariant survives elsewhere
+in the file; grepped `docs/KNOWN-ISSUES.md` with `^Gate: \[PENDING`
+(anchored to start-of-line, the shape a stamping pass would actually
+match) after the round-4 deletion - exactly one hit, this section's own
+gate line below. A plain unanchored substring grep for `Gate: [PENDING`
+returns more hits (round-3's and this section's own finding writeups,
+which quote the gate line as prose inside backticks mid-sentence rather
+than presenting it as an actual gate) but none of those are at
+start-of-line, so they cannot be mistaken for a real gate by a
+line-anchored stamping pass; left untouched as historical record;
+confirmed the gate-line deletion did not disturb any other content in
+round 4's section (`git diff` shows only the one line removed, no
+reflow); confirmed the ARCHITECTURE.md edit does not touch
+`Services/ModuleLog.cs`, `Services/PlanContentHeightMath.cs`,
+`Services/PlanRelayoutMath.cs`, scroll machinery, or
+`VendorBatchSolver`'s merged-ceil batching math, all off-limits for this
+round. Nice-to-have (not applied - out of scope, no coverage gain): a
+short automated check (e.g. a test or lint step counting literal
+`Gate: [PENDING`/`Gate: PASS`/`Gate: FAIL` occurrences in
+`KNOWN-ISSUES.md` and failing when the count isn't exactly one) would
+have caught this class of regression mechanically instead of relying on
+each review round to notice by inspection; not added since it would be
+new test infrastructure with no production code to exercise, and the
+finding itself was caught by manual review same as round 3's identical
+issue.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` clean, 0
+errors, 0 warnings (docs-only diff, no `.cs` file touched). Tests: 1383
+passed, 0 failed (same total as round 5 - no test added or removed this
+round, confirmed via `dotnet test
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`). No Blish
+HUD/BlishHUD.exe references added to tests; no test file touched at all
+this round. Repo invariants otherwise not in play - no pricing-
+comparability, ID-display, or coin-icon-ordering code was touched;
+`Services/ModuleLog.cs`, `Services/PlanContentHeightMath.cs`,
 `Services/PlanRelayoutMath.cs`, scroll machinery, and
 `VendorBatchSolver`'s merged-ceil batching math were not touched.
 

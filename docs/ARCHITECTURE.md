@@ -393,12 +393,14 @@ inventing a new one. The load-bearing rules:
   TP side first, and only when that SAME item has no listings on its
   preferred side does it fall back to that same item's other TP side
   rather than treating the item as unpriceable (see KNOWN-ISSUES.md,
-  "AUDIT ROW 20/38"). This is a per-item same-item substitution, not
-  basis-mixing across items - the solver never compares one item's
-  buy-order price against a different item's sell-listing price, and an
-  item with listings on its preferred side never uses the other side.
-  Currencies (as recipe ingredients) contribute to the craft-vs-buy
-  *decision* via an optional per-unit valuation, but never to the
+  "AUDIT ROW 20/38"). This is a per-item same-item substitution: no
+  single item is ever priced on a mixed basis, and an item with listings
+  on its preferred side never touches the other side. A total summed
+  across items - e.g. a craft cost built from several ingredients - can
+  still combine sides when a fallback fires on one of them, so the
+  guarantee is scoped to "no single item," not "no comparison anywhere
+  in the tree." Currencies (as recipe ingredients) contribute to the
+  craft-vs-buy *decision* via an optional per-unit valuation, but never to the
   displayed real coin cost - an unvalued currency never has an invented
   exchange rate.
 - **Craft/vendor comparability parity:** a recipe with an unvalued
