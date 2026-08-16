@@ -2637,4 +2637,63 @@ data already resident in memory from the pre-existing fetch; its only
 allocation is additional entries in the `metadataIds` HashSet that was
 already being built, no new collection type.
 
+**Review-fix round 2 (2026-08-15) - 2 Must Fix findings from a further
+adversarial review, both the same shape as round 1's fixes one field/map
+over, both addressed.**
+
+- *Fix (Must Fix, `Services/VendorBatchSolver.cs` line 292): missing
+  `Count > 0` guard on the non-coin Currency cost-line capture.* Round 1
+  guarded the Item cost-line capture (`itemCostRaw`) against a
+  zero/negative-count line inventing a phantom "item" cost KIND, but left
+  the identical `currencyCosts.Add(cost)` five lines above it unguarded -
+  a zero/negative-count non-coin Currency cost line could still invent a
+  phantom "currency" cost KIND the same way, flipping an otherwise
+  single-kind offer into leaf-synthesis mode with a 0-quantity (or, for a
+  negative Count, negative-quantity) ghost leaf: blank cost, no pill. Now
+  guarded with `if (cost.Count > 0)`, mirroring both the raw-coin branch's
+  own guard immediately above it and the Item-line guard below it;
+  `coinCost` is untouched either way. New test:
+  `PlanSolverVendorOfferTests.ZeroCountCurrencyCostLine_DoesNotPopulateVendorCurrencyCosts`
+  (sibling to round 1's `ZeroCountItemCostLine_DoesNotPopulateVendorItemCosts`).
+
+- *Fix (Must Fix, `Services/CraftingPlanPipeline.cs`
+  `BuildOwnedVendorItemComponentAmounts`): the ownership map was never
+  widened the way metadata was.* Round 1 widened metadata fetching
+  (`AddAllVendorOfferItemComponentIds`) so a vendor offer NOT chosen at
+  baseline still resolves a real name/icon after a manual
+  `BuyFromVendor` override via `ResolveWithOverrides`. The parallel
+  ownership computation, `BuildOwnedVendorItemComponentAmounts`, was left
+  scoped to only the BASELINE winning decisions'
+  `VendorItemCosts` (via `AddVendorItemComponentIds` alone) - so the same
+  override scenario surfaced a correctly-named item component leaf with
+  permanently NO have pill, even with the item sitting in the account,
+  until the whole plan was regenerated. `PlanSolveContext.
+  OwnedVendorItemAmounts` is, like `Metadata`, captured once at generation
+  time and passed to `ResolveWithOverrides` verbatim - never recomputed.
+  Widened `BuildOwnedVendorItemComponentAmounts` to also call
+  `AddAllVendorOfferItemComponentIds` over `vendorOffers` (reusing the
+  round 1 method rather than duplicating its scan), at both call sites
+  (single-item and multi-item generation entry points). Extended test:
+  `CraftingPlanPipelineTests.
+  MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadataAndOwnership`
+  (renamed from round 1's `...StillResolvesRealItemMetadata`, now also
+  attaching a snapshot with partial ownership of the item component and
+  asserting `ComponentOwnedQuantity` survives the override re-solve).
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors); full module
+test suite green - 1309 passed (1308 from round 1 + 1 new round-2 test;
+the round-2 ownership fix extended an existing test rather than adding a
+new one). No new Blish HUD references in tests; both new/extended tests
+exercise real production code (`PlanSolver.Solve`,
+`CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`)
+with no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
+internal-only. `VendorBatchSolver.cs`'s DO-NOT-TOUCH merged-ceil methods
+had their dollar-amount arithmetic left byte-for-byte unchanged - the only
+edit inside that file this round is the one `Count > 0` capture guard
+(plus its doc comment). `ResolveWithOverrides`/`BuildPresetOverrides`
+themselves needed no change in either fix - both walk the SOLVER tree via
+`solveResult.Decisions`, not the display tree, and neither fix touches
+decision-making, only the cosmetic metadata/ownership maps consulted
+afterward when building display leaves.
+
 Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
