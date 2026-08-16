@@ -392,9 +392,32 @@ namespace GW2CraftingHelper.Services
             // partial when a descendant is genuinely unpriceable - the
             // descendant still surfaces as its own (Unknown or
             // force-crafted) node with its own decision.
-            long? bestCraftCost = null;
-            long? bestCraftRealCost = null;
-            int bestRecipeId = 0;
+            // Recipe candidates split into COMPARABLE and FALLBACK tiers -
+            // mirrors VendorBatchSolver.EvaluateVendorOffers' comparable/
+            // fallback split exactly (see that method's doc comment): a
+            // recipe with a Currency-type ingredient that has NO
+            // user-provided valuation is comparable-ineligible - its craft
+            // cost never competes with TP/vendor coin costs in
+            // PickCheapest below, since an unvalued currency's real cost is
+            // unknown and ranking the recipe by its priced ingredients
+            // alone would hide that unknown cost (the craft/vendor
+            // comparability asymmetry this split fixes - a heavy-currency
+            // recipe could otherwise be declared "cheapest" while its real
+            // cost stayed invisible). Such a recipe is still tracked as a
+            // FALLBACK candidate - offered (CanCraft stays true below, the
+            // M33 guarantee) and used only when nothing coin-comparable
+            // exists anywhere for this node (see the terminal fallback
+            // branch further down), exactly like a fallback-only vendor
+            // offer. A recipe with no Currency ingredients, or where every
+            // one is valued, is COMPARABLE and competes on equal footing
+            // with TP/vendor, same as before this fix.
+            long? bestComparableCraftCost = null;
+            long? bestComparableCraftRealCost = null;
+            int bestComparableRecipeId = 0;
+
+            long? bestFallbackCraftCost = null;
+            long? bestFallbackCraftRealCost = null;
+            int bestFallbackRecipeId = 0;
 
             foreach (var recipe in node.Recipes)
             {
@@ -423,6 +446,7 @@ namespace GW2CraftingHelper.Services
                 // OutputCount there.
                 long craftCost = 0L;
                 long craftRealCost = 0L;
+                bool hasUnvaluedCurrency = false;
 
                 foreach (var ingredient in recipe.Ingredients)
                 {
@@ -437,9 +461,13 @@ namespace GW2CraftingHelper.Services
                         // 4.2/4.3: a currency cost can tip a recipe out of
                         // being the cheapest option, but the plan's gold
                         // total never invents an exchange rate for it. An
-                        // unvalued currency (the default - no invented
-                        // rate) contributes zero to both, same as before
-                        // this fix.
+                        // unvalued currency demotes this recipe to the
+                        // fallback tier below (see hasUnvaluedCurrency)
+                        // instead of silently contributing zero to a
+                        // fully-comparable cost - the exact fix this split
+                        // exists for - matching the treatment
+                        // EvaluateVendorOffers already gives an unvalued
+                        // vendor currency line.
                         if (currencyValuation != null &&
                             currencyValuation.TryGetCopperValue(ingredient.Id, out long copperPerUnit))
                         {
@@ -449,9 +477,18 @@ namespace GW2CraftingHelper.Services
                             }
                             catch (OverflowException)
                             {
-                                // Absurd valuation input; ignore rather than
-                                // crash or silently misrank the recipe.
+                                // Absurd valuation input; demote to fallback
+                                // rather than crash or silently treat this
+                                // recipe as comparable - mirrors
+                                // EvaluateVendorOffers' identical per-line
+                                // valuation-overflow handling (allValued =
+                                // false).
+                                hasUnvaluedCurrency = true;
                             }
+                        }
+                        else
+                        {
+                            hasUnvaluedCurrency = true;
                         }
                         continue;
                     }
@@ -463,25 +500,48 @@ namespace GW2CraftingHelper.Services
                     craftRealCost += memo[ingredient.NodeId].TotalCost ?? 0L;
                 }
 
-                // Cost tie-break: lowest RecipeId, so the choice is
-                // deterministic regardless of recipe list order.
-                if (!bestCraftCost.HasValue ||
-                    craftCost < bestCraftCost.Value ||
-                    (craftCost == bestCraftCost.Value && recipe.RecipeId < bestRecipeId))
+                // Cost tie-break within each tier: lowest RecipeId, so the
+                // choice is deterministic regardless of recipe list order -
+                // same rule as before this fix, now applied separately per
+                // tier so a cheap-looking fallback recipe can never
+                // out-rank (or get out-ranked by) a comparable one here;
+                // that competition happens later, in PickCheapest/the
+                // terminal fallback branch, exactly like vendor's own
+                // comparable-vs-fallback split.
+                if (hasUnvaluedCurrency)
                 {
-                    bestCraftCost = craftCost;
-                    bestCraftRealCost = craftRealCost;
-                    bestRecipeId = recipe.RecipeId;
+                    if (!bestFallbackCraftCost.HasValue ||
+                        craftCost < bestFallbackCraftCost.Value ||
+                        (craftCost == bestFallbackCraftCost.Value && recipe.RecipeId < bestFallbackRecipeId))
+                    {
+                        bestFallbackCraftCost = craftCost;
+                        bestFallbackCraftRealCost = craftRealCost;
+                        bestFallbackRecipeId = recipe.RecipeId;
+                    }
+                }
+                else
+                {
+                    if (!bestComparableCraftCost.HasValue ||
+                        craftCost < bestComparableCraftCost.Value ||
+                        (craftCost == bestComparableCraftCost.Value && recipe.RecipeId < bestComparableRecipeId))
+                    {
+                        bestComparableCraftCost = craftCost;
+                        bestComparableCraftRealCost = craftRealCost;
+                        bestComparableRecipeId = recipe.RecipeId;
+                    }
                 }
             }
 
             // canCraft = "hasComponents" (gw2e): true whenever a recipe
             // exists at all, since craft cost is now always defined (see
-            // above). A node with a recipe but no buy price therefore
+            // above) - comparable or fallback tier alike (M33 guarantee:
+            // CanCraft/the CRAFT pill stay true even when the only recipe
+            // is fallback-tier and cannot win the automatic comparison). A
+            // node with a COMPARABLE recipe but no buy price therefore
             // always force-crafts via PickCheapest below (craftBeatsBuy is
             // true whenever buyCost is null), matching gw2e's
             // isCheaperToCraft = craftPrice-defined && (!buyPrice || ...).
-            bool canCraft = bestCraftCost.HasValue;
+            bool canCraft = bestComparableCraftCost.HasValue || bestFallbackCraftCost.HasValue;
             bool canBuyTp = buyTotalCost.HasValue;
             bool canBuyVendor = comparableVendorValue.HasValue ||
                                 fallbackVendorCoinCost.HasValue;
@@ -489,10 +549,14 @@ namespace GW2CraftingHelper.Services
             // M34-B2a #3: raw diagnostics for OwnedMaterialsForceBuyPrePass -
             // recorded regardless of forceBuyOnlyNodeIds/decision, so the
             // pre-pass (a throwaway solve with neither set) can read the
-            // same numbers the real solve would have used.
+            // same numbers the real solve would have used. Comparable-tier
+            // cost when one exists (the figure PickCheapest itself
+            // compares below), else the fallback-tier cost as the
+            // last-resort figure - mirrors the real decision's own tier
+            // priority.
             if (costDiagnostics != null)
             {
-                costDiagnostics[node.NodeId] = (buyTotalCost, bestCraftCost);
+                costDiagnostics[node.NodeId] = (buyTotalCost, bestComparableCraftCost ?? bestFallbackCraftCost);
             }
 
             // M34-B2a #3: gw2e's "Value Own Materials" force-buy pre-pass
@@ -534,7 +598,12 @@ namespace GW2CraftingHelper.Services
             {
                 if (forced == AcquisitionSource.Craft && canCraft)
                 {
-                    return Commit(AcquisitionSource.Craft, bestCraftRealCost, bestCraftCost, bestRecipeId, null);
+                    // Comparable-first, fallback otherwise - same
+                    // precedence VendorBatchSolver's own override handling
+                    // uses just below for BuyFromVendor.
+                    return bestComparableCraftCost.HasValue
+                        ? Commit(AcquisitionSource.Craft, bestComparableCraftRealCost, bestComparableCraftCost, bestComparableRecipeId, null)
+                        : Commit(AcquisitionSource.Craft, bestFallbackCraftRealCost, bestFallbackCraftCost, bestFallbackRecipeId, null);
                 }
                 if (forced == AcquisitionSource.BuyFromTp && canBuyTp)
                 {
@@ -549,10 +618,14 @@ namespace GW2CraftingHelper.Services
             }
 
             // Three-way comparison: vendor (coin part + any valued currency
-            // lines) vs TP buy vs craft
+            // lines) vs TP buy vs craft. Only the COMPARABLE craft cost
+            // participates here - a fallback-tier craft (unvalued currency
+            // ingredient) never competes on coin cost, exactly like a
+            // fallback-tier vendor offer never does (comparableVendorValue,
+            // never fallbackVendorCoinCost, is passed here too).
             var source = PickCheapest(
                 buyTotalCost,
-                craftExcludedFromAutoPick ? null : bestCraftCost,
+                craftExcludedFromAutoPick ? null : bestComparableCraftCost,
                 comparableVendorValue);
 
             if (source == AcquisitionSource.BuyFromVendor)
@@ -567,21 +640,45 @@ namespace GW2CraftingHelper.Services
 
             if (source == AcquisitionSource.Craft)
             {
-                return Commit(AcquisitionSource.Craft, bestCraftRealCost, bestCraftCost, bestRecipeId, null);
+                return Commit(AcquisitionSource.Craft, bestComparableCraftRealCost, bestComparableCraftCost, bestComparableRecipeId, null);
             }
 
-            // Fallback: nothing coin-priceable/craftable beat buy (source ==
-            // UnknownSource here implies buyCost, bestCraftCost, and
-            // comparableVendorValue are ALL null - if bestCraftCost had a
-            // value, PickCheapest would already have returned Craft or
-            // BuyFromTp, never UnknownSource, since craftCost is now always
-            // defined whenever a recipe exists). A mixed-currency vendor
-            // offer is a concrete, fully-known acquisition and is used as
-            // the last resort; otherwise this is gw2e's "Not sold or
-            // crafted" - no recipe, no price, genuinely no known source.
-            if (fallbackVendorCoinCost.HasValue)
+            // Fallback: nothing COMPARABLE beat buy (source == UnknownSource
+            // here implies buyCost, the comparable craft cost passed above,
+            // and comparableVendorValue are ALL null - if a comparable
+            // craft recipe had a value, PickCheapest would already have
+            // returned Craft or BuyFromTp, never UnknownSource, since a
+            // comparable craftCost is always defined whenever a comparable
+            // recipe exists). A fallback-tier craft (unvalued currency
+            // ingredient) or a fallback-tier vendor offer (unvalued
+            // non-coin currency line) is a concrete, fully-known
+            // acquisition even though its full cost cannot be honestly
+            // compared with coin, and each is used as a last resort here -
+            // exactly like EvaluateVendorOffers' own fallback tier already
+            // was for vendor alone. When both a fallback craft and a
+            // fallback vendor offer exist, mirrors PickCheapest's own
+            // craft/vendor tie-break above: the numerically cheaper of the
+            // two wins, an exact tie keeps vendor - "someone must still be
+            // picked" (this engine's pre-existing vendor-fallback
+            // precedent), extended to cover craft's new fallback tier too.
+            // Force-buy-only nodes (craftExcludedFromAutoPick) never fall
+            // back to craft either, consistent with craft being excluded
+            // from every automatic path for that node. Otherwise (neither
+            // fallback exists) this is gw2e's "Not sold or crafted" - no
+            // recipe, no price, genuinely no known source.
+            long? fallbackCraftCost = craftExcludedFromAutoPick ? null : bestFallbackCraftCost;
+
+            if (fallbackCraftCost.HasValue || fallbackVendorCoinCost.HasValue)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch);
+                bool fallbackVendorWins = fallbackVendorCoinCost.HasValue &&
+                    (!fallbackCraftCost.HasValue || fallbackVendorCoinCost.Value <= fallbackCraftCost.Value);
+
+                if (fallbackVendorWins)
+                {
+                    return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch);
+                }
+
+                return Commit(AcquisitionSource.Craft, bestFallbackCraftRealCost, bestFallbackCraftCost, bestFallbackRecipeId, null);
             }
 
             return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);
