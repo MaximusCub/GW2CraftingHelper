@@ -348,6 +348,52 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void VendorOfferWithUnrecognizedCostLineType_TreatedAsUnpriceable_NeverWinsOverTp()
+        {
+            // Adversarial-review finding (2026-08-16, class-level sibling of
+            // the recipe-ingredient Item-positive sweep): before the fix,
+            // VendorBatchSolver's cost-line fold had no `else` branch, so an
+            // unrecognized CostLine.Type (VendorOfferLoader performs no type
+            // validation at load, and ref/vendor_offers.json is
+            // tool-scraped, so a future third type is directly reachable)
+            // was silently dropped - `priceable` stayed true and the offer
+            // was costed as if the line were not there at all, a
+            // fabricated-low (here: zero) coin cost that would always beat
+            // a real TP price. This offer's only cost line is an
+            // unrecognized type, so a correctly-fixed solver must exclude
+            // it entirely and fall back to the real TP price instead of
+            // "buying" it from the vendor for free.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } }
+            };
+            var offer = new VendorOffer
+            {
+                OfferId = "test-unrecognized-cost-line",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine>
+                {
+                    new CostLine { Type = "MysteryCostType", Id = 999, Count = 5 }
+                },
+                MerchantName = "Barter Vendor",
+                Locations = new List<string>()
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var solver = new PlanSolver();
+
+            var plan = solver.Solve(tree, prices, vendorOffers).Plan;
+
+            Assert.Single(plan.Steps);
+            Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
+            Assert.Equal(200, plan.TotalCoinCost);
+        }
+
+        [Fact]
         public void VendorOfferWithOutputCountGreaterThanOne_ScalesCorrectly()
         {
             var tree = Leaf(1, 5);

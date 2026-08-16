@@ -836,7 +836,13 @@ namespace GW2CraftingHelper.Views.Rendering
                         : "A vendor cost item's instant-buy price is unavailable - its buy-order price is used");
             }
 
-            if (node.Decision == CraftingDecision.Unknown && !string.IsNullOrEmpty(node.AcquisitionHint))
+            // guildupgrade-ingredients fix: a GuildUpgrade node's
+            // acquisition-hint-style explanation (see CraftingTreeBuilder's
+            // "GuildUpgrade" branch) shares this same tooltip line as the
+            // Unknown case - both are "no priceable source, here is why"
+            // text, just for a different reason.
+            if ((node.Decision == CraftingDecision.Unknown || node.Decision == CraftingDecision.GuildUpgrade) &&
+                !string.IsNullOrEmpty(node.AcquisitionHint))
             {
                 extraTooltipLines.Add(node.AcquisitionHint);
             }
@@ -1202,6 +1208,45 @@ namespace GW2CraftingHelper.Views.Rendering
                         tooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
                             ? node.AcquisitionHint
                             : "No known acquisition source";
+                    }
+                    // guildupgrade-ingredients fix: the GUILD UPGRADE pill
+                    // is the same "no available source" situation as
+                    // UNKNOWN above (not "exactly one feasible source" -
+                    // "Only available source" would be equally misleading
+                    // here), just with its own always-populated
+                    // AcquisitionHint (see CraftingTreeBuilder's
+                    // "GuildUpgrade" branch) instead of a seeded wiki hint.
+                    else if (node.Decision == CraftingDecision.GuildUpgrade)
+                    {
+                        tooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
+                            ? node.AcquisitionHint
+                            : "Requires a claimed Guild Hall upgrade";
+                    }
+                    // Adversarial-review fix (guildupgrade-ingredients,
+                    // second pass): the UNRECOGNIZED pill (node.Decision ==
+                    // UnrecognizedIngredient - an ingredient type this
+                    // module does not recognize at all) is the same
+                    // "no available source" situation as UNKNOWN/GUILD
+                    // UPGRADE above, not "exactly one feasible source" -
+                    // without this branch it fell into the misleading
+                    // "Only available source" default below.
+                    // CraftingTreeBuilder's UnrecognizedIngredient branch
+                    // returns before ApplyAcquisitionHint ever runs, so
+                    // node.AcquisitionHint is always null here - no ternary
+                    // needed, unlike the Unknown/GuildUpgrade branches above.
+                    else if (node.Decision == CraftingDecision.UnrecognizedIngredient)
+                    {
+                        tooltipText = "Unrecognized ingredient type - no known acquisition source";
+                    }
+                    // Adversarial-review fix (guildupgrade-ingredients,
+                    // final pass): the plain CURRENCY pill was falling into
+                    // the same misleading "Only available source" default -
+                    // a currency ingredient is paid from the wallet, not
+                    // sourced from a market/vendor/recipe at all, so there
+                    // is no "source" for this wording to describe.
+                    else if (node.Decision == CraftingDecision.Currency)
+                    {
+                        tooltipText = "Paid from your wallet as a game currency - no purchase or crafting source applies";
                     }
                     else
                     {

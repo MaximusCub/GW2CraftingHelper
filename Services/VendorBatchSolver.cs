@@ -360,6 +360,28 @@ namespace GW2CraftingHelper.Services
                             break;
                         }
                     }
+                    else
+                    {
+                        // Adversarial-review finding (2026-08-16, class-level
+                        // sibling of the recipe-ingredient Item-positive
+                        // sweep): an unrecognized CostLine.Type must never be
+                        // silently dropped from the fold above - doing so
+                        // would leave `priceable` true and cost this offer
+                        // as if the line were not there at all, understating
+                        // it and letting it win BuyFromVendor at a
+                        // fabricated-low price. VendorOfferLoader performs
+                        // no type validation at load and ref/vendor_offers.json
+                        // is tool-scraped, so a future third CostLine.Type
+                        // (today only "Currency"/"Item" appear) reaches this
+                        // loop directly, the same way "GuildUpgrade" reached
+                        // the recipe-ingredient guards this mirrors. Mirrors
+                        // the Item-with-no-price branch immediately above:
+                        // treat the whole offer as unpriceable rather than
+                        // guess at a cost for a cost-line shape this solver
+                        // has never seen.
+                        priceable = false;
+                        break;
+                    }
                 }
 
                 if (!priceable)

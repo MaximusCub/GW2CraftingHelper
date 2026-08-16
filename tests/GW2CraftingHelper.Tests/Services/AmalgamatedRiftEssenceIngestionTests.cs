@@ -35,6 +35,12 @@ namespace GW2CraftingHelper.Tests.Services
     /// so this test also proves the row round-trips through the real seed
     /// JSON shape correctly - not just that RecipeService's in-memory model
     /// can represent it.
+    ///
+    /// Also covers the guildupgrade-ingredients fix (docs/KNOWN-ISSUES.md):
+    /// this same schema-versioning fix incidentally revealed a second,
+    /// previously-unmodeled ingredient type ("GuildUpgrade", a Guild
+    /// Decoration recipe's claimed-guild-hall-upgrade requirement) through
+    /// the exact same production pipeline - see the tests below.
     /// </summary>
     public class AmalgamatedRiftEssenceIngestionTests
     {
@@ -177,31 +183,23 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task GuildUpgradeIngredient_DiscoveredByTheSameSchemaFix_DoesNotThrow()
+        public async Task GuildUpgradeIngredient_NeverPricedAsItemOrCurrency_DisplaysAsUnresolvedGuildUpgrade()
         {
-            // Adversarial-review finding from this same fix (out of scope
-            // to actually FIX - see docs/KNOWN-ISSUES.md's own entry): the
-            // versioned schema pinned by this fix does not only reveal
-            // Currency ingredients - it also folds an UNVERSIONED response's
-            // separate top-level "guild_ingredients" array directly into
-            // "ingredients" as a new "GuildUpgrade" ingredient type this
-            // module has never modeled (verified live: recipe 9917's real
-            // seed row, ref/recipes_seed.json, now carries a
-            // {"type":"GuildUpgrade","id":279,"count":1} ingredient that
-            // was previously silently dropped entirely, both before and
-            // after this fix - the module has never read
-            // "guild_ingredients"). PlanSolver has no "GuildUpgrade" arm
-            // (only "Currency" short-circuits to a free leaf) and
-            // CraftingTreeBuilder buckets ANY non-"Item" type as a display
-            // Currency leaf - so this ingredient ends up priced as
-            // unavailable (contributes 0, like an unvalued Currency) and
-            // displayed with the generic "Currency" fallback name
-            // (Gw2Constants.ResolveCurrencyName has no entry for a guild
-            // upgrade id and falls back to the literal string "Currency").
-            // This test exists purely to PROVE that mislabeling is
-            // cosmetic, not a crash: the real seed row for a genuine
-            // Guild Decoration recipe must flow through the full pipeline
-            // without throwing.
+            // guildupgrade-ingredients fix (docs/KNOWN-ISSUES.md): the
+            // versioned schema pinned by the recipe-ingestion fix does not
+            // only reveal Currency ingredients - it also folds an
+            // UNVERSIONED response's separate top-level "guild_ingredients"
+            // array directly into "ingredients" as a "GuildUpgrade"
+            // ingredient type (verified live: recipe 9917's real seed row,
+            // ref/recipes_seed.json, carries a
+            // {"type":"GuildUpgrade","id":279,"count":1} ingredient).
+            // Before this fix, PlanSolver.Evaluate's ingredient loop only
+            // special-cased "Currency", so a GuildUpgrade ingredient fell
+            // through to the item-pricing path and was priced as whatever
+            // TP item happened to share its numeric id - a real mis-costing
+            // bug, not just a cosmetic display gap. A TP price is
+            // deliberately seeded here for id 279 (the exact "shares that
+            // numeric id" collision) to prove it is no longer consulted.
             var recipes = new Dictionary<int, RawRecipe>
             {
                 {
@@ -231,10 +229,18 @@ namespace GW2CraftingHelper.Tests.Services
             var seededStore = BuildSeededStore(recipes, searches);
             var fallbackApi = new InMemoryRecipeApiClient();
 
+            // buyUnitPrice/sellUnitPrice set equal on each line (rather
+            // than distinct values) so the effective per-unit cost under
+            // PriceBasis.InstantBuy is unambiguous regardless of which of
+            // the two the solver's GetUnitPrice reads.
             var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(70454, buyUnitPrice: 1000, sellUnitPrice: 2000);
-            priceApi.AddPrice(24356, buyUnitPrice: 10, sellUnitPrice: 20);
-            priceApi.AddPrice(24350, buyUnitPrice: 10, sellUnitPrice: 20);
+            priceApi.AddPrice(70454, buyUnitPrice: 1000, sellUnitPrice: 1000);
+            priceApi.AddPrice(24356, buyUnitPrice: 10, sellUnitPrice: 10);
+            priceApi.AddPrice(24350, buyUnitPrice: 10, sellUnitPrice: 10);
+            // Deliberately mispriced "collision" - id 279 is a guild
+            // upgrade id, not the id of this absurdly expensive TP item.
+            // The fix must never look this up.
+            priceApi.AddPrice(279, buyUnitPrice: 999999, sellUnitPrice: 999999);
 
             var itemApi = new InMemoryItemApiClient();
             itemApi.AddItem(75375, "Guild Decoration", "icon.png");
@@ -250,13 +256,102 @@ namespace GW2CraftingHelper.Tests.Services
                 75375, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
 
-            // Does not throw, and the tree completes with the guild-upgrade
-            // ingredient present (as a Currency-labeled leaf - the known,
-            // documented, out-of-scope cosmetic gap).
+            // The recipe is still fully craftable (M33 "hasComponents"
+            // guarantee, same as an all-unvalued-currency recipe) - a
+            // GuildUpgrade ingredient does not disqualify the recipe.
             Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
             var guildNode = result.CraftingTree.Children.Single(c => c.ItemId == 279);
-            Assert.Equal(CraftingDecision.Currency, guildNode.Decision);
+
+            // Distinct decision from Currency (see CraftingDecision.
+            // GuildUpgrade's own doc comment), a generic ID-free display
+            // name (repo invariant: IDs are never displayed), and no
+            // priced cost cell at all - never Currency's literal "Currency"
+            // fallback name.
+            Assert.Equal(CraftingDecision.GuildUpgrade, guildNode.Decision);
+            Assert.Equal("Guild upgrade (unresolved)", guildNode.Name);
             Assert.Equal(1, guildNode.Quantity);
+            Assert.Null(guildNode.SubtreeCost);
+
+            // The root's REAL cost is exactly the 3 item ingredients' TP
+            // price sum (1000 + 500 + 500 = 2000) - the bogus 999999-copper
+            // "price" for id 279 must never leak in.
+            Assert.Equal(2000, result.CraftingTree.SubtreeCost);
+            Assert.Contains(result.Plan.Steps, s =>
+                s.ItemId == 75375 && s.Source == AcquisitionSource.Craft && s.TotalCost == 2000);
+            Assert.DoesNotContain(result.Plan.Steps, s => s.ItemId == 279);
+            Assert.Empty(result.Plan.CurrencyCosts);
+        }
+
+        [Fact]
+        public async Task GuildUpgradeIngredient_RealRecipe12002Shape_CraftsAtItemIngredientCostOnly()
+        {
+            // The exact real seed row (ref/recipes_seed.json, verified live
+            // via api.guildwars2.com/v2/recipes/12002?v=2026-08-15): a Guild
+            // Decoration recipe needing 1x a real crafting item plus 5x
+            // guild upgrade id 829 - the audit's own reference shape for
+            // this fix.
+            var recipes = new Dictionary<int, RawRecipe>
+            {
+                {
+                    12002, new RawRecipe
+                    {
+                        Id = 12002,
+                        OutputItemId = 80471,
+                        OutputItemCount = 1,
+                        Ingredients = new List<RawIngredient>
+                        {
+                            new RawIngredient { Type = "Item", Id = 70489, Count = 1 },
+                            new RawIngredient { Type = "GuildUpgrade", Id = 829, Count = 5 }
+                        },
+                        Disciplines = new List<string> { "Scribe" },
+                        MinRating = 350,
+                        Flags = new List<string> { "AutoLearned" }
+                    }
+                }
+            };
+            var searches = new Dictionary<int, IReadOnlyList<int>>
+            {
+                { 80471, new List<int> { 12002 } }
+            };
+
+            var seededStore = BuildSeededStore(recipes, searches);
+            var fallbackApi = new InMemoryRecipeApiClient();
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(70489, buyUnitPrice: 250, sellUnitPrice: 250);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(80471, "Guild Decoration", "icon.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(fallbackApi, cacheStore: seededStore),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var result = await pipeline.GenerateStructuredAsync(
+                80471, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
+            Assert.Equal(12002, result.CraftingTree.RecipeId);
+            Assert.Equal(2, result.CraftingTree.Children.Count);
+
+            var itemChild = result.CraftingTree.Children.Single(c => c.ItemId == 70489);
+            Assert.Equal(CraftingDecision.BuyFromTp, itemChild.Decision);
+            Assert.Equal(1, itemChild.Quantity);
+
+            var guildChild = result.CraftingTree.Children.Single(c => c.ItemId == 829);
+            Assert.Equal(CraftingDecision.GuildUpgrade, guildChild.Decision);
+            Assert.Equal(5, guildChild.Quantity);
+            Assert.Equal("Guild upgrade (unresolved)", guildChild.Name);
+            Assert.Null(guildChild.SubtreeCost);
+            Assert.Empty(guildChild.Children);
+
+            // Root cost is the item ingredient's price alone.
+            Assert.Equal(250, result.CraftingTree.SubtreeCost);
+            Assert.Empty(result.Plan.CurrencyCosts);
         }
     }
 }

@@ -410,6 +410,336 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void CurrencyNode_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides()
+        {
+            // Adversarial-review finding (guildupgrade-ingredients, Must
+            // Fix): mirrors
+            // GuildUpgradeNode_NeverResolvesIconOrRarityViaItemMetadata_
+            // EvenWhenIdCollides below - `metadata` (the ItemMetadata dict
+            // every Item node's IconUrl/Rarity is looked up from, keyed by
+            // raw ingredient id) happens to carry a genuine entry for the
+            // SAME numeric id as this Currency ingredient. Not merely
+            // hypothetical: id 24 is both a real vendor-offer outputItemId
+            // in ref/vendor_offers.json and a KnownCurrencyNames key
+            // ("Pristine Fractal Relics"), and CraftingPlanPipeline's
+            // metadataIds unions step item ids (among other sources) into
+            // the same dict handed to this builder, so a genuine item-24
+            // entry reaching `metadata` cannot be ruled out. Both IconUrl
+            // and Rarity must stay clear of the item-keyed lookup so an
+            // unrelated item's icon and rarity color can never render
+            // under a currency's name.
+            var node = Leaf(24, 5, "Currency");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = new Dictionary<int, ItemMetadata>
+            {
+                { 24, new ItemMetadata { ItemId = 24, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.Currency, treeNode.Decision);
+            Assert.NotEqual("wrong.png", treeNode.IconUrl);
+            Assert.Null(treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
+        }
+
+        [Fact]
+        public void CurrencyNode_IconResolvedFromCurrencyMetadata_NotItemMetadata()
+        {
+            // Positive half of the fix above: a Currency leaf's IconUrl now
+            // comes from CurrencyDisplayResolver (currency-domain,
+            // currencyMetadata-keyed) rather than staying at whatever the
+            // generic item-keyed ResolveIcon lookup produced for this id.
+            var node = Leaf(61, 5, "Currency");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+            var currencyMetadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 61, new CurrencyMetadata { CurrencyId = 61, Name = "Research Note", IconUrl = "note.png" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, currencyMetadata: currencyMetadata);
+
+            Assert.Equal(CraftingDecision.Currency, treeNode.Decision);
+            Assert.Equal("note.png", treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
+        }
+
+        // ---- guildupgrade-ingredients fix: "GuildUpgrade" ingredient type ----
+        // (Guild Decoration recipes' claimed-guild-hall-upgrade requirement,
+        // GW2 API ingredient type - see the real recipe 12002 -> item 80471
+        // shape captured in ref/recipes_seed.json). Deliberately NOT bucketed
+        // as CraftingDecision.Currency (see that enum's own doc comment): a
+        // guild upgrade id and a wallet currency id are distinct id spaces
+        // with no defined relationship to each other, and treating one as
+        // the other on the strength of a numeric match would risk silently
+        // showing the wrong name, price, icon, or rarity on any collision.
+
+        [Fact]
+        public void GuildUpgradeNode_DecisionIsGuildUpgrade_WithGenericLabelAndHint_NoRawId()
+        {
+            var node = Leaf(829, 5, "GuildUpgrade");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.GuildUpgrade, treeNode.Decision);
+            Assert.Equal(829, treeNode.ItemId); // internal only - never rendered, see repo invariant
+            Assert.Equal(5, treeNode.Quantity);
+            Assert.False(treeNode.IsReferenceBranch);
+            Assert.Empty(treeNode.Children);
+            Assert.Null(treeNode.SubtreeCost);
+            // The displayed name must never leak the raw id (repo invariant:
+            // IDs are internal-only) - unlike the Currency branch's
+            // Gw2Constants.ResolveCurrencyName fallback, this never even
+            // attempts a currency-domain lookup.
+            Assert.Equal("Guild upgrade (unresolved)", treeNode.Name);
+            Assert.DoesNotContain("829", treeNode.Name);
+            Assert.False(string.IsNullOrEmpty(treeNode.AcquisitionHint));
+            Assert.Null(treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
+        }
+
+        [Fact]
+        public void GuildUpgradeNode_NeverResolvesViaCurrencyMetadata_EvenWhenIdCollides()
+        {
+            // Adversarial case: currencyMetadata happens to carry an entry
+            // for the SAME numeric id as this GuildUpgrade ingredient - a
+            // guild upgrade id and a wallet currency id are distinct id
+            // spaces with no defined relationship to each other, so a
+            // numeric match is possible in principle even though none is
+            // present in the current seed. The fix must never consult
+            // currencyMetadata for a GuildUpgrade node at all -
+            // CurrencyDisplayResolver.ResolveName is only ever called from
+            // the Currency branch, never this one.
+            var node = Leaf(73, 1, "GuildUpgrade");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+            var currencyMetadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 73, new CurrencyMetadata { CurrencyId = 73, Name = "Unrelated Wallet Currency", IconUrl = "wrong.png" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, currencyMetadata: currencyMetadata);
+
+            Assert.Equal(CraftingDecision.GuildUpgrade, treeNode.Decision);
+            Assert.Equal("Guild upgrade (unresolved)", treeNode.Name);
+            Assert.NotEqual("Unrelated Wallet Currency", treeNode.Name);
+        }
+
+        [Fact]
+        public void GuildUpgradeNode_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides()
+        {
+            // Adversarial-review finding: `metadata` (the ItemMetadata
+            // dict every OTHER node's IconUrl/Rarity is looked up from,
+            // keyed by raw ingredient id) happens to carry a genuine entry
+            // for the SAME numeric id as this GuildUpgrade ingredient. The
+            // dict handed to CraftingTreeBuilder is not populated by
+            // CollectTreeItemIds alone - CraftingPlanPipeline's
+            // metadataIds also unions step item ids, the target item id,
+            // used-material ids, and vendor cost-component ids - so this
+            // shape is not merely hypothetical. Both IconUrl and Rarity
+            // must stay null so an unrelated item's icon and rarity color
+            // can never render under the "Guild upgrade (unresolved)"
+            // label - the same wrong-domain class the Name fix above
+            // already closes.
+            var node = Leaf(829, 5, "GuildUpgrade");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = new Dictionary<int, ItemMetadata>
+            {
+                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.GuildUpgrade, treeNode.Decision);
+            Assert.Equal("Guild upgrade (unresolved)", treeNode.Name);
+            Assert.Null(treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
+        }
+
+        [Fact]
+        public void IgnoredItemIds_GuildUpgradeNode_NeverCollapsedByIgnore()
+        {
+            // Mirrors IgnoredItemIds_CurrencyNode_NeverCollapsedByIgnore
+            // above: Ignore is scoped to Item nodes only (M34-B2b) - a
+            // GuildUpgrade node sharing the same numeric id must keep its
+            // normal GuildUpgrade treatment, never collapse to Have.
+            var node = Leaf(829, 5, "GuildUpgrade");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+            var ignoredItemIds = new HashSet<int> { 829 };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, ignoredItemIds: ignoredItemIds);
+
+            Assert.Equal(CraftingDecision.GuildUpgrade, treeNode.Decision);
+            Assert.False(treeNode.IsIgnored);
+        }
+
+        // ---- Class-level follow-up (adversarial review, guildupgrade-
+        // ingredients): line 177's non-Item branch used to read
+        // `!= "Item"`, silently labeling ANY unrecognized ingredient type
+        // as CraftingDecision.Currency via CurrencyDisplayResolver - the
+        // exact wrong-domain mislabel the GuildUpgrade branch above exists
+        // to avoid, just one catch-all wider. It is now scoped to the
+        // literal string "Currency"; anything else falls through to its own
+        // dedicated CraftingDecision.UnrecognizedIngredient leaf. These
+        // tests use a made-up type string ("MysteryIngredientType") to
+        // prove the general fallthrough, not just the "GuildUpgrade"
+        // instance covered above.
+        //
+        // Second adversarial-review pass: this leaf used to share
+        // CraftingDecision.Unknown with a genuine no-source "Item" node,
+        // which meant it also picked up DecisionPillPlanner's interactive
+        // IGNORE pill - keyed by TreeSectionController on this node's raw
+        // non-item ItemId, reopening the exact instance-vs-class id-space
+        // gap this whole fix exists to close, one layer up in the pill
+        // rendering. See CraftingDecision.UnrecognizedIngredient's own doc
+        // comment for the full explanation; UnrecognizedIngredientType_
+        // NeverGetsIgnorePill_EvenThoughDecisionLooksLikeNoSource below is
+        // the direct regression test for that finding.
+
+        [Fact]
+        public void UnrecognizedIngredientType_DecisionIsUnrecognizedIngredient_NeverMislabeled()
+        {
+            var node = Leaf(829, 5, "MysteryIngredientType");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.UnrecognizedIngredient, treeNode.Decision);
+            Assert.NotEqual(CraftingDecision.Currency, treeNode.Decision);
+            Assert.NotEqual(CraftingDecision.GuildUpgrade, treeNode.Decision);
+            Assert.NotEqual(CraftingDecision.Unknown, treeNode.Decision);
+        }
+
+        [Fact]
+        public void UnrecognizedIngredientType_NeverGetsIgnorePill_EvenThoughDecisionLooksLikeNoSource()
+        {
+            // Direct regression test for the reintroduced instance-vs-class
+            // gap: DecisionPillPlanner.BuildPillSpecs must route this node
+            // to the same single-locked-pill short-circuit Currency and
+            // GuildUpgrade get, never the options.Count == 0 branch that
+            // appends the interactive IGNORE pill for a genuine no-source
+            // "Item" node. Exercises the real production path end to end -
+            // CraftingTreeBuilder.BuildTree feeding directly into
+            // DecisionPillPlanner.BuildPillSpecs on the resulting node.
+            var node = Leaf(829, 5, "MysteryIngredientType");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+            var specs = DecisionPillPlanner.BuildPillSpecs(treeNode);
+
+            Assert.Single(specs);
+            Assert.Equal("UNRECOGNIZED", specs[0].Text);
+            Assert.Equal(PillKind.Locked, specs[0].Kind);
+            Assert.Null(specs[0].Source);
+            Assert.DoesNotContain(specs, s => s.Kind == PillKind.Ignore);
+        }
+
+        [Fact]
+        public void UnrecognizedIngredientType_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides()
+        {
+            // Mirrors CurrencyNode_NeverResolvesIconOrRarityViaItemMetadata_
+            // EvenWhenIdCollides and GuildUpgradeNode_
+            // NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides
+            // above - `metadata` and `hints` (both keyed by raw ingredient
+            // id in the ITEM domain) happen to carry genuine entries for
+            // the same numeric id as this unrecognized-type ingredient.
+            // Name, IconUrl, Rarity, AcquisitionHint and AcquisitionBadge
+            // must ALL stay clear of the item-keyed lookups set earlier in
+            // BuildNode / ApplyAcquisitionHint, even though this type falls
+            // through to its own dedicated UnrecognizedIngredient leaf
+            // rather than the ITEM-domain decision-found path - a collision
+            // leaking any one of the five would put an unrelated item's
+            // data (including its badge, the literal pill text
+            // DecisionPillPlanner renders) on a node this builder never
+            // identified as that item.
+            var node = Leaf(829, 5, "MysteryIngredientType");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = new Dictionary<int, ItemMetadata>
+            {
+                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+            };
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                { 829, new AcquisitionHint { ItemId = 829, Hint = "Salvage from unrelated item", Badge = "SALVAGE" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, hints);
+
+            Assert.Equal(CraftingDecision.UnrecognizedIngredient, treeNode.Decision);
+            Assert.Equal("Unrecognized ingredient type", treeNode.Name);
+            Assert.Null(treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
+            Assert.Null(treeNode.AcquisitionHint);
+            Assert.Null(treeNode.AcquisitionBadge);
+        }
+
+        [Fact]
+        public void UnrecognizedIngredientType_IgnoresStaleMemoEntry_EvenWhenOneExistsForThisNodeId()
+        {
+            // Class-level follow-up (guildupgrade-ingredients, adversarial
+            // review): the non-"Item" catch-all above sits BEFORE the
+            // decisions lookup now, matching where the GuildUpgrade and
+            // Currency branches sit, rather than only inside the "no
+            // decision found" branch. PlanSolver's Evaluate never actually
+            // memoizes a non-"Item" node today (see that method's
+            // Item-positive top guard), so this scenario - a `decisions`
+            // entry present for a "MysteryIngredientType" node's own NodeId
+            // - cannot occur via the real solver right now. This test
+            // proves the guard holds by this method's OWN construction
+            // regardless: even when handed a decision for this exact
+            // NodeId, the node must still take the UnrecognizedIngredient/
+            // "Unrecognized ingredient" leaf, never the decision-found
+            // path's ITEM-domain Name/IconUrl/Rarity - the same guarantee
+            // the GuildUpgrade and Currency branches already give their own
+            // known types.
+            var node = Leaf(829, 5, "MysteryIngredientType");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>
+            {
+                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } }
+            };
+            var metadata = new Dictionary<int, ItemMetadata>
+            {
+                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.UnrecognizedIngredient, treeNode.Decision);
+            Assert.NotEqual(CraftingDecision.BuyFromTp, treeNode.Decision);
+            Assert.Equal("Unrecognized ingredient type", treeNode.Name);
+            Assert.Null(treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
+            Assert.Null(treeNode.SubtreeCost);
+            Assert.Null(treeNode.UnitCost);
+        }
+
+        [Fact]
         public void MultiLevel_Tree_CorrectStructure()
         {
             // Root -> Craft(recipe 10) -> Intermediate -> Craft(recipe 20) -> Leaf(Buy)
