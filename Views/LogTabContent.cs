@@ -773,7 +773,7 @@ namespace GW2CraftingHelper.Views
         {
             string levelText = entry.Level.ToString().ToUpperInvariant();
             string tagPart = string.IsNullOrEmpty(entry.Tag) ? string.Empty : $"[{entry.Tag}] ";
-            return $"[{levelText}] {entry.TimestampUtc.ToLocalTime():HH:mm:ss} {tagPart}{entry.Message}";
+            return $"[{levelText}] {entry.TimestampUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss} {tagPart}{entry.Message}";
         }
 
         private static Color ColorForLevel(ModuleLogLevel level)

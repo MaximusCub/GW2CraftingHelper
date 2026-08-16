@@ -1046,7 +1046,7 @@ namespace GW2CraftingHelper
                 Interlocked.Exchange(ref _lastFailedRefreshAttemptTicks, 0);
                 if (snapshot != null)
                 {
-                    var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}";
+                    var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():MMM d, yyyy h:mm tt}";
                     SaveStatusThreadSafe(status);
                 }
                 // else: superseded by Clear Cache while this fetch was in
@@ -1076,7 +1076,7 @@ namespace GW2CraftingHelper
                 // popups are a separate, deferred UX call.
                 var classification = SnapshotFailureClassifier.Classify(ex);
                 string cause = StatusText.ForRefreshFailure(classification.Kind, classification.FailedSourceCount, classification.TotalSourceCount);
-                var status = $"{cause} \u2014 {DateTime.Now:t}";
+                var status = $"{cause} \u2014 {DateTime.Now:MMM d, yyyy h:mm tt}";
                 SaveStatusThreadSafe(status);
             }
             finally

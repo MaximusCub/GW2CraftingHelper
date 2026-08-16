@@ -243,7 +243,7 @@ namespace GW2CraftingHelper.Views
             {
                 _clearCache();
                 SetSnapshot(null);
-                var status = $"Cache Cleared \u2014 {DateTime.Now:t}";
+                var status = $"Cache Cleared \u2014 {DateTime.Now:MMM d, yyyy h:mm tt}";
                 SetStatus(status);
                 _saveStatus(status);
             };
@@ -526,7 +526,7 @@ namespace GW2CraftingHelper.Views
             {
                 var snapshot = await _refreshAsync();
                 string status = snapshot != null
-                    ? $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():t}"
+                    ? $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime():MMM d, yyyy h:mm tt}"
                     : null;
 
                 // Persist BEFORE marshaling, while still on this
@@ -581,7 +581,7 @@ namespace GW2CraftingHelper.Views
 
                 var classification = SnapshotFailureClassifier.Classify(ex);
                 string cause = StatusText.ForRefreshFailure(classification.Kind, classification.FailedSourceCount, classification.TotalSourceCount);
-                var status = $"{cause} \u2014 {DateTime.Now:t}";
+                var status = $"{cause} \u2014 {DateTime.Now:MMM d, yyyy h:mm tt}";
                 _saveStatusThreadSafe(status);
                 MainThreadMarshal.Run(() =>
                 {
