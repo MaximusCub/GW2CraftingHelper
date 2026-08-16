@@ -149,48 +149,91 @@ namespace GW2CraftingHelper.Services
                 // this takes precedence (only reachable when node.Recipes
                 // is ALSO non-empty - a vendor-only item with no recipe at
                 // all, the common real case, was never going to build a
-                // reference branch anyway). Null (fewer than 2 kinds, or
-                // not a BuyFromVendor decision at all) falls through to the
-                // existing reference-branch logic completely unchanged.
-                List<CraftingTreeNode> componentLeaves = decision.Source == AcquisitionSource.BuyFromVendor
+                // reference branch anyway). Null (fewer than 2 kinds, not a
+                // BuyFromVendor decision at all, or VendorComponentCostsUnreliable
+                // - see below) falls through to the existing reference-branch
+                // logic completely unchanged.
+                //
+                // W4B review-fix (Critical): VendorComponentCostsUnreliable
+                // (SolverDecision's own doc comment) is true whenever this
+                // occurrence's decision.VendorItemCosts/VendorCurrencyCosts
+                // are pre-merge numbers PlanSolver's AllocateVendorNodeCosts
+                // pass has since reallocated a DIFFERENT (corrected)
+                // TotalCost around - i.e. this item was needed via 2+ tree
+                // occurrences that merged into one true batched vendor
+                // purchase. Synthesizing a leaf from those stale numbers
+                // would show a component cost that no longer sums to (and
+                // can even exceed) this node's own corrected SubtreeCost -
+                // suppressing leaf synthesis entirely for that case keeps
+                // the parent-total-equals-sum-of-visible-parts guarantee
+                // exact rather than approximate. The node still shows its
+                // own correct (reallocated) SubtreeCost either way.
+                List<CraftingTreeNode> componentLeaves = decision.Source == AcquisitionSource.BuyFromVendor &&
+                    !decision.VendorComponentCostsUnreliable
                     ? BuildVendorCostComponentLeaves(
                         node.NodeId, decision, metadata, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts)
                     : null;
 
+                // Reference branch: gw2e's "what it would cost to craft
+                // instead" - informational, not an actual crafting step, so
+                // it is built from recipe[0] (the deterministic first
+                // option) rather than a "chosen" recipe, since nothing was
+                // crafted here. PlanSolver.Evaluate always walks every
+                // recipe's ingredients to get a comparison value, even for a
+                // node it ultimately decides to buy, so those ingredients'
+                // decisions already exist in the dict - safe to recurse into
+                // here.
+                //
+                // Capped to AT MOST ONE reference branch per root-to-leaf
+                // path: everything built below here passes
+                // insideReferenceBranch=true, which blocks starting another
+                // one no matter how many further Craft/Buy-with-recipe
+                // decisions alternate beneath it. A naive "reset to
+                // not-inside on every Craft step" cap (tried first) does NOT
+                // bound this: GW2 crafting data very commonly alternates
+                // buyable-with-a-recipe <-> craft <-> buyable-with-a-recipe
+                // down a chain, and node.Recipes here is the FULL
+                // alternate-recipe graph the upstream RecipeService already
+                // expanded for every option (not just the solver's chosen
+                // path, which is all this builder walked before) - letting
+                // reference branches restart at every such alternation
+                // measured as an effectively unbounded hang on a real deep
+                // item (Deldrimor Steel Ingot) during manual verification.
+                bool wantsReferenceBranch = !insideReferenceBranch &&
+                    (decision.Source == AcquisitionSource.BuyFromTp ||
+                     decision.Source == AcquisitionSource.BuyFromVendor) &&
+                    node.Recipes.Count > 0;
+
                 if (componentLeaves != null)
                 {
+                    // W4B review-fix (Must Fix): a vendor node whose cost
+                    // ALSO has a recipe (so it would otherwise get a
+                    // reference branch) must not silently lose that
+                    // comparison just because it also got component leaves
+                    // - STACK them instead of picking one, component leaves
+                    // first so TreeSectionController's
+                    // `Children[0].IsCostComponent` cost-cell-suppression
+                    // check (unchanged, still correct) keeps working. The
+                    // reference-branch ingredients are appended as
+                    // additional, ordinary children - IsReferenceBranch is
+                    // purely informational today (not read by any renderer;
+                    // dimming already comes from node.Decision != Craft
+                    // uniformly for every child, component leaf or not), so
+                    // mixing the two lists is safe.
+                    if (wantsReferenceBranch)
+                    {
+                        var referenceChildren = BuildChildren(
+                            node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true,
+                            ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId, ignoredItemIds: ignoredItemIds,
+                            currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
+                            ownedVendorItemAmounts: ownedVendorItemAmounts);
+                        componentLeaves.AddRange(referenceChildren);
+                        treeNode.IsReferenceBranch = true;
+                    }
                     treeNode.Children = componentLeaves;
                 }
-                else if (!insideReferenceBranch &&
-                         (decision.Source == AcquisitionSource.BuyFromTp ||
-                          decision.Source == AcquisitionSource.BuyFromVendor) &&
-                         node.Recipes.Count > 0)
+                else if (wantsReferenceBranch)
                 {
-                    // Reference branch: gw2e's "what it would cost to craft
-                    // instead" - informational, not an actual crafting step, so
-                    // it is built from recipe[0] (the deterministic first
-                    // option) rather than a "chosen" recipe, since nothing was
-                    // crafted here. PlanSolver.Evaluate always walks every
-                    // recipe's ingredients to get a comparison value, even for a
-                    // node it ultimately decides to buy, so those ingredients'
-                    // decisions already exist in the dict - safe to recurse into
-                    // here.
-                    //
-                    // Capped to AT MOST ONE reference branch per root-to-leaf
-                    // path: everything built below here passes
-                    // insideReferenceBranch=true, which blocks starting another
-                    // one no matter how many further Craft/Buy-with-recipe
-                    // decisions alternate beneath it. A naive "reset to
-                    // not-inside on every Craft step" cap (tried first) does NOT
-                    // bound this: GW2 crafting data very commonly alternates
-                    // buyable-with-a-recipe <-> craft <-> buyable-with-a-recipe
-                    // down a chain, and node.Recipes here is the FULL
-                    // alternate-recipe graph the upstream RecipeService already
-                    // expanded for every option (not just the solver's chosen
-                    // path, which is all this builder walked before) - letting
-                    // reference branches restart at every such alternation
-                    // measured as an effectively unbounded hang on a real deep
-                    // item (Deldrimor Steel Ingot) during manual verification.
                     treeNode.Children = BuildChildren(
                         node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true,
                         ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId, ignoredItemIds: ignoredItemIds,

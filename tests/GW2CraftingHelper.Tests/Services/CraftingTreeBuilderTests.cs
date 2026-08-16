@@ -1291,5 +1291,169 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.True(leaf.NodeId < 0);
             }
         }
+
+        // ---- W4B review-fix round (2026-08-15): Critical/Must Fix findings ----
+
+        /// <summary>
+        /// W4B review-fix (Critical): item 500 is needed via TWO separate
+        /// tree occurrences (under items 2 and 3), each demanding 6 units,
+        /// from a single mixed item+currency vendor offer (OutputCount 15,
+        /// no raw coin). PlanSolver.Collect merges both occurrences into
+        /// ONE vendor step (same stepKey: (500, BuyFromVendor, 0)), and
+        /// AllocateVendorNodeCosts then reallocates that step's corrected
+        /// total back across the two occurrences - but
+        /// decision.VendorItemCosts/VendorCurrencyCosts stay the STALE,
+        /// per-occurrence-local numbers EvaluateVendorOffers originally
+        /// captured (30 gold each, 60 total - nearly double the real
+        /// merged 30-gold total). Before the fix, each occurrence's node
+        /// rendered a component leaf showing that stale 30-gold value even
+        /// though the node's own (correctly reallocated) SubtreeCost was
+        /// only 12 or 18. Leaf synthesis must be suppressed for BOTH
+        /// occurrences.
+        /// </summary>
+        [Fact]
+        public void MultiOccurrence_MergedMixedVendorOffer_SuppressesComponentLeaves_ParentStaysConsistent()
+        {
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1,
+                    Craftable(2, 1, Option(11, 1, 1, Leaf(500, 6))),
+                    Craftable(3, 1, Option(12, 1, 1, Leaf(500, 6)))));
+
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+            };
+            var offer = ItemAndCurrencyVendorOffer(
+                500, new[] { (42, 3) }, new[] { (23, 5) }, coinCost: 0, outputCount: 15);
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 500, new List<VendorOffer> { offer } }
+            };
+            var metadata = Meta(
+                (1, "Root", "r.png"),
+                (2, "Sub A", "a.png"),
+                (3, "Sub B", "b.png"),
+                (42, "Glob of Ectoplasm", "ecto.png"));
+
+            var solver = new PlanSolver();
+            var solveResult = solver.Solve(tree, prices, vendorOffers);
+
+            var builder = new CraftingTreeBuilder();
+            var root = builder.BuildTree(tree, solveResult.Decisions, metadata);
+
+            var subA = root.Children.Single(c => c.ItemId == 2);
+            var subB = root.Children.Single(c => c.ItemId == 3);
+            var leafA = subA.Children.Single(c => c.ItemId == 500);
+            var leafB = subB.Children.Single(c => c.ItemId == 500);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, leafA.Decision);
+            Assert.Equal(CraftingDecision.BuyFromVendor, leafB.Decision);
+
+            // No leaves for either occurrence - the pre-fix bug synthesized
+            // a stale 30-gold leaf under EACH occurrence.
+            Assert.Empty(leafA.Children);
+            Assert.Empty(leafB.Children);
+
+            // Sanity: this really did merge into ONE true batch
+            // (ceil(12/15)=1), not two independently-ceil'd purchases
+            // (which would have been 2 * 30 = 60) - proves the scenario
+            // actually exercises the merge path this test targets.
+            var step = solveResult.Plan.Steps.Single(s => s.ItemId == 500);
+            Assert.Equal(30, step.TotalCost);
+
+            // The node's own reallocated SubtreeCost must still sum
+            // exactly to the real merged PlanStep total - the guarantee
+            // that matters once there is no leaf breakdown to cross-check
+            // against.
+            Assert.True(leafA.SubtreeCost.HasValue);
+            Assert.True(leafB.SubtreeCost.HasValue);
+            Assert.Equal(step.TotalCost, leafA.SubtreeCost.Value + leafB.SubtreeCost.Value);
+        }
+
+        /// <summary>
+        /// W4B review-fix (Must Fix): kindCount in
+        /// BuildVendorCostComponentLeaves counts by
+        /// decision.VendorCurrencyCosts.Count &gt; 0 (a boolean per KIND),
+        /// not per distinct currency id - so an offer spanning 3 different
+        /// non-coin currencies (and nothing else) is still just ONE kind
+        /// and must get NO leaves, exactly like the existing single-
+        /// currency case (SingleKindVendorOffer_CurrencyOnly_NoLeaves).
+        /// Locks down the kindCount-is-per-list-not-per-line design choice
+        /// against a future refactor silently flipping it.
+        /// </summary>
+        [Fact]
+        public void SingleKindVendorOffer_ThreeDistinctCurrencies_NoItemNoCoin_CountsAsSingleKind_NoLeaves()
+        {
+            var tree = Leaf(1, 2);
+            var prices = new Dictionary<int, ItemPrice>();
+            var offer = ItemAndCurrencyVendorOffer(
+                1, itemCostLines: null,
+                currencyCostLines: new[] { (23, 3), (24, 5), (25, 7) });
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var metadata = Meta((1, "Vendor Item", "v.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.Empty(node.Children);
+        }
+
+        /// <summary>
+        /// W4B review-fix (Must Fix): a BuyFromVendor node whose winning
+        /// offer ALSO has 2+ cost kinds AND a known recipe must not
+        /// silently lose gw2e's "what it would cost to craft instead"
+        /// comparison just because it also got component leaves - the two
+        /// STACK (component leaves first, so TreeSectionController's
+        /// Children[0].IsCostComponent cost-cell check keeps working; the
+        /// reference-branch ingredients appended after as plain,
+        /// non-component children). Item 99's price (100000) is deliberately
+        /// far pricier than the vendor offer (70) so the vendor decision is
+        /// unambiguous regardless of the recipe's exact quantity scaling.
+        /// </summary>
+        [Fact]
+        public void MixedOfferNode_AlsoHasRecipe_StacksComponentLeavesThenReferenceBranch()
+        {
+            var tree = Craftable(1, 2,
+                Option(50, 1, 1, Leaf(99, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } },
+                { 99, new ItemPrice { ItemId = 99, BuyInstant = 100000 } }
+            };
+            // Item + raw coin (no currency line) - 2 kinds (item, coin),
+            // avoiding an unvalued-currency fallback tier so the vendor
+            // offer stays directly comparable against the (much pricier)
+            // craft cost.
+            var offer = ItemAndCurrencyVendorOffer(
+                1, new[] { (42, 5) }, currencyCostLines: null, coinCost: 20);
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } }
+            };
+            var metadata = Meta(
+                (1, "Vendor+Recipe Item", "v.png"),
+                (42, "Glob of Ectoplasm", "ecto.png"),
+                (99, "Filler", "f.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.True(node.IsReferenceBranch);
+            Assert.Equal(2, node.Children.Count);
+
+            // Component leaf first...
+            Assert.True(node.Children[0].IsCostComponent);
+            Assert.Equal(42, node.Children[0].ItemId);
+
+            // ...then the reference-branch ingredient, a plain
+            // (non-component) child - not silently dropped.
+            var refChild = node.Children[1];
+            Assert.False(refChild.IsCostComponent);
+            Assert.Equal(99, refChild.ItemId);
+            Assert.Equal(CraftingDecision.BuyFromTp, refChild.Decision);
+        }
     }
 }

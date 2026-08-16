@@ -78,6 +78,15 @@ namespace GW2CraftingHelper.Models
         // recipe, so Children holds gw2e's "what it would cost to craft
         // instead" reference branch rather than an actual crafting step.
         // The view renders these dimmed and collapsed by default.
+        //
+        // W4B review-fix: for a BuyFromVendor node that ALSO synthesized
+        // cost-component leaves (IsCostComponent children), Children is a
+        // STACK of both - the component leaves first, then the reference
+        // branch's own recipe ingredients appended after (see
+        // CraftingTreeBuilder.BuildNode) - not one or the other. This flag
+        // still means exactly "Children includes the reference-branch
+        // ingredients", just no longer implies Children is EXCLUSIVELY the
+        // reference branch in that mixed case.
         public bool IsReferenceBranch { get; set; }
 
         // W4B (vendor cost-component leaves): true only for a DISPLAY-ONLY

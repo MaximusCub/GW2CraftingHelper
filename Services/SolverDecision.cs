@@ -39,6 +39,18 @@ namespace GW2CraftingHelper.Services
         // doc comment for why).
         public bool VendorHasRawCoin { get; internal set; }
 
+        // W4B review-fix (Critical): true when this decision's
+        // VendorCurrencyCosts/VendorItemCosts are stale relative to the
+        // corrected TotalCost above - set only when PlanSolver.Solve's
+        // AllocateVendorNodeCosts pass has reallocated a merged vendor
+        // step's true cost across 2+ tree occurrences of the same item (see
+        // PlanSolver.FlagUnreliableVendorComponentCosts' own doc comment).
+        // CraftingTreeBuilder reads this to suppress cost-component leaf
+        // synthesis whenever it is true, rather than display a component
+        // number that can no longer be proven to sum to this decision's own
+        // (corrected) TotalCost.
+        public bool VendorComponentCostsUnreliable { get; internal set; }
+
         // Which acquisition paths were feasible for this node, independent
         // of which one was chosen. Drives the per-node override UI.
         //
