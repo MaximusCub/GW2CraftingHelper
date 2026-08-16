@@ -424,9 +424,13 @@ namespace GW2CraftingHelper.Views.Rendering
                     var s = _treeNodeStates[i];
                     if (!s.ChildrenBuilt)
                     {
-                        foreach (var child in s.Node.Children)
+                        int captionSplitIndex = ReceiptCaptionHelper.ComputeCaptionSplitIndex(s.Node);
+                        for (int childIndex = 0; childIndex < s.Node.Children.Count; childIndex++)
                         {
-                            RenderTreeNode(child, s.ChildContainer, _getCurrentPanelWidth(), s.Depth + 1, s.ChildDimmed);
+                            string childCaption = ReceiptCaptionHelper.CaptionForChildIndex(captionSplitIndex, childIndex);
+                            RenderTreeNode(
+                                s.Node.Children[childIndex], s.ChildContainer, _getCurrentPanelWidth(),
+                                s.Depth + 1, s.ChildDimmed, childCaption);
                         }
                         s.ChildrenBuilt = true;
                     }
@@ -574,7 +578,16 @@ namespace GW2CraftingHelper.Views.Rendering
         // CurrencyMetadata; PreserveScrollAcross(...) ->
         // _preserveScrollAcross(...); GetCurrentPanelWidth() ->
         // _getCurrentPanelWidth().
-        private void RenderTreeNode(CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, bool dimmed)
+        // UI-bundle milestone: captionText is the sanctioned tooltip
+        // fallback for Feature C (receipt/what-if captions) - see
+        // ReceiptCaptionHelper's own doc comment for why a real extra ROW
+        // is not used (frozen PlanContentHeightMath tree-height math counts
+        // exactly node.Children.Count rows per level). null for every node
+        // except the first child of each group under a node whose Children
+        // stack cost-component leaves + a reference branch - see the three
+        // call sites that compute it via ReceiptCaptionHelper.
+        private void RenderTreeNode(
+            CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, bool dimmed, string captionText = null)
         {
             int indent = depth * TreeIndentPer;
             bool hasChildren = node.Children.Count > 0;
@@ -846,6 +859,84 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 extraTooltipLines.Add(node.AcquisitionHint);
             }
+
+            // UI-bundle milestone, Feature C (receipt/what-if captions):
+            // sanctioned tooltip fallback - see the class-level doc comment
+            // on the captionText parameter above. Inserted at the front,
+            // ahead of any unit-price/caveat lines already in
+            // extraTooltipLines - but on a row whose label got ellipsized,
+            // UpdateTreeRowTooltip itself prepends the full item name ahead
+            // of everything already in extraTooltipLines, so on those rows
+            // the caption reads second, after the name line, not first.
+            if (!string.IsNullOrEmpty(captionText))
+            {
+                extraTooltipLines.Insert(0, captionText);
+            }
+
+            // UI-bundle milestone, Feature A (wiki links): this module's
+            // FIRST external-URL launch (deliberate maintainer decision) -
+            // a context action (right-click), not a visible icon, per the
+            // maintainer's pre-authorized placement discretion. Every tree
+            // row gets this, item leaf or internal node alike - a wiki page
+            // that does not exist for an internal-only concept (e.g. a
+            // synthesized cost-component "currency" name) just 404s rather
+            // than crashing anything; WikiLinkBuilder.HasWikiPage/
+            // BuildItemPageUrl additionally suppress the affordance
+            // entirely for the known placeholder names (see
+            // WikiLinkBuilder's SentinelNames), which never resolve to a
+            // real page at all.
+            //
+            // Fix-pass (render-path allocation): HasWikiPage is a cheap
+            // non-whitespace + not-a-placeholder-name check - the actual
+            // URL (Trim + Replace + Uri.EscapeDataString, a closure, and a
+            // delegate) is built lazily inside the press/release handlers
+            // below instead of eagerly for every tree row on every build
+            // and every lazy expand, since most rows are never
+            // right-clicked at all.
+            //
+            // Fix-pass (right-click-as-camera-drag): GW2's own right-drag
+            // is the camera-rotate gesture, and firing on button-DOWN alone
+            // (the previous behavior) meant a drag begun over this row -
+            // input Blish otherwise swallows here today - opened the
+            // browser and yanked focus out of a fullscreen game the
+            // instant the button went down, with no way to abort. Firing
+            // on RightMouseButtonReleased alone is NOT a fix: Blish routes
+            // the release event to whichever row is under the cursor at
+            // release time, so a drag that started on a DIFFERENT row
+            // would open THIS row's page instead. Pairing press+release on
+            // this SAME rowPanel closes that: press arms a per-row flag,
+            // and only this row's own Released handler (which only fires
+            // when the release also lands on this row) can consume it.
+            // MouseLeft additionally disarms the flag the moment the
+            // cursor leaves this row after a press, so a drag that starts
+            // here, wanders off, and is released back over this row later
+            // (from an unrelated gesture) cannot replay a stale arm.
+            //
+            // Review-fix note: unlike toggleHandler below, this handler
+            // does NOT exclude clicks landing on a pill (pillPanels is not
+            // yet in scope at this point in the build - it is declared
+            // below by RenderDecisionPills). This divergence is intentional
+            // and considered harmless: decision pills carry no right-click
+            // meaning of their own, so a right-click that lands on one
+            // still falls through to this row's wiki-link handler rather
+            // than doing nothing.
+            if (WikiLinkBuilder.HasWikiPage(node.Name))
+            {
+                string nodeName = node.Name;
+                bool wikiLinkArmed = false;
+                rowPanel.RightMouseButtonPressed += (_, __) => wikiLinkArmed = true;
+                rowPanel.MouseLeft += (_, __) => wikiLinkArmed = false;
+                rowPanel.RightMouseButtonReleased += (_, __) =>
+                {
+                    if (wikiLinkArmed)
+                    {
+                        wikiLinkArmed = false;
+                        WikiLinkLauncher.Open(WikiLinkBuilder.BuildItemPageUrl(nodeName));
+                    }
+                };
+                extraTooltipLines.Add("Right-click: Open wiki page");
+            }
+
             UpdateTreeRowTooltip(rowPanel, displayName, fullName, extraTooltipLines);
 
             // Decision pill column: one pill per feasible source (direct
@@ -925,9 +1016,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 _treeNodeStates.Add(state);
                 if (isExpanded)
                 {
-                    foreach (var child in node.Children)
+                    // UI-bundle milestone, Feature C: caption split computed
+                    // once per node, reused for every child index - see
+                    // ReceiptCaptionHelper's own doc comment.
+                    int captionSplitIndex = ReceiptCaptionHelper.ComputeCaptionSplitIndex(node);
+                    for (int childIndex = 0; childIndex < node.Children.Count; childIndex++)
                     {
-                        RenderTreeNode(child, childFlow, panelWidth, depth + 1, childDimmed);
+                        string childCaption = ReceiptCaptionHelper.CaptionForChildIndex(captionSplitIndex, childIndex);
+                        RenderTreeNode(node.Children[childIndex], childFlow, panelWidth, depth + 1, childDimmed, childCaption);
                     }
                     state.ChildrenBuilt = true;
                     state.IsExpanded = true;
@@ -959,10 +1055,13 @@ namespace GW2CraftingHelper.Views.Rendering
                             // triggers a rebuild) width this node itself was
                             // built at - see GetCurrentPanelWidth.
                             int currentWidth = _getCurrentPanelWidth();
-                            foreach (var child in state.Node.Children)
+                            int captionSplitIndex = ReceiptCaptionHelper.ComputeCaptionSplitIndex(state.Node);
+                            for (int childIndex = 0; childIndex < state.Node.Children.Count; childIndex++)
                             {
+                                string childCaption = ReceiptCaptionHelper.CaptionForChildIndex(captionSplitIndex, childIndex);
                                 RenderTreeNode(
-                                    child, state.ChildContainer, currentWidth, state.Depth + 1, state.ChildDimmed);
+                                    state.Node.Children[childIndex], state.ChildContainer, currentWidth,
+                                    state.Depth + 1, state.ChildDimmed, childCaption);
                             }
                             state.ChildrenBuilt = true;
                         }

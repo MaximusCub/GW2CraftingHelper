@@ -7,6 +7,15 @@ namespace GW2CraftingHelper.Models
         public int RecipeId { get; set; }
         public int OutputItemId { get; set; }
         public bool IsAutoLearned { get; set; }
+
+        // UI-bundle milestone, Feature A (wiki links): true when this
+        // recipe's unlock method is a consumable recipe sheet
+        // (RecipeOption.Flags contains "LearnedFromItem" - see
+        // PlanResultBuilder). Drives which wiki page the Required Recipes
+        // Missing! row links to (WikiLinkBuilder.BuildRequiredRecipeUrl):
+        // the recipe's own "Recipe: &lt;name&gt;" sheet page when true, the
+        // output item's page + "#Acquisition" anchor otherwise.
+        public bool IsLearnedFromItem { get; set; }
         public int MinRating { get; set; }
         public List<string> Disciplines { get; set; } = new List<string>();
         public bool? IsMissing { get; set; }

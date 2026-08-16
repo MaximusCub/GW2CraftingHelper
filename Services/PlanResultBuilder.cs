@@ -355,6 +355,11 @@ namespace GW2CraftingHelper.Services
                 }
 
                 bool isAutoLearned = option.Flags.Contains("AutoLearned");
+                // UI-bundle milestone, Feature A (wiki links): same
+                // Flags-membership pattern as isAutoLearned immediately
+                // above - GW2 API recipe flags include "LearnedFromItem"
+                // for a recipe unlocked via a consumable recipe sheet.
+                bool isLearnedFromItem = option.Flags.Contains("LearnedFromItem");
                 bool? isMissing;
                 if (option.Disciplines.Any(d => InherentlyAvailableDisciplines.Contains(d)))
                 {
@@ -380,6 +385,7 @@ namespace GW2CraftingHelper.Services
                     RecipeId = step.RecipeId,
                     OutputItemId = step.ItemId,
                     IsAutoLearned = isAutoLearned,
+                    IsLearnedFromItem = isLearnedFromItem,
                     MinRating = option.MinRating,
                     Disciplines = new List<string>(option.Disciplines),
                     IsMissing = isMissing

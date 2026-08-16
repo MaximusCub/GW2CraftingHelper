@@ -195,6 +195,9 @@
     <Compile Include="Models\PlanViewModel.cs" />
     <Compile Include="Services\PlanViewModelBuilder.cs" />
     <Compile Include="Services\RequiredRecipesVisibility.cs" />
+    <Compile Include="Services\WikiLinkBuilder.cs" />
+    <Compile Include="Services\WikiLinkLauncher.cs" />
+    <Compile Include="Services\ReceiptCaptionHelper.cs" />
     <Compile Include="Services\Gw2AccountRecipeClient.cs" />
     <Compile Include="Services\IMysticForgeRecipeSource.cs" />
     <Compile Include="Services\FileMysticForgeRecipeSource.cs" />

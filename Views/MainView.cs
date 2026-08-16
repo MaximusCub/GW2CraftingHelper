@@ -98,14 +98,27 @@ namespace GW2CraftingHelper.Views
         // Layout constants
         private const int HeaderRowY = 5;
         private const int HeaderHeight = 40;
-        private const int SearchRowY = 50;
+
+        // UI-bundle milestone, Feature B (status own row, maintainer
+        // decision): the status label used to share _headerPanel with the
+        // Clear Cache/Refresh Now buttons at a fixed x=140 (see
+        // ApplyStatusDisplay's own "Layout risk" doc comment for the
+        // exact overflow this caused - a long status string sliding under
+        // the button row at the window's clamped minimum size). It now
+        // gets its own full-width row directly beneath the header, so
+        // every row below shifts down by StatusRowHeight + the same 5px
+        // gap the header already used before SearchRowY - every other gap
+        // (SearchRowY->SourceFilterRowY, etc.) is preserved exactly.
+        private const int StatusRowY = HeaderRowY + HeaderHeight + 5;
+        private const int StatusRowHeight = 24;
+        private const int SearchRowY = StatusRowY + StatusRowHeight + 5;
         private const int SearchRowHeight = 35;
-        private const int SourceFilterRowY = 88;
+        private const int SourceFilterRowY = SearchRowY + SearchRowHeight + 3;
         private const int SourceFilterHeight = 30;
-        private const int CoinRowY = 122;
+        private const int CoinRowY = SourceFilterRowY + SourceFilterHeight + 4;
         private const int CoinHeight = 24;
-        private const int ContentY = 150;
-        private const int TopRegionHeight = 150;
+        private const int ContentY = CoinRowY + CoinHeight + 4;
+        private const int TopRegionHeight = ContentY;
 
         private const int SearchBoxWidth = 300;
         private const int FilterDropdownWidth = 140;
@@ -116,6 +129,7 @@ namespace GW2CraftingHelper.Views
 
         // UI controls (stored for resize handler)
         private Panel _headerPanel;
+        private Panel _statusPanel;
         private Panel _filterPanel;
         private Panel _sourceFilterPanel;
         private FlowPanel _contentPanel;
@@ -207,20 +221,6 @@ namespace GW2CraftingHelper.Views
                 Parent = _headerPanel
             };
 
-            _statusLabel = new Label()
-            {
-                Text = "",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(140, 12),
-                Parent = _headerPanel
-            };
-            // Capture Blish's own real default rather than guessing/
-            // hardcoding one, so the non-stale case is byte-identical to
-            // today's unset-TextColor appearance once ApplyStatusDisplay
-            // below starts writing to this property.
-            _defaultStatusColor = _statusLabel.TextColor;
-
             _clearButton = new StandardButton()
             {
                 Text = "Clear Cache",
@@ -249,6 +249,36 @@ namespace GW2CraftingHelper.Views
             };
 
             _refreshButton.Click += async (_, __) => await RefreshNowAsync();
+
+            // UI-bundle milestone, Feature B (status own row, maintainer
+            // decision): full-width row beneath the header buttons, not
+            // sharing _headerPanel with them any more - see StatusRowY's
+            // own doc comment for the layout-risk this replaces.
+            _statusPanel = new Panel()
+            {
+                Size = new Point(w, StatusRowHeight),
+                Location = new Point(0, StatusRowY),
+                Parent = buildPanel
+            };
+
+            _statusLabel = new Label()
+            {
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                // Review-fix: y=2 (not 4) inside this 24px _statusPanel -
+                // matches the coin row's own precedent
+                // (LayoutCoinSegments(_coinPanel, segments, 0, 2, font), y=2
+                // in the same 24px height), leaving DefaultFont14 the same
+                // clearance the coin row already relies on.
+                Location = new Point(0, 2),
+                Parent = _statusPanel
+            };
+            // Capture Blish's own real default rather than guessing/
+            // hardcoding one, so the non-stale case is byte-identical to
+            // today's unset-TextColor appearance once ApplyStatusDisplay
+            // below starts writing to this property.
+            _defaultStatusColor = _statusLabel.TextColor;
 
             // Search row: plain TextBox (not SuggestionPanel/
             // AutocompleteTextBox - see class doc comment) + the existing
@@ -490,6 +520,7 @@ namespace GW2CraftingHelper.Views
             _headerPanel.Size = new Point(w, HeaderHeight);
             _clearButton.Location = new Point(w - 220, 5);
             _refreshButton.Location = new Point(w - 110, 5);
+            _statusPanel.Size = new Point(w, StatusRowHeight);
             _filterPanel.Size = new Point(w, SearchRowHeight);
             _sourceFilterPanel.Size = new Point(w, SourceFilterHeight);
             _coinPanel.Size = new Point(w, CoinHeight);
@@ -626,22 +657,16 @@ namespace GW2CraftingHelper.Views
         /// render, SetSnapshot, SetStatus) so the two can never drift out
         /// of sync with each other.
         /// <para>
-        /// Layout risk (reported, not silently patched around): adding the
-        /// capture date to every status string (RefreshNowAsync's "Updated"
-        /// string, the _clearButton.Click handler's "Cache Cleared" string at
-        /// ~line 247, StatusText.ForRefreshFailure's callers) plus this
-        /// method's own "(Nh Nm ago)" suffix can produce a run long enough to
-        /// approach or exceed the free space in _headerPanel before
-        /// _clearButton's left edge at the window's clamped 930x710 minimum
-        /// size (Views/ResizableTabbedWindow.cs's HandleWindowResize; the
-        /// Point(930, 710) minimum-size argument itself is passed from
-        /// Module.cs). Truncating here would cut the tail of the string,
-        /// which is exactly where the date/time now lives - worst on the
-        /// failure statuses a user most needs to date. This method
-        /// intentionally does not truncate; if the free run at minimum size
-        /// proves too tight in practice, the fix belongs in the header layout
-        /// (e.g. widening the label's run or shortening the button row), not
-        /// in this label's text.
+        /// UI-bundle milestone, Feature B (status own row, maintainer
+        /// decision): the layout risk this paragraph used to document -
+        /// a long status string (capture date + this method's own "(Nh Nm
+        /// ago)" suffix) sliding under the Clear Cache/Refresh Now buttons
+        /// at the window's clamped 930x710 minimum size - no longer applies
+        /// now that _statusLabel lives in its own full-width _statusPanel
+        /// row beneath the header, with no button run to collide with. This
+        /// method still intentionally does not truncate the composed text;
+        /// the full-width row is simply far less likely to run out of
+        /// space than the header's old shared, button-crowded run was.
         /// </para>
         /// </summary>
         private void ApplyStatusDisplay()
