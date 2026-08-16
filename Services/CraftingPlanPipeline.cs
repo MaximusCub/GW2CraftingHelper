@@ -269,6 +269,14 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
+            // W4B: a vendor cost-component ITEM leaf (e.g. Globs of
+            // Ectoplasm) is never a real tree ingredient - only a
+            // VendorOffer.CostLines entry - so allItemIds above never
+            // collects it. Add every such id here, before the single bulk
+            // metadata fetch below, so CraftingTreeBuilder can resolve a
+            // real name/icon for it instead of falling back to "Unknown
+            // Item" (see AddVendorItemComponentIds).
+            AddVendorItemComponentIds(solveResult.Decisions, metadataIds);
             phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
             progress?.Report(new PlanStatus
             {
@@ -336,11 +344,18 @@ namespace GW2CraftingHelper.Services
                 BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
             result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
 
+            // W4B: owned-item annotation for vendor cost-component ITEM
+            // leaves, cosmetic only - see
+            // BuildOwnedVendorItemComponentAmounts' own doc comment.
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
+                BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions);
+
             // Build crafting tree
             var treeBuilder = new CraftingTreeBuilder();
             result.CraftingTree = treeBuilder.BuildTree(
                 treeUsedForSolve, solveResult.Decisions, metadata, _acquisitionHints,
-                ownedQuantityUsedByNodeId);
+                ownedQuantityUsedByNodeId, ignoredItemIds: null, currencyMetadata: currencyMetadata,
+                ownedCurrencyAmounts: ownedCurrencyAmounts, ownedVendorItemAmounts: ownedVendorItemAmounts);
 
             SellSideEconomics.ApplySellSideEconomics(
                 result, treeUsedForSolve, solveResult, prices,
@@ -365,6 +380,7 @@ namespace GW2CraftingHelper.Services
                 AcquisitionHints = _acquisitionHints,
                 OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
+                OwnedVendorItemAmounts = ownedVendorItemAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
                 HomesteadTiers = tiers,
                 CharacterDisciplines = result.CharacterDisciplines
@@ -682,6 +698,8 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
+            // W4B: see the single-item overload's matching call for why.
+            AddVendorItemComponentIds(solveResult.Decisions, metadataIds);
             phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
             progress?.Report(new PlanStatus
             {
@@ -738,9 +756,15 @@ namespace GW2CraftingHelper.Services
                 BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts);
             result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
 
+            // W4B: see the single-item overload's matching computation.
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
+                BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions);
+
             BuildCraftingTreeResult(
                 result, treeUsedForSolve, solveResult.Decisions, metadata,
-                _acquisitionHints, ownedQuantityUsedByNodeId, ignoredItemIds: null);
+                _acquisitionHints, ownedQuantityUsedByNodeId, ignoredItemIds: null,
+                currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
+                ownedVendorItemAmounts: ownedVendorItemAmounts);
 
             SellSideEconomics.ApplyBatchSellSideEconomics(
                 result, treeUsedForSolve, solveResult, prices, items,
@@ -763,6 +787,7 @@ namespace GW2CraftingHelper.Services
                 AcquisitionHints = _acquisitionHints,
                 OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
+                OwnedVendorItemAmounts = ownedVendorItemAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
                 RequestedItems = items,
                 HomesteadTiers = tiers,
@@ -832,7 +857,9 @@ namespace GW2CraftingHelper.Services
 
             BuildCraftingTreeResult(
                 result, context.Tree, solveResult.Decisions, context.Metadata,
-                context.AcquisitionHints, context.OwnedQuantityUsedByNodeId, ignoredItemIds);
+                context.AcquisitionHints, context.OwnedQuantityUsedByNodeId, ignoredItemIds,
+                currencyMetadata: context.CurrencyMetadata, ownedCurrencyAmounts: context.OwnedCurrencyAmounts,
+                ownedVendorItemAmounts: context.OwnedVendorItemAmounts);
 
             // M37 (closes KNOWN-ISSUES #25): a local override/Ignore
             // re-solve must recompute whichever sell-side economics the
@@ -1110,7 +1137,13 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemMetadata> metadata,
             IReadOnlyDictionary<int, AcquisitionHint> hints,
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
-            ISet<int> ignoredItemIds)
+            ISet<int> ignoredItemIds,
+            // W4B: optional/null-tolerant, threaded straight through to
+            // CraftingTreeBuilder.BuildTree - see that method's own doc
+            // comment.
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts = null,
+            IReadOnlyDictionary<int, int> ownedVendorItemAmounts = null)
         {
             var treeBuilder = new CraftingTreeBuilder();
 
@@ -1125,7 +1158,8 @@ namespace GW2CraftingHelper.Services
                     {
                         roots.Add(treeBuilder.BuildTree(
                             itemRoot, decisions, metadata, hints,
-                            ownedQuantityUsedByNodeId, ignoredItemIds));
+                            ownedQuantityUsedByNodeId, ignoredItemIds,
+                            currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts));
                     }
                 }
                 result.CraftingTree = null;
@@ -1135,7 +1169,8 @@ namespace GW2CraftingHelper.Services
             {
                 result.CraftingTree = treeBuilder.BuildTree(
                     tree, decisions, metadata, hints,
-                    ownedQuantityUsedByNodeId, ignoredItemIds);
+                    ownedQuantityUsedByNodeId, ignoredItemIds,
+                    currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts);
                 result.MultiItemRoots = null;
             }
         }
@@ -1184,6 +1219,81 @@ namespace GW2CraftingHelper.Services
             foreach (var cc in currencyCosts)
             {
                 result[cc.CurrencyId] = currencyIndex.GetQuantity(cc.CurrencyId);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// W4B (vendor cost-component leaves): adds every item id that
+        /// appears as a TP-valued Item cost line on any winning
+        /// BuyFromVendor decision (SolverDecision.VendorItemCosts) into
+        /// <paramref name="metadataIds"/> - called before the single bulk
+        /// item-metadata fetch each generation path already makes, so
+        /// CraftingTreeBuilder's synthesized item-component leaves get a
+        /// real name/icon instead of the "Unknown Item"/null fallback (see
+        /// CraftingTreeBuilder.ResolveName/ResolveIcon). A no-op when no
+        /// decision has any VendorItemCosts at all (the common case).
+        /// </summary>
+        private static void AddVendorItemComponentIds(
+            IReadOnlyDictionary<int, SolverDecision> decisions, HashSet<int> metadataIds)
+        {
+            if (decisions == null)
+            {
+                return;
+            }
+            foreach (var decision in decisions.Values)
+            {
+                if (decision.VendorItemCosts == null)
+                {
+                    continue;
+                }
+                foreach (var line in decision.VendorItemCosts)
+                {
+                    metadataIds.Add(line.ItemId);
+                }
+            }
+        }
+
+        /// <summary>
+        /// W4B: owned-item annotation for vendor cost-component ITEM leaves
+        /// (CraftingTreeNode.ComponentOwnedQuantity), computed strictly
+        /// AFTER solving from the account inventory snapshot - the exact
+        /// same "cosmetic reconciliation, never fed back into any decision
+        /// or total" contract BuildOwnedCurrencyAmounts already has for
+        /// currencies (see AccountCurrencyIndex/AccountItemIndex's own doc
+        /// comments), just for item components instead of wallet
+        /// currencies. Scoped to only the item ids that actually appear as
+        /// a vendor Item cost component anywhere in this solve (not every
+        /// owned item in the account) - null when there is no snapshot or
+        /// no such component anywhere, so callers can treat null as "no
+        /// data" distinctly from "0 owned", same as
+        /// BuildOwnedCurrencyAmounts.
+        /// </summary>
+        private static IReadOnlyDictionary<int, int> BuildOwnedVendorItemComponentAmounts(
+            AccountSnapshot snapshot, IReadOnlyDictionary<int, SolverDecision> decisions)
+        {
+            if (snapshot == null || decisions == null)
+            {
+                return null;
+            }
+
+            var itemIds = new HashSet<int>();
+            AddVendorItemComponentIds(decisions, itemIds);
+            if (itemIds.Count == 0)
+            {
+                return null;
+            }
+
+            var itemIndex = new AccountItemIndex(snapshot.Items);
+            var result = new Dictionary<int, int>(itemIds.Count);
+            foreach (var itemId in itemIds)
+            {
+                int total = 0;
+                foreach (var source in itemIndex.GetSources(itemId))
+                {
+                    total += itemIndex.GetQuantity(itemId, source);
+                }
+                result[itemId] = total;
             }
             return result;
         }

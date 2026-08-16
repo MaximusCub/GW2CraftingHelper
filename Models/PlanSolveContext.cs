@@ -79,6 +79,21 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
 
         /// <summary>
+        /// W4B (vendor cost-component leaves): owned amount per item id
+        /// that appears as a TP-valued Item cost line on any winning
+        /// BuyFromVendor decision in the plan, snapshotted at GENERATION
+        /// time the same way OwnedCurrencyAmounts is (see
+        /// CraftingPlanPipeline.BuildOwnedVendorItemComponentAmounts) -
+        /// cosmetic display data only, feeding ONLY a component leaf's
+        /// informational HAVE pill (CraftingTreeNode.ComponentOwnedQuantity)
+        /// - never consulted by InventoryReducer or PlanSolver, so it can
+        /// never affect a decision, a total, or Quantity itself. Null under
+        /// the same conditions as OwnedCurrencyAmounts (no wallet/inventory
+        /// snapshot, or no vendor Item cost component anywhere in the plan).
+        /// </summary>
+        public IReadOnlyDictionary<int, int> OwnedVendorItemAmounts { get; set; }
+
+        /// <summary>
         /// NodeIds gw2e's "Value Own Materials" force-buy pre-pass excluded
         /// from crafting at GENERATION time (M34-B2a #3 - see
         /// OwnedMaterialsForceBuyPrePass), snapshotted here so
