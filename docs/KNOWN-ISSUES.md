@@ -2357,6 +2357,918 @@ No live desktop gate for this pass - container-encoding-only change,
 user-sanctioned quick fix, validated by real-file unit round-trip
 tests instead (see above).
 
+**Recipe Tree header button tooltips (2026-08-15).** Small user-requested
+diff, riding along with the W4A cost-section gate: the five Recipe Tree
+section header buttons (`Views/Rendering/TreeSectionController.cs`,
+`CreateTreeSection` - Best Path, Craft All, Buy All, Expand All, Collapse
+All) now set `BasicTooltipText` directly on the `StandardButton` itself
+(the control that actually captures the mouse - see the M32 lesson noted
+elsewhere in this doc). Each tooltip's wording was derived from the real
+click handler, not guessed: Craft All/Buy All call `ApplyPreset`, which
+clears every existing manual override and rebuilds it from
+`CraftingPlanPipeline.BuildPresetOverrides` walking the FULL solver tree
+(including nodes hidden under bought intermediates) - forcing Craft (or
+Buy from TP) on every node where that source is feasible, and leaving
+every infeasible node to the solver's own normal pick, exactly as
+`PlanSolver.Evaluate`'s override handling (`canCraft`/`canBuyTp` gates)
+actually resolves it. Best Path clears `_nodeOverrides` entirely
+(covering both individual pill clicks and a prior Craft All/Buy All) and
+re-solves for the solver's unforced cheapest plan; `_ignoredItemIds` is
+untouched by any of the three presets, matching the existing field-level
+doc comment on that collection. Expand All/Collapse All tooltips describe
+the existing recursive expand/build-lazy-children and hide-children
+behavior verbatim. Pure tooltip-string change - no production logic
+touched, no new tests (out of the Blish-free test scope for pure
+BasicTooltipText strings on Blish controls; hover text is covered by the
+live desktop gate).
+
+Live desktop gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+## W4B: Vendor cost-component leaves (2026-08-15)
+
+User-designed after live field observation: an "Amalgamated Rift Essence"
+node inside an Endless Summer plan showed a vendor offer costing 3 wallet
+currencies PLUS Globs of Ectoplasm (a TP-valued item). `CraftingPlanPipeline.
+AugmentWithVendorCostPricesAsync` already TP-values an offer's Item cost
+lines and folds them into one effective coin price - correct math, but the
+tree row's right side then rendered a very long run (gold-including-
+hidden-ectos + 3 currency segments) that collided with the row layout and
+hid that part of the "gold" total was actually paid in items, not coins.
+Implemented in the isolated `wt-w4b` worktree (stacked on the unmerged
+`tree-tooltips` branch, `4095fd2`) on branch `w4b-vendor-cost-leaves`.
+
+**Design.** For any vendor-acquired display-tree node whose winning offer's
+price mixes 2+ cost KINDS (coin / non-coin currency / TP-valued item),
+`CraftingTreeBuilder.BuildVendorCostComponentLeaves` now synthesizes
+DISPLAY-ONLY child leaves - one per non-coin-currency cost line and one
+per TP-valued item cost line - instead of the "what it would cost to craft
+instead" reference branch that node would otherwise get (component leaves
+take precedence; a vendor-only item with no recipe at all, the common
+real-world case, was never going to get a reference branch anyway). A
+single-kind offer (the overwhelming majority - plain coin, or all-currency,
+or all-item-folded-to-coin) is completely unaffected: no leaves, exactly
+today's rendering. A raw coin component never gets its own leaf even when
+it is one of the 2+ kinds - it stays folded into the parent's compact total
+exactly as before, the simplest presentation that still keeps every VISIBLE
+leaf's number consistent with the parent. The collapsed parent's cost cell
+now shows ONLY that compact gold total (`Views/Rendering/
+TreeSectionController.cs` skips the currency-segment run whenever the row's
+own children are component leaves) - the collision is gone, and the
+breakdown is one click away via the existing expander machinery.
+
+**Data plumbing (all additive, no existing math touched).** The item cost
+component's TP-valued gold amount did not previously survive past
+`VendorBatchSolver.EvaluateVendorOffers` (an Item cost line was folded
+straight into `coinCost` and discarded as a discrete number) - the
+merged-ceil batching arithmetic itself (DO-NOT-TOUCH) is unchanged; a new
+`VendorItemCostLine` (`ItemId`/`Quantity`/`GoldValue`) is captured at the
+EXACT SAME multiplication site that already fed `coinCost`, scaled by the
+same `unitsNeeded`, and threaded through `VendorOfferEvaluation` ->
+`PlanSolver.Decision.VendorItemCosts` -> `SolverDecision.VendorItemCosts`
+(mirroring the existing `VendorCurrencyCosts` passthrough exactly) -> the
+display leaf's own `SubtreeCost`. A leaf's gold amount is therefore
+literally the same number already folded into the parent's total, never
+independently recomputed. `SolverDecision.VendorHasRawCoin` (also additive)
+records only whether the winning offer had a genuine raw coin line, so the
+"2+ kinds" gate can tell "coin" apart from "item money that became coin"
+without re-deriving it from `TotalCost`.
+
+**Synthetic node ids.** Each leaf gets a deterministic, stable, always-
+NEGATIVE `NodeId` (`-(parentNodeId * 1000 + componentIndex + 1)`) -
+`RecipeNodeIds.Assign` only ever produces small non-negative ids, so
+collision is structurally impossible, and the id is stable across a
+`ResolveWithOverrides` re-solve of the same tree (the parent's own NodeId
+is preserved verbatim, and a leaf's `componentIndex` is a fixed position in
+a list built from the same winning offer's own `CostLines`), so expansion
+state survives a decision-pill click elsewhere in the tree.
+
+**Decision pills stay decision-free.** Component leaves are facts about a
+price, not an acquisition choice: `DecisionPillPlanner.BuildPillSpecs`
+checks `CraftingTreeNode.IsCostComponent` FIRST and returns only an
+informational HAVE / "HAVE x/y NEEDED" pill (or none) - never a CRAFT/TP/
+VENDOR pill, never Ignore, never `Source`-bearing (so it can never be
+clicked into an override). The HAVE data itself comes from a NEW,
+deliberately separate field, `ComponentOwnedQuantity` - unlike the existing
+`OwnedQuantityUsed` (which means "already subtracted from Quantity"), a
+component leaf's `Quantity`/cost are NEVER reduced for ownership; owning
+some of a cost component is purely informational, read from the account
+snapshot's wallet (`AccountCurrencyIndex`) and inventory
+(`AccountItemIndex`) via two new pipeline-computed, cosmetic-only
+dictionaries (`ownedCurrencyAmounts`, already existed; the new
+`OwnedVendorItemAmounts`) that - like their existing `OwnedCurrencyAmounts`
+sibling - are never consulted by `InventoryReducer` or `PlanSolver`, so
+they cannot affect a decision or a total. `CraftingPlanPipeline` also
+widens its one bulk item-metadata fetch to include every vendor Item cost
+component id (`AddVendorItemComponentIds`) - those ids are never real tree
+ingredients, so without this an item leaf would show "Unknown Item"
+instead of "Glob of Ectoplasm".
+
+**Verified separation from the solver.** `CraftingPlanPipeline.
+CollectPresetOverrides`/`BuildPresetOverrides` and `PlanSolver.Evaluate`'s
+override lookup both walk `RecipeNode`/`RecipeOption` (the SOLVER tree)
+exclusively - a component leaf corresponds to no `RecipeNode` at all and is
+never fed back into either, so Craft All/Buy All/Best Path and a plain
+per-node override click are provably unaffected (a dedicated pipeline test
+builds a preset override map and re-solves with component leaves present,
+asserting the leaves survive untouched and every produced override key is
+`>= 0`, i.e. a real solver id, never a synthetic negative one).
+
+`Models/CraftingTreeNode.cs` gained `IsCostComponent`/`ComponentOwnedQuantity`
+- both additive with `false`/`0` defaults, so an old `plan.json` simply
+deserializes every existing node with no component leaves (renders exactly
+as it did before this milestone) until the plan is regenerated;
+`PlanStructuralValidator.IsValidCraftingTreeNode`'s existing recursive
+`Children` walk already covers a component leaf with zero changes needed.
+
+New tests (all Blish-free, real production paths - no Blish/BlishHUD/
+Gw2Sharp references, no fake file I/O): `VendorBatchSolver`/`PlanSolver`
+level tests proving `VendorItemCosts`/`VendorHasRawCoin` populate correctly
+for mixed offers and stay null/false for single-kind ones
+(`PlanSolverVendorOfferTests`); `CraftingTreeBuilder` tests covering leaf
+labels/amounts/flags, parent-total-equals-leaf-value consistency, blank
+currency-leaf cost, no leaves for every single-kind offer shape (coin-only,
+currency-only, item-only, coin+currency-with-currency-leaf-only), HAVE-pill
+coverage (full/partial/none) from owned-amount dictionaries, currency-leaf
+name/icon from live `CurrencyMetadata` with the offline fallback, and
+stable/collision-free synthetic ids across two builds of the same tree
+(`CraftingTreeBuilderTests`); pill-vocabulary tests proving a component
+leaf never gets a decision/Ignore pill and only ever the informational
+HAVE/OwnedInfo pair (`DecisionPillPlannerTests`); end-to-end pipeline tests
+through a real `VendorOfferStore` + `AccountSnapshot` proving the metadata
+widening, the owned-amount wiring, a `ResolveWithOverrides` round-trip
+preserving leaf NodeIds/values, and the preset-override separation
+(`CraftingPlanPipelineTests`); and a real `PlanStore` save/load round trip
+proving component leaves survive gzip-compressed persistence and pass
+`PlanStructuralValidator` unchanged (`PlanStoreTests`). Full module suite:
+1273 baseline + 30 new W4B tests, all green.
+
+**Review-fix round (2026-08-15) - 7 findings from an adversarial review (2
+Critical, 4 Must Fix, 1 Must Fix flagged for explicit justification), all
+addressed.** The two Critical findings were the same defect surfacing twice:
+`VendorItemCosts`/`VendorCurrencyCosts` are captured PRE-merge, per tree
+occurrence, by `VendorBatchSolver.EvaluateVendorOffers` - but when the same
+vendor item is needed via 2+ tree occurrences that merge into one true
+batched purchase (the exact shape the merge-then-ceil machinery exists for),
+`AllocateVendorNodeCosts` reallocates each occurrence's corrected
+`TotalCost` share WITHOUT re-deriving those raw component numbers the same
+way. A component leaf built from them could show a value that no longer
+summed to (and could even exceed) its own parent's corrected total - a
+reproduced, concrete regression of the exact "two sections of the same page
+disagree" defect class the batching correction passes exist to prevent, one
+level lower.
+
+- *Fix (Critical x2, `Services/VendorBatchSolver.cs` lines 767/743,
+  `Services/CraftingTreeBuilder.cs` line 283).* Added
+  `SolverDecision.VendorComponentCostsUnreliable` (additive bool, default
+  false) and a new `PlanSolver.FlagUnreliableVendorComponentCosts` pass,
+  run immediately after `AllocateVendorNodeCosts` in `PlanSolver.Solve`: it
+  marks every occurrence of a step that genuinely merged 2+ tree occurrences
+  (`vendorOccurrences[stepKey].Count > 1` AND
+  `step.VendorOfferOutputCount > 0`, the same gate `AllocateVendorNodeCosts`
+  itself uses to decide whether a step was actually corrected).
+  `CraftingTreeBuilder.BuildVendorCostComponentLeaves` now short-circuits to
+  "no leaves" whenever this flag is set, regardless of kind count - the
+  node still shows its own correctly reallocated `SubtreeCost`, just without
+  an unprovable item/currency breakdown. Deliberately kept OUT of
+  `VendorBatchSolver.cs` (DO-NOT-TOUCH: merged-ceil batching math) - the new
+  pass lives in `PlanSolver.cs`, reads `AllocateVendorNodeCosts`'s own
+  already-public inputs/outputs (`vendorOccurrences`, `stepMap`) strictly
+  after it returns, and writes only the new auxiliary flag; `VendorBatchSolver.cs`'s
+  `AllocateVendorNodeCosts` method body is byte-for-byte unchanged (only its
+  doc comment gained a cross-reference). A single-occurrence vendor buy is
+  unaffected (nothing was actually reallocated there, so the original
+  numbers stay accurate) - every pre-existing W4B leaf test keeps passing
+  unmodified. New test: `CraftingTreeBuilderTests.
+  MultiOccurrence_MergedMixedVendorOffer_SuppressesComponentLeaves_ParentStaysConsistent`
+  reproduces the exact two-occurrence bulk-offer shape from the finding
+  (batch size 15, two 6-unit occurrences merging to one true batch) and
+  asserts both occurrences get no leaves while their reallocated
+  `SubtreeCost` values still sum exactly to the real merged `PlanStep`
+  total.
+
+- *Fix (Must Fix, `Services/CraftingTreeBuilder.cs` line 155): reference
+  branch silently dropped when a vendor node also got component leaves.*
+  The two no longer compete for the same `Children` slot - a vendor node
+  whose offer both mixed 2+ cost kinds AND has a known recipe now STACKS
+  them: component leaves first (so `TreeSectionController`'s
+  `Children[0].IsCostComponent` cost-cell-suppression check keeps working
+  unmodified), then the reference branch's own recipe ingredients appended
+  as additional, ordinary children. Verified safe to mix: `IsReferenceBranch`
+  is purely informational today (not read by any renderer - grepped), and
+  per-child dimming already comes from the PARENT's `Decision != Craft`
+  uniformly, not from any per-child reference-branch flag, so a mixed
+  `Children` list renders exactly as consistently dimmed as either kind
+  alone. `CraftingTreeNode.IsReferenceBranch`'s doc comment updated to
+  record the now-possible mixed case. New test: `CraftingTreeBuilderTests.
+  MixedOfferNode_AlsoHasRecipe_StacksComponentLeavesThenReferenceBranch`.
+
+- *Fix (Must Fix, `Services/VendorBatchSolver.cs` line 300): missing
+  `Count > 0` guard on the Item cost-line capture.* A zero/negative-count
+  Item cost line (malformed wiki-scraped seed data) could invent a phantom
+  "item" cost KIND, flipping an otherwise single-kind offer into
+  leaf-synthesis mode with a 0-quantity/0-gold ghost leaf. Guarded the raw
+  `itemCostRaw` capture with `cost.Count > 0`, mirroring the raw-coin
+  branch's own identical guard a few lines above it; `coinCost` itself is
+  untouched (a Count of 0 already contributed nothing to it). New test:
+  `PlanSolverVendorOfferTests.ZeroCountItemCostLine_DoesNotPopulateVendorItemCosts`.
+
+- *Fix (Must Fix, `Services/CraftingPlanPipeline.cs` line 859):
+  `ResolveWithOverrides` metadata gap for a non-baseline-winning vendor
+  offer.* `ResolveWithOverrides` never re-fetches metadata (by design - it
+  is purely local, no network calls); the pre-existing
+  `AddVendorItemComponentIds` only scanned the BASELINE winning decisions'
+  `VendorItemCosts`, so a node whose original decision was Craft - later
+  manually overridden to `BuyFromVendor`, an ordinary and commonly-used
+  interaction - could surface an item component leaf whose id was never
+  widened into `PlanSolveContext.Metadata`, rendering "Unknown Item" with
+  no icon until the whole plan was regenerated. Added
+  `AddAllVendorOfferItemComponentIds`, called at both generation entry
+  points (`GenerateStructuredAsync`/`GenerateStructuredMultiAsync`) right
+  alongside the existing decisions-only widening: it scans every `Item`
+  cost line on EVERY vendor offer already fetched for the tree (not just
+  the winning one), using data already resident in memory from the
+  existing `vendorOffers` fetch - no extra network round trip, and
+  `ResolveWithOverrides` itself needed no change. New test:
+  `CraftingPlanPipelineTests.
+  MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadata`.
+
+- *Fix (Must Fix, `tests/.../CraftingTreeBuilderTests.cs` line 1160):
+  missing 3-distinct-currency single-kind coverage.* Added
+  `SingleKindVendorOffer_ThreeDistinctCurrencies_NoItemNoCoin_CountsAsSingleKind_NoLeaves`,
+  locking down that `kindCount` counts by
+  `decision.VendorCurrencyCosts.Count > 0` (a boolean per KIND) rather than
+  per distinct currency id, so an offer spanning 3 different non-coin
+  currencies still gets no leaves - a deliberate design choice that was
+  previously unverified by any test.
+
+- *Justified, not changed (`Services/VendorBatchSolver.cs` line 333):
+  the `itemsScalable`/`continue` overflow guard added inside
+  `EvaluateVendorOffers`.* Flagged as new control flow inside a DO-NOT-TOUCH
+  method. Kept as-is: it is structurally identical to - and only extends to
+  a second cost dimension - the pre-existing `scalable`/`continue` guard a
+  few lines below it for currency lines (same file, same loop, same
+  overflow-safety shape, predates this feature), so it introduces no new
+  KIND of control flow. It can only fire when a single occurrence's scaled
+  Item-cost quantity exceeds `int.MaxValue` - unreachable with real GW2
+  data. Rewriting it as a clamp instead (silently truncating the
+  represented cost) would be the actual behavior change, and a strictly
+  worse one - a clamped value is silently wrong, while skipping the offer
+  fails safe exactly like its currency sibling already does. Documented
+  inline with this reasoning for future reviewers.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors); full module
+test suite green - 1308 passed (1273 baseline + 30 original W4B + 5 new
+review-fix tests: 3 in `CraftingTreeBuilderTests`, 1 in
+`CraftingPlanPipelineTests`, 1 in `PlanSolverVendorOfferTests`). No new
+Blish HUD references in tests; every new test exercises real production
+code (`PlanSolver.Solve`, `CraftingTreeBuilder.BuildTree`,
+`CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`) with
+no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
+internal-only. `VendorBatchSolver.cs`'s DO-NOT-TOUCH merged-ceil methods
+(`EvaluateVendorOffers`, `FinalizeVendorBatches`, `AllocateVendorNodeCosts`,
+`MergeVendorCurrencyCosts`, `VendorBatchesEqual`, `ScaleCostLines`) had
+their dollar-amount arithmetic (coin costs, ceil/batch selection,
+allocation shares) left byte-for-byte unchanged throughout this round - the
+only edits inside that file are a `Count > 0` capture guard and doc
+comments, both confirmed by diff review to touch no cost computation.
+Performance note: the new `AddAllVendorOfferItemComponentIds` scan runs
+once per plan generation (not a render/UI hot path) over `vendorOffers`
+data already resident in memory from the pre-existing fetch; its only
+allocation is additional entries in the `metadataIds` HashSet that was
+already being built, no new collection type.
+
+**Review-fix round 2 (2026-08-15) - 2 Must Fix findings from a further
+adversarial review, both the same shape as round 1's fixes one field/map
+over, both addressed.**
+
+- *Fix (Must Fix, `Services/VendorBatchSolver.cs` line 292): missing
+  `Count > 0` guard on the non-coin Currency cost-line capture.* Round 1
+  guarded the Item cost-line capture (`itemCostRaw`) against a
+  zero/negative-count line inventing a phantom "item" cost KIND, but left
+  the identical `currencyCosts.Add(cost)` five lines above it unguarded -
+  a zero/negative-count non-coin Currency cost line could still invent a
+  phantom "currency" cost KIND the same way, flipping an otherwise
+  single-kind offer into leaf-synthesis mode with a 0-quantity (or, for a
+  negative Count, negative-quantity) ghost leaf: blank cost, no pill. Now
+  guarded with `if (cost.Count > 0)`, mirroring both the raw-coin branch's
+  own guard immediately above it and the Item-line guard below it;
+  `coinCost` is untouched either way. New test:
+  `PlanSolverVendorOfferTests.ZeroCountCurrencyCostLine_DoesNotPopulateVendorCurrencyCosts`
+  (sibling to round 1's `ZeroCountItemCostLine_DoesNotPopulateVendorItemCosts`).
+
+- *Fix (Must Fix, `Services/CraftingPlanPipeline.cs`
+  `BuildOwnedVendorItemComponentAmounts`): the ownership map was never
+  widened the way metadata was.* Round 1 widened metadata fetching
+  (`AddAllVendorOfferItemComponentIds`) so a vendor offer NOT chosen at
+  baseline still resolves a real name/icon after a manual
+  `BuyFromVendor` override via `ResolveWithOverrides`. The parallel
+  ownership computation, `BuildOwnedVendorItemComponentAmounts`, was left
+  scoped to only the BASELINE winning decisions'
+  `VendorItemCosts` (via `AddVendorItemComponentIds` alone) - so the same
+  override scenario surfaced a correctly-named item component leaf with
+  permanently NO have pill, even with the item sitting in the account,
+  until the whole plan was regenerated. `PlanSolveContext.
+  OwnedVendorItemAmounts` is, like `Metadata`, captured once at generation
+  time and passed to `ResolveWithOverrides` verbatim - never recomputed.
+  Widened `BuildOwnedVendorItemComponentAmounts` to also call
+  `AddAllVendorOfferItemComponentIds` over `vendorOffers` (reusing the
+  round 1 method rather than duplicating its scan), at both call sites
+  (single-item and multi-item generation entry points). Extended test:
+  `CraftingPlanPipelineTests.
+  MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadataAndOwnership`
+  (renamed from round 1's `...StillResolvesRealItemMetadata`, now also
+  attaching a snapshot with partial ownership of the item component and
+  asserting `ComponentOwnedQuantity` survives the override re-solve).
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors); full module
+test suite green - 1309 passed (1308 from round 1 + 1 new round-2 test;
+the round-2 ownership fix extended an existing test rather than adding a
+new one). No new Blish HUD references in tests; both new/extended tests
+exercise real production code (`PlanSolver.Solve`,
+`CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`)
+with no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
+internal-only. `VendorBatchSolver.cs`'s DO-NOT-TOUCH merged-ceil methods
+had their dollar-amount arithmetic left byte-for-byte unchanged - the only
+edit inside that file this round is the one `Count > 0` capture guard
+(plus its doc comment). `ResolveWithOverrides`/`BuildPresetOverrides`
+themselves needed no change in either fix - both walk the SOLVER tree via
+`solveResult.Decisions`, not the display tree, and neither fix touches
+decision-making, only the cosmetic metadata/ownership maps consulted
+afterward when building display leaves.
+
+**Review-fix round 3 (2026-08-15) - 1 Must Fix finding: the round-2
+ownership widening covered the ITEM component map only and missed its
+exact currency-side sibling.**
+
+- *Fix (Must Fix, `Services/CraftingPlanPipeline.cs`
+  `BuildOwnedCurrencyAmounts`): the currency ownership map was never
+  widened the way the item one was.* Round 2 widened
+  `BuildOwnedVendorItemComponentAmounts` to scan every vendor offer's Item
+  cost lines (`AddAllVendorOfferItemComponentIds`), not just the baseline
+  winning decisions - but `BuildOwnedCurrencyAmounts` still keyed its
+  dictionary strictly off `plan.CurrencyCosts`, the baseline plan's
+  aggregated currency totals. Same failure shape as round 2, currency
+  side: a node whose baseline decision is Craft, manually overridden to
+  `BuyFromVendor` via `ResolveWithOverrides`, surfaces a currency
+  cost-component leaf with a correct name/icon/quantity but permanently NO
+  have pill, even with a full wallet, because that currency id was never
+  in `plan.CurrencyCosts` and `PlanSolveContext.OwnedCurrencyAmounts` is
+  captured once at generation time and reused verbatim (never
+  recomputed) by `ResolveWithOverrides` - exactly the reuse-verbatim
+  argument that justified the round-2 item-side fix. Added
+  `AddAllVendorOfferCurrencyComponentIds`, the currency-side twin of
+  `AddAllVendorOfferItemComponentIds` (same non-coin-Currency /
+  `Count > 0` filter `VendorBatchSolver.EvaluateVendorOffers` itself
+  uses), and widened `BuildOwnedCurrencyAmounts` to scan `vendorOffers`
+  through it in addition to `plan.CurrencyCosts`, at both call sites
+  (single-item and multi-item generation entry points). Harmless for the
+  pre-existing currency summary rows (`PlanViewModelBuilder`), which only
+  ever look up the ids they themselves iterate from `plan.CurrencyCosts` -
+  extra keys in the returned map are simply never read by that caller.
+  Extended test: `CraftingPlanPipelineTests.
+  MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadataAndOwnership`
+  now also attaches a wallet entry for the offer's non-coin currency
+  component and asserts `ComponentOwnedQuantity` on the currency leaf
+  survives the override re-solve, the currency-side sibling of the
+  existing item-leaf assertion in the same test.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors); full module
+test suite green - 1309 passed (unchanged count - the round-3 fix
+extended the same existing test the round-2 fix had already extended,
+rather than adding a new one). No new Blish HUD references in tests; the
+extended test exercises real production code (`PlanSolver.Solve`,
+`CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`)
+with no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
+internal-only. `VendorBatchSolver.cs`'s DO-NOT-TOUCH merged-ceil methods
+were not touched at all this round (the fix is entirely inside
+`CraftingPlanPipeline.cs`, a cosmetic ownership-annotation map consulted
+strictly after solving). `ResolveWithOverrides`/`BuildPresetOverrides`
+themselves needed no change: `BuildPresetOverrides` walks `context.Tree`
+(the solver's `RecipeNode` tree) and never references
+`OwnedCurrencyAmounts` at all - confirmed by reading it. `ResolveWithOverrides`'s
+own decision-making call, `_solver.Solve(context.Tree, ...)`, is likewise
+never given `OwnedCurrencyAmounts` and cannot see it; that map is only
+passed, read-only, into `BuildCraftingTreeResult` afterward, which
+annotates the DISPLAY tree's already-decided leaves with a HAVE pill - it
+cannot feed back into `solveResult.Decisions`, so this fix cannot affect a
+solver decision, only the cosmetic HAVE pill a display leaf reads
+afterward.
+
+**Pre-gate addendum (2026-08-15): "OWN n"/"CURRENCY" badge wording pass.**
+Maintainer field-testing found the component leaves' informational HAVE/
+"HAVE x/y NEEDED" pill (Section "Decision pills stay decision-free" above)
+misleading: that vocabulary means "your stock covers this need and reduced
+the plan cost" everywhere else in the tree, but a component leaf's
+ownership never reduces this line's cost (see `ComponentOwnedQuantity`'s
+own doc comment) - it is purely informational.
+`DecisionPillPlanner.BuildPillSpecs`'s `IsCostComponent` branch now shows a
+subdued "OWN n" badge instead (n = the raw `ComponentOwnedQuantity` holding, no full-vs-partial
+split since coverage never changes the cost either way), rendered only
+when n > 0 (no "OWN 0" clutter) - reusing `PillKind.OwnedInfo` (the same
+muted-gold kind the ordinary partial-ownership annotation already uses, no
+new color). Also added: a "CURRENCY" badge (`PillKind.Locked`, the SAME
+kind/text the plain currency-ingredient leaf's own pill already uses a few
+lines above in `BuildPillSpecs`) on the currency-type component shape
+(`SubtreeCost` never set - the "deliberately blank cost cell"
+`BuildVendorCostComponentLeaves`' currency-line branch produces),
+explaining at a glance why no gold value is shown - gw2efficiency's own grey Currency-
+badge pattern. The two badges are independent and may both appear on one
+leaf; `TreeSectionController.RenderDecisionPills` needed no layout change
+- both badge strings are short ("CURRENCY" plus "OWN n") and comfortably
+fit the existing 240px pill-column budget together (the pill column
+already fits the old, longer "HAVE x/y NEEDED" text alongside a source
+pill - see the `RealSolver_*`/`PartialOwnership_*` tests above), so
+`PlanRelayoutMath.ComputeVisiblePillCount` (untouched) never needs to drop
+either one in practice.
+
+Regular (non-component) currency-ingredient leaves already carried the
+identical "CURRENCY" / `PillKind.Locked` badge before this pass (the
+`CraftingDecision.Currency` short-circuit in `BuildPillSpecs`) - the
+vocabulary-consistency extension this addendum considered for those leaves
+was therefore already in place with zero additional diff.
+
+Tooltips follow the existing pattern exactly (`BasicTooltipText` stamped on
+all three of `outer`/`inner`/`label` together in
+`TreeSectionController.RenderDecisionPills`, per that method's own "tooltip resolved once... then
+stamped onto outer/inner/label together" comment - a tooltip on `outer`
+alone is swallowed by `inner`/`label`, which cover almost the entire pill).
+"OWN n"'s tooltip: "You own {n} - informational only, does not change the
+plan cost". "CURRENCY"'s tooltip (component-leaf case only; the ordinary
+currency-ingredient leaf's ambient "Only available source" default is
+unchanged): "Paid in a non-coin currency - no gold value to show here".
+The now-dead `IsCostComponent` branch of the `PillKind.Have` tooltip (a
+component leaf can no longer reach that `Kind` at all) was simplified back
+to the plain-node wording only.
+
+Updated: `Models/CraftingTreeNode.cs` (`IsCostComponent`'s and
+`ComponentOwnedQuantity`'s doc comments), `Services/CraftingTreeBuilder.cs`
+(`ResolveOwnedQuantity`'s doc comment), `Services/DecisionPillPlanner.cs`,
+`Views/Rendering/TreeSectionController.cs`. `DO-NOT-TOUCH` files (`Services/
+ModuleLog.cs`, `Services/PlanContentHeightMath.cs`, `Services/
+PlanRelayoutMath.cs`, scroll machinery, `VendorBatchSolver`'s merged-ceil
+vendor batching math) were not touched. `DecisionPillPlannerTests` updated:
+3 existing cost-component tests renamed/adjusted for the new "OWN n"
+wording (no more full/partial HAVE split), plus 3 new tests covering the
+CURRENCY-badge threshold (blank vs. non-null `SubtreeCost`) and the two
+badges coexisting in emission order (CURRENCY first, then OWN). Full module
+suite: 1312 passed (1309 baseline + 3 net new).
+`dotnet build -p:Platform=x64` clean (0 errors). No new Blish HUD
+references in tests; the extended/added tests exercise the real
+`DecisionPillPlanner.BuildPillSpecs` production code, no contract-mirror/
+fake-logic tests. Item/currency/vendor IDs remain internal-only (badge text
+is `"OWN n"`/`"CURRENCY"` only, never an id).
+
+Live desktop gate: Gate: PASS 2026-08-16 (orchestrator live sandbox session, combined wave-4 staging build). Verified on the real Amalgamated Rift Essence vendor path: component leaves render under the vendor-selected root (ecto leaf's gold share exactly equals the parent's collapsed total; three currency leaves blank-cost with CURRENCY badges), OWN badges show the RAW wallet holding (300/150/100 against 250/100/50 needs) after the gate-found clamp fix in this branch, no OWN badge at zero holding, manual override to VENDOR re-solves and the overridden state survives module restart via the persisted plan, tree-button tooltips render live (Best Path text verified verbatim). Known composition note: component leaves and the dimmed what-crafting-would-cost reference branch both render under a vendor root with a recipe - as designed; a visual separator is a queued UX question.
+
+## Craft/vendor comparability parity fix (2026-08-15)
+
+Root-caused via user-approved investigation: `Services/PlanSolver.cs`'s
+craft-cost path (the recipe loop inside `Evaluate`) silently valued
+UNVALUED currency ingredients at ZERO coin while still letting the craft
+option compete fully on coin cost in `PickCheapest` - the opposite of how
+`Services/VendorBatchSolver.cs`'s `EvaluateVendorOffers` already treats an
+unvalued non-coin currency line on a vendor offer (demoted to a
+FALLBACK-ONLY tier that never competes on coin cost - see that method's
+own doc comment, M33-era). Consequence: a recipe with a heavy, unpriced
+currency cost could be declared "cheapest" purely because that cost was
+invisible to the comparison, while a vendor offer charging the identical
+currency was correctly barred from the same trick. This asymmetry was
+about to go live the moment a parallel branch's ~188 restored
+currency-ingredient recipes (e.g. Amalgamated Rift Essence: 3 currencies +
+50 ectos crafted vs. the same currencies + 60 ectos vendor) started
+ingesting.
+
+**The fix: give craft the SAME comparable/fallback tier semantics vendor
+already has.** `PlanSolver.Evaluate`'s recipe loop now splits candidate
+recipes into two tiers, exactly mirroring `EvaluateVendorOffers`:
+
+- **Comparable** - no `Currency`-type ingredient, or every one has a
+  user-provided valuation (`CurrencyValuation`/`ModuleSettings.
+  CurrencyValuationsJson`, the same mechanism vendor offers already read).
+  Competes on equal footing with TP buy and a comparable vendor offer in
+  `PickCheapest`, unchanged from before this fix.
+- **Fallback** - at least one `Currency`-type ingredient has NO valuation
+  (or its valuation arithmetic overflows - mirrors `EvaluateVendorOffers`'
+  identical per-line overflow handling). Still fully offered (`CanCraft`
+  stays true, the CRAFT pill still shows - the M33 guarantee is
+  preserved unchanged) but never wins the automatic decision against any
+  comparable option; used only when NOTHING comparable exists anywhere
+  for that node (no TP price, no comparable vendor offer, no comparable
+  recipe).
+
+Two tracked "best" candidates (`bestComparableCraftCost`/
+`bestFallbackCraftCost`, each with its own real-cost and RecipeId
+sibling) replace the old single `bestCraftCost`, with the pre-existing
+lowest-RecipeId tie-break now applied per tier. Only the comparable
+value is ever passed into `PickCheapest`; a manual per-node override
+(`forced == AcquisitionSource.Craft`) uses comparable-first-else-fallback,
+mirroring `VendorBatchSolver`'s own override precedence for
+`BuyFromVendor`. The terminal fallback branch (previously vendor-only:
+"nothing beat buy, but a fallback vendor offer exists") now also
+considers a fallback craft, and when BOTH a fallback craft and a
+fallback vendor offer exist, applies the exact same tie-break
+`PickCheapest` already uses for the comparable tier: the numerically
+cheaper of the two wins, an exact tie keeps vendor - "someone must still
+be picked," extended from the pre-existing vendor-only fallback
+precedent to cover craft's new fallback tier too. A force-buy-only node
+(`OwnedMaterialsForceBuyPrePass`) is excluded from the fallback branch
+the same way it was already excluded from the primary comparison -
+craft stays off every automatic path for that node, not just the
+primary one; `OwnedMaterialsForceBuyPrePass`'s own raw-diagnostics
+`craftCost` figure now reports the comparable-tier cost when one
+exists, else the fallback-tier cost, mirroring the real decision's own
+tier priority (previously the single undifferentiated number).
+
+**Item 2 (valued currencies already competed symmetrically) - verified,
+no change needed.** A recipe's valued `Currency` ingredient already fed
+the craft-vs-buy DECISION value exactly like a vendor offer's valued
+currency line does (`PlanSolver.cs`'s pre-existing currency-ingredient
+branch in the recipe loop, unchanged by this fix) - this was already
+correct and is untouched.
+
+**Item 3 (decision-only valuation - never inflates a displayed coin
+total) - verified already correct, now locked by a dedicated test.**
+Audited both paths: `Decision.TotalCost`/`craftRealCost` (craft) and
+`VendorOfferEvaluation.BestComparableCoinCost`/`totalCoinCost` (vendor)
+already excluded valuation-derived coin from every real, committed cost
+- both were already documented as intentional (`Decision`'s own doc
+comment, "Never includes a valued currency's coin-equivalent"). No
+display-layer code (`PlanResultBuilder`, `PlanViewModelBuilder`) touches
+cost totals at all - `Plan.TotalCoinCost`/`PlanStep.TotalCost`/
+`CraftingTreeNode.SubtreeCost` are the only user-visible coin surfaces
+and are all sourced from `Decision.TotalCost`. Pre-existing tests
+(`PlanSolverCurrencyValuationTests`,
+`PlanSolverCoreDecisionTests.CurrencyIngredient_ValuedButCraftStillWins_RealCostExcludesCurrencyValue`)
+already locked the step-level case; a new test
+(`PlanSolverCraftVendorComparabilityTests.
+ValuedCurrencyIngredient_ComparableCraftWins_PlanTotalCoinCostExcludesValuation`)
+locks it explicitly at the `plan.TotalCoinCost` level too. No fix was
+needed for this item.
+
+**Item 4 (fallback picks must not display a false coin cheapness) -
+verified, no UI change needed.** `DecisionPillPlanner.BuildPillSpecs` and
+`CraftingTreeBuilder.BuildNode` are driven purely by
+`CanCraft`/`CanBuyTp`/`CanBuyVendor`/`Source`/`TotalCost` - they never
+distinguish comparable from fallback tier, and no UI surface anywhere in
+the module claims a decision is "cheapest" (grepped `Views/`/`Services/`/
+`Models/` for the word - no hits). A fallback craft decision now flows
+through the exact same `Commit`/`Decision`/`PlanStep` shape a fallback
+vendor decision already used (real coin `TotalCost`, no invented
+number), so it already presents identically - reuse, not a new UI path,
+per the repo's "reuse existing UI, do not invent new UI" rule.
+
+**Flagged limitation (spec item 5, documented rather than expanded in
+scope): a true tie inside the ARE-shaped fallback case.** When a craft
+recipe and a vendor offer are both fallback-tier (identical unvalued
+currency ingredients on each side) AND their priced/real portions are
+ALSO numerically equal, the terminal fallback tie-break has no finer
+signal than its existing "exact tie keeps vendor" rule - it cannot
+express "these two options are ACTUALLY identical in total real cost
+because the currency lines net out," because currencies are ignored
+entirely on both sides (decision-only valuation), never compared or
+"cancelled" against each other. This is not a regression: the pre-fix
+code could not express this either, and a coin/currency exchange rate
+would have to be invented to do better, which the repo invariant (avoid
+inventing currency exchange rates) rules out. The common case - priced
+portions genuinely differ, as in the real Amalgamated Rift Essence
+example (50 ectos crafted vs. 60 vendor) - is handled correctly: see
+`PlanSolverCraftVendorComparabilityTests.
+AmalgamatedRiftEssenceShaped_IdenticalUnvaluedCurrencies_CraftWinsOnRealItemCostDifference`.
+
+**Tests
+(`tests/GW2CraftingHelper.Tests/Services/PlanSolverCraftVendorComparabilityTests.cs`,
+11 new; plus 3 pre-existing tests updated because they encoded the old
+buggy behavior).** New file covers: a fallback craft stays offered
+(`CanCraft` true) even when the automatic decision picks buy; a
+comparable recipe is chosen over a numerically cheaper fallback recipe
+on the same node; multiple-fallback-recipe tie-break by lowest RecipeId;
+a valued-currency recipe still competes as comparable and can beat both
+a comparable vendor offer and TP buy; `plan.TotalCoinCost` excludes a
+winning comparable recipe's currency valuation; both directions of the
+all-fallback craft-vs-vendor tie-break (cheaper wins) plus the exact-tie
+case (vendor wins); `OwnedMaterialsForceBuyPrePass` exclusion also
+blocks the fallback-craft last resort; a manual per-node override still
+forces a fallback-only recipe; and the Amalgamated-Rift-Essence-shaped
+case itself. The 3 pre-existing tests that encoded the bug
+(`PlanSolverCoreDecisionTests.CurrencyIngredient_AppearsInCurrencyCostsNotSteps`,
+`PlanSolverCoreDecisionTests.CurrencyIngredient_Unvalued_ContributesZeroToDecisionAndCost`
+- renamed to `..._ComparableBuyWins_RegardlessOfFakeZeroCost` and its
+assertion flipped to the corrected outcome,
+`CraftingTreeBuilderTests.CurrencyNode_ResolvesKnownNames`) were each
+updated to remove the item's TP buy price, so the fallback craft is
+still exercised as the last resort and each test's real subject
+(currency display, not the buy-vs-craft decision itself) still applies -
+found via a full-suite run surfacing the regression, then a repo-wide
+grep for every `Leaf(..., "Currency")`/`IngredientType = "Currency"`
+construction site (fix the class, not the instance) to confirm no
+further sibling was missed.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
+warnings from any touched file). Module test suite green - 1284 passed
+(was 1273; +11 new `PlanSolverCraftVendorComparabilityTests`, 3
+pre-existing tests updated in place, net test count unchanged for those
+three). No new Blish HUD references in tests; every new/updated test
+exercises real production code (`PlanSolver.Solve` end-to-end, real
+`RecipeNode`/`RecipeOption`/`VendorOffer` fixtures), no contract-mirror/
+fake-logic tests. Item/currency/vendor IDs remain internal-only. Pricing
+logic continues to preserve multiple sources and avoid inventing
+currency exchange rates - this fix tightens that invariant for craft
+rather than relaxing it.
+
+No live desktop gate for this pass (solver-only change, seed data with a
+currency-ingredient recipe not yet ingested on this branch - see the
+"parallel branch" note above).
+
+## Craft/vendor comparability parity fix - adversarial review follow-up (2026-08-15)
+
+A second, adversarial pass over the fix above (Code Reviewer Mode, per
+this repo's mandatory Edit -> Review -> Fix loop) found five defects, all
+in `Services/PlanSolver.cs`'s recipe loop and terminal fallback branch.
+Four were fixed; one is a flagged, deliberately-unfixed heuristic
+limitation (documented below, per the task's own "flag genuinely
+debatable large fixes rather than expand scope" instruction).
+
+**Fixed (critical): cross-tier scale mismatch at the terminal fallback
+comparison.** The terminal tie-break compared `bestFallbackCraftCost` (a
+ComparisonValue that could include valued-currency valuation copper)
+against `fallbackVendorCoinCost` (real coin only, by the donor's own
+"discard valuation once not allValued" design) - two different scales.
+Fixed by ranking the craft fallback tier itself on `craftRealCost`
+(never the valuation-tainted `craftCost`) and comparing that against
+`fallbackVendorCoinCost` at the terminal branch - both sides are now
+real coin only, exactly mirroring `EvaluateVendorOffers`' own
+fallback-vs-fallback ranking. `bestFallbackCraftCost` and
+`bestFallbackCraftRealCost` are now always assigned the same value for
+a fallback-tier recipe, so a fallback decision's returned
+`ComparisonValue` can never smuggle hidden valuation to a parent either
+(closes the same class of leak as the propagation fix below).
+
+**Fixed (mustFix): mixed valued/unvalued currency on one recipe no
+longer partially contaminates the fallback ranking.** A recipe's
+valuation contribution (`valuationCopper`) is now accumulated separately
+from `craftCost` and only folded in when the recipe stays comparable
+(`!hasUnvaluedCurrency`) - mirrors `EvaluateVendorOffers`' identical
+`valuationCopper`/`allValued` split byte-for-byte. Previously a valued
+line's copper was added directly into `craftCost` inline, so a LATER
+unvalued line on the same recipe demoted it to fallback without ever
+retracting the earlier contribution. Covered by
+`RecipeWithBothValuedAndUnvaluedCurrency_DiscardsValuation_RanksOnRealCostOnly`
+(also exercises the cross-tier fix above - the two defects compounded on
+the same code path).
+
+**Fixed (mustFix): fallback-tier taint now propagates transitively
+through ancestor Craft decisions.** `Decision` gained an internal
+`HasUnvaluedCurrency` bool (never surfaced on the public
+`SolverDecision` - purely a tier-tracking aid, same scope as
+`ComparisonValue`), set true at every fallback-tier `Commit` call site.
+The recipe loop now ORs a chosen ingredient's own
+`HasUnvaluedCurrency` into `hasUnvaluedCurrency` after evaluating it, so
+a recipe with NO currency ingredient of its own but that consumes an
+ingredient whose OWN decision is fallback-tier is itself demoted to
+fallback too. Without this, a currency cost hidden one Craft level down
+would "launder" back into a fully-comparable-looking ancestor - the
+transitive shape of the exact asymmetry this whole fix exists to close.
+Covered by
+`FallbackTaintPropagatesThroughAncestorCraft_NeverLaundersHiddenCurrencyCost`.
+This also uncovered two pre-existing `PlanSolverVendorOfferTests` (
+`VendorCurrencyCosts_MergedAcrossDeduplicatedOccurrences`,
+`VendorCurrencyCosts_MergeOverflow_ClampsRatherThanWraps`) that
+inadvertently relied on the OLD (buggy) non-propagating behavior to
+force an intermediate item to craft via a fallback-vendor-sourced
+ingredient despite having its own real TP price - updated in place
+(remove that intermediate item's TP price so the fallback craft is still
+exercised as the last resort) using the same established pattern already
+applied to the 3 pre-existing tests fixed in the base pass above; their
+real subject (VendorCurrencyCosts merging across tree occurrences) is
+unaffected.
+
+**Fixed (mustFix): a `Currency`-type ingredient tagged with the coin
+currency id is now treated as real copper, not an unvaluable currency.**
+`Models/CurrencyValuation.cs` hard-throws if ever keyed on
+`Gw2Constants.CoinCurrencyId`, so without a dedicated branch a
+coin-typed ingredient could never be valued and would unconditionally
+demote its recipe to the fallback tier - turning a data quirk (GW2's
+v2/recipes ingredients can carry `IngredientType: "Currency"` tagged
+with the coin id itself) into a wrong decision. Mirrors
+`EvaluateVendorOffers`' identical coin-vs-currency routing
+(`VendorBatchSolver.cs` ~230-240): the ingredient's `Quantity` is added
+directly to both `craftCost` and `craftRealCost`, no valuation lookup
+involved. This fix has two sibling sites that needed the identical
+carve-out and were found only because the first regression test written
+against the primary fix failed (`RecomputeCraftCosts`, which
+re-derives every Craft decision's `TotalCost` bottom-up AFTER
+`Evaluate`'s initial commit and previously skipped ALL Currency-type
+ingredients unconditionally, silently stripping the coin contribution
+back out; and `Collect`, whose top-of-method Currency-node handling
+previously folded a coin-typed ingredient into `currencyMap` -
+`plan.CurrencyCosts` - alongside genuine non-coin currencies, which
+would have mis-tagged real copper as currency id 1 and double-reported
+it against the coin already counted in `TotalCost`). All three sites
+now agree. Covered by
+`CoinTypedCurrencyIngredient_IsRealCoin_NeverDemotesRecipeToFallback`.
+
+**Fixed (adversarial-review self-catch, not in the original finding
+list): the new `craftCost = checked(craftCost + valuationCopper)` fold
+could throw an uncaught `OverflowException`.** `craftCost` (from
+non-currency ingredients) and `valuationCopper` could each individually
+stay within `long` range while their sum overflows - the original
+inline `checked` add (pre-existing code, one accumulator) caught this at
+the point of addition; splitting the accumulation into two variables
+(the finding-5 fix above) moved the final combine outside any
+try/catch. Wrapped in the same try/catch-and-demote-to-fallback pattern
+used everywhere else in this loop for absurd valuation input, rather
+than letting a crafting-tree with an extreme currency valuation crash
+the whole `Solve()` call.
+
+**Flagged limitation (finding 4, deliberately not fixed - reported per
+the task's "flag genuinely debatable large fixes" instruction): the
+terminal fallback tie-break can let a vendor offer with a near-zero
+coin part beat a craft fallback with a materially higher real coin
+cost, even though the vendor's true total cost (its own large unvalued
+currency line) is unknown and could be higher.** Concretely: a craft
+fallback costing 500 real copper loses to a vendor fallback offer
+costing 0 coin + 500,000 units of an unvalued currency, purely because
+0 <= 500. This is NOT a scale mismatch (both sides are real coin, after
+the finding-1 fix above) and not new unsoundness introduced by this
+milestone: it is the identical heuristic `EvaluateVendorOffers`' own
+DO-NOT-TOUCH fallback-vs-fallback ranking already uses today (rank by
+coin part alone, since currency is unknowable/incomparable across
+offers - see that method's doc comment), now visible in a new pairing
+(craft vs. vendor) that never existed before this milestone added a
+craft fallback tier at all. Rejecting a low-coin-part vendor offer in
+favor of craft would require inventing some notion of "this coin part
+isn't a meaningful proxy for total cost," which is exactly the kind of
+currency-exchange-rate judgment the repo invariant (avoid inventing
+currency comparisons) forbids, and the vendor-side ranking rule is
+explicitly DO-NOT-TOUCH pattern-donor code this milestone was told to
+mirror, not redesign. Per the task's own guidance for this class of
+finding, the deliberate choice is documented here (not just left silent)
+and locked by a dedicated regression test,
+`AllFallback_VendorZeroCoinPart_BeatsHigherRealCraftCost_DocumentedLimitation`,
+so a future change to this heuristic is a conscious decision rather than
+an untested drift.
+
+**Tests**: 4 new regression tests added to
+`PlanSolverCraftVendorComparabilityTests.cs` (one per fixed finding,
+plus the flagged-limitation lock), for 15 new tests total in that file
+since the base pass; 2 additional pre-existing `PlanSolverVendorOfferTests`
+updated in place (see the transitive-propagation entry above) for 5
+pre-existing tests updated in place across this whole milestone.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
+warnings from any touched file). Module test suite green - 1288 passed
+(was 1273 baseline; 1284 after the base pass; +4 new
+`PlanSolverCraftVendorComparabilityTests` in this follow-up, 2 more
+pre-existing tests updated in place, net test count change +4 from the
+base pass's 1284). No new Blish HUD references in tests; every
+new/updated test exercises real production code (`PlanSolver.Solve`
+end-to-end, real `RecipeNode`/`RecipeOption`/`VendorOffer` fixtures), no
+contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
+internal-only. Pricing logic continues to preserve multiple sources and
+avoid inventing currency exchange rates.
+
+## Craft/vendor comparability parity fix - external review, fourth-site finding (2026-08-15)
+
+An external review of the two passes above found one more defect in
+`Services/PlanSolver.cs`, in the coin-typed-currency-ingredient carve-out
+added by the adversarial-review follow-up pass (the "all three sites now
+agree" fix documented above).
+
+**The asymmetry.** That earlier fix made a `Currency`-type ingredient
+tagged with `Gw2Constants.CoinCurrencyId` (real copper paid directly as
+part of a recipe, not a currency needing a user valuation) contribute to
+`decision.TotalCost` via `Evaluate`'s recipe loop and
+`RecomputeCraftCosts`, and confirmed it reached the Recipe Tree
+(`CraftingTreeNode.SubtreeCost`, sourced from `memo`/`Decisions`) and the
+Crafting Steps shopping-list row (`RefreshCraftStepCosts`, which sums
+`decision.TotalCost` per craft-step occurrence). It did not reach
+`plan.TotalCoinCost` - the Total Cost summary band. That total is built
+by summing only `BuyFromTp`/`BuyFromVendor` step costs (deliberately,
+to avoid double-counting a Craft step's already-recursive total against
+its own Buy-step children) - a coin-typed currency ingredient has no
+Buy step of its own, so its copper fell through that sum entirely. The
+same reproduction the earlier fix's own test used demonstrates it: a
+recipe costing 10 copper (a TP-bought sub-ingredient) plus 50 copper
+(a coin-typed currency ingredient) reported `decision.TotalCost == 60`
+(Recipe Tree, Crafting Steps row) but `plan.TotalCoinCost == 10` (Total
+Cost summary band) - the same "two sections of the same page disagree"
+defect class the M34 fix (fcbb277) eliminated for the vendor-batch
+correction passes, now reintroduced for this one ingredient shape.
+Confirmed latent rather than live on this branch: no seeded recipe in
+`ref/recipes_seed.json` currently carries a `Currency` ingredient tagged
+with the coin id, but the whole premise of the fix this defect was found
+in is that the pending ~188-recipe ingest may bring that shape in, so it
+would have shipped armed.
+
+**Fixed (mustFix): `plan.TotalCoinCost` now includes coin-typed currency
+ingredients.** `Collect`'s Currency-node handling no longer special-cases
+the coin id with an early return; it now folds into `currencyMap` via
+the exact same per-tree-occurrence accumulation every other currency
+already uses (visited once per occurrence, matching how
+`Evaluate`/`RecomputeCraftCosts` already count it exactly once per
+occurrence - no double count introduced). `Solve`'s plan-building step
+then routes that one `currencyMap` key into `totalCoinCost` (instead of
+the ordinary `BuyFromTp`/`BuyFromVendor`-step sum, which it has no step
+to be caught by) and excludes it from `plan.CurrencyCosts`, so it still
+never double-displays as a "currency 1" line - preserving the original
+fix's own display intent, just reaching all four sites instead of three.
+No other `currencyMap` consumer is affected:
+`VendorBatchSolver.FinalizeVendorBatches` only ever writes non-coin
+vendor currency lines into `currencyMap` (vendor's own coin cost is
+already routed straight into a Buy step's coin cost, never into
+`currencyMap`, at `VendorBatchSolver.cs` ~230-240), so it can never
+collide with or double-count the new coin key.
+
+This also corrects `SellSideEconomics`' profit calculation
+(`NetSaleValue - Plan.TotalCoinCost`), which previously would have
+overstated profit by exactly the hidden coin-ingredient amount for any
+plan carrying one - not a separate fix, a direct consequence of
+`TotalCoinCost` now being correct.
+
+**Tests**: extended the existing
+`CoinTypedCurrencyIngredient_IsRealCoin_NeverDemotesRecipeToFallback`
+test (same fixture, no new test method - the finding was that this
+exact test's own scenario proved the bug once `plan.TotalCoinCost` was
+inspected) with an assertion that `plan.TotalCoinCost == 60` (previously
+would have been `10`) and that `plan.CurrencyCosts` never carries a
+`CoinCurrencyId` entry. Net test count unchanged (1288) from the prior
+pass.
+
+Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
+warnings from any touched file). Module test suite green - 1288 passed
+(unchanged from the prior pass's count; no new test methods, one
+existing test extended with additional assertions). No new Blish HUD
+references in tests; the extended test exercises real production code
+(`PlanSolver.Solve` end-to-end). Item/currency/vendor IDs remain
+internal-only. Pricing logic continues to preserve multiple sources and
+avoid inventing currency exchange rates - this fix corrects a real-coin
+total, not a valuation-derived one, so it does not touch the
+decision-only valuation principle.
+
+Gate: PASS 2026-08-16 (orchestrator live sandbox session, combined wave-4 staging build). Verified: Amalgamated Rift Essence offers CRAFT and VENDOR side by side with CRAFT winning honestly on the real priced portion (50 vs 60 ectos, identical currency lines washing out); manual VENDOR override honored and re-solved; fallback-tier vendor behavior observed live on a shard-priced vendor path in the Zojja plan. Coin-typed currency TotalCoinCost routing covered by the suite (no live coin-ingredient recipe in the gate scenarios).
+
+## Timestamp date display (all user-facing timestamps gain dates)
+
+User-directed, field-test feedback: "a session could wrap over midnight" -
+plain HH:mm/h:mm tt time-only displays are ambiguous across a midnight
+boundary, so every user-facing timestamp in the module gains its date. No
+transient-event exclusions - the directive covered every one of them, not
+just the long-lived ones.
+
+**Sites converted (10 in scope, plus 3 out-of-scope sites pulled in as a
+tracked scope expansion).** All ten formerly time-only sites now render with
+a date, using `CultureInfo.InvariantCulture`:
+- `Module.cs`: the `SaveStatusThreadSafe` "Updated" snapshot status and the
+  refresh-failure "{cause}" status (~line 1049 and ~line 1079).
+- `Views/LogTabContent.cs`: `FormatLine`'s log-row timestamp, now
+  `yyyy-MM-dd HH:mm:ss` (was `HH:mm:ss`).
+- `Views/MainView.cs`: the `_clearButton.Click` handler's "Cache Cleared"
+  status (~line 247), `RefreshNowAsync`'s "Updated" status (~line 526), and
+  its own refresh-failure "{cause}" status (~line 581).
+- `Views/SettingsTabContent.cs`: the four "Saved" labels (homestead tiers,
+  log retention, snapshot refresh interval, currency valuations).
+
+Scope expansion (needs PR-body ratification, not silently absorbed): three
+additional `Views/CraftingPlanView.cs` sites that were already
+date-formatted (`SeedRestored`'s "Generated ..." line 724,
+`_statusBoard.Finish`'s "Plan generated - ..." line 2618, the W3D banner's
+"Generated: ..." line 3083) were converted from ambient `CurrentCulture`
+interpolation to `CultureInfo.InvariantCulture` too, to keep all thirteen
+timestamp sites in the module agreeing on one culture policy. This was
+outside this feature's original brief ("already date-formatted, leave
+untouched") and needs the user's explicit sign-off in the PR body, not
+silent inclusion.
+
+**InvariantCulture policy.** Every one of the thirteen sites above formats
+with `CultureInfo.InvariantCulture` rather than the ambient
+`CurrentCulture`: the module's UI strings are English-only, Invariant keeps
+month abbreviations and the AM/PM designator stable (under de-DE, `h:mm tt`
+yields an EMPTY AM/PM designator - "2:14" would be ambiguous with "14:14"),
+and it stops ':' from being culture-substituted inside `HH:mm:ss`.
+Documented in-repo at `Views/LogTabContent.cs`'s `FormatLine` (the log
+format is the strongest case) and at `Views/CraftingPlanView.cs`'s
+`SeedRestored` call (the three out-of-scope sites' own anchor).
+
+**OPEN USER DECISION (layout risk, not silently patched around).** At the
+default 930x710 window, the header status label's free run before
+`_clearButton`'s left edge is ~524px; the worst-case failure composite
+("Refresh partially failed - 3 of 5 sources - Aug 15, 2026 3:41 PM (2h 5m
+ago)") is inferred at roughly 490-530px. Overflow slides UNDER the Clear
+Cache button rather than being clipped, because the buttons draw on top of
+the status label. Options: widen the label's free run, give status its own
+row, or accept the risk as-is - awaiting the user's call.
+
+**Recorded facts (not bugs, not fixed).**
+- Log search matches the FORMATTED line (post-`FormatLine`), so dates are
+  now searchable text - a short numeric query (e.g. "15" or "20") now
+  matches nearly every row via the date, not just a rare timestamp
+  coincidence.
+- Log rows clip ~11 chars more on the right than before (the `yyyy-MM-dd `
+  prefix is 11 characters). Copy still exports the full, unclipped line via
+  `CopyToClipboard`; a horizontal scroll on the Log tab's content panel is
+  the real fix if that tab is revisited.
+
+Gate: PASS 2026-08-16 (orchestrator live sandbox session, combined wave-4 staging build). Verified: Log tab rows render "[INFO] 2026-08-15 21:14:10" ISO-dated; a freshly-produced failure status renders "Refresh failed - GW2 API access not ready - Aug 15, 2026 9:32 PM (25d ago)" with no clipping at the default window width; plan strip and W3D banner dated. Note: a status string persisted by a PRE-fix build renders in the old time-only format until the next status write - expected, not a defect.
 ---
 
 ## Recipe-ingestion bug class: missing schema-version parameter (2026-08-15)
