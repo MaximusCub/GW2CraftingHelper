@@ -5428,14 +5428,25 @@ two new note kinds), `Module.cs` (`FestivalContext` read),
 **Validation performed:** `dotnet build GW2CraftingHelper.csproj
 -p:Platform=x64` - clean, 0 errors (only pre-existing StyleCop warnings,
 none in new/edited files). `dotnet test tests/GW2CraftingHelper.Tests/
-GW2CraftingHelper.Tests.csproj` (measured): 1554 (baseline) -> 1600
-(+46): `CostLineValuationTests` (7), `SeasonalOfferFilterTests` (5),
+GW2CraftingHelper.Tests.csproj` (measured): 1554 (baseline) -> 1601
+(+47): `CostLineValuationTests` (7), `SeasonalOfferFilterTests` (5),
 `RecipeSheetSavingsCalculatorTests` (12), `SeasonalVendorTipCalculatorTests`
-(9), `PlanViewModelBuilderNotesRecipeSheetSavingsTests` (4),
+(10 - includes a review-fix-round addition, see below),
+`PlanViewModelBuilderNotesRecipeSheetSavingsTests` (4),
 `PlanViewModelBuilderNotesSeasonalVendorTipTests` (5), plus 3 new cases
 appended to the existing `CraftingTreeBuilderTests`, plus one existing
 test file gained two new constructor parameters
-(`CraftingPlanResultBuilders`, not itself a test). All 1600 green.
+(`CraftingPlanResultBuilders`, not itself a test). All 1601 green.
+
+**Review-fix round (self-review, before handoff):**
+`SeasonalVendorTipCalculator` was picking the FIRST qualifying seasonal
+offer per item rather than the cheapest - the three real seeded ecto
+offers are exactly this case (three Halloween candy colors, each its
+own TP price, all trading for the same 5x ecto), so a plan could have
+surfaced a real but non-optimal deal. Fixed to scan every qualifying
+offer and keep the cheapest, mirroring `RecipeSheetSavingsCalculator`'s
+own identical "cheapest priceable offer wins" precedent - new test
+`MultipleQualifyingOffers_PicksCheapest`.
 
 **Risks / follow-ups:**
 - `recipeSheetItemIdByRecipeId` ships empty - see the RECIPE-SHEET
