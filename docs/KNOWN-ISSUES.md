@@ -4150,3 +4150,85 @@ logs outside the repository, which are conversation records rather than
 project source and are out of this fix's scope.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+## GuildUpgrade ingredient costing/display fix - Currency sibling icon/rarity leak (2026-08-16)
+
+A third adversarial pass over the fix above found that the icon/rarity
+leak closed for the `GuildUpgrade` branch in the follow-up pass immediately
+above was left wide open one branch below it, in the same method, for the
+`Currency` branch - an incomplete class sweep (repo rule: fix the class,
+not the instance). No DO-NOT-TOUCH code was touched (`Services/
+ModuleLog.cs`, `Services/PlanContentHeightMath.cs`, `Services/
+PlanRelayoutMath.cs`, scroll machinery, `VendorBatchSolver`'s merged-ceil
+batching math).
+
+**Fixed (mustFix): `CraftingTreeBuilder.BuildNode`'s Currency branch set
+only `Name`, leaving `IconUrl`/`Rarity` at whatever the generic
+item-keyed `ResolveIcon`/`ResolveRarity` lookup (against `metadata`,
+keyed on the raw ingredient id) had already populated them with above.**
+A wallet currency id is the same distinct-id-space situation as a guild
+upgrade id: no defined relationship to item ids, so a numeric collision is
+possible and not merely hypothetical - `ref/vendor_offers.json` contains a
+vendor offer with `outputItemId: 24`, and 24 is also a
+`KnownCurrencyNames` key ("Pristine Fractal Relics"). Any plan whose steps
+buy item 24 unions 24 into `CraftingPlanPipeline`'s `metadataIds` (via
+`plan.Steps.Select(s => s.ItemId)`), so `metadata[24]` becomes that
+Wintersday item's `ItemMetadata` and a Pristine Fractal Relics currency
+leaf elsewhere in the same tree would render that item's icon and
+rarity-colored name (`Views/Rendering/TreeSectionController.cs` feeds
+`node.Rarity` to `RarityColors.GetRarityBorderColor`/
+`GetRarityNameColor` and renders `node.IconUrl` directly, for every node
+including Currency ones). Fixed by resolving `IconUrl` through
+`CurrencyDisplayResolver.ResolveIconUrl` (currency-domain, keyed on
+`currencyMetadata`, null when no live metadata has an icon for this id -
+never a guess) instead of the item-keyed result, and explicitly clearing
+`Rarity` to null - currencies have no rarity concept at all, matching
+`BuildVendorCostComponentLeaves`'s own currency-component leaves just
+below in the same file, which already never set `Rarity` for a currency
+leaf.
+
+**Sweep (repo rule: fix the class, not the instance):** re-read all of
+`BuildNode`'s early-return branches (Have/Ignore/GuildUpgrade/Currency/
+Unknown) and `BuildVendorCostComponentLeaves`'s two leaf kinds for the
+same item-metadata-onto-non-item-id pattern. The Have/Ignore/Unknown
+branches and the vendor-item-cost-component leaves all resolve icon/
+rarity for a genuine `"Item"`-typed id (a real item id in every case),
+so the generic `ResolveIcon`/`ResolveRarity` lookup is correct there and
+was left unchanged. The vendor-currency-cost-component leaves already
+used `CurrencyDisplayResolver.ResolveIconUrl` and never set `Rarity`
+(the exact shape this fix now gives the plain Currency branch too). No
+further sibling leaks found.
+
+**Tests (2 new, real production code paths, no Blish references):**
+`CurrencyNode_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides`
+(mirrors `GuildUpgradeNode_NeverResolvesIconOrRarityViaItemMetadata_
+EvenWhenIdCollides`, seeding a colliding `ItemMetadata` entry for id 24
+directly and asserting both `IconUrl` and `Rarity` stay null) and
+`CurrencyNode_IconResolvedFromCurrencyMetadata_NotItemMetadata` (positive
+case: `IconUrl` now comes from `currencyMetadata`, not the item-keyed
+lookup). Both were verified to fail (not merely differ) against the
+pre-fix code before the fix was applied, confirming they actually
+exercise the regression. `.csproj` unchanged (no new files); no Blish HUD
+references; both tests call `CraftingTreeBuilder.BuildTree` directly with
+real `RecipeNode`/`ItemMetadata`/`CurrencyMetadata` fixtures, no
+contract-mirror/fake-logic tests. Item/currency ids remain internal-only
+(never asserted into a displayed string). Pricing logic is untouched;
+this fix is display-only (icon/rarity), matching the class of bug it
+closes.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - PASS (0
+errors, only pre-existing StyleCop warnings, none on
+`Services/CraftingTreeBuilder.cs` or the touched test file). Tests:
+`dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+- 1384 total (1382 baseline + 2 net new) - PASS, 0 failed.
+
+**Self-review findings (Code Reviewer Mode, fixed before commit):** none
+Critical or Must Fix beyond the finding itself. Nice to have, not applied
+(scope discipline - the finding was narrowly about `CraftingTreeBuilder`):
+`Services/PlanViewModelBuilder.cs` has several other `IconUrl = iconUrl`
+assignments that were grepped and spot-checked as part of the sweep above;
+none showed the same item-metadata-keyed-onto-a-non-item-id shape (each
+resolves icon for a genuine item context), so none were changed - flagging
+here rather than silently expanding scope.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]

@@ -409,6 +409,66 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(treeNode.Children);
         }
 
+        [Fact]
+        public void CurrencyNode_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides()
+        {
+            // Adversarial-review finding (guildupgrade-ingredients, Must
+            // Fix): mirrors
+            // GuildUpgradeNode_NeverResolvesIconOrRarityViaItemMetadata_
+            // EvenWhenIdCollides below - `metadata` (the ItemMetadata dict
+            // every Item node's IconUrl/Rarity is looked up from, keyed by
+            // raw ingredient id) happens to carry a genuine entry for the
+            // SAME numeric id as this Currency ingredient. Not merely
+            // hypothetical: id 24 is both a real vendor-offer outputItemId
+            // in ref/vendor_offers.json and a KnownCurrencyNames key
+            // ("Pristine Fractal Relics"), and CraftingPlanPipeline's
+            // metadataIds unions step item ids (among other sources) into
+            // the same dict handed to this builder, so a genuine item-24
+            // entry reaching `metadata` cannot be ruled out. Both IconUrl
+            // and Rarity must stay clear of the item-keyed lookup so an
+            // unrelated item's icon and rarity color can never render
+            // under a currency's name.
+            var node = Leaf(24, 5, "Currency");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = new Dictionary<int, ItemMetadata>
+            {
+                { 24, new ItemMetadata { ItemId = 24, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata);
+
+            Assert.Equal(CraftingDecision.Currency, treeNode.Decision);
+            Assert.NotEqual("wrong.png", treeNode.IconUrl);
+            Assert.Null(treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
+        }
+
+        [Fact]
+        public void CurrencyNode_IconResolvedFromCurrencyMetadata_NotItemMetadata()
+        {
+            // Positive half of the fix above: a Currency leaf's IconUrl now
+            // comes from CurrencyDisplayResolver (currency-domain,
+            // currencyMetadata-keyed) rather than staying at whatever the
+            // generic item-keyed ResolveIcon lookup produced for this id.
+            var node = Leaf(61, 5, "Currency");
+            node.NodeId = 0;
+            var decisions = new Dictionary<int, SolverDecision>();
+            var metadata = Meta();
+            var currencyMetadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 61, new CurrencyMetadata { CurrencyId = 61, Name = "Research Note", IconUrl = "note.png" } }
+            };
+
+            var builder = new CraftingTreeBuilder();
+            var treeNode = builder.BuildTree(node, decisions, metadata, currencyMetadata: currencyMetadata);
+
+            Assert.Equal(CraftingDecision.Currency, treeNode.Decision);
+            Assert.Equal("note.png", treeNode.IconUrl);
+            Assert.Null(treeNode.Rarity);
+        }
+
         // ---- guildupgrade-ingredients fix: "GuildUpgrade" ingredient type ----
         // (Guild Decoration recipes' claimed-guild-hall-upgrade requirement,
         // GW2 API ingredient type - see the real recipe 12002 -> item 80471

@@ -155,10 +155,31 @@ namespace GW2CraftingHelper.Services
             // whenever currencyMetadata is available, rather than only
             // ever depending on this file staying manually in sync with
             // the live API.
+            //
+            // Adversarial-review follow-up (guildupgrade-ingredients,
+            // Must Fix): the GuildUpgrade branch above explicitly clears
+            // IconUrl/Rarity because both were already populated above
+            // from `metadata` keyed on the raw ingredient id - a wallet
+            // currency id is the SAME situation (a distinct id space from
+            // item ids, with a real seed collision: item/currency id 24 is
+            // both a vendor-offer outputItemId in ref/vendor_offers.json
+            // and a KnownCurrencyNames key, "Pristine Fractal Relics"), so
+            // this branch left the same wrong-domain icon/rarity leak open
+            // for Currency that the GuildUpgrade branch had already closed
+            // for itself. IconUrl is now resolved through
+            // CurrencyDisplayResolver.ResolveIconUrl (currency-domain,
+            // null when no live metadata has an icon for this id - never a
+            // guess) instead of the item-keyed ResolveIcon result set
+            // above; Rarity is cleared outright since currencies have no
+            // rarity concept at all (mirrors BuildVendorCostComponentLeaves'
+            // currency-component leaves just below, which never set Rarity
+            // either).
             if (node.IngredientType != "Item")
             {
                 treeNode.Decision = CraftingDecision.Currency;
                 treeNode.Name = CurrencyDisplayResolver.ResolveName(node.Id, currencyMetadata);
+                treeNode.IconUrl = CurrencyDisplayResolver.ResolveIconUrl(node.Id, currencyMetadata);
+                treeNode.Rarity = null;
                 return treeNode;
             }
 
