@@ -3949,3 +3949,91 @@ is Blish-bound and outside this session's test-runnable surface, same
 constraint prior UI-adjacent entries in this file note.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+## AUDIT ROW 20/38 review-fix: test gap + doc-comment fix (2026-08-16)
+
+Adversarial re-review of the AUDIT ROW 20/38 TP price-side fallback
+change (previous section) found two issues, both fixed here.
+
+**Finding 1 (Must Fix, test gap)**: the display half of that change was
+unverified. `SolverDecision.PriceSideFellBack` had coverage, but nothing
+asserted `CraftingTreeNode.PriceSideFellBack`, and nothing exercised the
+BuyFromTp-only gate written twice - once in `PlanSolver.cs`'s `Commit`
+(`src == AcquisitionSource.BuyFromTp && buyPriceSideFellBack`) and again
+in `CraftingTreeBuilder.cs`'s `BuildNode` (`decision.Source ==
+AcquisitionSource.BuyFromTp && decision.PriceSideFellBack`).
+`buyPriceSideFellBack` is computed unconditionally for every node
+regardless of which `Source` wins, so if either gate were ever dropped a
+Craft/BuyFromVendor node would silently render the "price unavailable"
+tooltip line, and no test would fail. Three tests close the gap:
+
+- `PlanSolverPriceBasisAndOverrideTests.
+  BuyOrderBasis_CraftWinsOverFallbackPricedBuy_DecisionFlagStaysFalse` -
+  item 1's preferred TP side is empty (its buy total only exists via the
+  same-item other-side fallback), but Craft wins the three-way
+  comparison; asserts `Decisions[0].PriceSideFellBack == false` at the
+  `Commit` gate.
+- `CraftingTreeBuilderTests.
+  LeafBuyNode_PriceSideFellBack_ReachesCraftingTreeNode` - a leaf priced
+  entirely via the fallback side wins BuyFromTp outright; asserts the
+  positive case, that the flag actually reaches `CraftingTreeNode` (the
+  first assertion of this fact anywhere in the suite - previously only
+  the `SolverDecision` layer was checked).
+- `CraftingTreeBuilderTests.
+  CraftNode_WinsOverFallbackPricedBuy_PriceSideFellBackStaysFalseOnNode`
+  - same fixture shape as the `PlanSolver`-level test above, but built
+  through the real `CraftingTreeBuilder.BuildTree`, asserting the
+  repeated `BuildNode` gate also stays closed on the winning Craft node.
+
+All three exercise real `PlanSolver.Solve` / `CraftingTreeBuilder.
+BuildTree` production code paths (the file's existing `BuildViaRealSolver`
+helper, unchanged) - no contract-mirror or fake-logic tests introduced.
+
+**Finding 2 (Must Fix, misleading API surface)**: the 2-arg
+`PlanSolver.GetUnitPrice(ItemPrice, PriceBasis)` overload's doc comment
+still read "lowest sell listing (instant) or highest buy order
+(patient)... 0 = not priceable" - both now false, since it silently
+delegates to the 3-arg overload and can return the OTHER basis's side
+when the preferred one is empty. Its two external callers
+(`VendorBatchSolver.cs:319` and `CraftingPlanPipeline.cs:1139`'s Buy-All
+preset feasibility check) bind to this overload and only ever see this
+summary in the IDE - the accurate fallback documentation lived
+exclusively on the 3-arg overload neither of them calls. The behavior
+itself was already correct and intentional (both callers should gain the
+fallback, and both already tolerate it via their unchanged `> 0` checks),
+so this was a doc-only fix: the 2-arg overload's comment now states it
+applies the same same-item cross-side fallback and points readers at the
+3-arg overload for the fell-back fact.
+
+**Self-review findings** (Code Reviewer Mode pass over this diff):
+confirmed the new `PlanSolverPriceBasisAndOverrideTests` fixture does not
+accidentally trigger a fallback on the craft ingredient (item 2's
+preferred side is populated directly, so only item 1's losing buy option
+exercises the fallback path, isolating what the assertion is actually
+proving); confirmed the two new `CraftingTreeBuilderTests` cases use
+`BuildViaRealSolver`'s existing default `PriceBasis.InstantBuy` (no new
+helper parameter needed, keeping the diff minimal per the finding's own
+suggested approach); confirmed neither new test file touches
+`ModuleLog.cs`, `PlanContentHeightMath.cs`, `PlanRelayoutMath.cs`, scroll
+machinery, or `VendorBatchSolver`'s merged-ceil batching math (all
+DO-NOT-TOUCH); grepped for any other 2-arg `GetUnitPrice` call site
+beyond the two the finding named - none found, so the doc-comment fix's
+"two external callers" framing is complete, not partial. Nice-to-have
+(not applied - out of scope, doc-only diff per the finding's own
+guidance): the 3-arg overload's doc comment could cross-reference back
+to the 2-arg one, but that direction was already accurate before this
+fix and editing it risked unrelated churn.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` clean, 0
+errors (StyleCop warning count unchanged - both new-test files and the
+one doc-comment edit added no new warnings on touched lines). Tests:
+1374 passed, 0 failed (baseline 1371 from the previous section; +3 net
+new, exactly the three `[Fact]` tests listed above, confirmed via `git
+diff` on the two test files). No Blish HUD/BlishHUD.exe references
+added to tests; both edited test files remain Blish-free. IDs remain
+internal-only; coin icons unaffected (no coin-rendering code touched).
+No live desktop verification performed for this pass - purely a
+solver/builder-layer test and doc-comment fix, no UI-adjacent behavior
+changed.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]

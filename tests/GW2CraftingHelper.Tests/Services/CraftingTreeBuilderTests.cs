@@ -1530,5 +1530,60 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(99, refChild.ItemId);
             Assert.Equal(CraftingDecision.BuyFromTp, refChild.Decision);
         }
+
+        // ---- AUDIT ROW 20/38: SolverDecision.PriceSideFellBack reaching CraftingTreeNode ----
+
+        /// <summary>
+        /// AUDIT ROW 20/38: item 1's preferred side under the default
+        /// InstantBuy basis (BuyInstant) is empty - the buy total only
+        /// exists via this same item's other-side fallback to SellInstant.
+        /// BuyFromTp wins outright (no craft/vendor option at all), so the
+        /// flag must reach the built CraftingTreeNode as true.
+        /// </summary>
+        [Fact]
+        public void LeafBuyNode_PriceSideFellBack_ReachesCraftingTreeNode()
+        {
+            var tree = Leaf(1, 2);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 100 } }
+            };
+            var metadata = Meta((1, "Copper Ore", "copper.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, node.Decision);
+            Assert.True(node.PriceSideFellBack);
+        }
+
+        /// <summary>
+        /// AUDIT ROW 20/38: the repeated BuyFromTp-only guard in
+        /// CraftingTreeBuilder.BuildNode (mirroring PlanSolver's own Commit
+        /// gate) must stop SolverDecision.PriceSideFellBack from leaking
+        /// onto a winning Craft node's CraftingTreeNode even though item 1's
+        /// own (losing) buy option internally fell back to its other TP
+        /// side. Same fixture shape as
+        /// BuyOrderBasis_CraftWinsOverFallbackPricedBuy_DecisionFlagStaysFalse
+        /// in PlanSolverPriceBasisAndOverrideTests, but asserting the flag
+        /// at the CraftingTreeNode layer the UI tooltip actually reads.
+        /// </summary>
+        [Fact]
+        public void CraftNode_WinsOverFallbackPricedBuy_PriceSideFellBackStaysFalseOnNode()
+        {
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 100 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 20 } }
+            };
+            var metadata = Meta(
+                (1, "Sword", "sword.png"),
+                (2, "Ingot", "ingot.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata);
+
+            Assert.Equal(CraftingDecision.Craft, node.Decision);
+            Assert.False(node.PriceSideFellBack);
+        }
     }
 }

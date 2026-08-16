@@ -1457,7 +1457,12 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Unit acquisition cost under the chosen basis: lowest sell listing
-        /// (instant) or highest buy order (patient). 0 = not priceable.
+        /// (instant) or highest buy order (patient), falling back to this
+        /// SAME item's other TP side when the preferred side is empty (see
+        /// the 3-arg overload below for the full rationale). 0 = not
+        /// priceable (both sides empty). Discards whether a fallback
+        /// happened - callers that need that fact (e.g. to surface it in
+        /// the UI) must call the 3-arg overload instead.
         /// </summary>
         internal static int GetUnitPrice(ItemPrice price, PriceBasis priceBasis)
         {

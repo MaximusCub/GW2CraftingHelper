@@ -72,6 +72,32 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void BuyOrderBasis_CraftWinsOverFallbackPricedBuy_DecisionFlagStaysFalse()
+        {
+            // AUDIT ROW 20/38: buyPriceSideFellBack is computed unconditionally
+            // for every node's own TP price (item 1's preferred side, buy
+            // orders / SellInstant, is empty here - the buy-side total only
+            // exists via this same item's other-side fallback to BuyInstant).
+            // Craft still wins the three-way comparison (20 < 100), so
+            // Commit's `src == AcquisitionSource.BuyFromTp` gate must keep
+            // the flag false on the winning Craft decision even though the
+            // losing buy option internally fell back.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 0, SellInstant = 20 } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, null, PriceBasis.BuyOrder);
+
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.Equal(20, result.Plan.TotalCoinCost);
+            Assert.False(result.Decisions[0].PriceSideFellBack);
+        }
+
+        [Fact]
         public void BuyOrderBasis_CanFlipBuyVsCraftDecision()
         {
             // Output: instant 100 / order 90. Craft from 2x ingredient:
