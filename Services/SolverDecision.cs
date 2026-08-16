@@ -9,6 +9,23 @@ namespace GW2CraftingHelper.Services
         public int RecipeId { get; internal set; }
         public long? TotalCost { get; internal set; }
 
+        // currency-ux-package (Feature 3): the internal comparison figure
+        // PlanSolver actually ranked this decision on (real coin/craft cost
+        // PLUS any valued currency contribution, recursively rolled up
+        // through descendants - see PlanSolver.Evaluate's Decision.
+        // ComparisonValue doc comment, the private counterpart this is
+        // copied from). DECISION-ONLY (repo invariant, restated here since
+        // this is the one place that internal figure crosses into public
+        // API surface): TotalCost above remains the sole real/displayed
+        // coin figure everywhere in the app; ComparisonValue exists only so
+        // a hover detail (TreeSectionController's value-detail tooltip) can
+        // explain WHY a CRAFT/BuyFromVendor decision won, never to be
+        // summed into any displayed total. Equal to TotalCost whenever no
+        // currency valuation contributed anywhere in this decision's own
+        // subtree (the common case) - null only when TotalCost is also
+        // null (UnknownSource).
+        public long? ComparisonValue { get; internal set; }
+
         // Non-coin currency lines of a winning BuyFromVendor decision (e.g.
         // spirit shards, karma) - null/empty for every other Source. This is
         // the real, already-scaled-to-quantity cost that TotalCost cannot

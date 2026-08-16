@@ -23,7 +23,19 @@ namespace GW2CraftingHelper.Services
                 TreeRoot = isMultiItem ? null : result.CraftingTree,
                 MultiItemRoots = isMultiItem ? result.MultiItemRoots : null,
                 CurrencyMetadata = result.CurrencyMetadata,
-                PriceBasis = result.PriceBasis
+                PriceBasis = result.PriceBasis,
+                // currency-ux-package (Feature 2): whole-plan currency
+                // totals/holding, unaffected by isMultiItem - result.Plan
+                // is already the single combined Plan object for a batch
+                // (same source BuildCurrencyTableRows already reads for the
+                // Summary section's currency table), so this passthrough
+                // needs no branching.
+                CurrencyPlanTotals = BuildCurrencyPlanTotals(result.Plan.CurrencyCosts),
+                OwnedCurrencyAmounts = result.OwnedCurrencyAmounts,
+                // currency-ux-package (Feature 3): same whole-plan-source
+                // reasoning as CurrencyPlanTotals above - result.Plan is
+                // already the single combined Plan for a multi-item batch.
+                VendorCapsByItemId = BuildVendorCapsByItemId(result.Plan.TimegatedItems)
             };
 
             if (isMultiItem)
@@ -444,6 +456,54 @@ namespace GW2CraftingHelper.Services
             // unstable sort could reorder that tied pair nondeterministically
             // run to run.
             section.Rows.AddRange(currencyRows.OrderBy(r => r.Label, StringComparer.Ordinal));
+        }
+
+        /// <summary>
+        /// currency-ux-package (Feature 2): converts the plan's currency
+        /// cost list into a currency-id-keyed dictionary for
+        /// PlanViewModel.CurrencyPlanTotals - the Recipe Tree's per-leaf
+        /// pill needs O(1) lookup by currency id, unlike
+        /// BuildCurrencyTableRows above, which only ever iterates the list
+        /// once in Summary-table order.
+        /// </summary>
+        private static IReadOnlyDictionary<int, long> BuildCurrencyPlanTotals(List<CurrencyCost> currencyCosts)
+        {
+            if (currencyCosts == null || currencyCosts.Count == 0)
+            {
+                return null;
+            }
+
+            var totals = new Dictionary<int, long>(currencyCosts.Count);
+            foreach (var cc in currencyCosts)
+            {
+                totals[cc.CurrencyId] = cc.Amount;
+            }
+            return totals;
+        }
+
+        /// <summary>
+        /// currency-ux-package (Feature 3): re-indexes the plan's
+        /// informational timegated-cap notices by ItemId for
+        /// PlanViewModel.VendorCapsByItemId - pure passthrough/reindex of
+        /// an already-computed list (VendorBatchSolver.FinalizeVendorBatches
+        /// owns the actual cap computation, untouched here), one entry per
+        /// item id by construction (TimegatedItem is already a per-item
+        /// merged notice).
+        /// </summary>
+        private static IReadOnlyDictionary<int, TimegatedItem> BuildVendorCapsByItemId(
+            List<TimegatedItem> timegatedItems)
+        {
+            if (timegatedItems == null || timegatedItems.Count == 0)
+            {
+                return null;
+            }
+
+            var byItemId = new Dictionary<int, TimegatedItem>(timegatedItems.Count);
+            foreach (var item in timegatedItems)
+            {
+                byItemId[item.ItemId] = item;
+            }
+            return byItemId;
         }
 
         private PlanSectionViewModel BuildUsedMaterialsSection(CraftingPlanResult result)

@@ -2114,5 +2114,74 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(40, node.SubtreeCost);
             Assert.False(node.PriceSideFellBack);
         }
+
+        // --- currency-ux-package (Feature 3): DecisionValue threading ---
+
+        [Fact]
+        public void BuyFromVendorNode_ValuedCurrency_DecisionValueDivergesFromSubtreeCost()
+        {
+            // Same shape as PlanSolverCurrencyValuationTests'
+            // ValuedCurrencyOffer_BeatsExpensiveTp test: 0 coin + 50 karma,
+            // valued at 5 copper/unit = 250 decision-only contribution.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
+            var metadata = Meta((1, "Karma Item", "karma.png"));
+            var solver = new PlanSolver();
+            var solveResult = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation);
+
+            var builder = new CraftingTreeBuilder();
+            var node = builder.BuildTree(tree, solveResult.Decisions, metadata);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.Equal(0, node.SubtreeCost);
+            Assert.Equal(250, node.DecisionValue);
+        }
+
+        [Fact]
+        public void BuyFromTpNode_NeverHasDivergentDecisionValue()
+        {
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+            };
+            var metadata = Meta((1, "TP Item", "tp.png"));
+            var solver = new PlanSolver();
+            var solveResult = solver.Solve(tree, prices);
+
+            var builder = new CraftingTreeBuilder();
+            var node = builder.BuildTree(tree, solveResult.Decisions, metadata);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, node.Decision);
+            Assert.Equal(100, node.SubtreeCost);
+            Assert.Equal(node.SubtreeCost, node.DecisionValue);
+        }
+
+        [Fact]
+        public void CraftNode_NoCurrencyIngredient_DecisionValueEqualsSubtreeCost()
+        {
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+            };
+            var metadata = Meta((1, "Crafted Item", "c.png"), (2, "Material", "m.png"));
+            var solver = new PlanSolver();
+            var solveResult = solver.Solve(tree, prices);
+
+            var builder = new CraftingTreeBuilder();
+            var node = builder.BuildTree(tree, solveResult.Decisions, metadata);
+
+            Assert.Equal(CraftingDecision.Craft, node.Decision);
+            Assert.Equal(node.SubtreeCost, node.DecisionValue);
+        }
     }
 }

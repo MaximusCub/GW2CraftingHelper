@@ -317,6 +317,89 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(50, ccRow.Quantity);
         }
 
+        // --- currency-ux-package (Feature 2): plan-scope passthrough for
+        // the Recipe Tree's per-leaf currency pill ---
+
+        [Fact]
+        public void CurrencyPlanTotals_PopulatedFromPlanCurrencyCosts()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 2, Amount = 50 },
+                new CurrencyCost { CurrencyId = 23, Amount = 3600 }
+            });
+
+            var vm = _builder.Build(result);
+
+            Assert.NotNull(vm.CurrencyPlanTotals);
+            Assert.Equal(50, vm.CurrencyPlanTotals[2]);
+            Assert.Equal(3600, vm.CurrencyPlanTotals[23]);
+        }
+
+        [Fact]
+        public void CurrencyPlanTotals_NoCurrencyCosts_IsNull()
+        {
+            var result = MakeResult();
+
+            var vm = _builder.Build(result);
+
+            Assert.Null(vm.CurrencyPlanTotals);
+        }
+
+        [Fact]
+        public void OwnedCurrencyAmounts_PassesThroughResultUnchanged()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 2, Amount = 50 }
+            });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 2, 10 } };
+
+            var vm = _builder.Build(result);
+
+            Assert.NotNull(vm.OwnedCurrencyAmounts);
+            Assert.Equal(10, vm.OwnedCurrencyAmounts[2]);
+        }
+
+        [Fact]
+        public void OwnedCurrencyAmounts_NoSnapshot_IsNull()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 2, Amount = 50 }
+            });
+
+            var vm = _builder.Build(result);
+
+            Assert.Null(vm.OwnedCurrencyAmounts);
+        }
+
+        [Fact]
+        public void VendorCapsByItemId_PopulatedFromPlanTimegatedItems()
+        {
+            var result = MakeResult(timegatedItems: new List<TimegatedItem>
+            {
+                new TimegatedItem { ItemId = 5, CapType = TimegatedCapType.Daily, CapValue = 3, NeededCount = 10 }
+            });
+
+            var vm = _builder.Build(result);
+
+            Assert.NotNull(vm.VendorCapsByItemId);
+            Assert.True(vm.VendorCapsByItemId.TryGetValue(5, out var cap));
+            Assert.Equal(TimegatedCapType.Daily, cap.CapType);
+            Assert.Equal(3, cap.CapValue);
+        }
+
+        [Fact]
+        public void VendorCapsByItemId_NoTimegatedItems_IsNull()
+        {
+            var result = MakeResult();
+
+            var vm = _builder.Build(result);
+
+            Assert.Null(vm.VendorCapsByItemId);
+        }
+
         [Fact]
         public void CurrencyTable_HaveIsUnclamped_ExceedsRequired()
         {

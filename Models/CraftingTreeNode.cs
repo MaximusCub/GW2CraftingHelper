@@ -66,6 +66,35 @@ namespace GW2CraftingHelper.Models
         public long? UnitCost { get; set; }
         public long? SubtreeCost { get; set; }
 
+        // currency-ux-package (Feature 3): passthrough of
+        // SolverDecision.ComparisonValue for this node's committed
+        // decision - see that property's own doc comment. DECISION-ONLY
+        // (repo invariant, restated here since this is the field the tree
+        // renderer's value-detail tooltip reads directly): SubtreeCost
+        // above remains the sole real/displayed cost for this node;
+        // DecisionValue exists only to explain, on hover, why a CRAFT/
+        // BuyFromVendor decision won when it diverges from SubtreeCost -
+        // never to be shown as, or folded into, a displayed total. Equal
+        // to SubtreeCost whenever no currency valuation contributed
+        // anywhere in this node's own subtree (the common case).
+        public long? DecisionValue { get; set; }
+
+        // currency-ux-package review fix (finding 4, MEASURED): passthrough
+        // of SolverDecision.VendorComponentCostsUnreliable for this node's
+        // committed decision. True only for a BuyFromVendor decision whose
+        // per-occurrence VendorItemCosts/VendorCurrencyCosts (and, by
+        // extension, DecisionValue's own currency component) could not be
+        // proven to still sum to this node's corrected TotalCost after
+        // AllocateVendorNodeCosts merged 2+ tree occurrences into one true
+        // batch (see Decision.VendorComponentCostsUnreliable's own doc
+        // comment). CraftingTreeBuilder already refuses to synthesize
+        // vendor cost-component leaves under this condition
+        // (BuildVendorCostComponentLeaves) for the identical reason;
+        // ValueDetailTooltipBuilder.TryBuild gates on this flag the same
+        // way, so the Feature-3 hover never presents a currency figure it
+        // cannot vouch for.
+        public bool VendorComponentCostsUnreliable { get; set; }
+
         // AUDIT ROW 20/38 (gw2e price-side fallback parity): true when this
         // node's UnitCost above came from an item's NON-preferred TP side
         // because the preferred side (per the plan's PriceBasis) had no

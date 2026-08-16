@@ -94,6 +94,7 @@
     <Compile Include="Models\PlanStep.cs" />
     <Compile Include="Models\CurrencyCost.cs" />
     <Compile Include="Models\CurrencyValuation.cs" />
+    <Compile Include="Models\CurrencyDecisionDefaults.cs" />
     <Compile Include="Models\HomesteadEfficiencyTiers.cs" />
     <Compile Include="Models\CraftingPlan.cs" />
     <Compile Include="Models\TimegatedItem.cs" />
@@ -201,6 +202,7 @@
     <Compile Include="Models\CraftingTreeNode.cs" />
     <Compile Include="Models\VendorItemCostLine.cs" />
     <Compile Include="Services\DecisionPillPlanner.cs" />
+    <Compile Include="Services\ValueDetailTooltipBuilder.cs" />
     <Compile Include="Contracts\IItemSearchProvider.cs" />
     <Compile Include="Services\StaticItemSearchProvider.cs" />
     <Compile Include="Services\CraftableItemSearchProvider.cs" />
