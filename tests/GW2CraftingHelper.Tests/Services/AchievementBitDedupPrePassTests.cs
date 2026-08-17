@@ -227,8 +227,8 @@ namespace GW2CraftingHelper.Tests.Services
             // that turns out to be the ONLY real occurrence on the
             // actually-solved path - purely because a sibling, never-chosen
             // option happened to be visited first. Mirrors
-            // InventoryReducer.ReduceNode's own existing precedent for this
-            // exact ambiguity (only node.Recipes[0] is ever treated as
+            // InventoryReducer.ReduceNodeSourced's own existing precedent
+            // for this exact ambiguity (only node.Recipes[0] is ever treated as
             // canonical): the second option's bit occurrence is left
             // completely alone by this pass.
             var bitInOptionA = Leaf(55, 1, achievementId: 1, achievementBit: 0);

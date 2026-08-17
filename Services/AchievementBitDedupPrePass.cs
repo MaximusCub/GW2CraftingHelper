@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Services
     /// RecipeNode's absolute Quantity once, at tree-build time
     /// (RecipeService.BuildNodeAsync). Zeroing a duplicate occurrence here
     /// therefore also clears that occurrence's own Recipes - mirroring
-    /// InventoryReducer.ReduceNode's identical "Quantity &lt;= 0 -&gt;
+    /// InventoryReducer.ReduceNodeSourced's identical "Quantity &lt;= 0 -&gt;
     /// Recipes.Clear()" treatment of a genuinely fully-owned node exactly -
     /// so PlanSolver.Evaluate has no craft path left to consider for it and
     /// the ordinary zero-quantity Buy/Have collapse (GetBuyCost(...,
@@ -103,8 +103,8 @@ namespace GW2CraftingHelper.Services
         /// still walked normally.
         ///
         /// Only descends through each node's PRIMARY option
-        /// (node.Recipes[0]) - mirroring InventoryReducer.ReduceNode's own
-        /// existing precedent for the identical ambiguity (see its
+        /// (node.Recipes[0]) - mirroring InventoryReducer.ReduceNodeSourced's
+        /// own existing precedent for the identical ambiguity (see its
         /// consumeFromPool doc comment): PlanSolver has not run yet at
         /// pre-pass time, so which of a node's alternate RecipeOptions will
         /// actually be chosen is unknowable here, and gw2efficiency's own

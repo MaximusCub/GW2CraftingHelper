@@ -133,6 +133,38 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Build recipe tree: {sw.ElapsedMilliseconds}ms");
 
+            return await RunPipelineAsync(
+                tree, targetItemId, quantity, items: null, snapshot, ct, progress,
+                activeCharacterName, priceBasis, valuation, ownMaterialsMode, tiers,
+                characterDisciplines, sw, timingLog, phaseTracker);
+        }
+
+        /// <summary>
+        /// Steps 2 through result build, shared by the single-item and
+        /// multi-item paths. Callers run Step 1 (tree build) themselves so
+        /// PlanPhaseTimingSummary keeps its per-path phase labels. items is
+        /// null on the single-item path; when set, tree is the synthetic
+        /// multi-item wrapper and targetItemId/quantity carry the wrapper
+        /// sentinel values for the SolveContext.
+        /// </summary>
+        private async Task<CraftingPlanResult> RunPipelineAsync(
+            RecipeNode tree,
+            int targetItemId,
+            int quantity,
+            IReadOnlyList<PlanRequestItem> items,
+            AccountSnapshot snapshot,
+            CancellationToken ct,
+            IProgress<PlanStatus> progress,
+            string activeCharacterName,
+            PriceBasis priceBasis,
+            CurrencyValuation valuation,
+            OwnMaterialsMode ownMaterialsMode,
+            HomesteadEfficiencyTiers tiers,
+            IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines,
+            Stopwatch sw,
+            List<string> timingLog,
+            PhaseTracker phaseTracker)
+        {
             // Always applied; a no-op when the tree has no achievement-bit
             // ingredients. Must run before inventory reduction and the
             // force-buy pre-pass - see AchievementBitDedupPrePass.
@@ -276,7 +308,17 @@ namespace GW2CraftingHelper.Services
             // and the cached SolveContext metadata must cover them all.
             var metadataIds = new HashSet<int>(allItemIds);
             metadataIds.UnionWith(plan.Steps.Select(s => s.ItemId));
-            metadataIds.Add(targetItemId);
+            if (items != null)
+            {
+                foreach (var item in items)
+                {
+                    metadataIds.Add(item.ItemId);
+                }
+            }
+            else
+            {
+                metadataIds.Add(targetItemId);
+            }
             if (usedMaterials != null)
             {
                 foreach (var um in usedMaterials)
@@ -330,6 +372,7 @@ namespace GW2CraftingHelper.Services
             result.CurrencyMetadata = currencyMetadata;
             result.AcquisitionHints = _acquisitionHints;
             result.DailyCooldownItems = _dailyCooldownItems;
+            result.RequestedItems = items;
             result.CharacterDisciplines = effectiveCharacterDisciplines;
 
             // Owned-currency annotation, cosmetic only - never fed back
@@ -343,16 +386,24 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
                 BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions, vendorOffers);
 
-            // Build crafting tree
-            var treeBuilder = new CraftingTreeBuilder();
-            result.CraftingTree = treeBuilder.BuildTree(
-                treeUsedForSolve, solveResult.Decisions, metadata, _acquisitionHints,
-                ownedQuantityUsedByNodeId, ignoredItemIds: null, currencyMetadata: currencyMetadata,
-                ownedCurrencyAmounts: ownedCurrencyAmounts, ownedVendorItemAmounts: ownedVendorItemAmounts);
+            BuildCraftingTreeResult(
+                result, treeUsedForSolve, solveResult.Decisions, metadata,
+                _acquisitionHints, ownedQuantityUsedByNodeId, ignoredItemIds: null,
+                currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
+                ownedVendorItemAmounts: ownedVendorItemAmounts);
 
-            SellSideEconomics.ApplySellSideEconomics(
-                result, treeUsedForSolve, solveResult, prices,
-                targetItemId, quantity, priceBasis, usedMaterials, ownMaterialsMode);
+            if (items == null)
+            {
+                SellSideEconomics.ApplySellSideEconomics(
+                    result, treeUsedForSolve, solveResult, prices,
+                    targetItemId, quantity, priceBasis, usedMaterials, ownMaterialsMode);
+            }
+            else
+            {
+                SellSideEconomics.ApplyBatchSellSideEconomics(
+                    result, treeUsedForSolve, solveResult, prices, items,
+                    priceBasis, usedMaterials, ownMaterialsMode);
+            }
 
             // Annotation-only: writes only result.ExcessCraftOutputs.
             ExcessCraftOutputCalculator.Apply(result, prices, metadata);
@@ -391,6 +442,7 @@ namespace GW2CraftingHelper.Services
                 OwnedVendorItemAmounts = ownedVendorItemAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
                 CompetencyIndependentForceBuyNodeIds = competencyIndependentForceBuyNodeIds,
+                RequestedItems = items,
                 HomesteadTiers = tiers,
                 CharacterDisciplines = result.CharacterDisciplines,
                 // Only populated when the force-buy pre-pass ran - see
@@ -542,237 +594,10 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Build recipe trees: {sw.ElapsedMilliseconds}ms ({items.Count} items)");
 
-            // Same pre-pass as the single-item path, applied to the whole
-            // wrapper tree at once: an achievement-bit ingredient under one
-            // requested item can coexist with a plain occurrence of the
-            // same id under another, which only the merged tree can see.
-            AchievementBitDedupPrePass.Apply(tree);
-
-            // Step 2: Collect all item IDs from the tree for price lookup
-            progress?.Report(new PlanStatus { Message = "Collecting item IDs..." });
-            sw.Restart();
-            var allItemIds = new HashSet<int>();
-            CollectItemIds(tree, allItemIds);
-            sw.Stop();
-            timingLog.Add($"Collect item IDs: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
-
-            // Step 3: Fetch TP prices
-            phaseTracker.Start(PlanPhase.FetchingPrices, "Fetching prices", allItemIds.Count);
-            progress?.Report(new PlanStatus
-            {
-                Message = $"Fetching prices ({allItemIds.Count} items)...",
-                Total = allItemIds.Count
-            });
-            sw.Restart();
-            var prices = await _tradingPostService.GetPricesAsync(allItemIds, ct);
-            sw.Stop();
-            timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
-
-            // Step 4: Query vendor offers, then price any vendor-only cost items
-            var vendorContext = await FetchPricedVendorContextAsync(
-                allItemIds, prices, progress, sw, timingLog, ct);
-            var vendorOffers = vendorContext.VendorOffers;
-            prices = vendorContext.Prices;
-
-            // See the single-item overload's matching declaration.
-            var solverVendorOffers = SeasonalOfferFilter.ExcludeSeasonal(vendorOffers);
-
-            // Same force-buy pre-pass as the single-item path, applied to
-            // the whole wrapper batch at once.
-            bool useForceBuyPrePass = ownMaterialsMode == OwnMaterialsMode.Valued &&
-                snapshot != null && _reducer != null;
-
-            if (useForceBuyPrePass)
-            {
-                RecipeNodeIds.Assign(tree);
-            }
-
-            // See the single-item overload's matching computation.
-            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
-
-            // Steps 5.5/5.6: see the single-item overload's matching block.
-            ISet<int> forceBuyOnlyNodeIds = null;
-            ISet<int> competencyIndependentForceBuyNodeIds = null;
-            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
-            if (useForceBuyPrePass)
-            {
-                var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, solverVendorOffers, priceBasis, valuation,
-                    characterDisciplines: effectiveCharacterDisciplines);
-                forceBuyOnlyNodeIds = forceBuyPrePassResult.ForceBuyOnlyNodeIds;
-                competencyIndependentForceBuyNodeIds = forceBuyPrePassResult.CompetencyIndependentForceBuyNodeIds;
-
-                var zeroOwnedSolve = _solver.Solve(
-                    tree, prices, solverVendorOffers, priceBasis,
-                    overrides: null, currencyValuation: valuation,
-                    forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
-                    competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
-                    homesteadTiers: tiers,
-                    characterDisciplines: effectiveCharacterDisciplines);
-                zeroOwnedDecisions = zeroOwnedSolve.Decisions;
-            }
-
-            // Step 6: Inventory reduction
-            phaseTracker.Start(PlanPhase.SolvingDecisions, "Solving decisions", null);
-            progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
-            sw.Restart();
-            RecipeNode treeUsedForSolve = tree;
-            List<UsedMaterial> usedMaterials = null;
-            Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null;
-            AccountItemIndex accountIndex = null;
-
-            if (snapshot != null && _reducer != null)
-            {
-                accountIndex = new AccountItemIndex(snapshot.Items);
-                var reduced = _reducer.Reduce(tree, accountIndex, activeCharacterName, zeroOwnedDecisions);
-                treeUsedForSolve = reduced.ReducedTree;
-                usedMaterials = reduced.UsedMaterials;
-                ownedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
-            }
-            sw.Stop();
-            timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
-
-            // Step 7: Solve. The wrapper tree is fed through exactly like a
-            // single item's tree (see PlanSolver.Collect).
-            progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
-            sw.Restart();
-            var solveResult = _solver.Solve(
-                treeUsedForSolve, prices, solverVendorOffers, priceBasis,
-                overrides: null, currencyValuation: valuation,
-                forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
-                competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
-                assignNodeIds: !useForceBuyPrePass,
-                homesteadTiers: tiers,
-                characterDisciplines: effectiveCharacterDisciplines,
-                // See PlanSolver.Evaluate's ownedQuantityUsedByNode doc comment.
-                ownedQuantityUsedByNode: ownedQuantityUsedByNode);
-            var plan = solveResult.Plan;
-            sw.Stop();
-            timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
-
-            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId =
-                BuildOwnedQuantityUsedByNodeId(ownedQuantityUsedByNode);
-
-            // Step 8: Fetch item metadata for every tree item + every
-            // requested item + used materials.
-            var metadataIds = new HashSet<int>(allItemIds);
-            metadataIds.UnionWith(plan.Steps.Select(s => s.ItemId));
-            foreach (var item in items)
-            {
-                metadataIds.Add(item.ItemId);
-            }
-            if (usedMaterials != null)
-            {
-                foreach (var um in usedMaterials)
-                {
-                    metadataIds.Add(um.ItemId);
-                }
-            }
-            // See the single-item overload's matching calls.
-            AddVendorItemComponentIds(solveResult.Decisions, metadataIds);
-            AddAllVendorOfferItemComponentIds(vendorOffers, metadataIds);
-            phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
-            progress?.Report(new PlanStatus
-            {
-                Message = $"Fetching item details ({metadataIds.Count} items)...",
-                Total = metadataIds.Count
-            });
-            sw.Restart();
-
-            // See the single-item overload's matching fetch.
-            var currencyTask = _currencyMetadataService?.GetAllAsync(ct);
-            ObserveFault(currencyTask);
-
-            var metadata = await _itemMetadataService.GetMetadataAsync(metadataIds, ct);
-            sw.Stop();
-            timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
-
-            // Await the currency metadata fetch started above
-            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata =
-                await AwaitCurrencyMetadataOrNullAsync(currencyTask, progress, sw, timingLog, ct);
-
-            // Step 10: Fetch learned recipe IDs (if permission available)
-            ISet<int> learnedRecipeIds =
-                await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, ct);
-
-            // Step 11: Build structured result
-            phaseTracker.Start(PlanPhase.BuildingDisplay, "Building display", null);
-            progress?.Report(new PlanStatus { Message = "Building final result..." });
-            sw.Restart();
-            var resultBuilder = new PlanResultBuilder();
-            // Cosmetic only - see the single-item overload's matching assignment.
-            var result = resultBuilder.Build(
-                plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
-            result.CurrencyMetadata = currencyMetadata;
-            result.AcquisitionHints = _acquisitionHints;
-            result.DailyCooldownItems = _dailyCooldownItems;
-            result.RequestedItems = items;
-            result.CharacterDisciplines = effectiveCharacterDisciplines;
-
-            IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
-                BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts, vendorOffers);
-            result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
-
-            IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
-                BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions, vendorOffers);
-
-            BuildCraftingTreeResult(
-                result, treeUsedForSolve, solveResult.Decisions, metadata,
-                _acquisitionHints, ownedQuantityUsedByNodeId, ignoredItemIds: null,
-                currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
-                ownedVendorItemAmounts: ownedVendorItemAmounts);
-
-            SellSideEconomics.ApplyBatchSellSideEconomics(
-                result, treeUsedForSolve, solveResult, prices, items,
-                priceBasis, usedMaterials, ownMaterialsMode);
-
-            // Annotation-only; walks MultiItemRoots the same way the
-            // single-item call site walks CraftingTree.
-            ExcessCraftOutputCalculator.Apply(result, prices, metadata);
-
-            // See the single-item overload's matching call sites.
-            RecipeSheetSavingsCalculator.Apply(
-                result, learnedRecipeIds, prices, priceBasis, _offersForRecipeSheetItem,
-                _recipeSheetItemIdByRecipeId, effectiveCharacterDisciplines);
-            SeasonalVendorTipCalculator.Apply(
-                result, vendorOffers, prices, priceBasis, _activeFestivalNames());
-            CompetencyOpportunityCalculator.Apply(result);
-
-            result.SolveContext = new PlanSolveContext
-            {
-                TargetItemId = Gw2Constants.MultiItemWrapperItemId,
-                Quantity = 1,
-                Tree = treeUsedForSolve,
-                Prices = prices,
-                VendorOffers = vendorOffers,
-                Metadata = metadata,
-                LearnedRecipeIds = learnedRecipeIds,
-                UsedMaterials = usedMaterials,
-                PriceBasis = priceBasis,
-                CurrencyValuation = valuation,
-                OwnMaterialsMode = ownMaterialsMode,
-                CurrencyMetadata = currencyMetadata,
-                AcquisitionHints = _acquisitionHints,
-                DailyCooldownItems = _dailyCooldownItems,
-                OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId,
-                OwnedCurrencyAmounts = ownedCurrencyAmounts,
-                OwnedVendorItemAmounts = ownedVendorItemAmounts,
-                ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
-                CompetencyIndependentForceBuyNodeIds = competencyIndependentForceBuyNodeIds,
-                RequestedItems = items,
-                HomesteadTiers = tiers,
-                CharacterDisciplines = result.CharacterDisciplines,
-                UnreducedTree = useForceBuyPrePass ? tree : null,
-                AccountItems = useForceBuyPrePass ? ProjectAccountItemsForSolveContext(snapshot.Items) : null,
-                ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null
-            };
-            sw.Stop();
-            timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
-
-            FinishTimingLog(result, timingLog);
-            phaseTracker.Finish();
-
-            return result;
+            return await RunPipelineAsync(
+                tree, Gw2Constants.MultiItemWrapperItemId, quantity: 1, items, snapshot, ct,
+                progress, activeCharacterName, priceBasis, valuation, ownMaterialsMode, tiers,
+                characterDisciplines, sw, timingLog, phaseTracker);
         }
 
         /// <summary>

@@ -9,7 +9,8 @@ namespace GW2CraftingHelper.Services
     {
         public ReducedTreeResult Reduce(
             RecipeNode tree,
-            Dictionary<int, int> ownedItems,
+            AccountItemIndex index,
+            string activeCharacterName,
             // Value-Own-Materials (VOM) design, Candidate A: the Decisions
             // dictionary from a throwaway zero-owned PlanSolver.Solve on the
             // SAME unreduced tree (with forceBuyOnlyNodeIds already applied)
@@ -17,24 +18,41 @@ namespace GW2CraftingHelper.Services
             // by RecipeNode.NodeId, which must already be assigned on
             // `tree` (RecipeNodeIds.Assign) before this call, since it is
             // what CloneNode below preserves onto the clone this method
-            // walks. Null (every existing caller/test) reproduces today's
-            // exact i==0-primary-option heuristic - see ReduceNode's own
-            // doc comment.
+            // walks. Null reproduces the legacy i==0-primary-option
+            // heuristic - see ReduceNodeSourced's own doc comment.
             IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null)
         {
-            var pool = new Dictionary<int, int>(ownedItems);
+            // Build a mutable consumption pool: itemId -> source -> remaining
+            var pool = new Dictionary<int, Dictionary<string, int>>();
             var usedRaw = new List<UsedMaterial>();
             var ownedUsageByNode = new Dictionary<RecipeNode, int>();
 
             var clone = CloneNode(tree);
-            ReduceNode(clone, pool, usedRaw, ownedUsageByNode, consumeFromPool: true, zeroOwnedDecisions);
+            ReduceNodeSourced(clone, index, activeCharacterName, pool, usedRaw, ownedUsageByNode, consumeFromPool: true, zeroOwnedDecisions);
 
             var aggregated = usedRaw
                 .GroupBy(u => u.ItemId)
-                .Select(g => new UsedMaterial
+                .Select(g =>
                 {
-                    ItemId = g.Key,
-                    QuantityUsed = g.Sum(u => u.QuantityUsed)
+                    var allSources = g
+                        .Where(u => u.Sources != null)
+                        .SelectMany(u => u.Sources)
+                        .GroupBy(s => s.Source, StringComparer.Ordinal)
+                        .Select(sg => new MaterialSourceAllocation
+                        {
+                            Source = sg.Key,
+                            Quantity = sg.Sum(a => a.Quantity)
+                        })
+                        .Where(a => a.Quantity > 0)
+                        .OrderBy(a => a.Source, StringComparer.Ordinal)
+                        .ToList();
+
+                    return new UsedMaterial
+                    {
+                        ItemId = g.Key,
+                        QuantityUsed = g.Sum(u => u.QuantityUsed),
+                        Sources = allSources
+                    };
                 })
                 .Where(u => u.QuantityUsed > 0)
                 .ToList();
@@ -49,7 +67,8 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Reduces <paramref name="node"/> and its descendants against the
-        /// shared <paramref name="pool"/>.
+        /// shared <paramref name="pool"/>, lazily initialized per
+        /// item/source from <paramref name="index"/>.
         ///
         /// <paramref name="consumeFromPool"/> decides whether THIS node's
         /// own Quantity may be discounted (inherited from the caller/parent,
@@ -117,152 +136,6 @@ namespace GW2CraftingHelper.Services
         /// to stay internally consistent (every ingredient of every recipe
         /// is always evaluated, even one the solver ultimately doesn't
         /// choose).
-        /// </summary>
-        private void ReduceNode(
-            RecipeNode node,
-            Dictionary<int, int> pool,
-            List<UsedMaterial> used,
-            Dictionary<RecipeNode, int> ownedUsageByNode,
-            bool consumeFromPool,
-            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions)
-        {
-            // In the current GW2 recipe model, only "Item" nodes are consumable
-            // from inventory and can have recipes. Currency nodes are leaves.
-            if (node.IngredientType != "Item")
-            {
-                return;
-            }
-
-            if (consumeFromPool)
-            {
-                int available = 0;
-                pool.TryGetValue(node.Id, out available);
-                int consume = Math.Min(available, node.Quantity);
-
-                if (consume > 0)
-                {
-                    pool[node.Id] = available - consume;
-                    used.Add(new UsedMaterial
-                    {
-                        ItemId = node.Id,
-                        QuantityUsed = consume
-                    });
-                    ownedUsageByNode[node] = consume;
-                    node.Quantity -= consume;
-                }
-            }
-
-            if (node.Quantity <= 0)
-            {
-                node.Quantity = 0;
-                node.Recipes.Clear();
-                return;
-            }
-
-            if (node.Recipes.Count == 0)
-            {
-                return;
-            }
-
-            SolverDecision guideDecision = null;
-            // Reduce is public API with an IReadOnlyDictionary
-            // parameter - PlanSolver never emits a null VALUE, but nothing
-            // stops a caller from doing so. TryGetValue alone returns true
-            // for an entry whose value IS null, and the code below
-            // dereferences guideDecision.Source unconditionally whenever
-            // hasGuide is true - the extra null check keeps a
-            // maliciously/accidentally null-valued entry falling back to
-            // the safe legacy heuristic instead of throwing.
-            bool hasGuide = zeroOwnedDecisions != null &&
-                zeroOwnedDecisions.TryGetValue(node.NodeId, out guideDecision) &&
-                guideDecision != null;
-
-            for (int i = 0; i < node.Recipes.Count; i++)
-            {
-                var option = node.Recipes[i];
-                int origCraftsNeeded = option.CraftsNeeded;
-                int newCraftsNeeded = ComputeCraftsNeeded(node.Quantity, option);
-                option.CraftsNeeded = newCraftsNeeded;
-
-                bool optionConsumes = hasGuide
-                    ? consumeFromPool &&
-                        guideDecision.Source == AcquisitionSource.Craft &&
-                        option.RecipeId == guideDecision.RecipeId
-                    : consumeFromPool && i == 0;
-
-                foreach (var ingredient in option.Ingredients)
-                {
-                    int perCraft = (ingredient.Quantity + origCraftsNeeded - 1) / origCraftsNeeded;
-                    ingredient.Quantity = perCraft * newCraftsNeeded;
-
-                    ReduceNode(ingredient, pool, used, ownedUsageByNode, optionConsumes, zeroOwnedDecisions);
-                }
-            }
-        }
-
-        public ReducedTreeResult Reduce(
-            RecipeNode tree,
-            AccountItemIndex index,
-            string activeCharacterName,
-            // See the other Reduce overload's matching parameter doc
-            // comment - identical semantics, threaded through
-            // ReduceNodeSourced instead of ReduceNode.
-            IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null)
-        {
-            // Build a mutable consumption pool: itemId -> source -> remaining
-            var pool = new Dictionary<int, Dictionary<string, int>>();
-            var usedRaw = new List<UsedMaterial>();
-            var ownedUsageByNode = new Dictionary<RecipeNode, int>();
-
-            var clone = CloneNode(tree);
-            ReduceNodeSourced(clone, index, activeCharacterName, pool, usedRaw, ownedUsageByNode, consumeFromPool: true, zeroOwnedDecisions);
-
-            var aggregated = usedRaw
-                .GroupBy(u => u.ItemId)
-                .Select(g =>
-                {
-                    var allSources = g
-                        .Where(u => u.Sources != null)
-                        .SelectMany(u => u.Sources)
-                        .GroupBy(s => s.Source, StringComparer.Ordinal)
-                        .Select(sg => new MaterialSourceAllocation
-                        {
-                            Source = sg.Key,
-                            Quantity = sg.Sum(a => a.Quantity)
-                        })
-                        .Where(a => a.Quantity > 0)
-                        .OrderBy(a => a.Source, StringComparer.Ordinal)
-                        .ToList();
-
-                    return new UsedMaterial
-                    {
-                        ItemId = g.Key,
-                        QuantityUsed = g.Sum(u => u.QuantityUsed),
-                        Sources = allSources
-                    };
-                })
-                .Where(u => u.QuantityUsed > 0)
-                .ToList();
-
-            return new ReducedTreeResult
-            {
-                ReducedTree = clone,
-                UsedMaterials = aggregated,
-                OwnedQuantityUsedByNode = ownedUsageByNode
-            };
-        }
-
-        /// <summary>
-        /// See ReduceNode's doc comment for <paramref name="consumeFromPool"/>
-        /// / <paramref name="zeroOwnedDecisions"/> - identical reasoning
-        /// applies to this sourced overload (the actual production code
-        /// path, driven by an AccountItemIndex rather than a flat pool):
-        /// with a guide, only the recipe option the zero-owned decision
-        /// actually chose (Source == Craft, matching RecipeId) may recurse
-        /// with pool consumption enabled; without one (null or a NodeId
-        /// missing from the guide), only the primary (first-listed) option
-        /// does, so an alternate, un-chosen recipe option never drains owned
-        /// stock a real branch needs.
         /// </summary>
         private void ReduceNodeSourced(
             RecipeNode node,
