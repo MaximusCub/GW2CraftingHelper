@@ -21,18 +21,11 @@ namespace GW2CraftingHelper.Services
         /// Set to null on success, or a diagnostic string when the fallback
         /// provider is returned.
         /// </param>
-        public static IItemSearchProvider Create(
-            Stream seedStream, out string fallbackReason)
-        {
-            return Create(seedStream, out fallbackReason, out _);
-        }
-
-        /// <summary>
-        /// Overload that also exposes the parsed seed data so other services
-        /// (e.g. metadata fallback) can reuse it without re-reading the file.
-        /// <paramref name="seedData"/> is null when the fallback provider is
-        /// returned.
-        /// </summary>
+        /// <param name="seedData">
+        /// The parsed seed data, so other services (e.g. metadata fallback)
+        /// can reuse it without re-reading the file; null when the fallback
+        /// provider is returned.
+        /// </param>
         public static IItemSearchProvider Create(
             Stream seedStream, out string fallbackReason, out ItemNameSeedData seedData)
         {

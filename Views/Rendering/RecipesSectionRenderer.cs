@@ -79,7 +79,7 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         // M36 fix-pass (MUSTFIX-3): the no-sublabel branch's rowHeight (32)
-        // left the RarityFramedIconOuterSize (34) icon frame at y=1
+        // left the 34px CreateRarityFramedIcon default frame at y=1
         // overflowing rowHeight by 3px even BEFORE the M36 divider-width
         // change (icon bottom = 1 + 34 = 35, rowHeight = 32) - pre-existing
         // negative headroom, not "several pixels of headroom" as

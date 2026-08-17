@@ -50,15 +50,5 @@ namespace GW2CraftingHelper.Services.Recipes
         {
             // No persistence — nothing to do.
         }
-
-        public IReadOnlyDictionary<int, IReadOnlyList<int>> GetAllSearches()
-        {
-            return _searches;
-        }
-
-        public IReadOnlyDictionary<int, RawRecipe> GetAllRecipes()
-        {
-            return _recipes;
-        }
     }
 }

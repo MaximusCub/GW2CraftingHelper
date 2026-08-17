@@ -336,21 +336,5 @@ namespace GW2CraftingHelper.Services
         {
             CurrencyValuationsJson.Value = CurrencyValuationSerializer.Serialize(valuation);
         }
-
-        public void ResetToDefaults()
-        {
-            ModalDialogX.Value = -1;
-            ModalDialogY.Value = -1;
-            CurrencyValuationsJson.Value = string.Empty;
-            ValueOwnMaterials.Value = true;
-            HomesteadFiberTier.Value = 0;
-            HomesteadMetalTier.Value = 0;
-            HomesteadWoodTier.Value = 0;
-            ScrollDiagnosticsEnabled.Value = false;
-            LogMaxSizeBytes.Value = 2 * 1024 * 1024;
-            LogRetentionDays.Value = 14;
-            LogDiagnosticsEnabled.Value = false;
-            SnapshotRefreshIntervalMinutes.Value = 10;
-        }
     }
 }
