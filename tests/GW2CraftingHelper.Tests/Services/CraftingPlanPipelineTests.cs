@@ -795,6 +795,114 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(currencyLeaf.SubtreeCost);
         }
 
+        /// <summary>
+        /// Gate finding 2026-08-16 (receipt/what-if captions, live repro):
+        /// same fixture shape as
+        /// MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadataAndOwnership
+        /// (a Craft-baseline item whose Recipes are non-empty, manually
+        /// overridden to BuyFromVendor via ResolveWithOverrides against a
+        /// 2+-kind vendor offer) - proves the stacked "component leaves +
+        /// reference branch" shape CraftingTreeBuilder.BuildNode produces
+        /// for this case (MixedOfferNode_AlsoHasRecipe_StacksComponentLeavesThenReferenceBranch's
+        /// non-override twin) survives the ResolveWithOverrides round trip
+        /// intact, and that ReceiptCaptionHelper - the exact consumer
+        /// TreeSectionController's three render call sites feed - still
+        /// finds a valid split on the resulting node. This is the deepest
+        /// Blish-free seam that reaches the live "root overridden to
+        /// VENDOR" repro: TreeSectionController itself cannot be exercised
+        /// here (Blish-bound), so a real render-path miss beyond this
+        /// point would not surface as a failure here - see KNOWN-ISSUES.md.
+        /// </summary>
+        [Fact]
+        public async Task MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_ProducesReferenceBranchWithValidCaptionSplit()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(2, buyUnitPrice: 1, sellUnitPrice: 1); // craft is cheap - the baseline winner
+            priceApi.AddPrice(42, buyUnitPrice: 10, sellUnitPrice: 20);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Amalgamated Rift Essence", "essence.png");
+            itemApi.AddItem(2, "Cheap Ingredient", "cheap.png");
+            itemApi.AddItem(42, "Glob of Ectoplasm", "ecto.png");
+
+            CraftingPlanPipeline pipeline;
+            CraftingPlanResult result;
+            using (var tmp = new TempDirectory())
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tmp.Path, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-not-baseline-caption",
+                        OutputItemId = 1,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Item", Id = 42, Count = 5 },
+                            new CostLine { Type = "Currency", Id = 23, Count = 3 }
+                        },
+                        MerchantName = "Test NPC",
+                        Locations = new List<string>()
+                    }
+                });
+
+                pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store,
+                    reducer: new InventoryReducer());
+
+                result = await pipeline.GenerateStructuredAsync(1, 2, null, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy);
+            }
+
+            Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
+
+            var overrides = new Dictionary<int, AcquisitionSource>
+            {
+                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromVendor }
+            };
+            var resolved = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, resolved.CraftingTree.Decision);
+            // The exact live shape: component leaves (item 42, currency 23)
+            // stacked ahead of the reference-branch ingredient (item 2) -
+            // see CraftingTreeBuilder.BuildNode's componentLeaves != null &&
+            // wantsReferenceBranch branch.
+            Assert.True(resolved.CraftingTree.IsReferenceBranch);
+            Assert.Equal(3, resolved.CraftingTree.Children.Count);
+            Assert.True(resolved.CraftingTree.Children[0].IsCostComponent);
+            Assert.True(resolved.CraftingTree.Children[1].IsCostComponent);
+            Assert.False(resolved.CraftingTree.Children[2].IsCostComponent);
+
+            int splitIndex = ReceiptCaptionHelper.ComputeCaptionSplitIndex(resolved.CraftingTree);
+            Assert.Equal(2, splitIndex);
+            Assert.Equal(
+                ReceiptCaptionHelper.VendorPriceCaption,
+                ReceiptCaptionHelper.CaptionForChildIndex(splitIndex, 0));
+            Assert.Equal(
+                ReceiptCaptionHelper.CraftReferenceCaption,
+                ReceiptCaptionHelper.CaptionForChildIndex(splitIndex, splitIndex));
+        }
+
         // M38 WP-14: this test used to prove the (now-deleted, test-only)
         // GenerateAsync produced the same base plan as GenerateStructuredAsync
         // with a null snapshot, plus the latter's extra structured fields.
