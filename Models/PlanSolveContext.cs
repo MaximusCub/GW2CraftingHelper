@@ -183,7 +183,7 @@ namespace GW2CraftingHelper.Models
         /// whenever the pre-pass did not run (Free mode, or no snapshot/
         /// reducer at generation time) - Tree/UsedMaterials above are
         /// already final and correct in that case, so no re-reduction is
-        /// needed or possible. See AccountIndex/ActiveCharacterName below,
+        /// needed or possible. See AccountItems/ActiveCharacterName below,
         /// both populated under the exact same condition as this field.
         /// </summary>
         public RecipeNode UnreducedTree { get; set; }
@@ -201,7 +201,7 @@ namespace GW2CraftingHelper.Models
 
         /// <summary>
         /// The active character name at GENERATION time, threaded through
-        /// to a re-reduction the same way UnreducedTree/AccountIndex are -
+        /// to a re-reduction the same way UnreducedTree/AccountItems are -
         /// see UnreducedTree's doc comment.
         /// </summary>
         public string ActiveCharacterName { get; set; }

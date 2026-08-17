@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Models
         // How much cheaper crafting would have been than the plan's actual
         // committed cost for this node - always > 0 (a note is only ever
         // built when craft would genuinely have saved money; see
-        // CraftingPlanPipeline.BuildCompetencyOpportunities).
+        // CompetencyOpportunityCalculator.Apply).
         public long DeltaCost { get; set; }
 
         public IReadOnlyList<string> Disciplines { get; set; }

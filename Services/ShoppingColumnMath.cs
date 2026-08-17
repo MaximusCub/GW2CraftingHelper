@@ -10,8 +10,9 @@ namespace GW2CraftingHelper.Services
     /// widest actual coin-value string in each column (measured in the view
     /// via BitmapFont.MeasureString, which is Blish-bound and therefore not
     /// tested here), clamped to fixed minimums so short/low-value lists
-    /// don't look cramped. See CraftingPlanView.CreateShoppingListBody for
-    /// the pre-scan that produces maxEachWidth/maxTotalWidth.
+    /// don't look cramped. See ShoppingListSectionRenderer.
+    /// CreateShoppingListBody for the pre-scan that produces
+    /// maxEachWidth/maxTotalWidth.
     /// </summary>
     public static class ShoppingColumnMath
     {

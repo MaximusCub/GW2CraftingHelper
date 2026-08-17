@@ -356,7 +356,7 @@ namespace GW2CraftingHelper.Services
             Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null;
             // VOM finding #1 fix: captured here (rather than scoped inside
             // the `if` below) so it can also feed PlanSolveContext.
-            // AccountIndex further down - see that field's own doc comment.
+            // AccountItems further down - see that field's own doc comment.
             AccountItemIndex accountIndex = null;
 
             if (snapshot != null && _reducer != null)

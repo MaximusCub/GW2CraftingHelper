@@ -15,8 +15,8 @@ namespace GW2CraftingHelper.Models
         // AUTOMATIC pick specifically because no character meets the
         // winning recipe's discipline requirement (see
         // SolverDecision.CraftExcludedByCompetency), even though it would
-        // have been cheaper - see CraftingPlanPipeline.
-        // BuildCompetencyOpportunities. Null/empty when nothing qualifies
+        // have been cheaper - see CompetencyOpportunityCalculator.
+        // Apply. Null/empty when nothing qualifies
         // (no snapshot, nothing excluded, or every exclusion was cost-
         // neutral-or-worse). Rendered by PlanViewModelBuilder.
         // BuildNotesSection as concrete "would save N" Plan Notes lines,

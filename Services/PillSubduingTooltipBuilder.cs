@@ -80,12 +80,11 @@ namespace GW2CraftingHelper.Services
             return $"Always more expensive - needs everything the selected option needs, plus {suffix}";
         }
 
-        // Deliberately duplicates ValueDetailTooltipBuilder's own
-        // FormatCoin (which itself deliberately duplicates
-        // CoinCurrencyRenderer.FormatCoinText) rather than referencing
-        // either - see that method's own doc comment for why this trivial
-        // three-unit format stays independently duplicated per Blish-free
-        // tooltip-builder class instead of shared.
+        // Same gold/silver/copper split as ValueDetailTooltipBuilder's own
+        // FormatCoin, but a different output format (leading zero units
+        // omitted here, always three units there). Deliberately kept
+        // independent per Blish-free tooltip-builder class rather than
+        // shared - see that method's own doc comment for why.
         private static string FormatCoin(long copper)
         {
             if (copper < 0)

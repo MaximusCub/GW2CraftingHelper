@@ -65,21 +65,14 @@ namespace GW2CraftingHelper.Services
             public VendorOfferBatch Batch;
             public bool Conflict;
 
-            // M37 (KNOWN-ISSUES #24/#25 3.3, gw2e parity - the Homestead
-            // Refinement cap-notice gap) previously added a second, coarser
-            // (CapDailyCap, CapWeeklyCap, CapConflict) ratchet here so a
-            // mixed-offer step could still sum a cap notice when every
-            // occurrence's offer agreed on the raw cap tuple, even if the
-            // full batch shape (Conflict above) disagreed. Reverted:
-            // adversarial review found the premise false - the wiki's
-            // per-row WeeklyCap is a template parameter, not a confirmed
-            // per-station aggregate (see KNOWN-ISSUES #24's "Cap data"
-            // note), so two occurrences agreeing on that raw number does
-            // not mean they agree on a real shared limit worth summing
-            // against. Conflict alone continues to suppress the notice for
-            // this step, as it did before this milestone - see
-            // FinalizeVendorBatches and the MixedOffer*_DocumentedLimitation
-            // tests in PlanSolverTests.
+            // Do NOT add a coarser (CapDailyCap, CapWeeklyCap, CapConflict)
+            // ratchet here to sum cap notices for mixed-offer steps: the
+            // wiki's per-row WeeklyCap is a template parameter, not a
+            // confirmed per-station aggregate (KNOWN-ISSUES #24, "Cap
+            // data"), so occurrences agreeing on the raw tuple does not
+            // mean a real shared limit worth summing against. Conflict
+            // alone suppresses the notice - see FinalizeVendorBatches and
+            // the MixedOffer*_DocumentedLimitation tests in PlanSolverTests.
         }
 
         /// <summary>
