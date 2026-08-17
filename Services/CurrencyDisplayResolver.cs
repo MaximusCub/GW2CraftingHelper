@@ -84,10 +84,12 @@ namespace GW2CraftingHelper.Services
             foreach (var line in costLines)
             {
                 int? owned = null;
+                int? rawOwned = null;
                 if (ownedCurrencyAmounts != null &&
                     ownedCurrencyAmounts.TryGetValue(line.Id, out int ownedRaw))
                 {
                     owned = Math.Min(ownedRaw, line.Count);
+                    rawOwned = ownedRaw;
                 }
 
                 result.Add(new CurrencyAmountViewModel
@@ -95,7 +97,8 @@ namespace GW2CraftingHelper.Services
                     Amount = line.Count,
                     Name = ResolveName(line.Id, currencyMetadata),
                     IconUrl = ResolveIconUrl(line.Id, currencyMetadata),
-                    OwnedQuantity = owned
+                    OwnedQuantity = owned,
+                    RawOwnedQuantity = rawOwned
                 });
             }
             return result;

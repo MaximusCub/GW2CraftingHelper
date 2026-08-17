@@ -195,6 +195,32 @@ namespace GW2CraftingHelper.Tests.Services
 
             var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
             Assert.Equal(40, row.CurrencyCosts[0].OwnedQuantity);
+            Assert.Equal(40, row.CurrencyCosts[0].RawOwnedQuantity);
+        }
+
+        [Fact]
+        public void ShoppingList_VendorRow_OwnedCurrencyAmountsExceedRequirement_RawOwnedQuantityKeepsUnclampedHolding()
+        {
+            // shoplist-have-format: OwnedQuantity clamps to the row's Total
+            // (100) so the HAVE/Amount pair the tooltip renders always
+            // reads as coverage; RawOwnedQuantity must still carry the real
+            // 250 the wallet holds so the tooltip can spell that out too.
+            var result = MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep
+                    {
+                        ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromVendor,
+                        TotalCost = 0, UnitCost = 0,
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } }
+                    }
+                });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 250 } };
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Equal(100, row.CurrencyCosts[0].OwnedQuantity);
+            Assert.Equal(250, row.CurrencyCosts[0].RawOwnedQuantity);
         }
 
         [Fact]
@@ -214,6 +240,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
             Assert.Null(row.CurrencyCosts[0].OwnedQuantity);
+            Assert.Null(row.CurrencyCosts[0].RawOwnedQuantity);
         }
 
         [Fact]
@@ -239,6 +266,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
             Assert.Null(row.UnitCurrencyCosts[0].OwnedQuantity);
+            Assert.Null(row.UnitCurrencyCosts[0].RawOwnedQuantity);
             Assert.Equal(40, row.CurrencyCosts[0].OwnedQuantity);
         }
 
