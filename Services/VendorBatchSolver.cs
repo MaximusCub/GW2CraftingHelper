@@ -65,21 +65,15 @@ namespace GW2CraftingHelper.Services
             public VendorOfferBatch Batch;
             public bool Conflict;
 
-            // M37 (KNOWN-ISSUES #24/#25 3.3, gw2e parity - the Homestead
-            // Refinement cap-notice gap) previously added a second, coarser
-            // (CapDailyCap, CapWeeklyCap, CapConflict) ratchet here so a
-            // mixed-offer step could still sum a cap notice when every
-            // occurrence's offer agreed on the raw cap tuple, even if the
-            // full batch shape (Conflict above) disagreed. Reverted:
-            // adversarial review found the premise false - the wiki's
-            // per-row WeeklyCap is a template parameter, not a confirmed
-            // per-station aggregate (see KNOWN-ISSUES #24's "Cap data"
-            // note), so two occurrences agreeing on that raw number does
-            // not mean they agree on a real shared limit worth summing
-            // against. Conflict alone continues to suppress the notice for
-            // this step, as it did before this milestone - see
-            // FinalizeVendorBatches and the MixedOffer*_DocumentedLimitation
-            // tests in PlanSolverTests.
+            // Do NOT add a coarser (CapDailyCap, CapWeeklyCap, CapConflict)
+            // ratchet here to sum cap notices for mixed-offer steps: the
+            // wiki's per-row WeeklyCap is a template parameter, not a
+            // confirmed per-station aggregate (dev-notes/HISTORY.md, M37
+            // "Cap data" note), so occurrences agreeing on the raw tuple
+            // does not mean a real shared limit worth summing against.
+            // Conflict alone suppresses the notice - see
+            // FinalizeVendorBatches and the
+            // MixedOffer*_DocumentedLimitation tests in PlanSolverTests.
         }
 
         /// <summary>
@@ -278,7 +272,7 @@ namespace GW2CraftingHelper.Services
                 // unitPrice` line below - captured here so a display leaf
                 // can be built from it after unitsNeeded scaling, without
                 // ever recomputing the multiplication. PriceSideFellBack
-                // (AUDIT ROW 20/38 review-fix) is this same line's own
+                // is this same line's own
                 // GetUnitPrice out param, carried alongside so the scaled
                 // VendorItemCostLine below can flag it the same way a
                 // plain BuyFromTp node already is.
@@ -299,7 +293,7 @@ namespace GW2CraftingHelper.Services
                         }
                         else
                         {
-                            // W4B review-fix (Must Fix): guard with
+                            // Guarded with
                             // Count > 0, mirroring the raw-coin branch's own
                             // `if (cost.Count > 0)` guard 5 lines above and
                             // the identical Item-cost-line guard below - a
@@ -325,11 +319,9 @@ namespace GW2CraftingHelper.Services
                     }
                     else if (string.Equals(cost.Type, "Item", StringComparison.Ordinal))
                     {
-                        // AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap):
-                        // the 3-arg GetUnitPrice overload replaces the
-                        // 2-arg one used here previously so this barter
-                        // item's own fell-back-side fact is captured, not
-                        // just discarded - see itemCostRaw's doc comment
+                        // The 3-arg GetUnitPrice overload captures this
+                        // barter item's own fell-back-side fact rather than
+                        // discarding it - see itemCostRaw's doc comment
                         // above and VendorItemCostLine.PriceSideFellBack.
                         int unitPrice = 0;
                         bool itemPriceSideFellBack = false;
@@ -340,7 +332,7 @@ namespace GW2CraftingHelper.Services
                         if (unitPrice > 0)
                         {
                             coinCost += (long)cost.Count * unitPrice;
-                            // W4B review-fix (Must Fix): guard the raw
+                            // Guard the raw
                             // capture with Count > 0, mirroring the raw-coin
                             // branch's own `if (cost.Count > 0)` guard above
                             // - a zero/negative-count Item cost line (e.g.
@@ -368,9 +360,7 @@ namespace GW2CraftingHelper.Services
                     }
                     else
                     {
-                        // Adversarial-review finding (2026-08-16, class-level
-                        // sibling of the recipe-ingredient Item-positive
-                        // sweep): an unrecognized CostLine.Type must never be
+                        // An unrecognized CostLine.Type must never be
                         // silently dropped from the fold above - doing so
                         // would leave `priceable` true and cost this offer
                         // as if the line were not there at all, understating
@@ -410,28 +400,10 @@ namespace GW2CraftingHelper.Services
                 // VendorItemCostLine.Quantity (int) skips the offer rather
                 // than truncating it silently.
                 //
-                // W4B review-fix note: a follow-up review flagged this
-                // `itemsScalable`/`continue` guard as new control flow added
-                // inside EvaluateVendorOffers (one of the six DO-NOT-TOUCH
-                // merged-ceil batching methods), asking for it to be either
-                // explicitly justified or rewritten as a non-disqualifying
-                // clamp. Kept as-is, deliberately: it is structurally
-                // identical to - and only extends to a second cost
-                // dimension - the pre-existing `scalable`/`continue` guard a
-                // few lines below for the currency lines (same file, same
-                // loop, same overflow-safety shape, predates this feature),
-                // so it introduces no new KIND of control flow, only
-                // coverage for a new field. It can only fire when a single
-                // occurrence's scaled Item-cost quantity exceeds
-                // int.MaxValue (billions of units of one vendor item in one
-                // purchase) - unreachable with real GW2 data. Rewriting it
-                // as a clamp instead (silently truncating the represented
-                // cost/quantity rather than skipping the offer) would be
-                // the actual behavior change and strictly worse: a clamped
-                // value is silently wrong, while skipping the offer here -
-                // exactly like its currency sibling - never touches
-                // TotalCost/UnitCost/batch selection for any realistic
-                // input and fails safe rather than silently.
+                // The `itemsScalable`/`continue` guard is structurally
+                // identical to the pre-existing currency `scalable` guard
+                // below, can only fire above int.MaxValue scaled quantity,
+                // and skips rather than clamps - a clamp is silently wrong.
                 List<VendorItemCostLine> scaledItemCosts = null;
                 bool itemsScalable = true;
                 if (itemCostRaw != null)
@@ -698,20 +670,10 @@ namespace GW2CraftingHelper.Services
         /// a MustFix-level display nuance - a deliberate, narrower scope
         /// than the currency fix, not an oversight.
         ///
-        /// M37 (KNOWN-ISSUES #24/#25 3.3) investigated a second branch here
-        /// that would still sum a cap notice when occurrences disagreed on
-        /// the winning offer's batch shape (Conflict true) but agreed on the
-        /// raw (DailyCap, WeeklyCap) tuple - targeting the Homestead
-        /// Refinement case, where many distinct input-material offers for
-        /// the same output all carry an identical WeeklyCap. Adversarial
-        /// review found the premise false (that shared number is the wiki's
-        /// per-row template parameter, not a confirmed per-station
-        /// aggregate - see KNOWN-ISSUES #24's "Cap data" note) and the
-        /// summing itself unsound across occurrences that share only a
-        /// subset of one offer, so this was reverted: Conflict alone still
-        /// suppresses the notice for this step, as it did before this
-        /// milestone. See the MixedOffer*_DocumentedLimitation tests in
-        /// PlanSolverTests.
+        /// Do not re-add a branch that sums a cap notice for Conflict steps
+        /// whose occurrences agree on the raw (DailyCap, WeeklyCap) tuple -
+        /// the premise is false, see VendorBatchState's own comment.
+        /// Conflict alone suppresses the notice.
         /// </summary>
         internal List<TimegatedItem> FinalizeVendorBatches(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
@@ -737,8 +699,7 @@ namespace GW2CraftingHelper.Services
                         : 0;
 
                     step.TotalCost = batch.CoinCostPerBatch * unitsNeeded;
-                    // M34 fix (MustFix review finding, PlanSolver.cs:1062):
-                    // the coin "Each" cell must show the winning offer's own
+                    // The coin "Each" cell must show the winning offer's own
                     // true per-unit rate (its per-batch coin cost divided by
                     // its own OutputCount), not a truncating average of the
                     // corrected AGGREGATE total over aggregate Quantity -
@@ -795,8 +756,8 @@ namespace GW2CraftingHelper.Services
                 }
                 // Conflict == true (occurrences disagreed on the winning
                 // offer's exact batch shape) intentionally produces no cap
-                // notice here - see this method's doc comment and
-                // KNOWN-ISSUES #24's "Cap data" note for why a cap notice
+                // notice here - see this method's doc comment and the M37
+                // "Cap data" note in dev-notes/HISTORY.md for why a cap notice
                 // cannot be soundly computed across genuinely different
                 // offers with only a wiki-scraped per-row cap number to
                 // compare against.
@@ -818,11 +779,11 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Redistributes each FinalizeVendorBatches-corrected merged vendor
         /// step's true aggregate TotalCost back to the individual per-
-        /// occurrence memo (Decision) entries that fed it - the fix for the
-        /// Critical review finding that CraftingTreeNode.SubtreeCost (via
-        /// the public Decisions dict) kept showing the stale, per-
-        /// occurrence-overcounted sum after FinalizeVendorBatches corrected
-        /// only the merged PlanStep/currencyMap view.
+        /// occurrence memo (Decision) entries that fed it - without this,
+        /// CraftingTreeNode.SubtreeCost (via the public Decisions dict)
+        /// kept showing the stale, per-occurrence-overcounted sum after
+        /// FinalizeVendorBatches corrected only the merged PlanStep/
+        /// currencyMap view.
         ///
         /// Only touches stepKeys FinalizeVendorBatches actually corrected
         /// (step.VendorOfferOutputCount &gt; 0 - only ever set inside that
@@ -872,7 +833,7 @@ namespace GW2CraftingHelper.Services
         /// specific shape - see
         /// MultiOccurrenceBulkVendorOffer_CorrectionPropagatesThroughFourCraftLevelsAndBranches.
         ///
-        /// W4B review-fix note: a component leaf's raw VendorItemCosts/
+        /// A component leaf's raw VendorItemCosts/
         /// VendorCurrencyCosts (captured pre-merge, per occurrence, by
         /// EvaluateVendorOffers) are NOT re-derived here the way TotalCost
         /// is - they can disagree with the corrected share this method
@@ -921,7 +882,7 @@ namespace GW2CraftingHelper.Services
                 long allocated = 0L;
                 for (int i = 0; i < occurrences.Count; i++)
                 {
-                    // Review fix (overflow): step.TotalCost * quantity can
+                    // Overflow: step.TotalCost * quantity can
                     // exceed long range (up to totalQuantity times larger
                     // than the old UnitCost * quantity product this shape
                     // replaced), and on wrap the numerator goes negative,

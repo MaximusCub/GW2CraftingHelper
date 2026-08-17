@@ -15,10 +15,11 @@ namespace GW2CraftingHelper.Services
     /// reference Blish HUD/Gw2Sharp" invariant (see
     /// SnapshotFetchFailedExceptionTests' own doc comment for the same
     /// reasoning applied to that type). Gw2AccountSnapshotService - which
-    /// IS allowed to reference Gw2Sharp - is the only place that ever turns
-    /// a real caught exception into a type name string
-    /// (ex.GetType().Name), via SnapshotFetchFailedException's
-    /// FailedSourceExceptionTypeNames.
+    /// IS allowed to reference Gw2Sharp - turns real caught exceptions
+    /// into type name strings (ex.GetType().Name) via
+    /// SnapshotFetchFailedException's FailedSourceExceptionTypeNames; the
+    /// Classify(Exception) overload below does the same for a bare
+    /// exception.
     /// </summary>
     public static class SnapshotFailureClassifier
     {

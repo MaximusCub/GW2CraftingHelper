@@ -55,16 +55,6 @@ namespace GW2CraftingHelper.Views
         private const int RightEdgePadding = 20;
         private const int SectionSpacing = 16;
 
-        // M36 fix-pass (NICETOHAVE c): overall outer size (icon + both
-        // border edges) of IconControls.CreateRarityFramedIcon's DEFAULT frame (32px
-        // icon + 1px border each side - see that method's own default
-        // parameters). Named so the row-height-vs-icon-frame arithmetic
-        // comments this pass touches (CreateRecipeRow, M38 WP-23c: now
-        // Views/Rendering/RecipesSectionRenderer.CreateRecipeRow) reference
-        // one source of truth instead of re-hardcoding "34" independently of
-        // IconControls.CreateRarityFramedIcon's actual defaults.
-        private const int RarityFramedIconOuterSize = 34;
-
         // Section divider grey, readable against the parchment texture, one
         // tier below the 180-grey structural separators (window chrome,
         // unrelated to this). The row-divider twin (RowDividerColor) moved
@@ -541,7 +531,8 @@ namespace GW2CraftingHelper.Views
         // used to repeat "_settings != null && _settings.ScrollDiagnosticsEnabled.Value"
         // verbatim. Pure property, same short-circuit null-guard, no behavior
         // change - see docs/KNOWN-ISSUES.md #12 for why this stays gated.
-        // M39 (log system, tab-roadmap-proposal Section 2.1): ALSO true when
+        // M39 (log system, docs/dev-notes/m38-plan/proposals/
+        // tab-roadmap-proposal.md Section 2.1): ALSO true when
         // the new unified LogDiagnosticsEnabled setting is on -
         // LogDiagnosticsEnabled subsumes ScrollDiagnosticsEnabled (one
         // Settings-tab checkbox for the whole module going forward), but
@@ -554,7 +545,8 @@ namespace GW2CraftingHelper.Views
             (_settings.LogDiagnosticsEnabled.Value || _settings.ScrollDiagnosticsEnabled.Value);
 
         /// <summary>
-        /// M39 (log system, d2-log-system.md Section 8): routes every
+        /// M39 (log system, docs/dev-notes/m38-plan/proposals/
+        /// d2-log-system.md Section 8): routes every
         /// [scrolldiag] line to BOTH sinks - Blish's own Logger (unchanged,
         /// additive) and the new module-wide ModuleLog at Debug level, tag
         /// "scrolldiag" - so the channel is visible in-module via the Log

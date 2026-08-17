@@ -48,17 +48,7 @@ namespace GW2CraftingHelper.Services.Recipes
 
         public void Flush(bool force = false)
         {
-            // No persistence — nothing to do.
-        }
-
-        public IReadOnlyDictionary<int, IReadOnlyList<int>> GetAllSearches()
-        {
-            return _searches;
-        }
-
-        public IReadOnlyDictionary<int, RawRecipe> GetAllRecipes()
-        {
-            return _recipes;
+            // No persistence - nothing to do.
         }
     }
 }

@@ -38,8 +38,6 @@ namespace MysticForgeSeeder
         private readonly int _maxRequests;
         private int _requestCount;
 
-        public int RequestCount => _requestCount;
-
         public WikiRecipeClient(HttpClient httpClient, int delayMs = 250, int maxRequests = 200)
         {
             _httpClient = httpClient;

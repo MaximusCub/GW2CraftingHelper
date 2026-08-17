@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Tests.Services
             ]";
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
             {
-                var provider = ItemSearchProviderFactory.Create(stream, out string reason);
+                var provider = ItemSearchProviderFactory.Create(stream, out string reason, out _);
 
                 Assert.IsType<CraftableItemSearchProvider>(provider);
                 Assert.Null(reason);
@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Tests.Services
             string json = "[]";
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
             {
-                var provider = ItemSearchProviderFactory.Create(stream, out string reason);
+                var provider = ItemSearchProviderFactory.Create(stream, out string reason, out _);
 
                 Assert.IsType<StaticItemSearchProvider>(provider);
                 Assert.NotNull(reason);
@@ -40,7 +40,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void NullStream_ReturnsFallbackWithReason()
         {
-            var provider = ItemSearchProviderFactory.Create(null, out string reason);
+            var provider = ItemSearchProviderFactory.Create(null, out string reason, out _);
 
             Assert.IsType<StaticItemSearchProvider>(provider);
             Assert.NotNull(reason);
@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Tests.Services
             string json = "not valid json at all";
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
             {
-                var provider = ItemSearchProviderFactory.Create(stream, out string reason);
+                var provider = ItemSearchProviderFactory.Create(stream, out string reason, out _);
 
                 Assert.IsType<StaticItemSearchProvider>(provider);
                 Assert.NotNull(reason);
@@ -69,7 +69,7 @@ namespace GW2CraftingHelper.Tests.Services
             ]";
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
             {
-                var provider = ItemSearchProviderFactory.Create(stream, out _);
+                var provider = ItemSearchProviderFactory.Create(stream, out _, out _);
 
                 var results = provider.SearchAsync(
                     "Zojja", 10, System.Threading.CancellationToken.None).Result;

@@ -57,7 +57,7 @@ namespace GW2CraftingHelper.RecipeSeeder.Tests
 
                 Assert.Equal(new List<int> { 10, 20, 30 }, ids);
                 Assert.NotNull(handler.LastRequestUri);
-                Assert.Contains("v=", handler.LastRequestUri.Query);
+                Assert.Matches(@"[?&]v=\d{4}-\d{2}-\d{2}(&|$)", handler.LastRequestUri.Query);
             }
         }
 
@@ -81,7 +81,7 @@ namespace GW2CraftingHelper.RecipeSeeder.Tests
                 Assert.Single(recipes);
                 Assert.Equal(10, recipes[0].Id);
                 Assert.NotNull(handler.LastRequestUri);
-                Assert.Contains("v=", handler.LastRequestUri.Query);
+                Assert.Matches(@"[?&]v=\d{4}-\d{2}-\d{2}(&|$)", handler.LastRequestUri.Query);
             }
         }
 

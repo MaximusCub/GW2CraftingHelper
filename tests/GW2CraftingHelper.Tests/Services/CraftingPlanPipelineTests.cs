@@ -1906,22 +1906,23 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task GenerateStructuredAsync_NullPhaseProgress_BehavesIdenticallyToOmitted()
+        public async Task GenerateStructuredAsync_NullPhaseProgress_ProducesCompleteResult()
         {
+            // Same fixture and absolute expectations as
+            // Structured_TargetHasBuyOrders_ProfitFieldsComputed - a null
+            // phaseProgress must not degrade the result.
             var pipeline = BuildEconomicsPipeline(out var priceApi);
             priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
             priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
 
-            var withOmittedParam = await pipeline.GenerateStructuredAsync(
-                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
-            var withExplicitNull = await pipeline.GenerateStructuredAsync(
+            var result = await pipeline.GenerateStructuredAsync(
                 1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,
                 phaseProgress: null);
 
-            Assert.Equal(withOmittedParam.Plan.TotalCoinCost, withExplicitNull.Plan.TotalCoinCost);
-            Assert.Equal(withOmittedParam.Plan.Steps.Count, withExplicitNull.Plan.Steps.Count);
-            Assert.Equal(withOmittedParam.CraftingProfit, withExplicitNull.CraftingProfit);
-            Assert.Equal(withOmittedParam.NetSaleValue, withExplicitNull.NetSaleValue);
+            Assert.Equal(300, result.Plan.TotalCoinCost);
+            Assert.Equal(2, result.Plan.Steps.Count);
+            Assert.Equal(340, result.NetSaleValue);
+            Assert.Equal(40, result.CraftingProfit);
         }
 
         [Fact]

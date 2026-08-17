@@ -1,0 +1,42 @@
+{
+  "CapturedAt": "2026-07-21T12:00:00.0000000Z",
+  "CoinCopper": 1500000,
+  "Items": [
+    {
+      "ItemId": 19675,
+      "Name": "Mystic Clover",
+      "IconUrl": "https://render.guildwars2.com/file/FE9DC3E10D4B2AE16DADEB07CF28A058570E2EF3/455855.png",
+      "Count": 30,
+      "Source": "MaterialStorage"
+    },
+    {
+      "ItemId": 73248,
+      "Name": "Stabilizing Matrix",
+      "IconUrl": "https://render.guildwars2.com/file/1995007E91F8EE320FBA5805AEF27EECCF9CD3A0/1200208.png",
+      "Count": 30,
+      "Source": "MaterialStorage"
+    },
+    {
+      "ItemId": 79418,
+      "Name": "Mystic Runestone",
+      "IconUrl": "https://render.guildwars2.com/file/04296A0273A1DB6866E5180B73F5A3E59E2A0C95/1493223.png",
+      "Count": 150,
+      "Source": "MaterialStorage"
+    },
+    {
+      "ItemId": 46752,
+      "Name": "Augur's Stone",
+      "IconUrl": "https://render.guildwars2.com/file/622C35BD7B48F77C07C94CA3C73F9D9ADBCA4403/631529.png",
+      "Count": 5,
+      "Source": "MaterialStorage"
+    }
+  ],
+  "Wallet": [
+    {
+      "CurrencyId": 23,
+      "CurrencyName": "Spirit Shards",
+      "IconUrl": "",
+      "Value": 50
+    }
+  ]
+}

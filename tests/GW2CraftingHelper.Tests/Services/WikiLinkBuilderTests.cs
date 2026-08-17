@@ -207,16 +207,22 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(WikiLinkBuilder.HasWikiPage(sentinelName));
         }
 
-        [Fact]
-        public void HasWikiPage_AgreesWithBuildItemPageUrl_ForRealName()
+        [Theory]
+        [InlineData("Bolt of Damask", true)]
+        [InlineData("Unknown Item", false)]
+        [InlineData("Currency", false)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void HasWikiPage_AgreesWithBuildItemPageUrl(string itemName, bool expected)
         {
             // The whole point of the pre-check is that callers can trust it
             // to predict BuildItemPageUrl's null-vs-non-null outcome
-            // without paying for the real URL construction - assert the two
-            // never disagree for a realistic input.
-            Assert.Equal(
-                WikiLinkBuilder.BuildItemPageUrl("Bolt of Damask") != null,
-                WikiLinkBuilder.HasWikiPage("Bolt of Damask"));
+            // without paying for the real URL construction - pin both legs
+            // to the same expected outcome across inputs from both sides of
+            // the divide, so agreement-by-accident (false == false for
+            // every input) cannot pass.
+            Assert.Equal(expected, WikiLinkBuilder.BuildItemPageUrl(itemName) != null);
+            Assert.Equal(expected, WikiLinkBuilder.HasWikiPage(itemName));
         }
     }
 }

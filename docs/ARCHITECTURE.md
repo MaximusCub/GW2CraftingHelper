@@ -342,8 +342,8 @@ plan-authoring baseline down to ~2,802 lines at the time WP-26 was cut -
 real progress, even though short of the plan's own 2,000-line target - so
 the remaining scroll/resize/wheel machinery stays in `CraftingPlanView.cs`,
 fully region-mapped with KNOWN-ISSUES anchor comments at each region head.
-Measured current: `Views/CraftingPlanView.cs` is 3,674 lines (2026-08-17) -
-higher than the post-WP-26 figure above, which is expected, not a
+`Views/CraftingPlanView.cs` has since grown well past the post-WP-26
+figure above, which is expected, not a
 regression of the decomposition: every line added since (W3B status
 strip/spinner, currency-ux-package, gate-round fixes, the
 tree-tooltip-composer extraction itself, ...) is a legitimate feature/fix

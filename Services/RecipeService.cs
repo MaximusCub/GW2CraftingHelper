@@ -20,7 +20,6 @@ namespace GW2CraftingHelper.Services
         private const int DefaultMaxConcurrency = 4;
 
         public Action<string> OnStatusUpdate { get; set; }
-        public RecipeCacheStats CacheStats => _cacheStore.Stats;
 
         public RecipeService(
             IRecipeApiClient api,

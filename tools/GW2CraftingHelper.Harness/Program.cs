@@ -681,27 +681,6 @@ namespace GW2CraftingHelper.Harness
             return sorted[mid];
         }
 
-        private static double Percentile(List<long> sorted, double p)
-        {
-            if (sorted.Count == 0)
-            {
-                return 0;
-            }
-            if (sorted.Count == 1)
-            {
-                return sorted[0];
-            }
-            double rank = p * (sorted.Count - 1);
-            int lower = (int)Math.Floor(rank);
-            int upper = (int)Math.Ceiling(rank);
-            if (lower == upper)
-            {
-                return sorted[lower];
-            }
-            double frac = rank - lower;
-            return sorted[lower] + frac * (sorted[upper] - sorted[lower]);
-        }
-
         private static async Task<int> FetchBuildIdAsync(HttpClient httpClient)
         {
             using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5)))

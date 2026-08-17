@@ -616,6 +616,13 @@ namespace GW2CraftingHelper.Services
                     // then made the value-detail tooltip's divergence check
                     // fire and render a precise-looking optimization price
                     // for an offer that was never actually valued.
+                    // Consequence: a skipped fallback-tier decision keeps
+                    // its PRE-correction ComparisonValue, so ComparisonValue
+                    // == TotalCost need not hold for it after the merged
+                    // correction. Contained today (ValueDetailTooltipBuilder
+                    // bails on VendorComponentCostsUnreliable, and
+                    // RecomputeComparisonValues overwrites Craft ancestors);
+                    // a new consumer must not assume that invariant here.
                     if (memo.TryGetValue(nodeId, out var decision) && decision.TotalCost.HasValue &&
                         !decision.HasUnvaluedCurrency)
                     {
