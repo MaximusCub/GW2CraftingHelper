@@ -60,15 +60,54 @@ namespace GW2CraftingHelper.Services
         /// forced. CompetencyIndependentForceBuyNodeIds is the (always
         /// smaller-or-equal) subset forced under BOTH that evaluation AND a
         /// second, competency-BLIND evaluation using the RAW cheapest recipe
-        /// regardless of training - i.e. genuinely forced no matter what the
-        /// account is trained in. PlanSolver.Evaluate gates
+        /// regardless of training - forced under both evaluations, a much
+        /// stronger signal than ForceBuyOnlyNodeIds alone but NOT a strict
+        /// training-independence guarantee (see the nuance below).
+        /// PlanSolver.Evaluate gates
         /// Decision.CheapestCraftUntrained on THIS narrower set (via
         /// Solve's competencyIndependentForceBuyNodeIds parameter), not on
         /// ForceBuyOnlyNodeIds membership, so a competency-caused force-buy
-        /// never silently suppresses a real training opportunity -
+        /// at the node's OWN recipe choice can no longer suppress a real
+        /// training opportunity - see the nuance below for the residual
+        /// child-inflation case that still can -
         /// PillSourceCostBreakdown/the solver's own forceBuyOnlyNodeIds
         /// parameter (solve behavior itself) still use ForceBuyOnlyNodeIds
         /// exactly as before this fix.
+        /// <para>
+        /// Doc nuance (recorded follow-up, srcsel verification; direction
+        /// corrected on a later follow-up sweep - see docs/KNOWN-ISSUES.md
+        /// for the reasoning): "competency-BLIND" above describes the raw
+        /// evaluation only AT THE NODE'S OWN recipe choice - picking the
+        /// numerically cheapest recipe among node.Recipes regardless of
+        /// whether the account is trained for it. The ingredient costs THAT
+        /// recipe sums are NOT similarly blind: PlanSolver.Evaluate's
+        /// recursive call for each child ingredient (see the
+        /// rawCraftCostDiagnostics-writing loop) still threads
+        /// bestRatingByDiscipline through, so a child's contribution to this
+        /// raw figure is its normal competency-RESOLVED cost, not a second
+        /// training-blind recursion all the way down. This makes the raw
+        /// craft cost look more expensive than a truly training-blind
+        /// figure would (a costlier resolved child, never a cheaper
+        /// untrained one it isn't allowed to use) - and since membership is
+        /// `buyCost.Value &lt; rawCraftCost.Value * ForceBuyDiscountFactor`,
+        /// an INFLATED rawCraftCost only makes that inequality EASIER to
+        /// satisfy. A node can therefore only be ADDED to
+        /// CompetencyIndependentForceBuyNodeIds by this effect, never
+        /// dropped from it - the resolved-cost figure never falls below the
+        /// true training-blind figure, so no genuinely-forced node is ever
+        /// missed. The residual risk runs the OTHER way: a parent node whose
+        /// own untrained recipe is genuinely cheap enough to survive a true
+        /// blind evaluation can still get pulled into
+        /// CompetencyIndependentForceBuyNodeIds by a resolved child's
+        /// inflated contribution, which then suppresses THAT PARENT's own
+        /// Decision.CheapestCraftUntrained (PlanSolver.cs's
+        /// `cheapestCraftUntrained = !isCompetencyIndependentForceBuy &amp;&amp;
+        /// ...` gate) - i.e. this can falsely exclude a real training
+        /// opportunity at the parent, not miss a genuinely-independent one.
+        /// A child's own untrained-recipe opportunity is not lost by this -
+        /// it is evaluated and reported independently at that child's own
+        /// node, via that child's own diagnostics entry.
+        /// </para>
         /// </summary>
         public readonly struct ForceBuyPrePassResult
         {

@@ -755,6 +755,15 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
+            // Follow-up fix (recorded non-blocking): the "(runs in parallel
+            // with other daily-gated items)" clause only makes sense when
+            // there is another daily-gated notice for it to run in parallel
+            // WITH - a single-item notice has nothing to be parallel to.
+            // Collect the qualifying notices first so the clause can be
+            // gated on the real total count (2+) rather than rendered
+            // unconditionally on every row.
+            var pending = new List<(string ItemName, int PerDayCap, int Quantity, int Days)>();
+
             foreach (var step in craftSteps)
             {
                 if (!result.DailyCooldownItems.TryGetValue(step.ItemId, out var cooldown) ||
@@ -765,27 +774,55 @@ namespace GW2CraftingHelper.Services
 
                 string itemName = ResolveName(step.ItemId, result.ItemMetadata);
                 int days = (int)Math.Ceiling((double)step.Quantity / cooldown.PerDayCap);
+                pending.Add((itemName, cooldown.PerDayCap, step.Quantity, days));
+            }
 
+            bool showsParallelClause = pending.Count >= 2;
+
+            foreach (var notice in pending)
+            {
                 // Review fix (audit row 56 PART C nice-to-have): the
                 // singular "day" branch was dead code - this loop already
                 // `continue`s above whenever step.Quantity <= cooldown.
                 // PerDayCap, so every notice reaching this point has
                 // Quantity > PerDayCap, making days = Ceiling(qty / cap)
                 // always >= 2. Always plural.
+                string label = $"{notice.ItemName} is timegated - {notice.PerDayCap} per day per account - " +
+                    $"crafting {notice.Quantity} will take about {notice.Days} days";
+
+                // Review nice-to-have (post-PART-C follow-up): each
+                // notice row is individually accurate but says nothing
+                // about how multiple rows combine - the real floor
+                // across several gated items in one plan is max(days),
+                // not the sum, since the per-account daily caps run
+                // independently of each other (e.g. the flagship
+                // Gift of Aurene case, which needs several gated
+                // Dragon Hatchling Doll components at once). The clause
+                // is only appended when there are 2+ notices in the plan;
+                // a lone notice has nothing else to run in parallel with.
+                //
+                // Wording fix (recorded-followups-sweep verification
+                // finding): `pending` (and therefore showsParallelClause)
+                // counts ONLY daily craft-cooldown notices from this loop,
+                // never the separate Daily-cap vendor notices this same
+                // section also emits from Plan.TimegatedItems just above
+                // (see the CapType == TimegatedCapType.Daily branch). A
+                // plan can have exactly one craft-cooldown notice running
+                // alongside a Daily-cap vendor notice and genuinely be in
+                // parallel with it, so the clause names the population the
+                // gate actually measures - other daily-CRAFTED items -
+                // rather than the broader "daily-gated" (which would also
+                // read as covering the vendor-cap notices this count never
+                // looks at).
+                if (showsParallelClause)
+                {
+                    label += " (runs in parallel with other daily-crafted items)";
+                }
+
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.TimegatedNotice,
-                    // Review nice-to-have (post-PART-C follow-up): each
-                    // notice row is individually accurate but says nothing
-                    // about how multiple rows combine - the real floor
-                    // across several gated items in one plan is max(days),
-                    // not the sum, since the per-account daily caps run
-                    // independently of each other (e.g. the flagship
-                    // Gift of Aurene case, which needs several gated
-                    // Dragon Hatchling Doll components at once).
-                    Label = $"{itemName} is timegated - {cooldown.PerDayCap} per day per account - " +
-                        $"crafting {step.Quantity} will take about {days} days " +
-                        "(runs in parallel with other daily-gated items)"
+                    Label = label
                 });
             }
         }
