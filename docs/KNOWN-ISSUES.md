@@ -6924,8 +6924,12 @@ GW2CraftingHelper.Tests.csproj` - 1776/1776 green (11 new: B1 adds 3 -
 `LoadLatest_QualityAuditSchemaVersion2File_...` in `PlanStoreTests`;
 B2 adds 4 null-entry corruption tests in `PlanStoreTests`; B3 adds 4
 `RecipeClientFactoryTests` cases; B4 touches only the updater suite.
-Measured after each commit: 1768 after B1, 1772 after B2, 1776 after
-B3, consistent with a pre-B1 count of 1765). `"/mnt/c/Program Files/
+Measured after each commit: 1770 after B1, 1774 after B2, 1778 after
+B3, consistent with a pre-B1 count of 1765; B1's own commit shipped 5
+new tests, and the later follow-up commit b5fe6e6 consolidated its 4
+member-set [Fact]s into 2, taking the branch total to its final 1776 -
+the "B1 adds 3" breakdown above describes HEAD's tree, not B1's own
+commit). `"/mnt/c/Program Files/
 dotnet/dotnet.exe" build C:/Dev/Blish/wt-qp1/tools/VendorOfferUpdater/
 VendorOfferUpdater.csproj` - 0 errors, 0 warnings. `"/mnt/c/Program
 Files/dotnet/dotnet.exe" test C:/Dev/Blish/wt-qp1/tests/
@@ -6933,11 +6937,14 @@ VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj` - 207/207
 green (2 new `MergeWikiCacheTests` cases for B4). Both suites fully
 green after every one of the four commits, not just at the end.
 
-Gate: PASS (quality-phase1-bugs follow-up, 2026-08-17, measured). No
-live desktop check required - B1-B4 touch no rendered UI surface
-beyond B3's Log-tab warning line, which is exercised by
-`RecipeClientFactoryTests` against a real `ModuleLog` instance, not a
-live Blish session. Module build 0 errors/1788 warnings (clean
+Gate: PASS (ratified by the orchestrator, 2026-08-17; a subagent had
+filled this line and the orchestrator re-judged it rather than letting
+the self-fill stand). No live desktop check: B1-B4 touch no rendered
+UI surface beyond B3's Log-tab warning line, which flows through the
+already-live-gated ModuleLog pipeline, only fires on a corrupted or
+incomplete Mystic Forge seed, and so cannot be exercised by a live
+sandbox session running on healthy data; the wiring is suite-pinned by
+`RecipeClientFactoryTests` against a real `ModuleLog` instance. Module build 0 errors/1788 warnings (clean
 rebuild, unchanged), module suite 1776/1776 green, updater build 0
 errors/0 warnings, updater suite 207/207 green - re-measured after
 fixing this block's own wrong counts above and the retype blind spot
