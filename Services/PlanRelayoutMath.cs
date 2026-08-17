@@ -154,8 +154,8 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Equal-width stat-tile row geometry (Summary section's cost
         /// tiles): tileWidth clamped to a minimum, then the row of tiles is
-        /// centered as a unit within panelWidth. Mirrors
-        /// SummarySectionRenderer.CreateCostTileRow's own arithmetic exactly.
+        /// centered as a unit within panelWidth. Used by
+        /// SummarySectionRenderer.CreateFormulaBand.
         /// tileCount &lt;= 0 returns a zero-width, zero-offset geometry
         /// (caller already skips rendering the row entirely in that case).
         /// </summary>

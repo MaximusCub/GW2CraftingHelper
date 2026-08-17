@@ -7952,8 +7952,10 @@ merge directive (2026-08-16).
 
 Triage source: quality-audit-triage.md sections A1/A3/A4/C/E, verified at
 master e21a280; every site re-located and re-verified against d1092f5
-before editing (10 PRs of drift). Five commits, build + module suite
-green after each.
+before editing (10 PRs of drift). Six commits, build + module suite
+green after each; the sixth fixes review findings against the first
+five (two stale method-name repoints, a dangling "Cap data" anchor
+retargeted to dev-notes/HISTORY.md, the m37-r1..r4 duplicates dropped).
 
 **A1 factual comment/doc fixes (8 of 9 applied):**
 - A1.1 SnapshotFailureClassifier "only place" claim corrected (its own
@@ -7962,7 +7964,9 @@ green after each.
   never-existent CraftingPlanPipeline.BuildCompetencyOpportunities to
   CompetencyOpportunityCalculator.Apply
 - A1.3 ShoppingColumnMath repointed to
-  ShoppingListSectionRenderer.CreateShoppingListBody
+  ShoppingListSectionRenderer.Render (the pre-scan's actual home;
+  CreateShoppingListBody survives only as the CraftingPlanView method
+  the Render body was moved from)
 - A1.4 ARCHITECTURE.md: literal CraftingPlanView line count (3 lines
   stale again at re-check) replaced with non-rotting wording
 - A1.5 SKIPPED - already fixed on master (doc says FOUR instances)
@@ -7996,12 +8000,17 @@ discriminating Theory; ZojjasClaymore fixture renumbered to a fake
 46742 verified untouched). Module suite 1823 -> 1827 (Theory expansion).
 
 **D-4 + C2:** /mnt/c/Dev/Blish/m38-plan committed at
-docs/dev-notes/m38-plan/ (14 top-level docs + 9 proposals + 1 json
-snapshot); the four dangling anchors in ModuleLog.cs and
-CraftingPlanView.cs retargeted to the committed paths.
+docs/dev-notes/m38-plan/ (9 top-level docs + 1 json snapshot +
+9 proposals); the four dangling anchors in ModuleLog.cs and
+CraftingPlanView.cs retargeted to the committed paths. The m37-r1..r4
+research records were dropped from the copy: no anchor points at them,
+and docs/research/ already holds the canonical versions (corrected
+Lumber Mill tables, machine-local paths scrubbed) which the stale
+copies contradicted.
 
 **C1 + C3 (former-frozen files, comment-only):** PlanRelayoutMath mirror
-comment retargeted to SummarySectionRenderer.CreateCostTileRow; the
+comment retargeted to SummarySectionRenderer.CreateFormulaBand (which
+absorbed the old CreateCostTileRow's geometry); the
 21-line EvaluateVendorOffers reviewer exchange compressed to 4 lines
 (three load-bearing facts kept); nine review-round prefixes stripped;
 FinalizeVendorBatches reverted-branch history compressed to a pointer at

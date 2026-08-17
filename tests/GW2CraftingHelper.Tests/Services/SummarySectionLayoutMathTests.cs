@@ -230,8 +230,8 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Omitting widestNumberWidth must reproduce the fixed-60px
             // geometry, pinned absolutely: rightEdge = 800 - 8 = 792,
-            // MarkerX = 792 - 34, then each column steps left by
-            // gap(14) + width(60).
+            // MarkerX = 792 - 34, NeededRightEdge = MarkerX - gap(14),
+            // then each further column steps left by gap(14) + width(60).
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
 
             Assert.Equal(758, edges.MarkerX);

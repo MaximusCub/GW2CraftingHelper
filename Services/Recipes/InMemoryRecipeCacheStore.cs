@@ -48,7 +48,7 @@ namespace GW2CraftingHelper.Services.Recipes
 
         public void Flush(bool force = false)
         {
-            // No persistence — nothing to do.
+            // No persistence - nothing to do.
         }
     }
 }

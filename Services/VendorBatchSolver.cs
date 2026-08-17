@@ -68,11 +68,12 @@ namespace GW2CraftingHelper.Services
             // Do NOT add a coarser (CapDailyCap, CapWeeklyCap, CapConflict)
             // ratchet here to sum cap notices for mixed-offer steps: the
             // wiki's per-row WeeklyCap is a template parameter, not a
-            // confirmed per-station aggregate (KNOWN-ISSUES #24, "Cap
-            // data"), so occurrences agreeing on the raw tuple does not
-            // mean a real shared limit worth summing against. Conflict
-            // alone suppresses the notice - see FinalizeVendorBatches and
-            // the MixedOffer*_DocumentedLimitation tests in PlanSolverTests.
+            // confirmed per-station aggregate (dev-notes/HISTORY.md, M37
+            // "Cap data" note), so occurrences agreeing on the raw tuple
+            // does not mean a real shared limit worth summing against.
+            // Conflict alone suppresses the notice - see
+            // FinalizeVendorBatches and the
+            // MixedOffer*_DocumentedLimitation tests in PlanSolverTests.
         }
 
         /// <summary>
@@ -755,8 +756,8 @@ namespace GW2CraftingHelper.Services
                 }
                 // Conflict == true (occurrences disagreed on the winning
                 // offer's exact batch shape) intentionally produces no cap
-                // notice here - see this method's doc comment and
-                // KNOWN-ISSUES #24's "Cap data" note for why a cap notice
+                // notice here - see this method's doc comment and the M37
+                // "Cap data" note in dev-notes/HISTORY.md for why a cap notice
                 // cannot be soundly computed across genuinely different
                 // offers with only a wiki-scraped per-row cap number to
                 // compare against.
