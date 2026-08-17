@@ -7333,4 +7333,4 @@ this entry's own "Validation performed" section above, which remains
 accurate as a historical record of this stream's state at `81598bf`
 before the merge.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: not applicable - quorum-verdict cleanup with characterization-first proof where the high-evidence zone was entered; suite-pinned. Merged under the maintainer's standing merge directive (2026-08-16).
