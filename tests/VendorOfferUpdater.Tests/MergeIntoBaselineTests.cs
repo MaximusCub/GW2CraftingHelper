@@ -298,5 +298,66 @@ namespace VendorOfferUpdater.Tests
             Assert.Single(result.Merged);
             Assert.Equal("dragonbash", result.Merged[0].SeasonalFestival);
         }
+
+        // Data-loss fix (2026-08-19): mirror image of
+        // MergedResult_DedupesByOfferId_PreferringFreshRow_WhenProtectedBaselineAndFreshShareAnId
+        // above. That test covers a TAGGED fresh row winning over an
+        // untagged baseline row on an OfferId collision (correct: no data
+        // lost, the tag is new information this run added). This test
+        // covers the opposite and previously-broken direction: an
+        // UNTAGGED fresh row (e.g. from a page whose wikitext fetch
+        // transiently missed this run) colliding on OfferId with a
+        // TAGGED baseline row. Before the fix, g.First() picked the fresh
+        // row unconditionally and its lack of a tag silently overwrote
+        // the shipped baseline tag - exactly the "never silently deletes
+        // shipped data" charter (MergeIntoBaseline's own doc comment)
+        // this whole protected-merchant mechanism exists to uphold. The
+        // fresh row must still win (it may carry other updated fields),
+        // but the baseline's tag must be carried forward onto it.
+        [Fact]
+        public void MergedResult_DedupesByOfferId_CarriesBaselineTagForward_WhenFreshRowSharesIdButIsUntagged()
+        {
+            var baseline = new List<VendorOffer>
+            {
+                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash")
+            };
+            var fresh = new List<VendorOffer>
+            {
+                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1)
+            };
+            var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
+
+            var result = Program.MergeIntoBaseline(baseline, fresh, skipped);
+
+            Assert.Single(result.Merged);
+            Assert.Equal("dragonbash", result.Merged[0].SeasonalFestival);
+        }
+
+        // Nice-to-have (2026-08-19): when the content-key dedupe pass
+        // resolves a collision to the baseline row (because it carries
+        // the tag and the fresh row does not), the surviving row must not
+        // be pinned to the baseline's stale, pre-hash-format-change
+        // OfferId when a current-format OfferId (the fresh row's) is
+        // available - it should migrate onto the fresh id instead of
+        // shipping the old hash forever.
+        [Fact]
+        public void ProtectedMerchant_ContentKeyWinner_MigratesToFreshOfferId_WhenBaselineRowWinsOnTag()
+        {
+            var baseline = new List<VendorOffer>
+            {
+                MakeOffer("old-hash-format", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash")
+            };
+            var fresh = new List<VendorOffer>
+            {
+                MakeOffer("new-hash-format", "Festival Rewards Vendor (Weekly)", 1)
+            };
+            var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
+
+            var result = Program.MergeIntoBaseline(baseline, fresh, skipped);
+
+            Assert.Single(result.Merged);
+            Assert.Equal("dragonbash", result.Merged[0].SeasonalFestival);
+            Assert.Equal("new-hash-format", result.Merged[0].OfferId);
+        }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -675,8 +676,11 @@ namespace VendorOfferUpdater
         /// merchant OUT of wholesale replacement: its baseline offers are
         /// kept alongside whatever fresh offers this pass did resolve for
         /// it (union, deduplicated by OfferId with the FRESH row preferred
-        /// on collision, plus a content-key pass - see ComputeContentKey -
-        /// for a baseline row that predates a hash-format change and so
+        /// on collision - but a losing row's SeasonalFestival tag is
+        /// carried forward onto the winner if the winner itself has none,
+        /// so an untagged fresh row can never silently erase a shipped
+        /// tag - plus a content-key pass - see ComputeContentKey - for a
+        /// baseline row that predates a hash-format change and so
         /// collides on content but not OfferId), rather than dropped and
         /// replaced by a known-incomplete fresh set. This trades "some
         /// possibly-stale baseline rows survive an extra run or two" for
@@ -724,9 +728,32 @@ namespace VendorOfferUpdater
             // silently discarded the freshly-derived SeasonalFestival tag,
             // i.e. exactly the merchants the protected-merchant guard
             // exists to preserve data for kept shipping untagged.
+            // Data-loss fix (2026-08-19): this pass used to just take
+            // g.First() unconditionally, so a FRESH row with no
+            // SeasonalFestival (e.g. one whose page's wikitext fetch
+            // missed this run - see ResolveSeasonalFestivalValuesAsync's
+            // null-wikitext handling) silently deleted a shipped, tagged
+            // baseline row on an OfferId collision - the exact opposite of
+            // the content-key pass below, which already prefers whichever
+            // side carries the tag. Same rule now applies here: keep the
+            // winning row (fresh, if present in the group, for freshness
+            // of everything else), but carry a losing sibling's tag
+            // forward if the winner itself has none.
             var merged = fresh.Concat(kept)
                 .GroupBy(o => o.OfferId, StringComparer.Ordinal)
-                .Select(g => g.First())
+                .Select(g =>
+                {
+                    var winner = g.First();
+                    if (winner.SeasonalFestival == null)
+                    {
+                        var taggedSibling = g.FirstOrDefault(o => o.SeasonalFestival != null);
+                        if (taggedSibling != null)
+                        {
+                            winner.SeasonalFestival = taggedSibling.SeasonalFestival;
+                        }
+                    }
+                    return winner;
+                })
                 .ToList();
 
             // A protected merchant's baseline row can also predate a
@@ -743,6 +770,21 @@ namespace VendorOfferUpdater
             if (merchantsProtected.Count > 0)
             {
                 var protectedSet = new HashSet<string>(merchantsProtected, StringComparer.Ordinal);
+
+                // Nice-to-have (2026-08-19): when a content-key collision
+                // resolves to the baseline (kept) row because it carries
+                // the tag and the fresh row does not, the swap below used
+                // to keep the baseline row's OfferId wholesale - stale,
+                // pre-hash-format-change - discarding the fresh row's
+                // current-format OfferId even though the fresh row is
+                // otherwise thrown away. Track which OfferId strings came
+                // from THIS run's fresh batch so the winning row can be
+                // migrated onto the current-format id instead of carrying
+                // the stale one forward indefinitely.
+                var freshOfferIds = new HashSet<string>(
+                    fresh.Where(o => o.OfferId != null).Select(o => o.OfferId!),
+                    StringComparer.Ordinal);
+
                 var byContentKey = new Dictionary<string, VendorOffer>(StringComparer.Ordinal);
                 var result = new List<VendorOffer>();
                 foreach (var offer in merged)
@@ -758,6 +800,12 @@ namespace VendorOfferUpdater
                     {
                         if (survivor.SeasonalFestival == null && offer.SeasonalFestival != null)
                         {
+                            if (offer.OfferId != null && survivor.OfferId != null
+                                && freshOfferIds.Contains(survivor.OfferId)
+                                && !freshOfferIds.Contains(offer.OfferId))
+                            {
+                                offer.OfferId = survivor.OfferId;
+                            }
                             byContentKey[contentKey] = offer;
                         }
                     }
@@ -1107,48 +1155,69 @@ namespace VendorOfferUpdater
                         ct.ThrowIfCancellationRequested();
 
                         string pageName = toFetch[i];
-                        string? wikitext;
+
+                        // Throttle-class fix (2026-08-19): the inter-
+                        // request delay used to sit ONLY after a
+                        // successful fetch+parse, guarded by the same
+                        // "not the last item" check now on the finally
+                        // below. Every `continue` above it (HTTP failure,
+                        // JSON parse failure, null wikitext) skipped the
+                        // delay entirely, so a stretch of missing/failing
+                        // pages issued back-to-back requests against
+                        // api.guildwars2.com with no throttling at all,
+                        // defeating both --delay and the 200ms floor. A
+                        // `finally` runs on every exit from the try below
+                        // - success, a `continue`, or an uncaught
+                        // exception propagating out - so moving the delay
+                        // here makes every iteration throttle uniformly,
+                        // not just the ones that happen to succeed.
                         try
                         {
-                            wikitext = await wikiClient.FetchWikitextAsync(pageName, ct);
-                        }
-                        catch (HttpRequestException ex)
-                        {
-                            Console.WriteLine(
-                                $"  WARNING: Failed to fetch wikitext for \"{pageName}\": {ex.Message} - left uncached.");
-                            continue;
-                        }
-                        catch (JsonException ex)
-                        {
-                            Console.WriteLine(
-                                $"  WARNING: Failed to parse wikitext response for \"{pageName}\": {ex.Message} - left uncached.");
-                            continue;
-                        }
+                            string? wikitext;
+                            try
+                            {
+                                wikitext = await wikiClient.FetchWikitextAsync(pageName, ct);
+                            }
+                            catch (HttpRequestException ex)
+                            {
+                                Console.WriteLine(
+                                    $"  WARNING: Failed to fetch wikitext for \"{pageName}\": {ex.Message} - left uncached.");
+                                continue;
+                            }
+                            catch (JsonException ex)
+                            {
+                                Console.WriteLine(
+                                    $"  WARNING: Failed to parse wikitext response for \"{pageName}\": {ex.Message} - left uncached.");
+                                continue;
+                            }
 
-                        // Review fix (2026-08-18): a null wikitext (missing/
-                        // renamed page, or an "error" object in the API
-                        // response - see WikiSmwClient.FetchWikitextAsync's
-                        // own doc comment) is NOT the same thing as "page
-                        // fetched fine, no {{Temporary}} template found" -
-                        // the latter legitimately caches as "" below. Caching
-                        // a null the same way baked a false "checked - not
-                        // tagged" negative into the cache permanently, with
-                        // no warning and no future retry. Warn and leave the
-                        // page uncached instead, same as an HTTP/JSON failure.
-                        if (wikitext == null)
-                        {
-                            Console.WriteLine(
-                                $"  WARNING: No wikitext returned for \"{pageName}\" " +
-                                "(missing/renamed page, or a wiki API error response) - left uncached.");
-                            continue;
+                            // Review fix (2026-08-18): a null wikitext (missing/
+                            // renamed page, or an "error" object in the API
+                            // response - see WikiSmwClient.FetchWikitextAsync's
+                            // own doc comment) is NOT the same thing as "page
+                            // fetched fine, no {{Temporary}} template found" -
+                            // the latter legitimately caches as "" below. Caching
+                            // a null the same way baked a false "checked - not
+                            // tagged" negative into the cache permanently, with
+                            // no warning and no future retry. Warn and leave the
+                            // page uncached instead, same as an HTTP/JSON failure.
+                            if (wikitext == null)
+                            {
+                                Console.WriteLine(
+                                    $"  WARNING: No wikitext returned for \"{pageName}\" " +
+                                    "(missing/renamed page, or a wiki API error response) - left uncached.");
+                                continue;
+                            }
+
+                            string? raw = TemporaryTemplateParser.ExtractSeasonalOrEventParameter(wikitext);
+                            cache[pageName] = raw ?? string.Empty;
                         }
-
-                        string? raw = TemporaryTemplateParser.ExtractSeasonalOrEventParameter(wikitext);
-                        cache[pageName] = raw ?? string.Empty;
-
-                        if (i + 1 < toFetch.Count)
+                        finally
                         {
-                            await Task.Delay(effectiveDelay, ct);
+                            if (i + 1 < toFetch.Count)
+                            {
+                                await Task.Delay(effectiveDelay, ct);
+                            }
                         }
                     }
                 }
@@ -1202,6 +1271,28 @@ namespace VendorOfferUpdater
             return hashIndex >= 0 ? subjectKey.Substring(0, hashIndex) : subjectKey;
         }
 
+        // Nice-to-have (2026-08-19): reserved dictionary key (not a real
+        // wiki page title - none contain "__") that stores the cache
+        // format version alongside the real page entries, so a version
+        // bump can force a one-time recheck of entries written before a
+        // fix that changes what "" ("checked - no tag") means. See
+        // SeasonalWikitextCacheVersion's own doc comment.
+        private const string SeasonalWikitextCacheVersionKey = "__cache_version__";
+
+        // Bump this when a fix changes the MEANING of an already-cached
+        // value, so LoadSeasonalWikitextCache purges the affected entries
+        // instead of trusting them forever. Current bump (2 - the
+        // &redirects=1 fix, WikiSmwClient.FetchWikitextAsync): before that
+        // fix, a redirected vendor page's wikitext came back as
+        // "#REDIRECT [[Target]]", TemplateRegex found no {{Temporary}}
+        // template in that, and the caller cached it as "" - identical to
+        // a real, deliberate "checked, not tagged" - so those pages were
+        // never retried even though the fix would resolve them correctly.
+        // A missing/older version number purges every "" entry (the only
+        // ones that ambiguity could have affected; a non-empty resolved
+        // value was never subject to it) so they get one clean re-fetch.
+        private const int SeasonalWikitextCacheVersion = 2;
+
         private static Dictionary<string, string> LoadSeasonalWikitextCache(string path)
         {
             var cache = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -1218,6 +1309,31 @@ namespace VendorOfferUpdater
                 {
                     cache[prop.Name] = prop.Value.GetString() ?? string.Empty;
                 }
+
+                bool isCurrentVersion = cache.TryGetValue(SeasonalWikitextCacheVersionKey, out var versionText)
+                    && versionText == SeasonalWikitextCacheVersion.ToString(CultureInfo.InvariantCulture);
+                cache.Remove(SeasonalWikitextCacheVersionKey);
+
+                if (!isCurrentVersion)
+                {
+                    var staleEmptyKeys = cache
+                        .Where(kv => kv.Value.Length == 0)
+                        .Select(kv => kv.Key)
+                        .ToList();
+                    foreach (var key in staleEmptyKeys)
+                    {
+                        cache.Remove(key);
+                    }
+                    if (staleEmptyKeys.Count > 0)
+                    {
+                        Console.WriteLine(
+                            $"Seasonal wikitext cache version bump: cleared {staleEmptyKeys.Count} " +
+                            "pre-redirects-fix \"\" entr" +
+                            (staleEmptyKeys.Count == 1 ? "y" : "ies") +
+                            " for recheck.");
+                    }
+                }
+
                 Console.WriteLine($"Loaded seasonal wikitext cache ({cache.Count} entries) from {path}");
             }
             catch
@@ -1230,7 +1346,13 @@ namespace VendorOfferUpdater
 
         private static void SaveSeasonalWikitextCache(string path, Dictionary<string, string> cache)
         {
-            var sorted = cache
+            var toWrite = new Dictionary<string, string>(cache, StringComparer.Ordinal)
+            {
+                [SeasonalWikitextCacheVersionKey] =
+                    SeasonalWikitextCacheVersion.ToString(CultureInfo.InvariantCulture)
+            };
+
+            var sorted = toWrite
                 .OrderBy(kv => kv.Key, StringComparer.Ordinal)
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
 

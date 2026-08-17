@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using VendorOfferUpdater;
@@ -500,6 +502,150 @@ namespace VendorOfferUpdater.Tests
 
                 Assert.Empty(handler.RequestedUrls);
                 Assert.False(File.Exists(cachePath));
+            }
+            finally
+            {
+                File.Delete(cachePath);
+            }
+        }
+
+        // Throttle-class fix (2026-08-19): a null-wikitext `continue`
+        // (and the two pre-existing HttpRequestException/JsonException
+        // `continue`s) used to jump straight past the inter-request
+        // Task.Delay, which only ran on the success path. A stretch of
+        // missing/failing pages was fetched back-to-back with no
+        // throttling at all, defeating both --delay and the 200ms floor
+        // (Math.Max(200, delayMs)). The delay now lives in a per-
+        // iteration `finally`, so it must fire after the FIRST (null-
+        // wikitext) page here even though delayMs is 0 - only the 200ms
+        // floor applies, but that floor must still be honored.
+        [Fact]
+        public async Task NullWikitextOnNonLastPage_StillThrottlesBeforeNextRequest()
+        {
+            var handler = new FakeHttpHandler();
+            using var httpClient = new HttpClient(handler);
+            var client = new WikiSmwClient(httpClient);
+
+            handler.MapUrl(
+                url => url.Contains("action=parse") && url.Contains("Missing"),
+                "{\"error\":{\"code\":\"missingtitle\"}}");
+            handler.MapUrl(
+                url => url.Contains("action=parse") && url.Contains("Good"),
+                BuildWikitextResponse("{{Temporary|release=Dragon Bash 2019|seasonal=Dragon Bash}}"));
+
+            var results = new List<WikiVendorResult>
+            {
+                new WikiVendorResult { PageName = "Missing Vendor#vendor1", GameId = 1 },
+                new WikiVendorResult { PageName = "Good Vendor#vendor1", GameId = 2 },
+            };
+
+            string cachePath = TempCachePath();
+            try
+            {
+                var stopwatch = Stopwatch.StartNew();
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    results, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
+                stopwatch.Stop();
+
+                Assert.True(
+                    stopwatch.ElapsedMilliseconds >= 180,
+                    $"Expected the 200ms floor delay to fire after the null-wikitext page, " +
+                    $"elapsed only {stopwatch.ElapsedMilliseconds}ms.");
+                Assert.Null(results[0].TemporarySeasonalValue);
+                Assert.Equal("Dragon Bash", results[1].TemporarySeasonalValue);
+            }
+            finally
+            {
+                File.Delete(cachePath);
+            }
+        }
+
+        // Nice-to-have (2026-08-19): a cache file written before the
+        // &redirects=1 fix (WikiSmwClient.FetchWikitextAsync) may contain
+        // "" entries that actually mean "this page's SMW subject was a
+        // redirect and its wikitext came back as '#REDIRECT [[...]]',
+        // which happened to parse as no {{Temporary}} template" rather
+        // than a real, deliberate "checked, not tagged". A legacy cache
+        // (no version marker) must have its "" entries purged and
+        // re-fetched once, not trusted forever.
+        [Fact]
+        public async Task LegacyCacheWithNoVersionMarker_PurgesEmptyEntries_RefetchesThem()
+        {
+            var handler = new FakeHttpHandler();
+            using var httpClient = new HttpClient(handler);
+            var client = new WikiSmwClient(httpClient);
+
+            handler.MapUrl(
+                url => url.Contains("action=parse"),
+                BuildWikitextResponse("{{Temporary|release=Dragon Bash 2019|seasonal=Dragon Bash}}"));
+
+            string cachePath = TempCachePath();
+            try
+            {
+                // Simulates a pre-version-marker cache file: a plain
+                // pageName -> "" map, no "__cache_version__" key, as
+                // SaveSeasonalWikitextCache would have written before this
+                // fix. The redirect page genuinely has a {{Temporary}}
+                // template once fetched with &redirects=1, but the stale
+                // "" entry would previously have hidden that forever.
+                File.WriteAllText(cachePath, JsonSerializer.Serialize(
+                    new Dictionary<string, string> { ["Redirected Vendor"] = string.Empty }));
+
+                var results = new List<WikiVendorResult>
+                {
+                    new WikiVendorResult { PageName = "Redirected Vendor#vendor1", GameId = 1 }
+                };
+
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    results, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
+
+                Assert.Single(handler.RequestedUrls);
+                Assert.Equal("Dragon Bash", results[0].TemporarySeasonalValue);
+            }
+            finally
+            {
+                File.Delete(cachePath);
+            }
+        }
+
+        // Companion to the above: once the cache has been saved WITH the
+        // current version marker, a resolved non-empty value must still
+        // be trusted and NOT re-fetched (the version bump only forces a
+        // recheck of the ambiguous "" case, not every cached value).
+        [Fact]
+        public async Task CurrentVersionCache_ResolvedValue_NotRefetched()
+        {
+            var handler = new FakeHttpHandler();
+            using var httpClient = new HttpClient(handler);
+            var client = new WikiSmwClient(httpClient);
+
+            handler.MapUrl(
+                url => url.Contains("action=parse"),
+                BuildWikitextResponse("{{Temporary|release=Dragon Bash 2019|seasonal=Dragon Bash}}"));
+
+            string cachePath = TempCachePath();
+            try
+            {
+                var firstRun = new List<WikiVendorResult>
+                {
+                    new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor1", GameId = 1 }
+                };
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    firstRun, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
+                Assert.Single(handler.RequestedUrls);
+
+                var secondRun = new List<WikiVendorResult>
+                {
+                    new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor2", GameId = 2 }
+                };
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    secondRun, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
+
+                // Still exactly 1 request - the saved cache already carried
+                // the current version marker, so the resolved value is
+                // trusted rather than re-fetched.
+                Assert.Single(handler.RequestedUrls);
+                Assert.Equal("Dragon Bash", secondRun[0].TemporarySeasonalValue);
             }
             finally
             {

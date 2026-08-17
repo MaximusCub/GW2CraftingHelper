@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# refresh-vendor-data.sh — Refreshes the vendor offers baseline data.
+# refresh-vendor-data.sh - Refreshes the vendor offers baseline data.
 #
 # Usage:
 #   ./tools/refresh-vendor-data.sh              # Full refresh (pass 1 + pass 2)
@@ -13,7 +13,7 @@
 #   DELAY_PASS2   Delay between resolution requests (default: 1500)
 #
 # Requires: .NET 8 SDK, Git Bash on Windows, internet access.
-# jq is optional — used for offer count in the summary if available.
+# jq is optional - used for offer count in the summary if available.
 
 set -euo pipefail
 
@@ -23,6 +23,19 @@ cd "$ROOT"
 PROJ="tools/VendorOfferUpdater/VendorOfferUpdater.csproj"
 CACHE="ref/wiki_vendor_cache.json"
 OUTPUT="ref/vendor_offers.json"
+
+# --merge-into requires the target file to already exist (Program.cs
+# errors out otherwise) - normally true, since $OUTPUT is a baseline file
+# committed to the repo, but guard against a from-scratch bootstrap (no
+# prior baseline at all) falling back to a plain first-time generate
+# instead of hard-failing. Computed fresh (not once up front) so that if
+# Pass 1 itself bootstraps $OUTPUT into existence, Pass 2 still merges
+# into it rather than repeating the no-baseline case.
+merge_flags() {
+    if [[ -f "$OUTPUT" ]]; then
+        printf '%s\n%s\n' --merge-into "$OUTPUT"
+    fi
+}
 
 # --- Argument parsing ---
 
@@ -79,12 +92,24 @@ echo ""
 # --- Pass 1: Wiki scrape ---
 
 if [[ "$PASS2_ONLY" == false ]]; then
-    echo "=== Pass 1: Wiki scrape (--skip-item-resolution) ==="
+    # Data-safety fix (2026-08-19): --tag-seasonal-festivals re-derives
+    # seasonal tags from the live wiki, and --merge-into "$OUTPUT" (self-
+    # merge against the file this same run is about to overwrite) applies
+    # Program.MergeIntoBaseline's tag-preserving collision rules - without
+    # both, this pass wholesale-replaced ref/vendor_offers.json with an
+    # untagged fresh scrape, silently dropping every previously-tagged
+    # festival-vendor row. See tools/VendorOfferUpdater/README.md's
+    # "Seasonal Tag Preservation" section for the full explanation.
+    echo "=== Pass 1: Wiki scrape (--skip-item-resolution --tag-seasonal-festivals) ==="
+    mapfile -t MERGE_FLAGS < <(merge_flags)
     dotnet run --project "$PROJ" -c Release --no-build -- \
         --skip-item-resolution \
+        --tag-seasonal-festivals \
+        "${MERGE_FLAGS[@]+"${MERGE_FLAGS[@]}"}" \
         --max-runtime "${MAX_RUNTIME:-20}" \
         --max-requests "${MAX_REQUESTS:-2000}" \
-        --delay "${DELAY_PASS1:-250}"
+        --delay "${DELAY_PASS1:-250}" \
+        "$OUTPUT"
     echo ""
 else
     echo "=== Skipping Pass 1 (--pass2-only) ==="
@@ -99,10 +124,19 @@ fi
 
 # --- Pass 2: Currency resolution ---
 
+# Data-safety fix (2026-08-19): --merge-into "$OUTPUT" here for the same
+# reason as Pass 1 above - Pass 2 recomputes offers from the wiki cache
+# (which already carries Pass 1's resolved seasonal tags) and would
+# otherwise wholesale-overwrite $OUTPUT with only this run's fresh set,
+# with no protection for a merchant this run's own currency/game-id
+# resolution happened to miss.
 echo "=== Pass 2: Currency resolution (--resolve-item-currencies-only) ==="
+mapfile -t MERGE_FLAGS < <(merge_flags)
 dotnet run --project "$PROJ" -c Release --no-build -- \
     --resolve-item-currencies-only \
-    --delay "${DELAY_PASS2:-1500}"
+    "${MERGE_FLAGS[@]+"${MERGE_FLAGS[@]}"}" \
+    --delay "${DELAY_PASS2:-1500}" \
+    "$OUTPUT"
 echo ""
 
 # --- Summary ---
