@@ -490,11 +490,15 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(12, result.Decisions[craftB.NodeId].TotalCost);
             Assert.Equal(12, result.Decisions[craftA.NodeId].TotalCost);
             Assert.Equal(83, result.Decisions[craftD.NodeId].TotalCost);
-            // craftE's leaf occurrence is last in DFS order, so
-            // AllocateVendorNodeCosts' remainder-absorption lands its
-            // corrected share here (180 - 12 - 83 = 85) rather than the
-            // naively-corrected-in-isolation 84 - see
-            // AllocateVendorNodeCosts' doc comment.
+            // craftE's leaf occurrence (quantity 84) gets the single leftover
+            // copper under AllocateVendorNodeCosts' largest-remainder
+            // apportionment: floor(180 * 84 / 179) = 84 with remainder
+            // 84/179, the largest fractional remainder among all five
+            // occurrences (4/179, 4/179, 4/179, 83/179, 84/179), so it is
+            // the one that receives leftover = 180 - 179 = 1, landing on 85
+            // rather than the naively-corrected-in-isolation 84. This is a
+            // property of craftE's quantity being the largest share, not of
+            // DFS position - see AllocateVendorNodeCosts' doc comment.
             Assert.Equal(85, result.Decisions[craftE.NodeId].TotalCost);
             Assert.Equal(180, result.Decisions[tree.NodeId].TotalCost);
 
@@ -678,6 +682,54 @@ namespace GW2CraftingHelper.Tests.Services
                 1000,
                 result.Decisions[leafA.NodeId].TotalCost.Value +
                 result.Decisions[leafB.NodeId].TotalCost.Value);
+        }
+
+        // Review finding 6 (merged-ceil-remainder stream, MEASURED): the
+        // two prior tests never exercise the genuinely new, order-sensitive
+        // code - the equal-quantity test above divides evenly (1000 * 1/2,
+        // no leftover copper at all) and the flagship regression test's
+        // single leftover copper lands on a unique largest remainder. Three
+        // EQUAL-quantity occurrences of the same batch produce a three-way
+        // TIE on fractional remainder (1000 * 1 / 3 = 333 remainder 1 for
+        // every occurrence identically), which is exactly the case the
+        // `.ThenBy(i)` first-seen tie-break in AllocateVendorNodeCosts
+        // exists for and the case neither pre-existing test can pin.
+        [Fact]
+        public void MultiOccurrenceThreeEqualQuantityBulkVendorOffer_TiedRemainderGoesToFirstSeenOccurrence()
+        {
+            var leafA = Leaf(99, 1);
+            var leafB = Leaf(99, 1);
+            var leafC = Leaf(99, 1);
+            var tree = Craftable(1, 1, Option(10, 1, 1, leafA, leafB, leafC));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var plan = result.Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(3, vendorStep.Quantity);
+            Assert.Equal(1000, vendorStep.TotalCost);
+
+            // floor(1000 * 1 / 3) = 333 for all three, remainder 1/3 for
+            // all three - a genuine tie. The single leftover copper
+            // (1000 - 999) must land on the first-seen (DFS-order)
+            // occurrence, leafA, not be split further or dumped on
+            // whichever occurrence is last - pinning both the <=1-copper
+            // bound for equal quantities and the deterministic tie-break.
+            Assert.Equal(334, result.Decisions[leafA.NodeId].TotalCost);
+            Assert.Equal(333, result.Decisions[leafB.NodeId].TotalCost);
+            Assert.Equal(333, result.Decisions[leafC.NodeId].TotalCost);
+
+            Assert.Equal(
+                1000,
+                result.Decisions[leafA.NodeId].TotalCost.Value +
+                result.Decisions[leafB.NodeId].TotalCost.Value +
+                result.Decisions[leafC.NodeId].TotalCost.Value);
         }
     }
 }

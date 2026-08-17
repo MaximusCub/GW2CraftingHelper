@@ -541,21 +541,23 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, result.RecipeSheetSavingsOpportunities[0].SheetCost);
         }
 
-        // --- Characterization: RecipeSheetSavingsCalculator is a real
-        // downstream consumer of AllocateVendorNodeCosts' merged-ceil
-        // remainder shape (quorum verdict C6, merged-ceil-remainder
-        // stream). The reference branch's one ingredient (item 200) is
-        // fed the exact per-occurrence corrected SubtreeCost
-        // AllocateVendorNodeCosts assigns a non-last occurrence of the
-        // SAME "100 for 1000c" bulk offer used by the VendorBatchSolver-
-        // level characterization (two 1-unit occurrences, fair
-        // proportional share 500 each).
-        //
-        // PRE-FIX, the old algorithm's floor share for a non-last
-        // occurrence (10, not 500) fed a craftUnitCost of 1 (10 / node.
-        // Quantity 10), reporting a 49/unit "savings" this module could
-        // not actually prove existed - purely an artifact of which
-        // occurrence happened to land last in DFS order.
+        // --- Review finding 7 correction (merged-ceil-remainder stream,
+        // MEASURED): despite the name, this is NOT a real downstream
+        // consumer of AllocateVendorNodeCosts - it hand-constructs a
+        // CraftingTreeNode tree directly via BoughtNodeWithReferenceBranch
+        // and feeds `ingredientSubtreeCost` in as a plain constructor
+        // constant. It never calls PlanSolver.Solve or
+        // AllocateVendorNodeCosts, so it cannot exercise the merge/
+        // apportionment code path at all and cannot detect a regression
+        // in it - only in RecipeSheetSavingsCalculator's own craftUnitCost
+        // = SubtreeCost / Quantity arithmetic. The 500 below was chosen by
+        // hand to EQUAL what AllocateVendorNodeCosts' fair proportional
+        // share would be for a two-occurrence "100 for 1000c" bulk offer
+        // (see MultiOccurrenceEqualQuantityBulkVendorOffer_BatchOverrun-
+        // SharedProportionally in PlanSolverVendorBatchingTests for the
+        // actual integration coverage of that shape) - it is illustrative
+        // context for why 500, not evidence the calculator was ever wired
+        // to it.
         [Fact]
         public void MergedVendorLeafIngredient_FairProportionalShare_NoOverstatedSavings()
         {

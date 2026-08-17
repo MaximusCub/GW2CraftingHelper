@@ -468,12 +468,16 @@ namespace GW2CraftingHelper.Services
             // FinalizeVendorBatches above, so its valuation (via the same
             // currencyValuation.TryGetCopperValue every other solver call
             // site uses) is computed exactly ONCE per merged step, then that
-            // single total is allocated across occurrences the same way
-            // AllocateVendorNodeCosts allocates TotalCost: quantity-
-            // weighted, with the last occurrence (same first-seen DFS order
-            // from vendorOccurrences) absorbing the exact remainder so
-            // shares always sum to precisely the step total - no drift, no
-            // invented precision. AllocateVendorNodeCosts (VendorBatchSolver,
+            // single total is allocated across occurrences the SAME
+            // largest-remainder (Hamilton) apportionment AllocateVendorNodeCosts
+            // itself uses for TotalCost (see that method's doc comment):
+            // floor(total * quantity / totalQuantity) per occurrence, with
+            // any leftover copper(s) going to the occurrences with the
+            // largest fractional remainder, ties broken by first-seen (DFS)
+            // order from vendorOccurrences - so shares always sum to
+            // precisely the step total, no drift, no invented precision,
+            // and no unbounded skew toward whichever occurrence happens to
+            // land last. AllocateVendorNodeCosts (VendorBatchSolver,
             // DO-NOT-TOUCH: merged-ceil batching math) corrects TotalCost
             // for every occurrence of a merged vendor step but has no reason
             // to know about ComparisonValue at all; done here in the
@@ -523,15 +527,62 @@ namespace GW2CraftingHelper.Services
                 }
 
                 var occurrences = kvp.Value;
-                long currencyUnitRate = step.Quantity > 0 ? totalCurrencyValue / step.Quantity : 0L;
-                long allocatedCurrency = 0L;
+
+                // class-sweep fix (MEASURED): mirrors AllocateVendorNodeCosts'
+                // own largest-remainder (Hamilton) apportionment exactly -
+                // this is the sibling of that method's TotalCost allocation,
+                // apportioning the currency-equivalent share instead. Using
+                // the deleted "last occurrence absorbs the remainder" shape
+                // here (as before) let ComparisonValue diverge from the
+                // fairly-apportioned TotalCost by up to step.Quantity - 1
+                // copper for a merged step, undoing the bound the class
+                // sweep on 938f6c9 was supposed to establish everywhere.
+                long totalQuantity = 0L;
                 for (int i = 0; i < occurrences.Count; i++)
                 {
-                    var (nodeId, quantity) = occurrences[i];
-                    long currencyShare = (i == occurrences.Count - 1)
-                        ? totalCurrencyValue - allocatedCurrency
-                        : currencyUnitRate * quantity;
-                    allocatedCurrency += currencyShare;
+                    totalQuantity += occurrences[i].Quantity;
+                }
+
+                var currencyShares = new long[occurrences.Count];
+                if (totalQuantity > 0)
+                {
+                    var currencyRemainders = new long[occurrences.Count];
+                    long allocatedCurrency = 0L;
+                    for (int i = 0; i < occurrences.Count; i++)
+                    {
+                        long numerator = totalCurrencyValue * occurrences[i].Quantity;
+                        currencyShares[i] = numerator / totalQuantity;
+                        currencyRemainders[i] = numerator % totalQuantity;
+                        allocatedCurrency += currencyShares[i];
+                    }
+
+                    long leftover = totalCurrencyValue - allocatedCurrency;
+                    if (leftover > 0)
+                    {
+                        var byLargestRemainder = Enumerable.Range(0, occurrences.Count)
+                            .OrderByDescending(i => currencyRemainders[i])
+                            .ThenBy(i => i);
+                        foreach (int i in byLargestRemainder)
+                        {
+                            if (leftover <= 0)
+                            {
+                                break;
+                            }
+                            currencyShares[i]++;
+                            leftover--;
+                        }
+                    }
+                }
+                // else: totalQuantity <= 0 is defensive only (vendorOccurrences'
+                // construction, AggregateStep, never records a non-positive
+                // Quantity in practice) - currencyShares stays all-zero rather
+                // than divide by zero, matching AllocateVendorNodeCosts' own
+                // guard for the same condition.
+
+                for (int i = 0; i < occurrences.Count; i++)
+                {
+                    int nodeId = occurrences[i].NodeId;
+                    long currencyShare = currencyShares[i];
 
                     // currency-ux-package regression fix (MEASURED): mirrors
                     // RecomputeComparisonValues' own fallback-tier guard at

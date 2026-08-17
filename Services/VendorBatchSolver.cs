@@ -849,8 +849,9 @@ namespace GW2CraftingHelper.Services
         /// overrun - unbounded for equal-quantity occurrences - onto
         /// whichever occurrence happened to land last in DFS order. See
         /// PlanSolverVendorBatchingTests.
-        /// MultiOccurrenceEqualQuantityBulkVendorOffer_PreFix_LastOccurrenceAbsorbsEntireBatchOverrun
-        /// (now re-baselined) for the canonical repro: two 1-unit
+        /// MultiOccurrenceEqualQuantityBulkVendorOffer_BatchOverrunSharedProportionally
+        /// (renamed from ..._PreFix_LastOccurrenceAbsorbsEntireBatchOverrun by
+        /// this same fix) for the canonical repro: two 1-unit
         /// occurrences of a "100 for 1000c" bulk offer used to render
         /// 10/990; now render 500/500 (1000 * 1/2 = 500 exactly, no
         /// remainder to distribute). The flagship 179-unit/"3 for 3"
@@ -866,9 +867,12 @@ namespace GW2CraftingHelper.Services
         /// VendorCurrencyCosts (captured pre-merge, per occurrence, by
         /// EvaluateVendorOffers) are NOT re-derived here the way TotalCost
         /// is - they can disagree with the corrected share this method
-        /// computes whenever a step merges 2+ tree occurrences. This method
-        /// itself is unchanged (DO-NOT-TOUCH: merged-ceil batching math);
-        /// the caller (PlanSolver.Solve, see FlagUnreliableVendorComponentCosts)
+        /// computes whenever a step merges 2+ tree occurrences, and that
+        /// stays true across the C6 largest-remainder rewrite above: only
+        /// the TotalCost allocation shape changed, not this gap. (Formerly
+        /// DO-NOT-TOUCH: merged-ceil batching math - retired 2026-08-17;
+        /// changes here now require characterization-first proof, see
+        /// KNOWN-ISSUES.) The caller (PlanSolver.Solve, see FlagUnreliableVendorComponentCosts)
         /// reads this method's own already-public outputs (vendorOccurrences,
         /// stepMap) AFTER it returns to mark which decisions must suppress
         /// component-leaf display for that reason - see
