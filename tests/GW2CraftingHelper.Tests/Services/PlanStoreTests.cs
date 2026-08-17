@@ -734,6 +734,74 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task Save_Load_CompetencyIndependentForceBuyNodeIds_PopulatedSetRoundTrips()
+        {
+            // Follow-up fix (recorded non-blocking, srcsel verification):
+            // PlanSolveContext.CompetencyIndependentForceBuyNodeIds (see
+            // OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult's own doc
+            // comment) had no persistence round-trip coverage at all -
+            // ForceBuyOnlyNodeIds' sibling test above never asserted on it.
+            // Same fixture as that test: no CharacterDisciplines snapshot,
+            // so the competency-resolved and competency-blind evaluations
+            // agree and this narrower set comes out equal to
+            // ForceBuyOnlyNodeIds - real, non-empty content either way.
+            var pipeline = BuildForceBuyPipeline(out _);
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, OwnFourOfIngredient(), CancellationToken.None,
+                ownMaterialsMode: OwnMaterialsMode.Valued,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.NotNull(initial.SolveContext.CompetencyIndependentForceBuyNodeIds);
+            Assert.NotEmpty(initial.SolveContext.CompetencyIndependentForceBuyNodeIds);
+
+            _store.Save(Wrap(initial, DateTime.Now));
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded?.Result?.SolveContext);
+
+            Assert.NotNull(loaded.Result.SolveContext.CompetencyIndependentForceBuyNodeIds);
+            Assert.Equal(
+                new HashSet<int>(initial.SolveContext.CompetencyIndependentForceBuyNodeIds),
+                new HashSet<int>(loaded.Result.SolveContext.CompetencyIndependentForceBuyNodeIds));
+        }
+
+        [Fact]
+        public async Task Save_Load_ForceBuyNodeIdSets_NullInJson_DeserializeToNullWithoutValidatorRejection()
+        {
+            // Follow-up fix (recorded non-blocking): OwnMaterialsMode.Free
+            // never runs the pre-pass (see CraftingPlanPipeline's own
+            // useForceBuyPrePass gate), so both ForceBuyOnlyNodeIds and
+            // CompetencyIndependentForceBuyNodeIds stay null on the
+            // generated result. Newtonsoft's default NullValueHandling is
+            // Include (measured below, not the Ignore this test's original
+            // "absent-in-JSON" framing assumed) - PlanStoreHelpers uses no
+            // custom JsonSerializerSettings, so both fields are written as
+            // an explicit JSON null, not omitted. Either way the round trip
+            // must land back on null with PlanStructuralValidator NOT
+            // rejecting the reload on that basis (it never references
+            // either field - see Services/PlanStructuralValidator.cs).
+            var pipeline = BuildPipeline(out _);
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Null(initial.SolveContext.ForceBuyOnlyNodeIds);
+            Assert.Null(initial.SolveContext.CompetencyIndependentForceBuyNodeIds);
+
+            string json = PlanStore.Serialize(Wrap(initial, DateTime.Now));
+            Assert.Contains("\"ForceBuyOnlyNodeIds\":null", json);
+            Assert.Contains("\"CompetencyIndependentForceBuyNodeIds\":null", json);
+
+            _store.Save(Wrap(initial, DateTime.Now));
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded?.Result?.SolveContext);
+            Assert.Null(loaded.Result.SolveContext.ForceBuyOnlyNodeIds);
+            Assert.Null(loaded.Result.SolveContext.CompetencyIndependentForceBuyNodeIds);
+        }
+
+        [Fact]
         public async Task Save_Load_FullFeaturedFixture_RoundTripsPreviouslyUnexercisedSolveContextShapes()
         {
             using (var tmp = new TempDirectory())
