@@ -6973,4 +6973,4 @@ taken.
 **Risks / follow-ups:** none new; the sweep's own "not taken" list above
 restates why each remaining candidate stays open.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: not applicable - comment/test/wording cleanup with no visual surface beyond a conditional notice clause (suite-pinned). Merged under the maintainer's standing merge directive (2026-08-16).
