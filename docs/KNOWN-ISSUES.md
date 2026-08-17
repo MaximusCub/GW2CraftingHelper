@@ -7007,15 +7007,7 @@ this verdict, not merely out of scope.
    `Views/CraftingPlanView.cs` (the field declaration and the constructor
    call site) - plus, as measured pre-change at `ce64423`, 3 mentions in
    `docs/ARCHITECTURE.md` and `docs/ROADMAP.md` (`docs/KNOWN-ISSUES.md`
-   carried 42 more as historical narrative) - not 18. (That doc-mention
-   count is a snapshot, not a live figure: this same commit's own doc
-   edits add mentions on landing, so as of this commit
-   `TreeSectionController` is named 81 times across 7 doc files instead
-   of 3 across 2 - `docs/ARCHITECTURE.md` 6, `docs/ROADMAP.md` 1,
-   `docs/KNOWN-ISSUES.md` 57, `CONTRIBUTING.md` 3,
-   `docs/gw2e-considerations.md` 2, `docs/dev-notes/HISTORY.md` 4,
-   `docs/research/gw2e-convergence-matrix.md` 8 - per
-   `git grep -c TreeSectionController -- '*.md'`.) (The file count moved
+   carried 42 more as historical narrative) - not 18. (That doc-mention count is a snapshot, not a live figure: every doc entry that names the class (including this one) adds mentions on landing, so no post-change total is stated here - reproduce the current count with `git grep -c TreeSectionController -- '*.md'`.) (The file count moved
    from a pre-change 13 to 14 because this same milestone's own new
    `TreeRowTooltipComposer.cs` documents its provenance with a
    "TreeSectionController.RenderTreeNode" reference in its own doc
