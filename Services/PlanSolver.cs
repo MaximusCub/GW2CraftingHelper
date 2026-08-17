@@ -1147,8 +1147,16 @@ namespace GW2CraftingHelper.Services
             // below - a manual override (checked next, using the
             // unmodified canCraft flag above) still always wins, matching
             // gw2e's own manual pill always beating its automatic pre-pass.
-            bool craftExcludedFromAutoPick = forceBuyOnlyNodeIds != null &&
+            // Captured separately from craftExcludedFromAutoPick below (which
+            // also gets folded into by craftExcludedByCompetency further
+            // down) - CheapestCraftUntrained needs the RAW "was this node's
+            // craft forced off by the force-buy pre-pass" answer, not the
+            // combined flag, or it would fire for a node whose craft was
+            // excluded for a reason that has nothing to do with competency
+            // at all. See cheapestCraftUntrained's own doc comment below.
+            bool isForceBuyOnly = forceBuyOnlyNodeIds != null &&
                 forceBuyOnlyNodeIds.Contains(node.NodeId);
+            bool craftExcludedFromAutoPick = isForceBuyOnly;
 
             // source-selection-simplification (maintainer-approved
             // redesign, docs/gw2e-considerations.md): a Craft source should
@@ -1305,11 +1313,22 @@ namespace GW2CraftingHelper.Services
             // first override, so this can be untrained even while
             // autoPickCraftOption itself resolved to a different
             // (competent) recipe.
+            //
+            // Verification-review fix: also gated on !isForceBuyOnly - the
+            // force-buy pre-pass decides forceBuyOnlyNodeIds on a zero-owned,
+            // unreduced solve, while THIS solve may run reduced (owned
+            // materials applied), so the committed buy cost here can exceed
+            // this cheap recipe's real cost for a node whose craft was
+            // excluded by force-buy, not by competency. Without this guard,
+            // CompetencyOpportunityCalculator would promise the user a
+            // saving from training a discipline that unlocks nothing - the
+            // force-buy pre-pass excludes craft here regardless of rating.
             RecipeOption cheapestCraftOptionOverall = bestComparableOption ?? bestFallbackOption;
             long? cheapestCraftRealCostOverall = bestComparableOption != null
                 ? bestComparableCraftRealCost
                 : bestFallbackCraftRealCost;
-            bool cheapestCraftUntrained = cheapestCraftOptionOverall != null &&
+            bool cheapestCraftUntrained = !isForceBuyOnly &&
+                cheapestCraftOptionOverall != null &&
                 bestRatingByDiscipline != null &&
                 !CraftCompetencyEvaluator.AccountCanCraft(
                     cheapestCraftOptionOverall.Disciplines, cheapestCraftOptionOverall.MinRating, bestRatingByDiscipline);

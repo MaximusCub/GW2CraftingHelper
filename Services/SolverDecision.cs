@@ -141,6 +141,15 @@ namespace GW2CraftingHelper.Services
         // cheap untrained one). CheapestCraftRealCost/Disciplines/MinRating
         // describe that cheap recipe - only meaningful when
         // CheapestCraftUntrained is true.
+        //
+        // Verification-review fix: always false for a node the force-buy
+        // pre-pass excluded craft from (never for a competency-caused
+        // reason) - see PlanSolver.Evaluate's isForceBuyOnly/
+        // cheapestCraftUntrained local variables for why: the pre-pass's
+        // own exclusion set is computed on a zero-owned, unreduced solve
+        // and can disagree with this (possibly reduced) solve's real
+        // craft cost, which would otherwise let this field fire for a
+        // node whose craft was never actually gated on competency at all.
         public bool CheapestCraftUntrained { get; internal set; }
         public long? CheapestCraftRealCost { get; internal set; }
         public IReadOnlyList<string> CheapestCraftDisciplines { get; internal set; }

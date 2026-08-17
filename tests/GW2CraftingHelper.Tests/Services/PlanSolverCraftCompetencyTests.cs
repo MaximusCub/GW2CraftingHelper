@@ -377,5 +377,55 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Weaponsmith", Assert.Single(opp.Disciplines));
             Assert.Equal(500, opp.MinRating);
         }
+
+        [Fact]
+        public void ForceBuyOnlyNode_UntrainedCheapestRecipe_ReportsNoOpportunity()
+        {
+            // Verification-review fix: the force-buy pre-pass (gw2e "Value
+            // Own Materials") excludes craft at this node REGARDLESS of
+            // competency - training Weaponsmith 500 here would unlock
+            // nothing. Before this fix, CheapestCraftUntrained was computed
+            // purely from competency (ignoring forceBuyOnlyNodeIds
+            // entirely), so a force-buy-excluded node with an untrained
+            // cheapest recipe and a committed buy cost genuinely higher
+            // than that recipe's real cost (100c committed vs 30c the
+            // recipe would have cost) still satisfied
+            // CompetencyOpportunityCalculator's SubtreeCost >
+            // CheapestCraftRealCost delta check - producing a Plan Note
+            // promising a concrete saving from training a discipline that
+            // would change nothing about this node's outcome.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(2, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+            };
+            var characterDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+            };
+            var forceBuyOnly = new HashSet<int> { 0 };
+
+            var solver = new PlanSolver();
+            var solveResult = solver.Solve(
+                tree, prices, null, PriceBasis.InstantBuy,
+                overrides: null, currencyValuation: null,
+                forceBuyOnlyNodeIds: forceBuyOnly,
+                characterDisciplines: characterDisciplines);
+            var builder = new CraftingTreeBuilder();
+            var root = builder.BuildTree(tree, solveResult.Decisions, new Dictionary<int, ItemMetadata>());
+
+            Assert.Equal(CraftingDecision.BuyFromTp, root.Decision);
+            Assert.Equal(100, root.SubtreeCost);
+            // The recipe genuinely is untrained and genuinely is cheaper -
+            // but the reason craft lost here is force-buy, not competency.
+            Assert.False(root.CheapestCraftUntrained);
+
+            var result = new CraftingPlanResult { CraftingTree = root };
+            CompetencyOpportunityCalculator.Apply(result);
+
+            Assert.Empty(result.CompetencyOpportunities);
+        }
     }
 }

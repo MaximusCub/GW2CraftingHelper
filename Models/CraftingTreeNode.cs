@@ -277,7 +277,9 @@ namespace GW2CraftingHelper.Models
         // CompetencyOpportunityCalculator; never fed back into any
         // displayed cost. CheapestCraftRealCost/Disciplines/MinRating
         // describe that cheap recipe - only meaningful when
-        // CheapestCraftUntrained is true.
+        // CheapestCraftUntrained is true. Verification-review fix: never
+        // true for a node the force-buy pre-pass excluded craft from - see
+        // SolverDecision.CheapestCraftUntrained's own doc comment.
         public bool CheapestCraftUntrained { get; set; }
         public long? CheapestCraftRealCost { get; set; }
         public IReadOnlyList<string> CheapestCraftDisciplines { get; set; }
