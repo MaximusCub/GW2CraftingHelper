@@ -36,7 +36,21 @@ namespace GW2CraftingHelper.Services
         // plain HAVE pill entirely rather than appending alongside it (a
         // genuinely-owned node's HAVE display must never be confused with
         // "this still needs to be obtained once, just not counted twice").
-        AchievementBitDeduped
+        AchievementBitDeduped,
+
+        // source-selection-simplification (maintainer-approved redesign,
+        // docs/gw2e-considerations.md): a non-selected, multi-option pill
+        // that PillSubduingEvaluator found decisively loses to the
+        // selected pill (see PillSubduingRule's two cases) - reuses
+        // Locked's exact muted-gray color (PillColors.GetPillColors), NOT
+        // Locked itself: Source stays non-null (still a real, clickable
+        // override - see BuildPillSpecs), and TreeSectionController's own
+        // "Selected/Locked are the only two Kinds a committed CRAFT/
+        // BuyFromVendor decision can ever have" assumption (the
+        // ValueDetailTooltipBuilder gate) would be violated if a LOSING
+        // pill also carried Kind.Locked. Never applied to the Selected
+        // pill itself (BuildPillSpecs only evaluates non-selected options).
+        Subdued
     }
 
     public readonly struct PillSpec
@@ -45,11 +59,20 @@ namespace GW2CraftingHelper.Services
         public readonly AcquisitionSource? Source; // non-null => clickable
         public readonly PillKind Kind;
 
-        public PillSpec(string text, AcquisitionSource? source, PillKind kind)
+        // source-selection-simplification: non-null only when Kind ==
+        // Subdued - the structured (id-only) reason PillSubduingEvaluator
+        // computed, so the View layer (which already resolves currency/
+        // item names for other tooltips) can build the "why" tooltip text
+        // without this Blish-free class ever formatting display text or
+        // touching a raw id (repo invariant).
+        public readonly PillSubduingResult SubduingResult;
+
+        public PillSpec(string text, AcquisitionSource? source, PillKind kind, PillSubduingResult subduingResult = null)
         {
             Text = text;
             Source = source;
             Kind = kind;
+            SubduingResult = subduingResult;
         }
     }
 
@@ -261,19 +284,80 @@ namespace GW2CraftingHelper.Services
                 default: current = options[0].src; break; // defensive; solver always matches one of the options
             }
 
+            // source-selection-simplification: the selected pill's own
+            // breakdown, compared against each LOSING option's below.
+            // Never subdued itself - PillSubduingEvaluator is only ever
+            // called with a losing (non-selected) breakdown as its second
+            // argument.
+            //
+            // Suppressed entirely (every pill stays Available, same as
+            // "no breakdown data") when node.VendorComponentCostsUnreliable
+            // is true: the SAME conservative posture
+            // ValueDetailTooltipBuilder.TryBuild and CraftingTreeBuilder.
+            // BuildVendorCostComponentLeaves already take for exactly this
+            // signal - a merged multi-occurrence vendor step's per-
+            // occurrence VendorCurrencyCosts/VendorItemCosts (and therefore
+            // this node's OWN BuyFromVendorCostBreakdown, built from those
+            // same local numbers) can disagree with the corrected TotalCost
+            // once AllocateVendorNodeCosts reallocates it - see that
+            // field's own doc comment. Only relevant when node.Decision ==
+            // BuyFromVendor (the flag is only ever set on a winning vendor
+            // decision), i.e. only when VENDOR is the SELECTED pill acting
+            // as every other pill's comparison baseline here.
+            bool subduingSuppressed = node.VendorComponentCostsUnreliable;
+            var selectedBreakdown = GetCostBreakdown(node, current);
+
             foreach (var opt in options)
             {
                 bool selected = opt.src == current;
+                PillKind kind = PillKind.Available;
+                PillSubduingResult subduingResult = null;
+                if (!selected && !subduingSuppressed)
+                {
+                    var optionBreakdown = GetCostBreakdown(node, opt.src);
+                    var result = PillSubduingEvaluator.Evaluate(selectedBreakdown, optionBreakdown);
+                    if (result.Rule != PillSubduingRule.None)
+                    {
+                        kind = PillKind.Subdued;
+                        subduingResult = result;
+                    }
+                }
+
                 specs.Add(new PillSpec(
                     opt.text,
                     // The selected pill is already the active choice -
                     // clicking it would be a no-op re-solve, so it is
-                    // rendered non-interactive rather than wired up.
+                    // rendered non-interactive rather than wired up. A
+                    // decisively-losing pill (Kind == Subdued) stays
+                    // clickable - only its styling/tooltip changed, the
+                    // manual-override affordance is unchanged.
                     selected ? (AcquisitionSource?)null : opt.src,
-                    selected ? PillKind.Selected : PillKind.Available));
+                    selected ? PillKind.Selected : kind,
+                    subduingResult));
             }
             AppendOwnershipPills(specs, node);
             return specs;
+        }
+
+        /// <summary>
+        /// source-selection-simplification: the node's own raw cost
+        /// breakdown for one specific source, matching CraftingTreeNode's
+        /// three parallel fields - see PillSourceCostBreakdown's own doc
+        /// comment. Defensive default arm (an unrecognized AcquisitionSource
+        /// never reaches here in practice - `options` above is built from
+        /// only Craft/BuyFromTp/BuyFromVendor) returns an unavailable
+        /// breakdown rather than throwing, so a future regression here
+        /// degrades to "never subdued" instead of crashing pill rendering.
+        /// </summary>
+        private static PillSourceCostBreakdown GetCostBreakdown(CraftingTreeNode node, AcquisitionSource source)
+        {
+            switch (source)
+            {
+                case AcquisitionSource.Craft: return node.CraftCostBreakdown;
+                case AcquisitionSource.BuyFromTp: return node.BuyFromTpCostBreakdown;
+                case AcquisitionSource.BuyFromVendor: return node.BuyFromVendorCostBreakdown;
+                default: return null;
+            }
         }
 
         /// <summary>

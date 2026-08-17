@@ -259,6 +259,19 @@ namespace GW2CraftingHelper.Services
                 RecipeNodeIds.Assign(tree);
             }
 
+            // source-selection-simplification: computed here (before every
+            // Solve() call this method makes, including the zero-owned
+            // guide solve below) rather than at its original later use
+            // site, so PlanSolver.Evaluate's competency check sees the SAME
+            // discipline data at every solve of this generation - including
+            // the zero-owned guide solve, which must already reflect any
+            // competency-driven default flip so InventoryReducer never
+            // discounts ingredients for a Craft path the real solve below
+            // will end up abandoning. See PlanResultBuilder.Build's
+            // characterDisciplines doc comment for the prefer-explicit-
+            // argument-over-snapshot rationale this mirrors.
+            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
+
             // Step 5.5/5.6 (M34-B2a #3 / VOM design Candidate A - review-fix:
             // merged into one `if` block, was two adjacent identical
             // `if (useForceBuyPrePass)` blocks - see GenerateStructuredMultiAsync's
@@ -290,17 +303,35 @@ namespace GW2CraftingHelper.Services
             // leaves InventoryReducer's legacy primary-option heuristic
             // fully in charge, unchanged.
             ISet<int> forceBuyOnlyNodeIds = null;
+            // Verification-review fix: the narrower, competency-independent
+            // subset of forceBuyOnlyNodeIds - see
+            // OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult's own doc
+            // comment. Threaded to every Solve() call below alongside
+            // forceBuyOnlyNodeIds so Decision.CheapestCraftUntrained is
+            // gated correctly at every solve of this generation, not just
+            // the real one.
+            ISet<int> competencyIndependentForceBuyNodeIds = null;
             IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
             if (useForceBuyPrePass)
             {
-                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, solverVendorOffers, priceBasis, valuation);
+                // Adversarial-review fix (Critical #3, source-selection-
+                // simplification): threaded effectiveCharacterDisciplines
+                // through so this throwaway solve is competency-aware too -
+                // see ComputeForceBuyOnlyNodeIds' own characterDisciplines
+                // doc comment for the propagation failure this closes.
+                var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                    _solver, tree, prices, solverVendorOffers, priceBasis, valuation,
+                    characterDisciplines: effectiveCharacterDisciplines);
+                forceBuyOnlyNodeIds = forceBuyPrePassResult.ForceBuyOnlyNodeIds;
+                competencyIndependentForceBuyNodeIds = forceBuyPrePassResult.CompetencyIndependentForceBuyNodeIds;
 
                 var zeroOwnedSolve = _solver.Solve(
                     tree, prices, solverVendorOffers, priceBasis,
                     overrides: null, currencyValuation: valuation,
                     forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
-                    homesteadTiers: tiers);
+                    competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
+                    homesteadTiers: tiers,
+                    characterDisciplines: effectiveCharacterDisciplines);
                 zeroOwnedDecisions = zeroOwnedSolve.Decisions;
             }
 
@@ -338,8 +369,22 @@ namespace GW2CraftingHelper.Services
                 treeUsedForSolve, prices, solverVendorOffers, priceBasis,
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                // Verification-review fix: see the declaration site's own
+                // doc comment - this is the call whose Decisions feed the
+                // real Plan/CraftingTree, so gating
+                // Decision.CheapestCraftUntrained correctly here is what
+                // actually fixes the Plan Notes bug.
+                competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
                 assignNodeIds: !useForceBuyPrePass,
-                homesteadTiers: tiers);
+                homesteadTiers: tiers,
+                characterDisciplines: effectiveCharacterDisciplines,
+                // Adversarial-review fix (Critical #4, source-selection-
+                // simplification): threaded so a losing pill's raw-quantity
+                // StrictDomination claim never compares a craft ingredient
+                // InventoryReducer already discounted against an unrelated
+                // vendor line it never discounted - see PlanSolver.Evaluate's
+                // own ownedQuantityUsedByNode doc comment.
+                ownedQuantityUsedByNode: ownedQuantityUsedByNode);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -423,16 +468,11 @@ namespace GW2CraftingHelper.Services
             // decision/total EXCEPT the Build() tiebreak below (see
             // PlanResultBuilder.Build's characterDisciplines doc comment -
             // it can only relabel which equally-good discipline is
-            // reported, never change a decision or a total).
-            // W3C review-fix (mustFix): prefer the explicit
-            // characterDisciplines argument over snapshot?.CharacterDisciplines
-            // so Build()'s tiebreak sees the SAME list whether or not
-            // `snapshot` itself was nulled out to disable reduction (see
-            // this method's characterDisciplines parameter doc comment).
-            // Falls back to snapshot?.CharacterDisciplines when the caller
-            // did not supply the argument, preserving every pre-existing
-            // caller's behavior.
-            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
+            // reported, never change a decision or a total) and the
+            // solver's own competency-aware default (source-selection-
+            // simplification - see the Solve() calls above, which already
+            // consumed effectiveCharacterDisciplines, computed earlier in
+            // this method so every solve of this generation sees it).
             var result = resultBuilder.Build(
                 plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
             result.CurrencyMetadata = currencyMetadata;
@@ -484,6 +524,12 @@ namespace GW2CraftingHelper.Services
             SeasonalVendorTipCalculator.Apply(
                 result, vendorOffers, prices, priceBasis, _activeFestivalNames());
 
+            // Adversarial-review fix (#7, source-selection-simplification
+            // design-law gap): same annotation-only role, writes only
+            // result.CompetencyOpportunities - see that calculator's own
+            // doc comment.
+            CompetencyOpportunityCalculator.Apply(result);
+
             // Capture inputs so the UI can re-solve locally with per-node
             // overrides (no network round-trips).
             result.SolveContext = new PlanSolveContext
@@ -506,6 +552,7 @@ namespace GW2CraftingHelper.Services
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
                 OwnedVendorItemAmounts = ownedVendorItemAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
+                CompetencyIndependentForceBuyNodeIds = competencyIndependentForceBuyNodeIds,
                 HomesteadTiers = tiers,
                 CharacterDisciplines = result.CharacterDisciplines,
                 // VOM finding #1 fix: only populated when the force-buy
@@ -773,6 +820,13 @@ namespace GW2CraftingHelper.Services
                 RecipeNodeIds.Assign(tree);
             }
 
+            // source-selection-simplification: see the single-item
+            // overload's matching computation for the full rationale -
+            // computed here (before every Solve() call below, including
+            // the zero-owned guide solve) so every solve of this batch
+            // generation sees the same discipline data.
+            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
+
             // Step 5.5/5.6 (M34-B2a #3 / VOM design Candidate A - review-fix:
             // merged into one `if` block, was two adjacent identical
             // `if (useForceBuyPrePass)` blocks): see the single-item
@@ -781,17 +835,30 @@ namespace GW2CraftingHelper.Services
             // wrapper batch at once, moved ahead of Step 6 so its output can
             // guide InventoryReducer.Reduce below.
             ISet<int> forceBuyOnlyNodeIds = null;
+            // Verification-review fix: see the single-item overload's
+            // matching declaration for the full rationale.
+            ISet<int> competencyIndependentForceBuyNodeIds = null;
             IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
             if (useForceBuyPrePass)
             {
-                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, solverVendorOffers, priceBasis, valuation);
+                // Adversarial-review fix (Critical #3, source-selection-
+                // simplification): threaded effectiveCharacterDisciplines
+                // through so this throwaway solve is competency-aware too -
+                // see ComputeForceBuyOnlyNodeIds' own characterDisciplines
+                // doc comment for the propagation failure this closes.
+                var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                    _solver, tree, prices, solverVendorOffers, priceBasis, valuation,
+                    characterDisciplines: effectiveCharacterDisciplines);
+                forceBuyOnlyNodeIds = forceBuyPrePassResult.ForceBuyOnlyNodeIds;
+                competencyIndependentForceBuyNodeIds = forceBuyPrePassResult.CompetencyIndependentForceBuyNodeIds;
 
                 var zeroOwnedSolve = _solver.Solve(
                     tree, prices, solverVendorOffers, priceBasis,
                     overrides: null, currencyValuation: valuation,
                     forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
-                    homesteadTiers: tiers);
+                    competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
+                    homesteadTiers: tiers,
+                    characterDisciplines: effectiveCharacterDisciplines);
                 zeroOwnedDecisions = zeroOwnedSolve.Decisions;
             }
 
@@ -827,8 +894,22 @@ namespace GW2CraftingHelper.Services
                 treeUsedForSolve, prices, solverVendorOffers, priceBasis,
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                // Verification-review fix: see the declaration site's own
+                // doc comment - this is the call whose Decisions feed the
+                // real Plan/CraftingTree, so gating
+                // Decision.CheapestCraftUntrained correctly here is what
+                // actually fixes the Plan Notes bug.
+                competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
                 assignNodeIds: !useForceBuyPrePass,
-                homesteadTiers: tiers);
+                homesteadTiers: tiers,
+                characterDisciplines: effectiveCharacterDisciplines,
+                // Adversarial-review fix (Critical #4, source-selection-
+                // simplification): threaded so a losing pill's raw-quantity
+                // StrictDomination claim never compares a craft ingredient
+                // InventoryReducer already discounted against an unrelated
+                // vendor line it never discounted - see PlanSolver.Evaluate's
+                // own ownedQuantityUsedByNode doc comment.
+                ownedQuantityUsedByNode: ownedQuantityUsedByNode);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -898,10 +979,9 @@ namespace GW2CraftingHelper.Services
             // AccountSnapshot.CharacterDisciplines' doc comment) - see the
             // single-item GenerateStructuredAsync's matching assignment
             // above for the full rationale, including the Build()
-            // tiebreak-only use.
-            // W3C review-fix (mustFix): see the single-item overload's
-            // matching effectiveCharacterDisciplines computation.
-            var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
+            // tiebreak-only use. effectiveCharacterDisciplines was computed
+            // earlier in this method (source-selection-simplification), so
+            // every Solve() call above already consumed it too.
             var result = resultBuilder.Build(
                 plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
             result.CurrencyMetadata = currencyMetadata;
@@ -949,6 +1029,12 @@ namespace GW2CraftingHelper.Services
             SeasonalVendorTipCalculator.Apply(
                 result, vendorOffers, prices, priceBasis, _activeFestivalNames());
 
+            // Adversarial-review fix (#7, source-selection-simplification
+            // design-law gap): same annotation-only role, writes only
+            // result.CompetencyOpportunities - see that calculator's own
+            // doc comment.
+            CompetencyOpportunityCalculator.Apply(result);
+
             result.SolveContext = new PlanSolveContext
             {
                 TargetItemId = Gw2Constants.MultiItemWrapperItemId,
@@ -969,6 +1055,7 @@ namespace GW2CraftingHelper.Services
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
                 OwnedVendorItemAmounts = ownedVendorItemAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
+                CompetencyIndependentForceBuyNodeIds = competencyIndependentForceBuyNodeIds,
                 RequestedItems = items,
                 HomesteadTiers = tiers,
                 CharacterDisciplines = result.CharacterDisciplines,
@@ -1048,6 +1135,18 @@ namespace GW2CraftingHelper.Services
             RecipeNode solveTree = context.Tree;
             List<UsedMaterial> usedMaterials = context.UsedMaterials;
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId = context.OwnedQuantityUsedByNodeId;
+            // Adversarial-review fix (Critical #4, source-selection-
+            // simplification): reference-keyed twin of
+            // ownedQuantityUsedByNodeId above, for PlanSolver.Evaluate's
+            // own StrictDomination-reliability check - only ever populated
+            // when this call actually re-reduces below (a fresh
+            // Dictionary<RecipeNode,int> keyed to THIS call's own
+            // solveTree nodes). Stays null when reusing the frozen,
+            // already-generation-time-reduced context.Tree verbatim - no
+            // regression (this StrictDomination check did not exist before
+            // this fix either), just not yet covered for that narrower
+            // branch.
+            Dictionary<RecipeNode, int> resolveOwnedQuantityUsedByNode = null;
 
             // Defensive: UnreducedTree is only ever set alongside a reducer
             // at generation time (see PlanSolveContext.UnreducedTree's doc
@@ -1068,9 +1167,16 @@ namespace GW2CraftingHelper.Services
                     context.UnreducedTree, context.Prices, solverVendorOffers,
                     context.PriceBasis, overrides, context.CurrencyValuation,
                     forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
+                    // Verification-review fix: see
+                    // PlanSolveContext.CompetencyIndependentForceBuyNodeIds'
+                    // own doc comment - reapplied alongside
+                    // ForceBuyOnlyNodeIds so a local re-solve stays in sync
+                    // with the original generation.
+                    competencyIndependentForceBuyNodeIds: context.CompetencyIndependentForceBuyNodeIds,
                     assignNodeIds: false,
                     ignoredItemIds: ignoredItemIds,
-                    homesteadTiers: context.HomesteadTiers);
+                    homesteadTiers: context.HomesteadTiers,
+                    characterDisciplines: context.CharacterDisciplines);
 
                 var accountIndex = GetOrBuildAccountItemIndex(context);
                 var reduced = _reducer.Reduce(
@@ -1080,6 +1186,7 @@ namespace GW2CraftingHelper.Services
                 solveTree = reduced.ReducedTree;
                 usedMaterials = reduced.UsedMaterials;
                 ownedQuantityUsedByNodeId = BuildOwnedQuantityUsedByNodeId(reduced.OwnedQuantityUsedByNode);
+                resolveOwnedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
             }
 
             // M34-B2a #3: reapply the SAME force-buy pre-pass result the
@@ -1100,9 +1207,18 @@ namespace GW2CraftingHelper.Services
                 solveTree, context.Prices, solverVendorOffers,
                 context.PriceBasis, overrides, context.CurrencyValuation,
                 forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
+                // Verification-review fix: see
+                // PlanSolveContext.CompetencyIndependentForceBuyNodeIds' own
+                // doc comment - this is the call whose Decisions feed the
+                // re-solved Plan/CraftingTree, so gating
+                // Decision.CheapestCraftUntrained correctly here is what
+                // actually keeps a local re-solve's Plan Notes correct.
+                competencyIndependentForceBuyNodeIds: context.CompetencyIndependentForceBuyNodeIds,
                 assignNodeIds: false,
                 ignoredItemIds: ignoredItemIds,
-                homesteadTiers: context.HomesteadTiers);
+                homesteadTiers: context.HomesteadTiers,
+                characterDisciplines: context.CharacterDisciplines,
+                ownedQuantityUsedByNode: resolveOwnedQuantityUsedByNode);
 
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(
@@ -1184,6 +1300,12 @@ namespace GW2CraftingHelper.Services
                 _recipeSheetItemIdByRecipeId, context.CharacterDisciplines);
             SeasonalVendorTipCalculator.Apply(
                 result, context.VendorOffers, context.Prices, context.PriceBasis, _activeFestivalNames());
+
+            // Adversarial-review fix (#7, source-selection-simplification
+            // design-law gap): same annotation-only role, writes only
+            // result.CompetencyOpportunities - see that calculator's own
+            // doc comment.
+            CompetencyOpportunityCalculator.Apply(result);
 
             result.SolveContext = context;
 

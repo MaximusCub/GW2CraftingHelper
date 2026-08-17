@@ -66,6 +66,24 @@ namespace GW2CraftingHelper.Tests.Helpers
             return opt;
         }
 
+        // source-selection-simplification: same additive-optional-parameter
+        // pattern Leaf's achievementId/achievementBit already established -
+        // every existing Option(...) call keeps building a Disciplines-free/
+        // MinRating-0 RecipeOption (RecipeOption's own field defaults)
+        // unchanged; only a caller that needs to exercise
+        // CraftCompetencyEvaluator against a real RecipeOption shape
+        // (PlanSolverCraftCompetencyTests) passes these.
+        public static RecipeOption Option(
+            int recipeId, int outputCount, int craftsNeeded,
+            IReadOnlyList<string> disciplines, int minRating,
+            params RecipeNode[] ingredients)
+        {
+            var opt = Option(recipeId, outputCount, craftsNeeded, ingredients);
+            opt.Disciplines = disciplines != null ? new List<string>(disciplines) : new List<string>();
+            opt.MinRating = minRating;
+            return opt;
+        }
+
         // --- M35-B1: synthetic multi-item wrapper root (gw2e parity) ---
         public static RecipeNode WrapperOf(params RecipeNode[] itemRoots)
         {

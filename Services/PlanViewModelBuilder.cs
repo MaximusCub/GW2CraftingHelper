@@ -23,6 +23,9 @@ namespace GW2CraftingHelper.Services
                 TreeRoot = isMultiItem ? null : result.CraftingTree,
                 MultiItemRoots = isMultiItem ? result.MultiItemRoots : null,
                 CurrencyMetadata = result.CurrencyMetadata,
+                // source-selection-simplification: see PlanViewModel.
+                // ItemMetadata's own doc comment.
+                ItemMetadata = result.ItemMetadata,
                 PriceBasis = result.PriceBasis,
                 // currency-ux-package (Feature 2): whole-plan currency
                 // totals/holding, unaffected by isMultiItem - result.Plan
@@ -901,13 +904,17 @@ namespace GW2CraftingHelper.Services
         /// design-plan-notes.md (Notes section, Option 1 - single flat
         /// section, one shared NoteLine row shape). Assembles rows in a
         /// fixed order - excess/reclaim lines, then a total (only when 2+
-        /// excess lines exist), then competency lines, then (opportunity-
-        /// notes) RECIPE-SHEET SAVINGS opportunities, then SEASONAL VENDOR
-        /// TIP opportunities, then the gambling-forge scope line (0 or 1) -
-        /// so re-solves and screenshots stay diffable. Returns a section
-        /// with zero rows when every note kind is empty; the caller
-        /// (Build()) only appends it to vm.Sections when Rows.Count > 0, so
-        /// an empty Notes section never renders a header at all.
+        /// excess lines exist), then competency lines (disciplines a
+        /// COMMITTED Craft step already needs), then competency
+        /// OPPORTUNITY lines (disciplines that would make the plan cost
+        /// LESS, for a node craft was excluded from on competency
+        /// grounds), then (opportunity-notes) RECIPE-SHEET SAVINGS
+        /// opportunities, then SEASONAL VENDOR TIP opportunities, then
+        /// the gambling-forge scope line (0 or 1) - so re-solves and
+        /// screenshots stay diffable. Returns a section with zero rows
+        /// when every note kind is empty; the caller (Build()) only
+        /// appends it to vm.Sections when Rows.Count > 0, so an empty
+        /// Notes section never renders a header at all.
         /// </summary>
         private PlanSectionViewModel BuildNotesSection(CraftingPlanResult result)
         {
@@ -1020,6 +1027,51 @@ namespace GW2CraftingHelper.Services
                     });
                     noteEntryCount++;
                 }
+            }
+
+            // 2b. Competency OPPORTUNITY lines (adversarial-review fix #7,
+            // design-law gap) - alphabetical by resolved item name, same
+            // ordering precedent as the excess/reclaim lines above.
+            // Distinct from the "2. Competency lines" block just above:
+            // that block explains disciplines the plan ALREADY needs (a
+            // committed Craft step); this one surfaces disciplines that
+            // would let the plan cost LESS than it currently does, for a
+            // node the automatic pick excluded craft from specifically on
+            // competency grounds (PlanSolver only suppresses
+            // Decision.CheapestCraftUntrained for a node the force-buy
+            // pre-pass excluded craft from REGARDLESS of training - see
+            // cheapestCraftUntrained's own doc comment in
+            // PlanSolver.Evaluate and OwnedMaterialsForceBuyPrePass.
+            // ForceBuyPrePassResult's own doc comment; a force-buy
+            // exclusion that is ITSELF competency-caused still reports here
+            // - and CompetencyOpportunityCalculator itself filters out
+            // manual-override-to-craft nodes and cost-neutral-or-worse
+            // cases; every entry here is a genuine, concrete "train this
+            // and save N" opportunity).
+            if (result.CompetencyOpportunities != null && result.CompetencyOpportunities.Count > 0)
+            {
+                var opportunityRows = new List<(string Name, PlanRowViewModel Row)>(
+                    result.CompetencyOpportunities.Count);
+                foreach (var opportunity in result.CompetencyOpportunities)
+                {
+                    string name = ResolveName(opportunity.ItemId, result.ItemMetadata);
+                    string disciplines = opportunity.Disciplines != null && opportunity.Disciplines.Count > 0
+                        ? string.Join(" or ", opportunity.Disciplines)
+                        : "the required discipline";
+
+                    opportunityRows.Add((name, new PlanRowViewModel
+                    {
+                        RowType = PlanRowType.NoteLine,
+                        Label = $"{name}: could be crafted for less - no character has " +
+                            $"{disciplines} {opportunity.MinRating}",
+                        CoinValue = opportunity.DeltaCost
+                    }));
+                    noteEntryCount++;
+                }
+
+                section.Rows.AddRange(opportunityRows
+                    .OrderBy(r => r.Name, StringComparer.Ordinal)
+                    .Select(r => r.Row));
             }
 
             // 3. RECIPE-SHEET SAVINGS opportunities (opportunity-notes),
@@ -1392,7 +1444,13 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        private static string ResolveName(
+        // source-selection-simplification: widened private -> internal (no
+        // logic change) so TreeSectionController can resolve a Subdued
+        // pill's StrictDomination item-kind delta to a display name too -
+        // see PlanViewModel.ItemMetadata's own doc comment. Still not
+        // public - stays same-assembly-only, matching every other
+        // resolver this pure builder class exposes.
+        internal static string ResolveName(
             int itemId, IReadOnlyDictionary<int, ItemMetadata> metadata)
         {
             if (metadata != null &&

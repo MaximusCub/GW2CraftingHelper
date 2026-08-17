@@ -101,5 +101,66 @@ namespace GW2CraftingHelper.Services
         // matching CraftingTreeNode so the recipe-tree unit-price tooltip
         // can tell the user which side was actually used.
         public bool PriceSideFellBack { get; internal set; }
+
+        // source-selection-simplification (maintainer-approved redesign,
+        // docs/gw2e-considerations.md): raw cost breakdowns for EVERY
+        // feasible source at this node, straight passthrough of
+        // PlanSolver.Decision's own matching fields - see
+        // PillSourceCostBreakdown's own doc comment for why these exist
+        // independent of Source/TotalCost above (unlike VendorCurrencyCosts/
+        // VendorItemCosts, populated for every source, not just the
+        // winner). Always non-null (IsAvailable reflects CanCraft/CanBuyTp/
+        // CanBuyVendor above). Feeds CraftingTreeNode's own matching fields
+        // via CraftingTreeBuilder, ultimately consumed by
+        // PillSubduingEvaluator - never read by any cost total.
+        public PillSourceCostBreakdown CraftCostBreakdown { get; internal set; }
+        public PillSourceCostBreakdown BuyFromTpCostBreakdown { get; internal set; }
+        public PillSourceCostBreakdown BuyFromVendorCostBreakdown { get; internal set; }
+
+        // Adversarial-review fix (#7, source-selection-simplification
+        // design-law gap): straight passthrough of PlanSolver.Decision's
+        // own matching fields - see that field's own doc comment. True
+        // only when craft was excluded from the AUTOMATIC pick because no
+        // character meets the winning recipe's discipline requirement
+        // (never for the force-buy pre-pass's own, separately-explained
+        // exclusion). CraftExcludedRealCost/Disciplines/MinRating describe
+        // the recipe that would have won - only meaningful when
+        // CraftExcludedByCompetency is true.
+        public bool CraftExcludedByCompetency { get; internal set; }
+        public long? CraftExcludedRealCost { get; internal set; }
+        public IReadOnlyList<string> CraftExcludedDisciplines { get; internal set; }
+        public int CraftExcludedMinRating { get; internal set; }
+
+        // Adversarial-review round-2 fix (finding #5): straight
+        // passthrough of PlanSolver.Decision's own matching fields - see
+        // that field's own doc comment. True whenever the numerically
+        // cheapest raw craft recipe overall is untrained, independent of
+        // whether the AUTOMATIC pick itself got excluded (unlike
+        // CraftExcludedByCompetency above, this also covers a competent
+        // fallback-tier/costlier-sibling recipe winning instead of the
+        // cheap untrained one). CheapestCraftRealCost/Disciplines/MinRating
+        // describe that cheap recipe - only meaningful when
+        // CheapestCraftUntrained is true.
+        //
+        // Verification-review fix (second pass): always false for a node
+        // the force-buy pre-pass excluded craft from under BOTH a
+        // competency-resolved AND a competency-BLIND evaluation of its
+        // 0.85 rule - see PlanSolver.Evaluate's isCompetencyIndependentForceBuy/
+        // cheapestCraftUntrained local variables and
+        // OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult's own doc
+        // comment for why. The original fix here gated on raw
+        // forceBuyOnlyNodeIds membership instead, which over-corrected:
+        // that set's own exclusion CAN itself be competency-caused (the
+        // pre-pass's throwaway solve is competency-aware, so a node whose
+        // cheap recipe is untrained can land in forceBuyOnlyNodeIds purely
+        // because competency demoted the pre-pass's own craft-cost
+        // diagnostic to a costlier competent recipe) - silencing this field
+        // in exactly that shape hid a real, concrete training opportunity.
+        // This field now only ever suppresses for a node genuinely forced
+        // regardless of training, never for a competency-caused reason.
+        public bool CheapestCraftUntrained { get; internal set; }
+        public long? CheapestCraftRealCost { get; internal set; }
+        public IReadOnlyList<string> CheapestCraftDisciplines { get; internal set; }
+        public int CheapestCraftMinRating { get; internal set; }
     }
 }
