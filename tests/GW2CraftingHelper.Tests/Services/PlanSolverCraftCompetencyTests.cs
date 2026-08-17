@@ -395,9 +395,12 @@ namespace GW2CraftingHelper.Tests.Services
             // ReportsOpportunity below for the shape where that gate was
             // actually wrong (a force-buy exclusion that is ITSELF
             // competency-caused). Passing competencyIndependentForceBuyNodeIds
-            // explicitly (mirroring what OwnedMaterialsForceBuyPrePass would
-            // itself compute for this fixture) is what PlanSolver.Evaluate
-            // now gates on.
+            // explicitly is what PlanSolver.Evaluate now gates on. (The
+            // real pre-pass would produce EMPTY sets for this exact fixture
+            // - 100 < 30*0.85 is false - but the hand-fed set is still
+            // production-realistic: the pre-pass solves the unreduced tree
+            // while the real solve can run reduced, so a node can be in
+            // the sets while this solve's own numbers would not force it.)
             var tree = Craftable(1, 1,
                 Option(10, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(2, 1)));
             var prices = new Dictionary<int, ItemPrice>
