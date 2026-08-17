@@ -58,9 +58,9 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Item 1 (qty 5) -> recipe 10 -> leaf item 2 (qty 5)
             var tree = Craftable(1, 5, 10, 1, Leaf(2, 5));
-            var pool = new Dictionary<int, int>();
+            var index = new AccountItemIndex(null);
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(5, result.ReducedTree.Quantity);
             Assert.Single(result.ReducedTree.Recipes);
@@ -73,9 +73,12 @@ namespace GW2CraftingHelper.Tests.Services
         public void OriginalTreeNotMutated()
         {
             var tree = Craftable(1, 5, 10, 1, Leaf(2, 5));
-            var pool = new Dictionary<int, int> { { 1, 3 } };
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 3, AccountItemIndex.SourceMaterialStorage)
+            });
 
-            _reducer.Reduce(tree, pool);
+            _reducer.Reduce(tree, index, null);
 
             // Original tree must be unchanged
             Assert.Equal(5, tree.Quantity);
@@ -103,9 +106,9 @@ namespace GW2CraftingHelper.Tests.Services
             dedupedIngredient.IsAchievementBitDeduped = true;
 
             var tree = Craftable(1, 5, 10, 1, dedupedIngredient);
-            var pool = new Dictionary<int, int>();
+            var index = new AccountItemIndex(null);
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             var clonedIngredient = result.ReducedTree.Recipes[0].Ingredients[0];
             Assert.Equal(8493, clonedIngredient.AchievementId);
@@ -117,9 +120,12 @@ namespace GW2CraftingHelper.Tests.Services
         public void LeafFullyOwned_QuantityZero()
         {
             var tree = Leaf(100, 5);
-            var pool = new Dictionary<int, int> { { 100, 5 } };
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage)
+            });
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(0, result.ReducedTree.Quantity);
             Assert.Single(result.UsedMaterials);
@@ -131,9 +137,12 @@ namespace GW2CraftingHelper.Tests.Services
         public void LeafPartiallyOwned_ReducedQuantity()
         {
             var tree = Leaf(100, 5);
-            var pool = new Dictionary<int, int> { { 100, 3 } };
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage)
+            });
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(2, result.ReducedTree.Quantity);
             Assert.Single(result.UsedMaterials);
@@ -146,9 +155,13 @@ namespace GW2CraftingHelper.Tests.Services
             // Item 1 (qty 2) -> recipe 10 -> leaf item 2 (qty 6)
             // Own 2 of item 1 - should clear recipes, NOT consume item 2
             var tree = Craftable(1, 2, 10, 1, Leaf(2, 6));
-            var pool = new Dictionary<int, int> { { 1, 2 }, { 2, 100 } };
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 2, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(2, 100, AccountItemIndex.SourceMaterialStorage)
+            });
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(0, result.ReducedTree.Quantity);
             Assert.Empty(result.ReducedTree.Recipes);
@@ -157,9 +170,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(result.UsedMaterials);
             Assert.Equal(1, result.UsedMaterials[0].ItemId);
             Assert.Equal(2, result.UsedMaterials[0].QuantityUsed);
-
-            // Pool for item 2 should still be 100
-            Assert.Equal(100, pool[2]);
+            Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
         }
 
         [Fact]
@@ -170,9 +181,12 @@ namespace GW2CraftingHelper.Tests.Services
             // Own 4 of item 1 -> qty becomes 6, newCrafts = ceil(6/2) = 3
             // ingredient qty = 5 * 3 = 15
             var tree = Craftable(1, 10, 10, 2, Leaf(2, 25));
-            var pool = new Dictionary<int, int> { { 1, 4 } };
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage)
+            });
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(6, result.ReducedTree.Quantity);
             var option = result.ReducedTree.Recipes[0];
@@ -208,9 +222,9 @@ namespace GW2CraftingHelper.Tests.Services
                 Quantity = 77,
                 Recipes = new List<RecipeOption> { option }
             };
-            var pool = new Dictionary<int, int>(); // nothing owned
+            var index = new AccountItemIndex(null); // nothing owned
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(0.31, result.ReducedTree.Recipes[0].ExpectedOutputCount);
         }
@@ -237,12 +251,18 @@ namespace GW2CraftingHelper.Tests.Services
                 Recipes = new List<RecipeOption> { option }
             };
 
-            // Own 4 of item 1 -> qty becomes 6. Recomputing crafts needed
-            // from ExpectedOutputCount (0.5): ceil(6/0.5) = 12. Using the
-            // (buggy) nominal OutputCount (1) instead would give 6.
-            var pool = new Dictionary<int, int> { { 1, 4 } };
+            // Own 4 of item 1 (split across two sources, unlike the
+            // single-source Sourced_ variant below) -> qty becomes 6.
+            // Recomputing crafts needed from ExpectedOutputCount (0.5):
+            // ceil(6/0.5) = 12. Using the (buggy) nominal OutputCount (1)
+            // instead would give 6.
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 2, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(1, 2, AccountItemIndex.SourceBank)
+            });
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(6, result.ReducedTree.Quantity);
             var reducedOption = result.ReducedTree.Recipes[0];
@@ -312,8 +332,11 @@ namespace GW2CraftingHelper.Tests.Services
                 Recipes = new List<RecipeOption> { option }
             };
 
-            var pool = new Dictionary<int, int> { { 2, 5 } };
-            var result = _reducer.Reduce(tree, pool);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+            var result = _reducer.Reduce(tree, index, null);
 
             var reducedIng1 = result.ReducedTree.Recipes[0].Ingredients[0];
             var reducedIng2 = result.ReducedTree.Recipes[0].Ingredients[1];
@@ -350,16 +373,18 @@ namespace GW2CraftingHelper.Tests.Services
                 Recipes = new List<RecipeOption> { option }
             };
 
-            // Pool has currency id 99 - should not be consumed
-            var pool = new Dictionary<int, int> { { 99, 999 } };
+            // Index has currency id 99 - should not be consumed
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(99, 999, AccountItemIndex.SourceMaterialStorage)
+            });
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             var currencyNode = result.ReducedTree.Recipes[0].Ingredients[1];
             Assert.Equal(50, currencyNode.Quantity);
             Assert.Equal("Currency", currencyNode.IngredientType);
             Assert.Empty(result.UsedMaterials);
-            Assert.Equal(999, pool[99]);
         }
 
         [Fact]
@@ -383,8 +408,11 @@ namespace GW2CraftingHelper.Tests.Services
                 Recipes = new List<RecipeOption> { option }
             };
 
-            var pool = new Dictionary<int, int> { { 2, 10 } };
-            var result = _reducer.Reduce(tree, pool);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 10, AccountItemIndex.SourceMaterialStorage)
+            });
+            var result = _reducer.Reduce(tree, index, null);
 
             // Both branches fully covered, aggregated into one entry
             var item2Used = result.UsedMaterials.Where(u => u.ItemId == 2).ToList();
@@ -413,8 +441,12 @@ namespace GW2CraftingHelper.Tests.Services
             var leaf4 = Leaf(4, 4);
             var root = Craftable(1, 4, 10, 2, item2, leaf4);
 
-            var pool = new Dictionary<int, int> { { 1, 1 }, { 3, 5 } };
-            var result = _reducer.Reduce(root, pool);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 1, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(3, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+            var result = _reducer.Reduce(root, index, null);
 
             // Root: 4-1=3, newCrafts=ceil(3/2)=2
             Assert.Equal(3, result.ReducedTree.Quantity);
@@ -455,8 +487,11 @@ namespace GW2CraftingHelper.Tests.Services
             var intermediate = Craftable(500, 9, 200, 3, leaf);
             var root = Craftable(1, 1, 100, 1, intermediate);
 
-            var pool = new Dictionary<int, int> { { 500, 3 } };
-            var result = _reducer.Reduce(root, pool);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(500, 3, AccountItemIndex.SourceMaterialStorage)
+            });
+            var result = _reducer.Reduce(root, index, null);
 
             var reducedIntermediate = result.ReducedTree.Recipes[0].Ingredients[0];
             Assert.Equal(6, reducedIntermediate.Quantity);
@@ -472,9 +507,12 @@ namespace GW2CraftingHelper.Tests.Services
             // Item 1 (qty 3) -> recipe 10 -> leaf item 2 (qty 9)
             // Own 3 of item 1 - fully owned craftable intermediate
             var tree = Craftable(1, 3, 10, 1, Leaf(2, 9));
-            var pool = new Dictionary<int, int> { { 1, 3 } };
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 3, AccountItemIndex.SourceMaterialStorage)
+            });
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(0, result.ReducedTree.Quantity);
             Assert.Empty(result.ReducedTree.Recipes);
@@ -509,8 +547,14 @@ namespace GW2CraftingHelper.Tests.Services
                 Recipes = new List<RecipeOption> { optionA, optionB }
             };
 
-            var pool = new Dictionary<int, int> { { 2, 5 } };
-            var result = _reducer.Reduce(tree, pool);
+            // Split across two sources, unlike the single-source Sourced_
+            // variant below.
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(2, 2, AccountItemIndex.SourceBank)
+            });
+            var result = _reducer.Reduce(tree, index, null);
 
             var reducedOptionA = result.ReducedTree.Recipes[0];
             var reducedOptionB = result.ReducedTree.Recipes[1];
@@ -581,8 +625,11 @@ namespace GW2CraftingHelper.Tests.Services
             };
 
             // Own 4 of item 1 itself -> Quantity becomes 6, newCrafts = ceil(6/2) = 3
-            var pool = new Dictionary<int, int> { { 1, 4 } };
-            var result = _reducer.Reduce(tree, pool);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage)
+            });
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(6, result.ReducedTree.Quantity);
             Assert.Equal(3, result.ReducedTree.Recipes[0].CraftsNeeded);
@@ -598,9 +645,12 @@ namespace GW2CraftingHelper.Tests.Services
         public void OwnedQuantityUsedByNode_RecordsConsumptionKeyedByNodeObject()
         {
             var leaf = Leaf(100, 5);
-            var pool = new Dictionary<int, int> { { 100, 3 } };
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage)
+            });
 
-            var result = _reducer.Reduce(leaf, pool);
+            var result = _reducer.Reduce(leaf, index, null);
 
             Assert.Single(result.OwnedQuantityUsedByNode);
             var entry = result.OwnedQuantityUsedByNode.Single();
@@ -628,8 +678,11 @@ namespace GW2CraftingHelper.Tests.Services
                 Recipes = new List<RecipeOption> { option }
             };
 
-            var pool = new Dictionary<int, int> { { 2, 5 } };
-            var result = _reducer.Reduce(tree, pool);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(2, result.OwnedQuantityUsedByNode.Count);
             var reducedIng1 = result.ReducedTree.Recipes[0].Ingredients[0];
@@ -660,9 +713,9 @@ namespace GW2CraftingHelper.Tests.Services
         public void OwnedQuantityUsedByNode_EmptyWhenNothingConsumed()
         {
             var tree = Craftable(1, 5, 10, 1, Leaf(2, 5));
-            var pool = new Dictionary<int, int>();
+            var index = new AccountItemIndex(null);
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Empty(result.OwnedQuantityUsedByNode);
         }
@@ -774,18 +827,22 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void Sourced_OldOverload_StillWorksUnchanged()
+        public void Sourced_SingleSourcePartialConsumption_SourcesListsAllocation()
         {
             var tree = Leaf(100, 5);
-            var pool = new Dictionary<int, int> { { 100, 3 } };
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage)
+            });
 
-            var result = _reducer.Reduce(tree, pool);
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Equal(2, result.ReducedTree.Quantity);
             Assert.Single(result.UsedMaterials);
             Assert.Equal(3, result.UsedMaterials[0].QuantityUsed);
-            // Legacy contract: old overload leaves Sources null
-            Assert.Null(result.UsedMaterials[0].Sources);
+            Assert.Single(result.UsedMaterials[0].Sources);
+            Assert.Equal(AccountItemIndex.SourceMaterialStorage, result.UsedMaterials[0].Sources[0].Source);
+            Assert.Equal(3, result.UsedMaterials[0].Sources[0].Quantity);
         }
 
         [Fact]
@@ -996,16 +1053,34 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void Sourced_OldOverload_SourcesIsNull()
+        public void Sourced_SameSourceAcrossBranches_AllocationsMergedBySource()
         {
-            // Legacy contract: old overload has no source concept, Sources stays null
-            var tree = Leaf(100, 5);
-            var pool = new Dictionary<int, int> { { 100, 3 } };
+            // Two branches both draw item 2 from the same source; the
+            // aggregated UsedMaterial must merge them into ONE allocation
+            // with the summed quantity, not one entry per branch.
+            var option = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
+            option.Ingredients.Add(Leaf(2, 3));
+            option.Ingredients.Add(Leaf(2, 4));
+            var tree = new RecipeNode
+            {
+                Id = 1,
+                IngredientType = "Item",
+                Quantity = 1,
+                Recipes = new List<RecipeOption> { option }
+            };
 
-            var result = _reducer.Reduce(tree, pool);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 10, AccountItemIndex.SourceBank)
+            });
+
+            var result = _reducer.Reduce(tree, index, null);
 
             Assert.Single(result.UsedMaterials);
-            Assert.Null(result.UsedMaterials[0].Sources);
+            Assert.Equal(7, result.UsedMaterials[0].QuantityUsed);
+            Assert.Single(result.UsedMaterials[0].Sources);
+            Assert.Equal(AccountItemIndex.SourceBank, result.UsedMaterials[0].Sources[0].Source);
+            Assert.Equal(7, result.UsedMaterials[0].Sources[0].Quantity);
         }
 
         [Fact]
@@ -1092,43 +1167,47 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void OldVsNew_SameQuantityResults_WhenSourcesProvided()
+        public void Sourced_SourceSplitInvariance_SameQuantityResults()
         {
-            // Regression: sourced overload must produce the same tree quantities
-            // as old overload when total owned quantities match.
+            // Regression: splitting the same owned total across sources must
+            // produce the same tree quantities as holding it in one source.
             // Item 1 (qty 10) -> recipe 10 (output 2) -> leaf item 2 (qty 25)
-            // Own 4 of item 1 from mixed sources.
+            // Own 4 of item 1 either way.
             var tree = Craftable(1, 10, 10, 2, Leaf(2, 25));
 
-            // Old overload: flat pool
-            var pool = new Dictionary<int, int> { { 1, 4 } };
-            var oldResult = _reducer.Reduce(tree, pool);
+            var singleSource = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage)
+            });
+            var singleResult = _reducer.Reduce(tree, singleSource, null);
 
-            // New overload: same total from two sources
-            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            var splitSource = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(1, 2, AccountItemIndex.SourceMaterialStorage),
                 SnapEntry(1, 2, AccountItemIndex.SourceBank)
             });
-            var newResult = _reducer.Reduce(tree, index, null);
+            var splitResult = _reducer.Reduce(tree, splitSource, null);
+
+            // Absolute anchor: 10-4=6, newCrafts=ceil(6/2)=3
+            Assert.Equal(6, singleResult.ReducedTree.Quantity);
 
             // Tree quantities must match exactly
-            Assert.Equal(oldResult.ReducedTree.Quantity, newResult.ReducedTree.Quantity);
+            Assert.Equal(singleResult.ReducedTree.Quantity, splitResult.ReducedTree.Quantity);
             Assert.Equal(
-                oldResult.ReducedTree.Recipes[0].CraftsNeeded,
-                newResult.ReducedTree.Recipes[0].CraftsNeeded);
+                singleResult.ReducedTree.Recipes[0].CraftsNeeded,
+                splitResult.ReducedTree.Recipes[0].CraftsNeeded);
             Assert.Equal(
-                oldResult.ReducedTree.Recipes[0].Ingredients[0].Quantity,
-                newResult.ReducedTree.Recipes[0].Ingredients[0].Quantity);
+                singleResult.ReducedTree.Recipes[0].Ingredients[0].Quantity,
+                splitResult.ReducedTree.Recipes[0].Ingredients[0].Quantity);
 
             // Total consumed quantity matches
             Assert.Equal(
-                oldResult.UsedMaterials.Sum(u => u.QuantityUsed),
-                newResult.UsedMaterials.Sum(u => u.QuantityUsed));
+                singleResult.UsedMaterials.Sum(u => u.QuantityUsed),
+                splitResult.UsedMaterials.Sum(u => u.QuantityUsed));
 
-            // New overload has Sources; old does not
-            Assert.Null(oldResult.UsedMaterials[0].Sources);
-            Assert.NotNull(newResult.UsedMaterials[0].Sources);
+            // Only the split run reports two allocations
+            Assert.Single(singleResult.UsedMaterials[0].Sources);
+            Assert.Equal(2, splitResult.UsedMaterials[0].Sources.Count);
 
             // Original tree not mutated by either call
             Assert.Equal(10, tree.Quantity);
@@ -1167,8 +1246,14 @@ namespace GW2CraftingHelper.Tests.Services
                 { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
             };
 
-            var pool = new Dictionary<int, int> { { 2, 5 } };
-            var result = _reducer.Reduce(tree, pool, guide);
+            // Split across two sources, unlike the single-source Sourced_
+            // variant below.
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(2, 2, AccountItemIndex.SourceBank)
+            });
+            var result = _reducer.Reduce(tree, index, null, guide);
 
             var reducedOptionA = result.ReducedTree.Recipes[0];
             var reducedOptionB = result.ReducedTree.Recipes[1];
@@ -1197,8 +1282,11 @@ namespace GW2CraftingHelper.Tests.Services
                 { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
             };
 
-            var pool = new Dictionary<int, int> { { 2, 5 } };
-            var result = _reducer.Reduce(tree, pool, guide);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 5, AccountItemIndex.SourceBank)
+            });
+            var result = _reducer.Reduce(tree, index, null, guide);
 
             Assert.Equal(5, result.ReducedTree.Recipes[0].Ingredients[0].Quantity);
             Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
@@ -1220,8 +1308,15 @@ namespace GW2CraftingHelper.Tests.Services
                 { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
             };
 
-            var pool = new Dictionary<int, int> { { 1, 3 }, { 2, 5 } };
-            var result = _reducer.Reduce(tree, pool, guide);
+            // Node's own stock split across two sources, unlike the
+            // single-source Sourced_ variant below.
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(1, 2, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(1, 1, AccountItemIndex.SourceBank),
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+            });
+            var result = _reducer.Reduce(tree, index, null, guide);
 
             // Node's own quantity discounted from 5 to 2 (3 owned units used).
             Assert.Equal(2, result.ReducedTree.Quantity);
@@ -1265,8 +1360,14 @@ namespace GW2CraftingHelper.Tests.Services
                 { 99, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
             };
 
-            var pool = new Dictionary<int, int> { { 2, 5 } };
-            var result = _reducer.Reduce(tree, pool, guide);
+            // Split across two sources, unlike the single-source Sourced_
+            // variant below.
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(2, 2, AccountItemIndex.SourceBank)
+            });
+            var result = _reducer.Reduce(tree, index, null, guide);
 
             var reducedOptionA = result.ReducedTree.Recipes[0];
             var reducedOptionB = result.ReducedTree.Recipes[1];
@@ -1315,8 +1416,14 @@ namespace GW2CraftingHelper.Tests.Services
                 { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 999 } }
             };
 
-            var pool = new Dictionary<int, int> { { 2, 5 } };
-            var result = _reducer.Reduce(tree, pool, guide);
+            // Split across two sources, unlike the single-source Sourced_
+            // variant below.
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
+                SnapEntry(2, 2, AccountItemIndex.SourceBank)
+            });
+            var result = _reducer.Reduce(tree, index, null, guide);
 
             var reducedOptionA = result.ReducedTree.Recipes[0];
             var reducedOptionB = result.ReducedTree.Recipes[1];
@@ -1327,8 +1434,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 2);
         }
 
-        // ---- Sourced_ mirrors (AccountItemIndex overload - the actual
-        // production code path) ----
+        // ---- Sourced_ single-source variants of the guide tests above ----
 
         [Fact]
         public void Sourced_MultipleRecipeOptions_DecisionGuided_NonPrimaryOptionConsumesPoolWhenChosen()
@@ -1424,12 +1530,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Sourced_MissingNodeInGuide_FallsBackToPrimaryHeuristic()
         {
-            // Coverage: MissingNodeInGuide_FallsBackToPrimaryHeuristic
-            // above pins this defensive fallback only on the
-            // flat-Dictionary overload - production
-            // exclusively calls the AccountItemIndex-sourced overload this
-            // class mirrors (see ReduceNodeSourced's own doc comment,
-            // which claims "identical reasoning" without a dedicated pin).
+            // Single-source variant of MissingNodeInGuide_
+            // FallsBackToPrimaryHeuristic above.
             var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
             optionA.Ingredients.Add(Leaf(2, 5));
             var optionB = new RecipeOption { RecipeId = 20, OutputCount = 1, CraftsNeeded = 1 };
@@ -1462,8 +1564,7 @@ namespace GW2CraftingHelper.Tests.Services
             var reducedOptionB = result.ReducedTree.Recipes[1];
 
             // Primary option's ingredient fully covered by the pool (legacy
-            // heuristic), alternate option untouched - same as the
-            // flat-Dictionary mirror.
+            // heuristic), alternate option untouched.
             Assert.Equal(0, reducedOptionA.Ingredients[0].Quantity);
             Assert.Equal(5, reducedOptionB.Ingredients[0].Quantity);
         }
@@ -1471,11 +1572,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Sourced_StaleRecipeIdInGuide_NoOptionMatches_SuppressesAllConsumptionForThatNode()
         {
-            // Sourced mirror of StaleRecipeIdInGuide_NoOptionMatches_
+            // Single-source variant of StaleRecipeIdInGuide_NoOptionMatches_
             // SuppressesAllConsumptionForThatNode above - see that test's
-            // own doc comment for the full rationale. Pinned on the
-            // production AccountItemIndex overload too, since this is the
-            // path a stale guide entry would actually be hit through.
+            // own doc comment for the full rationale.
             var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
             optionA.Ingredients.Add(Leaf(2, 5));
             var optionB = new RecipeOption { RecipeId = 20, OutputCount = 1, CraftsNeeded = 1 };
