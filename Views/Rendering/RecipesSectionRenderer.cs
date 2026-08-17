@@ -7,15 +7,12 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-23c (m38-a1-architecture.md S3b-T2, continuing the WP-23/WP-23b
-    // extractions): moved verbatim out of CraftingPlanView's "7. Section
-    // builders (continued)" region - the Required Recipes row list (with
-    // BOTH row heights: RecipeRowHeightWithSublabel (44px) and
-    // RecipeRowHeightNoSublabel (36px, per the M36 fix-pass correction) and
-    // the Auto-learned/Learned/Missing! status tags. Behavior is unchanged:
-    // same row geometry, same PlanContentHeightMath/PlanRelayoutMath calls,
-    // same LabelHelpers.CreateRowDivider usage (DO-NOT-TOUCH #6 - divider
-    // math, its per-branch bottomClearance selection, and the M36b 1px
+    // The Required Recipes row list, with both row heights
+    // (RecipeRowHeightWithSublabel 44px, RecipeRowHeightNoSublabel 36px)
+    // and the Auto-learned/Learned/Missing! status tags - same row
+    // geometry, PlanContentHeightMath/PlanRelayoutMath calls, and
+    // LabelHelpers.CreateRowDivider usage (divider
+    // math, its per-branch bottomClearance selection, and the 1px
     // scissor clearance untouched). The only edit inside the moved row body
     // is _relayoutActions.Add -> the injected ISectionRelayoutSink.AddRelayout
     // (a semantics-preserving pass-through - see ISectionRelayoutSink's doc

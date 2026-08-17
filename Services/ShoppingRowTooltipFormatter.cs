@@ -13,16 +13,15 @@ namespace GW2CraftingHelper.Services
     /// directly unit-testable without a live BasicTooltipText - and,
     /// critically, so both CreateShoppingRow's initial tooltip build and
     /// its AddReellipsis rebuild call the identical code path: the two
-    /// used to diverge, with the rebuild silently dropping every currency
-    /// line on the first resize/settle (shoplist-have-format review
-    /// finding #1).
+    /// must never diverge - a diverging rebuild silently drops every
+    /// currency line on the first resize/settle.
     ///
     /// cc.Amount is this ROW's own currency total (one PlanStep's
     /// VendorCurrencyCosts - see PlanViewModelBuilder.
     /// BuildShoppingListSection), never the whole plan's requirement for
     /// that currency id (that figure is PlanViewModel.CurrencyPlanTotals,
     /// which this renderer is never handed) - so the wording below never
-    /// claims "plan requires" (review finding #2); it states only what
+    /// claims "plan requires"; it states only what
     /// this row's own numbers actually mean.
     /// </summary>
     public static class ShoppingRowTooltipFormatter
@@ -48,7 +47,7 @@ namespace GW2CraftingHelper.Services
         /// aside is the only place it survives.
         ///
         /// The "THIS ROW" suffix on both halves is deliberate (shoplist-
-        /// have-format review finding #1, SCOPE COLLISION): both numbers
+        /// have-format SCOPE COLLISION): both numbers
         /// are this ROW's own total (cc.Amount, one PlanStep's own
         /// VendorCurrencyCosts - see the class doc comment), never the
         /// whole plan's requirement for that currency id. Without a scope

@@ -46,7 +46,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int ComputeCaptionSplitIndex(CraftingTreeNode node)
         {
-            // Review-fix: Children[0]/Children[index] are dereferenced via
+            // Children[0]/Children[index] are dereferenced via
             // ?. below rather than assumed non-null - CraftingTreeBuilder
             // never appends a null child today, but this method already
             // defends against upstream invariant drift elsewhere (see the

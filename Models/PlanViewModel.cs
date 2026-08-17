@@ -324,7 +324,7 @@ namespace GW2CraftingHelper.Models
         // other row type.
         public string TooltipText { get; set; }
 
-        // W4A review-fix-round-2: true (default) when the formula band's
+        // true (default) when the formula band's
         // "=" operator drawn immediately to this tile's left is an honest
         // statement (left tile - middle tile literally equals this tile's
         // displayed CoinValue). SummarySectionRenderer.CreateFormulaBand

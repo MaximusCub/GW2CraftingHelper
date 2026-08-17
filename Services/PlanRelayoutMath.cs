@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M34 fix (MustFix review finding): how many of the recipe tree's
+        /// how many of the recipe tree's
         /// decision pills (already-measured widths, in
         /// DecisionPillPlanner.BuildPillSpecs emission order - source pills
         /// first, then the supplementary OwnedInfo/Ignore pills) fit

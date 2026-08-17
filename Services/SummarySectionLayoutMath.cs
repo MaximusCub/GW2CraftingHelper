@@ -117,7 +117,7 @@ namespace GW2CraftingHelper.Services
         // ComputeEdges' "clamp to a fixed minimum, widen from an actual
         // per-render widest-value measurement" shape.
         //
-        // Review fix: the fixed-60px-only version of
+        // The fixed-60px-only version of
         // this comment claimed Required/Have/Needed have "no realistic risk
         // of a value needing more than a handful of digits" - untrue once
         // the W4A spec UNCLAMPED the Have column to the real wallet
@@ -187,7 +187,7 @@ namespace GW2CraftingHelper.Services
         /// width" shape so header and data rows built from the same
         /// panelWidth/widestNumberWidth pair always agree by construction.
         /// widestNumberWidth defaults to 0 (i.e. the fixed
-        /// CurrencyNumberColumnWidth floor, unchanged pre-review-fix
+        /// CurrencyNumberColumnWidth floor, unchanged prior
         /// behavior) for callers - existing tests among them - that don't
         /// need to pass a data-driven width.
         /// </summary>

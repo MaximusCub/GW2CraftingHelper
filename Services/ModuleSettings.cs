@@ -321,7 +321,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public CurrencyValuation GetEffectiveCurrencyValuation()
         {
-            // currency-ux-package review fix (finding 5, MEASURED): the
+            // the
             // merge itself now lives on CurrencyValuation.WithDefaults (a
             // Blish-free Models type, therefore unit-testable) instead of
             // being inlined here - this class stays the sole production

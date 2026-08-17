@@ -8024,3 +8024,73 @@ with re-verified zero references; no rendered surface changed, so no
 desktop gate applies; evidence is the per-commit build/suite record
 above and the verification pass at 9022c9b - module 1827/1827, updater
 207/207, build 0 errors).
+
+---
+
+## Comment-minimalism sweep (repo-wide, comment-minimalism-sweep branch)
+
+Repo-wide pass applying the maintainer's comment bar: a comment survives
+only if it states a constraint the code cannot express, once, in 1-2
+lines. Review-round narration, gate/round markers, dates, milestone
+tags, and superseded-design retellings deleted; genuine invariants kept
+trimmed at one canonical site. Comments and blank lines only - verified
+code-identical (comment-stripped before/after diff clean per commit).
+
+**Per-area line deltas (files touched, comment lines +added/-removed):**
+
+- Services (incl. Diagnostics/Recipes): 63 files, +1733 -4461
+- Models: 26 files, +325 -807
+- Views (incl. Rendering): 23 files, +681 -1345
+- Module.cs: 1 file, +149 -426
+- tools (VendorOfferUpdater/RecipeSeeder/Harness/MysticForgeSeeder):
+  9 files, +92 -159
+- tests (module + updater suites): 97 files, +350 -351
+- Total: 208 files, net -4,198 lines (10 files with non-ASCII
+  em-dashes/arrows/box glyphs converted to ASCII; the flagged
+  InMemoryRecipeCacheStore em-dash was already fixed on origin/master -
+  the remaining instances of that class were in Services/Recipes and
+  tests, all fixed here)
+
+**Invariants relocated / canonicalized (from -> to):**
+
+- CompetencyOpportunityCalculator.Apply rationale: three byte-identical
+  4-line blocks in CraftingPlanPipeline reduced to one-line
+  "annotation-only" notes; canonical contract stays on the calculator's
+  own class doc.
+- CraftingPlanPipeline Solve()-overload twin blocks (Step 5.5/5.6,
+  seasonal filter, force-buy pre-pass, metadata widening): stated once
+  at the single-item overload; multi-item overload reduced to "see the
+  single-item overload's matching X" pointers.
+- PlanSolver comparability-tier rationale: canonical at
+  Decision.ComparisonValue/HasUnvaluedCurrency and the Evaluate
+  vendor/recipe tier blocks; restatement sites (SolverDecision,
+  CraftingTreeNode, CraftingPlanResult, CompetencyOpportunity,
+  CompetencyOpportunityCalculator) trimmed to short passthrough notes.
+- AccountCurrencyIndex: gw2efficiency provenance litigation deleted;
+  the display-only/never-affects-decisions invariant kept as the class
+  doc.
+- DecisionPillPlanner: three successive pill-wording narrations reduced
+  to the current wording only.
+- No invariant was orphaned: every deletion either had a surviving
+  canonical statement (owning class doc, ARCHITECTURE.md sections 4/5/7/8,
+  or this file) or was process metadata with no invariant content.
+
+**Kept intact (verified):** PlanContentHeightMath's one-level-per-frame
+AutoSize convergence class doc; WheelDeltaSanitizer's root-cause/
+threshold contract doc; ISectionRelayoutSink's seam contract;
+CurrencyDecisionDefaults' MIT permission notice; scroll
+preserve-restore-verify invariants in CraftingPlanView (comment edits
+only, no code touched in the high-evidence zones).
+
+**Flagged suspect claims (not rewritten; verify separately):** none
+found - no surviving comment's technical claim was determined false
+during the sweep. Two former false claims were already self-documented
+as corrected upstream (Gw2Constants festival-table scoping,
+VendorOfferUpdater round-trip save ordering) and were compressed to
+their corrected form.
+
+**Validation:** build 0 errors after every batch; module suite
+1827/1827 after every batch; updater suite 207/207 after the tools and
+tests batches.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]

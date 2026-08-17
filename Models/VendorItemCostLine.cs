@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Models
         public int Quantity { get; set; }
         public long GoldValue { get; set; }
 
-        // AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap): true when this
+        // true when this
         // line's per-unit TP price (folded into GoldValue above) came from
         // this SAME item's NON-preferred TP side because the preferred
         // side had no listings - see PlanSolver.GetUnitPrice's 3-arg

@@ -165,7 +165,7 @@ namespace GW2CraftingHelper.Services
             }
 
             SolverDecision guideDecision = null;
-            // Review-fix: Reduce is public API with an IReadOnlyDictionary
+            // Reduce is public API with an IReadOnlyDictionary
             // parameter - PlanSolver never emits a null VALUE, but nothing
             // stops a caller from doing so. TryGetValue alone returns true
             // for an entry whose value IS null, and the code below
@@ -345,7 +345,7 @@ namespace GW2CraftingHelper.Services
             }
 
             SolverDecision guideDecision = null;
-            // Review-fix: Reduce is public API with an IReadOnlyDictionary
+            // Reduce is public API with an IReadOnlyDictionary
             // parameter - PlanSolver never emits a null VALUE, but nothing
             // stops a caller from doing so. TryGetValue alone returns true
             // for an entry whose value IS null, and the code below

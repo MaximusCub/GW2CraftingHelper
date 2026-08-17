@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Services
     /// this class formats is for a HOVER TOOLTIP only - it must never be
     /// copied into a displayed total anywhere else in the app.
     ///
-    /// currency-ux-package review fix (nice-to-have): this hover can never
+    /// this hover can never
     /// fire for the "unpriceable component" trigger the brief lists
     /// alongside valued currencies. PlanSolver.RecomputeComparisonValues
     /// sets ComparisonValue = TotalCost for every fallback-tier decision,
@@ -60,7 +60,7 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
-            // currency-ux-package review fix (nice-to-have): a currency-type
+            // a currency-type
             // vendor cost-component leaf also has Decision == BuyFromVendor
             // and is kept out today only because BuildVendorCostComponentLeaves
             // happens not to set DecisionValue on that construction path -
@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
-            // currency-ux-package review fix (finding 4, MEASURED): a
+            // a
             // merged vendor decision's VendorComponentCostsUnreliable is
             // already the documented signal (see that field's own doc
             // comment, and CraftingTreeBuilder's identical guard on

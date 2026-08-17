@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Services
             {
                 values[kvp.Key] = kvp.Value;
             }
-            // currency-ux-package review fix (nice-to-have): ClearedCurrencyIds
+            // ClearedCurrencyIds
             // is a HashSet<int>, whose enumeration order is not guaranteed
             // stable across otherwise-identical instances - sorted here so
             // the persisted "Cleared" array (and therefore the whole

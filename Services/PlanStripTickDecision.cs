@@ -32,7 +32,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Pure decision for what a status-strip spinner tick should do with a
     /// freshly read <see cref="PlanStripStatusSnapshot"/> (Gate round 1
-    /// review-fix). Mirrors <see cref="StatusUpdateGuard"/>/
+    /// Mirrors <see cref="StatusUpdateGuard"/>/
     /// <see cref="PhaseOrdinalGuard"/>'s shape/spirit: the race-sensitive
     /// "stop or render, and render what" decision the mandate calls out
     /// ("when the board reports finished, render the final status and stop
@@ -60,7 +60,7 @@ namespace GW2CraftingHelper.Services
         /// CraftingPlanView.RenderFromBoard). Falls back to "Generating..."
         /// for a null event or one with no display name, matching the
         /// pre-first-event text TriggerGenerate already shows. W3B
-        /// review-fix: when a phase carries no item count but does carry
+        /// When a phase carries no item count but does carry
         /// Detail (currently only the very first "Building recipe tree"
         /// event, shown unconditionally regardless of whether the cache
         /// actually turns out warm or cold - see

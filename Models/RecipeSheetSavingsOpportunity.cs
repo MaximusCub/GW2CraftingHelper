@@ -19,14 +19,10 @@ namespace GW2CraftingHelper.Models
         public int RecipeId { get; set; }
 
         /// <summary>
-        /// The purchasable recipe-sheet item that unlocks RecipeId. Review
-        /// note (nice-to-have): populated but not currently read by
-        /// PlanViewModelBuilder.BuildNotesSection - the rendered note
-        /// names the CRAFTED item, not the sheet itself (SheetItemName was
-        /// never plumbed through). Carried here as provenance/for a future
-        /// consumer (e.g. showing the sheet's own name), same "carried but
-        /// not yet rendered" posture as several fields on
-        /// AcquisitionHint/DailyCooldownItem.
+        /// The purchasable recipe-sheet item that unlocks RecipeId.
+        /// Populated but not currently read by BuildNotesSection - the
+        /// rendered note names the crafted item, not the sheet. Carried
+        /// as provenance for a future consumer.
         /// </summary>
         public int SheetItemId { get; set; }
 
@@ -53,7 +49,7 @@ namespace GW2CraftingHelper.Models
         /// The recipe's own (real, player-levelable) discipline - null when
         /// the recipe needs no such discipline (e.g. Mystic Forge/
         /// Achievement/Merchant-only) or no account snapshot was available
-        /// to the calculator at all. Review-fix (nice-to-have): set
+        /// to the calculator at all. set
         /// whenever a real discipline exists AND a snapshot was available,
         /// REGARDLESS of DisciplineBlocked - the renderer's own
         /// DisciplineBlocked-first check (PlanViewModelBuilder.

@@ -61,7 +61,7 @@ namespace GW2CraftingHelper.Services
                     {
                         foreach (var flag in flagsToken)
                         {
-                            // Nice-to-have (review fix): a malformed array
+                            // a malformed array
                             // element (null, or a non-string token) must
                             // not inject a null into Flags - RawItem.Flags'
                             // own doc comment promises a never-null LIST,

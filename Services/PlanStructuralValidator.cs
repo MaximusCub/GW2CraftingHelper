@@ -4,7 +4,7 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Round 4 review-fix: a single,
+    /// a single,
     /// class-level structural walk of the ENTIRE object graph a
     /// deserialized <see cref="PersistedPlan"/> carries, run once at the
     /// deserialization boundary (<see cref="PlanStoreHelpers.DeserializePersistedPlan"/>)
@@ -328,7 +328,7 @@ namespace GW2CraftingHelper.Services
             // there NREs.
             if (!NoNullEntries(context.RequestedItems, "SolveContext.RequestedItems", out reason)) return false;
 
-            // Round 5 review-fix (mustFix): SolveContext.UsedMaterials is a
+            // SolveContext.UsedMaterials is a
             // SEPARATELY serialized copy of the same list as
             // CraftingPlanResult.UsedMaterials above (Newtonsoft writes no
             // $ref by default - see PlanStoreHelpers' own doc comment on

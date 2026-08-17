@@ -2,7 +2,7 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Pure decision for whether a live <see cref="PlanPhaseEvent"/> should
-    /// still be applied to the status strip (W3B review-fix - monotonic
+    /// still be applied to the status strip (monotonic
     /// phase ordering). Mirrors StatusUpdateGuard's shape/spirit: a pure,
     /// Blish-free function CraftingPlanView calls at the moment each event
     /// actually drains, since the race it closes cannot be seen any other

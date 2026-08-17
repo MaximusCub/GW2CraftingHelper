@@ -64,7 +64,7 @@ namespace GW2CraftingHelper.Services
                             // limit (and would divide-by-zero the "days
                             // needed" math downstream) - skip rather than
                             // invent a notice from malformed seed data.
-                            // Review nice-to-have: an itemId <= 0 is
+                            // an itemId <= 0 is
                             // equally malformed (no PlanStep ever carries
                             // one) - same guard shape as PerDayCap. This
                             // guard is stricter than AcquisitionHintService.

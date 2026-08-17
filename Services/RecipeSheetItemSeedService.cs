@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// opportunity-notes (RECIPE-SHEET SAVINGS, review-fix): loads the
+    /// opportunity-notes (RECIPE-SHEET SAVINGS): loads the
     /// wiki/API-verified recipe id -&gt; unlocking recipe-sheet item id seed
     /// (ref/recipe_sheet_items.json) into the plain
     /// IReadOnlyDictionary&lt;int, int&gt; RecipeSheetSavingsCalculator/
@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Services
     /// Without this loader, Module.cs had no way to populate
     /// recipeSheetItemIdByRecipeId at all - the calculator's own gate on a
     /// non-empty map meant the feature could never fire for a real plan
-    /// (docs/KNOWN-ISSUES.md RECIPE-SHEET SAVINGS entry, review-fix).
+    /// (docs/KNOWN-ISSUES.md RECIPE-SHEET SAVINGS entry).
     /// </summary>
     public static class RecipeSheetItemSeedService
     {

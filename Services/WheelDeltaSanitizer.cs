@@ -65,7 +65,7 @@ namespace GW2CraftingHelper.Services
     /// count), so "raw &lt;= -60000" identifies exactly the corruption and
     /// nothing else.
     ///
-    /// NOTE ON THE HARDCODED 120 (M36 fix-pass, NICETOHAVE d): this class
+    /// NOTE ON THE HARDCODED 120: this class
     /// (and CraftingPlanView.ApplyWheelWrapCorrection's own
     /// "intendedDelta / 120.0" notch-count arithmetic) hardcodes 120
     /// rather than reading it live, unlike MouseWheelScrollLines (see
@@ -127,7 +127,7 @@ namespace GW2CraftingHelper.Services
         /// Windows' "one screen at a time" mouse-wheel-lines setting
         /// (Control Panel/Settings mouse wheel option) reports
         /// SystemInformation.MouseWheelScrollLines as -1, not a usable
-        /// line count (M36 fix-pass, MUSTFIX-2). Used directly, that sign
+        /// line count. Used directly, that sign
         /// flips CraftingPlanView.ApplyWheelWrapCorrection's corrective
         /// pixel delta for every wrapped up-flick (Blish's own
         /// Scrollbar.HandleWheelScroll has the identical defect - its

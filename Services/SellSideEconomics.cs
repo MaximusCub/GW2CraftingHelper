@@ -183,7 +183,7 @@ namespace GW2CraftingHelper.Services
             // the requested quantity), this root's own cost pays for the
             // whole batch, so the extra units are sellable too.
             //
-            // Review fix (finding 8, MEASURED): "produced" must use the
+            // "produced" must use the
             // SAME basis CraftsNeeded was derived from - ExpectedOutputCount
             // (EV), not the nominal OutputCount - exactly the finding-1 fix
             // ExcessCraftOutputCalculator.Walk already applies. For an
@@ -322,7 +322,7 @@ namespace GW2CraftingHelper.Services
         /// sell price - the batch equivalent of the single-item "no sell
         /// price at all" case.
         ///
-        /// Documented nuance (M37 review, UPDATED by the VOM design -
+        /// Documented nuance (updated by the decision-guided reduction design -
         /// Candidate A - decision-invariant reduction): MaterialOpportunityCost
         /// is a SINGLE sum over the batch's whole merged UsedMaterials list
         /// (Reduce still runs on the entire wrapper tree before Solve ever

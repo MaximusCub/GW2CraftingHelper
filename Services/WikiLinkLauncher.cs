@@ -45,7 +45,7 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            // Review-fix: every current caller only ever passes a
+            // every current caller only ever passes a
             // WikiLinkBuilder result (always BaseUrl-prefixed), but this is
             // the module's first shell-out and Process.Start(string) on
             // net48 resolves through ShellExecute (UseShellExecute
@@ -62,7 +62,7 @@ namespace GW2CraftingHelper.Services
             {
                 try
                 {
-                    // Review-fix: dispose the handle ShellExecute hands
+                    // dispose the handle ShellExecute hands
                     // back on a successful launch - discarding it undisposed
                     // leaks a process handle per click in a long-running
                     // overlay. The ShellExecute path can return null here;

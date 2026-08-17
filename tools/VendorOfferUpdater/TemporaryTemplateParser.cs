@@ -34,7 +34,7 @@ namespace VendorOfferUpdater
     ///     vendor) - ExtractSeasonalOrEventParameter returns null for
     ///     that shape, same as for a page with no {{Temporary}} template
     ///     at all.
-    ///   - Known, untested shape (review note - no live page
+    ///   - Known, untested shape (no live page
     ///     has shown it yet): the extracted value is NOT normalized
     ///     against wiki markup - "seasonal=[[Halloween]]" would extract
     ///     the literal "[[Halloween]]", which is correctly left untagged

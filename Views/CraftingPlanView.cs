@@ -529,20 +529,11 @@ namespace GW2CraftingHelper.Views
             DateTime generatedAt,
             IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides,
             IReadOnlyList<int> ignoredItemIds,
-            // "Value Own Materials"
-            // checkbox state at the GENERATION time this plan was
-            // persisted (PersistedPlan.ValueOwnMaterials) - restoring it
-            // here is the whole reason that field was added to the schema
-            // (see PersistedPlan.ValueOwnMaterials' own doc comment); it
-            // previously round-tripped to disk and back but was never fed
-            // into the live checkbox, so every restored session silently
-            // reset to the checkbox's construction-time default (true)
-            // regardless of what the user had actually chosen. See
-            // _valueOwnMaterials/_valueOwnMaterialsCheckbox below for where
-            // this is applied. UseOwnMaterials/PriceBasis have the same
-            // pre-existing gap (their live controls are not restored
-            // either) but that is out of scope for this fix - see
-            // docs/KNOWN-ISSUES.md.
+            // "Value Own Materials" checkbox state at the generation
+            // time this plan was persisted - restoring it into the live
+            // checkbox is the whole reason PersistedPlan.ValueOwnMaterials
+            // exists. UseOwnMaterials/PriceBasis have the same gap (their
+            // live controls are not restored) - see docs/KNOWN-ISSUES.md.
             bool valueOwnMaterials)
         {
             if (result == null) return;

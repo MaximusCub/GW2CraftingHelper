@@ -54,7 +54,7 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Optional short additional detail, e.g. "may take several
         /// seconds on first run" on the very first BuildingTree event of a
-        /// cold recipe cache (W3B review-fix - see
+        /// cold recipe cache (see
         /// CraftingPlanPipeline.FirstRunTreeHint and
         /// PlanStripTickDecision.FormatPhaseText). Null for every phase
         /// that has none.

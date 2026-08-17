@@ -184,7 +184,7 @@ namespace GW2CraftingHelper.Services
         /// is the board's own one-time initial seed - called at most once
         /// per module session, before the strip has shown anything else.
         /// <para>
-        /// Review-fix: no-op if a real
+        /// no-op if a real
         /// generation has already Begin()'n this session (_sequence != 0)
         /// or is currently in flight - "called at most once... before the
         /// strip has shown anything else" above is a caller EXPECTATION,
@@ -225,7 +225,7 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Round-3 review-fix (mustFix): undoes a <see cref="SeedRestored"/>
+        /// undoes a <see cref="SeedRestored"/>
         /// call whose downstream render subsequently failed - see
         /// Views/CraftingPlanView.cs's shared rollback helper, called from
         /// both RenderPlan call sites that can reach a still-unvalidated

@@ -36,12 +36,8 @@ namespace GW2CraftingHelper.Services
         public const int CTableHeaderRowHeight = 26;
         public const int DisciplineRowHeight = 32;
 
-        // M36 fix-pass (MUSTFIX-3): was 32, which left CraftingPlanView's
-        // 34px rarity-framed icon (at y=1, then y=0 after this fix)
-        // overflowing this row's own height - pre-existing negative
-        // headroom made worse when M36 widened row dividers from 1px to
-        // 2px (see Views/Rendering/RecipesSectionRenderer.CreateRecipeRow's
-        // own doc comment - M38 WP-23c moved this out of CraftingPlanView).
+        // 36, not 32: a 32px row left the 34px rarity-framed icon
+        // overflowing the row height once dividers widened to 2px.
         // 36 = 34px icon (y=0) + 2px divider, an exact, non-overlapping
         // fit, mirroring UsedMaterialRowHeight/ShoppingRowHeight's already-
         // correct 36.
