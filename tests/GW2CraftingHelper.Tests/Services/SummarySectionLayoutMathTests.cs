@@ -226,18 +226,18 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ComputeCurrencyColumnEdges_NoWidestNumberWidthArg_MatchesFixedFloorBehavior()
+        public void ComputeCurrencyColumnEdges_NoWidestNumberWidthArg_ProducesFixedFloorGeometry()
         {
-            // Default parameter (0) must reproduce the exact pre-review-fix
-            // fixed-60px geometry - existing callers/tests that only ever
-            // pass panelWidth must see byte-identical edges.
-            var withDefault = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
-            var explicitZero = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800, 0);
+            // Omitting widestNumberWidth must reproduce the fixed-60px
+            // geometry, pinned absolutely: rightEdge = 800 - 8 = 792,
+            // MarkerX = 792 - 34, then each column steps left by
+            // gap(14) + width(60).
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
 
-            Assert.Equal(explicitZero.RequiredRightEdge, withDefault.RequiredRightEdge);
-            Assert.Equal(explicitZero.HaveRightEdge, withDefault.HaveRightEdge);
-            Assert.Equal(explicitZero.NeededRightEdge, withDefault.NeededRightEdge);
-            Assert.Equal(explicitZero.MarkerX, withDefault.MarkerX);
+            Assert.Equal(758, edges.MarkerX);
+            Assert.Equal(744, edges.NeededRightEdge);
+            Assert.Equal(670, edges.HaveRightEdge);
+            Assert.Equal(596, edges.RequiredRightEdge);
         }
 
         [Fact]

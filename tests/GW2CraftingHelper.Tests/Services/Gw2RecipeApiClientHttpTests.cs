@@ -78,7 +78,7 @@ namespace GW2CraftingHelper.Tests.Services
                 await client.SearchByOutputAsync(1, CancellationToken.None);
 
                 Assert.NotNull(handler.LastRequestUri);
-                Assert.Contains("v=", handler.LastRequestUri.Query);
+                Assert.Matches(@"[?&]v=\d{4}-\d{2}-\d{2}(&|$)", handler.LastRequestUri.Query);
             }
         }
 
@@ -162,7 +162,7 @@ namespace GW2CraftingHelper.Tests.Services
                 await client.GetRecipeAsync(10, CancellationToken.None);
 
                 Assert.NotNull(handler.LastRequestUri);
-                Assert.Contains("v=", handler.LastRequestUri.Query);
+                Assert.Matches(@"[?&]v=\d{4}-\d{2}-\d{2}(&|$)", handler.LastRequestUri.Query);
             }
         }
 

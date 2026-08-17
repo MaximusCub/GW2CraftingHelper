@@ -219,12 +219,14 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Regression guard mirroring the research report's own
             // BFS-verified finding: Exordium's tree reaches zero Homestead
-            // Refinement materials, so a plan for a tree with NO homestead
-            // offers at all must be byte-identical regardless of the
-            // configured tier setting. A small synthetic tree stands in for
-            // the real (14k-recipe) Exordium tree here; the real tree is
-            // checked via the offline Harness per this milestone's manual
-            // verification step.
+            // Refinement materials, so a plan whose reachable offers carry
+            // no HomesteadTier must be byte-identical regardless of the
+            // configured tier setting. The non-Homestead offer on item 2
+            // makes the solver actually walk the per-offer tier gate (a
+            // null vendorOffers dict would skip it entirely). A small
+            // synthetic tree stands in for the real (14k-recipe) Exordium
+            // tree here; the real tree is checked via the offline Harness
+            // per this milestone's manual verification step.
             var tree = Craftable(1, 1,
                 Option(10, 1, 1, Leaf(2, 3), Leaf(3, 5)));
             var prices = new Dictionary<int, ItemPrice>
@@ -233,9 +235,13 @@ namespace GW2CraftingHelper.Tests.Services
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
                 { 3, new ItemPrice { ItemId = 3, BuyInstant = 20 } }
             };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 2, new List<VendorOffer> { CoinVendorOffer(2, 4) } }
+            };
             var solver = new PlanSolver();
 
-            var planTier0 = solver.Solve(tree, prices, null, PriceBasis.InstantBuy).Plan;
+            var planTier0 = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy).Plan;
             var maxTiers = new HomesteadEfficiencyTiers(new Dictionary<int, int>
             {
                 { Gw2Constants.RefinedHomesteadFiberItemId, 2 },
@@ -243,7 +249,7 @@ namespace GW2CraftingHelper.Tests.Services
                 { Gw2Constants.RefinedHomesteadWoodItemId, 2 }
             });
             var planTier2 = solver.Solve(
-                tree, prices, null, PriceBasis.InstantBuy, homesteadTiers: maxTiers).Plan;
+                tree, prices, vendorOffers, PriceBasis.InstantBuy, homesteadTiers: maxTiers).Plan;
 
             Assert.Equal(planTier0.TotalCoinCost, planTier2.TotalCoinCost);
             Assert.Equal(planTier0.Steps.Count, planTier2.Steps.Count);

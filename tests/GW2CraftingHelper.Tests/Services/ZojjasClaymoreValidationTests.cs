@@ -11,42 +11,44 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// Structural validation tests using Zojja's Claymore (46762) as a
-    /// representative deep ascended Weaponsmith tree. All data is in-memory;
+    /// Structural validation tests over a SYNTHETIC deep Weaponsmith tree
+    /// modeled on Zojja's Claymore's shape. Every item/recipe ID is fake
+    /// (9001+/9101+, deliberately outside real GW2 data) and the names are
+    /// labels only - the real item's tree differs. All data is in-memory;
     /// no HTTP calls.
     ///
     /// Recipe tree (Weaponsmith-only):
-    ///   Zojja's Claymore (46762) - Recipe 7836, WS 500, AutoLearned
-    ///   +-- Orichalcum GS Blade (46738) x1 - Recipe 11539, WS 450, AutoLearned
-    ///   |   +-- Orichalcum Ingot (19685) x3 - leaf
-    ///   |   +-- Deldrimor Steel Ingot (46739) x3 - Recipe 11517, WS 450, AutoLearned
-    ///   |       +-- Iron Ingot (19683) x1 - leaf
-    ///   |       +-- Steel Ingot (19688) x1 - leaf
-    ///   +-- Orichalcum GS Hilt (46742) x1 - leaf (no recipe)
-    ///   +-- Inscription (46688) x1 - Recipe 11548, WS 500, NOT AutoLearned
-    ///   |   +-- Orichalcum Ingot (19685) x5 - leaf (shared with Blade)
-    ///   |   +-- Glob of Ectoplasm (19721) x5 - leaf
-    ///   +-- Glob of Dark Matter (46746) x1 - leaf
+    ///   Claymore (9001) - Recipe 9101, WS 500, AutoLearned
+    ///   +-- GS Blade (9002) x1 - Recipe 9102, WS 450, AutoLearned
+    ///   |   +-- Ori Ingot (9006) x3 - leaf
+    ///   |   +-- Deldrimor Steel (9005) x3 - Recipe 9103, WS 450, AutoLearned
+    ///   |       +-- Iron Ingot (9007) x1 - leaf
+    ///   |       +-- Steel Ingot (9008) x1 - leaf
+    ///   +-- GS Hilt (9003) x1 - leaf (no recipe)
+    ///   +-- Inscription (9004) x1 - Recipe 9104, WS 500, NOT AutoLearned
+    ///   |   +-- Ori Ingot (9006) x5 - leaf (shared with Blade)
+    ///   |   +-- Glob of Ectoplasm (9009) x5 - leaf
+    ///   +-- Glob of Dark Matter (9010) x1 - leaf
     /// </summary>
     public class ZojjasClaymoreValidationTests
     {
         // Item IDs
-        private const int ZojjasClaymore = 46762;
-        private const int OriGsBlade = 46738;
-        private const int OriGsHilt = 46742;
-        private const int Inscription = 46688;
-        private const int DeldrimorSteel = 46739;
-        private const int OriIngot = 19685;
-        private const int IronIngot = 19683;
-        private const int SteelIngot = 19688;
-        private const int GlobEcto = 19721;
-        private const int GlobDarkMatter = 46746;
+        private const int ZojjasClaymore = 9001;
+        private const int OriGsBlade = 9002;
+        private const int OriGsHilt = 9003;
+        private const int Inscription = 9004;
+        private const int DeldrimorSteel = 9005;
+        private const int OriIngot = 9006;
+        private const int IronIngot = 9007;
+        private const int SteelIngot = 9008;
+        private const int GlobEcto = 9009;
+        private const int GlobDarkMatter = 9010;
 
         // Recipe IDs
-        private const int RecipeClaymore = 7836;
-        private const int RecipeBlade = 11539;
-        private const int RecipeDeldrimor = 11517;
-        private const int RecipeInscription = 11548;
+        private const int RecipeClaymore = 9101;
+        private const int RecipeBlade = 9102;
+        private const int RecipeDeldrimor = 9103;
+        private const int RecipeInscription = 9104;
 
         private static readonly int[] AllItemIds =
         {
@@ -293,7 +295,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var (pipeline, _) = BuildPipeline();
 
-            // Own 1x Orichalcum GS Blade (46738) - a Weaponsmith-only craftable
+            // Own 1x GS Blade - a Weaponsmith-only craftable
             var snapshot = new AccountSnapshot
             {
                 Items = new List<SnapshotItemEntry>
@@ -310,7 +312,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains(result.UsedMaterials,
                 u => u.ItemId == OriGsBlade && u.QuantityUsed > 0);
 
-            // 15. Blade recipe (11539) is pruned from RequiredRecipes
+            // 15. Blade recipe is pruned from RequiredRecipes
             Assert.DoesNotContain(result.RequiredRecipes,
                 r => r.RecipeId == RecipeBlade);
 
