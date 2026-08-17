@@ -597,7 +597,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
