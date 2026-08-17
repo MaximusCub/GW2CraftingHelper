@@ -490,11 +490,15 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(12, result.Decisions[craftB.NodeId].TotalCost);
             Assert.Equal(12, result.Decisions[craftA.NodeId].TotalCost);
             Assert.Equal(83, result.Decisions[craftD.NodeId].TotalCost);
-            // craftE's leaf occurrence is last in DFS order, so
-            // AllocateVendorNodeCosts' remainder-absorption lands its
-            // corrected share here (180 - 12 - 83 = 85) rather than the
-            // naively-corrected-in-isolation 84 - see
-            // AllocateVendorNodeCosts' doc comment.
+            // craftE's leaf occurrence (quantity 84) gets the single leftover
+            // copper under AllocateVendorNodeCosts' largest-remainder
+            // apportionment: floor(180 * 84 / 179) = 84 with remainder
+            // 84/179, the largest fractional remainder among all five
+            // occurrences (4/179, 4/179, 4/179, 83/179, 84/179), so it is
+            // the one that receives leftover = 180 - 179 = 1, landing on 85
+            // rather than the naively-corrected-in-isolation 84. This is a
+            // property of craftE's quantity being the largest share, not of
+            // DFS position - see AllocateVendorNodeCosts' doc comment.
             Assert.Equal(85, result.Decisions[craftE.NodeId].TotalCost);
             Assert.Equal(180, result.Decisions[tree.NodeId].TotalCost);
 
@@ -619,6 +623,184 @@ namespace GW2CraftingHelper.Tests.Services
             }
             Assert.Equal(150, leafTotalCostSum);
             Assert.Equal(650, leafComparisonSum);
+        }
+
+        [Fact]
+        public void MultiOccurrenceMergedVendorOffer_ValuedCurrency_ComparisonValueDivergesPerOccurrenceUnderOldSharingRule()
+        {
+            // Review fix (UNTESTED RUNTIME CHANGE, merged-ceil-remainder
+            // stream): the sibling test above only ever asserted the SUMMED
+            // ComparisonValue across occurrences (leafComparisonSum), which
+            // is identical (250/250 in that test's own shape) whether
+            // RecomputeComparisonValues' currency-equivalent share loop uses
+            // the deleted "last occurrence absorbs the remainder" shape or
+            // the largest-remainder (Hamilton) apportionment 0b60ceb
+            // replaced it with - so no test ever exercised the PER-
+            // OCCURRENCE divergence between those two algorithms. This test
+            // does, using the review's own reproducer: two qty-3 occurrences
+            // (equal quantities, so AllocateVendorNodeCosts' TotalCost split
+            // is already an even 3/3 either way) with a valued currency line
+            // whose total value (10) is NOT evenly divisible by the total
+            // quantity (6) - the condition that made the two algorithms
+            // actually disagree.
+            //
+            // Old (deleted) shape: currencyUnitRate = totalCurrencyValue /
+            // totalQuantity = 10 / 6 = 1 (integer division); the first
+            // (non-last) occurrence gets rate * quantity = 1 * 3 = 3, and
+            // the last occurrence absorbs the entire remaining balance,
+            // 10 - 3 = 7. A 3/7 split for two structurally identical
+            // purchases, entirely an artifact of tree position - the same
+            // failure mode 938f6c9 fixed for AllocateVendorNodeCosts'
+            // TotalCost split, left unfixed here until 0b60ceb.
+            //
+            // New (Hamilton) shape: numerator = totalCurrencyValue *
+            // quantity = 10 * 3 = 30 for each occurrence; 30 / 6 = 5 with
+            // remainder 0 for both, so the currency share splits evenly
+            // 5/5 - no tree-position artifact. Added to each occurrence's
+            // own TotalCost share (3 coin each), ComparisonValue is 8/8, not
+            // the old algorithm's 6/10.
+            var leafA = Leaf(99, 3);
+            var leafB = Leaf(99, 3);
+            var tree = Craftable(1, 1, Option(10, 1, 1, leafA, leafB));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { MixedVendorOffer(99, 6, 7, 10, outputCount: 6) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 7, 1 } });
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation);
+            var plan = result.Plan;
+
+            Assert.Equal(6, plan.TotalCoinCost);
+            var currencyCost = Assert.Single(plan.CurrencyCosts, c => c.CurrencyId == 7);
+            Assert.Equal(10, currencyCost.Amount);
+
+            var decisionA = result.Decisions[leafA.NodeId];
+            var decisionB = result.Decisions[leafB.NodeId];
+            Assert.Equal(AcquisitionSource.BuyFromVendor, decisionA.Source);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, decisionB.Source);
+
+            // TotalCost splits evenly regardless of which algorithm is
+            // used (already exercised by AllocateVendorNodeCosts' own
+            // tests) - asserted here only as a precondition for the
+            // ComparisonValue check below.
+            Assert.Equal(3, decisionA.TotalCost);
+            Assert.Equal(3, decisionB.TotalCost);
+
+            // The actual regression coverage: BOTH occurrences must land on
+            // 8, not the old algorithm's 6/10 (or any tree-position-
+            // dependent split).
+            Assert.Equal(8, decisionA.ComparisonValue);
+            Assert.Equal(8, decisionB.ComparisonValue);
+        }
+
+        // --- Characterization: AllocateVendorNodeCosts' pre-fix
+        // bounded-divergence largest-remainder apportionment (quorum
+        // verdict C6, merged-ceil-remainder stream) ---
+        //
+        // AllocateVendorNodeCosts (VendorBatchSolver.cs) used to give
+        // every occurrence EXCEPT the last exactly UnitCost * quantity
+        // (the offer's own per-unit rate, floor-exact since UnitCost is
+        // already an integer), then dump the ENTIRE remaining balance -
+        // including the full cost of any unused/wasted batch overrun -
+        // onto whichever occurrence happened to be last in first-seen DFS
+        // order. For occurrences of EQUAL quantity this was unbounded: two
+        // 1-unit occurrences of a "100 for 1000c" bulk offer (must buy a
+        // whole 100-unit batch to cover a 2-unit need) used to render
+        // 10 and 990 - a 980-copper divergence between two structurally
+        // identical purchases, entirely an artifact of tree position.
+        //
+        // Fixed via largest-remainder (Hamilton) apportionment,
+        // proportional to each occurrence's own quantity share of demand -
+        // see AllocateVendorNodeCosts' own doc comment. For this shape:
+        // 1000 * 1 / 2 = 500 exactly for each occurrence, no remainder
+        // left to distribute at all - the divergence is now 0, well
+        // within the fix's <=1-copper bound for equal quantities.
+
+        [Fact]
+        public void MultiOccurrenceEqualQuantityBulkVendorOffer_BatchOverrunSharedProportionally()
+        {
+            var leafA = Leaf(99, 1);
+            var leafB = Leaf(99, 1);
+            var tree = Craftable(1, 1, Option(10, 1, 1, leafA, leafB));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var plan = result.Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(2, vendorStep.Quantity);
+            Assert.Equal(1000, vendorStep.TotalCost);
+            Assert.Equal(10, vendorStep.UnitCost);
+
+            // Both equal-quantity occurrences now share the batch overrun
+            // evenly (500/500), regardless of DFS position - the fix for
+            // the unbounded pre-fix 10/990 split.
+            Assert.Equal(500, result.Decisions[leafA.NodeId].TotalCost);
+            Assert.Equal(500, result.Decisions[leafB.NodeId].TotalCost);
+
+            // Sum invariant: unaffected by the fix - both algorithms must
+            // always allocate the corrected step.TotalCost exactly, no
+            // drift, no invented precision. Stays true before and after.
+            Assert.Equal(
+                1000,
+                result.Decisions[leafA.NodeId].TotalCost.Value +
+                result.Decisions[leafB.NodeId].TotalCost.Value);
+        }
+
+        // Review finding 6 (merged-ceil-remainder stream, MEASURED): the
+        // two prior tests never exercise the genuinely new, order-sensitive
+        // code - the equal-quantity test above divides evenly (1000 * 1/2,
+        // no leftover copper at all) and the flagship regression test's
+        // single leftover copper lands on a unique largest remainder. Three
+        // EQUAL-quantity occurrences of the same batch produce a three-way
+        // TIE on fractional remainder (1000 * 1 / 3 = 333 remainder 1 for
+        // every occurrence identically), which is exactly the case the
+        // `.ThenBy(i)` first-seen tie-break in AllocateVendorNodeCosts
+        // exists for and the case neither pre-existing test can pin.
+        [Fact]
+        public void MultiOccurrenceThreeEqualQuantityBulkVendorOffer_TiedRemainderGoesToFirstSeenOccurrence()
+        {
+            var leafA = Leaf(99, 1);
+            var leafB = Leaf(99, 1);
+            var leafC = Leaf(99, 1);
+            var tree = Craftable(1, 1, Option(10, 1, 1, leafA, leafB, leafC));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var plan = result.Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(3, vendorStep.Quantity);
+            Assert.Equal(1000, vendorStep.TotalCost);
+
+            // floor(1000 * 1 / 3) = 333 for all three, remainder 1/3 for
+            // all three - a genuine tie. The single leftover copper
+            // (1000 - 999) must land on the first-seen (DFS-order)
+            // occurrence, leafA, not be split further or dumped on
+            // whichever occurrence is last - pinning both the <=1-copper
+            // bound for equal quantities and the deterministic tie-break.
+            Assert.Equal(334, result.Decisions[leafA.NodeId].TotalCost);
+            Assert.Equal(333, result.Decisions[leafB.NodeId].TotalCost);
+            Assert.Equal(333, result.Decisions[leafC.NodeId].TotalCost);
+
+            Assert.Equal(
+                1000,
+                result.Decisions[leafA.NodeId].TotalCost.Value +
+                result.Decisions[leafB.NodeId].TotalCost.Value +
+                result.Decisions[leafC.NodeId].TotalCost.Value);
         }
     }
 }

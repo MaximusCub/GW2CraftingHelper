@@ -23,6 +23,25 @@ for the handful of mechanisms (scroll preserve/restore, the resize
 relayout registry, the wheel-delta sanitizer, merged-ceil vendor batching,
 solver decision rules, and so on) that this history produced.
 
+## Policy: high-evidence zones (formerly DO-NOT-TOUCH)
+
+High-evidence zones (formerly the do-not-touch list): `Services/ModuleLog.cs`,
+`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`, the
+scroll/resize/wheel machinery in `Views/CraftingPlanView.cs`, and
+`Services/VendorBatchSolver.cs`'s merged-ceil batching math. Changes are
+permitted when they carry their proof - characterization tests pinning
+current behavior BEFORE the change (for visual/geometry code: the
+pixel-scanner and a live desktop check), the standard adversarial review
+pipeline, and an explicit statement of what improved with evidence of zero
+regression. The burden of proof scales with the file's regression history;
+it never becomes prohibition. (Policy set by the maintainer 2026-08-17,
+replacing the M38-era freeze.)
+
+Numbered items below that still say "DO-NOT-TOUCH" are historical records
+narrating what applied to that specific past change at the time it was
+made, and are left in their original wording to preserve the record; this
+section is the current, active statement of the rule.
+
 ---
 
 ## Numbered issue catalog
@@ -146,7 +165,8 @@ row's bottom edge unpredictably depending on scroll phase. M36b gave
 `CreateRowDivider` a `bottomClearance` parameter (1 extra logical pixel of
 gap for the vulnerable 44px/32px row types), proven immune by simulation
 across every row height and all four GW2 UI Size scale factors - this is
-DO-NOT-TOUCH machinery, see `docs/ARCHITECTURE.md` section 3.
+high-evidence-zone machinery (formerly DO-NOT-TOUCH; see the policy note
+above), see `docs/ARCHITECTURE.md` section 3.
 Required Recipes and Crafting Steps were live pixel-scan verified at
 multiple scroll offsets after the fix; Required Disciplines (32px rows)
 was simulation-proven at the time but not yet individually pixel-scanned
@@ -383,7 +403,7 @@ a main-thread path also touches):
 | `SettingsTabContent` (Settings tab) | NO HAZARD - `Build()` re-runs off the main thread on every tab revisit, but nothing outside `Build()` (no `Module.Update()` polling, no `TabChanged` handling) ever touches this class's fields; every other mutation is a button-`Click`/`CheckedChanged` handler, which cannot fire before `Build()` has already finished and the control exists. |
 | `AboutTabContent` (About tab) | NO HAZARD - static, render-once content; nothing outside its own `Build()` touches its fields. |
 | Plan History / Crafting Ranker placeholders (`Module.BuildPlaceholder`) | NO HAZARD - creates one `Label` and returns; nothing else ever references it. |
-| `CraftingPlanView` (Crafting Plan tab) | **HAZARD PRESENT, OUT OF SCOPE** - not modified (scroll/`FrameTicker` machinery is DO-NOT-TOUCH per M38, hardened M31-M36). A first sweep pass incorrectly recorded this row as no live race; a 2026-08-06 review corrected it: `Build()` calls `StopLiveTickers()` (`Views/CraftingPlanView.cs:1511`) on the ThreadPool thread; that method `Cancel()`s -> `Dispose()`s three `SpriteScreen`-parented `FrameTicker` Controls (`_scrollVerifyTicker`, `_resizeDebounceTicker`, `_wheelWrapVerifyTicker`) whose `DoUpdate` runs on the main thread and survives tab switches (they are parented to `GameService.Graphics.SpriteScreen`, not this view's own control tree - by design, per their own field comments), and zeroes `_resizeSettlePending`/`_resizeScrollRestorePending`/`_resizeScrollSavedOffset`/`_lastWheelEventUtc`, which those same main-thread ticker steps read and write. Same hazard class as the two fixed rows above; deferred to a dedicated pass that can safely touch the M31-M36 scroll machinery rather than fixed here. |
+| `CraftingPlanView` (Crafting Plan tab) | **HAZARD PRESENT, OUT OF SCOPE** - not modified (scroll/`FrameTicker` machinery is a high-evidence zone, formerly DO-NOT-TOUCH per M38, hardened M31-M36). A first sweep pass incorrectly recorded this row as no live race; a 2026-08-06 review corrected it: `Build()` calls `StopLiveTickers()` (`Views/CraftingPlanView.cs:1511`) on the ThreadPool thread; that method `Cancel()`s -> `Dispose()`s three `SpriteScreen`-parented `FrameTicker` Controls (`_scrollVerifyTicker`, `_resizeDebounceTicker`, `_wheelWrapVerifyTicker`) whose `DoUpdate` runs on the main thread and survives tab switches (they are parented to `GameService.Graphics.SpriteScreen`, not this view's own control tree - by design, per their own field comments), and zeroes `_resizeSettlePending`/`_resizeScrollRestorePending`/`_resizeScrollSavedOffset`/`_lastWheelEventUtc`, which those same main-thread ticker steps read and write. Same hazard class as the two fixed rows above; deferred to a dedicated pass that can safely touch the M31-M36 scroll machinery rather than fixed here. |
 
 A third review round (2026-08-06) found the second round's own fix had left
 behind a documentation defect of the exact class this issue exists to
@@ -3869,7 +3889,30 @@ Follow-ups (recorded during a later polish pass, not yet implemented):
   (`PlanContentHeightMathTests.cs` ~348-390), and `PlanRowType.CoinTotal`
   once the DO-NOT-TOUCH freeze on `PlanContentHeightMath` lifts - all
   three are dead for production since `CraftingPlanView` routes Summary
-  to `SummarySectionLayoutMath`.
+  to `SummarySectionLayoutMath`. **DONE (2026-08-17, high-evidence-zones
+  branch).** Characterized first per the new policy (see this file's
+  policy note above): confirmed by grep that no production call site
+  ever passes `PlanSectionType.Summary` into `SectionBodyHeight`
+  (`CraftingPlanView` always special-cases it to
+  `SummarySectionLayoutMath.BodyHeight` first) and that
+  `PlanViewModelBuilder` never emits `PlanRowType.CoinTotal`. Deleted:
+  `SummaryBodyHeight`, its `SectionBodyHeight` switch case,
+  `PlanRowType.CoinTotal`, and 4 tests that referenced `CoinTotal`
+  directly and would not otherwise compile (`Summary_CoinRowPlusCurrencyRows`
+  plus the three originally estimated at ~348-390) - one more than this
+  bullet's own estimate, found during characterization. **Follow-up
+  correction (2026-08-17, same branch, code review):** the fifth
+  Summary-shape test, `Summary_NoCoinRow_OmitsTileRow`, does not reference
+  `CoinTotal` and still compiled/passed, so it was initially left as-is -
+  but review found it had gone vacuous: with `SummaryBodyHeight`'s switch
+  case gone, it exercises `SectionBodyHeight`'s `default` arm and only
+  passes because `CurrencyRowHeight`/`FallbackTextRowHeight` are both 28,
+  a coincidence unrelated to Summary. It duplicated
+  `UnknownSectionType_FallsBackToTextRowHeightPerRow` under a name
+  claiming Summary-specific semantics that no longer exist, and would
+  false-fail the moment either constant is retuned independently. Deleted.
+  Full suite: 1765 before the first deletion pass, 1761 after it, 1760
+  after this correction (5 dead/vacuous tests removed total).
 - Follow-up (user decision pending): the Summary currency table now
   shows the RAW wallet holding in Have, while the shopping list still
   clamps its per-currency owned amount to the required amount
@@ -6847,6 +6890,612 @@ above was measured pre-merge; master added 90 tests of its own).
 untouched by the merge, 57 `seasonalFestival` tags intact.
 
 Gate: not yet run live - updater-side tooling verified by suite; the 57 seasonal tags and solver exclusion were live-gated 2026-08-16. Merged after the full review pipeline (three verification rounds) resolved every finding, under the maintainer's standing merge directive (2026-08-16).
+
+## Recorded follow-ups batch sweep (2026-08-17)
+
+**Milestone goal:** four small, explicitly-logged non-blocking follow-ups
+from recent review rounds, taken now as a batch, plus a sweep of
+docs/KNOWN-ISSUES.md's last two days of sections for any other purely
+cosmetic (comment/doc/test-only) follow-up bullets cheap enough to take
+alongside them.
+
+**What changed:**
+1. **Cooldown notice wording (`Services/PlanViewModelBuilder.cs`,
+   `AppendDailyCooldownNotices`).** The "(runs in parallel with other
+   daily-gated items)" clause rendered unconditionally on every daily
+   craft-cooldown notice, even a lone one with no sibling notice to run
+   in parallel with. The method now collects qualifying notices first
+   and appends the clause only when the plan has 2+ of them.
+   Wording corrected on a later follow-up sweep (recorded-followups-
+   sweep verification finding): the 2+ count (`pending`) only ever
+   counts daily craft-cooldown notices from this loop, never the
+   separate Daily-cap vendor notices this same section also emits from
+   `Plan.TimegatedItems` - so a plan with exactly one craft-cooldown
+   notice running alongside a Daily-cap vendor notice IS genuinely
+   running in parallel with another daily-gated item, yet the old
+   "daily-gated" wording implied that broader population was what the
+   gate measured. The clause text is now "(runs in parallel with other
+   daily-crafted items)", naming only the population the count actually
+   covers.
+   `PlanViewModelBuilderDailyCooldownTests` updated: the existing single-
+   notice test now asserts the clause is absent, and a new
+   `TwoCraftCooldownNotices_BothAppendParallelClause` test pins it
+   present on both rows of a 2-notice plan.
+2. **`AcquisitionHintServiceTests.cs` header comment.** Corrected the
+   claim that the in-file fixture "mirrors" the real
+   `ref/acquisition_hints_seed.json` content - the fixture holds 6 of
+   the now-7 seed entries. Reworded to describe the fixture as an
+   isolated parsing-shape exercise, pointing drift coverage at the
+   separate `Load_ShippedSeedFile_*` test that pins the real file.
+3. **`PlanSolveContext.CompetencyIndependentForceBuyNodeIds` persistence
+   gap (srcsel verification finding).** `ForceBuyOnlyNodeIds` had a
+   dedicated `PlanStoreTests` round-trip test; its sibling
+   `CompetencyIndependentForceBuyNodeIds` had none. Added two real
+   `PlanStore`/`PlanStoreHelpers` round-trip tests: a populated set
+   surviving save+load, and both sets round-tripping correctly as an
+   explicit JSON `null` (`OwnMaterialsMode.Free`, pre-pass never ran)
+   without `PlanStructuralValidator` rejecting the reload. (The new
+   test's own comment initially assumed Newtonsoft omits a null
+   property from the written JSON entirely - measured false, the
+   project uses no custom `JsonSerializerSettings` so the default
+   `NullValueHandling.Include` writes an explicit `null`; the test and
+   its comment were corrected to assert that instead before this was
+   committed.)
+4. **`ForceBuyPrePassResult` doc nuance
+   (`Services/OwnedMaterialsForceBuyPrePass.cs`) - direction corrected
+   (recorded-followups-sweep verification finding).** The doc comment
+   read as if the "competency-blind" raw evaluation was training-
+   independent top to bottom. In reality it is competency-blind only at
+   the node's OWN recipe choice (picks the cheapest recipe among
+   `node.Recipes` regardless of training); each child ingredient's
+   contribution to that raw figure still comes from
+   `PlanSolver.Evaluate`'s normal competency-RESOLVED recursive call
+   (`bestRatingByDiscipline` threaded through), which makes the raw
+   craft cost look pricier than a truly training-blind figure would.
+   An earlier version of this entry (and the doc comment it described)
+   drew the wrong conclusion from that correct premise: membership is
+   `buyCost < rawCraftCost * 0.85`, so an INFLATED rawCraftCost only
+   makes that test EASIER to satisfy - it can only ADD nodes to
+   `CompetencyIndependentForceBuyNodeIds`, never cause a miss. The real
+   risk is the opposite of what was originally written: a parent node
+   whose own untrained recipe would genuinely survive a true blind
+   evaluation can still be pulled into the set by a resolved child's
+   inflated cost, suppressing that PARENT's own
+   `Decision.CheapestCraftUntrained` - i.e. this can falsely EXCLUDE a
+   real training opportunity, not miss an independent one. Corrected the
+   doc comment and this entry to state that direction plainly. No
+   runtime behavior changed; the code on this branch is unchanged from
+   master.
+
+**Sweep of docs/KNOWN-ISSUES.md's last two days of sections (2026-08-15/
+16, plus the Festival-vendor entry's own later-dated review-fix notes)
+for other pure comment/doc/test "follow-up:"/"nice-to-have" bullets:**
+every other open item found is either (a) a real feature/behavior change
+deferred out of scope (shopping-list caveat threading, wiki-scrape
+auto-detection of new seasonal vendors, per-vendor tag-coverage
+incoherence, currency-id pluralization judgment calls, extracting a
+shared discipline-tag constant set, `ExcessCraftOutputCalculator`'s
+recursion depth, the caret-tooltip sweep across three untouched
+renderer files), (b) already resolved/taken in an earlier pass (PART D's
+own nice-to-haves, the currency-name-index guard test, the
+`DailyCooldownItemService.Load` `ItemId <= 0` guard), (c) an accepted
+design tradeoff explicitly not a bug (the currency-valuation snapshot
+staleness note, the sticky seasonal-tag limitation), or (d) touches a
+DO-NOT-TOUCH file (`PlanContentHeightMath`'s tree-arm caption-row
+widening). None qualified as both pure comment/doc/test AND genuinely
+cheap beyond the four items already taken above - nothing further was
+taken.
+
+**Validation performed:**
+- Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
+  C:/Dev/Blish/wt-followups/GW2CraftingHelper.csproj -p:Platform=x64` -
+  0 errors (1782 pre-existing StyleCop warnings, none in any file this
+  pass touched).
+- Tests: `"/mnt/c/Program Files/dotnet/dotnet.exe" test
+  C:/Dev/Blish/wt-followups/tests/GW2CraftingHelper.Tests/
+  GW2CraftingHelper.Tests.csproj` - 1768/1768 green (baseline 1765 + 3
+  new: `TwoCraftCooldownNotices_BothAppendParallelClause`,
+  `Save_Load_CompetencyIndependentForceBuyNodeIds_
+  PopulatedSetRoundTrips`, `Save_Load_ForceBuyNodeIdSets_NullInJson_
+  DeserializeToNullWithoutValidatorRejection`). One test failed on first
+  run (the "absent-in-JSON" assumption above) and was corrected before
+  the final green run.
+- Manual: `git status --short` confirmed no intermediate cache files
+  (`ref/wiki_vendor_cache.json`/`ref/item_id_cache.json`) were touched;
+  a full-diff ASCII scan (`grep -P '[^\x00-\x7F]'`) confirmed no non-ASCII
+  bytes (and therefore no em-dashes) in any touched file.
+
+**Repo Invariants Checklist:**
+- [x] No Blish HUD references added to tests
+- [x] Tests exercise real production paths
+- [x] No fake file I/O tests introduced
+- [x] Pricing logic preserves multi-source correctness (no cost/pricing
+  logic touched at all - wording, a doc comment, and two new persistence
+  tests only)
+- [x] IDs remain internal-only (not displayed)
+
+**Risks / follow-ups:** none new; the sweep's own "not taken" list above
+restates why each remaining candidate stays open.
+
+Gate: not applicable - comment/test/wording cleanup with no visual surface beyond a conditional notice clause (suite-pinned). Merged under the maintainer's standing merge directive (2026-08-16).
+
+## High-evidence zones: policy rewrite + PlanContentHeightMath dead-code sweep (high-evidence-zones, 2026-08-17)
+
+Two-part change, the first application of the new high-evidence-zone
+policy (maintainer, 2026-08-17, replacing the M38-era DO-NOT-TOUCH
+freeze - see this file's own policy note near the top).
+
+**Part 1 (policy docs).** Swept `docs/KNOWN-ISSUES.md` and
+`docs/ARCHITECTURE.md` for DO-NOT-TOUCH/frozen-file language that
+functions as an active, current-state statement (as opposed to a
+historical gate/review record narrating what applied to a specific past
+change at the time it was made, which was left untouched to preserve the
+record): added the policy note near the top of this file; reworded item
+23's and the concurrency-audit table's `CraftingPlanView` row's
+DO-NOT-TOUCH phrasing to "high-evidence zone (formerly DO-NOT-TOUCH)";
+reworded `docs/ARCHITECTURE.md` section 7's two do-not-touch statements
+about `VendorBatchSolver.cs`'s merged-ceil arithmetic the same way, and
+added the proof requirement to that section. `CLAUDE.md` (in-repo) was
+checked and does not carry DO-NOT-TOUCH/frozen-file language, so it
+needed no change. Historical narration of specific past PRs' DO-NOT-TOUCH
+compliance (roughly two dozen entries throughout this file's numbered
+catalog and PR write-ups) was deliberately left in its original wording -
+rewriting those would misrepresent what rule actually applied at the
+time.
+
+**Part 2 (first application - the freeze-trapped dead code).**
+Characterized before touching anything, per the new policy's proof
+requirement: grepped every reference to `SummaryBodyHeight` and
+`CoinTotal` across `src` and `tests`; confirmed `PlanViewModelBuilder`
+never emits `PlanRowType.CoinTotal` and that `Views/CraftingPlanView.cs`
+always special-cases `PlanSectionType.Summary` to
+`SummarySectionLayoutMath.BodyHeight` before it would ever reach
+`PlanContentHeightMath.SectionBodyHeight`, so the private
+`SummaryBodyHeight` method (and the `PlanSectionType.Summary` case that
+called it) has been unreachable from any live path since W4A. Ran the
+full suite first: 1765 passed. Then deleted
+`PlanContentHeightMath.SummaryBodyHeight`, its `SectionBodyHeight` switch
+case, the `PlanRowType.CoinTotal` enum member, and updated the
+comments in `Models/PlanViewModel.cs`, `Services/PlanContentHeightMath.cs`,
+`Services/SummarySectionLayoutMath.cs`, `Views/CraftingPlanView.cs`, and
+`Views/Rendering/SummarySectionRenderer.cs` that referenced them as
+pending deletion or still-live. Characterization surfaced one more dead
+test than this file's own W4A follow-up bullet had estimated:
+`Summary_CoinRowPlusCurrencyRows` (outside the bullet's ~348-390
+estimate) also referenced `PlanRowType.CoinTotal` directly and would not
+compile once the member was removed, so it was deleted alongside the
+three tests the bullet did name
+(`Summary_MultiItemNoteRow_AddsFallbackTextRowHeight`,
+`Summary_NoMultiItemNoteRow_UnaffectedByNewBranch`,
+`Summary_MultiItemFourCoinRowsPlusNoteRow_StillOneCostTileRowHeight`) -
+4 deleted tests total. `Summary_NoCoinRow_OmitsTileRow` does not
+reference `CoinTotal`, still compiles, and still passes (the
+`PlanSectionType.Summary` case now falls through to
+`SectionBodyHeight`'s existing `default` branch, which happens to return
+the same value for its one-`CurrencyCost`-row input since
+`CurrencyRowHeight`/`FallbackTextRowHeight` are both 28) - initially left
+unchanged on the theory that the larger `SummarySectionLayoutMath`
+fold-back is out of scope for this branch. Re-ran the full suite after:
+1761 passed - exactly baseline (1765) minus the 4 deleted dead tests,
+nothing else changed.
+
+**Follow-up correction (same day, code review).** Leaving
+`Summary_NoCoinRow_OmitsTileRow` in place was itself a defect, not a
+scope call: with the `Summary` switch case gone, the test exercises only
+`default`'s `rows.Count * FallbackTextRowHeight` arithmetic, passing
+solely because `CurrencyRowHeight` and `FallbackTextRowHeight` happen to
+both equal 28 - a coincidence with no connection to `Summary`. It had
+become a duplicate of `UnknownSectionType_FallsBackToTextRowHeightPerRow`
+under a name asserting Summary-specific tile-omission behavior that no
+longer exists anywhere in the codebase, and would produce a confusing
+false failure (naming `Summary`/`OmitsTileRow`) the first time either
+constant is retuned independently of the other. Deleted. Full suite:
+1760 passed after this correction (5 dead/vacuous tests removed from the
+1765 baseline total). The `SummaryBodyHeight` deletion did not remove
+`PlanRowType.CoinTotal`'s underlying enum value from a serialized/
+persisted format anywhere: `PlanRowType`/`PlanRowViewModel` are rebuilt
+fresh on every render by `PlanViewModelBuilder` and never
+serialized/persisted, and grep found no `(int)PlanRowType`/
+`Enum.GetValues(typeof(PlanRowType))` call sites, so the enum's ordinal
+values shifting by one position (removed member was first) has no
+runtime effect.
+
+Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-hezone/GW2CraftingHelper.csproj -p:Platform=x64` - 0
+errors both before and after (pre-existing StyleCop warnings only).
+Tests: `"/mnt/c/Program Files/dotnet/dotnet.exe" test
+C:/Dev/Blish/wt-hezone/tests/GW2CraftingHelper.Tests/
+GW2CraftingHelper.Tests.csproj` - 1765 before, 1761 after the first
+deletion pass, 1760 after the same-day follow-up correction that deleted
+`Summary_NoCoinRow_OmitsTileRow` (see above), 0 failed at every step.
+
+Repo Invariants Checklist:
+- [x] No Blish HUD references added to tests.
+- [x] Tests exercise real production paths (deleted tests exercised only
+  the now-removed dead code; the remaining suite is unchanged production
+  coverage).
+- [x] No fake file I/O tests introduced.
+- [x] Pricing logic preserves multi-source correctness (untouched by this
+  change).
+- [x] IDs remain internal-only (untouched by this change).
+
+Not pushed; not committed to `master`. This branch does not attempt the
+larger `SummarySectionLayoutMath`/`PlanContentHeightMath` fold-back - that
+remains a real behavior-bearing change awaiting the audit fleet's
+architecture findings, per this task's own instruction.
+
+Gate: PASS (non-visual change: docs policy rewrite plus dead-code
+deletion, so no desktop gate applies; evidence is the unreachability
+grep proof plus the suite arithmetic above - 1765 baseline to 1760
+passing with only the 5 dead/vacuous tests removed, 0 failures, build
+clean at b420460).
+
+## Value-detail hover investigation, pipeline-level follow-up (value-detail-pipeline, 2026-08-17)
+
+Follow-up to "Gate investigation: receipt/what-if captions + value-detail
+hover (2026-08-16)" above: that entry's Item 2 traced the value-detail
+hover only as far as `PlanSolver.Solve -> CraftingTreeBuilder.BuildTree ->
+ValueDetailTooltipBuilder.TryBuild` (the seam test) and found no defect,
+but the live miss reproduced again on two separate desktop builds after
+that entry was merged - a stronger signal than "stale build", so this
+pass went one layer further down: the full `CraftingPlanPipeline.
+GenerateStructuredAsync` path the seam test does not model at all (VOM
+force-buy pre-pass, `InventoryReducer`, real vendor-offer-store lookups,
+`ModuleSettings.GetEffectiveCurrencyValuation()`'s actual return value on
+a fresh settings state).
+
+Reproduced a simplified analogue of the live shape end to end (2 levels,
+single vendor occurrence - NOT the live tree's actual depth, which
+matters for the untested factors listed at the bottom of this entry): a
+craft root (Deldrimor Steel Ingot-style, quantity 5) whose recipe has a
+vendor-only child priced
+purely in spirit shards (currency 23, curated default 3600 copper/unit,
+`Models/CurrencyDecisionDefaults.cs` line 109) plus an ordinary TP-priced
+sibling, `OwnMaterialsMode.Valued` with a real `AccountSnapshot` owning
+some of the SIBLING (not the vendor child - reduction never touches the
+node the divergence comes from), through `CraftingPlanPipeline.
+GenerateStructuredAsync` itself (fake HTTP fixtures, real
+`VendorOfferStore`/`InventoryReducer`, matching this file's established
+pattern). New test:
+`CraftingPlanPipelineTests.GenerateStructuredAsync_
+CraftRootWithVendorChildValuedInCuratedCurrency_VomOn_
+ValueDetailTooltipFires`. **Passes on the first run**: `root.SubtreeCost
+== 140` (real coin only, the sibling's un-owned 7 units at the InstantBuy
+basis' sell price of 20), `root.DecisionValue == 360140` (the same 140
+plus the vendor child's 100 shards x 3600 copper/unit), and `TryBuild`
+returns true with all three expected lines carrying those exact figures.
+
+Checked the four live factors the prior entry's seam test could not
+exercise, all confirmed not to be the gap:
+- (a) `ModuleSettings.GetEffectiveCurrencyValuation()` is exactly
+  `CurrencyValuation.WithDefaults(GetCurrencyValuation())`
+  (`Services/ModuleSettings.cs` line 329); on a fresh/empty persisted
+  state `GetCurrencyValuation()` deserializes to `CurrencyValuation.None`
+  - byte-for-byte the same valuation the test constructs.
+- (b) VOM's force-buy pre-pass, zero-owned guide solve, and
+  `InventoryReducer` all ran (`useForceBuyPrePass` requires
+  `OwnMaterialsMode.Valued` + a non-null snapshot + a non-null reducer -
+  all three supplied).
+- (c) `PlanSolver.RecomputeComparisonValues` and the vendor-currency
+  reallocation pass both ran as part of the real `Solve()` call inside
+  the pipeline (not bypassed) and produced the correct rolled-up
+  `DecisionValue`.
+- (d) the snapshot's owned quantity sits on the sibling, confirmed not to
+  touch the vendor child's own reduction.
+
+Went one step further than the prior entry: also reproduced the case
+where the root's pill is genuinely `PillKind.Selected` (2+ options,
+craft beating an intentionally-uncompetitive TP price) rather than
+`PillKind.Locked` (single option) - the prior entry's seam test left the
+root single-option, whose own base tooltip would actually read "Only
+available source", not the "Current source: CRAFT" wording the live
+report quoted (`Views/Rendering/TreeSectionController.cs`'s
+`spec.Kind == PillKind.Selected` branch, line ~1381, is the only site
+that produces that exact wording). New test:
+`CraftingPlanPipelineTests.GenerateStructuredAsync_
+CraftRootSelectedAmongMultipleOptions_ValueDetailTooltipFires` - asserts
+`DecisionPillPlanner.BuildPillSpecs` returns a `CRAFT` pill with
+`PillKind.Selected` (the same Blish-free data `TreeSectionController`
+consumes to pick a render branch) AND that `TryBuild` fires. **Also
+passes.** Since the append gate at
+`TreeSectionController.RenderDecisionPills` (line ~1490) calls
+`ValueDetailTooltipBuilder.TryBuild(node, ...)` on the SAME `node`/`spec`
+already established as Selected/Craft in that same loop iteration where
+the base "Current source: CRAFT" tooltip was just set two branches
+above, and `TryBuild` is a pure function of that node's own fields, a
+live miss on this exact wording requires the node reaching line 1490 live
+to carry different `SubtreeCost`/`DecisionValue`/
+`VendorComponentCostsUnreliable` values than the ones
+`GenerateStructuredAsync` produces for THIS shape - which the tests above
+rule out only for this shape, not for the live tree.
+
+**Conclusion: correct-by-design for the shape modelled here; no code
+defect found in it.** Both tests pass, so the data layer (solver through
+`CraftingTreeNode`) is correct for a shallow craft-over-valued-vendor-
+child tree at every depth an xunit test can reach.
+
+This does NOT clear the whole pipeline, and the live behaviour has NOT
+been verified either way - no live capture was taken during this pass.
+Two suppression paths inside `ValueDetailTooltipBuilder.TryBuild` itself
+remain untested for a Craft ROOT, and both would produce exactly the
+reported symptom:
+
+- **Fallback-tier propagation (the strongest untested candidate).**
+  `PlanSolver.RecomputeComparisonValues` (line 2443) sets
+  `ComparisonValue = TotalCost` whenever `decision.HasUnvaluedCurrency`,
+  and that flag propagates transitively up through every Craft ancestor
+  (line 1061). One unvalued currency or `GuildUpgrade` ingredient
+  ANYWHERE in the chosen subtree therefore forces `delta == 0` on the
+  root and suppresses this hover - the scope limit already documented in
+  `ValueDetailTooltipBuilder.cs` lines 26-36. A real Deldrimor Steel
+  Ingot tree is far deeper than the 2-level fixture used here and can
+  easily contain one. The only existing test on this path
+  (`PlanSolverCurrencyValuationTests.
+  MixedCoinValuedUnvaluedFallbackOffer_ComparisonValueMatchesTotalCost_
+  NoTooltip`) covers a FLAT vendor leaf, never the ancestor rollup.
+- **`VendorComponentCostsUnreliable`.** Set by
+  `FlagUnreliableVendorComponentCosts` on every occurrence of a vendor
+  step merged across 2+ tree occurrences. No test anywhere passes a node
+  with this flag true to `TryBuild`. It lands on vendor nodes rather than
+  Craft ancestors, so it is the weaker candidate for a root-pill miss,
+  but it is untested.
+
+Next step if a third live repro occurs: rule out fallback-tier
+propagation FIRST (a test with an unvalued-currency ingredient buried
+under the craft root, asserting whether the root hover survives), since
+that is a cheap Blish-free test and a genuine code-level explanation.
+Only if that comes back clean is Blish-side instrumentation warranted - a
+log line in `TreeSectionController.RenderDecisionPills` at line ~1490
+recording `node.ItemId`, `node.Decision`, `node.SubtreeCost`, `node.
+DecisionValue`, `node.VendorComponentCostsUnreliable`, and the `TryBuild`
+return value at the moment of the live render.
+
+Tests: 1768 -> 1770 (2 new:
+`GenerateStructuredAsync_CraftRootWithVendorChildValuedInCuratedCurrency_
+VomOn_ValueDetailTooltipFires`,
+`GenerateStructuredAsync_CraftRootSelectedAmongMultipleOptions_
+ValueDetailTooltipFires`), via `"/mnt/c/Program Files/dotnet/dotnet.exe"
+test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`. Both
+new tests exercise real production entry points
+(`CraftingPlanPipeline.GenerateStructuredAsync`, real `VendorOfferStore`/
+`InventoryReducer`, `DecisionPillPlanner`, `ValueDetailTooltipBuilder`) -
+no Blish HUD reference, no fake logic, no fake file I/O. Build:
+`"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-valuedetail/GW2CraftingHelper.csproj -p:Platform=x64` -
+clean, 0 errors (pre-existing StyleCop warnings only, none in either
+touched file). No files on the DO-NOT-TOUCH list (`ModuleLog`,
+`PlanContentHeightMath`, `PlanRelayoutMath`, scroll machinery,
+`VendorBatchSolver` merged-ceil batching) were edited - only a test file
+and this doc.
+
+Gate: not run live this pass - test-and-docs change with no runtime
+code touched; pipeline-level behaviour is suite-pinned (mutation-checked
+per the review record above) and the live hover re-check stays on the
+next desktop gate batch, where fallback-tier propagation is the first
+thing to rule out. Merged under the maintainer's standing merge
+directive (2026-08-16).
+
+## Merged-ceil remainder: largest-remainder apportionment + display-layer narrowing fix (2026-08-17)
+
+**Milestone goal:** quorum verdict C6 (TARGETED_FIX_ONLY plus the
+judge's own new finding) on the `merged-ceil-remainder` stream, which
+enters `VendorBatchSolver` - a former high-evidence/freeze zone
+(maintainer-retired 2026-08-17) - so per that retirement's own terms,
+characterize the current behavior in tests BEFORE changing it, then
+fix, then prove improved-X/regressed-nothing.
+
+**What changed:**
+1. **Characterization commit (`25fc887`).** Pinned
+   `AllocateVendorNodeCosts`' pre-fix "UnitCost * quantity per non-last
+   occurrence, last occurrence absorbs the entire remaining balance"
+   shape before touching it: the unbounded equal-quantity case (a "100
+   for 1000c" bulk offer split 1+1 rendered 10/990), the sum invariant,
+   and three real downstream consumers -
+   `CompetencyOpportunityCalculator` (real Solve()+
+   `CraftingTreeBuilder`+calculator round trip),
+   `RecipeSheetSavingsCalculator` (fixture bridging the same
+   arithmetic), and `SellSideEconomics.ApplyBatchSellSideEconomics`/
+   `CraftingProfit` (real Solve() round trip). Every assertion is
+   commented with the exact number the fix commit re-baselines it to.
+2. **Fix commit (`938f6c9`).** Replaced that shape with largest-
+   remainder (Hamilton) apportionment: each occurrence's floor share is
+   `step.TotalCost * quantity / totalQuantity`, and the leftover
+   (always strictly fewer coppers than there are occurrences - a
+   standard apportionment identity, proven in the commit message) goes
+   one each to the occurrences with the largest fractional remainder,
+   ties broken by first-seen (DFS) order. Divergence between any two
+   equal-quantity occurrences is now bounded to <=1 copper (was
+   unbounded). The flagship 179-unit/"3 for 3"-Laurel regression shape
+   (quantities 4/4/4/83/84, hand-verified floors 4/4/4/83/84 + the one
+   leftover copper landing on the 84-quantity occurrence via its 84/179
+   fraction, the largest) is **unchanged**: still 4/4/4/83/85 summing
+   to 180. Re-baselined the four pinned characterization tests plus one
+   pre-existing (not new) test that turned out to depend on the old
+   skewed shape (`MultiItemPlanTests.
+   GenerateStructuredAsync_TwoItems_SharedBulkVendorMaterial_
+   BothTradable_...`: two symmetric roots sharing a "5 for 20 coin"
+   material used to split 8/12 by tree-position accident, now split
+   evenly 10/10).
+3. **New bug (judge-found, real, unrelated to the vendor-batch math):
+   `Services/PlanViewModelBuilder.cs` `BuildCurrencyTableRows` narrowed
+   `CurrencyCost.Amount` (long) to int with a plain `(int)` cast. Past
+   `int.MaxValue` this silently wraps NEGATIVE, and
+   `fullyCovered = owned >= required` then reads true for almost any
+   owned amount - the opposite of what a currency requirement that
+   large should show. Class-swept (grepped Services/Models/Views for
+   any other unchecked long-to-int narrowing of an Amount/TotalCost/
+   UnitCost/Count-shaped field): this was the only one. Fixed with
+   `ClampToInt` (clamp to `int.MaxValue`), the identical convention
+   `VendorBatchSolver.ClampToInt` already uses for the same class of
+   risk. New boundary test
+   (`PlanViewModelBuilderSummaryTests.
+   CurrencyTable_AmountExceedsIntRange_ClampsRatherThanWrapsNegative`)
+   confirmed reproducing the bug pre-fix and passing post-fix.
+4. **C6(b) currencyMap "overstates" claim - verified NOT a bug.** The
+   quorum verdict named a prior claim that a Conflict-tier vendor
+   step's `currencyMap` accumulation "overstates" cost. Searched this
+   repo exhaustively (`docs/KNOWN-ISSUES.md`, `docs/ARCHITECTURE.md`,
+   `docs/gw2e-considerations.md`, `docs/research/gw2e-convergence-
+   matrix.md`, every other tracked doc, and code comments across
+   `Services/`/`Models/`) plus every sibling worktree on this machine
+   (`wt-hezone`, `wt-qp1`, `wt-valuedetail`) for the exact wording or
+   any equivalent ("double-count", "inflate", "overcounts") tied to
+   `currencyMap`/Conflict - found no such claim anywhere accessible to
+   this stream. Recording the correct verdict here as the authoritative
+   reference regardless, so any surviving reference elsewhere resolves
+   against this entry: a Conflict-tier step (two tree occurrences that
+   genuinely prefer different vendor offers - see
+   `PlanSolverVendorBatchingTests.
+   MultiOccurrenceDifferentWinningOffers_LeavesPerOccurrenceSumUnmerged`)
+   never runs through `AllocateVendorNodeCosts` at all
+   (`VendorOfferOutputCount` stays 0, guarded out at that method's own
+   entry). Its `currencyMap`/`Required` total is exactly the sum of
+   each occurrence's own genuinely-different, individually-correct
+   currency cost - which is also exactly the shopping list's summed
+   `PlanStep.Quantity` and the sum of the real tree leaves' own
+   `Decision.TotalCost` (152 coin in that test's own 1-for-2 + 100-for-
+   150 shape: 2 + 150 = 152, matching `vendorStep.TotalCost`,
+   `plan.TotalCoinCost`, and `result.Decisions[tree.NodeId].TotalCost`
+   all at once). This is correct, not an overstatement: there is no
+   single true merged offer to ceil across two occurrences that
+   genuinely used different offers, so forcing one would misrepresent
+   the real purchases rather than fix anything. Changing Conflict-tier
+   `currencyMap` to disagree with `Required`/the shopping list/the tree
+   leaves would create the real internal inconsistency the alternative
+   claim would have introduced.
+5. **Review-fix commit (`0b60ceb`).** A follow-up review found the
+   class sweep for item 2/938f6c9's largest-remainder apportionment had
+   missed a second runtime path: `PlanSolver.RecomputeComparisonValues`'
+   currency-equivalent share loop still used the deleted "last
+   occurrence absorbs the remainder" shape, letting `ComparisonValue`
+   diverge from the corrected `TotalCost` by up to `step.Quantity - 1`
+   copper for a merged step. Converted to the same largest-remainder
+   (Hamilton) apportionment `AllocateVendorNodeCosts` uses. Also fixed
+   the caller comment describing the deleted shape, a dangling renamed-
+   test reference, one (of several) self-contradicting "DO-NOT-TOUCH"
+   line, the flagship regression test's explanatory comment, and added
+   a three-equal-quantity-occurrence tie-break test. This runtime change
+   shipped with no new characterization pin of its own - see item 6.
+6. **Review-response commit (this one).** A further review on `0b60ceb`
+   found: (a) item 5's `RecomputeComparisonValues` rewrite was still
+   unpinned - the only test touching that path asserted the summed
+   `ComparisonValue` across occurrences, which is identical under both
+   the old and new algorithm for its 2x qty-1 shape, so the actual
+   per-occurrence divergence was never exercised; added
+   `MultiOccurrenceMergedVendorOffer_ValuedCurrency_
+   ComparisonValueDivergesPerOccurrenceUnderOldSharingRule` (two qty-3
+   occurrences, currency value 10 not evenly divisible by total
+   quantity 6 - old algorithm gives 3/7, new gives 5/5) to close that
+   gap. (b) item 5's DO-NOT-TOUCH sweep fixed only one of five stale
+   instances (`VendorBatchSolver.cs:873`); the remaining four
+   (`VendorBatchSolver.cs` class doc, `PlanSolver.cs` class doc, and two
+   more `PlanSolver.cs` call-site comments) still asserted the merged-
+   ceil arithmetic was frozen/unchanged when this stream had already
+   rewritten it - corrected all four to note the 2026-08-17 retirement
+   instead. (c) both largest-remainder apportionment sites
+   (`AllocateVendorNodeCosts` and `RecomputeComparisonValues`) multiply
+   a `long` total by an occurrence's `int` quantity without an overflow
+   guard; on a large-enough total the product silently wraps negative,
+   breaking the "shares always sum to the total" invariant both doc
+   comments assert unconditionally. Widened both multiply/divide sites
+   to `decimal` (whose range comfortably covers any `long` x `int`
+   product either field's own type can hold), removing the overflow
+   risk entirely rather than just documenting it as a limitation.
+
+**Validation performed:**
+- Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
+  C:/Dev/Blish/wt-qceil/GW2CraftingHelper.csproj -p:Platform=x64` -
+  0 errors. StyleCop warnings are pre-existing project-wide (1789 at
+  HEAD, none new in this commit's own diff), but MEASURED across the
+  whole `merged-ceil-remainder` stream (ce64423 baseline vs. this
+  commit's HEAD, full rebuild): `PlanSolver.cs` 134->142,
+  `VendorBatchSolver.cs` 50->54, `PlanViewModelBuilder.cs` 158->160 -
+  +14 new SA1512/SA1513/SA1515 warnings introduced across the stream's
+  five commits (mostly comment-blank-line spacing in the new blocks),
+  correcting item 3/4/5's repeated "none in any touched file" claim,
+  which was false for this stream from `0b60ceb` onward.
+- Tests: `"/mnt/c/Program Files/dotnet/dotnet.exe" test
+  C:/Dev/Blish/wt-qceil/tests/GW2CraftingHelper.Tests/
+  GW2CraftingHelper.Tests.csproj` - MEASURED 1775/1775 green (1774 at
+  `0b60ceb` + 1 new per-occurrence characterization test from item 6a),
+  correcting the stale "1773/1773" count this entry previously carried
+  (actual count at `0b60ceb` was already 1774/1774, one more than
+  recorded, from the tie-break test item 5 added).
+- Self-review (Code Reviewer Mode) on all runtime-affecting edits: the
+  `decimal` widening cannot itself overflow for any `long`/`int` pair
+  either field's own type can hold (long max ~9.2e18 x int max ~2.1e9
+  ~= 1.98e28, decimal max ~7.9e28); truncation back to `long` after the
+  divide is exact since both operands are whole coppers; the new test's
+  expected 5/5 vs. the old algorithm's 3/7 was hand-verified against
+  both algorithms' own arithmetic before asserting it.
+
+**Repo Invariants Checklist:**
+- [x] No Blish HUD references added to tests
+- [x] Tests exercise real production paths (all characterization/
+  regression tests are genuine `Solve()`+builder round trips, not
+  mirrored logic)
+- [x] No fake file I/O tests introduced
+- [x] Pricing logic preserves multi-source correctness (Conflict-tier
+  currency handling explicitly re-verified unchanged per item 4 above;
+  the overflow fix changes no value for any realistic input, only
+  removes a wrap-around failure mode)
+- [x] IDs remain internal-only (not displayed)
+
+**Risks / follow-ups:** none new. The C6(b) correction (item 4) is
+recorded here as the authoritative verdict since no prior claim was
+locatable to edit in place; if the orchestrator has the original claim
+in a stream this session could not see, that record should be updated
+to point back here rather than restate the (incorrect) claim.
+`VendorBatchSolver.cs:409`'s comment recounting a past review's own
+"one of the six DO-NOT-TOUCH merged-ceil batching methods" wording was
+left as-is (it accurately describes history at the time, not a present-
+tense claim about current code) - flagged here in case a future sweep
+disagrees.
+
+**Merge note (orchestrator, post-review):** `origin/master` had moved
+(the `high-evidence-zones` stream immediately above this entry, deleting
+5 dead/vacuous tests unrelated to this stream's own changes) since this
+stream's own 1775/1775 count above was measured at its pre-merge HEAD
+(`81598bf`). Merged with `git merge origin/master`; only this file
+conflicted (both streams appended an entry at the same location) and was
+resolved both-sides, master-first, as the two entries above. All other
+files (`Models/PlanViewModel.cs`, `Services/PlanContentHeightMath.cs`,
+`Services/SummarySectionLayoutMath.cs`, `Views/CraftingPlanView.cs`,
+`Views/Rendering/NotesSectionRenderer.cs`,
+`Views/Rendering/SummarySectionRenderer.cs`, `docs/ARCHITECTURE.md`,
+`docs/gw2e-considerations.md`,
+`docs/research/gw2e-convergence-matrix.md`,
+`tests/GW2CraftingHelper.Tests/Services/PlanContentHeightMathTests.cs`)
+merged automatically with no conflict; grepped the merged
+`VendorBatchSolver.cs`/`PlanSolver.cs` afterward and confirmed this
+stream's largest-remainder/decimal-widened apportionment logic is
+present unchanged post-merge. Rebuilt clean (0 errors) and re-ran the
+full suite post-merge: 1770/1770 passed - exactly this stream's own
+1775 baseline minus the 5 tests `high-evidence-zones` deleted (1775 - 5
+= 1770), confirming the two streams' changes compose without
+interaction. This 1770/1770 count supersedes the 1775/1775 figure in
+this entry's own "Validation performed" section above, which remains
+accurate as a historical record of this stream's state at `81598bf`
+before the merge.
+
+Gate: not applicable - quorum-verdict cleanup with characterization-first proof where the high-evidence zone was entered; suite-pinned. Merged under the maintainer's standing merge directive (2026-08-16).
+
+**Second merge note (orchestrator):** `origin/master` moved again (PR #131,
+`value-detail-pipeline`, the entry immediately above this one - test-and-
+docs only, no runtime code touched) while this branch's own PR #130 was
+polling CI. Merged with `git merge origin/master` a second time; again only
+this file conflicted (both streams appended at the same location),
+resolved both-sides, master-first, as the two entries above.
+`tests/GW2CraftingHelper.Tests/Services/CraftingPlanPipelineTests.cs`
+merged automatically with no conflict. Rebuilt clean (0 errors) and re-ran
+the full suite: 1772/1772 passed - exactly the first merge note's
+1770/1770 plus the 2 new tests `value-detail-pipeline` added
+(`GenerateStructuredAsync_CraftRootWithVendorChildValuedInCuratedCurrency_
+VomOn_ValueDetailTooltipFires`,
+`GenerateStructuredAsync_CraftRootSelectedAmongMultipleOptions_
+ValueDetailTooltipFires`), confirming the three streams' changes compose
+without interaction. This 1772/1772 count supersedes both this entry's own
+1775/1775 figure and the first merge note's 1770/1770 figure.
 
 ## Quality-audit cleanup, phase 1: four bug fixes (B1-B4, 2026-08-17)
 
