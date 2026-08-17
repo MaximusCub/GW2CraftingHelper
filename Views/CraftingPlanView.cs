@@ -531,7 +531,8 @@ namespace GW2CraftingHelper.Views
         // used to repeat "_settings != null && _settings.ScrollDiagnosticsEnabled.Value"
         // verbatim. Pure property, same short-circuit null-guard, no behavior
         // change - see docs/KNOWN-ISSUES.md #12 for why this stays gated.
-        // M39 (log system, tab-roadmap-proposal Section 2.1): ALSO true when
+        // M39 (log system, docs/dev-notes/m38-plan/proposals/
+        // tab-roadmap-proposal.md Section 2.1): ALSO true when
         // the new unified LogDiagnosticsEnabled setting is on -
         // LogDiagnosticsEnabled subsumes ScrollDiagnosticsEnabled (one
         // Settings-tab checkbox for the whole module going forward), but
@@ -544,7 +545,8 @@ namespace GW2CraftingHelper.Views
             (_settings.LogDiagnosticsEnabled.Value || _settings.ScrollDiagnosticsEnabled.Value);
 
         /// <summary>
-        /// M39 (log system, d2-log-system.md Section 8): routes every
+        /// M39 (log system, docs/dev-notes/m38-plan/proposals/
+        /// d2-log-system.md Section 8): routes every
         /// [scrolldiag] line to BOTH sinks - Blish's own Logger (unchanged,
         /// additive) and the new module-wide ModuleLog at Debug level, tag
         /// "scrolldiag" - so the channel is visible in-module via the Log

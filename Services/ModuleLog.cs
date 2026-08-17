@@ -8,7 +8,8 @@ using System.Threading.Tasks;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Module-wide structured log sink (d2-log-system.md Section 4). Two
+    /// Module-wide structured log sink (docs/dev-notes/m38-plan/proposals/
+    /// d2-log-system.md Section 4). Two
     /// responsibilities:
     /// <list type="number">
     /// <item>A thread-safe, fixed-capacity in-memory ring buffer, always
@@ -82,7 +83,8 @@ namespace GW2CraftingHelper.Services
 
         // The floor level that reaches the file sink even when
         // DiagnosticsEnabled is false. Hardcoded rather than a settings
-        // knob per the tab-roadmap-proposal synthesis's explicit rejection
+        // knob per docs/dev-notes/m38-plan/proposals/tab-roadmap-proposal.md's
+        // explicit rejection
         // ("LogMinFileLevel as a UI control - hardcode Info floor") - this
         // constant IS that floor. Debug's own file-sink gate below is
         // governed purely by DiagnosticsEnabled, not by this floor.
