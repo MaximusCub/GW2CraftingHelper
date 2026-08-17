@@ -133,14 +133,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void Summary_NoCoinRow_OmitsTileRow()
-        {
-            var rows = new List<PlanRowViewModel> { Row(PlanRowType.CurrencyCost) };
-            Assert.Equal(PlanContentHeightMath.CurrencyRowHeight,
-                PlanContentHeightMath.SectionBodyHeight(PlanSectionType.Summary, rows));
-        }
-
-        [Fact]
         public void UnknownSectionType_FallsBackToTextRowHeightPerRow()
         {
             var rows = new List<PlanRowViewModel> { Row(PlanRowType.CraftStep), Row(PlanRowType.CraftStep) };

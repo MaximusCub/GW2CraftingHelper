@@ -21,7 +21,8 @@ namespace GW2CraftingHelper.Views.Rendering
     //
     // Row-height discipline is load-bearing (design-plan-notes.md section
     // 4): PlanSectionType.Notes gets no case in PlanContentHeightMath.
-    // SectionBodyHeight (DO-NOT-TOUCH) on purpose - it falls through to
+    // SectionBodyHeight (a high-evidence zone, formerly DO-NOT-TOUCH; see
+    // docs/KNOWN-ISSUES.md's policy note) on purpose - it falls through to
     // that method's existing default arm (rows.Count * FallbackTextRowHeight),
     // which is only correct as long as EVERY NoteLine row - with or without
     // a coin cell - renders at exactly that height. Both branches below use
@@ -142,8 +143,9 @@ namespace GW2CraftingHelper.Views.Rendering
 #if DEBUG
             // Load-bearing per this class's own doc comment: PlanSectionType.
             // Notes relies on PlanContentHeightMath's default arm (rows.Count
-            // * FallbackTextRowHeight, DO-NOT-TOUCH), which is only correct
-            // when every row renders at exactly that height. Fail loud in
+            // * FallbackTextRowHeight; PlanContentHeightMath is a
+            // high-evidence zone, formerly DO-NOT-TOUCH), which is only
+            // correct when every row renders at exactly that height. Fail loud in
             // DEBUG rather than silently drifting the section's real height
             // out of sync with what CraftingPlanView computed for it.
             //

@@ -3900,11 +3900,19 @@ Follow-ups (recorded during a later polish pass, not yet implemented):
   `PlanRowType.CoinTotal`, and 4 tests that referenced `CoinTotal`
   directly and would not otherwise compile (`Summary_CoinRowPlusCurrencyRows`
   plus the three originally estimated at ~348-390) - one more than this
-  bullet's own estimate, found during characterization; the fifth
-  Summary-shape test, `Summary_NoCoinRow_OmitsTileRow`, does not
-  reference `CoinTotal` and still compiles/passes, so it was left as-is.
-  Full suite: 1765 before, 1761 after (exactly the 4 deleted tests,
-  nothing else changed).
+  bullet's own estimate, found during characterization. **Follow-up
+  correction (2026-08-17, same branch, code review):** the fifth
+  Summary-shape test, `Summary_NoCoinRow_OmitsTileRow`, does not reference
+  `CoinTotal` and still compiled/passed, so it was initially left as-is -
+  but review found it had gone vacuous: with `SummaryBodyHeight`'s switch
+  case gone, it exercises `SectionBodyHeight`'s `default` arm and only
+  passes because `CurrencyRowHeight`/`FallbackTextRowHeight` are both 28,
+  a coincidence unrelated to Summary. It duplicated
+  `UnknownSectionType_FallsBackToTextRowHeightPerRow` under a name
+  claiming Summary-specific semantics that no longer exist, and would
+  false-fail the moment either constant is retuned independently. Deleted.
+  Full suite: 1765 before the first deletion pass, 1761 after it, 1760
+  after this correction (5 dead/vacuous tests removed total).
 - Follow-up (user decision pending): the Summary currency table now
   shows the RAW wallet holding in Have, while the shopping list still
   clamps its per-currency owned amount to the required amount
@@ -6937,11 +6945,25 @@ reference `CoinTotal`, still compiles, and still passes (the
 `PlanSectionType.Summary` case now falls through to
 `SectionBodyHeight`'s existing `default` branch, which happens to return
 the same value for its one-`CurrencyCost`-row input since
-`CurrencyRowHeight`/`FallbackTextRowHeight` are both 28) - left
-unchanged, since the larger `SummarySectionLayoutMath` fold-back is
-explicitly out of scope for this branch. Re-ran the full suite after:
+`CurrencyRowHeight`/`FallbackTextRowHeight` are both 28) - initially left
+unchanged on the theory that the larger `SummarySectionLayoutMath`
+fold-back is out of scope for this branch. Re-ran the full suite after:
 1761 passed - exactly baseline (1765) minus the 4 deleted dead tests,
-nothing else changed. The `SummaryBodyHeight` deletion did not remove
+nothing else changed.
+
+**Follow-up correction (same day, code review).** Leaving
+`Summary_NoCoinRow_OmitsTileRow` in place was itself a defect, not a
+scope call: with the `Summary` switch case gone, the test exercises only
+`default`'s `rows.Count * FallbackTextRowHeight` arithmetic, passing
+solely because `CurrencyRowHeight` and `FallbackTextRowHeight` happen to
+both equal 28 - a coincidence with no connection to `Summary`. It had
+become a duplicate of `UnknownSectionType_FallsBackToTextRowHeightPerRow`
+under a name asserting Summary-specific tile-omission behavior that no
+longer exists anywhere in the codebase, and would produce a confusing
+false failure (naming `Summary`/`OmitsTileRow`) the first time either
+constant is retuned independently of the other. Deleted. Full suite:
+1760 passed after this correction (5 dead/vacuous tests removed from the
+1765 baseline total). The `SummaryBodyHeight` deletion did not remove
 `PlanRowType.CoinTotal`'s underlying enum value from a serialized/
 persisted format anywhere: `PlanRowType`/`PlanRowViewModel` are rebuilt
 fresh on every render by `PlanViewModelBuilder` and never
@@ -6955,8 +6977,9 @@ C:/Dev/Blish/wt-hezone/GW2CraftingHelper.csproj -p:Platform=x64` - 0
 errors both before and after (pre-existing StyleCop warnings only).
 Tests: `"/mnt/c/Program Files/dotnet/dotnet.exe" test
 C:/Dev/Blish/wt-hezone/tests/GW2CraftingHelper.Tests/
-GW2CraftingHelper.Tests.csproj` - 1765 before, 1761 after, 0 failed both
-times.
+GW2CraftingHelper.Tests.csproj` - 1765 before, 1761 after the first
+deletion pass, 1760 after the same-day follow-up correction that deleted
+`Summary_NoCoinRow_OmitsTileRow` (see above), 0 failed at every step.
 
 Repo Invariants Checklist:
 - [x] No Blish HUD references added to tests.
