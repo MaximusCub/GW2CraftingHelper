@@ -1154,6 +1154,129 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(400, opportunity.MinRating);
         }
 
+        // Fix (gate 2026-08-17, finding 1): end-to-end pipeline coverage
+        // for RecipeSheetSavingsCalculator's production wiring. The B8
+        // narrowing (see KNOWN-ISSUES.md item 3) moved the calculator's
+        // offer source from the well-covered _vendorOfferStore field onto
+        // _offersForRecipeSheetItem - a Func computed once in the
+        // constructor and never separately pinned. Measured: replacing
+        // that whole assignment with `_offersForRecipeSheetItem = null;`
+        // left all 1773 pre-existing tests green, silently disabling every
+        // recipe-sheet-savings note in production with no crash. Reuses
+        // the same competency-exclusion fixture shape as
+        // GenerateStructuredAsync_CraftExcludedByCompetency_
+        // PopulatesCompetencyOpportunities above (untrained discipline
+        // forces the cheaper Craft option out, so the baseline decision is
+        // BuyFromTp with an automatic reference branch -
+        // CraftingTreeBuilder's own wantsReferenceBranch gate, no manual
+        // override needed) plus a REAL temp-directory VendorOfferStore
+        // (repo invariant: real stores, not fakes) carrying a coin-priced
+        // recipe-sheet offer and a non-empty recipeSheetItemIdByRecipeId -
+        // both real CraftingPlanPipeline constructor params, so no test
+        // double stands in for either. Asserts NON-EMPTY, not merely
+        // NotNull - unlike the four pre-existing B8 tests, which only pin
+        // the null-delegate/empty-map guards and never exercise the
+        // delegate actually being called and returning real data.
+        [Fact]
+        public async Task GenerateStructuredAsync_RecipeSheetSavings_EndToEnd_PopulatesOpportunity()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "LearnedFromItem" }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            // Recipe 10 deliberately left unlearned (no AddLearnedRecipe
+            // call) - the "missing, purchasable recipe sheet" case this
+            // whole feature exists for.
+            var accountClient = new InMemoryAccountRecipeClient();
+
+            CraftingPlanResult result;
+            using (var tmp = new TempDirectory())
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tmp.Path, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "recipe-sheet-10",
+                        OutputItemId = 500,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 200 }
+                        },
+                        MerchantName = "Test NPC",
+                        Locations = new List<string>()
+                    }
+                });
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store,
+                    accountRecipeClient: accountClient,
+                    recipeSheetItemIdByRecipeId: new Dictionary<int, int> { { 10, 500 } });
+
+                var snapshot = new AccountSnapshot
+                {
+                    CharacterDisciplines = new List<SnapshotCharacterDiscipline>
+                    {
+                        // Untrained relative to the recipe's MinRating 400 -
+                        // craft is excluded from the automatic pick even
+                        // though far cheaper than the TP buy, so the plan
+                        // buys instead and CraftingTreeBuilder attaches an
+                        // automatic reference branch for the excluded craft.
+                        new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 100, Active = true }
+                    }
+                };
+
+                result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy);
+            }
+
+            var targetStep = Assert.Single(result.Plan.Steps, s => s.ItemId == 1);
+            Assert.Equal(AcquisitionSource.BuyFromTp, targetStep.Source);
+            Assert.True(result.CraftingTree.IsReferenceBranch);
+
+            Assert.NotNull(result.RecipeSheetSavingsOpportunities);
+            var opp = Assert.Single(result.RecipeSheetSavingsOpportunities);
+            Assert.Equal(1, opp.ItemId);
+            Assert.Equal(10, opp.RecipeId);
+            Assert.Equal(500, opp.SheetItemId);
+            Assert.Equal(200, opp.SheetCost);
+            Assert.True(opp.SavingsPerUnit > 0);
+            // Nice-to-have: the fixture's own untrained-Weaponsmith
+            // snapshot (already required above to force the Buy baseline)
+            // also drives DisciplineBlocked - pin it too rather than
+            // leaving that half of the fixture's effect unasserted.
+            Assert.True(opp.DisciplineBlocked);
+            Assert.Equal("Weaponsmith", opp.Discipline);
+            Assert.Equal(400, opp.RequiredRating);
+        }
+
         [Fact]
         public async Task GenerateStructuredAsync_NullSnapshot_CharacterDisciplinesIsNull()
         {

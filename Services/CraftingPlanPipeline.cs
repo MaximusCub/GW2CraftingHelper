@@ -1262,11 +1262,15 @@ namespace GW2CraftingHelper.Services
             // rows stay live across re-solves exactly like every other part
             // of the plan already does.
             //
-            // B8 shape fix: the single-vs-multi Tree.Id check itself now
+            // B8 shape fix: the single-vs-multi shape check itself now
             // lives inside SellSideEconomics.ApplyForPlanShape (same
-            // Gw2Constants.MultiItemWrapperItemId discriminator this if/
-            // else used directly before this refactor) rather than
-            // duplicated here - see that method's own doc comment.
+            // Gw2Constants.MultiItemWrapperItemId constant this if/else
+            // used directly before this refactor) rather than duplicated
+            // here - see that method's own doc comment for why this is
+            // NOT a pure move: the operand checked against that constant
+            // is now solveTree (possibly a fresh re-reduced clone), not
+            // context.Tree, and a null tree now dispatches to the
+            // single-item branch instead of throwing.
             SellSideEconomics.ApplyForPlanShape(
                 result, solveTree, solveResult, context.Prices,
                 context.TargetItemId, context.Quantity, context.RequestedItems,

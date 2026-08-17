@@ -7020,10 +7020,22 @@ fixes, and document the whole annotation-pass group in
    branch on `context.Tree.Id != Gw2Constants.MultiItemWrapperItemId`
    itself to pick `ApplySellSideEconomics` vs
    `ApplyBatchSellSideEconomics`. That if/else now lives inside
-   `SellSideEconomics` as `ApplyForPlanShape`, using the SAME `Tree.Id`
-   discriminator - `ResolveWithOverrides` calls the one new method
-   instead of duplicating the shape check. Pure move, no behavior
-   change (verified by the unchanged 1773/1773 suite run).
+   `SellSideEconomics` as `ApplyForPlanShape`, using the SAME
+   `Gw2Constants.MultiItemWrapperItemId` constant - `ResolveWithOverrides`
+   calls the one new method instead of duplicating the shape check.
+   **Correction (gate 2026-08-17): not a pure move.** The constant is
+   unchanged but the OPERAND is not: the deleted if/else read
+   `context.Tree.Id` (the frozen, generation-time tree); the new call
+   passes `solveTree`, which is `reduced.ReducedTree` - a fresh
+   `InventoryReducer` clone - whenever `context.UnreducedTree != null &&
+   _reducer != null`. Equivalent today only because
+   `InventoryReducer.CloneNode` copies `Id` onto the clone and the
+   wrapper root is never pruned - an invariant nothing asserts. The new
+   `tree != null &&` guard is also a second, previously-unstated behavior
+   change: a null tree used to throw NRE at `context.Tree.Id`; it now
+   silently routes to the single-item branch. See
+   `SellSideEconomics.ApplyForPlanShape`'s own doc comment for the
+   corrected description.
 3. **B8: `RecipeSheetSavingsCalculator.Apply` narrowed to
    `Func<int, IReadOnlyList<VendorOffer>>`
    (`Services/RecipeSheetSavingsCalculator.cs`).** The `vendorOfferStore`
