@@ -42,15 +42,26 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
-            var row = Assert.Single(section.Rows);
-            Assert.Equal(PlanRowType.NoteLine, row.RowType);
+            // Review fix (finding 4): split into two rows so the trailing
+            // "cheaper than..." clause can never be the part an ellipsized
+            // panel width cuts - see BuildNotesSection's own doc comment.
+            Assert.Equal(2, section.Rows.Count);
+            var tradeRow = section.Rows[0];
+            var priceRow = section.Rows[1];
+            Assert.Equal(PlanRowType.NoteLine, tradeRow.RowType);
+            Assert.Equal(PlanRowType.NoteLine, priceRow.RowType);
             // DisplayName ("Halloween"), not the internal key ("halloween").
-            Assert.Contains("During Halloween:", row.Label);
-            Assert.Contains("Candy Corn Vendor (Weekly)", row.Label);
-            Assert.Contains("1x Candy Corn", row.Label);
-            Assert.Contains("5x Glob of Ectoplasm", row.Label);
-            Assert.Contains("capped 1/week", row.Label);
-            Assert.Equal(100, row.CoinValue);
+            Assert.Contains("During Halloween:", tradeRow.Label);
+            Assert.Contains("Candy Corn Vendor (Weekly)", tradeRow.Label);
+            Assert.Contains("1x Candy Corn", tradeRow.Label);
+            Assert.Contains("5x Glob of Ectoplasm", tradeRow.Label);
+            Assert.Contains("capped 1/week", tradeRow.Label);
+            Assert.Equal(0, tradeRow.CoinValue);
+            // "per unit" stated explicitly - PlanUnitPrice is a PER-UNIT
+            // price, not the price of the "5x Glob of Ectoplasm" bundle
+            // named on the row just above it.
+            Assert.Contains("per unit", priceRow.Label);
+            Assert.Equal(100, priceRow.CoinValue);
             Assert.Equal("Notes (1)", section.Title);
         }
 

@@ -901,12 +901,13 @@ namespace GW2CraftingHelper.Services
         /// design-plan-notes.md (Notes section, Option 1 - single flat
         /// section, one shared NoteLine row shape). Assembles rows in a
         /// fixed order - excess/reclaim lines, then a total (only when 2+
-        /// excess lines exist), then competency lines, then the gambling-
-        /// forge scope line (0 or 1) - so re-solves and screenshots stay
-        /// diffable. Returns a section with zero rows when every note kind
-        /// is empty; the caller (Build()) only appends it to vm.Sections
-        /// when Rows.Count > 0, so an empty Notes section never renders a
-        /// header at all.
+        /// excess lines exist), then competency lines, then (opportunity-
+        /// notes) RECIPE-SHEET SAVINGS opportunities, then SEASONAL VENDOR
+        /// TIP opportunities, then the gambling-forge scope line (0 or 1) -
+        /// so re-solves and screenshots stay diffable. Returns a section
+        /// with zero rows when every note kind is empty; the caller
+        /// (Build()) only appends it to vm.Sections when Rows.Count > 0, so
+        /// an empty Notes section never renders a header at all.
         /// </summary>
         private PlanSectionViewModel BuildNotesSection(CraftingPlanResult result)
         {
@@ -1067,16 +1068,29 @@ namespace GW2CraftingHelper.Services
             }
 
             // 4. SEASONAL VENDOR TIP opportunities (opportunity-notes),
-            // alphabetical by resolved item name. Single row per tip - the
-            // tip's own "cost" description is built ONLY from Item-type
-            // cost lines (see BuildSeasonalCostDescription's own doc
-            // comment for why a coin-priced cost line is skipped entirely
-            // rather than rendered as raw text) - the only offers this
-            // module seeds today (Candy Corn Vendor (Weekly)) are pure
-            // single-Item-cost-line, so this never fires in practice yet.
+            // alphabetical by resolved item name. Two physical rows per
+            // tip (review fix, finding 4) - the trade description, then
+            // the "cheaper than this plan's price" comparison - same
+            // NotesSectionRenderer.LabelHelpers.EllipsizeToWidth exposure
+            // the RECIPE-SHEET SAVINGS note above was already split to
+            // avoid: a single ~150-char combined label ellipsizes at the
+            // panel edge, and the trailing clause (what the CoinValue on
+            // the SAME row actually means) is exactly what gets cut,
+            // leaving a bare coin number with no stated meaning. Splitting
+            // also resolves the "5x Glob of Ectoplasm" / "PlanUnitPrice"
+            // adjacency ambiguity (PlanUnitPrice is a PER-UNIT price, not
+            // the price of the 5x bundle just before it) by saying "per
+            // unit" explicitly on the row that actually carries the
+            // CoinValue. The tip's own "cost" description is built ONLY
+            // from Item-type cost lines (see BuildSeasonalCostDescription's
+            // own doc comment for why a coin-priced cost line is skipped
+            // entirely rather than rendered as raw text) - the only offers
+            // this module seeds today (Candy Corn Vendor (Weekly)) are
+            // pure single-Item-cost-line, so this never fires in practice
+            // yet.
             if (result.SeasonalVendorTips != null && result.SeasonalVendorTips.Count > 0)
             {
-                var tipRows = new List<(string Name, PlanRowViewModel Row)>(result.SeasonalVendorTips.Count);
+                var tipRows = new List<(string Name, List<PlanRowViewModel> Rows)>(result.SeasonalVendorTips.Count);
                 foreach (var tip in result.SeasonalVendorTips)
                 {
                     string costDescription = BuildSeasonalCostDescription(tip.CostLines, result.ItemMetadata);
@@ -1093,21 +1107,32 @@ namespace GW2CraftingHelper.Services
                             : "";
 
                     string festivalDisplayName = Gw2Constants.ResolveFestivalDisplayName(tip.Festival);
-                    string label = $"During {festivalDisplayName}: {tip.MerchantName} trades {costDescription} for " +
-                        $"{tip.OutputCount}x {itemName}{capClause} - cheaper than this plan's price of";
+                    string tradeLabel = $"During {festivalDisplayName}: {tip.MerchantName} trades {costDescription} for " +
+                        $"{tip.OutputCount}x {itemName}{capClause}";
 
-                    tipRows.Add((itemName, new PlanRowViewModel
+                    var rows = new List<PlanRowViewModel>(2)
                     {
-                        RowType = PlanRowType.NoteLine,
-                        Label = label,
-                        CoinValue = tip.PlanUnitPrice
-                    }));
+                        new PlanRowViewModel
+                        {
+                            RowType = PlanRowType.NoteLine,
+                            Label = tradeLabel
+                        },
+                        new PlanRowViewModel
+                        {
+                            RowType = PlanRowType.NoteLine,
+                            Label = "  Cheaper than this plan's price per unit",
+                            CoinValue = tip.PlanUnitPrice
+                        }
+                    };
+
+                    tipRows.Add((itemName, rows));
                     noteEntryCount++;
                 }
 
-                section.Rows.AddRange(tipRows
-                    .OrderBy(r => r.Name, StringComparer.Ordinal)
-                    .Select(r => r.Row));
+                foreach (var entry in tipRows.OrderBy(r => r.Name, StringComparer.Ordinal))
+                {
+                    section.Rows.AddRange(entry.Rows);
+                }
             }
 
             // 5. Gambling-forge scope note (0 or 1 logical entry). Wording

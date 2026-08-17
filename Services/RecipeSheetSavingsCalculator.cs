@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Models;
@@ -152,12 +153,28 @@ namespace GW2CraftingHelper.Services
             // IsCostComponent's own doc comment). Any child whose own cost
             // cannot be proven in coin (Currency ingredient, Unknown,
             // GuildUpgrade, unrecognized type) makes the whole craft cost
-            // unprovable - bail rather than under-count it. An owned
-            // (Have) child correctly contributes 0, not "unprovable".
+            // unprovable - bail rather than under-count it.
+            //
+            // Review fix (finding 6): a reference-branch child with
+            // Decision == Have is now ALSO treated as unprovable (bails),
+            // not "correctly contributes 0". This whole node is a
+            // HYPOTHETICAL "what if I crafted instead" branch - a child
+            // reported as owned may already be allocated to the REAL plan
+            // elsewhere (a different node's own reduction), so this
+            // hypothetical cannot safely assume those units are free AND
+            // available a second time here. Treating Have as free-0 would
+            // inflate SavingsPerUnit up to the full purchase price in the
+            // limit (every ingredient owned), and would silently mean
+            // something different under OwnMaterialsMode.Free vs. Valued
+            // even though this calculator takes no ownMaterialsMode
+            // parameter at all. Bailing (same as the Currency/Unknown/
+            // GuildUpgrade case just above) keeps the note's own math
+            // uniform regardless of that mode, and never fabricates a
+            // savings number this calculator cannot actually prove.
             long craftTotal = 0;
             foreach (var child in node.Children)
             {
-                if (child.IsCostComponent || child.Decision == CraftingDecision.Have)
+                if (child.IsCostComponent)
                 {
                     continue;
                 }
@@ -174,6 +191,8 @@ namespace GW2CraftingHelper.Services
                 craftTotal += child.SubtreeCost.Value;
             }
 
+            // Nice-to-have: floor (integer) division - see the matching
+            // note on perSheet below for the conservative-rounding bias.
             long craftUnitCost = craftTotal / node.Quantity;
             long chosenUnitCost = node.UnitCost.Value;
             long savingsPerUnit = chosenUnitCost - craftUnitCost;
@@ -182,6 +201,13 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
+            // Nice-to-have: craftUnitCost above, and perSheet here, are
+            // both floor (integer) division - a conservative bias (never
+            // overstates SavingsPerUnit from this rounding alone: it can
+            // only understate the craft cost / overstate the sheet's own
+            // cost), same undocumented-but-conservative posture as
+            // VendorBatchSolver's own per-unit math. Not corrected here -
+            // just flagged, since the UI presents these as exact numbers.
             var offers = vendorOfferStore.GetOffersForItem(sheetItemId);
             long? cheapestSheetCost = null;
             foreach (var offer in offers)
@@ -218,8 +244,21 @@ namespace GW2CraftingHelper.Services
                 .ToList();
             if (realDisciplines != null && realDisciplines.Count > 0 && characterDisciplines != null)
             {
-                discipline = realDisciplines[0];
                 requiredRating = node.ReferenceRecipeMinRating;
+
+                // Nice-to-have: pick the candidate discipline whose best
+                // account rating is CLOSEST to requiredRating, not simply
+                // the alphabetically-first one - a multi-discipline recipe
+                // (e.g. Armorsmith/Artificer/Huntsman/Weaponsmith) should
+                // steer the player toward the discipline they are already
+                // nearest to training, not whichever name sorts first.
+                // Falls back to alphabetical (realDisciplines is already
+                // ordinal-sorted) on an exact tie, for determinism.
+                discipline = realDisciplines
+                    .OrderBy(d => Math.Abs(BestAccountRating(d, characterDisciplines) - requiredRating))
+                    .ThenBy(d => d, System.StringComparer.Ordinal)
+                    .First();
+
                 bool accountHasIt = characterDisciplines.Any(cd =>
                     cd != null &&
                     realDisciplines.Contains(cd.Discipline) &&
@@ -239,6 +278,29 @@ namespace GW2CraftingHelper.Services
                 Discipline = discipline,
                 RequiredRating = requiredRating
             });
+        }
+
+        /// <summary>
+        /// Highest rating any character on the account has in discipline,
+        /// or 0 when no character has it at all - same "0 = untrained"
+        /// convention BestCharacterRating-style helpers elsewhere in this
+        /// module use. characterDisciplines is guaranteed non-null by this
+        /// method's sole call site.
+        /// </summary>
+        private static int BestAccountRating(
+            string discipline, IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines)
+        {
+            int best = 0;
+            foreach (var cd in characterDisciplines)
+            {
+                if (cd != null &&
+                    string.Equals(cd.Discipline, discipline, StringComparison.Ordinal) &&
+                    cd.Rating > best)
+                {
+                    best = cd.Rating;
+                }
+            }
+            return best;
         }
     }
 }

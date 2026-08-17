@@ -342,6 +342,81 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // opportunity-notes (SEASONAL VENDOR TIP, review-fix finding 5):
+        // real-path proof that SeasonalOfferFilter.ExcludeSeasonal is
+        // actually wired into the SOLVE call site, not just unit-tested in
+        // isolation (SeasonalOfferFilterTests). An item whose ONLY vendor
+        // offer is seasonal must fall back to the TP, never BuyFromVendor
+        // - and, with the festival active, the excluded offer should still
+        // surface as a SeasonalVendorTips entry (the informational Notes
+        // row this whole exclusion exists to make room for).
+        [Fact]
+        public async Task SeasonalOnlyVendorOffer_ExcludedFromSolve_FallsBackToTp_SurfacesAsTip()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            // No recipe for item 1
+
+            var priceApi = new InMemoryPriceApiClient();
+            // TP price is 500
+            priceApi.AddPrice(1, buyUnitPrice: 500, sellUnitPrice: 500);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Festival Item", "festival.png");
+
+            // The ONLY vendor offer for item 1 is a seasonal (Halloween)
+            // offer at 100 coin - cheaper than the 500 TP price, so if the
+            // exclusion were NOT wired at this solve call site the solver
+            // would wrongly pick BuyFromVendor here.
+            using (var tmp = new TempDirectory())
+            {
+                var tempDir = tmp.Path;
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tempDir, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-seasonal-vendor",
+                        OutputItemId = 1,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 100 }
+                        },
+                        MerchantName = "Candy Corn Vendor (Weekly)",
+                        Locations = new List<string>(),
+                        SeasonalFestival = Gw2Constants.HalloweenFestivalName
+                    }
+                });
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store,
+                    activeFestivalNames: () => new[] { Gw2Constants.HalloweenFestivalName });
+
+                var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy);
+
+                // Never chosen as BuyFromVendor - the seasonal-only offer
+                // was excluded from the solver's own candidate set.
+                Assert.Single(result.Plan.Steps);
+                Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
+                Assert.Equal(500, result.Plan.TotalCoinCost);
+
+                // Surfaces as an informational tip instead - the excluded
+                // offer is still cheaper than the plan's own TP price.
+                var tip = Assert.Single(result.SeasonalVendorTips);
+                Assert.Equal(1, tip.ItemId);
+                Assert.Equal(Gw2Constants.HalloweenFestivalName, tip.Festival);
+                Assert.Equal(100, tip.OfferUnitCost);
+                Assert.Equal(500, tip.PlanUnitPrice);
+            }
+        }
+
         [Fact]
         public async Task NullVendorStore_PipelineStillWorks()
         {

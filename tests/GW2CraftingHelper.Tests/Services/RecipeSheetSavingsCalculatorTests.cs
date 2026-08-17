@@ -81,8 +81,24 @@ namespace GW2CraftingHelper.Tests.Services
             long unitCost = 50, int quantity = 10, long ingredientSubtreeCost = 300,
             int recipeId = 999, bool learnedFromItem = true,
             List<string> disciplines = null, int minRating = 400,
-            List<CostLine> vendorCurrencyCosts = null)
+            List<CostLine> vendorCurrencyCosts = null,
+            IEnumerable<CraftingTreeNode> extraChildren = null)
         {
+            var children = new List<CraftingTreeNode>
+            {
+                new CraftingTreeNode
+                {
+                    ItemId = 200,
+                    Quantity = quantity * 2,
+                    Decision = CraftingDecision.BuyFromTp,
+                    SubtreeCost = ingredientSubtreeCost
+                }
+            };
+            if (extraChildren != null)
+            {
+                children.AddRange(extraChildren);
+            }
+
             return new CraftingTreeNode
             {
                 ItemId = 100,
@@ -95,16 +111,7 @@ namespace GW2CraftingHelper.Tests.Services
                 ReferenceRecipeMinRating = minRating,
                 ReferenceRecipeIsLearnedFromItem = learnedFromItem,
                 VendorCurrencyCosts = vendorCurrencyCosts,
-                Children = new[]
-                {
-                    new CraftingTreeNode
-                    {
-                        ItemId = 200,
-                        Quantity = quantity * 2,
-                        Decision = CraftingDecision.BuyFromTp,
-                        SubtreeCost = ingredientSubtreeCost
-                    }
-                }
+                Children = children
             };
         }
 
@@ -211,6 +218,68 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
 
+        // Review fix (finding 6): a reference-branch child reported as
+        // owned (Have) must NOT contribute 0 to the hypothetical craft
+        // cost - this whole node is a hypothetical "what if I crafted
+        // instead" branch, and those owned units may already be allocated
+        // to the real plan elsewhere, so the craft cost is unprovable, not
+        // free. Extra Have child alongside the normal priced ingredient -
+        // if Have still contributed 0 this would otherwise emit the same
+        // opportunity as PositiveSavings_SheetAvailable_MissingLearnedFromItemRecipe_EmitsOpportunity.
+        [Fact]
+        public void HaveChild_TreatedAsUnprovable_NoOpportunity()
+        {
+            var node = BoughtNodeWithReferenceBranch(extraChildren: new[]
+            {
+                new CraftingTreeNode
+                {
+                    ItemId = 201,
+                    Quantity = 5,
+                    Decision = CraftingDecision.Have
+                }
+            });
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var store = MakeStore(CoinSheetOffer(500, 200));
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
+
+            Assert.Empty(result.RecipeSheetSavingsOpportunities);
+        }
+
+        // Review fix (finding 6): the pre-existing "unprovable child bails
+        // the whole craft cost" path (Currency/Unknown/GuildUpgrade/
+        // UnrecognizedIngredient children) had no direct test - only the
+        // Have-child path was silently exempted from it. Currency here
+        // stands in for the whole "not Craft/BuyFromTp/BuyFromVendor"
+        // bail branch.
+        [Fact]
+        public void UnprovableChild_Currency_TreatedAsUnprovable_NoOpportunity()
+        {
+            var node = BoughtNodeWithReferenceBranch(extraChildren: new[]
+            {
+                new CraftingTreeNode
+                {
+                    ItemId = 202,
+                    Quantity = 5,
+                    Decision = CraftingDecision.Currency
+                }
+            });
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var store = MakeStore(CoinSheetOffer(500, 200));
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
+
+            Assert.Empty(result.RecipeSheetSavingsOpportunities);
+        }
+
         [Fact]
         public void VendorCurrencyCostsPresent_NotComparable_NoOpportunity()
         {
@@ -270,6 +339,34 @@ namespace GW2CraftingHelper.Tests.Services
 
             var opp = Assert.Single(result.RecipeSheetSavingsOpportunities);
             Assert.False(opp.DisciplineBlocked);
+        }
+
+        // Nice-to-have: multi-discipline recipe must steer toward the
+        // discipline the account is closest to training, not whichever
+        // name sorts first - "Armorsmith" sorts before "Weaponsmith", but
+        // the account here is far closer to the Weaponsmith requirement.
+        [Fact]
+        public void MultiDiscipline_PicksClosestAccountRating_NotAlphabeticallyFirst()
+        {
+            var node = BoughtNodeWithReferenceBranch(
+                disciplines: new List<string> { "Armorsmith", "Weaponsmith" }, minRating: 400);
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var store = MakeStore(CoinSheetOffer(500, 200));
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+            var characterDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Armorsmith", Rating = 100 },
+                new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Weaponsmith", Rating = 350 }
+            };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: characterDisciplines);
+
+            var opp = Assert.Single(result.RecipeSheetSavingsOpportunities);
+            Assert.Equal("Weaponsmith", opp.Discipline);
+            Assert.True(opp.DisciplineBlocked);
         }
 
         [Fact]

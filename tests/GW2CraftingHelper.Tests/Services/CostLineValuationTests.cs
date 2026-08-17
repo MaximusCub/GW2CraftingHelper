@@ -97,6 +97,29 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(ok);
         }
 
+        // Review fix (nice-to-have): a failure on a LATER line (not just
+        // the first) must still leave the out param at 0, not the partial
+        // sum accumulated from the earlier, valid line(s) - the pre-fix
+        // code only zeroed coinCost on a first-line failure (its initial
+        // value), so a caller checking `ok` correctly but glancing at
+        // `coin` on a false result would have seen a real-looking non-zero
+        // number for a genuinely unpriceable offer.
+        [Fact]
+        public void FailureOnLaterLine_OutParamResetToZero_NotPartialSum()
+        {
+            var lines = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 500 },
+                new CostLine { Type = "Currency", Id = 2, Count = 10 } // Karma - fails
+            };
+
+            bool ok = CostLineValuation.TryGetCoinCost(
+                lines, new Dictionary<int, ItemPrice>(), PriceBasis.BuyOrder, out long coin);
+
+            Assert.False(ok);
+            Assert.Equal(0, coin);
+        }
+
         [Fact]
         public void EmptyOrNullCostLines_ReturnsFalse()
         {

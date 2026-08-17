@@ -30,13 +30,22 @@ namespace GW2CraftingHelper.Services
         // nothing" gate is always exercised rather than an NRE.
         private readonly IReadOnlyDictionary<int, int> _recipeSheetItemIdByRecipeId;
 
-        // opportunity-notes (SEASONAL VENDOR TIP): the currently-active
-        // festival name keys, read ONCE by Module.cs at load from Blish's
-        // FestivalContext and passed straight through - see that class's
-        // own doc comment. Empty (never null) when the caller passes none
-        // (every pre-existing test/caller), so SeasonalVendorTipCalculator's
-        // own "no active festival -> nothing" gate is always exercised.
-        private readonly IReadOnlyList<string> _activeFestivalNames;
+        // opportunity-notes (SEASONAL VENDOR TIP, review-fix #3): the
+        // currently-active festival name keys, read LAZILY at
+        // plan-generation time via this Func rather than once, eagerly, at
+        // Module.cs's Initialize() - Blish's FestivalContext loads
+        // asynchronously (Blish HUD's own binary carries "Festival request
+        // was cancelled early." / "Active festival(s): {...}" strings,
+        // INFERRED not measured), so a one-shot Initialize()-time read
+        // could observe NotReady and silently disable the feature for the
+        // WHOLE session. Invoked once per Apply() call below (three call
+        // sites) - GameService.Contexts.GetContext/TryGetActiveFestivals
+        // just returns already-cached state, so this is not a new network
+        // call per plan generation, just a later, retried read. Defaults
+        // to an always-empty provider when the caller passes none (every
+        // pre-existing test/caller), so SeasonalVendorTipCalculator's own
+        // "no active festival -> nothing" gate is always exercised.
+        private readonly Func<IReadOnlyList<string>> _activeFestivalNames;
 
         // VOM finding #3 fix: ResolveWithOverrides rebuilds an
         // AccountItemIndex from context.AccountItems - an immutable,
@@ -86,11 +95,11 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, DailyCooldownItem> dailyCooldownItems = null,
             // opportunity-notes: see _recipeSheetItemIdByRecipeId/
             // _activeFestivalNames' own field doc comments. Both optional/
-            // default null -> normalized to empty below, so every
-            // pre-existing caller (Module.cs before this feature, every
-            // pipeline test) is unaffected.
+            // default null -> normalized to an empty dict/always-empty
+            // provider below, so every pre-existing caller (Module.cs
+            // before this feature, every pipeline test) is unaffected.
             IReadOnlyDictionary<int, int> recipeSheetItemIdByRecipeId = null,
-            IReadOnlyList<string> activeFestivalNames = null)
+            Func<IReadOnlyList<string>> activeFestivalNames = null)
         {
             _recipeService = recipeService;
             _tradingPostService = tradingPostService;
@@ -104,7 +113,7 @@ namespace GW2CraftingHelper.Services
             _moduleLog = moduleLog ?? ModuleLog.Shared;
             _dailyCooldownItems = dailyCooldownItems;
             _recipeSheetItemIdByRecipeId = recipeSheetItemIdByRecipeId ?? new Dictionary<int, int>();
-            _activeFestivalNames = activeFestivalNames ?? Array.Empty<string>();
+            _activeFestivalNames = activeFestivalNames ?? (() => Array.Empty<string>());
         }
 
         public async Task<CraftingPlanResult> GenerateStructuredAsync(
@@ -473,7 +482,7 @@ namespace GW2CraftingHelper.Services
                 result, learnedRecipeIds, prices, priceBasis, _vendorOfferStore,
                 _recipeSheetItemIdByRecipeId, effectiveCharacterDisciplines);
             SeasonalVendorTipCalculator.Apply(
-                result, vendorOffers, prices, priceBasis, _activeFestivalNames);
+                result, vendorOffers, prices, priceBasis, _activeFestivalNames());
 
             // Capture inputs so the UI can re-solve locally with per-node
             // overrides (no network round-trips).
@@ -938,7 +947,7 @@ namespace GW2CraftingHelper.Services
                 result, learnedRecipeIds, prices, priceBasis, _vendorOfferStore,
                 _recipeSheetItemIdByRecipeId, effectiveCharacterDisciplines);
             SeasonalVendorTipCalculator.Apply(
-                result, vendorOffers, prices, priceBasis, _activeFestivalNames);
+                result, vendorOffers, prices, priceBasis, _activeFestivalNames());
 
             result.SolveContext = new PlanSolveContext
             {
@@ -1174,7 +1183,7 @@ namespace GW2CraftingHelper.Services
                 result, context.LearnedRecipeIds, context.Prices, context.PriceBasis, _vendorOfferStore,
                 _recipeSheetItemIdByRecipeId, context.CharacterDisciplines);
             SeasonalVendorTipCalculator.Apply(
-                result, context.VendorOffers, context.Prices, context.PriceBasis, _activeFestivalNames);
+                result, context.VendorOffers, context.Prices, context.PriceBasis, _activeFestivalNames());
 
             result.SolveContext = context;
 

@@ -39,5 +39,18 @@ namespace VendorOfferUpdater.Models
         // (0/1/2) this offer row corresponds to, or null for a non-
         // Homestead-Refinement offer. See ConvertToOffer/HomesteadTierResolver.
         public int? HomesteadTier { get; set; }
+
+        // opportunity-notes (SEASONAL VENDOR TIP, review-fix): additive
+        // pass-through mirror of the runtime Models/VendorOffer.cs field
+        // (see that file's own doc comment) - same round-trip-safety
+        // reason SeasonalCap/HomesteadTier are both mirrored here. Without
+        // this, --merge-into deserializes the whole baseline through THIS
+        // model (MergeIntoBaseline, Program.cs), and any row this pass
+        // does not touch is still re-serialized through it - a property
+        // this class does not declare is silently dropped on every future
+        // run, even one scraping an unrelated merchant, with no OfferId
+        // change to make the loss noticeable (SeasonalFestival is
+        // deliberately not hashed by VendorOfferHasher).
+        public string? SeasonalFestival { get; set; }
     }
 }

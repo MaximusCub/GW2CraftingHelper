@@ -41,6 +41,13 @@ namespace GW2CraftingHelper.Services
             {
                 if (line == null)
                 {
+                    // Review nice-to-have: reset before every false return
+                    // (not just this first-line case, which happened to
+                    // already leave coinCost at its initial 0) so the
+                    // contract - out param is 0 whenever this returns
+                    // false - holds regardless of which line in the list
+                    // fails, not only a failure on line 1.
+                    coinCost = 0;
                     return false;
                 }
 
@@ -56,6 +63,7 @@ namespace GW2CraftingHelper.Services
                         // without a currency valuation, which neither caller
                         // has (both are informational Plan Notes, not
                         // solver decisions).
+                        coinCost = 0;
                         return false;
                     }
                 }
@@ -63,11 +71,13 @@ namespace GW2CraftingHelper.Services
                 {
                     if (prices == null || !prices.TryGetValue(line.Id, out var price))
                     {
+                        coinCost = 0;
                         return false;
                     }
                     int unitPrice = PlanSolver.GetUnitPrice(price, priceBasis);
                     if (unitPrice <= 0)
                     {
+                        coinCost = 0;
                         return false;
                     }
                     coinCost += (long)line.Count * unitPrice;
@@ -78,6 +88,7 @@ namespace GW2CraftingHelper.Services
                     // shape) - never guess at a cost for a shape this
                     // helper has never seen, mirroring VendorBatchSolver's
                     // own identical posture.
+                    coinCost = 0;
                     return false;
                 }
             }
