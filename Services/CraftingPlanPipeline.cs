@@ -16,6 +16,15 @@ namespace GW2CraftingHelper.Services
         private readonly PlanSolver _solver;
         private readonly ItemMetadataService _itemMetadataService;
         private readonly VendorOfferStore _vendorOfferStore;
+
+        // B8 shape fix: RecipeSheetSavingsCalculator.Apply now takes only
+        // the one VendorOfferStore method it ever calls (GetOffersForItem),
+        // narrowed to Func<int, IReadOnlyList<VendorOffer>> - see that
+        // calculator's own Apply doc comment. Computed once here (rather
+        // than at each of the three call sites below) so a null store still
+        // degrades to a null delegate, matching that calculator's own
+        // null-delegate "no offer source available" guard exactly.
+        private readonly Func<int, IReadOnlyList<VendorOffer>> _offersForRecipeSheetItem;
         private readonly InventoryReducer _reducer;
         private readonly IAccountRecipeClient _accountRecipeClient;
         private readonly CurrencyMetadataService _currencyMetadataService;
@@ -106,6 +115,9 @@ namespace GW2CraftingHelper.Services
             _solver = solver;
             _itemMetadataService = itemMetadataService;
             _vendorOfferStore = vendorOfferStore;
+            _offersForRecipeSheetItem = vendorOfferStore != null
+                ? (Func<int, IReadOnlyList<VendorOffer>>)vendorOfferStore.GetOffersForItem
+                : null;
             _reducer = reducer;
             _accountRecipeClient = accountRecipeClient;
             _currencyMetadataService = currencyMetadataService;
@@ -519,7 +531,7 @@ namespace GW2CraftingHelper.Services
             // ExcessCraftOutputCalculator above. Uses the RAW `vendorOffers`
             // (not solverVendorOffers) - see that variable's own comment.
             RecipeSheetSavingsCalculator.Apply(
-                result, learnedRecipeIds, prices, priceBasis, _vendorOfferStore,
+                result, learnedRecipeIds, prices, priceBasis, _offersForRecipeSheetItem,
                 _recipeSheetItemIdByRecipeId, effectiveCharacterDisciplines);
             SeasonalVendorTipCalculator.Apply(
                 result, vendorOffers, prices, priceBasis, _activeFestivalNames());
@@ -1024,7 +1036,7 @@ namespace GW2CraftingHelper.Services
             // TIP): see the single-item overload's matching call site for
             // the full rationale.
             RecipeSheetSavingsCalculator.Apply(
-                result, learnedRecipeIds, prices, priceBasis, _vendorOfferStore,
+                result, learnedRecipeIds, prices, priceBasis, _offersForRecipeSheetItem,
                 _recipeSheetItemIdByRecipeId, effectiveCharacterDisciplines);
             SeasonalVendorTipCalculator.Apply(
                 result, vendorOffers, prices, priceBasis, _activeFestivalNames());
@@ -1249,20 +1261,16 @@ namespace GW2CraftingHelper.Services
             // multi-item context - so the Total Cost section's sell/profit
             // rows stay live across re-solves exactly like every other part
             // of the plan already does.
-            if (context.Tree.Id != Gw2Constants.MultiItemWrapperItemId)
-            {
-                SellSideEconomics.ApplySellSideEconomics(
-                    result, solveTree, solveResult, context.Prices,
-                    context.TargetItemId, context.Quantity, context.PriceBasis,
-                    usedMaterials, context.OwnMaterialsMode);
-            }
-            else
-            {
-                SellSideEconomics.ApplyBatchSellSideEconomics(
-                    result, solveTree, solveResult, context.Prices,
-                    context.RequestedItems, context.PriceBasis,
-                    usedMaterials, context.OwnMaterialsMode);
-            }
+            //
+            // B8 shape fix: the single-vs-multi Tree.Id check itself now
+            // lives inside SellSideEconomics.ApplyForPlanShape (same
+            // Gw2Constants.MultiItemWrapperItemId discriminator this if/
+            // else used directly before this refactor) rather than
+            // duplicated here - see that method's own doc comment.
+            SellSideEconomics.ApplyForPlanShape(
+                result, solveTree, solveResult, context.Prices,
+                context.TargetItemId, context.Quantity, context.RequestedItems,
+                context.PriceBasis, usedMaterials, context.OwnMaterialsMode);
             // Post-review note (VOM finding #6, not fixed here): `context`
             // itself is carried forward verbatim, so context.Tree/
             // UsedMaterials/OwnedQuantityUsedByNodeId stay the GENERATION-
@@ -1296,7 +1304,7 @@ namespace GW2CraftingHelper.Services
             // an override) - context.VendorOffers (RAW) is used here, same
             // as at generation time.
             RecipeSheetSavingsCalculator.Apply(
-                result, context.LearnedRecipeIds, context.Prices, context.PriceBasis, _vendorOfferStore,
+                result, context.LearnedRecipeIds, context.Prices, context.PriceBasis, _offersForRecipeSheetItem,
                 _recipeSheetItemIdByRecipeId, context.CharacterDisciplines);
             SeasonalVendorTipCalculator.Apply(
                 result, context.VendorOffers, context.Prices, context.PriceBasis, _activeFestivalNames());

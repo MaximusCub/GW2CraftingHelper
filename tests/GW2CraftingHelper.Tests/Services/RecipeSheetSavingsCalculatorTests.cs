@@ -125,7 +125,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Single(result.RecipeSheetSavingsOpportunities);
@@ -148,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int> { 999 }, prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -164,7 +164,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -179,7 +179,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: new Dictionary<int, int>(), characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -195,9 +195,32 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
+            Assert.Empty(result.RecipeSheetSavingsOpportunities);
+        }
+
+        // B8 shape fix: offersForItem narrowed from VendorOfferStore to
+        // Func<int, IReadOnlyList<VendorOffer>> - pins the null-delegate
+        // guard (the direct replacement for the old `vendorOfferStore !=
+        // null` check) with every OTHER input otherwise satisfied, so this
+        // fails only on the delegate-null branch, not any of the other
+        // required-input guards NoTreeAtAll/SheetInMapButNoVendorOffer
+        // above already cover.
+        [Fact]
+        public void NullOffersForItemDelegate_NoOffersSource_EmitsNothing_NoCrash()
+        {
+            var node = BoughtNodeWithReferenceBranch();
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, offersForItem: null,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
+
+            Assert.NotNull(result.RecipeSheetSavingsOpportunities);
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
 
@@ -219,7 +242,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -262,7 +285,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -279,7 +302,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -311,7 +334,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -341,7 +364,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -358,7 +381,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -398,7 +421,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -418,7 +441,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: characterDisciplines);
 
             var opp = Assert.Single(result.RecipeSheetSavingsOpportunities);
@@ -441,7 +464,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: characterDisciplines);
 
             var opp = Assert.Single(result.RecipeSheetSavingsOpportunities);
@@ -468,7 +491,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: characterDisciplines);
 
             var opp = Assert.Single(result.RecipeSheetSavingsOpportunities);
@@ -492,7 +515,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Equal(2, result.RecipeSheetSavingsOpportunities.Count);
@@ -512,7 +535,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, new HashSet<int>(), new Dictionary<int, ItemPrice>(), PriceBasis.BuyOrder,
-                MakeStore(), new Dictionary<int, int> { { 1, 2 } }, null);
+                MakeStore().GetOffersForItem, new Dictionary<int, int> { { 1, 2 } }, null);
 
             Assert.NotNull(result.RecipeSheetSavingsOpportunities);
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
@@ -535,7 +558,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
-                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
             Assert.Equal(200, result.RecipeSheetSavingsOpportunities[0].SheetCost);

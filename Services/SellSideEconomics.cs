@@ -80,6 +80,46 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// B8 shape fix: dispatches to ApplySellSideEconomics (single-item)
+        /// or ApplyBatchSellSideEconomics (multi-item) using the SAME
+        /// Tree.Id discriminator (Gw2Constants.MultiItemWrapperItemId)
+        /// ResolveWithOverrides' own if/else used before this refactor -
+        /// centralized here as a single self-dispatch entry point rather
+        /// than duplicated per call site, so a future caller sharing the
+        /// same "which shape is this plan" question does not need its own
+        /// copy of the check. targetItemId/quantity are consulted only by
+        /// the single-item branch; requestedItems only by the multi-item
+        /// branch - the unused pair of arguments is simply ignored by
+        /// whichever branch does not run, exactly as each branch's own
+        /// existing parameter list already required.
+        /// </summary>
+        internal static void ApplyForPlanShape(
+            CraftingPlanResult result,
+            RecipeNode tree,
+            SolveResult solveResult,
+            IReadOnlyDictionary<int, ItemPrice> prices,
+            int targetItemId,
+            int quantity,
+            IReadOnlyList<PlanRequestItem> requestedItems,
+            PriceBasis priceBasis,
+            List<UsedMaterial> usedMaterials,
+            OwnMaterialsMode ownMaterialsMode)
+        {
+            if (tree != null && tree.Id == Gw2Constants.MultiItemWrapperItemId)
+            {
+                ApplyBatchSellSideEconomics(
+                    result, tree, solveResult, prices, requestedItems,
+                    priceBasis, usedMaterials, ownMaterialsMode);
+            }
+            else
+            {
+                ApplySellSideEconomics(
+                    result, tree, solveResult, prices, targetItemId, quantity,
+                    priceBasis, usedMaterials, ownMaterialsMode);
+            }
+        }
+
+        /// <summary>
         /// One requested root's own sell-side figures - the SellableQuantity/
         /// NetSaleValue/TargetUnitSellPrice arithmetic factored out of
         /// ApplySellSideEconomics (M20/M37) so both the single-item path
