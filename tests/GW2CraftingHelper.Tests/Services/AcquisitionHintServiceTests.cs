@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Tests.Services
     {
         // In-file fixture with 6 of the now-7 real ref/acquisition_hints_
         // seed.json entries (the five wiki-verified entries from docs/
-        // KNOWN-ISSUES.md item 8, plus the M33 item-17 Gift of Battle
+        // KNOWN-ISSUES.md item 8, plus the Gift of Battle
         // entry) - exercises AcquisitionHintService.Load's parsing shape
         // in isolation. The separate Load_ShippedSeedFile_* test below
         // reads the actual shipped file and pins its real (7-entry) count,
@@ -164,7 +164,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Assert.False(string.IsNullOrEmpty(hint.Badge));
                 }
 
-                // Review fix (finding 1, post-PART-C follow-up): Charged
+                // Charged
                 // Quartz Crystal (43772) is made at a Place of Power, not
                 // via any recipe this module resolves, so it can never be a
                 // DailyCooldownItemService.Load Craft-step entry (see

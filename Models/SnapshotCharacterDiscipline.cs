@@ -2,7 +2,7 @@ namespace GW2CraftingHelper.Models
 {
     /// <summary>
     /// One learned crafting discipline on one character, captured at
-    /// snapshot time (W3C - per-character discipline display, gw2efficiency
+    /// snapshot time (per-character discipline display, gw2efficiency
     /// parity - see AccountSnapshot.CharacterDisciplines' own doc comment).
     /// Rating persists even when the discipline is not currently active - a
     /// character can only have 2 disciplines active at once, but a

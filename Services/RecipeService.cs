@@ -44,8 +44,8 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M35-B1 (gw2efficiency parity - multi-item plans): builds a
-        /// single item's tree via BuildTreeAsync's own logic without the
+        /// Builds a single item's tree via BuildTreeAsync's own logic
+        /// without the
         /// per-call cache flush, so BuildMultiItemTreeAsync below can build
         /// N item trees and flush exactly once at the end instead of once
         /// per item (a hot-path allocation/IO concern when N is not 1).
@@ -59,12 +59,12 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M35-B1 (gw2efficiency parity - multi-item plans): builds each
-        /// requested item's own tree via the exact same BuildTreeAsync path
+        /// Builds each requested item's own tree via the exact same
+        /// BuildTreeAsync path
         /// a single-item request uses, then - for 2+ items - wraps them
         /// under a synthetic root RecipeNode the same way gw2e's frontend
-        /// does for its own Calculator (docs/gw2e-parity-spec.md, the M34
-        /// r1 multi-item research report): a reserved-id, never-rendered
+        /// does for its own Calculator (docs/gw2e-parity-spec.md):
+        /// a reserved-id, never-rendered
         /// "recipe" whose Ingredients are the N real item trees, each
         /// already carrying its own requested amount as its own Quantity
         /// (set by BuildTreeAsync itself, exactly like an ordinary recipe
@@ -275,7 +275,7 @@ namespace GW2CraftingHelper.Services
         private async Task<RecipeNode> BuildNodeAsync(
             int id, string ingredientType, int quantity,
             HashSet<int> visiting, CancellationToken ct,
-            // M37 (KNOWN-ISSUES #26): carried straight from the parent
+            // Carried straight from the parent
             // RawIngredient that produced this node - null for the tree
             // root (never itself an ingredient) and for every ordinary
             // ingredient. See RecipeNode.AchievementBit's doc comment.
@@ -329,7 +329,7 @@ namespace GW2CraftingHelper.Services
                         ? raw.ExpectedOutputCount.Value
                         : raw.OutputItemCount;
 
-                    // M33 Critical fix: craftsNeeded (and therefore every
+                    // craftsNeeded (and therefore every
                     // ingredient quantity scaled by it below) is computed
                     // from the EXPECTED output, not the nominal integer
                     // output - echoing gw2e's single-field output_item_count

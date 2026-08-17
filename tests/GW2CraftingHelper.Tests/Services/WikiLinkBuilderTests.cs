@@ -126,7 +126,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("https://wiki.guildwars2.com/wiki/Recipe:_Zojja%27s_Claymore", url);
         }
 
-        // --- Sentinel/placeholder names (fix-pass: dead-link suppression) ---
+        // --- Sentinel/placeholder names (dead-link suppression) ---
         // Every one of these is a real, literal name-resolution fallback
         // used elsewhere in the module (see WikiLinkBuilder's SentinelNames
         // doc comment for each source) - none of them names a real wiki

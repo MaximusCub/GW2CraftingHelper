@@ -17,13 +17,8 @@ namespace GW2CraftingHelper.Services
         private readonly ItemMetadataService _itemMetadataService;
         private readonly VendorOfferStore _vendorOfferStore;
 
-        // B8 shape fix: RecipeSheetSavingsCalculator.Apply now takes only
-        // the one VendorOfferStore method it ever calls (GetOffersForItem),
-        // narrowed to Func<int, IReadOnlyList<VendorOffer>> - see that
-        // calculator's own Apply doc comment. Computed once here (rather
-        // than at each of the three call sites below) so a null store still
-        // degrades to a null delegate, matching that calculator's own
-        // null-delegate "no offer source available" guard exactly.
+        // Computed once so a null store degrades to a null delegate,
+        // matching RecipeSheetSavingsCalculator's no-offer-source guard.
         private readonly Func<int, IReadOnlyList<VendorOffer>> _offersForRecipeSheetItem;
         private readonly InventoryReducer _reducer;
         private readonly IAccountRecipeClient _accountRecipeClient;
@@ -31,63 +26,29 @@ namespace GW2CraftingHelper.Services
         private readonly IReadOnlyDictionary<int, AcquisitionHint> _acquisitionHints;
         private readonly IReadOnlyDictionary<int, DailyCooldownItem> _dailyCooldownItems;
 
-        // opportunity-notes (RECIPE-SHEET SAVINGS): recipe id -> unlocking
-        // recipe-sheet item id, for RecipeSheetSavingsCalculator - see that
-        // class's own doc comment for why this is an injectable, curated
-        // lookup rather than a discovery pipeline. Empty (never null) when
-        // the caller passes none, so the calculator's own "no data ->
-        // nothing" gate is always exercised rather than an NRE.
+        // Recipe id -> unlocking recipe-sheet item id for
+        // RecipeSheetSavingsCalculator. Empty (never null) when absent.
         private readonly IReadOnlyDictionary<int, int> _recipeSheetItemIdByRecipeId;
 
-        // opportunity-notes (SEASONAL VENDOR TIP, review-fix #3): the
-        // currently-active festival name keys, read LAZILY at
-        // plan-generation time via this Func rather than once, eagerly, at
-        // Module.cs's Initialize() - Blish's FestivalContext loads
-        // asynchronously (Blish HUD's own binary carries "Festival request
-        // was cancelled early." / "Active festival(s): {...}" strings,
-        // INFERRED not measured), so a one-shot Initialize()-time read
-        // could observe NotReady and silently disable the feature for the
-        // WHOLE session. Invoked once per Apply() call below (three call
-        // sites) - GameService.Contexts.GetContext/TryGetActiveFestivals
-        // just returns already-cached state, so this is not a new network
-        // call per plan generation, just a later, retried read. Defaults
-        // to an always-empty provider when the caller passes none (every
-        // pre-existing test/caller), so SeasonalVendorTipCalculator's own
-        // "no active festival -> nothing" gate is always exercised.
+        // Active festival names, read lazily at plan-generation time:
+        // Blish's FestivalContext loads asynchronously, so a one-shot
+        // Initialize()-time read could observe NotReady and silently
+        // disable the feature for the whole session.
         private readonly Func<IReadOnlyList<string>> _activeFestivalNames;
 
-        // VOM finding #3 fix: ResolveWithOverrides rebuilds an
-        // AccountItemIndex from context.AccountItems - an immutable,
-        // GENERATION-time snapshot (see PlanSolveContext.AccountItems' own
-        // doc comment) - on EVERY override pill click, even though repeat
-        // clicks against the same restored/generated plan pass the exact
-        // same list reference every time. Caches the last-built index keyed
-        // by reference equality on the context object itself (this pipeline
-        // instance is a single Module-wide singleton shared across every
-        // open plan tab - see Module.cs's construction site - so a
-        // different plan/tab simply misses and rebuilds once, same as
-        // today). Safe without locking: ResolveWithOverrides only ever runs
-        // synchronously on the UI thread (see its own doc comment); the
-        // concurrent, background-thread generation path never touches these
-        // fields (its own AccountItemIndex is a local variable, unrelated).
+        // Last-built AccountItemIndex, keyed by reference equality on the
+        // context so repeat override clicks against the same plan skip the
+        // rebuild. No locking: ResolveWithOverrides runs only on the UI
+        // thread; background generation uses its own local index.
         private PlanSolveContext _cachedAccountIndexContext;
         private AccountItemIndex _cachedAccountIndex;
 
-        // W3B: rich per-generation logging sink. Optional constructor
-        // injection (defaults to the app-wide ModuleLog.Shared singleton -
-        // see Module.cs's construction site, which never passes this) so
-        // tests can inject an isolated `new ModuleLog()` instance for
-        // deterministic, non-shared assertions instead of touching Shared -
-        // see ModuleLog's own class doc comment on why Shared is unsuitable
-        // for exact-count/content test assertions.
+        // Defaults to ModuleLog.Shared; tests inject an isolated instance
+        // for deterministic assertions.
         private readonly ModuleLog _moduleLog;
 
-        // W3B review-fix: shared literal for both GenerateStructuredAsync's
-        // single-item Step 1 and GenerateStructuredMultiAsync's Step 1 -
-        // used both as the tree-building PlanPhaseEvent's Detail (surfaced
-        // live in PlanStripTickDecision.FormatPhaseText) and inside the
-        // existing PlanStatus wording, so the two channels never drift out
-        // of sync with each other.
+        // Shared by the phase event's Detail and the PlanStatus wording so
+        // the two channels never drift.
         private const string FirstRunTreeHint = "may take several seconds on first run";
 
         public CraftingPlanPipeline(
@@ -102,11 +63,6 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null,
             ModuleLog moduleLog = null,
             IReadOnlyDictionary<int, DailyCooldownItem> dailyCooldownItems = null,
-            // opportunity-notes: see _recipeSheetItemIdByRecipeId/
-            // _activeFestivalNames' own field doc comments. Both optional/
-            // default null -> normalized to an empty dict/always-empty
-            // provider below, so every pre-existing caller (Module.cs
-            // before this feature, every pipeline test) is unaffected.
             IReadOnlyDictionary<int, int> recipeSheetItemIdByRecipeId = null,
             Func<IReadOnlyList<string>> activeFestivalNames = null)
         {
@@ -132,29 +88,16 @@ namespace GW2CraftingHelper.Services
             int targetItemId, int quantity, AccountSnapshot snapshot,
             CancellationToken ct, IProgress<PlanStatus> progress = null,
             string activeCharacterName = null,
-            // M33 spec item 8: default to gw2efficiency's own "buy price"
-            // (buy orders) basis rather than instant-buy - see
-            // Views/CraftingPlanView.cs's matching field default.
+            // Default matches gw2efficiency's "buy price" (buy orders) basis.
             PriceBasis priceBasis = PriceBasis.BuyOrder,
             CurrencyValuation currencyValuation = null,
             OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free,
-            // M37 (KNOWN-ISSUES #24, gw2e parity): see ModuleSettings.
-            // GetHomesteadEfficiencyTiers/PlanSolveContext.HomesteadTiers.
             HomesteadEfficiencyTiers homesteadTiers = null,
-            // W3B: live coarse-phase events for CraftingPlanView's status
-            // strip - see PlanPhaseEvent's own doc comment. Optional/
-            // default null so every existing caller (Module.cs, every
-            // pipeline test) is unaffected.
+            // Live coarse-phase events for the status strip; see PlanPhaseEvent.
             IProgress<PlanPhaseEvent> phaseProgress = null,
-            // W3C review-fix (mustFix): the cosmetic per-character
-            // discipline list, threaded as ITS OWN argument rather than
-            // derived solely from `snapshot`. Module.cs's useOwn:false
-            // branch intentionally passes snapshot: null to disable
-            // reduction/force-buy/owned-currency, but that must NOT also
-            // blank the Required Disciplines tiebreak - see
-            // AccountSnapshot.CharacterDisciplines' doc comment. Default
-            // null preserves every existing caller's behavior unchanged
-            // (falls back to snapshot?.CharacterDisciplines below).
+            // Threaded separately from `snapshot`: the useOwn:false path
+            // passes snapshot: null, which must not also blank the Required
+            // Disciplines tiebreak (see AccountSnapshot.CharacterDisciplines).
             IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
@@ -164,28 +107,14 @@ namespace GW2CraftingHelper.Services
             var phaseTracker = new PhaseTracker(phaseProgress, _moduleLog);
 
             // Step 1: Build recipe tree
-            // W3B review-fix: the "(may take several seconds on first run)"
-            // hint now also rides the phase event's Detail (see
-            // PlanPhaseEvent.Detail and PlanStripTickDecision.
-            // FormatPhaseText), so it still reaches the live status strip
-            // now that the view passes progress: null below - see
-            // FirstRunTreeHint's own doc comment.
             phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
                 Message = $"Building recipe tree ({FirstRunTreeHint})..."
             });
-            // W3B review-fix: these two RecipeService diagnostics (this one
-            // and the stale-seed warning below) exist to explain a slow
-            // first run and an out-of-date recipe seed - genuinely useful,
-            // not routine per-step noise, and CraftingPlanView now passes
-            // progress: null (the coarse phase events above replace
-            // PlanStatus's frequent per-step text for the live strip). Also
-            // writing them straight to ModuleLog guarantees they are never
-            // silently lost regardless of whether any IProgress<PlanStatus>
-            // consumer is attached - RecipeService's own statusReported/
-            // staleReported flags already bound this to at most one Info
-            // line each per generation, so this cannot spam the log.
+            // These RecipeService diagnostics explain a slow first run and a
+            // stale recipe seed; RecipeService bounds each to one Info line
+            // per generation.
             _recipeService.OnStatusUpdate = msg =>
             {
                 progress?.Report(new PlanStatus { Message = msg });
@@ -204,12 +133,9 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Build recipe tree: {sw.ElapsedMilliseconds}ms");
 
-            // M37 (KNOWN-ISSUES #26): pure correctness fix, always applied
-            // (no settings toggle) - a no-op whenever the tree has no
-            // achievement-bit ingredients at all (every existing seed row).
-            // Runs BEFORE inventory reduction (Step 6) and the force-buy
-            // pre-pass's own zero-owned-baseline solve below - see
-            // AchievementBitDedupPrePass's own doc comment for why.
+            // Always applied; a no-op when the tree has no achievement-bit
+            // ingredients. Must run before inventory reduction and the
+            // force-buy pre-pass - see AchievementBitDedupPrePass.
             AchievementBitDedupPrePass.Apply(tree);
 
             // Step 2: Collect all item IDs from the tree for price lookup
@@ -238,99 +164,50 @@ namespace GW2CraftingHelper.Services
             var vendorOffers = vendorContext.VendorOffers;
             prices = vendorContext.Prices;
 
-            // opportunity-notes (SEASONAL VENDOR TIP, maintainer decision):
-            // the solver's own offer set unconditionally excludes seasonal
-            // offers - see SeasonalOfferFilter's own doc comment. `vendorOffers`
-            // above stays the RAW dictionary (unfiltered) for everything
-            // else in this method (metadata widening, owned-amount
-            // annotation, PlanSolveContext, and the SeasonalVendorTipCalculator
-            // call below); only the three _solver.Solve/ComputeForceBuyOnlyNodeIds
-            // call sites below use this filtered copy.
+            // The solver's offer set excludes seasonal offers (see
+            // SeasonalOfferFilter); `vendorOffers` stays the raw, unfiltered
+            // dictionary for everything else in this method.
             var solverVendorOffers = SeasonalOfferFilter.ExcludeSeasonal(vendorOffers);
 
-            // M34-B2a #3: gw2e's "Value Own Materials" force-buy pre-pass -
-            // only runs when the setting is Valued AND a snapshot actually
-            // drives reduction (see OwnedMaterialsForceBuyPrePass's and
-            // ModuleSettings.ValueOwnMaterials's doc comments for why this
-            // is deliberately narrower than gw2e's own unconditional
-            // `if (valueOwnItems)` gate).
+            // gw2e's "Value Own Materials" force-buy pre-pass - only when
+            // the setting is Valued and a snapshot drives reduction (see
+            // OwnedMaterialsForceBuyPrePass).
             bool useForceBuyPrePass = ownMaterialsMode == OwnMaterialsMode.Valued &&
                 snapshot != null && _reducer != null;
 
             if (useForceBuyPrePass)
             {
-                // Pre-assign stable NodeIds to the UNREDUCED tree BEFORE
-                // Step 6 clones/prunes it below - see RecipeNodeIds' doc
-                // comment: InventoryReducer.CloneNode preserves whatever
-                // NodeId a node already has, so these ids survive onto the
-                // corresponding surviving nodes of the reduced tree Step 7
-                // solves, letting the pre-pass below (computed against a
-                // genuine zero-owned baseline - this same, still-unreduced
-                // `tree`) key its forceBuyOnlyNodeIds set against exactly
-                // the ids that real solve will use.
+                // Pre-assign stable NodeIds to the unreduced tree before
+                // Step 6 clones it: CloneNode preserves NodeIds, so the
+                // pre-pass's forceBuyOnlyNodeIds keys match the ids the
+                // real solve uses.
                 RecipeNodeIds.Assign(tree);
             }
 
-            // source-selection-simplification: computed here (before every
-            // Solve() call this method makes, including the zero-owned
-            // guide solve below) rather than at its original later use
-            // site, so PlanSolver.Evaluate's competency check sees the SAME
-            // discipline data at every solve of this generation - including
-            // the zero-owned guide solve, which must already reflect any
-            // competency-driven default flip so InventoryReducer never
-            // discounts ingredients for a Craft path the real solve below
-            // will end up abandoning. See PlanResultBuilder.Build's
-            // characterDisciplines doc comment for the prefer-explicit-
-            // argument-over-snapshot rationale this mirrors.
+            // Computed before every Solve() call so the competency check
+            // sees the same discipline data at every solve of this
+            // generation, including the zero-owned guide solve.
             var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
 
-            // Step 5.5/5.6 (M34-B2a #3 / VOM design Candidate A - review-fix:
-            // merged into one `if` block, was two adjacent identical
-            // `if (useForceBuyPrePass)` blocks - see GenerateStructuredMultiAsync's
-            // matching block for why keeping the two edit sites in lockstep
-            // matters here). Both computed against `tree` - the ORIGINAL,
-            // UNREDUCED tree (InventoryReducer.Reduce below only ever
-            // mutates its CLONE, so `tree` still holds the full
-            // pre-ownership demand here) - matching gw2e's own
-            // zero-owned-baseline mechanics exactly (Section 2.2 of the R2
-            // report): otherwise, evaluating this rule on the ALREADY-
-            // reduced tree would make it a near no-op in precisely the
-            // scenario it exists for, since owning a pile of components
-            // already makes their post-reduction craft cost look cheap
-            // regardless of what a FRESH purchase would cost. Moved ahead
-            // of Step 6 (VOM design, Candidate A) so its output can feed
-            // the zero-owned decision pass below, which Step 6's Reduce
-            // call now needs as its guide.
+            // Steps 5.5/5.6: both computed against `tree` - the original,
+            // unreduced tree - matching gw2e's zero-owned-baseline
+            // mechanics: on the already-reduced tree the rule would be a
+            // near no-op, since owned components already make craft cost
+            // look cheap regardless of what a fresh purchase would cost.
             //
-            // Step 5.6's throwaway Solve() runs on the SAME zero-owned/
-            // unreduced `tree`, this time WITH forceBuyOnlyNodeIds applied,
-            // so its Decisions dictionary reflects the exact Craft/Buy/
-            // vendor/recipe-option choice a zero-owned baseline would make.
-            // InventoryReducer.Reduce below uses this as a guide: only the
-            // option this decision actually chose gets to consume owned
-            // stock, so owned stock can never flip a decision toward a
-            // chain that was worse at market prices - it can only make the
-            // zero-owned winner an even stronger winner. Null guide
-            // (useForceBuyPrePass false, e.g. Free mode or no snapshot)
-            // leaves InventoryReducer's legacy primary-option heuristic
-            // fully in charge, unchanged.
+            // The throwaway Solve() runs on the same zero-owned tree with
+            // forceBuyOnlyNodeIds applied; InventoryReducer.Reduce uses its
+            // Decisions as a guide so owned stock can only strengthen the
+            // zero-owned winner, never flip a decision. A null guide leaves
+            // the legacy primary-option heuristic in charge.
             ISet<int> forceBuyOnlyNodeIds = null;
-            // Verification-review fix: the narrower, competency-independent
-            // subset of forceBuyOnlyNodeIds - see
-            // OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult's own doc
-            // comment. Threaded to every Solve() call below alongside
-            // forceBuyOnlyNodeIds so Decision.CheapestCraftUntrained is
-            // gated correctly at every solve of this generation, not just
-            // the real one.
+            // Competency-independent subset of forceBuyOnlyNodeIds,
+            // threaded to every Solve() so Decision.CheapestCraftUntrained
+            // is gated consistently (see OwnedMaterialsForceBuyPrePass).
             ISet<int> competencyIndependentForceBuyNodeIds = null;
             IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
             if (useForceBuyPrePass)
             {
-                // Adversarial-review fix (Critical #3, source-selection-
-                // simplification): threaded effectiveCharacterDisciplines
-                // through so this throwaway solve is competency-aware too -
-                // see ComputeForceBuyOnlyNodeIds' own characterDisciplines
-                // doc comment for the propagation failure this closes.
                 var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                     _solver, tree, prices, solverVendorOffers, priceBasis, valuation,
                     characterDisciplines: effectiveCharacterDisciplines);
@@ -371,41 +248,25 @@ namespace GW2CraftingHelper.Services
             timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
 
             // Step 7: Solve. assignNodeIds:false only when the pre-pass
-            // above pre-assigned ids to `tree` (and therefore, via cloning,
-            // to treeUsedForSolve's surviving nodes) - reusing those ids
-            // here instead of renumbering from scratch is what lets
-            // forceBuyOnlyNodeIds' keys actually match (see RecipeNodeIds).
+            // pre-assigned ids, so forceBuyOnlyNodeIds' keys still match.
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
             var solveResult = _solver.Solve(
                 treeUsedForSolve, prices, solverVendorOffers, priceBasis,
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
-                // Verification-review fix: see the declaration site's own
-                // doc comment - this is the call whose Decisions feed the
-                // real Plan/CraftingTree, so gating
-                // Decision.CheapestCraftUntrained correctly here is what
-                // actually fixes the Plan Notes bug.
                 competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
                 assignNodeIds: !useForceBuyPrePass,
                 homesteadTiers: tiers,
                 characterDisciplines: effectiveCharacterDisciplines,
-                // Adversarial-review fix (Critical #4, source-selection-
-                // simplification): threaded so a losing pill's raw-quantity
-                // StrictDomination claim never compares a craft ingredient
-                // InventoryReducer already discounted against an unrelated
-                // vendor line it never discounted - see PlanSolver.Evaluate's
-                // own ownedQuantityUsedByNode doc comment.
+                // See PlanSolver.Evaluate's ownedQuantityUsedByNode doc comment.
                 ownedQuantityUsedByNode: ownedQuantityUsedByNode);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
 
-            // Step 7b (M34-B2a #1): convert the per-node owned-usage side
-            // channel (keyed by node object reference at reduction time,
-            // when NodeId did not exist yet) into a NodeId-keyed lookup now
-            // that Solve() above has assigned this tree's real, stable
-            // NodeIds to these same node objects.
+            // Step 7b: convert the reference-keyed owned-usage side channel
+            // into a NodeId-keyed lookup now that Solve() assigned NodeIds.
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId =
                 BuildOwnedQuantityUsedByNodeId(ownedQuantityUsedByNode);
 
@@ -423,19 +284,12 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
-            // W4B: a vendor cost-component ITEM leaf (e.g. Globs of
-            // Ectoplasm) is never a real tree ingredient - only a
-            // VendorOffer.CostLines entry - so allItemIds above never
-            // collects it. Add every such id here, before the single bulk
-            // metadata fetch below, so CraftingTreeBuilder can resolve a
-            // real name/icon for it instead of falling back to "Unknown
-            // Item" (see AddVendorItemComponentIds).
+            // Vendor cost-component item leaves are never tree ingredients,
+            // so allItemIds never collects them; add them before the bulk
+            // metadata fetch (see AddVendorItemComponentIds).
             AddVendorItemComponentIds(solveResult.Decisions, metadataIds);
-            // W4B review-fix (Must Fix): also widen for every OTHER offer
-            // (not just the baseline winning one) reachable by a later
-            // manual override - see AddAllVendorOfferItemComponentIds' own
-            // doc comment for why ResolveWithOverrides needs this covered
-            // up front (it never re-fetches metadata).
+            // Also widen for offers a later manual override could reach -
+            // see AddAllVendorOfferItemComponentIds.
             AddAllVendorOfferItemComponentIds(vendorOffers, metadataIds);
             phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
             progress?.Report(new PlanStatus
@@ -445,13 +299,9 @@ namespace GW2CraftingHelper.Services
             });
             sw.Restart();
 
-            // Kick off the decorative currency-metadata fetch now, in
-            // parallel with item metadata, rather than sequentially after
-            // it - the service has its own internal timeout (see
-            // CurrencyMetadataService), so a hung /v2/currencies can no
-            // longer add to the plan-generation critical path. Observed
-            // independently of the await below so a fault is never left
-            // unobserved if item metadata throws first.
+            // Fetch currency metadata in parallel with item metadata; the
+            // service has its own timeout. Observed independently so a
+            // fault is never left unobserved if item metadata throws first.
             var currencyTask = _currencyMetadataService?.GetAllAsync(ct);
             ObserveFault(currencyTask);
 
@@ -459,13 +309,11 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
-            // Step 9: Await the currency name/icon metadata fetch started
-            // above - see AwaitCurrencyMetadataOrNullAsync's own doc comment.
+            // Step 9: Await the currency metadata fetch started above
             IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata =
                 await AwaitCurrencyMetadataOrNullAsync(currencyTask, progress, sw, timingLog, ct);
 
-            // Step 10: Fetch learned recipe IDs (if permission available) -
-            // see FetchLearnedRecipeIdsAsync's own doc comment.
+            // Step 10: Fetch learned recipe IDs (if permission available)
             ISet<int> learnedRecipeIds =
                 await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, ct);
 
@@ -474,17 +322,9 @@ namespace GW2CraftingHelper.Services
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
             var resultBuilder = new PlanResultBuilder();
-            // W3C: per-character discipline data, cosmetic only (see
-            // AccountSnapshot.CharacterDisciplines' doc comment) - a
-            // straight passthrough of the snapshot, never fed back into any
-            // decision/total EXCEPT the Build() tiebreak below (see
-            // PlanResultBuilder.Build's characterDisciplines doc comment -
-            // it can only relabel which equally-good discipline is
-            // reported, never change a decision or a total) and the
-            // solver's own competency-aware default (source-selection-
-            // simplification - see the Solve() calls above, which already
-            // consumed effectiveCharacterDisciplines, computed earlier in
-            // this method so every solve of this generation sees it).
+            // Cosmetic only: feeds the Build() tiebreak, which can relabel
+            // which equally-good discipline is reported but never change a
+            // decision or total (see PlanResultBuilder.Build).
             var result = resultBuilder.Build(
                 plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
             result.CurrencyMetadata = currencyMetadata;
@@ -492,21 +332,14 @@ namespace GW2CraftingHelper.Services
             result.DailyCooldownItems = _dailyCooldownItems;
             result.CharacterDisciplines = effectiveCharacterDisciplines;
 
-            // M34-B2a #4: owned-currency annotation, cosmetic only (see
-            // AccountCurrencyIndex's doc comment) - built from the plan's
-            // final currency totals and the wallet snapshot, never fed back
-            // into any decision/total above.
-            // W4B review-fix (Must Fix): also pass vendorOffers - see
-            // BuildOwnedCurrencyAmounts' own doc comment for why.
+            // Owned-currency annotation, cosmetic only - never fed back
+            // into any decision or total (see BuildOwnedCurrencyAmounts).
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
                 BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts, vendorOffers);
             result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
 
-            // W4B: owned-item annotation for vendor cost-component ITEM
-            // leaves, cosmetic only - see
-            // BuildOwnedVendorItemComponentAmounts' own doc comment.
-            // W4B review-fix (Must Fix): also pass vendorOffers - see that
-            // method's own doc comment for why.
+            // Owned-item annotation for vendor cost-component leaves,
+            // cosmetic only (see BuildOwnedVendorItemComponentAmounts).
             IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
                 BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions, vendorOffers);
 
@@ -521,25 +354,18 @@ namespace GW2CraftingHelper.Services
                 result, treeUsedForSolve, solveResult, prices,
                 targetItemId, quantity, priceBasis, usedMaterials, ownMaterialsMode);
 
-            // design-plan-notes.md (Notes section, excess/reclaim):
-            // annotation-only, same architectural role as SellSideEconomics
-            // above - writes only result.ExcessCraftOutputs.
+            // Annotation-only: writes only result.ExcessCraftOutputs.
             ExcessCraftOutputCalculator.Apply(result, prices, metadata);
 
-            // opportunity-notes (RECIPE-SHEET SAVINGS / SEASONAL VENDOR
-            // TIP): annotation-only, same architectural role as
-            // ExcessCraftOutputCalculator above. Uses the RAW `vendorOffers`
-            // (not solverVendorOffers) - see that variable's own comment.
+            // Annotation-only. Uses the raw `vendorOffers` (not
+            // solverVendorOffers) - see that variable's own comment.
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds, prices, priceBasis, _offersForRecipeSheetItem,
                 _recipeSheetItemIdByRecipeId, effectiveCharacterDisciplines);
             SeasonalVendorTipCalculator.Apply(
                 result, vendorOffers, prices, priceBasis, _activeFestivalNames());
 
-            // Adversarial-review fix (#7, source-selection-simplification
-            // design-law gap): same annotation-only role, writes only
-            // result.CompetencyOpportunities - see that calculator's own
-            // doc comment.
+            // Annotation-only: writes only result.CompetencyOpportunities.
             CompetencyOpportunityCalculator.Apply(result);
 
             // Capture inputs so the UI can re-solve locally with per-node
@@ -567,10 +393,8 @@ namespace GW2CraftingHelper.Services
                 CompetencyIndependentForceBuyNodeIds = competencyIndependentForceBuyNodeIds,
                 HomesteadTiers = tiers,
                 CharacterDisciplines = result.CharacterDisciplines,
-                // VOM finding #1 fix: only populated when the force-buy
-                // pre-pass ran (useForceBuyPrePass implies snapshot/reducer
-                // non-null, so accountIndex is guaranteed set here too) -
-                // see PlanSolveContext.UnreducedTree's own doc comment.
+                // Only populated when the force-buy pre-pass ran - see
+                // PlanSolveContext.UnreducedTree.
                 UnreducedTree = useForceBuyPrePass ? tree : null,
                 AccountItems = useForceBuyPrePass ? ProjectAccountItemsForSolveContext(snapshot.Items) : null,
                 ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null
@@ -578,8 +402,6 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
 
-            // Prepend timing log to debug entries from PlanResultBuilder -
-            // see FinishTimingLog's own doc comment.
             FinishTimingLog(result, timingLog);
             phaseTracker.Finish();
 
@@ -587,20 +409,13 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M35-B1 (gw2efficiency parity - multi-item plans): generates a
-        /// combined plan for N requested items in one calculation. A
-        /// single-entry list delegates STRAIGHT to the untouched single-
-        /// item overload above - byte-identical output, no wrapper built at
-        /// all - echoing gw2e's own `if (r.length === 1) return r[0]`
-        /// short-circuit (docs/gw2e-parity-spec.md, the M34 r1 multi-item
-        /// research report). For 2+ items, builds the synthetic wrapper
-        /// tree (see RecipeService.BuildMultiItemTreeAsync) and feeds it
-        /// through the SAME reduction/force-buy-pre-pass/solve/vendor-
-        /// batch-finalization pipeline a single item uses - merged
-        /// shopping-list/steps/currency totals across shared materials fall
-        /// out of the existing per-item-id aggregation for free (see
-        /// PlanSolver.Collect's AggregateStep), with zero multi-item-
-        /// specific solver code.
+        /// Generates a combined plan for N requested items in one
+        /// calculation. A single-entry list delegates straight to the
+        /// single-item overload above. For 2+ items, builds the synthetic
+        /// wrapper tree (RecipeService.BuildMultiItemTreeAsync) and feeds
+        /// it through the same pipeline a single item uses - merged totals
+        /// across shared materials fall out of the existing per-item-id
+        /// aggregation (see PlanSolver.Collect's AggregateStep).
         /// </summary>
         public async Task<CraftingPlanResult> GenerateStructuredAsync(
             IReadOnlyList<PlanRequestItem> items,
@@ -612,52 +427,23 @@ namespace GW2CraftingHelper.Services
             CurrencyValuation currencyValuation = null,
             OwnMaterialsMode ownMaterialsMode = OwnMaterialsMode.Free,
             HomesteadEfficiencyTiers homesteadTiers = null,
-            // W3B: live coarse-phase events for CraftingPlanView's status
-            // strip - see the single-item overload's matching parameter
-            // (PlanPhaseEvent's own doc comment). Optional/default null so
-            // every existing caller (Module.cs, every pipeline test) is
-            // unaffected.
+            // See the single-item overload's matching parameter.
             IProgress<PlanPhaseEvent> phaseProgress = null,
-            // W3B: best-effort "name x quantity[, name x quantity...]"
-            // label for the Info start/finish log lines below (e.g. "Orrax
-            // Manifested x1") - supplied by CraftingPlanView from its own
-            // already-resolved item-row selection, so no extra network
-            // round trip is needed to know item names here. Null/empty
-            // falls back to the pre-W3B "(N items)" wording, e.g. for a
-            // caller that bypasses the view (every pipeline test, a future
-            // non-UI caller).
+            // Best-effort "name x quantity" label for the start/finish log
+            // lines; null falls back to "(N items)".
             string requestLabel = null,
-            // W3C review-fix (mustFix): see the single-item overload's
-            // matching parameter doc comment - threaded through to whichever
-            // branch below actually runs (single-item short-circuit or the
-            // genuine multi-item path).
+            // See the single-item overload's matching parameter.
             IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
-            // Marked async (rather than returning the branch Tasks directly)
-            // so this validation throws INSIDE the returned Task, exactly
-            // like every other failure mode of this method - a caller that
-            // awaits (rather than merely calls) this method sees consistent
-            // exception delivery regardless of which branch below is taken.
+            // Marked async so this validation throws inside the returned
+            // Task, like every other failure mode of this method.
             if (items == null || items.Count == 0)
             {
                 throw new ArgumentException("At least one plan request item is required.", nameof(items));
             }
 
-            // M39 (log system, d2-log-system.md Section 8's last row): NEW
-            // plan-lifecycle events, not a migration of an existing call -
-            // this is the one entry point Module.cs's own generateAsync
-            // lambda actually calls (a single-entry list short-circuits to
-            // the untouched single-item overload below, exactly as before -
-            // see that overload's own doc comment), so wrapping ONLY this
-            // thin dispatcher covers every real call site without touching
-            // either branch's internals - deliberately scoped this way so
-            // it does not collide with WP-13's planned extraction of shared
-            // helpers across the Generate*Async overloads (tab-roadmap-
-            // proposal.md Section 2.3's sequencing note).
-            //
-            // W3B: `label` upgrades the wording from "(N items)" to real
-            // item names whenever the caller supplied requestLabel - see
-            // that parameter's own doc comment for the fallback.
+            // This thin dispatcher is the one entry point Module.cs calls,
+            // so logging only here covers every real call site.
             var sw = Stopwatch.StartNew();
             string itemWord = items.Count == 1 ? "item" : "items";
             string label = string.IsNullOrEmpty(requestLabel) ? $"{items.Count} {itemWord}" : requestLabel;
@@ -681,18 +467,10 @@ namespace GW2CraftingHelper.Services
                         phaseProgress, characterDisciplines: characterDisciplines);
                 }
 
-                // W3B: compact per-phase summary line, derived from the raw
-                // timing lines FinishTimingLog already prepended to
-                // result.DebugLog inside the single/multi method just
-                // called - see PlanPhaseTimingSummary's own doc comment for
-                // why no separate timing plumbing is needed between here
-                // and there. W3B review-fix: sw (this wrapper's own
-                // Stopwatch, running since before the single/multi call)
-                // is now passed through as wallClockMs - the phase-sum-only
-                // "total" this used to log excludes every un-instrumented
-                // gap between steps, so it silently under-reported the
-                // real duration a field tester actually experiences; see
-                // FormatCompactSummary's own doc comment.
+                // Compact per-phase summary derived from the timing lines
+                // already in result.DebugLog (see PlanPhaseTimingSummary).
+                // sw is passed as wallClockMs: a phase-sum-only total would
+                // exclude un-instrumented gaps and under-report duration.
                 string phaseSummary = PlanPhaseTimingSummary.FormatCompactSummary(result?.DebugLog, sw.ElapsedMilliseconds);
                 _moduleLog.Write(ModuleLogLevel.Info, "plan",
                     string.IsNullOrEmpty(phaseSummary)
@@ -713,25 +491,12 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The genuine (2+ item) multi-item path behind the list overload
-        /// of GenerateStructuredAsync above. Mirrors the single-item
-        /// overload's own pipeline step-for-step (reduction, M34-B2a #3's
-        /// force-buy pre-pass, solve, vendor-batch finalization, metadata
-        /// fetch, structured result build) with the wrapper tree standing
-        /// in for a single item's tree throughout - PlanSolver,
+        /// The genuine (2+ item) path behind the list overload above.
+        /// Mirrors the single-item pipeline step-for-step with the wrapper
+        /// tree standing in for a single item's tree; PlanSolver,
         /// InventoryReducer, and OwnedMaterialsForceBuyPrePass are all
-        /// oblivious to the wrapper's presence (see their own doc comments)
-        /// so none of that logic needed to change.
-        ///
-        /// M37 (gw2efficiency parity - multi-item sell-side economics,
-        /// closes KNOWN-ISSUES #25): calls
-        /// SellSideEconomics.ApplyBatchSellSideEconomics
-        /// (Services/SellSideEconomics.cs) to populate
-        /// SellableQuantity/NetSaleValue/CraftingProfit/
-        /// MaterialOpportunityCost as a sum across every requested root
-        /// that has a live TP sell price - see that method's own doc
-        /// comment for the exact aggregation and its deliberate
-        /// divergences from gw2e's own multi-item rollup.
+        /// oblivious to the wrapper. Sell-side economics aggregate across
+        /// every requested root via ApplyBatchSellSideEconomics.
         /// </summary>
         private async Task<CraftingPlanResult> GenerateStructuredMultiAsync(
             IReadOnlyList<PlanRequestItem> items,
@@ -743,10 +508,7 @@ namespace GW2CraftingHelper.Services
             CurrencyValuation currencyValuation,
             OwnMaterialsMode ownMaterialsMode,
             HomesteadEfficiencyTiers homesteadTiers,
-            // W3B: see the single-item overload's matching parameter.
             IProgress<PlanPhaseEvent> phaseProgress,
-            // W3C review-fix (mustFix): see the single-item overload's
-            // matching parameter doc comment.
             IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
@@ -757,9 +519,6 @@ namespace GW2CraftingHelper.Services
 
             // Step 1: Build each item's own tree, then wrap them under the
             // synthetic multi-item root (RecipeService.BuildMultiItemTreeAsync).
-            // W3B review-fix: see the single-item overload's matching call
-            // site for why FirstRunTreeHint/OnStatusUpdate's ModuleLog
-            // write were added.
             phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
@@ -783,13 +542,10 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Build recipe trees: {sw.ElapsedMilliseconds}ms ({items.Count} items)");
 
-            // M37 (KNOWN-ISSUES #26): same unconditional pre-pass as the
-            // single-item path, applied to the whole wrapper tree at once -
-            // an achievement-bit ingredient nested under one requested item
-            // can coexist with a plain occurrence of the same id under a
-            // DIFFERENT requested item, which only the merged wrapper tree
-            // can see (see the class's own doc comment and
-            // MultiItemPlanTests' dedicated coverage of exactly this case).
+            // Same pre-pass as the single-item path, applied to the whole
+            // wrapper tree at once: an achievement-bit ingredient under one
+            // requested item can coexist with a plain occurrence of the
+            // same id under another, which only the merged tree can see.
             AchievementBitDedupPrePass.Apply(tree);
 
             // Step 2: Collect all item IDs from the tree for price lookup
@@ -818,12 +574,11 @@ namespace GW2CraftingHelper.Services
             var vendorOffers = vendorContext.VendorOffers;
             prices = vendorContext.Prices;
 
-            // opportunity-notes (SEASONAL VENDOR TIP): see the single-item
-            // overload's matching declaration for the full rationale.
+            // See the single-item overload's matching declaration.
             var solverVendorOffers = SeasonalOfferFilter.ExcludeSeasonal(vendorOffers);
 
-            // M34-B2a #3: same force-buy pre-pass as the single-item path,
-            // applied to the WHOLE wrapper batch at once.
+            // Same force-buy pre-pass as the single-item path, applied to
+            // the whole wrapper batch at once.
             bool useForceBuyPrePass = ownMaterialsMode == OwnMaterialsMode.Valued &&
                 snapshot != null && _reducer != null;
 
@@ -832,32 +587,15 @@ namespace GW2CraftingHelper.Services
                 RecipeNodeIds.Assign(tree);
             }
 
-            // source-selection-simplification: see the single-item
-            // overload's matching computation for the full rationale -
-            // computed here (before every Solve() call below, including
-            // the zero-owned guide solve) so every solve of this batch
-            // generation sees the same discipline data.
+            // See the single-item overload's matching computation.
             var effectiveCharacterDisciplines = characterDisciplines ?? snapshot?.CharacterDisciplines;
 
-            // Step 5.5/5.6 (M34-B2a #3 / VOM design Candidate A - review-fix:
-            // merged into one `if` block, was two adjacent identical
-            // `if (useForceBuyPrePass)` blocks): see the single-item
-            // overload's matching block for the full rationale - same
-            // force-buy pre-pass, same zero-owned decision pass, same WHOLE
-            // wrapper batch at once, moved ahead of Step 6 so its output can
-            // guide InventoryReducer.Reduce below.
+            // Steps 5.5/5.6: see the single-item overload's matching block.
             ISet<int> forceBuyOnlyNodeIds = null;
-            // Verification-review fix: see the single-item overload's
-            // matching declaration for the full rationale.
             ISet<int> competencyIndependentForceBuyNodeIds = null;
             IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
             if (useForceBuyPrePass)
             {
-                // Adversarial-review fix (Critical #3, source-selection-
-                // simplification): threaded effectiveCharacterDisciplines
-                // through so this throwaway solve is competency-aware too -
-                // see ComputeForceBuyOnlyNodeIds' own characterDisciplines
-                // doc comment for the propagation failure this closes.
                 var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                     _solver, tree, prices, solverVendorOffers, priceBasis, valuation,
                     characterDisciplines: effectiveCharacterDisciplines);
@@ -881,8 +619,6 @@ namespace GW2CraftingHelper.Services
             RecipeNode treeUsedForSolve = tree;
             List<UsedMaterial> usedMaterials = null;
             Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null;
-            // VOM finding #1 fix: see the single-item overload's matching
-            // declaration for why this is hoisted out of the `if` below.
             AccountItemIndex accountIndex = null;
 
             if (snapshot != null && _reducer != null)
@@ -897,30 +633,18 @@ namespace GW2CraftingHelper.Services
             timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
 
             // Step 7: Solve. The wrapper tree is fed through exactly like a
-            // single item's tree - see PlanSolver.Collect's own doc comment
-            // for how the wrapper's own throwaway "craft" is hidden from
-            // the resulting plan/steps.
+            // single item's tree (see PlanSolver.Collect).
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
             var solveResult = _solver.Solve(
                 treeUsedForSolve, prices, solverVendorOffers, priceBasis,
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
-                // Verification-review fix: see the declaration site's own
-                // doc comment - this is the call whose Decisions feed the
-                // real Plan/CraftingTree, so gating
-                // Decision.CheapestCraftUntrained correctly here is what
-                // actually fixes the Plan Notes bug.
                 competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
                 assignNodeIds: !useForceBuyPrePass,
                 homesteadTiers: tiers,
                 characterDisciplines: effectiveCharacterDisciplines,
-                // Adversarial-review fix (Critical #4, source-selection-
-                // simplification): threaded so a losing pill's raw-quantity
-                // StrictDomination claim never compares a craft ingredient
-                // InventoryReducer already discounted against an unrelated
-                // vendor line it never discounted - see PlanSolver.Evaluate's
-                // own ownedQuantityUsedByNode doc comment.
+                // See PlanSolver.Evaluate's ownedQuantityUsedByNode doc comment.
                 ownedQuantityUsedByNode: ownedQuantityUsedByNode);
             var plan = solveResult.Plan;
             sw.Stop();
@@ -944,11 +668,8 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
-            // W4B: see the single-item overload's matching call for why.
+            // See the single-item overload's matching calls.
             AddVendorItemComponentIds(solveResult.Decisions, metadataIds);
-            // W4B review-fix (Must Fix): see the single-item overload's
-            // matching call site (AddAllVendorOfferItemComponentIds' own
-            // doc comment).
             AddAllVendorOfferItemComponentIds(vendorOffers, metadataIds);
             phaseTracker.Start(PlanPhase.FetchingItemDetails, "Fetching item details", metadataIds.Count);
             progress?.Report(new PlanStatus
@@ -958,13 +679,7 @@ namespace GW2CraftingHelper.Services
             });
             sw.Restart();
 
-            // Kick off the decorative currency-metadata fetch now, in
-            // parallel with item metadata, rather than sequentially after
-            // it - the service has its own internal timeout (see
-            // CurrencyMetadataService), so a hung /v2/currencies can no
-            // longer add to the plan-generation critical path. Observed
-            // independently of the await below so a fault is never left
-            // unobserved if item metadata throws first.
+            // See the single-item overload's matching fetch.
             var currencyTask = _currencyMetadataService?.GetAllAsync(ct);
             ObserveFault(currencyTask);
 
@@ -972,13 +687,11 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
-            // Await the currency name/icon metadata fetch started above -
-            // see AwaitCurrencyMetadataOrNullAsync's own doc comment.
+            // Await the currency metadata fetch started above
             IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata =
                 await AwaitCurrencyMetadataOrNullAsync(currencyTask, progress, sw, timingLog, ct);
 
-            // Step 10: Fetch learned recipe IDs (if permission available) -
-            // see FetchLearnedRecipeIdsAsync's own doc comment.
+            // Step 10: Fetch learned recipe IDs (if permission available)
             ISet<int> learnedRecipeIds =
                 await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, ct);
 
@@ -987,13 +700,7 @@ namespace GW2CraftingHelper.Services
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
             var resultBuilder = new PlanResultBuilder();
-            // W3C: per-character discipline data, cosmetic only (see
-            // AccountSnapshot.CharacterDisciplines' doc comment) - see the
-            // single-item GenerateStructuredAsync's matching assignment
-            // above for the full rationale, including the Build()
-            // tiebreak-only use. effectiveCharacterDisciplines was computed
-            // earlier in this method (source-selection-simplification), so
-            // every Solve() call above already consumed it too.
+            // Cosmetic only - see the single-item overload's matching assignment.
             var result = resultBuilder.Build(
                 plan, treeUsedForSolve, metadata, usedMaterials, learnedRecipeIds, effectiveCharacterDisciplines);
             result.CurrencyMetadata = currencyMetadata;
@@ -1002,15 +709,10 @@ namespace GW2CraftingHelper.Services
             result.RequestedItems = items;
             result.CharacterDisciplines = effectiveCharacterDisciplines;
 
-            // W4B review-fix (Must Fix): also pass vendorOffers - see
-            // BuildOwnedCurrencyAmounts' own doc comment for why.
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts =
                 BuildOwnedCurrencyAmounts(snapshot, plan.CurrencyCosts, vendorOffers);
             result.OwnedCurrencyAmounts = ownedCurrencyAmounts;
 
-            // W4B: see the single-item overload's matching computation.
-            // W4B review-fix (Must Fix): also pass vendorOffers - see that
-            // method's own doc comment for why.
             IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
                 BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions, vendorOffers);
 
@@ -1024,27 +726,16 @@ namespace GW2CraftingHelper.Services
                 result, treeUsedForSolve, solveResult, prices, items,
                 priceBasis, usedMaterials, ownMaterialsMode);
 
-            // design-plan-notes.md (Notes section, excess/reclaim):
-            // annotation-only, same architectural role as
-            // SellSideEconomics above - writes only
-            // result.ExcessCraftOutputs. Walks MultiItemRoots (set by the
-            // BuildCraftingTreeResult call above) same as the single-item
-            // call site walks CraftingTree.
+            // Annotation-only; walks MultiItemRoots the same way the
+            // single-item call site walks CraftingTree.
             ExcessCraftOutputCalculator.Apply(result, prices, metadata);
 
-            // opportunity-notes (RECIPE-SHEET SAVINGS / SEASONAL VENDOR
-            // TIP): see the single-item overload's matching call site for
-            // the full rationale.
+            // See the single-item overload's matching call sites.
             RecipeSheetSavingsCalculator.Apply(
                 result, learnedRecipeIds, prices, priceBasis, _offersForRecipeSheetItem,
                 _recipeSheetItemIdByRecipeId, effectiveCharacterDisciplines);
             SeasonalVendorTipCalculator.Apply(
                 result, vendorOffers, prices, priceBasis, _activeFestivalNames());
-
-            // Adversarial-review fix (#7, source-selection-simplification
-            // design-law gap): same annotation-only role, writes only
-            // result.CompetencyOpportunities - see that calculator's own
-            // doc comment.
             CompetencyOpportunityCalculator.Apply(result);
 
             result.SolveContext = new PlanSolveContext
@@ -1071,9 +762,6 @@ namespace GW2CraftingHelper.Services
                 RequestedItems = items,
                 HomesteadTiers = tiers,
                 CharacterDisciplines = result.CharacterDisciplines,
-                // VOM finding #1 fix: see the single-item overload's
-                // matching assignment (PlanSolveContext.UnreducedTree's own
-                // doc comment).
                 UnreducedTree = useForceBuyPrePass ? tree : null,
                 AccountItems = useForceBuyPrePass ? ProjectAccountItemsForSolveContext(snapshot.Items) : null,
                 ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null
@@ -1081,7 +769,6 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
 
-            // See FinishTimingLog's own doc comment.
             FinishTimingLog(result, timingLog);
             phaseTracker.Finish();
 
@@ -1091,86 +778,44 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Re-solves a previously generated plan with per-node decision
         /// overrides. Purely local: reuses the context's tree, prices,
-        /// offers, and metadata; no network calls.
-        ///
-        /// W4B review-fix (Must Fix): because this never re-fetches
-        /// metadata, context.Metadata must already cover every id a
-        /// possible override could surface - including a vendor cost-
-        /// component ITEM leaf on an offer that was NOT the baseline
-        /// winner (e.g. a node whose original decision was Craft, manually
-        /// overridden here to BuyFromVendor). The generation-time callers
-        /// (GenerateStructuredAsync/GenerateStructuredMultiAsync) widen
-        /// their metadata fetch for exactly this via
-        /// AddAllVendorOfferItemComponentIds - see that method's own doc
-        /// comment - rather than this method fetching anything itself. The
-        /// same is true of context.OwnedCurrencyAmounts/
-        /// OwnedVendorItemAmounts below (line 875/887 reuse them verbatim,
-        /// never recomputed here): the generation-time callers already
-        /// widen BOTH via BuildOwnedCurrencyAmounts(..., vendorOffers) and
-        /// BuildOwnedVendorItemComponentAmounts(..., vendorOffers) so a
-        /// component leaf surfaced only by an override still gets a correct
-        /// HAVE pill - see each method's own doc comment.
+        /// offers, and metadata; no network calls. Because it never
+        /// re-fetches anything, context.Metadata and the owned-amount maps
+        /// must already cover every id any override could surface - the
+        /// generation-time callers widen them via
+        /// AddAllVendorOfferItemComponentIds and the vendorOffers-aware
+        /// owned-amount builders.
         /// </summary>
         public CraftingPlanResult ResolveWithOverrides(
             PlanSolveContext context,
             IReadOnlyDictionary<int, AcquisitionSource> overrides,
-            // M34-B2b (gw2e "Ignore" pill): item ids the user has manually
-            // marked "fully in-hand" for this session, re-applied on every
-            // local re-solve the same way `overrides` is - see
-            // PlanSolver.Solve's ignoredItemIds parameter. Not part of
-            // PlanSolveContext: unlike ForceBuyOnlyNodeIds (computed once at
-            // GENERATION time), this is live session state supplied fresh by
-            // the caller on every re-solve, exactly like `overrides` itself.
+            // Item ids the user marked "fully in-hand" for this session.
+            // Live state supplied fresh on every re-solve, exactly like
+            // `overrides` - deliberately not part of PlanSolveContext.
             ISet<int> ignoredItemIds = null)
         {
-            // VOM finding #1 fix: context.Tree/UsedMaterials/
-            // OwnedQuantityUsedByNodeId were reduced at GENERATION time
-            // using a guide keyed to the ZERO-OWNED decision at each node
-            // (see InventoryReducer.ReduceNode's doc comment) - a node the
-            // force-buy pre-pass flagged Buy therefore never discounted its
-            // own ingredient subtree. Replaying `overrides` against that
-            // frozen tree is correct for every node whose decision did NOT
-            // change, but silently wrong the moment an override flips a
-            // force-buy-flagged node to Craft: its ingredients are still
-            // priced at the full, un-owned cost even though real owned
-            // stock exists. When context.UnreducedTree is set (the pre-pass
-            // ran at generation time - see that field's own doc comment),
-            // re-run the SAME zero-owned-decision-pass-then-reduce dance
-            // Step 5.6/6 used at generation, but this time with `overrides`
-            // (and `ignoredItemIds`) applied to the decision pass, so the
-            // guide - and therefore which branch may discount - stays in
-            // sync with whatever the user actually picked. Falls back to
-            // the frozen context.Tree/UsedMaterials verbatim (today's exact
-            // behavior) whenever no pre-pass ran, since there is then
-            // nothing to re-guide (context.Tree is already the tree the
-            // legacy heuristic reduced, and it is already correct).
+            // The context's tree was reduced at generation time using a
+            // guide keyed to the zero-owned decisions, so replaying
+            // overrides against it goes wrong the moment an override flips
+            // a force-buy-flagged node to Craft: its ingredients stay
+            // priced at full un-owned cost. When UnreducedTree is set,
+            // re-run the same decision-pass-then-reduce dance with
+            // `overrides` applied so the guide stays in sync with what the
+            // user picked; otherwise fall back to the frozen context
+            // values (nothing to re-guide).
             RecipeNode solveTree = context.Tree;
             List<UsedMaterial> usedMaterials = context.UsedMaterials;
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId = context.OwnedQuantityUsedByNodeId;
-            // Adversarial-review fix (Critical #4, source-selection-
-            // simplification): reference-keyed twin of
-            // ownedQuantityUsedByNodeId above, for PlanSolver.Evaluate's
-            // own StrictDomination-reliability check - only ever populated
-            // when this call actually re-reduces below (a fresh
-            // Dictionary<RecipeNode,int> keyed to THIS call's own
-            // solveTree nodes). Stays null when reusing the frozen,
-            // already-generation-time-reduced context.Tree verbatim - no
-            // regression (this StrictDomination check did not exist before
-            // this fix either), just not yet covered for that narrower
-            // branch.
+            // Reference-keyed twin of ownedQuantityUsedByNodeId for
+            // PlanSolver.Evaluate's StrictDomination check; only populated
+            // when this call actually re-reduces below.
             Dictionary<RecipeNode, int> resolveOwnedQuantityUsedByNode = null;
 
-            // Defensive: UnreducedTree is only ever set alongside a reducer
-            // at generation time (see PlanSolveContext.UnreducedTree's doc
-            // comment), but guard against a mismatched pipeline instance
-            // (context generated by one CraftingPlanPipeline, resolved
-            // against another with no _reducer wired up) rather than NRE.
+            // The _reducer null-check below guards a context generated by
+            // one pipeline but resolved against another with no reducer.
 
-            // opportunity-notes (SEASONAL VENDOR TIP): context.VendorOffers
-            // is the RAW dictionary generation time stored (unfiltered -
-            // see the generation-time call sites' own comments); this local
-            // re-solve must still unconditionally exclude seasonal offers
-            // from the solver, exactly like generation did.
+            // context.VendorOffers is the raw, unfiltered dictionary; the
+            // solver must still exclude seasonal offers, exactly like
+            // generation did.
             var solverVendorOffers = SeasonalOfferFilter.ExcludeSeasonal(context.VendorOffers);
 
             if (context.UnreducedTree != null && _reducer != null)
@@ -1179,11 +824,6 @@ namespace GW2CraftingHelper.Services
                     context.UnreducedTree, context.Prices, solverVendorOffers,
                     context.PriceBasis, overrides, context.CurrencyValuation,
                     forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
-                    // Verification-review fix: see
-                    // PlanSolveContext.CompetencyIndependentForceBuyNodeIds'
-                    // own doc comment - reapplied alongside
-                    // ForceBuyOnlyNodeIds so a local re-solve stays in sync
-                    // with the original generation.
                     competencyIndependentForceBuyNodeIds: context.CompetencyIndependentForceBuyNodeIds,
                     assignNodeIds: false,
                     ignoredItemIds: ignoredItemIds,
@@ -1201,30 +841,15 @@ namespace GW2CraftingHelper.Services
                 resolveOwnedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
             }
 
-            // M34-B2a #3: reapply the SAME force-buy pre-pass result the
-            // original generation computed, so a local per-node override
-            // re-solve doesn't silently forget it for every other node - a
-            // manual override in `overrides` still always wins (see
-            // PlanSolver.Evaluate). assignNodeIds:false: solveTree's nodes
-            // already carry stable ids from the original generation's own
-            // Solve() call (whether freshly assigned there, or pre-assigned/
-            // preserved for the force-buy pre-pass - see RecipeNodeIds), and
-            // (when re-reduced above) InventoryReducer.CloneNode preserves
-            // those same ids onto the fresh clone - reassigning again here
-            // would either be a harmless no-op (the common case) or, when
-            // the pre-pass ran, would renumber the tree's already-pruned/
-            // non-contiguous ids from scratch and desync them from
+            // Reapply the generation-time force-buy pre-pass result so a
+            // local re-solve doesn't forget it; a manual override still
+            // wins. assignNodeIds:false - nodes already carry stable ids
+            // (CloneNode preserves them), and renumbering would desync
             // forceBuyOnlyNodeIds' keys.
             var solveResult = _solver.Solve(
                 solveTree, context.Prices, solverVendorOffers,
                 context.PriceBasis, overrides, context.CurrencyValuation,
                 forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
-                // Verification-review fix: see
-                // PlanSolveContext.CompetencyIndependentForceBuyNodeIds' own
-                // doc comment - this is the call whose Decisions feed the
-                // re-solved Plan/CraftingTree, so gating
-                // Decision.CheapestCraftUntrained correctly here is what
-                // actually keeps a local re-solve's Plan Notes correct.
                 competencyIndependentForceBuyNodeIds: context.CompetencyIndependentForceBuyNodeIds,
                 assignNodeIds: false,
                 ignoredItemIds: ignoredItemIds,
@@ -1242,10 +867,7 @@ namespace GW2CraftingHelper.Services
             result.DailyCooldownItems = context.DailyCooldownItems;
             result.OwnedCurrencyAmounts = context.OwnedCurrencyAmounts;
             result.RequestedItems = context.RequestedItems;
-            // W3C: per-character discipline data, cosmetic only - carried
-            // forward from the generation-time context so a local override
-            // re-solve keeps showing it (see PlanSolveContext.
-            // CharacterDisciplines' doc comment).
+            // Cosmetic only, carried forward so a re-solve keeps showing it.
             result.CharacterDisciplines = context.CharacterDisciplines;
 
             BuildCraftingTreeResult(
@@ -1254,73 +876,30 @@ namespace GW2CraftingHelper.Services
                 currencyMetadata: context.CurrencyMetadata, ownedCurrencyAmounts: context.OwnedCurrencyAmounts,
                 ownedVendorItemAmounts: context.OwnedVendorItemAmounts);
 
-            // M37 (closes KNOWN-ISSUES #25): a local override/Ignore
-            // re-solve must recompute whichever sell-side economics the
-            // original generation used - single-item ApplySellSideEconomics
-            // for a single-item context, or the M37 batch equivalent for a
-            // multi-item context - so the Total Cost section's sell/profit
-            // rows stay live across re-solves exactly like every other part
-            // of the plan already does.
-            //
-            // B8 shape fix: the single-vs-multi shape check itself now
-            // lives inside SellSideEconomics.ApplyForPlanShape (same
-            // Gw2Constants.MultiItemWrapperItemId constant this if/else
-            // used directly before this refactor) rather than duplicated
-            // here - see that method's own doc comment for why this is
-            // NOT a pure move: the operand checked against that constant
-            // is now solveTree (possibly a fresh re-reduced clone), not
-            // context.Tree. The `tree != null &&` guard is defensive
-            // only - a null tree still NREs one frame deeper, inside
-            // ComputePerItemEconomics' itemRoot.NodeId dereference - and
-            // is unreachable here in production anyway (ResolveWithOverrides
-            // passes this same solveTree to _solver.Solve and
-            // BuildCraftingTreeResult before this call).
+            // Recompute whichever sell-side economics the generation used
+            // so the Total Cost section stays live across re-solves. The
+            // single-vs-multi shape check lives in ApplyForPlanShape; the
+            // operand is solveTree (possibly a fresh re-reduced clone),
+            // not context.Tree.
             SellSideEconomics.ApplyForPlanShape(
                 result, solveTree, solveResult, context.Prices,
                 context.TargetItemId, context.Quantity, context.RequestedItems,
                 context.PriceBasis, usedMaterials, context.OwnMaterialsMode);
-            // Post-review note (VOM finding #6, not fixed here): `context`
-            // itself is carried forward verbatim, so context.Tree/
-            // UsedMaterials/OwnedQuantityUsedByNodeId stay the GENERATION-
-            // time values even when the UnreducedTree branch above just
-            // computed fresh solveTree/usedMaterials/ownedQuantityUsedByNodeId
-            // for THIS call's `result`. Harmless for repeat re-solves (each
-            // one re-derives its own fresh locals from context.UnreducedTree
-            // again), but BuildPresetOverrides (Craft All/Buy All) walks
-            // context.Tree directly - since reduction prunes
-            // (node.Recipes.Clear() at Quantity 0), a preset built from this
-            // stale context.Tree after an override re-reduces the tree can
-            // legitimately have a different node set than the fresh
-            // solveTree just computed, so it can emit overrides for pruned
-            // nodes and miss nodes that reappeared.
+            // `context` is carried forward verbatim, so context.Tree stays
+            // the generation-time tree even when the branch above just
+            // re-reduced. Harmless for repeat re-solves, but
+            // BuildPresetOverrides walks context.Tree directly and can emit
+            // overrides for pruned nodes and miss reappeared ones.
 
-            // design-plan-notes.md (Notes section, excess/reclaim): a local
-            // override/Ignore re-solve must recompute ExcessCraftOutputs
-            // exactly like it recomputes sell-side economics above - see
-            // this method's own comment on that call for why (KNOWN-ISSUES
-            // #25's precedent). Single call, unlike the sell-side branch
-            // above: ExcessCraftOutputCalculator.Apply already walks
-            // whichever of result.CraftingTree/MultiItemRoots
-            // BuildCraftingTreeResult populated, so it needs no single-vs-
-            // batch branch of its own.
-            ExcessCraftOutputCalculator.Apply(result, context.Prices, context.Metadata);
-
-            // opportunity-notes (RECIPE-SHEET SAVINGS / SEASONAL VENDOR
-            // TIP): a local override/Ignore re-solve must recompute these
-            // exactly like it recomputes ExcessCraftOutputs above (the
+            // A re-solve must recompute the annotations below too - the
             // chosen cost an opportunity compares against can change with
-            // an override) - context.VendorOffers (RAW) is used here, same
-            // as at generation time.
+            // an override. Raw context.VendorOffers, same as generation.
+            ExcessCraftOutputCalculator.Apply(result, context.Prices, context.Metadata);
             RecipeSheetSavingsCalculator.Apply(
                 result, context.LearnedRecipeIds, context.Prices, context.PriceBasis, _offersForRecipeSheetItem,
                 _recipeSheetItemIdByRecipeId, context.CharacterDisciplines);
             SeasonalVendorTipCalculator.Apply(
                 result, context.VendorOffers, context.Prices, context.PriceBasis, _activeFestivalNames());
-
-            // Adversarial-review fix (#7, source-selection-simplification
-            // design-law gap): same annotation-only role, writes only
-            // result.CompetencyOpportunities - see that calculator's own
-            // doc comment.
             CompetencyOpportunityCalculator.Apply(result);
 
             result.SolveContext = context;
@@ -1559,17 +1138,10 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M35-B1 (gw2e parity, multi-item plans): builds
-        /// CraftingPlanResult.CraftingTree (single-item) or MultiItemRoots
-        /// (multi-item) from <paramref name="tree"/> - the synthetic
-        /// wrapper root (see Gw2Constants.MultiItemWrapperItemId) never
-        /// surfaces in either field, echoing gw2efficiency's own
-        /// componentTree.html hiding its equivalent fake node
-        /// (docs/gw2e-parity-spec.md, the M34 r1 multi-item research
-        /// report). Shared by GenerateStructuredMultiAsync and
-        /// ResolveWithOverrides so a local override/Ignore re-solve of a
-        /// multi-item batch keeps exposing the same N roots on every
-        /// re-solve, not just the first generation.
+        /// Builds CraftingPlanResult.CraftingTree (single-item) or
+        /// MultiItemRoots (multi-item); the synthetic wrapper root never
+        /// surfaces in either. Shared with ResolveWithOverrides so a
+        /// re-solved multi-item batch keeps exposing the same N roots.
         /// </summary>
         private static void BuildCraftingTreeResult(
             CraftingPlanResult result,
@@ -1579,9 +1151,6 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, AcquisitionHint> hints,
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
             ISet<int> ignoredItemIds,
-            // W4B: optional/null-tolerant, threaded straight through to
-            // CraftingTreeBuilder.BuildTree - see that method's own doc
-            // comment.
             IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata = null,
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts = null,
             IReadOnlyDictionary<int, int> ownedVendorItemAmounts = null)
@@ -1617,12 +1186,9 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M34-B2a #1: converts the reference-keyed per-node owned-usage
-        /// side channel (see ReducedTreeResult.OwnedQuantityUsedByNode) into
-        /// a NodeId-keyed lookup, once the tree's real NodeIds have been
-        /// assigned by the Solve() call that just ran on these same node
-        /// objects. Null input (no reduction happened) yields an empty,
-        /// non-null dictionary so callers never need a null check.
+        /// Converts the reference-keyed owned-usage side channel into a
+        /// NodeId-keyed lookup once Solve() has assigned NodeIds. Null
+        /// input yields an empty dictionary.
         /// </summary>
         private static IReadOnlyDictionary<int, int> BuildOwnedQuantityUsedByNodeId(
             Dictionary<RecipeNode, int> ownedQuantityUsedByNode)
@@ -1640,12 +1206,9 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// VOM finding #3 fix: returns the AccountItemIndex built from
-        /// <paramref name="context"/>.AccountItems, reusing the last one
-        /// built for this exact context reference (see the matching
-        /// _cachedAccountIndex/_cachedAccountIndexContext field doc comment
-        /// for why reference equality is safe here) instead of rebuilding
-        /// an identical index on every override click.
+        /// Returns the AccountItemIndex for <paramref name="context"/>,
+        /// reusing the cached one for the same context reference instead
+        /// of rebuilding on every override click.
         /// </summary>
         private AccountItemIndex GetOrBuildAccountItemIndex(PlanSolveContext context)
         {
@@ -1658,20 +1221,11 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// VOM finding #2 fix: PlanSolveContext.AccountItems is persisted
-        /// verbatim into plan.json (PlanSolveContext is serialized as part
-        /// of PersistedPlan.Result.SolveContext - see PlanStoreHelpers' own
-        /// doc comment), but ResolveWithOverrides' re-reduction only ever
-        /// builds an AccountItemIndex from it (Services/AccountItemIndex.cs)
-        /// - a constructor that reads ONLY ItemId/Count/Source. SnapshotItemEntry's
-        /// Name and (render-service URL) IconUrl are pure dead weight in this
-        /// context, plausibly the bulk of a real account's item list in
-        /// bytes. Projects down to the three fields actually consulted
-        /// before the whole list is captured, so a full account snapshot
-        /// (thousands of entries) isn't serialized/deserialized/gzipped on
-        /// every override pill click for nothing. Null input yields null
-        /// (matches AccountItems' own "unpopulated when the pre-pass didn't
-        /// run" contract).
+        /// PlanSolveContext.AccountItems is persisted verbatim into
+        /// plan.json but only ever consumed via AccountItemIndex, which
+        /// reads ItemId/Count/Source. Projects down to those three fields
+        /// so a full account snapshot isn't serialized for nothing. Null
+        /// input yields null.
         /// </summary>
         private static IReadOnlyList<SnapshotItemEntry> ProjectAccountItemsForSolveContext(
             IReadOnlyList<SnapshotItemEntry> items)
@@ -1694,30 +1248,14 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M34-B2a #4: owned-currency annotation for the plan's final
-        /// currency totals (see AccountCurrencyIndex's doc comment) -
-        /// cosmetic only, computed strictly AFTER the plan/solve already
-        /// exist, never fed back into them. Null when there is no wallet
-        /// snapshot and the plan needs no currency at all, so callers can
-        /// treat null as "no data" distinctly from "0 owned".
-        ///
-        /// W4B review-fix (Must Fix): widened the SAME way
-        /// BuildOwnedVendorItemComponentAmounts widens its item id set (see
-        /// that method's own doc comment for the full rationale) -
-        /// <paramref name="vendorOffers"/> is scanned for every non-coin
-        /// Currency cost line on ANY vendor offer for ANY item in the tree,
-        /// not just the currency ids that made it into the baseline plan's
-        /// aggregated <paramref name="currencyCosts"/>. Without this, a
-        /// currency cost-component LEAF surfaced only by a manual override
-        /// (a node whose baseline decision was Craft, so its vendor offer's
-        /// currency cost lines were never folded into plan.CurrencyCosts)
-        /// would show correct name/icon/quantity but no HAVE pill,
-        /// permanently, even with a full wallet - the exact sibling of the
-        /// item-side gap AddAllVendorOfferItemComponentIds already closes.
-        /// Harmless for the pre-existing currency SUMMARY rows
-        /// (PlanViewModelBuilder), which only ever look up the ids they
-        /// themselves iterate from plan.CurrencyCosts - extra keys in the
-        /// returned map are simply never read by that caller.
+        /// Owned-currency annotation for the plan's currency totals -
+        /// cosmetic only, never fed back into decisions. Null when there
+        /// is no wallet snapshot or no currency ids at all, so callers can
+        /// distinguish "no data" from "0 owned". Scans
+        /// <paramref name="vendorOffers"/> for every non-coin Currency cost
+        /// line on any offer (not just the baseline plan's aggregated
+        /// costs) so a leaf first surfaced by a manual override still gets
+        /// a HAVE pill.
         /// </summary>
         private static IReadOnlyDictionary<int, int> BuildOwnedCurrencyAmounts(
             AccountSnapshot snapshot, List<CurrencyCost> currencyCosts,
@@ -1752,20 +1290,10 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W4B review-fix (Must Fix): currency-side twin of
-        /// AddAllVendorOfferItemComponentIds (see that method's own doc
-        /// comment for the full "why a decisions-only scan is not enough"
-        /// rationale - identical reasoning applies here). Adds every
-        /// currency id that appears as a non-coin Currency cost line on any
-        /// vendor offer for any item in the tree into
-        /// <paramref name="currencyIds"/>, mirroring exactly the
-        /// Type=="Currency" / Id != Gw2Constants.CoinCurrencyId / Count > 0
-        /// filter VendorBatchSolver.EvaluateVendorOffers itself uses to
-        /// decide what counts as a non-coin currency cost line (see that
-        /// method's own comments) - so this widened set can only ever
-        /// contain ids a real leaf could actually surface. A no-op when no
-        /// vendor offer in the tree has any non-coin Currency cost line at
-        /// all (the common case).
+        /// Currency-side twin of AddAllVendorOfferItemComponentIds, using
+        /// the same non-coin-currency filter as
+        /// VendorBatchSolver.EvaluateVendorOffers so the widened set only
+        /// contains ids a real leaf could surface.
         /// </summary>
         private static void AddAllVendorOfferCurrencyComponentIds(
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers, HashSet<int> currencyIds)
@@ -1800,15 +1328,9 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W4B (vendor cost-component leaves): adds every item id that
-        /// appears as a TP-valued Item cost line on any winning
-        /// BuyFromVendor decision (SolverDecision.VendorItemCosts) into
-        /// <paramref name="metadataIds"/> - called before the single bulk
-        /// item-metadata fetch each generation path already makes, so
-        /// CraftingTreeBuilder's synthesized item-component leaves get a
-        /// real name/icon instead of the "Unknown Item"/null fallback (see
-        /// CraftingTreeBuilder.ResolveName/ResolveIcon). A no-op when no
-        /// decision has any VendorItemCosts at all (the common case).
+        /// Adds every item id appearing as an Item cost line on a winning
+        /// BuyFromVendor decision, so synthesized component leaves get a
+        /// real name/icon instead of the "Unknown Item" fallback.
         /// </summary>
         private static void AddVendorItemComponentIds(
             IReadOnlyDictionary<int, SolverDecision> decisions, HashSet<int> metadataIds)
@@ -1831,27 +1353,12 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W4B review-fix (Must Fix): widens <paramref name="metadataIds"/>
-        /// to cover every item id that appears as a TP-valued Item cost
-        /// line on ANY vendor offer for ANY item in the tree - not just the
-        /// ones on the BASELINE winning decisions AddVendorItemComponentIds
-        /// (decisions overload, above) already covers. `ResolveWithOverrides`
-        /// is a purely local, no-network re-solve that reuses
-        /// PlanSolveContext.Metadata verbatim (see its own doc comment) -
-        /// it never re-fetches metadata. Without this, forcing a node to
-        /// BuyFromVendor via a manual override at generation time can win a
-        /// DIFFERENT offer than the one Evaluate originally picked (e.g. a
-        /// node whose baseline decision was Craft, so its vendor offer's
-        /// item cost component was never scanned by the decisions-only
-        /// overload above) - that offer's item component would render as
-        /// "Unknown Item" with no icon, forever, until the plan is fully
-        /// regenerated. Scanning every offer for every item that has ANY
-        /// vendor offer (using vendorOffers, already fetched for this
-        /// generation - no extra network round trip) guarantees every
-        /// offer reachable by ANY override, comparable or fallback, already
-        /// has its item components' metadata in hand before
-        /// ResolveWithOverrides ever runs. A no-op when no vendor offer in
-        /// the tree has any Item cost line at all (the common case).
+        /// Widens <paramref name="metadataIds"/> to every Item cost line on
+        /// ANY vendor offer, not just baseline winning decisions:
+        /// ResolveWithOverrides never re-fetches metadata, so an offer
+        /// first reached via a manual override would otherwise render
+        /// "Unknown Item" until the plan is regenerated. No extra network
+        /// round trip - vendorOffers is already fetched.
         /// </summary>
         private static void AddAllVendorOfferItemComponentIds(
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers, HashSet<int> metadataIds)
@@ -1884,35 +1391,12 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W4B: owned-item annotation for vendor cost-component ITEM leaves
-        /// (CraftingTreeNode.ComponentOwnedQuantity), computed strictly
-        /// AFTER solving from the account inventory snapshot - the exact
-        /// same "cosmetic reconciliation, never fed back into any decision
-        /// or total" contract BuildOwnedCurrencyAmounts already has for
-        /// currencies (see AccountCurrencyIndex/AccountItemIndex's own doc
-        /// comments), just for item components instead of wallet
-        /// currencies. Scoped to only the item ids that actually appear as
-        /// a vendor Item cost component anywhere in this solve (not every
-        /// owned item in the account) - null when there is no snapshot or
-        /// no such component anywhere, so callers can treat null as "no
-        /// data" distinctly from "0 owned", same as
-        /// BuildOwnedCurrencyAmounts.
-        ///
-        /// W4B review-fix (Must Fix): widened the same way
-        /// AddAllVendorOfferItemComponentIds widened the metadata scan
-        /// (same commit's own doc comment) - <paramref name="vendorOffers"/>
-        /// is scanned for every Item cost line on ANY offer, not just the
-        /// BASELINE winning decisions AddVendorItemComponentIds alone
-        /// covers. PlanSolveContext.OwnedVendorItemAmounts is, like
-        /// Metadata, captured once at generation time and reused verbatim
-        /// by ResolveWithOverrides (see its own doc comment) - it is never
-        /// recomputed. Without this, a node whose baseline decision was
-        /// Craft (so its vendor offer's item cost component was never
-        /// scanned by the decisions-only overload), manually overridden to
-        /// BuyFromVendor via ResolveWithOverrides, would show its item
-        /// component leaf with correct name/icon (metadata already
-        /// widened) but NO have pill - permanently - even with the item
-        /// sitting in the account, until the whole plan is regenerated.
+        /// Owned-item annotation for vendor cost-component item leaves -
+        /// same cosmetic, never-fed-back contract as
+        /// BuildOwnedCurrencyAmounts, and widened the same way: scans
+        /// every offer so a leaf first surfaced by a manual override still
+        /// gets its HAVE pill. Null when there is no snapshot or no such
+        /// component, distinguishing "no data" from "0 owned".
         /// </summary>
         private static IReadOnlyDictionary<int, int> BuildOwnedVendorItemComponentAmounts(
             AccountSnapshot snapshot, IReadOnlyDictionary<int, SolverDecision> decisions,
@@ -1962,11 +1446,9 @@ namespace GW2CraftingHelper.Services
 
         private static void CollectItemIds(RecipeNode node, HashSet<int> ids)
         {
-            // M35: never collect the synthetic multi-item wrapper's own
-            // sentinel id (see Gw2Constants.MultiItemWrapperItemId) - it is
-            // not a real GW2 item and must never trigger a TP price fetch.
-            // The recursion below still walks past it into its recipe's
-            // Ingredients (the N real item roots) unaffected.
+            // The synthetic wrapper's sentinel id is not a real GW2 item
+            // and must never trigger a TP price fetch; the recursion still
+            // walks past it into the N real item roots.
             if (node.IngredientType == "Item" && node.Id != Gw2Constants.MultiItemWrapperItemId)
             {
                 ids.Add(node.Id);
@@ -1982,39 +1464,14 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W3B (generation progress + rich logging): tracks the 5 coarse,
-        /// user-facing phases of one GenerateStructuredAsync/
-        /// GenerateStructuredMultiAsync run - fires a live PlanPhaseEvent
-        /// when each phase STARTS (for CraftingPlanView's status strip, via
-        /// <see cref="Start"/>) and writes one bounded Debug ModuleLog
-        /// entry (timing + optional count) when each phase COMPLETES,
-        /// detected as either the next phase starting or <see cref="Finish"/>
-        /// being called for the last one. Deliberately separate from
-        /// timingLog (the existing, much finer-grained ~10-step breakdown
-        /// that ends up in CraftingPlanResult.DebugLog via
-        /// FinishTimingLog) - that channel is unchanged; this one exists
-        /// purely to drive a stable, coarse live indicator without a UI
-        /// needing to parse PlanStatus.Message text, and to make the Log
-        /// tab show forward progress DURING a long-running generation
-        /// rather than only a burst of entries once it is already done.
-        /// <para>
-        /// Single-threaded, synchronous use only: constructed fresh per
-        /// GenerateStructuredAsync call (never shared across concurrent
-        /// generations) and driven entirely on whatever thread is running
-        /// that call's own async state machine at each await resumption -
-        /// never accessed concurrently by two threads at once, matching how
-        /// the existing local `timingLog`/`sw` variables in the very same
-        /// methods are already used with no locking.
-        /// </para>
-        /// <para>
-        /// If the generation throws/is cancelled mid-phase, the
-        /// currently-open phase never gets a completion Debug entry (Finish
-        /// is only reached on the success path) - accepted for v1: the
-        /// wrapper's own "Generation cancelled/failed" Info/Warn line
-        /// already reports elapsed time for that case, and an incomplete
-        /// phase leaves no resource to leak (no IDisposable, no external
-        /// handle).
-        /// </para>
+        /// Tracks the coarse user-facing phases of one generation: fires a
+        /// live PlanPhaseEvent when a phase starts and writes one Debug
+        /// log entry when it completes (next Start, or Finish). Separate
+        /// from the finer-grained timingLog channel, which is unchanged.
+        /// Single-threaded: constructed fresh per generation and driven
+        /// only by that call's own async state machine. If the generation
+        /// throws mid-phase, the open phase gets no completion entry; the
+        /// wrapper's cancelled/failed log line already reports elapsed time.
         /// </summary>
         private sealed class PhaseTracker
         {
@@ -2032,15 +1489,10 @@ namespace GW2CraftingHelper.Services
             }
 
             /// <summary>
-            /// Completes whatever phase was previously running (if any -
-            /// writing its Debug entry), then starts and reports the new
-            /// one. <paramref name="total"/> is an item/step count known up
-            /// front (e.g. items to price), or null when not applicable -
-            /// see PlanPhaseEvent.Total's own doc comment.
-            /// <paramref name="detail"/> is an optional short additional
-            /// detail (W3B review-fix: currently only the tree-building
-            /// phase's first-run hint - see PlanPhaseEvent.Detail's own doc
-            /// comment); null for every other call site.
+            /// Completes the previous phase (if any), then starts and
+            /// reports the new one. <paramref name="total"/> is a count
+            /// known up front, or null; <paramref name="detail"/> is an
+            /// optional short hint.
             /// </summary>
             public void Start(PlanPhase phase, string displayName, int? total, string detail = null)
             {
@@ -2067,21 +1519,10 @@ namespace GW2CraftingHelper.Services
                 CompleteCurrent();
             }
 
-            // W3B review-fix (doc-only): this Debug line's ms figure is
-            // _sw's elapsed time since THIS phase's own Start() call, up to
-            // whichever comes first of the next phase's Start() or Finish()
-            // - i.e. WALL time between two consecutive Start() calls,
-            // including any un-instrumented gap between the previous
-            // phase's actual work ending and this phase's own work
-            // beginning. That is a DIFFERENT measurement from the Info
-            // "finish" summary line (see PlanPhaseTimingSummary.
-            // FormatCompactSummary), which buckets and sums the finer-
-            // grained raw timingLog entries recorded around each step's own
-            // narrower stopwatched work only, excluding those same gaps -
-            // so the same phase can legitimately show two different
-            // millisecond figures across the Debug and Info log lines; this
-            // Debug figure is the wall-clock one, the Info bucket is the
-            // instrumented-work-only one.
+            // This Debug figure is wall time between consecutive Start()
+            // calls (includes un-instrumented gaps); the Info summary
+            // buckets only the stopwatched work, so the same phase can
+            // legitimately show two different ms figures.
             private void CompleteCurrent()
             {
                 if (_currentPhase == null)

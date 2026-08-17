@@ -6,7 +6,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // M39 (log system, d2-log-system.md Section 9): real temp-dir file IO,
+    // Real temp-dir file IO,
     // no mocked/fake I/O - same shape as VendorOfferStoreTests/StatusStoreTests.
     public class ModuleLogStoreTests
     {
@@ -231,7 +231,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- onError callback (WP-16 shape): real IO failures, not mocked. ---
+        // --- onError callback: real IO failures, not mocked. ---
 
         [Fact]
         public void AppendLine_DirectoryCreationFails_InvokesOnErrorInsteadOfThrowing()

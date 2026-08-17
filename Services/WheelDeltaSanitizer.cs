@@ -4,7 +4,7 @@ namespace GW2CraftingHelper.Services
     /// Classifies a raw Blish HUD wheel delta (GameService.Input.Mouse.
     /// State.ScrollWheelValue, itself sourced from Blish_HUD.Input.
     /// MouseEventArgs.WheelDelta) as either genuine or corrupted by a real
-    /// bug in the vendored library (M36, KNOWN-ISSUES #12 reopened and
+    /// bug in the vendored library (KNOWN-ISSUES #12, reopened and
     /// root-caused).
     ///
     /// ROOT CAUSE (confirmed by decompiling the shipped BlishHUD v1.3.0
@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Services
     /// so the getter "corrects" a value that was never wrapped in the first
     /// place, turning +240 into 240 - 65536 = -65296. This reproduces
     /// exactly the live-measured histogram (N = coalesced up-notch count,
-    /// 2026-07-21 instrumented user trace): N=2 -&gt; -65296, N=3 -&gt; -65176,
+    /// instrumented user trace): N=2 -&gt; -65296, N=3 -&gt; -65176,
     /// N=4 -&gt; -65056, N=5 -&gt; -64936, N=6 -&gt; -64816, N=7 -&gt; -64696,
     /// N=8 -&gt; -64576 (each is N*120 - 65536). A single up-notch (N=1,
     /// unsigned 120) sits exactly AT the threshold (not &gt; 120), so it is -
@@ -65,7 +65,7 @@ namespace GW2CraftingHelper.Services
     /// count), so "raw &lt;= -60000" identifies exactly the corruption and
     /// nothing else.
     ///
-    /// NOTE ON THE HARDCODED 120 (M36 fix-pass, NICETOHAVE d): this class
+    /// NOTE ON THE HARDCODED 120: this class
     /// (and CraftingPlanView.ApplyWheelWrapCorrection's own
     /// "intendedDelta / 120.0" notch-count arithmetic) hardcodes 120
     /// rather than reading it live, unlike MouseWheelScrollLines (see
@@ -79,7 +79,7 @@ namespace GW2CraftingHelper.Services
     /// value is always 120; it is not user-configurable the way
     /// MouseWheelScrollLines is). Hardcoding 120 here is therefore a
     /// deliberate simplification, not a live-setting oversight.
-    /// <para>See docs/ARCHITECTURE.md section 2 (M38 WP-27).</para>
+    /// <para>See docs/ARCHITECTURE.md section 2.</para>
     /// </summary>
     public static class WheelDeltaSanitizer
     {
@@ -127,7 +127,7 @@ namespace GW2CraftingHelper.Services
         /// Windows' "one screen at a time" mouse-wheel-lines setting
         /// (Control Panel/Settings mouse wheel option) reports
         /// SystemInformation.MouseWheelScrollLines as -1, not a usable
-        /// line count (M36 fix-pass, MUSTFIX-2). Used directly, that sign
+        /// line count. Used directly, that sign
         /// flips CraftingPlanView.ApplyWheelWrapCorrection's corrective
         /// pixel delta for every wrapped up-flick (Blish's own
         /// Scrollbar.HandleWheelScroll has the identical defect - its

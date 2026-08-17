@@ -215,8 +215,8 @@ namespace VendorOfferUpdater.Tests
             Assert.Matches("^[0-9a-f]{64}$", hash);
         }
 
-        // M37 (KNOWN-ISSUES #24): omitting homesteadTier is equivalent to
-        // passing explicit null - it does NOT reproduce the pre-M37 hash,
+        // Omitting homesteadTier is equivalent to
+        // passing explicit null - it does NOT reproduce the pre-tier hash,
         // since ComputeOfferId appends the ";homesteadTier=" segment
         // unconditionally (as "null" when omitted). This only pins down
         // self-consistency of the default value, not backward
@@ -261,7 +261,7 @@ namespace VendorOfferUpdater.Tests
             Assert.NotEqual(hashTier0, hashTier2);
         }
 
-        // Astral Acclaim package (KNOWN-ISSUES #28): seasonalCap is appended
+        // Astral Acclaim package: seasonalCap is appended
         // AFTER homesteadTier (not between it and weeklyCap) specifically so
         // every existing positional call above - including the ones that
         // already pass homesteadTier - keeps meaning exactly what it meant

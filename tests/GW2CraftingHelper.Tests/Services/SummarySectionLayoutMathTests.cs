@@ -5,7 +5,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // W4A (Total Cost section redesign): SummarySectionLayoutMath is the
+    // SummarySectionLayoutMath is the
     // redesigned Summary section's own layout arithmetic, deliberately kept
     // separate from PlanContentHeightMath/PlanRelayoutMath (both DO-NOT-
     // TOUCH for this package) - see that class's own doc comment.
@@ -149,7 +149,7 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- ComputeCurrencyColumnEdges ---
 
-        // Review fix (invariant: no contract-mirror tests): the previous
+        // The previous
         // version of this test recomputed ComputeCurrencyColumnEdges' exact
         // formula from the same public constants it was verifying, so it
         // could never fail unless both sides moved together. Expected
@@ -195,7 +195,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(wide.RequiredRightEdge > narrow.RequiredRightEdge);
         }
 
-        // --- Review fix: EffectiveCurrencyNumberColumnWidth / widened
+        // --- Regression: EffectiveCurrencyNumberColumnWidth / widened
         // ComputeCurrencyColumnEdges (a large unclamped Have value, e.g. a
         // 6-7 digit Karma balance, must not intrude into the Required
         // column - see the class doc comment above the currency-table

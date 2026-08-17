@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace GW2CraftingHelper.Models
 {
     /// <summary>
-    /// opportunity-notes (SEASONAL VENDOR TIP): one plan item that a
+    /// One plan item that a
     /// currently-active festival vendor sells (or barters) more cheaply
     /// than this plan's own chosen price - see
     /// Services/SeasonalVendorTipCalculator, the sole producer. Never

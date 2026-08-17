@@ -13,7 +13,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): end-to-end
+    /// KNOWN-ISSUES recipe-ingestion bug class: end-to-end
     /// proof, through the REAL production pipeline
     /// (CraftingPlanPipeline -> RecipeService -> PlanSolver ->
     /// CraftingTreeBuilder), that recipe 14025 (Amalgamated Rift Essence ->
@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Tests.Services
     /// The seeded recipe row below is the REAL entry now shipped in
     /// ref/recipes_seed.json after re-running
     /// tools/GW2CraftingHelper.RecipeSeeder (verified byte-for-byte
-    /// against a live `curl .../v2/recipes/14025?v=2026-08-15` fetch - see
+    /// against a live `curl .../v2/recipes/14025?v=` fetch - see
     /// Gw2RecipeApiClientParseTests' own real-JSON test for that capture).
     /// It is loaded through the exact same production deserialization path
     /// a real module install uses (SeededRecipeCacheStore.Load via
@@ -256,7 +256,7 @@ namespace GW2CraftingHelper.Tests.Services
                 75375, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
 
-            // The recipe is still fully craftable (M33 "hasComponents"
+            // The recipe is still fully craftable (the "hasComponents"
             // guarantee, same as an all-unvalued-currency recipe) - a
             // GuildUpgrade ingredient does not disqualify the recipe.
             Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
@@ -286,7 +286,7 @@ namespace GW2CraftingHelper.Tests.Services
         public async Task GuildUpgradeIngredient_RealRecipe12002Shape_CraftsAtItemIngredientCostOnly()
         {
             // The exact real seed row (ref/recipes_seed.json, verified live
-            // via api.guildwars2.com/v2/recipes/12002?v=2026-08-15): a Guild
+            // via api.guildwars2.com/v2/recipes/12002?v=): a Guild
             // Decoration recipe needing 1x a real crafting item plus 5x
             // guild upgrade id 829 - the audit's own reference shape for
             // this fix.

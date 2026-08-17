@@ -5,7 +5,7 @@ using Xunit;
 
 namespace VendorOfferUpdater.Tests
 {
-    // M37 (KNOWN-ISSUES #24): Program.MergeIntoBaseline is what
+    // Program.MergeIntoBaseline is what
     // "regenerate ONLY those pages' rows" actually means at the data
     // level - a scoped re-scrape of a handful of merchants must replace
     // only those merchants' offers in the full baseline, leaving every
@@ -175,7 +175,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Single(result2.Merged);
         }
 
-        // DATA LOSS fix (2026-08-17): a merchant flagged as having had a
+        // DATA LOSS fix: a merchant flagged as having had a
         // GameId<=0 row this pass must NOT have its baseline offers
         // dropped, even though it also appears in the fresh batch -
         // exactly the mechanism that silently deleted 6 shipped offers in
@@ -242,7 +242,7 @@ namespace VendorOfferUpdater.Tests
                 new[] { "Homestead Refinement\u2014Farm" }, result.MerchantNamesReplaced);
         }
 
-        // Review fix (2026-08-18, Critical): the comment this test used to
+        // The comment this test used to
         // carry ("Same OfferId means content-identical") is WRONG -
         // VendorOffer.SeasonalFestival is deliberately NOT hashed into
         // OfferId (see VendorOffer.SeasonalFestival's own doc comment), so
@@ -299,7 +299,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal("dragonbash", result.Merged[0].SeasonalFestival);
         }
 
-        // Data-loss fix (2026-08-19): mirror image of
+        // Data-loss fix: mirror image of
         // MergedResult_DedupesByOfferId_PreferringFreshRow_WhenProtectedBaselineAndFreshShareAnId
         // above. That test covers a TAGGED fresh row winning over an
         // untagged baseline row on an OfferId collision (correct: no data
@@ -333,7 +333,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal("dragonbash", result.Merged[0].SeasonalFestival);
         }
 
-        // Nice-to-have (2026-08-19): when the content-key dedupe pass
+        // When the content-key dedupe pass
         // resolves a collision to the baseline row (because it carries
         // the tag and the fresh row does not), the surviving row must not
         // be pinned to the baseline's stale, pre-hash-format-change
@@ -360,7 +360,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal("new-hash-format", result.Merged[0].OfferId);
         }
 
-        // Data-loss fix (2026-08-20, festival-scrape tag-carry follow-up):
+        // Data-loss fix:
         // `kept` used to drop EVERY replaced (non-protected) merchant's
         // baseline rows outright, before the fresh/kept GroupBy tag-carry
         // logic above ever ran - that logic only ever sees a baseline row

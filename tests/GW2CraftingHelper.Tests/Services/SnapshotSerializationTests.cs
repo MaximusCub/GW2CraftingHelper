@@ -167,13 +167,13 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("", result.Wallet[0].IconUrl);
         }
 
-        // --- W3C (per-character discipline display): backward compat for
+        // --- Per-character discipline display: backward compat for
         // a legacy snapshot.json that predates CharacterDisciplines. ---
 
         [Fact]
         public void Deserialize_OldJsonMissingCharacterDisciplines_ReturnsNull()
         {
-            // Simulate a pre-W3C snapshot.json - no CharacterDisciplines
+            // Simulate a legacy snapshot.json - no CharacterDisciplines
             // field at all. Must load cleanly and yield null (the "no data
             // captured yet" state), never an empty list masquerading as
             // "captured, nobody has any disciplines" and never a crash.

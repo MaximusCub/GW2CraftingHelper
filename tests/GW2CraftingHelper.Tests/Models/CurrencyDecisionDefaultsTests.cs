@@ -3,7 +3,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Models
 {
-    // currency-ux-package (Feature 1): CurrencyDecisionDefaults is a static
+    // CurrencyDecisionDefaults is a static
     // curated table, not a service - these tests pin its structural
     // invariants (no coin-keyed entry, no entry for the currencies the
     // maintainer explicitly decided must stay blank) rather than mirroring

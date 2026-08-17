@@ -213,7 +213,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- M30 review: cancellation, timeout, malformed-field, and
+        // --- cancellation, timeout, malformed-field, and
         // duplicate-id gaps ---
 
         /// <summary>

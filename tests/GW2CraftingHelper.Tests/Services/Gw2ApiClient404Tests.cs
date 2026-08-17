@@ -152,7 +152,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task ItemClient_ParsesFlags_MissingFieldYieldsEmptyList()
         {
-            // Review fix (finding 6): real-path coverage for
+            // Real-path coverage for
             // Gw2ItemApiClient.GetItemsAsync's "flags" array parsing -
             // previously nothing asserted this half of the account-bound
             // plumbing (only ItemMetadataService's derivation from an

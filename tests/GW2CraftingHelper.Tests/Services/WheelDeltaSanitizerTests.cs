@@ -5,8 +5,8 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class WheelDeltaSanitizerTests
     {
-        // Exact histogram measured in the live 2026-07-21 instrumented
-        // user trace (M36, KNOWN-ISSUES #12 reopened): fast multi-notch
+        // Exact histogram measured in the live instrumented
+        // user trace (KNOWN-ISSUES #12, reopened): fast multi-notch
         // wheel-UP flicks arrive as (N*120) - 65536 for N=2..8.
         [Theory]
         [InlineData(-65296, 240)]  // N=2
@@ -119,7 +119,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(5520, intendedDelta);
         }
 
-        // MUSTFIX-4 (M36 fix-pass): lattice-edge tests locking the
+        // Lattice-edge tests locking the
         // documented N*120 boundary the threshold derivation promises.
         // N=46 (46*120 - 65536 = -60016) is the largest coalesced up-flick
         // count the -60000 threshold still classifies as wrapped; N=47
@@ -146,7 +146,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(-59896, intendedDelta);
         }
 
-        // --- SanitizeScrollLines (MUSTFIX-2) ---
+        // --- SanitizeScrollLines ---
 
         [Theory]
         [InlineData(1)]
@@ -163,7 +163,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // -1 is Windows' real reported value for the "one screen at a
             // time" mouse option; used directly it flips the correction's
-            // sign (MUSTFIX-2) - substitute Windows' documented default of
+            // sign - substitute Windows' documented default of
             // 3 lines instead.
             Assert.Equal(3, WheelDeltaSanitizer.SanitizeScrollLines(-1));
         }

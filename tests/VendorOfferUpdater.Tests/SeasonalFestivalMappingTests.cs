@@ -4,8 +4,8 @@ using Xunit;
 namespace VendorOfferUpdater.Tests
 {
     /// <summary>
-    /// Festival-vendor auto-tagging follow-up (2026-08-16):
-    /// Gw2Constants.ResolveSeasonalFestivalKey against the six MEASURED
+    /// Festival-vendor auto-tagging follow-up:
+    /// Gw2Constants.ResolveSeasonalFestivalKey against the six measured
     /// wiki-display-name -> internal-key mappings (see
     /// FestivalKeysByWikiDisplayName's own doc comment for how each side
     /// was measured), plus the "never guess" contract for anything not in

@@ -161,7 +161,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ComputeVisiblePillCount ---
-        // MustFix review finding: DecisionPillPlanner's now-unconditional
+        // Regression: DecisionPillPlanner's now-unconditional
         // OwnedInfo/Ignore pills regularly overflow the tree row's fixed
         // 240px pill column, overlapping the right-aligned cost column.
         // CraftingPlanView.RenderDecisionPills uses this pure helper to

@@ -58,7 +58,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             // Only source available for the root (no root TP price, no
             // vendor offer) is the fallback-tier craft - same machinery an
-            // unvalued real Currency ingredient already uses (M33's
+            // unvalued real Currency ingredient already uses (the
             // "recipe stays feasible, just never wins the automatic
             // coin-comparable comparison" guarantee).
             Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
@@ -148,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void GuildUpgradeIngredient_NeverAppearsInPlanCurrencyCosts()
         {
-            // W4A sweep: a GuildUpgrade ingredient must never surface in
+            // A GuildUpgrade ingredient must never surface in
             // plan.CurrencyCosts (the Summary currency table's data source)
             // or any wallet-lookup-keyed display, unlike a real Currency
             // ingredient (which correctly does appear there).
@@ -214,7 +214,7 @@ namespace GW2CraftingHelper.Tests.Services
             // a GuildUpgrade requirement (no priceable component at all)
             // must still resolve to a feasible, zero-cost Craft - never
             // throw, never fall to UnknownSource just because its sole
-            // ingredient is unpriceable (mirrors the M33 "hasComponents"
+            // ingredient is unpriceable (mirrors the "hasComponents"
             // guarantee for an all-unvalued-currency recipe).
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
@@ -230,7 +230,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.Plan.CurrencyCosts);
         }
 
-        // ---- Class-level follow-up (adversarial review, guildupgrade-
+        // ---- Class-level follow-up (guildupgrade-
         // ingredients): the fix above must not be scoped to the literal
         // string "GuildUpgrade" - PlanSolver.Evaluate's top guard and
         // ingredient loop, Collect's top guard, and RecomputeCraftCosts'

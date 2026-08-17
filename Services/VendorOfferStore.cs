@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Services
         private Dictionary<string, VendorOffer> _mergedById;
         private Dictionary<int, List<VendorOffer>> _mergedByOutput;
 
-        // M39 (WP-16 shape, d2-log-system.md Section 4.2): see StatusStore's
+        // See StatusStore's
         // matching field comment.
         private readonly Action<string, Exception> _onError;
 

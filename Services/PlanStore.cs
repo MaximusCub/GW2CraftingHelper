@@ -7,8 +7,8 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// W3D (plan persistence across module restarts): loads/saves the
-    /// generated Crafting Plan tab's content so it survives a module
+    /// Loads/saves the generated Crafting Plan tab's content so it
+    /// survives a module
     /// close/reopen. Mirrors SnapshotStore's shape (single-file JSON,
     /// atomic .tmp+Replace write) with one deliberate divergence: a
     /// corrupt or old-schema file is NOT silently swallowed to null the
@@ -30,8 +30,7 @@ namespace GW2CraftingHelper.Services
     /// .tmp path at once - see the field's own comment.
     /// </para>
     /// <para>
-    /// Post-W3D quick fix (user-sanctioned, compression only): the
-    /// on-disk container is now gzip (a large plan's compact JSON runs
+    /// The on-disk container is gzip (a large plan's compact JSON runs
     /// ~700 KB, and this file is rewritten on every override-resolve
     /// pill click, not just once per Generate). The plan.json name is
     /// kept as-is (no .gz rename) - LoadLatest sniffs the first two
@@ -54,7 +53,7 @@ namespace GW2CraftingHelper.Services
 
         private readonly string _filePath;
 
-        // M39 (WP-16 shape, d2-log-system.md Section 4.2): see StatusStore's
+        // See StatusStore's
         // matching field comment.
         private readonly Action<string, Exception> _onError;
 
@@ -90,7 +89,7 @@ namespace GW2CraftingHelper.Services
         }
 
         // Atomic .tmp+Replace write, matching SnapshotStore/StatusStore/
-        // VendorOfferStore's own one-store-convention (M39) - a crash/
+        // VendorOfferStore's own one-store-convention - a crash/
         // power-loss mid-write can never leave a half-written plan.json
         // that LoadLatest then fails to parse.
         public void Save(PersistedPlan plan)

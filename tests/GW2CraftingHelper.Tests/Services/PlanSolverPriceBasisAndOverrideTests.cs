@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(200, instant.Plan.TotalCoinCost);
             Assert.Equal(120, order.Plan.TotalCoinCost);
-            // AUDIT ROW 20/38: preferred side present on both sides ->
+            // Preferred side present on both sides ->
             // used directly, no same-item other-side fallback triggered.
             Assert.False(instant.Decisions[0].PriceSideFellBack);
             Assert.False(order.Decisions[0].PriceSideFellBack);
@@ -35,7 +35,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void BuyOrderBasis_NoBuyOrders_FallsBackToInstantBuyPrice()
         {
-            // AUDIT ROW 20/38 (gw2e price-side fallback parity): the
+            // The
             // preferred side (buy orders / SellInstant) is empty, but this
             // SAME item's other side (instant-buy / BuyInstant) has a real
             // listing - gw2e falls back to it instead of treating the item
@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void BuyOrderBasis_BothSidesEmpty_ItemNotPriceable()
         {
-            // AUDIT ROW 20/38: both TP sides empty stays unpriceable - the
+            // Both TP sides empty stays unpriceable - the
             // fallback only ever tries this SAME item's other side, never
             // invents a price from nothing.
             var prices = new Dictionary<int, ItemPrice>
@@ -74,7 +74,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void BuyOrderBasis_CraftWinsOverFallbackPricedBuy_DecisionFlagStaysFalse()
         {
-            // AUDIT ROW 20/38: buyPriceSideFellBack is computed unconditionally
+            // BuyPriceSideFellBack is computed unconditionally
             // for every node's own TP price (item 1's preferred side, buy
             // orders / SellInstant, is empty here - the buy-side total only
             // exists via this same item's other-side fallback to BuyInstant).
@@ -100,7 +100,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void BuyOrderBasis_VendorWinsOverFallbackPricedBuy_DecisionFlagStaysFalse()
         {
-            // AUDIT ROW 20/38 review-fix (test gap): sibling of
+            // Sibling of
             // BuyOrderBasis_CraftWinsOverFallbackPricedBuy_DecisionFlagStaysFalse
             // above, but exercising the OTHER half of Commit's
             // `src == AcquisitionSource.BuyFromTp` gate - a BuyFromVendor
@@ -131,7 +131,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void BuyOrderBasis_FallbackPricedBuyWinsOverCraft_SourceIsBuyFromTp()
         {
-            // AUDIT ROW 20/38 review-fix (test gap): the sibling
+            // The sibling
             // *_WinsOverFallbackPricedBuy_DecisionFlagStaysFalse tests above
             // only cover the fallback-priced buy LOSING the comparison -
             // every one of them still passes if the fallback were removed
@@ -218,7 +218,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void BuyOrderBasis_VendorItemBarter_BarterItemFallsBackToOtherSide()
         {
-            // AUDIT ROW 20/38: PlanSolver.GetUnitPrice is the single site
+            // PlanSolver.GetUnitPrice is the single site
             // VendorBatchSolver's Item-cost-line pricing routes through, so
             // the same-item other-side fallback must reach it too. Barter
             // item 42's preferred side (buy orders / SellInstant) is empty
@@ -363,8 +363,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void UnpriceableRecipe_CanCraftIsTrue_ForceCraftSucceedsWithZeroFilledCost()
         {
-            // M33 partial-pricing parity (superseded
-            // "Override_ForcedCraftOnUnpriceableRecipe_IgnoredKeepsBuy"):
+            // Partial-pricing parity:
             // CanCraft now means "has a recipe" (gw2e's hasComponents), not
             // "recipe is fully priceable" - a recipe with an unpriceable
             // ingredient is always force-craftable (the ingredient just

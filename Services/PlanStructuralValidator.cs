@@ -4,7 +4,7 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Round 4 review-fix (W3D adversarial review, critical): a single,
+    /// a single,
     /// class-level structural walk of the ENTIRE object graph a
     /// deserialized <see cref="PersistedPlan"/> carries, run once at the
     /// deserialization boundary (<see cref="PlanStoreHelpers.DeserializePersistedPlan"/>)
@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Services
     /// check's own inline comment for the exact call site it protects.
     /// </para>
     /// <para>
-    /// Validation failure is the corrupt-file path (W3D spec item 4): the
+    /// Validation failure is the corrupt-file path: the
     /// caller throws, which propagates to <see cref="PlanStore.LoadLatest"/>'s
     /// own try/catch - one Warn log line, then a null return (fresh start).
     /// Never a partial accept: any single invalid field anywhere in the
@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Services
         // PlanStoreHelpers' own doc comment on why no custom
         // JsonSerializerSettings are used) already rejects JSON nested
         // deeper than this before either recursive walk below ever runs,
-        // but per the W3D spec's round 4 mandate, the walk itself must not
+        // but the walk itself must not
         // be the weak point - so it enforces its own generous, explicit
         // bound rather than relying on that upstream protection alone. A
         // depth this shallow is also nowhere near a real stack-overflow
@@ -187,7 +187,7 @@ namespace GW2CraftingHelper.Services
                 return false;
             }
 
-            // M35 (multi-item plans): the same tree, N times over - never
+            // Multi-item plans: the same tree, N times over - never
             // touched by PlanViewModelBuilder except by reference either.
             if (!NoNullEntries(result.MultiItemRoots, "MultiItemRoots", out reason)) return false;
             if (result.MultiItemRoots != null)
@@ -328,7 +328,7 @@ namespace GW2CraftingHelper.Services
             // there NREs.
             if (!NoNullEntries(context.RequestedItems, "SolveContext.RequestedItems", out reason)) return false;
 
-            // Round 5 review-fix (mustFix): SolveContext.UsedMaterials is a
+            // SolveContext.UsedMaterials is a
             // SEPARATELY serialized copy of the same list as
             // CraftingPlanResult.UsedMaterials above (Newtonsoft writes no
             // $ref by default - see PlanStoreHelpers' own doc comment on

@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     /// CraftingTreeNode objects, independent of the Views/Rendering render
     /// pass that consumes it.
     /// <para>
-    /// A vendor-selected node's Children is a STACK exactly when W4B's
+    /// A vendor-selected node's Children is a STACK exactly when the
     /// cost-component-leaf synthesis AND the "what it would cost to craft
     /// instead" reference branch both fired for the same node
     /// (CraftingTreeBuilder.BuildNode's componentLeaves != null &amp;&amp;
@@ -46,7 +46,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int ComputeCaptionSplitIndex(CraftingTreeNode node)
         {
-            // Review-fix: Children[0]/Children[index] are dereferenced via
+            // Children[0]/Children[index] are dereferenced via
             // ?. below rather than assumed non-null - CraftingTreeBuilder
             // never appends a null child today, but this method already
             // defends against upstream invariant drift elsewhere (see the

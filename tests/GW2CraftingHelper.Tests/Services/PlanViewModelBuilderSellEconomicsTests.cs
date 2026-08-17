@@ -7,7 +7,7 @@ using static GW2CraftingHelper.Tests.Helpers.CraftingPlanResultBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // W4A (Total Cost section redesign): rewritten for the two-formula-band
+    // Rewritten for the two-formula-band
     // shape (CostFormulaTile/ProfitFormulaTile) - see
     // PlanViewModelBuilderSummaryTests for the primary band/collapse-rule/
     // currency-table coverage. This file keeps its original name/focus
@@ -112,8 +112,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("buy-order prices", costTile.TooltipText);
         }
 
-        // --- Own-materials opportunity cost (M28) - now the cost band's
-        // middle "Your Materials Used" tile, per the W4A collapse rule ---
+        // --- Own-materials opportunity cost - the cost band's
+        // middle "Your Materials Used" tile, per the collapse rule ---
 
         [Fact]
         public void MaterialOpportunityCostPositive_ExpandsCostBandToThreeTiles()

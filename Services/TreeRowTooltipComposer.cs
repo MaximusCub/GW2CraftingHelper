@@ -90,13 +90,13 @@ namespace GW2CraftingHelper.Services
             // caveat is about WHICH TP side priced the node, not about a
             // qty=1 row already showing its own total as the unit price.
             //
-            // Review-fix (DISPLAY CAVEAT gap): also covers a BuyFromVendor
+            // also covers a BuyFromVendor
             // cost-component leaf (node.IsCostComponent) whose own TP-
             // valued barter price fell back the same way - see
             // VendorItemCostLine.PriceSideFellBack and
             // CraftingTreeBuilder.BuildVendorCostComponentLeaves.
             //
-            // Review-fix round 3 (DISPLAY CAVEAT gap): also covers a plain
+            // Also: also covers a plain
             // BuyFromVendor node with no cost-component leaves at all (a
             // pure item-barter offer, kindCount==1 - the common case - or
             // any offer VendorComponentCostsUnreliable suppressed leaf
@@ -110,7 +110,7 @@ namespace GW2CraftingHelper.Services
             // an explicit disjunct anyway to document both producers by
             // name rather than rely on that overlap implicitly.
             //
-            // Review-fix round 7 (DISPLAY CAVEAT gap, multi-kind offers):
+            // Also:
             // BuildNode's parent-flag check widened further to also cover a
             // BuyFromVendor node that DID get component leaves (2+ cost
             // kinds) - its own coin total still includes the fallen-back
@@ -124,7 +124,7 @@ namespace GW2CraftingHelper.Services
             // caveat with no double-render (they are separate tooltip
             // lines on separate rows).
             //
-            // Review-fix round 8 (misattributed caveat text on vendor
+            // (Misattributed caveat text on vendor
             // rows): a BuyFromVendor PARENT's PriceSideFellBack is never
             // about ITS OWN item's TP price - that node was not bought on
             // the TP at all - it is an aggregate ("did any barter cost
@@ -143,7 +143,7 @@ namespace GW2CraftingHelper.Services
             // an explicit "not a leaf" carve-out, checked first) gets a
             // distinct sentence naming the component instead of the row.
             //
-            // Nice-to-have (null-plan fallback, b18fb03): currentPlan is a
+            // currentPlan is a
             // real nullable parameter here (moved verbatim from
             // TreeSectionController's own hoisted _getCurrentPlan()
             // local), so when it IS null neither ternary below can know
@@ -193,7 +193,7 @@ namespace GW2CraftingHelper.Services
                 extraTooltipLines.Insert(0, captionText);
             }
 
-            // UI-bundle milestone, Feature A (wiki links): the tooltip-line
+            // The tooltip-line
             // half of the affordance only - see this class's own doc
             // comment for why the actual right-click wiring stays in
             // TreeSectionController. WikiLinkBuilder.HasWikiPage/

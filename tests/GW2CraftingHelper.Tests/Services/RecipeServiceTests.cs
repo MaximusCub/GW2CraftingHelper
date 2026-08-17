@@ -203,7 +203,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task NullTypedIngredient_BecomesLeaf_RecipeNeverExpanded()
         {
-            // Adversarial-review finding (2026-08-16): RawIngredient.Type
+            // RawIngredient.Type
             // deserializes to null when a seed/overlay JSON row omits
             // "type" (System.Text.Json applies no default), so this shape
             // is reachable from real cache data even though today's seed
@@ -245,7 +245,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task SelfReferentialIngredient_BecomesLeaf_QuantityDoesNotCompound()
         {
-            // M33 item 4 (m5 Finding 2 / r2 report): a real, wiki-verified
+            // A real, wiki-verified
             // Mystic Forge "trophy tier-up" recipe shape - N of the tier
             // below + 1 of ITS OWN output + junk items -> a few of itself
             // (Obsidian Shard, id 19925, is the exact real example already
@@ -297,8 +297,7 @@ namespace GW2CraftingHelper.Tests.Services
             // -592..-595): each tier needs 50 of the tier below + 1 of ITS
             // OWN output + dust + Philosopher's Stones -> 7 of itself.
             // Verified (m5's "explosion to millions" is real wiki-scale
-            // math for this brutal ratio, not a compounding bug - see the
-            // M33 structured-output concerns for the full trace): the
+            // math for this brutal ratio, not a compounding bug): the
             // demand must grow by a bounded, deterministic multiplier per
             // tier (not runaway/unbounded), and every self-ingredient at
             // every tier must stay an inert, non-recursing leaf.
@@ -420,7 +419,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task FractionalExpectedOutputCount_CraftsNeededAndIngredientQuantity_UseExpectedOutputCount()
         {
-            // M33 fix-pass Critical finding: craftsNeeded (and therefore
+            // craftsNeeded (and therefore
             // every ingredient quantity scaled by it) must derive from the
             // EXPECTED output, not the nominal integer output, exactly
             // mirroring the real Mystic Clover shape (recipe -1591,
@@ -612,7 +611,7 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     new RawIngredient { Type = "Item", Id = 2, Count = 1 }
                 }
-                // No Disciplines, MinRating, or Flags set — use defaults
+                // No Disciplines, MinRating, or Flags set - use defaults
             });
 
             var svc = new RecipeService(api);
@@ -648,7 +647,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain("AutoLearned", option.Flags);
         }
 
-        // --- M37 (KNOWN-ISSUES #26): achievement-bit ingredient propagation ---
+        // --- Achievement-bit ingredient propagation ---
 
         [Fact]
         public async Task AchievementFields_PropagateFromRawIngredientOntoChildNode()
@@ -706,7 +705,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(node.Recipes[0].Ingredients[0].AchievementBit);
         }
 
-        // --- M35-B1: BuildMultiItemTreeAsync (gw2e parity, multi-item plans) ---
+        // --- BuildMultiItemTreeAsync (gw2e parity, multi-item plans) ---
 
         [Fact]
         public async Task BuildMultiItemTreeAsync_SingleEntry_ReturnsItemTreeUnwrapped_NoSyntheticRoot()
@@ -784,7 +783,7 @@ namespace GW2CraftingHelper.Tests.Services
                 () => svc.BuildMultiItemTreeAsync(new List<PlanRequestItem>(), CancellationToken.None));
         }
 
-        // KNOWN-ISSUES api-degradation F5 (adversarial-review follow-up):
+        // KNOWN-ISSUES api-degradation F5 :
         // Gw2RecipeApiClient.GetRecipeAsync can now return null on a 404
         // instead of throwing. A recipe id a search result points to that
         // then 404s on its own detail lookup must not crash the tree build

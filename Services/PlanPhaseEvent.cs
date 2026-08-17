@@ -1,8 +1,8 @@
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// W3B (generation progress + rich logging): the five coarse,
-    /// user-facing phases of one CraftingPlanPipeline.GenerateStructuredAsync
+    /// The five coarse, user-facing phases of one
+    /// CraftingPlanPipeline.GenerateStructuredAsync
     /// run. Deliberately coarser than the pipeline's own internal timingLog
     /// (~10 detailed steps - see CraftingPlanPipeline.FinishTimingLog),
     /// which keeps reporting unchanged; this enum exists purely to drive a
@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Services
     }
 
     /// <summary>
-    /// One "a new phase has started" notification (W3B). Blish-free (no
+    /// One "a new phase has started" notification. Blish-free (no
     /// Blish_HUD/Gw2Sharp/Microsoft.Xna usings, matching every other type in
     /// this namespace - see ModuleLogEntry's own doc comment for why) so
     /// CraftingPlanPipeline stays independently testable. Reported via an
@@ -54,7 +54,7 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Optional short additional detail, e.g. "may take several
         /// seconds on first run" on the very first BuildingTree event of a
-        /// cold recipe cache (W3B review-fix - see
+        /// cold recipe cache (see
         /// CraftingPlanPipeline.FirstRunTreeHint and
         /// PlanStripTickDecision.FormatPhaseText). Null for every phase
         /// that has none.

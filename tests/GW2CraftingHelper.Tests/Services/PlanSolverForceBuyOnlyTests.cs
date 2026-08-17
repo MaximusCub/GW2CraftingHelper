@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class PlanSolverForceBuyOnlyTests
     {
-        // --- M34-B2a #3: cost diagnostics + force-buy-only exclusion ---
+        // --- Cost diagnostics + force-buy-only exclusion ---
 
         [Fact]
         public void CostDiagnostics_PopulatedForEveryItemNode_RegardlessOfDecision()
@@ -41,7 +41,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CostDiagnostics_CompetencyResolved_UsesCompetentRecipeNotCheapestOverall()
         {
-            // Adversarial-review round-2 finding #2: two recipes for item
+            // Regression: two recipes for item
             // 1 - RecipeId 10 (Weaponsmith 400, ingredient item 2 x1 @
             // 30c = the numerically cheapest overall) and RecipeId 20
             // (Armorsmith 400, ingredient item 3 x1 @ 100c = costlier, but

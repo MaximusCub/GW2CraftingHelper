@@ -7,41 +7,30 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-23c (m38-a1-architecture.md S3b-T2, continuing the WP-23/WP-23b
-    // extractions): moved verbatim out of CraftingPlanView's "7. Section
+    // Moved verbatim out of CraftingPlanView's "7. Section
     // builders (continued)" region - the Crafting Steps row list (including
-    // its TimegatedNotice informational rows - the M34 warn-only vendor-cap
-    // notices with the M37 Seasonal wording from PR #81) and the step-number
+    // its TimegatedNotice informational rows) and the step-number
     // rendering. Behavior is unchanged: same row geometry, same
     // PlanContentHeightMath/PlanRelayoutMath calls, same
-    // LabelHelpers.CreateRowDivider usage (DO-NOT-TOUCH #6 - divider math
-    // and its M36b 1px scissor clearance untouched). The only edits inside
+    // LabelHelpers.CreateRowDivider usage (divider math
+    // and its 1px scissor clearance untouched). The only edits inside
     // the moved bodies are _relayoutActions.Add -> the injected
     // ISectionRelayoutSink.AddRelayout (a semantics-preserving pass-through -
     // see ISectionRelayoutSink's doc comment) and CreateTextRow(...) ->
     // TextRowRenderer.CreateTextRow(..., _sink) (see that class's doc
-    // comment for why it moved to its own shared file rather than into this
+    // comment for why it is its own shared file rather than part of this
     // one - it has two other call sites still living in CraftingPlanView).
     //
-    // Per the WP-23 pilot's FORWARD NOTE, CreateCraftStepRow itself depends
-    // only on the already-extracted IconControls/RarityColors/LabelHelpers/
-    // PlanRelayoutMath statics the pilot also used - confirmed true. The one
-    // dependency the pilot's per-row check did not cover was body-level:
-    // CreateCraftingStepsBody's TimegatedNotice branch called
-    // CraftingPlanView's private CreateTextRow, resolved via TextRowRenderer
-    // as described above.
-    //
-    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateCraftStepRow's
-    // divider+relayout tail now goes through RowRelayoutHelpers.FinishRow -
+    // CreateCraftStepRow's
+    // divider+relayout tail goes through RowRelayoutHelpers.FinishRow -
     // the shared "row panel resize + extra reposition + divider resize"
-    // shape confirmed identical across all five extracted renderers' row
+    // shape identical across all five extracted renderers' row
     // builders (see that class's doc comment). This row's name/qty labels
-    // are NOT run through IconNameRowHelpers (the other WP-24 helper): they
+    // are NOT run through IconNameRowHelpers: they
     // are built via cumulative cursor-x concatenation ("Craft " + "{n}x " +
     // name) with no width cap or ellipsis at all, a genuinely different
     // shape from the ellipsized-name-at-a-fixed-column rows - see
-    // IconNameRowHelpers' own doc comment. Geometry unchanged - see the
-    // WP-24 constant-by-constant table in the PR/commit body.
+    // IconNameRowHelpers' own doc comment.
     internal sealed class CraftStepsSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -64,7 +53,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            // M34-B1 #3: a TimegatedNotice row (vendor-cap informational
+            // A TimegatedNotice row (vendor-cap informational
             // line) is a plain text row, not a numbered craft step - render
             // it via the same generic TextRowRenderer pattern every other
             // section's fallback rows use, and don't consume a step number
@@ -167,7 +156,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // (rowHeight-3 = 41), so the 1px shift is free of
             // icon-clearance side effects.
             //
-            // M33 C2b: name/qty labels sit at a fixed x (font-only, not
+            // Name/qty labels sit at a fixed x (font-only, not
             // width-dependent - textX never depended on panelWidth); only
             // the row width, its divider, and the right-aligned sublabel
             // need to move.

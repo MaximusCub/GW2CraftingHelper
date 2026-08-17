@@ -10,19 +10,12 @@ namespace GW2CraftingHelper.Models
         public List<RequiredDiscipline> RequiredDisciplines { get; set; }
         public List<RequiredRecipe> RequiredRecipes { get; set; }
 
-        // Adversarial-review fix (#7, source-selection-simplification
-        // design-law gap): nodes where craft was excluded from the
-        // AUTOMATIC pick specifically because no character meets the
-        // winning recipe's discipline requirement (see
-        // SolverDecision.CraftExcludedByCompetency), even though it would
-        // have been cheaper - see CompetencyOpportunityCalculator.
-        // Apply. Null/empty when nothing qualifies
-        // (no snapshot, nothing excluded, or every exclusion was cost-
-        // neutral-or-worse). Rendered by PlanViewModelBuilder.
-        // BuildNotesSection as concrete "would save N" Plan Notes lines,
-        // per the maintainer's design law (opportunities/considerations go
-        // to Plan Notes with concrete numbers) - never fed back into any
-        // cost/comparison.
+        // Nodes where craft was excluded from the automatic pick because
+        // no character meets the winning recipe's discipline requirement,
+        // even though it would have been cheaper (see
+        // CompetencyOpportunityCalculator). Null/empty when nothing
+        // qualifies. Rendered as concrete "would save N" Plan Notes -
+        // never fed back into any cost/comparison.
         public List<CompetencyOpportunity> CompetencyOpportunities { get; set; }
         public CraftingTreeNode CraftingTree { get; set; }
         public List<string> DebugLog { get; set; }
@@ -33,46 +26,36 @@ namespace GW2CraftingHelper.Models
         /// <summary>
         /// Instant-sell unit price of the target item (buys.unit_price),
         /// null when the item has no buy orders / is untradable. Always
-        /// null for a multi-item batch (M37, KNOWN-ISSUES #25) - a batch
-        /// has N per-item unit prices, one per requested item, and no
-        /// single number generalizes them (see
-        /// SellSideEconomics.ApplyBatchSellSideEconomics).
+        /// null for a multi-item batch - no single number generalizes N
+        /// per-item unit prices.
         /// </summary>
         public long? TargetUnitSellPrice { get; set; }
 
         /// <summary>
-        /// Units the plan actually produces (>= requested quantity when the
-        /// chosen root recipe over-produces). Sell-side figures use this.
-        /// For a multi-item batch (M37), this is the SUM across every
-        /// requested root that has a live sell price (see
-        /// SellSideEconomics.ApplyBatchSellSideEconomics) - there is NO
-        /// craft-vs-buy filter, a bought-but-tradable root is summed in
-        /// exactly like a crafted one; only a root with no sell price at
-        /// all is excluded from the sum entirely rather than contributing 0.
+        /// Units the plan actually produces (>= requested quantity when
+        /// the chosen root recipe over-produces). For a multi-item batch,
+        /// the sum across every requested root with a live sell price -
+        /// no craft-vs-buy filter; a root with no sell price is excluded
+        /// entirely rather than contributing 0.
         /// </summary>
         public int SellableQuantity { get; set; }
 
         /// <summary>
-        /// Net coin from instant-selling the crafted quantity after the 15%
-        /// Trading Post fees; null when no sell price exists. For a
-        /// multi-item batch (M37), this is the SUM of NetSaleValue across
-        /// every requested root that has a live sell price (see
-        /// SellSideEconomics.ApplyBatchSellSideEconomics) - there is NO
-        /// craft-vs-buy filter, bought and crafted roots contribute alike;
-        /// null when NOT ONE requested root has a live sell price.
+        /// Net coin from instant-selling the crafted quantity after the
+        /// 15% Trading Post fees; null when no sell price exists. For a
+        /// multi-item batch, the sum across every requested root with a
+        /// live sell price (no craft-vs-buy filter); null when not one
+        /// root has a live sell price.
         /// </summary>
         public long? NetSaleValue { get; set; }
 
         /// <summary>
-        /// NetSaleValue minus the plan's total COIN cost. Non-coin currency
-        /// costs are not valued and are excluded; null when no sell price.
-        /// For a multi-item batch (M37), the cost subtracted is the SUM of
-        /// only the sellable roots' own cost (each such root's own
-        /// SolverDecision.TotalCost, regardless of whether that root was
-        /// bought or crafted - there is NO craft-vs-buy filter) - NOT
-        /// Plan.TotalCoinCost, which also includes every requested root
-        /// that has no live sell price and so is excluded from this figure
-        /// entirely (see SellSideEconomics.ApplyBatchSellSideEconomics).
+        /// NetSaleValue minus the plan's total COIN cost. Non-coin
+        /// currency costs are not valued and are excluded; null when no
+        /// sell price. For a multi-item batch, the cost subtracted is the
+        /// sum of only the SELLABLE roots' own cost - NOT
+        /// Plan.TotalCoinCost, which also includes unsellable roots
+        /// excluded from this figure entirely.
         /// </summary>
         public long? CraftingProfit { get; set; }
 
@@ -83,20 +66,13 @@ namespace GW2CraftingHelper.Models
         public PlanSolveContext SolveContext { get; set; }
 
         /// <summary>
-        /// Sum, over UsedMaterials, of TradingPostMath.NetSaleRevenue for
-        /// that material's instant-sell unit price and quantity used: what
-        /// selling those already-owned materials would have netted after
-        /// Trading Post fees. Null in OwnMaterialsMode.Free, or when no
-        /// materials were used by inventory reduction. A material with no
-        /// instant-sell price (SellInstant 0/absent) contributes 0 rather
-        /// than being excluded from the sum. For a multi-item batch (M37),
-        /// this is computed once over the whole batch's already-merged
-        /// UsedMaterials list, independent of SellableQuantity/
-        /// NetSaleValue/CraftingProfit's own per-root live-sell-price
-        /// filter (which, like this field, has NO craft-vs-buy component) -
-        /// it is set whenever Valued mode produced any usedMaterials at
-        /// all, even if the batch turns out to have zero qualifying
-        /// sellable roots (see SellSideEconomics.ApplyBatchSellSideEconomics).
+        /// What selling the already-owned UsedMaterials would have netted
+        /// after Trading Post fees. Null in OwnMaterialsMode.Free or when
+        /// reduction used nothing; an unpriced material contributes 0
+        /// rather than being excluded. For a multi-item batch, computed
+        /// once over the merged UsedMaterials list, independent of the
+        /// per-root sell-price filter - set whenever Valued mode produced
+        /// any usedMaterials at all.
         /// </summary>
         public long? MaterialOpportunityCost { get; set; }
 
@@ -132,16 +108,15 @@ namespace GW2CraftingHelper.Models
 
         /// <summary>
         /// Owned amount per currency id referenced by Plan.CurrencyCosts
-        /// (M34-B2a #4 - see AccountCurrencyIndex). Cosmetic display data
-        /// only, computed strictly after solving from the account wallet
-        /// snapshot - never fed back into any decision or total. Null when
-        /// no wallet snapshot was available or the plan needs no currency.
+        /// (see AccountCurrencyIndex). Cosmetic display data only - never
+        /// fed back into any decision or total. Null when no wallet
+        /// snapshot was available or the plan needs no currency.
         /// </summary>
         public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
 
         /// <summary>
-        /// M35 (gw2efficiency parity - multi-item plans): the original
-        /// per-item request (item id + quantity) this result was generated
+        /// The original per-item request (item id + quantity) this
+        /// result was generated
         /// for, in request order. Populated ONLY for a genuine multi-item
         /// batch (2+ requested items, solved via the synthetic wrapper -
         /// see Gw2Constants.MultiItemWrapperItemId); null for a single-item
@@ -158,30 +133,18 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyList<PlanRequestItem> RequestedItems { get; set; }
 
         /// <summary>
-        /// Populated instead of CraftingTree for a multi-item plan
-        /// (RequestedItems has 2+ entries): one full CraftingTreeNode per
-        /// requested item, in request order, each built exactly as
-        /// CraftingTree would be for a single-item plan of that same
-        /// item/quantity. The synthetic wrapper root used to solve them
-        /// together never surfaces here - echoes gw2efficiency's own
-        /// componentTree.html hiding its equivalent fake
-        /// `multipleRecipeTree` node from the rendered tree
-        /// (docs/gw2e-parity-spec.md, the M34 r1 multi-item research
-        /// report). Null for a single-item plan, which continues to
-        /// populate CraftingTree as before.
+        /// Populated instead of CraftingTree for a multi-item plan: one
+        /// full CraftingTreeNode per requested item, in request order.
+        /// The synthetic wrapper root used to solve them together never
+        /// surfaces here. Null for a single-item plan.
         /// </summary>
         public List<CraftingTreeNode> MultiItemRoots { get; set; }
 
         /// <summary>
-        /// Per-character crafting discipline data captured in the account
-        /// snapshot (W3C - per-character discipline display, gw2efficiency
-        /// parity). A straight passthrough of
-        /// AccountSnapshot.CharacterDisciplines - see that field's own doc
-        /// comment for why null (no snapshot, or a snapshot that predates
-        /// this feature / had a degraded character-crafting fetch) is kept
-        /// distinct from a non-null-but-empty list. Cosmetic display data
-        /// only, read by PlanViewModelBuilder.BuildDisciplinesSection -
-        /// never fed into solving or any total.
+        /// Per-character crafting discipline data - a straight passthrough
+        /// of AccountSnapshot.CharacterDisciplines (null "no data" stays
+        /// distinct from empty). Cosmetic display data only - never fed
+        /// into solving or any total.
         /// </summary>
         public IReadOnlyList<SnapshotCharacterDiscipline> CharacterDisciplines { get; set; }
 
@@ -215,20 +178,16 @@ namespace GW2CraftingHelper.Models
         public List<int> ProbabilisticForgeOutputItemIds { get; set; }
 
         /// <summary>
-        /// opportunity-notes (RECIPE-SHEET SAVINGS): see
-        /// Services/RecipeSheetSavingsCalculator.Apply, the sole producer.
+        /// See RecipeSheetSavingsCalculator.Apply, the sole producer.
         /// Cosmetic display data only; null until the calculator runs,
-        /// empty (not null) when it found nothing - same convention as
-        /// ExcessCraftOutputs.
+        /// empty (not null) when it found nothing.
         /// </summary>
         public List<RecipeSheetSavingsOpportunity> RecipeSheetSavingsOpportunities { get; set; }
 
         /// <summary>
-        /// opportunity-notes (SEASONAL VENDOR TIP): see
-        /// Services/SeasonalVendorTipCalculator.Apply, the sole producer.
+        /// See SeasonalVendorTipCalculator.Apply, the sole producer.
         /// Cosmetic display data only; null until the calculator runs,
-        /// empty (not null) when no active festival beats this plan - same
-        /// convention as ExcessCraftOutputs.
+        /// empty (not null) when no active festival beats this plan.
         /// </summary>
         public List<SeasonalVendorTip> SeasonalVendorTips { get; set; }
     }

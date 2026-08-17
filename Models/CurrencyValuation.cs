@@ -4,49 +4,29 @@ using System.Collections.Generic;
 namespace GW2CraftingHelper.Models
 {
     /// <summary>
-    /// User-provided coin valuations for non-coin currencies (karma,
-    /// laurels, Spirit Shards, ...), plus (currency-ux-package, Feature 1)
-    /// which currencies the user has explicitly CLEARED of
-    /// CurrencyDecisionDefaults' curated defaults. Three effective states
-    /// per currency id, in precedence order: (1) an explicit user-set value
-    /// here always wins; (2) failing that, a currency in ClearedCurrencyIds
-    /// has no value at all, even if CurrencyDecisionDefaults has one -
-    /// "cleared" is a deliberate, persisted suppression, not merely "no
-    /// override yet"; (3) failing that, CurrencyDecisionDefaults' curated
-    /// value applies, if it has one. See TryGetEffectiveCopperValue for this
-    /// precedence's own implementation - despite its name it is NOT called
-    /// by the solver at runtime, only by its one production caller
-    /// (CurrencyValuation.WithDefaults, which materializes the precedence
-    /// into a plain dictionary BEFORE the solver ever runs); see that
-    /// method's own doc comment for why. TryGetCopperValue below stays a
-    /// RAW lookup of state (1) only on THIS instance (user overrides on a
-    /// persisted/unmaterialized valuation) - used by the Settings tab to
-    /// know what to show in a currency's text box, and by every solver call
-    /// site once handed an already-materialized valuation.
+    /// User-provided coin valuations for non-coin currencies, plus which
+    /// currencies the user has explicitly CLEARED of the curated
+    /// defaults. Precedence per currency id: user-set value wins; else a
+    /// cleared currency has no value at all (a deliberate, persisted
+    /// suppression); else the curated default applies. See
+    /// TryGetEffectiveCopperValue for the implementation - it is not
+    /// called by the solver at runtime; WithDefaults materializes the
+    /// precedence into a plain dictionary first. TryGetCopperValue stays
+    /// a raw user-override lookup on this instance.
     ///
-    /// The GW2 API defines no exchange rate for these currencies at all, so
-    /// the solver never invents one on its own (repo invariant): only a
-    /// currency with an effective value (user-set, or a non-cleared
-    /// default) is usable for cost comparison. Every other currency remains
-    /// unvalued, and vendor offers/recipes charging them stay fallback-tier
-    /// only (see VendorBatchSolver.EvaluateVendorOffers).
+    /// The GW2 API defines no exchange rate for these currencies, so the
+    /// solver never invents one (repo invariant): only a currency with an
+    /// effective value is usable for comparison; everything else stays
+    /// unvalued and fallback-tier only.
     /// </summary>
     public class CurrencyValuation
     {
         /// <summary>
-        /// No user-provided valuations or clears. The default when none is
-        /// configured.
-        ///
-        /// currency-ux-package review fix (nice-to-have): the name is a
-        /// misnomer once TryGetEffectiveCopperValue is called on this
-        /// instance directly - `None.TryGetEffectiveCopperValue(2, out v)`
-        /// returns true with v=1 (karma's curated default), since that
-        /// method falls through to CurrencyDecisionDefaults whenever
-        /// neither an override nor a clear exists (see that method's own
-        /// doc comment). "None" describes zero PERSISTED overrides/clears
-        /// on this instance, not zero effective values - callers that need
-        /// "truly nothing valued" must use TryGetCopperValue (raw lookup)
-        /// instead, not TryGetEffectiveCopperValue, on this instance.
+        /// No user-provided valuations or clears. "None" describes zero
+        /// PERSISTED overrides/clears, not zero effective values -
+        /// TryGetEffectiveCopperValue on this instance still falls through
+        /// to the curated defaults; use the raw TryGetCopperValue for
+        /// "truly nothing valued".
         /// </summary>
         public static readonly CurrencyValuation None = new CurrencyValuation(new Dictionary<int, long>());
 
@@ -154,37 +134,14 @@ namespace GW2CraftingHelper.Models
         }
 
         /// <summary>
-        /// Resolves <paramref name="currencyId"/>'s EFFECTIVE decision-only
-        /// copper value per the three-state precedence documented on this
-        /// class - user override, else (if not cleared) CurrencyDecisionDefaults'
-        /// curated default, else no value at all.
-        ///
-        /// currency-ux-package review fix (finding 3, MEASURED): despite
-        /// this method's original doc claiming it is "the solver's own
-        /// entry point ... the one method every currency-cost comparison in
-        /// the solver actually calls", it is NOT called by any solver
-        /// comparison at runtime - every production call site
-        /// (PlanSolver.Evaluate, PlanSolver.RecomputeComparisonValues,
-        /// VendorBatchSolver.EvaluateVendorOffers) calls the raw
-        /// TryGetCopperValue above instead. That is correct, not a bug: this
-        /// method's one production caller is CurrencyValuation.WithDefaults,
-        /// which MATERIALIZES this three-state precedence into a plain
-        /// CopperPerUnit dictionary at the seam where the solver is invoked
-        /// (ModuleSettings.GetEffectiveCurrencyValuation) - so by the time
-        /// Solve runs, "user override or curated default" is already baked
-        /// into what the raw TryGetCopperValue lookup returns, and the
-        /// solver never needs to consult defaults or clears itself. This
-        /// method is otherwise exercised directly only by
-        /// CurrencyValuationTests, to prove the precedence WithDefaults
-        /// relies on. Trap for a future caller: handing PlanSolver.Solve a
-        /// raw, non-materialized CurrencyValuation (i.e. skipping
-        /// WithDefaults/GetEffectiveCurrencyValuation) silently yields zero
-        /// curated defaults, since TryGetCopperValue on that instance only
-        /// sees explicit user overrides.
-        ///
-        /// Still strictly DECISION-ONLY (repo invariant) - the returned
-        /// value may tip a craft-vs-buy/vendor-vs-TP comparison, but must
-        /// never be folded into a displayed gold total.
+        /// Resolves <paramref name="currencyId"/>'s EFFECTIVE
+        /// decision-only copper value per the three-state precedence
+        /// documented on this class. Not called by any solver comparison
+        /// at runtime - its one production caller is WithDefaults, which
+        /// materializes the precedence into a plain dictionary before the
+        /// solver runs. Trap for a future caller: handing Solve a raw,
+        /// non-materialized CurrencyValuation silently yields zero
+        /// curated defaults. Strictly DECISION-ONLY.
         /// </summary>
         public bool TryGetEffectiveCopperValue(int currencyId, out long copperPerUnit)
         {
@@ -201,26 +158,13 @@ namespace GW2CraftingHelper.Models
         }
 
         /// <summary>
-        /// currency-ux-package review fix (finding 5, MEASURED): the
-        /// Blish-free counterpart of the merge previously inlined directly
-        /// inside ModuleSettings.GetEffectiveCurrencyValuation - that class
-        /// is Blish-coupled and therefore untestable per repo invariant,
-        /// which left the merge that turns persisted state + defaults into
-        /// the CurrencyValuation the solver actually receives completely
-        /// unverified, including the non-obvious invariant this method
-        /// depends on (no id can land in both the merged value set and
-        /// ClearedCurrencyIds, which would throw from this class's own
-        /// constructor above - see TryGetEffectiveCopperValue, which never
-        /// returns true for an id while IsCleared(id) is also true, so that
-        /// invariant holds by construction here). Same split this repo
-        /// already uses for CurrencyValuationSerializer.
-        ///
-        /// Returns a new CurrencyValuation containing every entry
-        /// EFFECTIVELY visible to the solver from <paramref name="persisted"/>
-        /// - user overrides plus, for every id in
-        /// CurrencyDecisionDefaults.DefaultCopperPerUnit that is neither
-        /// overridden nor cleared, that curated default value.
-        /// ClearedCurrencyIds passes through unchanged.
+        /// Blish-free merge that turns persisted state + curated defaults
+        /// into the CurrencyValuation the solver actually receives. No id
+        /// can land in both the merged value set and ClearedCurrencyIds
+        /// (the constructor would throw); that holds by construction
+        /// because TryGetEffectiveCopperValue never returns true for a
+        /// cleared id. Returns user overrides plus every non-overridden,
+        /// non-cleared curated default; ClearedCurrencyIds passes through.
         /// </summary>
         public static CurrencyValuation WithDefaults(CurrencyValuation persisted)
         {

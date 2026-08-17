@@ -6,8 +6,8 @@ using System.Text;
 namespace GW2CraftingHelper.Services.Diagnostics
 {
     /// <summary>
-    /// W3B (generation progress + rich logging): formats a compact,
-    /// coarse-phase timing summary for the CraftingPlanPipeline's "Info on
+    /// Formats a compact, coarse-phase timing summary for the
+    /// CraftingPlanPipeline's "Info on
     /// finish" ModuleLog line - e.g. "tree 120ms, prices 8400ms (418
     /// items), solve 30ms, item details 9200ms, display 250ms - total
     /// 19036ms (phases 18158ms)". Pure function over the SAME raw
@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Services.Diagnostics
     /// never mis-bucket a later, unrelated debug line.
     /// </para>
     /// <para>
-    /// W3B review-fix: the SUM of these raw per-step lines necessarily
+    /// the SUM of these raw per-step lines necessarily
     /// omits every un-instrumented gap between them (task-scheduling,
     /// awaits resuming, GC, etc.), so it is always LESS THAN OR EQUAL TO
     /// the wrapper's own wall-clock Stopwatch - for a real ~19s generation
@@ -98,7 +98,7 @@ namespace GW2CraftingHelper.Services.Diagnostics
         /// </summary>
         /// <param name="debugLog">The plan's full debug log (or any prefix ending at the summary-header marker).</param>
         /// <param name="wallClockMs">
-        /// W3B review-fix: the wrapper's own wall-clock elapsed
+        /// the wrapper's own wall-clock elapsed
         /// milliseconds, if known - see the class doc comment's own
         /// "phase sum vs wall clock" note. Null (the default) preserves
         /// the original phase-sum-only "total" wording exactly, so every
@@ -192,7 +192,7 @@ namespace GW2CraftingHelper.Services.Diagnostics
             sb.Append(" - total ");
             if (wallClockMs.HasValue)
             {
-                // W3B review-fix: the wrapper's real wall-clock duration is
+                // the wrapper's real wall-clock duration is
                 // the number a field tester actually experiences - it is
                 // always >= the phase sum (un-instrumented gaps only ever
                 // ADD time) - shown alongside the phase sum, not in place

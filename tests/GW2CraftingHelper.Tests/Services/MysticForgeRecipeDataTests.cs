@@ -388,7 +388,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(data.LoadWarnings);
         }
 
-        // --- expectedOutputCount (M33 item 7: Mystic Clover EV support) ---
+        // --- expectedOutputCount (Mystic Clover EV support) ---
 
         [Fact]
         public void Load_ExpectedOutputCount_ParsedAsFractionalDouble()
@@ -524,7 +524,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(recipe.ExpectedOutputCount);
         }
 
-        // --- M38 (WP-08 / tests T7): ref/mystic_forge_recipes.json (868KB)
+        // --- ref/mystic_forge_recipes.json (868KB)
         // was never exercised through the production MysticForgeRecipeData
         // loader by a committed test - mirrors the FindRepoFile shipped-
         // file pattern established in AcquisitionHintServiceTests /

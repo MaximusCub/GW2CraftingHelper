@@ -16,9 +16,9 @@ namespace GW2CraftingHelper.Services
         // (Blish-free) does the actual conversion so that logic is unit-testable.
         public SettingEntry<string> CurrencyValuationsJson { get; private set; }
 
-        // gw2efficiency-style "value own materials" (M28; M34-B2a #3
-        // upgraded this from a display-only opportunity-cost tweak into a
-        // real force-buy pre-pass - see OwnedMaterialsForceBuyPrePass;
+        // gw2efficiency-style "value own materials" (upgraded over time
+        // from a display-only opportunity-cost tweak into a real
+        // force-buy pre-pass - see OwnedMaterialsForceBuyPrePass;
         // the VOM design (Candidate A) further upgraded it into a full
         // decision-invariant reduction - see InventoryReducer's
         // zeroOwnedDecisions doc comment): when enabled, a node is
@@ -42,7 +42,7 @@ namespace GW2CraftingHelper.Services
         // live checkbox for this setting - see SettingsTabContent.
         public SettingEntry<bool> ValueOwnMaterials { get; private set; }
 
-        // M37 (KNOWN-ISSUES #24, gw2e parity): per-material Homestead
+        // Per-material Homestead
         // Refinement efficiency tier (0/1/2), echoing gw2efficiency's own
         // per-output-material userEfficiencyTiers setting exactly - three
         // independent settings, not one combined toggle, matching gw2e's
@@ -57,11 +57,11 @@ namespace GW2CraftingHelper.Services
         public SettingEntry<int> HomesteadMetalTier { get; private set; }
         public SettingEntry<int> HomesteadWoodTier { get; private set; }
 
-        // M33 C1 (#12 diagnostics): gates the scroll-machinery diagnostic
+        // Gates the scroll-machinery diagnostic
         // logging in CraftingPlanView (wheel events, restore/guard writes
         // and state transitions). Default false; instrumentation only -
         // never changes scroll/guard/restore behavior.
-        // M39 (log system): SUBSUMED by LogDiagnosticsEnabled below per the
+        // SUBSUMED by LogDiagnosticsEnabled below per the
         // tab-roadmap-proposal synthesis (Section 2.1) - the Settings tab
         // now ships exactly ONE diagnostics checkbox (LogDiagnosticsEnabled),
         // not two. This setting is kept defined (not removed) purely for
@@ -74,19 +74,19 @@ namespace GW2CraftingHelper.Services
         // one; new users only ever see LogDiagnosticsEnabled.
         public SettingEntry<bool> ScrollDiagnosticsEnabled { get; private set; }
 
-        // M39 (log system, d2-log-system.md Section 5): size cap for the
+        // Size cap for the
         // module log file (data/module_log.jsonl), in bytes. Default 2 MB.
         // Checked on every ModuleLog write (self-trimming) - see
         // ModuleLogStore.AppendLine.
         public SettingEntry<int> LogMaxSizeBytes { get; private set; }
 
-        // M39 (log system, d2-log-system.md Section 5): age-based retention
+        // Age-based retention
         // for the module log file, in days. Default 14. Enforced once per
         // session at Module.LoadAsync - see ModuleLogStore.PruneOlderThan.
         public SettingEntry<int> LogRetentionDays { get; private set; }
 
-        // M39 (log system, d2-log-system.md Section 5/tab-roadmap-proposal
-        // Section 2.1): the ONE diagnostics toggle for the whole module -
+        // The ONE diagnostics toggle for the whole module
+        // (d2-log-system.md Section 5) -
         // subsumes ScrollDiagnosticsEnabled above and additionally gates
         // whether Debug-level ModuleLog entries reach the file sink (they
         // always still land in the in-memory ring regardless - see
@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Services
         // SettingsTabContent).
         public SettingEntry<bool> LogDiagnosticsEnabled { get; private set; }
 
-        // M39 (d1-snapshot-about-settings.md Feature 3): replaces Module.cs's
+        // Replaces Module.cs's
         // previously-hardcoded `StaleThreshold` constant. Default 10 minutes
         // (matching the constant it replaces), clamped 1-120. Read directly
         // by Module.Update()'s own staleness check via
@@ -301,7 +301,7 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// currency-ux-package (Feature 1): the solver-facing counterpart
+        /// The solver-facing counterpart
         /// of GetCurrencyValuation - same raw persisted overrides/clears,
         /// PLUS every CurrencyDecisionDefaults entry that is neither
         /// explicitly overridden nor explicitly cleared, via
@@ -321,7 +321,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public CurrencyValuation GetEffectiveCurrencyValuation()
         {
-            // currency-ux-package review fix (finding 5, MEASURED): the
+            // the
             // merge itself now lives on CurrencyValuation.WithDefaults (a
             // Blish-free Models type, therefore unit-testable) instead of
             // being inlined here - this class stays the sole production

@@ -6,7 +6,7 @@ namespace VendorOfferUpdater.Tests.Helpers
     /// <summary>
     /// Locates real repo files from the running test assembly's output
     /// directory. Mirrors GW2CraftingHelper.Tests' Helpers/RepoFileLocator.cs
-    /// (M38 WP-01) exactly; duplicated rather than shared because this
+    /// exactly; duplicated rather than shared because this
     /// project (net8.0, VendorOfferUpdater.Tests) does not reference
     /// GW2CraftingHelper.Tests (net48, ProjectReference to the Blish
     /// module) - the two test assemblies are intentionally kept from

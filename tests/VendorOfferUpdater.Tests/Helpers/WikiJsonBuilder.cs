@@ -5,7 +5,7 @@ namespace VendorOfferUpdater.Tests.Helpers
 {
     /// <summary>
     /// Builds SMW action=ask JSON response payloads for testing WikiSmwClient.
-    /// Only constructs JSON strings — contains no parsing or production logic.
+    /// Only constructs JSON strings - contains no parsing or production logic.
     /// </summary>
     public class WikiJsonBuilder
     {

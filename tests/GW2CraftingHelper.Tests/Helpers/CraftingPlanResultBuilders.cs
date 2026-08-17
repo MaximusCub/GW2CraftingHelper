@@ -4,7 +4,7 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Tests.Helpers
 {
     /// <summary>
-    /// Shared CraftingPlanResult/ItemMetadata builder helpers (M38 WP-20).
+    /// Shared CraftingPlanResult/ItemMetadata builder helpers.
     /// MakeResult and MetaFor were private static methods on
     /// PlanViewModelBuilderTests before that 1798-line file was split into
     /// focused test files - both helpers are called from every split file,
@@ -57,12 +57,12 @@ namespace GW2CraftingHelper.Tests.Helpers
                 DailyCooldownItems = dailyCooldownItems,
                 RequestedItems = requestedItems,
                 MultiItemRoots = multiItemRoots,
-                // W3C: defaults to null (not an empty list) - matches
+                // Defaults to null (not an empty list) - matches
                 // AccountSnapshot.CharacterDisciplines/CraftingPlanResult.
                 // CharacterDisciplines' own "no data captured" null
                 // convention, so a test that doesn't pass this explicitly
                 // exercises the same "no data" path production code hits
-                // for every pre-W3C/degraded snapshot.
+                // for every legacy/degraded snapshot.
                 CharacterDisciplines = characterDisciplines,
                 // design-plan-notes.md (Notes section): matches
                 // RequiredDisciplines/RequiredRecipes' own "empty list, not
@@ -70,7 +70,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                 // PlanResultBuilder) never leaves either field null once run.
                 ExcessCraftOutputs = excessCraftOutputs ?? new List<ExcessCraftOutput>(),
                 ProbabilisticForgeOutputItemIds = probabilisticForgeOutputItemIds ?? new List<int>(),
-                // opportunity-notes: same "empty list, not null" default as
+                // Same "empty list, not null" default as
                 // ExcessCraftOutputs/ProbabilisticForgeOutputItemIds above -
                 // production (RecipeSheetSavingsCalculator/
                 // SeasonalVendorTipCalculator) never leaves either field

@@ -5,8 +5,7 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Pure "Hide Unlocked Recipes" filter/header-text logic for the plan
-    /// view's Required Recipes section (wave-3 quick win #3, 2026-08-06
-    /// field testing). Blish-free by design (works only on
+    /// view's Required Recipes section. Blish-free by design (works only on
     /// PlanRowViewModel/List/bool) so it can be exercised by a real test
     /// without any Blish HUD dependency - CraftingPlanView calls this from
     /// its RequiredRecipes render branch instead of embedding the filter
@@ -67,8 +66,8 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Section header title. Always states the TOTAL recipe count (post
-        /// wave-3 #2 Mystic Forge filter, applied upstream by
+        /// Section header title. Always states the TOTAL recipe count
+        /// (after the Mystic Forge filter applied upstream by
         /// PlanViewModelBuilder.BuildRecipesSection) so the header is never
         /// dishonest about how many recipes the plan actually needs -
         /// "(showing K missing of N)" only replaces the bare "(N)" when the

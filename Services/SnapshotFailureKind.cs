@@ -1,12 +1,12 @@
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Coarse cause classification for a failed snapshot refresh (field-
-    /// tested pain, 2026-08-06: the Snapshot tab's Refresh Now used to show
-    /// only "Refresh Failed - {time}" with no hint why - a real incident had
-    /// every account data source throw an invalid-token exception because
-    /// the user was at CHARACTER SELECT, where Blish has not yet resolved
-    /// the game's Mumble identity and therefore has no API key to send).
+    /// Coarse cause classification for a failed snapshot refresh. The
+    /// Snapshot tab's Refresh Now used to show only "Refresh Failed -
+    /// {time}" with no hint why; a real incident had every account data
+    /// source throw an invalid-token exception because the user was at
+    /// CHARACTER SELECT, where Blish has not yet resolved the game's
+    /// Mumble identity and therefore has no API key to send.
     /// Produced by <see cref="SnapshotFailureClassifier"/> from the
     /// underlying exception; consumed by Views/MainView.cs to decide
     /// between the ApiAccessNotReady walkthrough dialog and a plain

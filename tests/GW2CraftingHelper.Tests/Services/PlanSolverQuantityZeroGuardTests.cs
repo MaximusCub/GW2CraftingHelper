@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class PlanSolverQuantityZeroGuardTests
     {
-        // --- M37 (KNOWN-ISSUES #26 fix-pass finding): a Quantity == 0 node
+        // --- A Quantity == 0 node
         // must never leave a standalone "ghost" step, even when its own
         // resolved Source/stepKey does not match any other occurrence's ---
 
@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Tests.Services
             // - branchB: Quantity == 1, has its OWN recipe (crafting from
             //   901 at 1 coin beats buying 900 at 100), so it resolves to
             //   Craft - a DIFFERENT stepKey than branchA's forced Buy.
-            // Before the M37 fix-pass, branchA (Quantity 0, Source
+            // Before the guard, branchA (Quantity 0, Source
             // BuyFromTp) would still call AggregateStep and - since nothing
             // else shares its (900, BuyFromTp, 0) stepKey - leave a
             // standalone "buy 0 units of 900, 0 cost" row in Plan.Steps.
@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Same shape, but branchB has NO recipe of its own (a plain
             // buy) - both occurrences now share the SAME stepKey
-            // (900, BuyFromTp, 0). Confirms the M37 Quantity == 0 guard does
+            // (900, BuyFromTp, 0). Confirms the Quantity == 0 guard does
             // not merely avoid a ghost row but also does not change the
             // ordinary merge-by-stepKey outcome for the real occurrence.
             var branchA = Leaf(900, 0);

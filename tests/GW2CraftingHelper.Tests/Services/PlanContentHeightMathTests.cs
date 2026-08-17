@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Tests.Services
     /// Exercises the real PlanContentHeightMath arithmetic against the same
     /// row-height constants CraftingPlanView's row builders use, so a future
     /// change to one side without the other would show up here as a wrong
-    /// expected value rather than a silent drift (M33 C2a directive A).
+    /// expected value rather than a silent drift.
     /// </summary>
     public class PlanContentHeightMathTests
     {
@@ -71,7 +71,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CraftingSteps_MixedWithTimegatedNotice_SumsPerRowHeight()
         {
-            // M34-B1 #3: a TimegatedNotice row renders via the shorter
+            // A TimegatedNotice row renders via the shorter
             // plain-text row pattern (FallbackTextRowHeight), not the taller
             // numbered CraftStep row - height must be summed per row rather
             // than assumed uniform once a section can mix row kinds.
@@ -104,9 +104,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void RecipeRowHeightNoSublabel_ExactlyFitsIconFramePlusDivider()
         {
-            // M36 fix-pass (MUSTFIX-3):
             // Views/Rendering/RecipesSectionRenderer.CreateRecipeRow's
-            // no-sublabel branch (M38 WP-23c: moved out of CraftingPlanView)
+            // no-sublabel branch
             // places a 34px rarity-framed icon at y=0
             // and a bottom-anchored 2px row divider inside rowHeight - the
             // constant must equal exactly icon + divider (34 + 2 = 36) with
@@ -257,7 +256,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, PlanContentHeightMath.ChildrenHeight(null, 0, false, null));
         }
 
-        // --- MultiRootTreeFlowHeight (M35, gw2efficiency parity: multi-item plans) ---
+        // --- MultiRootTreeFlowHeight ---
 
         [Fact]
         public void MultiRootTreeFlowHeight_NullRoots_IsZero()
@@ -318,17 +317,17 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // Three tests formerly here (under a "SummaryBodyHeight +
-        // MultiItemNote (M35)" / "Multi-item batch sell-side economics
-        // (M37, KNOWN-ISSUES #25)" heading: Summary_MultiItemNoteRow_
+        // MultiItemNote" / "Multi-item batch sell-side economics
+        //" heading: Summary_MultiItemNoteRow_
         // AddsFallbackTextRowHeight, Summary_NoMultiItemNoteRow_
         // UnaffectedByNewBranch, Summary_MultiItemFourCoinRowsPlusNoteRow_
         // StillOneCostTileRowHeight) asserted
         // PlanContentHeightMath.SummaryBodyHeight's shape via
         // PlanRowType.CoinTotal. Deleted as dead code (KNOWN-ISSUES W4A
-        // follow-up, closed under the high-evidence-zone policy - see
+        // entry, closed under the high-evidence-zone policy - see
         // docs/KNOWN-ISSUES.md's policy note): CoinTotal was never emitted
         // by PlanViewModelBuilder, and SummaryBodyHeight was unreachable
-        // for a real Summary section since W4A routed
+        // for a real Summary section once the redesign routed
         // PlanSectionType.Summary to SummarySectionLayoutMath.BodyHeight
         // instead. Deleted together with the enum member and the method
         // (see Models/PlanViewModel.cs, Services/PlanContentHeightMath.cs).

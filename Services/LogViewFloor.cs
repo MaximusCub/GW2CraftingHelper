@@ -1,8 +1,8 @@
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Pure "Clear view" floor arithmetic for the Log tab (wave-3 quick win
-    /// #4, 2026-08-06 field testing). Blish-free by design so it can be
+    /// Pure "Clear view" floor arithmetic for the Log tab.
+    /// Blish-free by design so it can be
     /// unit-tested directly - LogTabContent itself cannot be (a Blish HUD
     /// view; tests must never reference Blish HUD per repo rules), and the
     /// floor's storage (Module._logViewClearedBeforeVersion - see that

@@ -87,7 +87,7 @@ namespace GW2CraftingHelper.Tests.Services
             // A trailing phase-event tick draining after this SAME
             // generation's own Finish() already ran must not resurrect a
             // stale phase text over the already-written final status - the
-            // M34-B1 #4 "already closed" case, folded into the board.
+            // "already closed" case, folded into the board.
             var board = new PlanStripStatusBoard();
             board.Begin(1);
             board.Finish(1, "Plan generated - Aug 8, 2026 3:00 PM");
@@ -136,7 +136,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Finish_OnVirginBoard_Rejected()
         {
-            // Gate round 2 review-fix: a raw `sequence != _sequence` check
+            // A raw `sequence != _sequence` check
             // alone would have accepted Finish(0, ...) on a never-Begin()'d
             // board, since a virgin board's own _sequence defaults to 0 -
             // relying entirely on the caller's myGen always being
@@ -155,7 +155,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Finish_CalledTwiceForSameGeneration_SecondCallRejected()
         {
-            // Gate round 2 review-fix: a raw sequence-only check would have
+            // A raw sequence-only check would have
             // let a second Finish() for the same, already-closed generation
             // silently overwrite the first-recorded wording (a future
             // cancel-plus-failure or retry path could plausibly complete
@@ -210,7 +210,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(snapshot.FinalStatusText);
         }
 
-        // --- W3D (plan persistence): SeedRestored - review-fix, mustFix
+        // --- SeedRestored
         // (new public production surface with zero prior test coverage) ---
 
         [Fact]
@@ -252,14 +252,14 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void SeedRestored_WhileGenerationInFlight_Rejected()
         {
-            // Review-fix (critical): Module.LoadAsync can still be awaiting
+            // Module.LoadAsync can still be awaiting
             // its own network refresh when a user opens the window and
             // clicks Generate, so a real Begin(1) can land BEFORE the
             // restore drain calls SeedRestored. Unconditionally stomping
             // _sequence back to 0 in that window would silently reject
             // every subsequent UpdatePhase(1,...)/Finish(1,...) for the
             // in-flight generation (StatusUpdateGuard sees sequence 0, not
-            // 1) and freeze its spinner - the exact W3B "lost completion
+            // 1) and freeze its spinner - the exact "lost completion
             // status" bug this board exists to prevent.
             var board = new PlanStripStatusBoard();
             board.Begin(1);
@@ -293,7 +293,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Plan generated - Aug 9, 2026 10:35 AM", snapshot.FinalStatusText);
         }
 
-        // --- Round 3 review-fix: ClearRestoredSeed (new public production
+        // --- Regression: ClearRestoredSeed (new public production
         // surface with zero prior test coverage) ---
 
         [Fact]

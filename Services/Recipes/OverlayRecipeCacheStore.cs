@@ -25,7 +25,7 @@ namespace GW2CraftingHelper.Services.Recipes
         private DateTime _lastFlushUtc = DateTime.MinValue;
         private int? _storedBuildId;
 
-        // M39 (WP-16 shape, d2-log-system.md Section 4.2): see StatusStore's
+        // See StatusStore's
         // matching field comment.
         private readonly Action<string, Exception> _onError;
 

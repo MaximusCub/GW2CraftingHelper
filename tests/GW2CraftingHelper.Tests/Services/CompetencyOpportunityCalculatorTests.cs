@@ -6,7 +6,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// Adversarial-review fix (#7, source-selection-simplification
+    /// (#7, source-selection-simplification
     /// design-law gap) - direct unit tests on
     /// CompetencyOpportunityCalculator's pure tree-walk aggregation, same
     /// "plain CraftingTreeNode fixtures, no solver/pipeline round-trip
@@ -68,7 +68,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CraftUsingTheCheapestUntrainedRecipeItself_NotReported_NoDelta()
         {
-            // Adversarial-review round-2 fix (finding #5): CheapestCraftUntrained
+            // CheapestCraftUntrained
             // can still be true even when the COMMITTED decision is Craft
             // (a manual override, or an automatic pick that lands on this
             // SAME cheap recipe because competency is unknown/irrelevant
@@ -90,7 +90,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CraftUsingACostlierCompetentSiblingRecipe_StillReported()
         {
-            // Adversarial-review round-2 fix (finding #5), shape (b): a
+            // Regression: a
             // costlier COMPETENT sibling recipe won Craft (Decision ==
             // Craft) over the cheaper untrained one - the plan still
             // crafts, so the old "Decision != Craft -> nothing to report"

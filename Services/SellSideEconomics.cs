@@ -8,9 +8,9 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Sell-side economics arithmetic (SellableQuantity/NetSaleValue/
     /// TargetUnitSellPrice/CraftingProfit/MaterialOpportunityCost), moved
-    /// out of CraftingPlanPipeline (M38 WP-12, architecture S4b) as a pure,
+    /// out of CraftingPlanPipeline as a pure,
     /// move-only extraction - same fields, same order, same arithmetic. See
-    /// docs/KNOWN-ISSUES.md #25 for the full M37 design rationale this
+    /// docs/KNOWN-ISSUES.md #25 for the full design rationale this
     /// class implements (single-item vs batch rollup, its documented
     /// divergences from gw2e's own multi-item economics). Blish-free and
     /// directly unit-testable; CraftingPlanPipeline calls these statics in
@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Services
             // fees, and profit versus the plan's coin cost. Coin-only by
             // design - non-coin currency costs have no coin value here.
             //
-            // M37 (KNOWN-ISSUES #25): the per-root arithmetic (over-
+            // The per-root arithmetic (over-
             // production bump, sell-price lookup) is now shared with the
             // batch path via ComputePerItemEconomics - a pure extraction,
             // not a behavior change (see that method's own doc comment).
@@ -139,9 +139,9 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// One requested root's own sell-side figures - the SellableQuantity/
         /// NetSaleValue/TargetUnitSellPrice arithmetic factored out of
-        /// ApplySellSideEconomics (M20/M37) so both the single-item path
+        /// ApplySellSideEconomics so both the single-item path
         /// (one call, on the plan's own tree root) and
-        /// ApplyBatchSellSideEconomics (M37, one call per requested root)
+        /// ApplyBatchSellSideEconomics
         /// share IDENTICAL fee math and instant-sell revenue basis - no
         /// parallel/duplicate costing logic. itemId is passed explicitly
         /// rather than read from itemRoot.Id: both call sites already
@@ -183,7 +183,7 @@ namespace GW2CraftingHelper.Services
             // the requested quantity), this root's own cost pays for the
             // whole batch, so the extra units are sellable too.
             //
-            // Review fix (finding 8, MEASURED): "produced" must use the
+            // "produced" must use the
             // SAME basis CraftsNeeded was derived from - ExpectedOutputCount
             // (EV), not the nominal OutputCount - exactly the finding-1 fix
             // ExcessCraftOutputCalculator.Walk already applies. For an
@@ -240,8 +240,8 @@ namespace GW2CraftingHelper.Services
         /// Sum, over <paramref name="usedMaterials"/>, of the net TP sale
         /// value of the owned materials inventory reduction consumed -
         /// pure extraction of ApplySellSideEconomics' own-materials
-        /// opportunity-cost arithmetic (M28/M34-B2a #3) so
-        /// ApplyBatchSellSideEconomics (M37) can reuse it unchanged over a
+        /// opportunity-cost arithmetic so
+        /// ApplyBatchSellSideEconomics can reuse it unchanged over a
         /// batch's merged UsedMaterials list (already aggregated across
         /// every requested root by the shared InventoryReducer pool - no
         /// per-root split needed or meaningful here). Preserves
@@ -274,14 +274,14 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M37 (gw2efficiency parity - multi-item sell-side economics,
+        /// Multi-item sell-side economics (gw2efficiency parity,
         /// closes KNOWN-ISSUES #25): batch analog of ApplySellSideEconomics
         /// for a 2+ item request. Computes each requested root's own
         /// economics via ComputePerItemEconomics (the SAME TradingPostMath
         /// fee math and SellInstant/instant-sell revenue basis the
         /// single-item path already uses) and sums the survivors into the
         /// batch-level CraftingPlanResult fields. See
-        /// docs/KNOWN-ISSUES.md #25's "FIXED in M37" record for the full
+        /// docs/KNOWN-ISSUES.md #25's FIXED record for the full
         /// design rationale; summary of how this diverges from gw2e's own
         /// multi-item rollup (the `o()` function in the live app bundle -
         /// see docs/research/m37-r2-batch-economics.md Sections 1.2/4.1):
@@ -322,7 +322,7 @@ namespace GW2CraftingHelper.Services
         /// sell price - the batch equivalent of the single-item "no sell
         /// price at all" case.
         ///
-        /// Documented nuance (M37 review, UPDATED by the VOM design -
+        /// Documented nuance (updated by the decision-guided reduction design -
         /// Candidate A - decision-invariant reduction): MaterialOpportunityCost
         /// is a SINGLE sum over the batch's whole merged UsedMaterials list
         /// (Reduce still runs on the entire wrapper tree before Solve ever

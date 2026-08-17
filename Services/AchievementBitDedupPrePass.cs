@@ -4,8 +4,8 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// M37 (KNOWN-ISSUES #26, gw2e parity - achievement-bit ingredient
-    /// dedup): echoes gw2efficiency's own two-part mechanism
+    /// Achievement-bit ingredient dedup (KNOWN-ISSUES #26, gw2e
+    /// parity): echoes gw2efficiency's own two-part mechanism
     /// (initialTreeChecks + calculateTreeQuantity's achievement_bit check,
     /// docs/research/m37-r3-achievement-dedup.md Sections 1.1/1.2) for a
     /// small handful of real recipes (WvW "Infinite [siege weapon]

@@ -10,8 +10,8 @@ namespace GW2CraftingHelper.Views
 {
     /// <summary>
     /// The "GW2 API access is not ready" walkthrough dialog for the
-    /// ApiAccessNotReady snapshot-refresh failure kind (field-tested pain,
-    /// 2026-08-06: at CHARACTER SELECT, Blish has not yet resolved the
+    /// ApiAccessNotReady snapshot-refresh failure kind (at CHARACTER
+    /// SELECT, Blish has not yet resolved the
     /// game's Mumble identity, so every account data source call fails
     /// with an invalid/missing API key, and the Snapshot tab's Refresh Now
     /// used to show only the unhelpful "Refresh Failed - {time}"). Lists
@@ -27,13 +27,12 @@ namespace GW2CraftingHelper.Views
     /// and its message Label is not wrapped at all - fine for its own
     /// short sentence, but this dialog's checklist items are full
     /// sentences that need to wrap. Text is pre-wrapped with Blish HUD's
-    /// own DrawUtil.WrapText (the AboutTabContent.AddInfoLine fix pattern,
-    /// 2026-07-23) rather than the Label control's own WrapText property,
+    /// own DrawUtil.WrapText (the AboutTabContent.AddInfoLine pattern)
+    /// rather than the Label control's own WrapText property,
     /// whose wrap width is pinned at the control's first internal layout
     /// pass - a pass that fires before a later Width assignment in the
     /// same object initializer would ever take effect (confirmed by
-    /// decompiling the shipped Blish HUD assembly; see that commit's own
-    /// message for the full trace).
+    /// decompiling the shipped Blish HUD assembly).
     /// </para>
     /// <para>
     /// Deliberately skips ModalDialog's settings-backed drag position

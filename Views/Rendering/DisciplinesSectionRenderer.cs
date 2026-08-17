@@ -7,39 +7,29 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-23 (m38-a1-architecture.md S3b-T2 pilot): moved verbatim out of
+    // Moved verbatim out of
     // CraftingPlanView's "7. Section builders (continued)" region - the
     // Required Disciplines row list only. Behavior is unchanged: same row
     // geometry, same PlanContentHeightMath/PlanRelayoutMath calls, same
-    // LabelHelpers.CreateRowDivider usage (DO-NOT-TOUCH #6 - divider math
-    // and its M36b 1px scissor clearance untouched). The only edit inside
+    // LabelHelpers.CreateRowDivider usage (divider math
+    // and its 1px scissor clearance untouched). The only edit inside
     // the moved bodies is _relayoutActions.Add -> the injected
     // ISectionRelayoutSink.AddRelayout, which is a semantics-preserving
     // pass-through (see ISectionRelayoutSink's doc comment).
     //
-    // The "Discipline"/"Level" column header (CreateCTableHeaderRow) stayed
-    // in CraftingPlanView for this pilot - it was shared chrome with the
-    // not-yet-extracted Required Recipes section (CreateRecipesBody called
-    // the same method for its "Recipe"/"Status" header), and moving it then
-    // would have either widened this pilot's scope to Recipes too or left
-    // Recipes calling into a class named for Disciplines. M38 WP-23c
-    // extracted Required Recipes too, so both callers are now extracted
-    // section renderers - the stay-in-the-view rationale no longer applies.
-    // The header call moved into this class's Render() below (see
-    // Views/Rendering/CTableHeaderRenderer's doc comment for the full
-    // resolution); CraftingPlanView.CreateCollapsibleSection no longer
-    // references the c-table header for either section.
+    // The "Discipline"/"Level" column header call (CTableHeaderRenderer,
+    // shared with Required Recipes) lives in this class's Render() below;
+    // CraftingPlanView.CreateCollapsibleSection no longer references the
+    // c-table header for either section.
     //
-    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateDisciplineRow's
-    // divider+relayout tail now goes through RowRelayoutHelpers.FinishRow -
+    // CreateDisciplineRow's
+    // divider+relayout tail goes through RowRelayoutHelpers.FinishRow -
     // the shared "row panel resize + extra reposition + divider resize"
-    // shape confirmed identical across all five extracted renderers' row
+    // shape identical across all five extracted renderers' row
     // builders (see that class's doc comment). This row has no icon and no
     // name column at all (just two plain DefaultFont14 labels), so it does
-    // not match IconNameRowHelpers (the other WP-24 helper) and stays
-    // hand-rolled there - see IconNameRowHelpers' own doc comment. Geometry
-    // unchanged - see the WP-24 constant-by-constant table in the PR/commit
-    // body.
+    // not match IconNameRowHelpers and stays
+    // hand-rolled - see IconNameRowHelpers' own doc comment.
     internal sealed class DisciplinesSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -59,15 +49,11 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <summary>
         /// Moved verbatim from CraftingPlanView.CreateDisciplinesBody's row
         /// loop, plus the CreateCTableHeaderRow call this renderer now owns
-        /// directly (M38 WP-23c - see the class doc comment above).
+        /// directly.
         ///
-        /// W3C polish (review nice-to-have): the header row used to read
-        /// only "Discipline"/"Level" even though CreateDisciplineRow renders
-        /// a third, per-character-availability label between them. It
-        /// stayed unlabeled at first because that label's X used to be
-        /// per-row (8 + nameLabel.Width + charGap - discipline names range
-        /// from "Chef" to "Leatherworker"), so no single fixed header
-        /// position could honestly line up with every row. Fixed here by
+        /// The per-character-availability column gets a real header: a
+        /// per-row X (varying with each discipline name's width) could
+        /// never line up with a single header position, fixed here by
         /// computing ONE column X for the whole section - 8 + the widest
         /// discipline name actually in this section's rows + charGap - and
         /// passing it into CreateDisciplineRow instead of letting each row
@@ -119,30 +105,19 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // W3C polish: shared between Render() (header column X) and
-        // CreateDisciplineRow (per-row charLabel X and its
-        // NameMaxWidthBeforeColumn call) so both always agree on the same
-        // gap. Was a local const in CreateDisciplineRow only, before the
-        // header needed to know it too.
+        // Shared between Render() (header column X) and
+        // CreateDisciplineRow so both always agree on the same gap.
         private const int CharGap = 12;
 
         // Moved verbatim from CraftingPlanView.CreateDisciplineRow. Only
         // change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
         //
-        // W3C (per-character discipline display, gw2efficiency parity):
-        // added the character-availability label between the discipline
-        // name and the Level column - see the block below. Row height,
-        // the two original labels, and the divider/relayout tail are all
-        // otherwise untouched (rowHeight stays the fixed
-        // PlanContentHeightMath.DisciplineRowHeight - no new layout math).
-        //
-        // W3C polish (review nice-to-have): charX used to be computed here,
-        // per row, from this row's own nameLabel.Width - which meant it
-        // varied row to row (discipline names range from "Chef" to
-        // "Leatherworker") and could never line up with a single header
-        // label. It is now passed in by Render() as one fixed column X for
-        // the whole section (8 + the widest discipline name actually
-        // present + CharGap), which Render()'s own doc comment covers in
+        // The character-availability label sits between the discipline
+        // name and the Level column. charX is passed in by Render() as
+        // one fixed column X for the whole section (8 + the widest
+        // discipline name present + CharGap) - a per-row X could never
+        // line up with a single header label - which Render()'s own doc
+        // comment covers in
         // full. Guaranteed >= 8 + nameLabel.Width + CharGap for every row
         // in this call (charX's max-of-all-rows construction), so charLabel
         // can never overlap nameLabel here.
@@ -160,7 +135,7 @@ namespace GW2CraftingHelper.Views.Rendering
             };
             var levelLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
 
-            // W3C: "Anna (500), Bob (400/450)" - secondary text sitting
+            // "Anna (500), Bob (400/450)" - secondary text sitting
             // between the discipline name and the right-aligned Level
             // column, ellipsized to whatever room is left (same
             // EllipsizeToWidth + tooltip-on-truncate convention as

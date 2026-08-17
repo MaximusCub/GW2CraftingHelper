@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Tests.Services
     /// using plain CraftingTreeNode fixtures (no Blish reference, no
     /// solver/pipeline round-trip needed).
     ///
-    /// Review fix note: every fixture below that wants to assert a real
+    /// Every fixture below that wants to assert a real
     /// excess figure nests the excess-producing Craft node one level
     /// UNDER a non-craft wrapper root (see WrapAsRoot). This is required
     /// by the finding-6 fix - the calculator now excludes the display-
@@ -204,7 +204,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.ExcessCraftOutputs);
         }
 
-        // --- Review fix (finding 1, MEASURED): fractional-EV (Mystic
+        // --- Regression: fractional-EV (Mystic
         // Clover-style) Mystic Forge yield must not fabricate an excess
         // claim - CraftsNeeded is derived from ExpectedOutputCount, not
         // RecipeOutputCount, so "produced" must be recovered on that same
@@ -252,7 +252,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(2, result.ExcessCraftOutputs[0].ExcessQuantity);
         }
 
-        // --- Review fix (finding 2, MEASURED): a reference-branch subtree
+        // --- Regression: a reference-branch subtree
         // (gw2e's "what it would cost to craft instead", built under a
         // Buy node that also has a recipe) carries real solver decisions
         // for hypothetical children - none of it was actually crafted, so
@@ -291,7 +291,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(2, result.ExcessCraftOutputs[0].ExcessQuantity);
         }
 
-        // --- Review fix (finding 6, MEASURED): the requested root item's
+        // --- Regression: the requested root item's
         // own over-production is already folded into SellSideEconomics'
         // Sell Value/Profit tiles (ComputePerItemEconomics raising
         // sellableQuantity) - advertising it again here double-counts the

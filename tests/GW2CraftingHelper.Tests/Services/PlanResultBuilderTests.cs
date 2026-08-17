@@ -156,7 +156,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
         }
 
-        // W3C review-fix (mustFix): the greedy set-cover tiebreak used to
+        // The greedy set-cover tiebreak used to
         // fall straight to alphabetical order whenever no Pass 1/pre-cover
         // discipline had already been selected - see PlanResultBuilder.
         // Build's accountDisciplineNames doc comment. A recipe craftable by
@@ -203,9 +203,9 @@ namespace GW2CraftingHelper.Tests.Services
         // Companion to the test above: when characterDisciplines is null
         // (no snapshot data at all - the pre-existing default for every
         // other test in this file), the tiebreak must still fall back to
-        // the pre-W3C alphabetical order rather than throwing or behaving
+        // the plain alphabetical order rather than throwing or behaving
         // unpredictably - accountDisciplineNames is empty in that case, so
-        // every candidate ties at 0 and alpha decides, same as before W3C.
+        // every candidate ties at 0 and alpha decides.
         [Fact]
         public void RequiredDisciplines_MultiDisciplineRecipe_NoCharacterData_FallsBackToAlpha()
         {
@@ -510,7 +510,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void RequiredDisciplines_RealMysticForgeDiscipline_ExcludedAsFacility()
         {
-            // Field-test finding E (user-approved, supersedes the M37-era
+            // Field-tested (user-approved, supersedes the
             // test this replaces): real production Mystic Forge recipes
             // always carry Disciplines = ["MysticForge"]
             // (MysticForgeRecipeData.Load sets this unconditionally),
@@ -629,7 +629,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void RequiredDisciplines_AchievementOrMerchantDiscipline_ExcludedFromList()
         {
-            // M37 fix-pass (adversarial review finding): "Achievement"/
+            // "Achievement"/
             // "Merchant" are gw2e-borrowed informational source tags on the
             // new achievement-bit seed recipes, not real, player-levelable
             // GW2 crafting disciplines - they must never appear in Required
@@ -661,7 +661,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void RequiredRecipes_AchievementRecipe_IsMissingFalse_NotFlaggedAsUnlockable()
         {
-            // M37 fix-pass: an achievement-sourced recipe (negative id,
+            // An achievement-sourced recipe (negative id,
             // adjacent to but distinct from the Mystic Forge id range) is
             // inherently available - no "learn this recipe" concept
             // applies - exactly like a real Mystic Forge recipe, even
@@ -738,7 +738,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(result.RequiredRecipes[0].IsAutoLearned);
         }
 
-        // UI-bundle milestone, Feature A (wiki links): same Flags-membership
+        // Same Flags-membership
         // pattern as RequiredRecipes_AutoLearnedFlag above.
         [Fact]
         public void RequiredRecipes_LearnedFromItemFlag()
@@ -927,7 +927,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// Helper for the M38 WP-07 duplicate-RecipeId regression tests below:
+        /// Helper for the duplicate-RecipeId regression tests below:
         /// builds a root whose single option has two ingredient branches, each
         /// carrying its own RecipeOption with the SAME RecipeId but different
         /// Disciplines/MinRating (deliberately unrealistic - real GW2 recipe
@@ -990,7 +990,7 @@ namespace GW2CraftingHelper.Tests.Services
             // to the next) and returned on first match - so with branchA
             // first in the root option's Ingredients list, branchA's
             // RecipeOption must win, exactly as it would have before the
-            // M38 WP-07 single-walk-Dictionary memoization.
+            // single-walk-Dictionary memoization.
             var branchA = DuplicateRecipeBranch(2, "Weaponsmith", 400);
             var branchB = DuplicateRecipeBranch(3, "Armorsmith", 999);
             var tree = TreeWithDuplicateRecipeId(branchA, branchB);
@@ -1053,11 +1053,11 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Build_NullTree_WithCraftStep_ThrowsLikeOldFindRecipeOption()
         {
-            // M38 WP-07 fix-pass: BuildRecipeOptionIndex intentionally has no
+            // BuildRecipeOptionIndex intentionally has no
             // null-tree guard. Pinning that a null treeUsedForSolve combined
             // with at least one Craft step fails loud (NullReferenceException)
             // rather than silently returning an empty index/missing recipe
-            // data - exactly matching the pre-WP-07 FindRecipeOption(node, id),
+            // data - exactly matching the old FindRecipeOption(node, id),
             // which dereferenced node.Recipes with no null check.
             var plan = new CraftingPlan
             {

@@ -5,7 +5,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // currency-ux-package (Feature 3): ValueDetailTooltipBuilder is the
+    // ValueDetailTooltipBuilder is the
     // Blish-free half of the Recipe Tree's value-detail hover (see
     // TreeSectionController.RenderDecisionPills for the actual
     // BasicTooltipText wiring, which cannot be unit tested per repo

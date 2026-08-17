@@ -262,7 +262,7 @@ namespace VendorOfferUpdater.Tests
             Assert.NotEqual(uncapped.OfferId, capped.OfferId);
         }
 
-        // Astral Acclaim package (KNOWN-ISSUES #28): SeasonalCap threading,
+        // Astral Acclaim package: SeasonalCap threading,
         // mirroring the daily/weekly cases above.
 
         [Fact]
@@ -318,7 +318,7 @@ namespace VendorOfferUpdater.Tests
             Assert.NotEqual(withDailyOnly.OfferId, withSeasonalOnly.OfferId);
         }
 
-        // M37 (KNOWN-ISSUES #24): HomesteadTier wiring end-to-end through
+        // HomesteadTier wiring end-to-end through
         // ConvertToOffer.
 
         [Fact]
@@ -441,7 +441,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Null(offer.HomesteadTier);
         }
 
-        // Festival-vendor auto-tagging follow-up (2026-08-16):
+        // Festival-vendor auto-tagging follow-up:
         // SeasonalFestival threading through ConvertToOffer, mirroring the
         // HomesteadTier wiring block above.
 

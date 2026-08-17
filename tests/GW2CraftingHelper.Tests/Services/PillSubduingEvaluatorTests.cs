@@ -6,7 +6,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// source-selection-simplification (maintainer-approved redesign,
+    /// (redesign,
     /// docs/gw2e-considerations.md): pure unit coverage of
     /// PillSubduingEvaluator, independent of PlanSolver/DecisionPillPlanner
     /// - see PlanSolverPillSubduingTests for real Solve()-path coverage of
@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Weighted_PureCoinBothSides_HasNonCoinCostFalse()
         {
-            // Adversarial-review finding: TP selected at 500c, CRAFT
+            // TP selected at 500c, CRAFT
             // losing with DecisionValue 800c and no Currency/Item cost
             // line on either side (plain gold difference) -
             // StrictDomination cannot fire (losing's RawCoin, 0, is LOWER
@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Weighted_ItemLinesOnlyNoCurrencyLine_HasNonCoinCostFalse()
         {
-            // Adversarial-review round-2 finding #1: BuildCraftCostBreakdown
+            // Regression: BuildCraftCostBreakdown
             // emits an "Item" CostLine for EVERY Item ingredient regardless
             // of valuation (TP-priced, never user-valued) - so a craft
             // breakdown very commonly has non-empty CostLines with no
@@ -131,7 +131,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Weighted_OneCopperMarginOnMultiGoldPurchase_NotDecisive_NotSubdued()
         {
-            // Adversarial-review round-2 finding #3: the exact reported
+            // Regression: the exact reported
             // shape - TP selected at 400c, craft losing at 401c (a
             // genuine 1-copper margin, clears neither the absolute nor
             // the relative floor on a value this size) - must stay None,

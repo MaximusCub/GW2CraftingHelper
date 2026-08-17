@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Views
 
     /// <summary>
     /// The Snapshot tab: a search-as-you-type account-inventory browser
-    /// (M39 snapshot search, d1-snapshot-about-settings.md Feature 1) over
+    /// over
     /// the existing AccountItemIndex/GetPrioritizedSources seams. A plain
     /// TextBox (not the Crafting Plan tab's SuggestionPanel/
     /// AutocompleteTextBox - that machinery is shaped for picking exactly
@@ -37,9 +37,9 @@ namespace GW2CraftingHelper.Views
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
         private static readonly Color WarningTextColor = new Color(255, 200, 60);
 
-        // Mirrors Module.cs's own StaleThreshold constant. M39 scope does
-        // not add d1's proposed shared SnapshotRefreshIntervalMinutes
-        // setting (Feature 3 - out of scope for this milestone); this
+        // Mirrors Module.cs's own StaleThreshold constant. d1's proposed
+        // shared SnapshotRefreshIntervalMinutes
+        // setting (Feature 3) is deliberately not added; this
         // local constant keeps the staleness label's own threshold
         // reasonable in the meantime without inventing a second setting.
         private static readonly TimeSpan StaleThreshold = TimeSpan.FromMinutes(10);
@@ -99,13 +99,10 @@ namespace GW2CraftingHelper.Views
         private const int HeaderRowY = 5;
         private const int HeaderHeight = 40;
 
-        // UI-bundle milestone, Feature B (status own row, maintainer
-        // decision): the status label used to share _headerPanel with the
-        // Clear Cache/Refresh Now buttons at a fixed x=140 (see
-        // ApplyStatusDisplay's own "Layout risk" doc comment for the
-        // exact overflow this caused - a long status string sliding under
-        // the button row at the window's clamped minimum size). It now
-        // gets its own full-width row directly beneath the header, so
+        // The status label gets its own full-width row beneath the
+        // header rather than sharing _headerPanel with the buttons - a
+        // long status string slid under the button row at the window's
+        // clamped minimum size. So
         // every row below shifts down by StatusRowHeight + the same 5px
         // gap the header already used before SearchRowY - every other gap
         // (SearchRowY->SourceFilterRowY, etc.) is preserved exactly.
@@ -250,10 +247,8 @@ namespace GW2CraftingHelper.Views
 
             _refreshButton.Click += async (_, __) => await RefreshNowAsync();
 
-            // UI-bundle milestone, Feature B (status own row, maintainer
-            // decision): full-width row beneath the header buttons, not
-            // sharing _headerPanel with them any more - see StatusRowY's
-            // own doc comment for the layout-risk this replaces.
+            // Full-width status row beneath the header buttons - see
+            // StatusRowY.
             _statusPanel = new Panel()
             {
                 Size = new Point(w, StatusRowHeight),
@@ -266,7 +261,7 @@ namespace GW2CraftingHelper.Views
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                // Review-fix: y=2 (not 4) inside this 24px _statusPanel -
+                // Y=2 (not 4) inside this 24px _statusPanel -
                 // matches the coin row's own precedent
                 // (LayoutCoinSegments(_coinPanel, segments, 0, 2, font), y=2
                 // in the same 24px height), leaving DefaultFont14 the same
@@ -386,7 +381,7 @@ namespace GW2CraftingHelper.Views
             };
 
             // Coin display panel - see UpdateCoinDisplay's doc comment for
-            // the M38 WP-22 repoint to the shared CoinCurrencyRenderer. The
+            // the repoint to the shared CoinCurrencyRenderer. The
             // actual UpdateCoinDisplay call is deferred to the marshaled
             // tail below (with ApplyStatusDisplay/RebuildContent) - see that
             // block's own comment for why.
@@ -410,8 +405,8 @@ namespace GW2CraftingHelper.Views
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
 
-            // Same hazard family as the LogTabContent field crash (2026-08-06,
-            // docs/KNOWN-ISSUES.md): Blish HUD runs a tab's Build() via
+            // Same hazard family as the LogTabContent field crash
+            // (docs/KNOWN-ISSUES.md): Blish HUD runs a tab's Build() via
             // View.DoLoad().ContinueWith(...) on a ThreadPool thread, not the
             // main/game thread (docs/ARCHITECTURE.md Section 1). Unlike
             // LogTabContent, this instance is never recreated per tab visit
@@ -445,8 +440,8 @@ namespace GW2CraftingHelper.Views
             // UpdateCoinDisplay/RebuildContent calls can each finish
             // disposing the OLD children before either adds the NEW ones,
             // and both survive - duplicated content, the same shape as the
-            // doubled "No log entries yet." placeholders LogTabContent hit
-            // live on 2026-07-23 (see LogTabContent.cs's _buildComplete doc
+            // doubled "No log entries yet." placeholders LogTabContent
+            // hit live (see LogTabContent.cs's _buildComplete doc
             // comment); and (b) the top-of-Build
             // _searchDebounceCts?.Cancel();?.Dispose(); sequence this branch
             // moved into this tail used to run directly in Build()'s
@@ -529,7 +524,7 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// The Refresh Now button's full click flow - also invoked by the
-        /// ApiAccessDialog's Retry button (field-tested pain, 2026-08-06),
+        /// ApiAccessDialog's Retry button,
         /// so this is a method rather than an inline lambda: both entry
         /// points are Blish UI event handlers (Click, or the dialog's own
         /// Click-driven Retry callback), so both always start on the main
@@ -657,13 +652,9 @@ namespace GW2CraftingHelper.Views
         /// render, SetSnapshot, SetStatus) so the two can never drift out
         /// of sync with each other.
         /// <para>
-        /// UI-bundle milestone, Feature B (status own row, maintainer
-        /// decision): the layout risk this paragraph used to document -
-        /// a long status string (capture date + this method's own "(Nh Nm
-        /// ago)" suffix) sliding under the Clear Cache/Refresh Now buttons
-        /// at the window's clamped 930x710 minimum size - no longer applies
-        /// now that _statusLabel lives in its own full-width _statusPanel
-        /// row beneath the header, with no button run to collide with. This
+        /// _statusLabel lives in its own full-width _statusPanel row
+        /// beneath the header, so a long status string has no button run
+        /// to collide with. This
         /// method still intentionally does not truncate the composed text;
         /// the full-width row is simply far less likely to run out of
         /// space than the header's old shared, button-crowded run was.
@@ -1000,7 +991,7 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            // See CreateItemRow's matching comment (audit row 56 PART B #1) -
+            // See CreateItemRow's matching comment -
             // same data-gap-vs-failure distinction applies to a wallet
             // currency's icon (e.g. the reported Spirit Shards row).
             IconControls.CreateItemIcon(rowPanel, entry.IconUrl, 2, 2);
@@ -1017,17 +1008,16 @@ namespace GW2CraftingHelper.Views
             };
         }
 
-        // M38 WP-22 (architecture report S6): this used to carry its own
+        // This used to carry its own
         // GetCoinColor/AddCoinSegment copies, byte-identical to the ones
         // CraftingPlanView carried before its own coin/currency rendering
-        // was extracted into Views/Rendering/CoinCurrencyRenderer (WP-21) -
+        // was extracted into Views/Rendering/CoinCurrencyRenderer -
         // the second independent encoding of the coin invariant. Both are
         // deleted; this now builds its own CoinSegmentSpec list (still
         // always exactly 3 segments - gold, silver, copper - via plain
         // ToString(), no leading-zero-unit omission or zero-padding: that
-        // formatting choice is unchanged from before this package,
-        // deliberately, per the M38 plan's behavior-preservation-by-
-        // default rule) via the shared CoinCurrencyRenderer.AddSegmentSpec
+        // formatting choice is unchanged,
+        // deliberately) via the shared CoinCurrencyRenderer.AddSegmentSpec
         // (bumped private -> internal for this reuse - a normal forward
         // MainView -> Views/Rendering consumer dependency; see the note at
         // CoinCurrencyRenderer.AddSegmentSpec for why this is not the same

@@ -57,14 +57,14 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             Assert.Empty(data.Items);
         }
 
-        // --- M38 (WP-08 / tests T7): ref/item_name_seed.json (2.1MB) was
+        // --- ref/item_name_seed.json (2.1MB) was
         // never exercised through the production ItemNameSeedData.Load by
         // a committed test - mirrors the FindRepoFile shipped-file pattern
         // established in AcquisitionHintServiceTests /
         // RecipeCacheSerializerTests. Pins the real loader's parsed shape
         // (exact count + a known row) through the actual shipped file.
         // This file also happens to ship with a leading UTF-8 BOM, so it
-        // incidentally exercises that path too, though the WP-08
+        // incidentally exercises that path too, though the
         // ReadToEnd->DeserializeAsync switch was never at risk of a BOM
         // regression (both paths handle this file's BOM correctly).
         [Fact]
@@ -79,7 +79,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var data = ItemNameSeedData.Load(stream);
 
-                // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): was
+                // KNOWN-ISSUES recipe-ingestion bug class: was
                 // 14587 before that fix re-ran the full seeder chain
                 // (including this file - item_name_seed.json is generated
                 // from the same craftable-item-id set recipe_search_seed.json

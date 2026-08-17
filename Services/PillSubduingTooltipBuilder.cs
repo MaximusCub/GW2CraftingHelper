@@ -5,16 +5,10 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// source-selection-simplification (maintainer-approved redesign,
-    /// docs/gw2e-considerations.md): builds the "why this pill is subdued"
-    /// tooltip text for a PillSubduingResult - same Blish-free "builds the
-    /// string, the View only assigns it to BasicTooltipText" split
-    /// ValueDetailTooltipBuilder already established for the neighboring
-    /// value-detail hover, so the wording stays directly unit-testable.
-    /// Resolves currency/item ids to names via the SAME resolvers the rest
-    /// of the tree renderer already uses (CurrencyDisplayResolver,
-    /// PlanViewModelBuilder.ResolveName) - never surfaces a raw id (repo
-    /// invariant).
+    /// Builds the "why this pill is subdued" tooltip text - Blish-free so
+    /// the wording is directly unit-testable; the View only assigns it.
+    /// Resolves ids to names via the shared resolvers and never surfaces
+    /// a raw id (repo invariant).
     /// </summary>
     public static class PillSubduingTooltipBuilder
     {
@@ -30,12 +24,9 @@ namespace GW2CraftingHelper.Services
 
             if (result.Rule == PillSubduingRule.Weighted)
             {
-                // Adversarial-review finding: "at your current currency
-                // values" is wrong wording for the (most common) case
-                // where no Currency/Item cost is involved on EITHER side -
-                // a plain-gold difference that no currency valuation ever
-                // touched. Only mention currency values when a non-coin
-                // cost actually participated in this comparison.
+                // Only mention "your current currency values" when a
+                // non-coin cost actually participated - a plain-gold
+                // difference never touched a currency valuation.
                 if (!result.HasNonCoinCost)
                 {
                     return result.ValueMarginCopper.HasValue
@@ -48,14 +39,9 @@ namespace GW2CraftingHelper.Services
             }
 
             // StrictDomination: "needs everything the selected option
-            // needs, plus N more X[, N more Y...]" - needs no valuation,
-            // joins every kind that proved the domination (almost always
-            // exactly one in practice). Adversarial-review nice-to-have:
-            // deliberately NOT "same currencies" - the union in
-            // TryComputeDomination treats a kind absent on the SELECTED
-            // side as zero there, so e.g. selected TP 500c vs losing
-            // vendor 500c + 3 Karma is a valid domination even though the
-            // two sides do not use the same currencies at all.
+            // needs, plus N more X" - no valuation needed. Deliberately
+            // not "same currencies": a kind absent on the selected side
+            // reads as zero, so the two sides need not share currencies.
             var parts = new List<string>();
             if (result.Deltas != null)
             {

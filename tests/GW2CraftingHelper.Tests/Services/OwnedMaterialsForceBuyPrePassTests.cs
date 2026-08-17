@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Tests.Services
                 solver, tree, prices, null, PriceBasis.InstantBuy, null);
 
             Assert.Contains(0, result.ForceBuyOnlyNodeIds); // root NodeId
-            // Verification-review fix (second pass): no discipline
+            // No discipline
             // requirement anywhere in this tree, so competency can never
             // demote anything - the competency-resolved and competency-
             // blind evaluations are identical, and this node is forced
@@ -75,7 +75,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.CompetencyIndependentForceBuyNodeIds);
         }
 
-        // Adversarial-review fix (Critical #3, source-selection-
+        // (Critical #3, source-selection-
         // simplification): before this fix, ComputeForceBuyOnlyNodeIds had
         // no characterDisciplines parameter at all, so this throwaway
         // solve was the ONLY solve of a generation that stayed

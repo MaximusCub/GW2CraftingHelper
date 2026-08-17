@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Services.Diagnostics
 {
     public static class PlanTimingAnalyzer
     {
-        // W3B: extracted so PlanPhaseTimingSummary can locate exactly where
+        // Extracted so PlanPhaseTimingSummary can locate exactly where
         // the raw per-step timing lines end within a full DebugLog (raw
         // lines, then this marker, then the percentage summary below) -
         // previously only an inline literal here.

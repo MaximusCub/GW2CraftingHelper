@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Tests.Services
     public class PlanSolverVendorCapTests
     {
         // --- Vendor purchase-cap tests ---
-        // V2 semantics (M34-B1 #3, gw2efficiency parity): a DailyCap/WeeklyCap
+        // V2 semantics: a DailyCap/WeeklyCap
         // NEVER excludes an offer or re-routes the solver to a different
         // source - gw2efficiency itself only ever surfaces a cap as a
         // post-solve "this is timegated" notice, never a tree change. A

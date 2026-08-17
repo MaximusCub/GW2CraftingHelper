@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CurrentGeneration_Closed_Rejected()
         {
-            // M34-B1 #4: the actual race fix - a trailing tick belonging to
+            // The actual race fix - a trailing tick belonging to
             // the CURRENT generation must still be dropped once that same
             // generation has already written its own completion status.
             Assert.False(StatusUpdateGuard.ShouldApply(tickGeneration: 5, currentGeneration: 5, currentGenerationStatusClosed: true));

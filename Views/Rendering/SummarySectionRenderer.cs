@@ -9,19 +9,13 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-23d (m38-a1-architecture.md S3b-T2, continuing the WP-23/WP-23b/
-    // WP-23c extractions): moved verbatim out of CraftingPlanView's "7.
+    // Moved verbatim out of CraftingPlanView's "7.
     // Section builders (continued)" region - the Summary/Total Cost section.
     //
-    // W4A (Total Cost section redesign, 2026-08-15, user-designed spec - see
-    // docs/KNOWN-ISSUES.md): rewritten. The section is now two formula-band
-    // tile rows (CreateFormulaBand, replacing the old single flat
-    // CreateCostTileRow call over every CoinTotal row at once - see
-    // PlanViewModelBuilder.BuildSummarySection for why the cost/profit
-    // tiles are now two distinct PlanRowType groups instead of one), a
-    // c-table for the plan's non-coin currency costs (CreateCurrencyTable,
-    // replacing the old plain-text CreateCurrencyRow), the pre-existing M35
-    // multi-item batch MultiItemNote banner row (unchanged, still via
+    // The section is two formula-band tile rows (CreateFormulaBand), a
+    // c-table for the plan's non-coin currency costs
+    // (CreateCurrencyTable), the multi-item batch MultiItemNote banner
+    // row (still via
     // TextRowRenderer), and a new subdued footnote row (CreateFootnoteRow).
     // Height agreement for this new shape lives in
     // Services/SummarySectionLayoutMath.BodyHeight, not
@@ -52,7 +46,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var profitBandRows = new List<PlanRowViewModel>();
             var currencyRows = new List<PlanRowViewModel>();
             var noteRows = new List<PlanRowViewModel>();
-            // Review fix: a List, like noteRows - not a single "last row
+            // A List, like noteRows - not a single "last row
             // wins" variable. SummarySectionLayoutMath.BodyHeight sums
             // FallbackTextRowHeight per SummaryFootnote row it counts
             // (its own doc comment: "summed rather than assumed so a
@@ -105,7 +99,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
             foreach (var row in noteRows)
             {
-                // M38 WP-23c: CreateTextRow moved to
+                // CreateTextRow moved to
                 // Views/Rendering/TextRowRenderer (see that class's doc
                 // comment - it has two call sites still living in
                 // CraftingPlanView, this one and the default fallback case
@@ -133,7 +127,7 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// W4A: a formula band - N equal-width stat tiles reading
+        /// A formula band - N equal-width stat tiles reading
         /// left-to-right as a formula ("Total Materials Value - Your
         /// Materials Used = Actual Cost to Craft", or "Sell Value - Total
         /// Materials Value = Profit if Sold"). Callers pass exactly the
@@ -144,26 +138,17 @@ namespace GW2CraftingHelper.Views.Rendering
         /// Services/SummarySectionLayoutMath.BodyHeight, which sizes for
         /// exactly that.
         ///
-        /// Geometry is unchanged from the pre-W4A CreateCostTileRow (same
-        /// PlanRelayoutMath.ComputeCostTileGeometry call, same centering).
-        /// The only behavioral addition is the tooltip: row.TooltipText is
-        /// set directly on captionLabel itself (M32 lesson - see
-        /// PlanRowViewModel.TooltipText's own doc comment), not on
+        /// Geometry matches ComputeCostTileGeometry's tile layout.
+        /// row.TooltipText is set directly on captionLabel itself, not on
         /// rowPanel, so hovering the header text always shows it
-        /// regardless of what other controls might overlap the row.
+        /// regardless of overlapping controls.
         ///
-        /// Review fix: the "-"/"=" formula operators between tiles are now
-        /// actually drawn (a small dim Label centered on each tile
-        /// boundary - no tooltip, so it never steals hover from a
-        /// neighboring caption). Without them, three same-shaped tiles
-        /// with no visible relationship between them was exactly the "two-
-        /// tile split-column band" ambiguity the W4A redesign exists to
-        /// remove - worse than before, since it is now two adjacent
-        /// unlabelled-relationship bands instead of one. Never drawn for a
-        /// collapsed 1-tile band (tileCount == 1): there is nothing to
-        /// relate a single tile to.
+        /// The "-"/"=" formula operators between tiles are drawn as small
+        /// dim Labels centered on each boundary (no tooltip, so they
+        /// never steal hover) - without them, same-shaped tiles have no
+        /// visible relationship. Never drawn for a collapsed 1-tile band.
         ///
-        /// Review fix (round 2): the final boundary's symbol is no longer
+        /// The final boundary's symbol is no longer
         /// an unconditional "=". It reads the rightmost tile's own
         /// PlanRowViewModel.FormulaResultIsExact (see that field's doc
         /// comment) and draws NeutralResultSeparator instead of "=" when
@@ -186,7 +171,7 @@ namespace GW2CraftingHelper.Views.Rendering
             const int minTileWidth = 80;
             const int operatorY = 30;
 
-            // Review fix (round 2): drawn at the final boundary instead of
+            // Drawn at the final boundary instead of
             // "=" when the rightmost tile's FormulaResultIsExact is false -
             // see this method's own doc comment. Deliberately not "-"
             // (would misread as a second subtraction) and not "=" (would
@@ -233,14 +218,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 tiles.Add(new CostTileHandle { CaptionLabel = captionLabel, Segments = segmentHandle });
             }
 
-            // One operator per boundary BETWEEN two tiles (tileCount - 1 of
-            // them): "-" for every boundary except the last. The last
-            // boundary reads "A - B = C" (true equation) for every band
-            // except the profit band's loss case, where it reads
-            // NeutralResultSeparator instead - see this method's own doc
-            // comment (round-2 review fix). Centered on the boundary x
-            // (where tile i+1 begins - tiles are laid out contiguously
-            // with no gap, per ComputeCostTileGeometry).
+            // One operator per boundary between two tiles: "-" for every
+            // boundary except the last, which reads "=" - except the
+            // profit band's loss case, which gets NeutralResultSeparator.
+            // Centered on the boundary x where tile i+1 begins.
             List<Label> operatorLabels = null;
             if (tileCount > 1)
             {
@@ -267,7 +248,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
             }
 
-            // M33 C2b [FANOUT]: every tile's caption + coin segments are
+            // [FANOUT]: every tile's caption + coin segments are
             // font-only (invariant to panelWidth) - only tileWidth/startX
             // and each tile's own centering offset move. No MeasureString.
             _sink.AddRelayout(w =>
@@ -298,8 +279,7 @@ namespace GW2CraftingHelper.Views.Rendering
             });
         }
 
-        // --- Currency table (W4A - replaces the pre-W4A plain-text
-        // CreateCurrencyRow) ---
+        // --- Currency table ---
         //
         // 4 columns (Currency | Required | Have | Needed) do not fit
         // CTableHeaderRenderer's left/middle/right (3-slot) shape, so this
@@ -313,7 +293,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private void CreateCurrencyTable(List<PlanRowViewModel> rows, FlowPanel parent, int panelWidth)
         {
-            // Review fix: pre-scan the actual widest rendered
+            // Pre-scan the actual widest rendered
             // Required/Have/Needed value across every row this render -
             // mirrors ShoppingListSectionRenderer.Render's own maxEachWidth/
             // maxTotalWidth pre-scan (see SummarySectionLayoutMath's
@@ -381,7 +361,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var haveLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Have", font, Color.White, edges.HaveRightEdge, 5);
             var neededLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Needed", font, Color.White, edges.NeededRightEdge, 5);
 
-            // M33 C2b: widestNumberWidth is cached from the build-time
+            // WidestNumberWidth is cached from the build-time
             // pre-scan (data-derived, not panelWidth-derived - it never
             // needs to re-run on resize, same reasoning as
             // ShoppingListSectionRenderer's own cached maxEachWidth/
@@ -396,23 +376,14 @@ namespace GW2CraftingHelper.Views.Rendering
             });
         }
 
-        // W4A full-coverage marker color: matches PillColors.PillKind.
-        // Selected's own green (#1F8F0C) - the established "positive/
-        // selected" hue in this codebase - without adding a new PillKind
-        // for this single non-tree use (PillColors' enum is shared by the
-        // recipe tree's decision pills; a one-off Summary-only marker does
-        // not belong on that shared contract).
+        // Full-coverage marker color: matches PillKind.Selected's green,
+        // without adding a new PillKind for this single non-tree use.
         private static readonly Color FullCoverageBorder = new Color(31, 143, 12);
         private static readonly Color FullCoverageFill = FullCoverageBorder * 0.15f;
 
-        // W4A glyph note: the spec asked for a "\u2713" (check mark)
-        // full-coverage marker, tinted green, with an explicit fallback to
-        // a green "OK" text badge if the glyph cannot be verified to
-        // render in the Blish font. This module's own prior investigation
-        // (docs/dev-notes/HISTORY.md, "Carried follow-up resolved: caret
-        // glyphs") deliberately chose ASCII carets over a technically-
-        // representable Unicode triangle glyph after LIVE desktop
-        // rendering showed the ASCII form was the reliable one across
+        // Glyph note: a "\u2713" check-mark marker was considered, but
+        // live desktop rendering has shown ASCII to be the reliable form
+        // for glyphs in the Blish font across
         // sessions/machines - i.e. this exact font has already shown
         // Unicode-glyph rendering is not something to assume without a
         // live check. No live Blish HUD session was available to verify
@@ -453,15 +424,10 @@ namespace GW2CraftingHelper.Views.Rendering
             };
             if (displayName != fullName)
             {
-                // Review fix: stamp BOTH the label AND its containing
-                // panel - the M32 lesson (field-test finding D,
-                // docs/KNOWN-ISSUES.md "Field-test UX wave") is that a
-                // label captures the mouse before a tooltip on a control
-                // underneath it would ever be reached. nameLabel sits
-                // directly on top of the truncated text (the one thing
-                // that visually looks hoverable), so a tooltip on rowPanel
-                // alone was swallowed there and only fired on the blank
-                // strip beside the name.
+                // Stamp BOTH the label AND its containing panel - a label
+                // captures the mouse before a tooltip on a control
+                // underneath it is ever reached, so a tooltip on rowPanel
+                // alone only fires on the blank strip beside the name.
                 nameLabel.BasicTooltipText = fullName;
                 rowPanel.BasicTooltipText = fullName;
             }
@@ -479,31 +445,19 @@ namespace GW2CraftingHelper.Views.Rendering
                 int markerY = (rowHeight - 18) / 2;
                 marker = LabelHelpers.CreateSmallTag(rowPanel, FullCoverageMarkerText, edges.MarkerX, markerY, FullCoverageBorder, FullCoverageFill);
                 // No BasicTooltipText here: CreateSmallTag's inner fill
-                // panel + label cover almost the entire pill (outer is
-                // only a 1px border ring) - stamping a tooltip on just the
-                // returned outer Panel would be swallowed exactly the way
-                // field-test finding D (docs/KNOWN-ISSUES.md, "Field-test
-                // UX wave") already documented for the tree's pills, and
-                // CreateSmallTag does not expose its inner panel/label to
-                // stamp all three the way that fix did. Not spec-mandated,
-                // so left off rather than shipped half-working.
+                // panel + label cover almost the entire pill, so a
+                // tooltip on the returned outer Panel alone would be
+                // swallowed, and CreateSmallTag does not expose its inner
+                // controls to stamp all three. Left off rather than
+                // shipped half-working.
             }
 
-            // No LabelHelpers.CreateRowDivider here (unlike Required
-            // Recipes/Disciplines' RowRelayoutHelpers.FinishRow-based
-            // rows): CurrencyRowHeight (28px) was never part of the M36b
-            // Container.Paint round-trip simulation sweep (LabelHelpers.
-            // CreateRowDivider's doc comment only proves 44px/32px rows
-            // vulnerable and 36px rows immune - 28px is neither), and the
-            // pre-W4A Summary section deliberately had no per-row dividers
-            // at all (this class's own original doc comment: "no
-            // list-style rows here"). Introducing a divider at an unproven
-            // row height would risk resurrecting exactly the vanishing-
-            // divider defect DO-NOT-TOUCH #6 exists to keep away from, for
-            // a visual element the W4A spec never explicitly asked for -
-            // the header row's dark background already delineates the
-            // table. See docs/KNOWN-ISSUES.md's W4A section, item 8, for
-            // the full rationale.
+            // No CreateRowDivider here: the 28px CurrencyRowHeight was
+            // never proven immune to the vanishing-divider defect (only
+            // 36px rows are proven immune), and the header row's dark
+            // background already delineates the table - introducing a
+            // divider at an unproven row height risks resurrecting that
+            // defect for a visual element nothing asked for.
             _sink.AddRelayout(w =>
             {
                 rowPanel.Size = new Point(w, rowHeight);
@@ -525,7 +479,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    // Review fix: both controls, same reasoning as the
+                    // Both controls, same reasoning as the
                     // build-time tooltip assignment above.
                     string tooltip = newDisplayName != fullName ? fullName : null;
                     nameLabel.BasicTooltipText = tooltip;
@@ -534,8 +488,8 @@ namespace GW2CraftingHelper.Views.Rendering
             });
         }
 
-        // W4A (user-mandated): a single subdued footnote row at the bottom
-        // of the section - deliberately smaller/dimmer than the plain
+        // A single subdued footnote row at the bottom of the section -
+        // deliberately smaller/dimmer than the plain
         // MultiItemNote banner (TextRowRenderer.CreateTextRow's default
         // styling) so it reads as fine print, not as plan-specific
         // information.

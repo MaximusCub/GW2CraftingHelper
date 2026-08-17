@@ -41,7 +41,7 @@ namespace GW2CraftingHelper.Services
             {
                 if (line == null)
                 {
-                    // Review nice-to-have: reset before every false return
+                    // reset before every false return
                     // (not just this first-line case, which happened to
                     // already leave coinCost at its initial 0) so the
                     // contract - out param is 0 whenever this returns

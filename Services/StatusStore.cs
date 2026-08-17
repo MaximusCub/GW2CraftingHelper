@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Services
     {
         private readonly string _filePath;
 
-        // M39 (WP-16 shape, d2-log-system.md Section 4.2): called instead of
+        // Called instead of
         // a bare Debug.WriteLine on any IO failure. No-op default preserves
         // every existing caller (Module.cs, tests) unchanged; Module.cs
         // wires this to ModuleLog.

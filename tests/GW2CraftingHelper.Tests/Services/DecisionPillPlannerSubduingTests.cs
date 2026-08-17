@@ -7,7 +7,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// source-selection-simplification (maintainer-approved redesign,
+    /// (redesign,
     /// docs/gw2e-considerations.md): DecisionPillPlanner-level coverage of
     /// the Subdued pill Kind - exercises the real BuildPillSpecs production
     /// code with CraftingTreeNode fixtures carrying hand-set

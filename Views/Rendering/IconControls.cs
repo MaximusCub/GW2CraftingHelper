@@ -4,8 +4,7 @@ using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-21 (Tier-1 static renderer extraction, m38-a1-architecture.md
-    // S3b-T1): moved verbatim out of CraftingPlanView's "11. Generic
+    // Moved verbatim out of CraftingPlanView's "11. Generic
     // control/format helpers" region - private static -> internal static,
     // no logic changes. Callers in CraftingPlanView now qualify as
     // IconControls.CreateRarityFramedIcon / IconControls.CreateItemIcon.
@@ -49,8 +48,8 @@ namespace GW2CraftingHelper.Views.Rendering
             return frame;
         }
 
-        // tooltipText (field-test finding B's name-tooltip sweep principle:
-        // anywhere a currency icon shows, its name must be available)
+        // tooltipText (anywhere a currency icon shows, its name must be
+        // available on hover)
         // defaults to null - every pre-existing caller (item icons, whose
         // name already renders as adjacent text) is unaffected; only a new
         // caller that opts in by passing it gets a hover tooltip.

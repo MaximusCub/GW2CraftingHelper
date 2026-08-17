@@ -22,39 +22,25 @@ namespace GW2CraftingHelper.Models
         public int Quantity { get; set; }
         public CraftingDecision Decision { get; set; }
 
-        // How many units of this node's OWN demand were covered by owned
-        // inventory during reduction (M34-B2a #1, gw2e parity groundwork -
-        // see InventoryReducer.ReducedTreeResult.OwnedQuantityUsedByNode).
-        // 0 when reduction never ran (no snapshot) or nothing owned was
-        // consumed for this node. Quantity + OwnedQuantityUsed recovers the
-        // node's original pre-reduction demand. This makes a PARTIALLY-owned
-        // node representable (Quantity > 0 but OwnedQuantityUsed > 0) -
-        // previously only fully-owned nodes (Quantity reduced to 0 ->
-        // Decision.Have) were visible at all.
+        // How many units of this node's own demand were covered by owned
+        // inventory during reduction; 0 when reduction never ran or
+        // nothing was consumed. Quantity + OwnedQuantityUsed recovers the
+        // original pre-reduction demand, making a partially-owned node
+        // representable.
         public int OwnedQuantityUsed { get; set; }
 
-        // True when the user manually marked this item's id "Ignore" (M34-
-        // B2b, gw2e parity - see PlanSolver's ignoredItemIds parameter and
-        // the "IGNORE"/"IGNORED" pill). Distinct from genuine full ownership
-        // (Quantity == 0 via real inventory reduction): CraftingTreeBuilder
-        // sets Decision = Have for an ignored node too (its cost is zero and
-        // it generates no crafting step, same as a truly-owned node), but
-        // this flag lets the pill layer still show an active, clickable
-        // "IGNORED" toggle alongside HAVE instead of the plain single HAVE
-        // pill a naturally-owned node gets.
+        // True when the user manually marked this item's id "Ignore".
+        // Distinct from genuine full ownership: an ignored node also gets
+        // Decision = Have, but this flag lets the pill layer show the
+        // clickable "IGNORED" toggle alongside HAVE.
         public bool IsIgnored { get; set; }
 
-        // True when this exact tree occurrence was zeroed by
-        // AchievementBitDedupPrePass (M37, KNOWN-ISSUES #26) because the
-        // same item id is already being counted elsewhere in the tree (an
-        // earlier achievement-bit occurrence of itself, or a plain/normal
-        // occurrence of the same id anywhere). Like IsIgnored, this
-        // coexists with Decision == Have (Quantity == 0) but means
-        // something different: nothing here is actually owned - the item
-        // still needs to be obtained once, just not counted twice. The
-        // pill layer renders a distinct, non-interactive "COUNTED
-        // ELSEWHERE" annotation instead of the plain HAVE a genuinely-owned
-        // node gets (see DecisionPillPlanner).
+        // True when this occurrence was zeroed by
+        // AchievementBitDedupPrePass because the same item id is already
+        // counted elsewhere in the tree. Coexists with Decision == Have
+        // but means something different: nothing here is actually owned -
+        // the item still needs to be obtained once, just not counted
+        // twice. Renders as "COUNTED ELSEWHERE", never plain HAVE.
         public bool IsAchievementBitDeduped { get; set; }
 
         // Feasible acquisition paths for this node (drives override cycling).
@@ -76,82 +62,39 @@ namespace GW2CraftingHelper.Models
         public int? CraftsNeeded { get; set; }
         public int? RecipeOutputCount { get; set; }
 
-        // Review fix (finding 1, MEASURED): the basis CraftsNeeded above
-        // was ACTUALLY derived from - RecipeService.BuildNodeAsync computes
-        // CraftsNeeded = ceil(Quantity / ExpectedOutputCount), never
-        // ceil(Quantity / RecipeOutputCount) - see RecipeOption.
-        // ExpectedOutputCount's own doc comment. For an integer-yield
-        // recipe ExpectedOutputCount == RecipeOutputCount exactly (a no-op
-        // ratio of 1.0); only a Mystic-Clover-style fractional-EV recipe
-        // (e.g. outputItemCount=1, expectedOutputCount=0.31) diverges.
-        // CraftsNeeded and RecipeOutputCount are on DIFFERENT bases for
-        // that case - ExcessCraftOutputCalculator MUST recover "produced"
-        // from CraftsNeeded * RecipeExpectedOutputCount, not
-        // CraftsNeeded * RecipeOutputCount, or it fabricates a large
-        // integer surplus for a recipe whose expected output was already
-        // probability-adjusted to land at (approximately) Quantity. Set
-        // only for Decision == Craft nodes, same gate as CraftsNeeded/
-        // RecipeOutputCount.
+        // The basis CraftsNeeded was actually derived from (ceil(Quantity
+        // / ExpectedOutputCount), never RecipeOutputCount). Equal for
+        // integer-yield recipes; a fractional-EV recipe diverges, and
+        // "produced" MUST be recovered from CraftsNeeded *
+        // RecipeExpectedOutputCount or a large integer surplus is
+        // fabricated for an already probability-adjusted yield. Set only
+        // for Decision == Craft nodes.
         public double? RecipeExpectedOutputCount { get; set; }
 
         public long? UnitCost { get; set; }
         public long? SubtreeCost { get; set; }
 
-        // currency-ux-package (Feature 3): passthrough of
-        // SolverDecision.ComparisonValue for this node's committed
-        // decision - see that property's own doc comment. DECISION-ONLY
-        // (repo invariant, restated here since this is the field the tree
-        // renderer's value-detail tooltip reads directly): SubtreeCost
-        // above remains the sole real/displayed cost for this node;
-        // DecisionValue exists only to explain, on hover, why a CRAFT/
-        // BuyFromVendor decision won when it diverges from SubtreeCost -
-        // never to be shown as, or folded into, a displayed total. Equal
-        // to SubtreeCost whenever no currency valuation contributed
-        // anywhere in this node's own subtree (the common case).
+        // Passthrough of SolverDecision.ComparisonValue. DECISION-ONLY:
+        // SubtreeCost remains the sole displayed cost; this exists only
+        // to explain on hover why a decision won, never to be folded into
+        // a displayed total. Equal to SubtreeCost when no currency
+        // valuation contributed.
         public long? DecisionValue { get; set; }
 
-        // currency-ux-package review fix (finding 4, MEASURED): passthrough
-        // of SolverDecision.VendorComponentCostsUnreliable for this node's
-        // committed decision. True only for a BuyFromVendor decision whose
-        // per-occurrence VendorItemCosts/VendorCurrencyCosts (and, by
-        // extension, DecisionValue's own currency component) could not be
-        // proven to still sum to this node's corrected TotalCost after
-        // AllocateVendorNodeCosts merged 2+ tree occurrences into one true
-        // batch (see Decision.VendorComponentCostsUnreliable's own doc
-        // comment). CraftingTreeBuilder already refuses to synthesize
-        // vendor cost-component leaves under this condition
-        // (BuildVendorCostComponentLeaves) for the identical reason;
-        // ValueDetailTooltipBuilder.TryBuild gates on this flag the same
-        // way, so the Feature-3 hover never presents a currency figure it
-        // cannot vouch for.
+        // Passthrough of SolverDecision.VendorComponentCostsUnreliable.
+        // Both component-leaf synthesis and the value-detail tooltip gate
+        // on this, so neither presents a currency figure that cannot be
+        // proven to sum to the corrected total.
         public bool VendorComponentCostsUnreliable { get; set; }
 
-        // AUDIT ROW 20/38 (gw2e price-side fallback parity): true when this
-        // node's UnitCost above came from an item's NON-preferred TP side
-        // because the preferred side (per the plan's PriceBasis) had no
-        // listings - see PlanSolver.GetUnitPrice's fallback overload. Three
-        // distinct producers, all gated the same way at their own source:
-        // (1) a plain BuyFromTp node, from SolverDecision.PriceSideFellBack
-        // (CraftingTreeBuilder.BuildNode gates this to Decision ==
-        // BuyFromTp only); (2) a BuyFromVendor cost-component leaf
-        // (IsCostComponent) representing a TP-valued Item barter line, from
-        // VendorItemCostLine.PriceSideFellBack (review-fix,
-        // BuildVendorCostComponentLeaves) - the leaf's OWN price, not the
-        // parent vendor node's; (3) review-fix round 3 (DISPLAY CAVEAT gap),
-        // widened round 7 (multi-kind offers): a BuyFromVendor node - the OR
-        // of every VendorItemCosts line's own PriceSideFellBack, set
-        // regardless of whether that node also got cost-component leaves
-        // (CraftingTreeBuilder.BuildNode, right after componentLeaves is
-        // computed), so both the parent AND a leaf beneath it can carry the
-        // flag at once with no double-counting (they are separate nodes).
-        // Always false for every other node, including a currency
-        // cost-component leaf (never TP-priced). The recipe-tree renderer
-        // reads this to add a caveat to the unit-price tooltip - a DIFFERENT
-        // sentence for case (3) than for cases (1)/(2) (review-fix round 8):
-        // a BuyFromVendor parent's flag describes one of ITS cost items
-        // falling back, not the row's own item, so the wording names the
-        // component rather than asserting the row's own price fell back -
-        // see TreeSectionController.RenderTreeNode's tooltip-gate comment.
+        // True when this node's UnitCost came from an item's
+        // non-preferred TP side because the preferred side had no
+        // listings. Three producers: a plain BuyFromTp node, a
+        // cost-component leaf (its OWN price), and a BuyFromVendor node
+        // (the OR of its VendorItemCosts lines - the flag then describes
+        // a cost item falling back, not the row's own item, so the
+        // tooltip wording differs). Parent and leaf can both carry the
+        // flag; they are separate nodes, no double-counting.
         public bool PriceSideFellBack { get; set; }
 
         // Non-coin currency cost of a BuyFromVendor decision (see
@@ -162,34 +105,19 @@ namespace GW2CraftingHelper.Models
         // names/icons before render.
         public IReadOnlyList<CostLine> VendorCurrencyCosts { get; set; }
 
-        // True when this node was bought (TP/vendor) but ALSO has a known
-        // recipe, so Children holds gw2e's "what it would cost to craft
-        // instead" reference branch rather than an actual crafting step.
-        // The view renders these dimmed and collapsed by default.
-        //
-        // W4B review-fix: for a BuyFromVendor node that ALSO synthesized
-        // cost-component leaves (IsCostComponent children), Children is a
-        // STACK of both - the component leaves first, then the reference
-        // branch's own recipe ingredients appended after (see
-        // CraftingTreeBuilder.BuildNode) - not one or the other. This flag
-        // still means exactly "Children includes the reference-branch
-        // ingredients", just no longer implies Children is EXCLUSIVELY the
-        // reference branch in that mixed case.
+        // True when this node was bought but also has a known recipe, so
+        // Children holds the "what it would cost to craft instead"
+        // reference branch - rendered dimmed and collapsed. For a vendor
+        // node that also synthesized cost-component leaves, Children is a
+        // stack of both (leaves first); this flag means "Children
+        // includes the reference-branch ingredients", not "exclusively".
         public bool IsReferenceBranch { get; set; }
 
-        // opportunity-notes (RECIPE-SHEET SAVINGS): the raw candidate
-        // recipe used to build the reference branch above (node.Recipes[0]
-        // in CraftingTreeBuilder - the SAME "deterministic first option"
-        // whose ingredients the reference branch already costs out), kept
-        // alongside it so a later annotation pass (RecipeSheetSavingsCalculator)
-        // can tell whether "what it would cost to craft instead" is
-        // actually blocked on an unlearned, purchasable-sheet recipe -
-        // without re-walking the solver's own RecipeNode tree. Set ONLY
-        // alongside IsReferenceBranch (never for a Craft-decision node,
-        // which already has its own RecipeId/Disciplines above from the
-        // CHOSEN recipe); null/default otherwise. Never used for cost math
-        // or display itself - the reference branch's own Children
-        // SubtreeCost sum remains the sole real craft-cost figure.
+        // The raw candidate recipe the reference branch was built from,
+        // kept so RecipeSheetSavingsCalculator can check whether the
+        // hypothetical craft is blocked on an unlearned purchasable-sheet
+        // recipe without re-walking the solver tree. Set only alongside
+        // IsReferenceBranch; never used for cost math or display.
         public int? ReferenceRecipeId { get; set; }
         public List<string> ReferenceRecipeDisciplines { get; set; }
         public int ReferenceRecipeMinRating { get; set; }
@@ -201,41 +129,19 @@ namespace GW2CraftingHelper.Models
         // ReferenceRecipeId is null.
         public bool ReferenceRecipeIsLearnedFromItem { get; set; }
 
-        // W4B (vendor cost-component leaves): true only for a DISPLAY-ONLY
-        // synthetic leaf CraftingTreeBuilder.BuildVendorCostComponentLeaves
-        // creates under a BuyFromVendor node whose winning offer mixed 2+
-        // cost kinds (coin / non-coin currency / TP-valued item) - never
-        // set on a real solver-backed node. Default false, additive, so an
-        // old plan.json simply deserializes every existing node with this
-        // false (renders exactly as before W4B) until the plan is
-        // regenerated. Downstream effects of this flag:
-        // - DecisionPillPlanner.BuildPillSpecs gives it ONLY the
-        //   informational "OWN n" badge (from ComponentOwnedQuantity
-        //   below, shown only when n > 0) and/or a "CURRENCY" badge (when
-        //   this leaf's cost cell is blank), or no pill at all - never a
-        //   decision pill, never Ignore, never override-clickable. (W4B
-        //   2026-08-15: "OWN n" replaced the earlier HAVE/"HAVE N/M
-        //   NEEDED" vocabulary - see DecisionPillPlanner.BuildPillSpecs'
-        //   own doc comment for why.)
-        // - It corresponds to no RecipeNode at all (it is never fed back
-        //   into PlanSolver.Evaluate/CollectPresetOverrides, which walk the
-        //   SOLVER tree exclusively - see CraftingPlanPipeline.
-        //   CollectPresetOverrides), so it cannot affect a solver decision.
+        // True only for a display-only synthetic leaf under a
+        // BuyFromVendor node whose winning offer mixed 2+ cost kinds -
+        // never on a real solver-backed node. Gets only informational
+        // badges, never a decision pill or the Ignore toggle, and
+        // corresponds to no RecipeNode at all, so it cannot affect a
+        // solver decision.
         public bool IsCostComponent { get; set; }
 
-        // W4B: informational-only "how much of this cost component's own
-        // Quantity do you already own" count, populated ONLY when
-        // IsCostComponent is true (0 otherwise). Unlike OwnedQuantityUsed
-        // above, this NEVER reduces Quantity or any displayed cost - a
-        // cost component is a fact about what the winning vendor offer
-        // charges, not a shopping demand InventoryReducer ever sees (see
-        // AccountCurrencyIndex/AccountItemIndex's own "cosmetic
-        // reconciliation, never consulted by the solver" precedent, which
-        // this reuses for both currency and item components). Deliberately
-        // a separate field from OwnedQuantityUsed (whose own doc comment's
-        // "Quantity + OwnedQuantityUsed recovers the original pre-
-        // reduction demand" contract does not hold here - Quantity on a
-        // cost-component leaf is never reduced at all).
+        // Informational-only "how much of this component do you own"
+        // count, populated only when IsCostComponent. Unlike
+        // OwnedQuantityUsed it never reduces Quantity or any cost - a
+        // cost component is a fact about what the offer charges, not a
+        // shopping demand the reducer sees - hence the separate field.
         public int ComponentOwnedQuantity { get; set; }
 
         // Wiki-derived acquisition guidance (see AcquisitionHintService),
@@ -254,56 +160,32 @@ namespace GW2CraftingHelper.Models
         // (or no hint at all) - the view falls back to "UNKNOWN".
         public string AcquisitionBadge { get; set; }
 
-        // source-selection-simplification (maintainer-approved redesign,
-        // docs/gw2e-considerations.md): raw cost breakdowns for EVERY
-        // feasible source at this node, straight passthrough of
-        // SolverDecision's own matching fields (see PillSourceCostBreakdown's
-        // own doc comment) - null until CraftingTreeBuilder populates them
-        // for a real "Item" node with a solved decision (the same early-
-        // return nodes that never set CanCraft/CanBuyTp/CanBuyVendor either -
-        // Have/GuildUpgrade/Currency/UnrecognizedIngredient/cost-component
-        // leaves - leave these null too, since DecisionPillPlanner never
-        // needs a breakdown comparison for a node with no real source
-        // choice). Consumed by PillSubduingEvaluator via DecisionPillPlanner
-        // - never fed back into any displayed cost.
+        // Raw cost breakdowns for every feasible source, passthrough of
+        // SolverDecision's matching fields - null on the early-return
+        // nodes that have no real source choice. Consumed by
+        // PillSubduingEvaluator; never fed back into any displayed cost.
         public PillSourceCostBreakdown CraftCostBreakdown { get; set; }
         public PillSourceCostBreakdown BuyFromTpCostBreakdown { get; set; }
         public PillSourceCostBreakdown BuyFromVendorCostBreakdown { get; set; }
 
-        // Adversarial-review fix (#7, source-selection-simplification
-        // design-law gap): straight passthrough of SolverDecision's own
-        // matching fields - true when craft was excluded from the
-        // AUTOMATIC pick specifically because no character meets the
-        // winning recipe's discipline requirement (never for the force-buy
-        // pre-pass's own, separately-explained exclusion). Consumed by
-        // CompetencyOpportunityCalculator to build a concrete "crafting
-        // would save N" Plan Notes line - never fed back into any
-        // displayed cost. CraftExcludedRealCost/Disciplines/MinRating
-        // describe the recipe that would have won; only meaningful when
-        // CraftExcludedByCompetency is true.
+        // Passthrough of SolverDecision's matching fields - true when
+        // craft was excluded from the automatic pick because no character
+        // meets the winning recipe's discipline requirement. Consumed by
+        // CompetencyOpportunityCalculator; never fed back into any
+        // displayed cost. The companion fields describe the recipe that
+        // would have won.
         public bool CraftExcludedByCompetency { get; set; }
         public long? CraftExcludedRealCost { get; set; }
         public IReadOnlyList<string> CraftExcludedDisciplines { get; set; }
         public int CraftExcludedMinRating { get; set; }
 
-        // Adversarial-review round-2 fix (finding #5): straight
-        // passthrough of SolverDecision's own matching fields - true
-        // whenever the numerically cheapest raw craft recipe overall is
-        // untrained, independent of whether the AUTOMATIC pick itself got
-        // excluded. Closes two gaps CraftExcludedByCompetency alone left
-        // unreported: (a) the cheapest COMPARABLE recipe is untrained but
-        // a competent recipe exists only in the FALLBACK tier (craft never
-        // even enters the comparable-tier PickCheapest race); (b) a
-        // costlier competent SIBLING recipe wins Craft over the cheaper
-        // untrained one (the plan still crafts, so CraftExcludedByCompetency's
-        // own "Decision == Craft -> nothing to report" precedent does not
-        // apply - the user still never got the cheap recipe). Consumed by
-        // CompetencyOpportunityCalculator; never fed back into any
-        // displayed cost. CheapestCraftRealCost/Disciplines/MinRating
-        // describe that cheap recipe - only meaningful when
-        // CheapestCraftUntrained is true. Verification-review fix: never
-        // true for a node the force-buy pre-pass excluded craft from - see
-        // SolverDecision.CheapestCraftUntrained's own doc comment.
+        // Passthrough of SolverDecision's matching fields - true whenever
+        // the numerically cheapest raw craft recipe overall is untrained,
+        // independent of whether the automatic pick got excluded (also
+        // covers a competent other-tier or costlier-sibling recipe
+        // winning instead). Consumed by CompetencyOpportunityCalculator;
+        // never fed back into any displayed cost. See
+        // SolverDecision.CheapestCraftUntrained for the force-buy gating.
         public bool CheapestCraftUntrained { get; set; }
         public long? CheapestCraftRealCost { get; set; }
         public IReadOnlyList<string> CheapestCraftDisciplines { get; set; }

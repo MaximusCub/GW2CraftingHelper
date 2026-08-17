@@ -6,8 +6,7 @@ namespace GW2CraftingHelper.Tests.Helpers
 {
     /// <summary>
     /// Loads the cross-project golden-vector fixture at
-    /// tests/shared/vendor_offer_hasher_vectors.json (M38 WP-19, tests
-    /// T13). The fixture lives outside both test projects' own directories
+    /// tests/shared/vendor_offer_hasher_vectors.json. The fixture lives outside both test projects' own directories
     /// - not under either project's Helpers/, and deliberately not under
     /// ref/ (ref/ is shipped module seed data loaded at runtime; this file
     /// is test-only infrastructure with no runtime consumer) - so both

@@ -3,7 +3,7 @@ using Xunit;
 
 namespace VendorOfferUpdater.Tests
 {
-    // M37 (KNOWN-ISSUES #24): EscapeNonAscii restores
+    // EscapeNonAscii restores
     // ref/vendor_offers.json's established escaping convention (non-ASCII
     // escaped as lowercase \uXXXX, every ASCII character - including
     // apostrophe/ampersand - left literal) on top of

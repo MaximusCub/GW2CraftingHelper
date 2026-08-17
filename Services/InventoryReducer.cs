@@ -91,7 +91,7 @@ namespace GW2CraftingHelper.Services
         ///   node with owned stock of ITSELF plus owned stock of its own
         ///   ingredients, and a recipe/vendor batch whose output count is
         ///   greater than 1.
-        /// - Legacy heuristic (M34-B2a #2, gw2e parity / M1 Finding 5): used
+        /// - Legacy heuristic: used
         ///   whenever <paramref name="zeroOwnedDecisions"/> is null (every
         ///   pre-VOM caller/test) OR does not contain this node's NodeId
         ///   (defensive fallback) - true only along the single
@@ -100,7 +100,7 @@ namespace GW2CraftingHelper.Services
         ///   RecipeService/the upstream recipe source puts first). Without a
         ///   guide, which recipe option will actually be chosen is
         ///   unknowable at reduction time; walking every option and letting
-        ///   each one drain the shared pool (the pre-M34-B2a#2 behavior)
+        ///   each one drain the shared pool
         ///   would let a recipe option the solver never picks steal owned
         ///   stock from a branch that IS chosen.
         ///
@@ -114,9 +114,9 @@ namespace GW2CraftingHelper.Services
         /// here regardless of consumeFromPool - that math reflects THIS
         /// node's own (already-decided, pool-independent) Quantity and is
         /// required for PlanSolver's cost comparison across recipe options
-        /// to stay internally consistent (M33 Finding 1: every ingredient of
-        /// every recipe is always evaluated, even one the solver ultimately
-        /// doesn't choose).
+        /// to stay internally consistent (every ingredient of every recipe
+        /// is always evaluated, even one the solver ultimately doesn't
+        /// choose).
         /// </summary>
         private void ReduceNode(
             RecipeNode node,
@@ -165,7 +165,7 @@ namespace GW2CraftingHelper.Services
             }
 
             SolverDecision guideDecision = null;
-            // Review-fix: Reduce is public API with an IReadOnlyDictionary
+            // Reduce is public API with an IReadOnlyDictionary
             // parameter - PlanSolver never emits a null VALUE, but nothing
             // stops a caller from doing so. TryGetValue alone returns true
             // for an entry whose value IS null, and the code below
@@ -345,7 +345,7 @@ namespace GW2CraftingHelper.Services
             }
 
             SolverDecision guideDecision = null;
-            // Review-fix: Reduce is public API with an IReadOnlyDictionary
+            // Reduce is public API with an IReadOnlyDictionary
             // parameter - PlanSolver never emits a null VALUE, but nothing
             // stops a caller from doing so. TryGetValue alone returns true
             // for an entry whose value IS null, and the code below
@@ -390,9 +390,9 @@ namespace GW2CraftingHelper.Services
         /// otherwise (a no-op for every ordinary recipe, where the two are
         /// equal). Using a DIFFERENT basis here than RecipeService used
         /// originally would desync origCraftsNeeded's per-craft ingredient
-        /// ratio from the reduced tree's new crafts count - see M33 Finding
-        /// 2 (CloneOption dropping ExpectedOutputCount silently disabled EV
-        /// pricing whenever a snapshot triggered this reduction path).
+        /// ratio from the reduced tree's new crafts count - CloneOption
+        /// once dropped ExpectedOutputCount and silently disabled EV
+        /// pricing whenever a snapshot triggered this reduction path.
         /// </summary>
         private static int ComputeCraftsNeeded(int quantity, RecipeOption option)
         {
@@ -458,11 +458,10 @@ namespace GW2CraftingHelper.Services
                 IngredientType = node.IngredientType,
                 Quantity = node.Quantity,
                 NodeId = node.NodeId,
-                // M37 (KNOWN-ISSUES #26): must be copied explicitly, same as
-                // every other field here - see the M33 Finding 2 comment on
-                // RecipeOption.ExpectedOutputCount below for why a field
-                // silently missing from this clone is a real, previously-hit
-                // bug class in this codebase, not a hypothetical one.
+                // Must be copied explicitly, same as every other field
+                // here - see the ExpectedOutputCount comment in CloneOption
+                // below for why a field silently missing from this clone is
+                // a real, previously-hit bug class in this codebase.
                 // AchievementBitDedupPrePass runs on the pre-reduction tree
                 // (before this clone is made), so IsAchievementBitDeduped
                 // must survive onto the tree PlanSolver/CraftingTreeBuilder
@@ -487,9 +486,9 @@ namespace GW2CraftingHelper.Services
                 RecipeId = option.RecipeId,
                 OutputCount = option.OutputCount,
                 CraftsNeeded = option.CraftsNeeded,
-                // M33 Finding 2 fix: this field was silently dropped here,
-                // which zeroed it out (C# default) on every cloned option -
-                // defeating EV pricing (PlanSolver/RecipeService's
+                // This field was once silently dropped here, zeroing it
+                // out (C# default) on every cloned option - defeating EV
+                // pricing (PlanSolver/RecipeService's
                 // ExpectedOutputCount-based math) whenever an account
                 // snapshot triggered a Reduce() clone, i.e. the normal
                 // own-materials path for a real plan.

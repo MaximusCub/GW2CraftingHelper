@@ -6,8 +6,7 @@ namespace VendorOfferUpdater.Tests.Helpers
 {
     /// <summary>
     /// Loads the cross-project golden-vector fixture at
-    /// tests/shared/vendor_offer_hasher_vectors.json (M38 WP-19, tests
-    /// T13). See GW2CraftingHelper.Tests/Helpers/VendorOfferHasherVectorFixture.cs
+    /// tests/shared/vendor_offer_hasher_vectors.json. See GW2CraftingHelper.Tests/Helpers/VendorOfferHasherVectorFixture.cs
     /// (this project's counterpart) for why the fixture lives outside both
     /// test projects rather than under ref/ or either project's own
     /// Helpers/.

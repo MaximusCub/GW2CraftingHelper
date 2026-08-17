@@ -34,7 +34,7 @@ namespace VendorOfferUpdater.Tests
             return (client, handler, httpClient);
         }
 
-        // ── Parsing tests ──────────────────────────────────────────
+        // -- Parsing tests ------------------------------------------
 
         [Fact]
         public async Task SingleResult_ParsesAllFields()
@@ -181,7 +181,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Null(results[0].WeeklyCap);
         }
 
-        // Astral Acclaim package (KNOWN-ISSUES #28): "Has seasonal purchase
+        // Astral Acclaim package: "Has seasonal purchase
         // cap" is a distinct SMW property from daily/weekly - live-confirmed
         // exclusively on the Wizard's Vault family of pages.
 
@@ -247,7 +247,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Empty(results);
         }
 
-        // ── Pagination tests ───────────────────────────────────────
+        // -- Pagination tests ---------------------------------------
 
         [Fact]
         public async Task Pagination_FollowsContinueOffset()
@@ -303,7 +303,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal(1, stats.DuplicatesDiscarded);
         }
 
-        // ── Partitioning tests ─────────────────────────────────────
+        // -- Partitioning tests -------------------------------------
 
         [Fact]
         public async Task MaxDepthZero_TruncatesPartition()
@@ -333,7 +333,7 @@ namespace VendorOfferUpdater.Tests
             var (client, handler, httpClient) = CreateClient();
             using var _ = httpClient;
 
-            // Root: result + stalled offset → overflow
+            // Root: result + stalled offset -> overflow
             string rootJson = new WikiJsonBuilder()
                 .AddResult("NPC#v1", gameId: 100, vendor: "Alpha")
                 .WithContinueOffset(0)
@@ -342,7 +342,7 @@ namespace VendorOfferUpdater.Tests
 
             // Probes happen sequentially (A-Z, 0-9). When a probe is non-empty,
             // the full pagination for that prefix runs IMMEDIATELY before the next probe.
-            // So the queue order is: A-probe → A-pagination → B-probe → C-probe → ...
+            // So the queue order is: A-probe -> A-pagination -> B-probe -> C-probe -> ...
             string prefixAJson = new WikiJsonBuilder()
                 .AddResult("NPC#v2", gameId: 200, vendor: "Alpha Vendor")
                 .Build();
@@ -371,7 +371,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal(38, stats.TotalHttpRequests);
         }
 
-        // ── Safety & cancellation tests ────────────────────────────
+        // -- Safety & cancellation tests ----------------------------
 
         [Fact]
         public async Task MaxTotalRequests_ReturnsPartialWithInterrupted()
@@ -408,7 +408,7 @@ namespace VendorOfferUpdater.Tests
                 client.QueryVendorItemsAsync("[[Sells item::+]]", FastOptions(), cts.Token));
         }
 
-        // ── Retry test ─────────────────────────────────────────────
+        // -- Retry test ---------------------------------------------
 
         [Fact]
         public async Task Http429_RetriesAndSucceeds()
@@ -434,7 +434,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal(2, handler.RequestedUrls.Count);
         }
 
-        // ── DryRun test ────────────────────────────────────────────
+        // -- DryRun test --------------------------------------------
 
         [Fact]
         public async Task DryRun_MakesNoHttpRequests()
@@ -455,7 +455,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Empty(handler.RequestedUrls);
         }
 
-        // ── Stats tests ────────────────────────────────────────────
+        // -- Stats tests --------------------------------------------
 
         [Fact]
         public async Task Stats_TracksRequestsAndRows()
@@ -497,7 +497,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal("#Special Vendor", stats.NonAlphaVendors[0]);
         }
 
-        // ── ResolveItemGameIdsAsync tests ──────────────────────────
+        // -- ResolveItemGameIdsAsync tests --------------------------
 
         [Fact]
         public async Task ResolveItemGameIds_SingleBatch()
@@ -537,7 +537,7 @@ namespace VendorOfferUpdater.Tests
 
             int initialUrlCount = handler.RequestedUrls.Count;
 
-            // 15 items → 2 batches (10 + 5)
+            // 15 items -> 2 batches (10 + 5)
             var items = Enumerable.Range(1, 15)
                 .Select(i => $"Item{i}")
                 .ToList();
@@ -585,7 +585,7 @@ namespace VendorOfferUpdater.Tests
             Assert.False(resolved.ContainsKey("Fake Item"));
         }
 
-        // Review fix (2026-08-18): action=parse does not resolve redirects
+        // Action=parse does not resolve redirects
         // by default, unlike action=ask - without &redirects=1 a vendor
         // page whose SMW subject title is a redirect returns "#REDIRECT
         // [[Target]]" as its wikitext, which the {{Temporary}} parser

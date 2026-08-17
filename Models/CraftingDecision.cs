@@ -3,7 +3,7 @@ namespace GW2CraftingHelper.Models
     /// <summary>
     /// The display-layer vocabulary for a <see cref="Models.CraftingTreeNode"/> - what the
     /// UI (tree rows, pills) renders. Deliberately kept separate from the solver's own
-    /// <see cref="Models.AcquisitionSource"/> (M38 DO-NOT-TOUCH #15): this enum adds
+    /// <see cref="Models.AcquisitionSource"/>: this enum adds
     /// <see cref="Have"/>, a display-only state the solver has no concept of (an owned or
     /// manually-ignored node - see <see cref="Services.CraftingTreeBuilder"/>'s zero-quantity
     /// and ignored-item-id checks), and it never needs <see cref="Models.AcquisitionSource"/>'s
@@ -20,11 +20,8 @@ namespace GW2CraftingHelper.Models
     /// <item><see cref="BuyFromTp"/> &lt;- <see cref="Models.AcquisitionSource.BuyFromTp"/></item>
     /// <item><see cref="BuyFromVendor"/> &lt;- <see cref="Models.AcquisitionSource.BuyFromVendor"/></item>
     /// <item><see cref="Currency"/> &lt;- set directly for "Currency"-typed ingredient
-    /// nodes only, never via <see cref="Models.AcquisitionSource.Currency"/>. Class-level
-    /// follow-up (guildupgrade-ingredients, adversarial review): this branch used to
-    /// catch ANY non-"Item"/non-"GuildUpgrade" ingredient node, silently mislabeling an
-    /// unrecognized ingredient type as a wallet currency - see
-    /// <see cref="Services.CraftingTreeBuilder"/>'s Currency branch, now scoped to the
+    /// nodes only, never via <see cref="Models.AcquisitionSource.Currency"/> - see
+    /// <see cref="Services.CraftingTreeBuilder"/>'s Currency branch, scoped to the
     /// literal string "Currency".</item>
     /// <item><see cref="Unknown"/> &lt;- <see cref="Models.AcquisitionSource.UnknownSource"/>,
     /// or a missing decision lookup (no solver entry for this node at all) - a genuine
@@ -46,18 +43,13 @@ namespace GW2CraftingHelper.Models
     /// branch. Full guild-decoration crafting support (resolving the upgrade's real name,
     /// verifying ownership) is out of scope - see docs/KNOWN-ISSUES.md.</item>
     /// <item><see cref="UnrecognizedIngredient"/> &lt;- set directly for an ingredient node
-    /// whose <c>IngredientType</c> is neither "Item", "Currency", nor "GuildUpgrade" (a
-    /// future GW2 API ingredient type this module does not yet know how to display), never
-    /// via <see cref="Models.AcquisitionSource"/>. Adversarial-review fix
-    /// (guildupgrade-ingredients): this used to share <see cref="Unknown"/> with a genuine
-    /// no-source "Item" node, which meant <see cref="Services.DecisionPillPlanner"/> could not
-    /// tell the two apart and appended the same interactive IGNORE toggle to both - keyed on
-    /// <see cref="Models.CraftingTreeNode.ItemId"/>, a raw non-item id here, so toggling it did
-    /// nothing for this node yet silently zeroed any genuine "Item" node elsewhere in the tree
-    /// that happened to share the same numeric id. Its own decision value routes it to
-    /// <see cref="Services.DecisionPillPlanner"/>'s single-locked-pill short-circuit instead,
-    /// the same treatment <see cref="Currency"/> and <see cref="GuildUpgrade"/> already get -
-    /// see <see cref="Services.CraftingTreeBuilder"/>'s non-"Item" catch-all branch.</item>
+    /// whose <c>IngredientType</c> is neither "Item", "Currency", nor "GuildUpgrade", never
+    /// via <see cref="Models.AcquisitionSource"/>. Deliberately distinct from
+    /// <see cref="Unknown"/>: a shared value once gave this leaf the interactive IGNORE
+    /// toggle, keyed on a raw non-item id that could silently zero an unrelated "Item"
+    /// node sharing the same numeric id. Its own value routes it to the single-locked-pill
+    /// short-circuit, the same treatment <see cref="Currency"/> and
+    /// <see cref="GuildUpgrade"/> get.</item>
     /// </list>
     ///
     /// <see cref="GuildUpgrade"/> and <see cref="UnrecognizedIngredient"/> are appended LAST,

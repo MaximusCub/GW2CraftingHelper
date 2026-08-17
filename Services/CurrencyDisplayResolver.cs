@@ -9,8 +9,8 @@ namespace GW2CraftingHelper.Services
     /// name/icon (CurrencyAmountViewModel), preferring live
     /// CurrencyMetadataService data and falling back to the offline
     /// Gw2Constants table - the exact same chain PlanViewModelBuilder's
-    /// Summary-section currency rows have used since M30 #3, now shared so
-    /// shopping-row and recipe-tree currency costs (KNOWN-ISSUES #16) never
+    /// Summary-section currency rows have always used, shared so
+    /// shopping-row and recipe-tree currency costs never
     /// drift from it. Blish-free (plain C#, no Blish/Gw2Sharp types) so the
     /// mapping is directly unit-testable - see CurrencyDisplayResolverTests.
     /// The no-displayed-IDs invariant is enforced by construction here:
@@ -61,7 +61,7 @@ namespace GW2CraftingHelper.Services
         /// non-null list), so callers can use a simple null/Count==0 check
         /// for "does this row/node have a currency cost at all".
         ///
-        /// ownedCurrencyAmounts (M34-B2b, gw2e's ownedCurrencies split -
+        /// ownedCurrencyAmounts (gw2e's ownedCurrencies split -
         /// optional, cosmetic only) sets each line's OwnedQuantity to
         /// min(line.Count, wallet amount) when the wallet holds any of that
         /// currency; null (not 0) when the caller has no wallet data at all
@@ -115,7 +115,7 @@ namespace GW2CraftingHelper.Services
         /// priced currency cost - the WINNING OFFER's true per-unit rate
         /// (its own per-batch cost line divided by its own OutputCount), not
         /// a truncated average over the row's aggregated total/Quantity
-        /// (M34-B1 #2). The previous total/quantity truncating-average
+        ///. The previous total/quantity truncating-average
         /// approach could show a misleading "1" for a merged row whose real
         /// purchases were e.g. 3-for-3 plus 1-for-1 batches; this resolves
         /// the actual offer rate instead.

@@ -9,7 +9,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.RecipeSeeder.Tests
 {
-    // Review-fix (recipe-ingestion-fix): tools/GW2CraftingHelper.RecipeSeeder
+    // Tools/GW2CraftingHelper.RecipeSeeder
     // previously had no test project at all (tests/VendorOfferUpdater.Tests
     // is this repo's own precedent for testing a tool), so its half of the
     // schema-version fix - identical in spirit to
@@ -88,7 +88,7 @@ namespace GW2CraftingHelper.RecipeSeeder.Tests
         [Fact]
         public async Task FetchRecipeBatchAsync_TypedIngredient_ParsesIdKeyWithoutThrowing()
         {
-            // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): the
+            // KNOWN-ISSUES recipe-ingestion bug class: the
             // versioned schema keys every ingredient's item id as "id" -
             // the seeder's own ParseRecipeBatch used to unconditionally
             // GetProperty("item_id"), which THROWS a JsonException on this

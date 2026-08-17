@@ -4,15 +4,15 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Pure width-dependent layout arithmetic (Blish-free, unit-testable)
-    /// shared by CraftingPlanView's initial section builders and its M33
-    /// C2b live in-place resize relayout registry. Every formula here is
+    /// shared by CraftingPlanView's initial section builders and its
+    /// live in-place resize relayout registry. Every formula here is
     /// called from BOTH the build path (CreateX... methods) and the
     /// relayout/re-ellipsis closures registered alongside them, so the two
     /// paths cannot drift apart - mirrors ShoppingColumnMath's "one source
     /// of truth" shape for the remaining width-dependent geometry m2's
     /// resize-path research identified (tree column anchors, cost-tile
     /// geometry, generic centering/right-alignment/name-column budgeting).
-    /// <para>See docs/ARCHITECTURE.md section 4 (M38 WP-27).</para>
+    /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
     public static class PlanRelayoutMath
     {
@@ -75,7 +75,7 @@ namespace GW2CraftingHelper.Services
         /// qty-prefix text width (font-only, invariant to panelWidth).
         /// Mirrors CraftingPlanView.RenderTreeNode's own pillColX/
         /// costRightEdge/nameMaxWidth arithmetic exactly - both the initial
-        /// build and the M33 C2b relayout/re-ellipsis closures call this
+        /// build and the relayout/re-ellipsis closures call this
         /// same function, so a tree row's columns and its build-time
         /// counterpart can never drift apart.
         /// </summary>
@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M34 fix (MustFix review finding): how many of the recipe tree's
+        /// how many of the recipe tree's
         /// decision pills (already-measured widths, in
         /// DecisionPillPlanner.BuildPillSpecs emission order - source pills
         /// first, then the supplementary OwnedInfo/Ignore pills) fit

@@ -9,7 +9,7 @@ namespace VendorOfferUpdater
     /// with.
     ///
     /// Live-confirmed shapes (api.guildwars2.com wiki mirror,
-    /// api.php?action=parse&amp;prop=wikitext, 2026-08-16):
+    /// api.php?action=parse&amp;prop=wikitext, ):
     ///   - Template name casing varies in the wild: both
     ///     "{{Temporary|...}}" and "{{temporary|...}}" appear verbatim on
     ///     real pages (e.g. "Mad King's Realm" uses the lowercase form) -
@@ -34,7 +34,7 @@ namespace VendorOfferUpdater
     ///     vendor) - ExtractSeasonalOrEventParameter returns null for
     ///     that shape, same as for a page with no {{Temporary}} template
     ///     at all.
-    ///   - Known, untested shape (2026-08-17 review note - no live page
+    ///   - Known, untested shape (no live page
     ///     has shown it yet): the extracted value is NOT normalized
     ///     against wiki markup - "seasonal=[[Halloween]]" would extract
     ///     the literal "[[Halloween]]", which is correctly left untagged
@@ -45,7 +45,7 @@ namespace VendorOfferUpdater
     /// </summary>
     internal static class TemporaryTemplateParser
     {
-        // Nice-to-have fix (2026-08-17 review): the comment here used to
+        // The comment here used to
         // say "Non-greedy up to the first }}", but the pattern actually
         // matches up to the first LITERAL '}' character via the negated
         // class [^}]* - a single stray '}' anywhere inside a real
@@ -75,7 +75,7 @@ namespace VendorOfferUpdater
         /// nothing after it is treated the same as the parameter being
         /// absent).
         ///
-        /// Nice-to-have fix (2026-08-17 review): this used to look only
+        /// This used to look only
         /// at the FIRST {{Temporary}} match on the page (Regex.Match) - a
         /// page with two such templates, where only the first carries
         /// release= and the second carries seasonal=/event=, would

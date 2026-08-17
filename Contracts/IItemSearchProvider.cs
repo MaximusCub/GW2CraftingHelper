@@ -6,12 +6,12 @@ namespace GW2CraftingHelper.Contracts
 {
     /// <summary>
     /// Represents an item that <see cref="IItemSearchProvider"/> has identified as a
-    /// valid plan target — an item for which <c>CraftingPlanPipeline</c> can generate
+    /// valid plan target - an item for which <c>CraftingPlanPipeline</c> can generate
     /// a crafting plan (e.g. discipline recipes, Mystic Forge outputs).
     /// </summary>
     public class ItemSearchResult
     {
-        /// <summary>GW2 API item ID. Internal-only — never display to users.</summary>
+        /// <summary>GW2 API item ID. Internal-only - never display to users.</summary>
         public int ItemId { get; set; }
 
         /// <summary>Display name shown in the item-selection dropdown.</summary>
@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Contracts
         public string IconUrl { get; set; }
 
         /// <summary>
-        /// Indicates that this item is a confirmed plan target — an item the
+        /// Indicates that this item is a confirmed plan target - an item the
         /// <c>CraftingPlanPipeline</c> can resolve into a crafting plan.
         /// Providers MUST set this to <c>true</c> for every returned result;
         /// items that are not valid plan targets should not be returned at all.
@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Contracts
         /// <remarks>
         /// Implementations MUST NOT perform an arbitrary search over all GW2
         /// items. Only items that the <c>CraftingPlanPipeline</c> can resolve
-        /// into a crafting plan may be returned. The provider — not the UI —
+        /// into a crafting plan may be returned. The provider - not the UI -
         /// is responsible for guaranteeing plan validity of every result.
         /// Implementations may also complete asynchronously; the caller
         /// (SuggestionPanel) marshals UI application of the result back to

@@ -63,8 +63,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MixedCurrencyVendor_ZeroFilledCraft_BeatsFallbackVendor()
         {
-            // M33 partial-pricing parity (superseded
-            // "MixedCurrencyVendor_FallbackForUnpriceableCraftNode"): item
+            // Partial-pricing parity: item
             // 1 has no TP price, an unpriceable-and-unrecipeable ingredient
             // (so its craft cost is zero-filled per the new rule, not
             // disqualified), and a fallback-only mixed vendor offer (25
@@ -73,7 +72,7 @@ namespace GW2CraftingHelper.Tests.Services
             // craft is chosen over a real, priced vendor offer specifically
             // BECAUSE the craft total is an artificially cheap partial
             // total. This is intentional (gw2e's own behavior), not a
-            // regression - see M33 spec item 2d.
+            // regression.
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
@@ -219,7 +218,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(plan.CurrencyCosts);
         }
 
-        // --- Aggregate-before-ceil tests (M34-B1 #1) ---
+        // --- Aggregate-before-ceil tests ---
         // gw2efficiency merges same-id demand across the WHOLE tree first,
         // then ceils the purchase count exactly once (docs/gw2e-parity-spec.md
         // Section 6.5). Evaluating/ceiling per tree occurrence and only
@@ -267,8 +266,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiOccurrenceBulkVendorOffer_CoinCost_AggregatesBeforeCeiling()
         {
-            // Sibling to the currency case above (M34-B1 #1's class-level
-            // scope note): the identical bug shape applies to a bulk offer
+            // Sibling to the currency case above: the
+            // identical bug shape applies to a bulk offer
             // priced in COIN, not just non-coin currency. Same 179-unit
             // demand, same 3-for-3 batch shape, coin instead of currency:
             // ceil(179/3)*3 = 180, not the per-occurrence sum of 186.
@@ -295,7 +294,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(180, vendorStep.TotalCost);
             Assert.Equal(180, plan.TotalCoinCost);
 
-            // Critical review finding (PlanSolver.cs:1038): the root Craft
+            // Regression: the root Craft
             // decision's own TotalCost - what CraftingTreeNode.SubtreeCost
             // shows for the Recipe Tree's root row - must agree with the
             // Total Cost summary above, not keep the stale per-occurrence
@@ -307,7 +306,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiOccurrenceBulkVendorOffer_NoCurrencyValued_ComparisonValueMatchesTotalCostEverywhere()
         {
-            // currency-ux-package review fix (finding 1, MEASURED): same
+            // Same
             // shape as MultiOccurrenceBulkVendorOffer_CoinCost_
             // AggregatesBeforeCeiling above (5 occurrences of item 99
             // totalling 179 units, one 3-for-3 coin-only vendor offer, no
@@ -354,7 +353,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiOccurrenceBulkVendorOffer_CoinUnitCost_UsesOfferRate_NotAggregateAverage()
         {
-            // MustFix review finding (PlanSolver.cs:1062): the coin "Each"
+            // Regression: the coin "Each"
             // cell (PlanStep.UnitCost) must show the winning offer's own
             // true per-unit rate (CoinCostPerBatch / OutputCount), not a
             // truncating average of the corrected aggregate TotalCost over
@@ -392,7 +391,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiOccurrenceBulkVendorOffer_CorrectionPropagatesThroughTwoCraftLevels()
         {
-            // Critical review finding, deeper repro: the same 4/4/4/83/84
+            // Regression: the same 4/4/4/83/84
             // demand for the vendor-bought leaf (99), but split across TWO
             // separately-crafted intermediate items (2 and 3), each itself
             // an ingredient of the root craft - a 3-level-deep tree
@@ -568,8 +567,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiOccurrenceMergedVendorOffer_ValuedCurrency_ComparisonValueScalesWithMergedBatch()
         {
-            // currency-ux-package review fix (finding 1/5, MEASURED): the
-            // review's own reproducer. Two tree occurrences of item 99
+            // The
+            // reported reproducer. Two tree occurrences of item 99
             // (qty 1 each) merge into ONE true vendor batch (a 100-unit
             // batch costing 150 coin + 100 karma, karma valued at 5 copper
             // per unit) - the single new code path (vendorComparisonDeltas)
@@ -628,7 +627,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiOccurrenceMergedVendorOffer_ValuedCurrency_ComparisonValueDivergesPerOccurrenceUnderOldSharingRule()
         {
-            // Review fix (UNTESTED RUNTIME CHANGE, merged-ceil-remainder
+            // Regression (merged-ceil-remainder
             // stream): the sibling test above only ever asserted the SUMMED
             // ComparisonValue across occurrences (leafComparisonSum), which
             // is identical (250/250 in that test's own shape) whether
@@ -637,7 +636,7 @@ namespace GW2CraftingHelper.Tests.Services
             // the largest-remainder (Hamilton) apportionment 0b60ceb
             // replaced it with - so no test ever exercised the PER-
             // OCCURRENCE divergence between those two algorithms. This test
-            // does, using the review's own reproducer: two qty-3 occurrences
+            // does, using the reported reproducer: two qty-3 occurrences
             // (equal quantities, so AllocateVendorNodeCosts' TotalCost split
             // is already an even 3/3 either way) with a valued currency line
             // whose total value (10) is NOT evenly divisible by the total
@@ -755,7 +754,7 @@ namespace GW2CraftingHelper.Tests.Services
                 result.Decisions[leafB.NodeId].TotalCost.Value);
         }
 
-        // Review finding 6 (merged-ceil-remainder stream, MEASURED): the
+        // Regression: the
         // two prior tests never exercise the genuinely new, order-sensitive
         // code - the equal-quantity test above divides evenly (1000 * 1/2,
         // no leftover copper at all) and the flagship regression test's

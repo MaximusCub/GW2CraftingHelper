@@ -348,7 +348,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(result.DebugLog);
 
             // All 9 pipeline phase prefixes must appear with timing in ms
-            // (M38 WP-10: the dead "Resolve vendor offers" step was removed
+            // (the dead "Resolve vendor offers" step was removed
             // along with the always-null VendorOfferResolver seam)
             var expectedPrefixes = new[]
             {

@@ -5,13 +5,11 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Pure row-list state transitions for the multi-item plan input strip
-    /// (Blish-free, unit-testable) - M35 (gw2efficiency parity: multi-item
-    /// plans). Mirrors gw2e's own `e.recipes` array semantics
-    /// (`addRecipe`/`removeRecipe`, the Remove link's `recipes.length > 1`
-    /// visibility gate - docs/gw2e-parity-spec.md, the M34 r1 multi-item
-    /// research report) minus the reorder (`moveRecipe`) affordance, which
-    /// is out of scope for this milestone - see docs/KNOWN-ISSUES.md's M35
-    /// section for that deliberate divergence.
+    /// (Blish-free, unit-testable). Mirrors gw2e's own `e.recipes` array
+    /// semantics (`addRecipe`/`removeRecipe`, the Remove link's
+    /// `recipes.length > 1` visibility gate - docs/gw2e-parity-spec.md)
+    /// minus the reorder (`moveRecipe`) affordance - see
+    /// docs/KNOWN-ISSUES.md's M35 section for that deliberate divergence.
     /// </summary>
     public static class ItemRowRequestBuilder
     {
@@ -50,8 +48,8 @@ namespace GW2CraftingHelper.Services
         /// is skipped rather than treated as an error - gw2e itself
         /// tolerates an empty `{id: null}` row in `e.recipes` sitting
         /// alongside filled ones (its own share-link builder filters them
-        /// out the same way: `recipes.filter(r=>r.id)` - see the M34 r1
-        /// report). Each row's quantity text is parsed the same way the
+        /// out the same way: `recipes.filter(r=>r.id)`).
+        /// Each row's quantity text is parsed the same way the
         /// single-item quantity box always has (invalid/blank/&lt;1
         /// silently corrected to 1), now applied per row instead of once.
         /// Returns an empty list, never null, when every row is empty.

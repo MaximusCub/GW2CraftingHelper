@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(1f, ScrollMath.RatioForOffset(5000, 2000, 700));
         }
 
-        // M36 (wheel-wrap fix, KNOWN-ISSUES #12 reopened): ApplyPixelDelta
+        // ApplyPixelDelta
         // coverage.
         [Fact]
         public void ApplyPixelDelta_ContentFitsViewport_ReturnsZero()

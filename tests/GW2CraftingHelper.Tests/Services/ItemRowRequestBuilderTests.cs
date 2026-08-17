@@ -5,7 +5,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// M35 (gw2efficiency parity - multi-item plans): pure row-list state
+    /// Pure row-list state
     /// transitions for the multi-item input strip - Blish-free, exercises
     /// the real ItemRowRequestBuilder production code CraftingPlanView's
     /// TriggerGenerate/row builders call.

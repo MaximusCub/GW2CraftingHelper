@@ -5,11 +5,12 @@ using Newtonsoft.Json;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Serialization for W3D plan persistence - mirrors SnapshotHelpers'
+    /// Serialization for plan persistence - mirrors SnapshotHelpers'
     /// shape, with two deliberate differences: (1) DeserializePersistedPlan
     /// does NOT swallow a parse/schema failure into a silent null itself.
-    /// The W3D spec requires a Warn log line for a corrupt or old-schema
-    /// file (unlike snapshot.json's own silent-null precedent) - so this
+    /// A corrupt or old-schema
+    /// file requires a Warn log line (unlike snapshot.json's own
+    /// silent-null precedent) - so this
     /// lets the exception propagate to PlanStore.LoadLatest's single
     /// try/catch, which already logs via the same onError callback every
     /// other store uses (see PlanStore.cs). (2) Compact (not Indented)
@@ -21,7 +22,7 @@ namespace GW2CraftingHelper.Services
         /// Serializes a PersistedPlan to a JSON string. Returns null if
         /// plan is null.
         /// <para>
-        /// Review-fix (W3D adversarial review, mustFix): compact
+        /// compact
         /// (Formatting.None), NOT Indented like SnapshotHelpers'/
         /// StatusStore's own precedent - a PersistedPlan carries the FULL
         /// SolveContext (the whole reduced crafting tree, every priced
@@ -60,8 +61,8 @@ namespace GW2CraftingHelper.Services
             // an old schema missing the fields this feature actually needs,
             // or a JSON document that happened to parse but was never a
             // real PersistedPlan at all) must not be handed back as if it
-            // were usable - "never partially render" (W3D spec item 4).
-            // The SchemaVersion check (review-fix, mustFix) is what makes
+            // were usable - "never partially render".
+            // The SchemaVersion check is what makes
             // this actually enforceable going forward: a future member
             // rename/removal elsewhere on this graph would otherwise still
             // pass the structural Result/Plan check below while coming back
@@ -72,7 +73,7 @@ namespace GW2CraftingHelper.Services
                     "Persisted plan is missing Result/Plan or has an unsupported SchemaVersion - corrupt or old-schema file.");
             }
 
-            // Round 4 review-fix (critical): a single, class-level walk of
+            // a single, class-level walk of
             // the ENTIRE restored object graph - the display tree, the
             // solve tree, and every collection the restore-render and local
             // override re-solve paths dereference without a null guard -

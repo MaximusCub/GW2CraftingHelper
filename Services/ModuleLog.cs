@@ -57,7 +57,7 @@ namespace GW2CraftingHelper.Services
     /// grown. This was a real, live hazard prior to this fix: the
     /// [scrolldiag] Debug channel (CraftingPlanView) calls <see cref="Write"/>
     /// on the main/UI thread from inside its frame-timing-sensitive
-    /// scroll-verify loop (KNOWN-ISSUES #12/#14), so any synchronous disk IO
+    /// scroll-verify loop, so any synchronous disk IO
     /// performed by Write itself - never mind an occasional full-file
     /// read+rewrite trim pass - would stall that exact frame.
     /// </para>
@@ -145,7 +145,7 @@ namespace GW2CraftingHelper.Services
         // drains it at a time, so entries always reach the file in the
         // exact order Write was called in - required for a diagnostic
         // channel whose entire purpose is reconstructing a precise
-        // sequence of frame events (KNOWN-ISSUES #12/#14).
+        // sequence of frame events.
         private readonly ConcurrentQueue<ModuleLogEntry> _fileWriteQueue = new ConcurrentQueue<ModuleLogEntry>();
 
         // 0 = no flush loop currently running/scheduled, 1 = one is. Only

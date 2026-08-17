@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Pure content-height arithmetic (Blish-free, unit-testable) for the
     /// plan view's collapsible section bodies and recipe-tree child
-    /// containers. M33 C2a directive A: these containers used to rely on
+    /// containers. These containers used to rely on
     /// Blish's FlowPanel HeightSizingMode.AutoSize, which only converges
     /// one nested level per real engine frame (Container.DoUpdate sizes a
     /// container from its children's CURRENT bounds before recursing into
@@ -22,7 +22,7 @@ namespace GW2CraftingHelper.Services
     /// AutoSize-replacement containers explicitly and to size the
     /// individual row Panels it creates, so the two paths cannot drift
     /// apart - mirrors ShoppingColumnMath's "one source of truth" shape.
-    /// <para>See docs/ARCHITECTURE.md section 4 (M38 WP-27).</para>
+    /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
     public static class PlanContentHeightMath
     {
@@ -36,12 +36,8 @@ namespace GW2CraftingHelper.Services
         public const int CTableHeaderRowHeight = 26;
         public const int DisciplineRowHeight = 32;
 
-        // M36 fix-pass (MUSTFIX-3): was 32, which left CraftingPlanView's
-        // 34px rarity-framed icon (at y=1, then y=0 after this fix)
-        // overflowing this row's own height - pre-existing negative
-        // headroom made worse when M36 widened row dividers from 1px to
-        // 2px (see Views/Rendering/RecipesSectionRenderer.CreateRecipeRow's
-        // own doc comment - M38 WP-23c moved this out of CraftingPlanView).
+        // 36, not 32: a 32px row left the 34px rarity-framed icon
+        // overflowing the row height once dividers widened to 2px.
         // 36 = 34px icon (y=0) + 2px divider, an exact, non-overlapping
         // fit, mirroring UsedMaterialRowHeight/ShoppingRowHeight's already-
         // correct 36.
@@ -85,14 +81,13 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M34-B1 #3: a Crafting Steps section can now mix numbered
+        /// A Crafting Steps section can now mix numbered
         /// CraftStep rows (CraftStepRowHeight, via
         /// Views/Rendering/CraftStepsSectionRenderer.CreateCraftStepRow) with
         /// plain TimegatedNotice info rows (FallbackTextRowHeight, via the
         /// shared Views/Rendering/TextRowRenderer.CreateTextRow helper - see
-        /// Views/Rendering/CraftStepsSectionRenderer.Render, M38 WP-23c:
-        /// renamed from CraftingPlanView.CreateCraftingStepsBody during the
-        /// move), so height is summed per-row rather than assumed uniform.
+        /// Views/Rendering/CraftStepsSectionRenderer.Render),
+        /// so height is summed per-row rather than assumed uniform.
         /// </summary>
         private static int CraftingStepsBodyHeight(IReadOnlyList<PlanRowViewModel> rows)
         {
@@ -188,20 +183,20 @@ namespace GW2CraftingHelper.Services
             return total;
         }
 
-        // M35 (gw2efficiency parity - multi-item plans): thin visual gap
+        // Thin visual gap
         // CraftingPlanView draws between two consecutive top-level trees in
         // a multi-item batch, so N stacked full item trees read as N
         // distinct blocks rather than blending into one continuous list of
         // rows. Never inserted for a single root (roots.Count == 1), which
-        // is what keeps that case byte-identical to the pre-M35 height.
+        // is what keeps that case byte-identical to the single-item height.
         public const int MultiRootDividerHeight = 12;
 
         /// <summary>
-        /// M35 (gw2efficiency parity - multi-item plans): total height of
+        /// Total height of
         /// the Recipe Tree section's single shared content FlowPanel when
         /// it holds N top-level trees stacked (gw2e's own "N independent
         /// top-level recipe trees" render, its synthetic wrapper node never
-        /// surfacing - docs/gw2e-parity-spec.md, the M34 r1 report) rather
+        /// surfacing - docs/gw2e-parity-spec.md) rather
         /// than one. Each requested item's own root node already IS its own
         /// full icon/name/quantity/pill/cost row (CraftingTreeNode, same
         /// shape TreeNodeHeight already sizes for a single-item plan) - so

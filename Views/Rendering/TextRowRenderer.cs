@@ -4,35 +4,16 @@ using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-23c (m38-a1-architecture.md S3b-T2, continuing the WP-23/WP-23b
-    // extractions): moved verbatim out of CraftingPlanView.CreateTextRow -
+    // Moved verbatim out of CraftingPlanView.CreateTextRow -
     // private static -> internal static, no logic changes.
     //
-    // Unlike ShoppingSourceTag (exactly one call site, moved directly into
-    // ShoppingListSectionRenderer) this is the CreateTextRow analogue of the
-    // GetPillColors fork WP-23b resolved with PillColors.cs: grepped every
-    // call site in CraftingPlanView before moving anything and found THREE,
-    // not one - the CraftingSteps section's TimegatedNotice branch (moving,
-    // now inside CraftStepsSectionRenderer), the default fallback case in
-    // CreateCollapsibleSection (staying in the view - a section type with no
-    // dedicated body builder), and CreateSummarySectionBody's noteRows loop
-    // (staying in the view at the time - Summary was not part of this
-    // package's scope). Because two non-extracted callers remained,
-    // CreateTextRow could not simply move into CraftStepsSectionRenderer the
-    // way a single-call-site helper would; extracted here instead, exactly
-    // mirroring the GetPillColors -> PillColors.cs resolution: all three call
-    // sites now call TextRowRenderer.CreateTextRow directly (forward
-    // Views/Rendering call, never the reverse edge the WP-21 findings fix,
-    // commit 5c56b2a, already reverted once).
-    //
-    // M38 WP-23d closed the CreateSummarySectionBody fork above: the
-    // Summary section (including its noteRows loop) moved out of
-    // CraftingPlanView too, into Views/Rendering/SummarySectionRenderer,
-    // which now calls CreateTextRow with its own injected sink. That leaves
-    // exactly ONE call site still living inside CraftingPlanView itself -
-    // CreateCollapsibleSection's default fallback case - plus the two now
-    // living in extracted section renderers (CraftStepsSectionRenderer's
-    // TimegatedNotice branch, SummarySectionRenderer's noteRows loop).
+    // Lives in its own shared file (like PillColors) because it has three
+    // call sites: CreateCollapsibleSection's default fallback case (the
+    // one still inside CraftingPlanView), CraftStepsSectionRenderer's
+    // TimegatedNotice branch, and SummarySectionRenderer's noteRows loop.
+    // All three call TextRowRenderer.CreateTextRow directly - a forward
+    // Views/Rendering call, never the reverse edge already reverted once
+    // (commit 5c56b2a).
     internal static class TextRowRenderer
     {
         internal static void CreateTextRow(string text, FlowPanel parent, int panelWidth, ISectionRelayoutSink sink)

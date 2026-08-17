@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Tests.Services
     {
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
-        // --- Multi-item plans (M35, gw2efficiency parity) ---
+        // --- Multi-item plans ---
 
         private static CraftingTreeNode RootNode(int nodeId, int itemId, string name)
         {
@@ -135,7 +135,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var result = MakeResult(totalCoinCost: 500, metadata: meta, requestedItems: requested,
                 multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
-            // M37 review fix: the note row is gated on the SAME
+            // Regression: the note row is gated on the SAME
             // result.NetSaleValue.HasValue condition as the Sell value/
             // Profit rows above it - it must never be shown next to zero
             // profit numbers, so this test now provides a live rollup.
@@ -145,7 +145,7 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
             var summaryRows = vm.Sections[0].Rows;
 
-            // W4A: the note row is now followed by the always-present
+            // The note row is now followed by the always-present
             // footnote row, so it is second-to-last rather than last.
             Assert.Equal(PlanRowType.MultiItemNote, summaryRows[summaryRows.Count - 2].RowType);
             Assert.Equal(PlanRowType.SummaryFootnote, summaryRows[summaryRows.Count - 1].RowType);
@@ -154,7 +154,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiItemRequest_NoQualifyingRoots_NoMultiItemNoteRow()
         {
-            // M37 review fix: a multi-item batch where every requested root
+            // Regression: a multi-item batch where every requested root
             // is excluded from the sell/profit rollup (NetSaleValue stays
             // null) must NOT show the note row - there would be no Sell
             // value/Profit rows above it for the note to describe.
@@ -183,7 +183,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(summaryRows, r => r.RowType == PlanRowType.MultiItemNote);
         }
 
-        // --- Multi-item batch sell-side economics (M37, KNOWN-ISSUES #25) ---
+        // --- Multi-item batch sell-side economics ---
 
         private static List<PlanRequestItem> TwoRequestedItems()
         {
@@ -277,8 +277,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiItemRequest_UnsellableRootPresent_ProfitBandMiddleTileDivergesFromCostBand()
         {
-            // Review fix: pins the exact scenario BuildProfitFormulaBand's
-            // own doc comment (and docs/KNOWN-ISSUES.md's W4A item 2)
+            // Pins the exact scenario BuildProfitFormulaBand's
+            // own doc comment (and docs/KNOWN-ISSUES.md's W4A entry, item 2)
             // describes but that no running test previously modeled - a
             // batch with an unsellable requested root, where
             // SellSideEconomics.ApplyBatchSellSideEconomics subtracts only
@@ -318,7 +318,7 @@ namespace GW2CraftingHelper.Tests.Services
             // disagree here.
             Assert.NotEqual(costBandTotalMaterialsValue, profitTiles[1].CoinValue);
 
-            // Review fix (caption divergence, finding #4): a multi-item
+            // A multi-item
             // batch's Band 2 middle tile carries a distinct caption rather
             // than reusing Band 1's "Total Materials Value" - two
             // identically-labeled tiles holding different numbers would
@@ -329,7 +329,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiItemRequest_NoteRowText_DescribesTradableOnlyRollupNotGw2eCraftOnlyBanner()
         {
-            // M37 review fix: the batch rollup has NO craft-vs-buy filter
+            // Regression: the batch rollup has NO craft-vs-buy filter
             // (a bought-but-tradable root still contributes - see
             // SellSideEconomics.ApplyBatchSellSideEconomics' own doc
             // comment, divergence item 1), so the note text must not claim

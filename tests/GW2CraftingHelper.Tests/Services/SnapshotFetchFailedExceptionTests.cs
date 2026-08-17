@@ -41,7 +41,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- FailedSourceExceptionTypeNames (SnapshotFailureClassifier's
-        // input - field-tested pain, 2026-08-06) ----
+        // input - field-tested pain) ----
 
         [Fact]
         public void TwoArgConstructor_FailedSourceExceptionTypeNames_IsEmptyNotNull()

@@ -15,9 +15,9 @@ namespace GW2CraftingHelper.Views
     /// and clear-view, backed directly by a ModuleLog's ring buffer.
     /// Pattern A (lightweight FlowPanel(CanScroll)) - label-per-row, no
     /// multi-column ellipsized rows that must reflow live during a resize
-    /// drag - so this does not opt into the M33
+    /// drag - so this does not opt into the
     /// PlanContentHeightMath/relayout-registry contract (that machinery is
-    /// CraftingPlanView-only, DO-NOT-TOUCH per M38).
+    /// CraftingPlanView-only).
     /// </summary>
     public class LogTabContent
     {
@@ -80,15 +80,13 @@ namespace GW2CraftingHelper.Views
         // as SelectedTab flips to the Log tab) could invoke RebuildRows()
         // concurrently with Build()'s own tail RebuildRows() call, on the
         // SAME freshly-created _contentPanel - this produced two stacked
-        // "No log entries yet." placeholders, confirmed live 2026-07-23
-        // (capture m38f_03_tab3.png).
+        // "No log entries yet." placeholders, confirmed live.
         // <para>
-        // PR #99's review missed a second path to the SAME hazard:
+        // A second path reaches the SAME hazard:
         // Module.cs's TabChanged handler also calls Refresh() ->
         // RebuildRows() synchronously on the main thread whenever the Log
-        // tab becomes selected, and Refresh() never checked this latch. A
-        // real user hit this in the field on 2026-08-06 (docs/
-        // KNOWN-ISSUES.md) - Build()'s ThreadPool-thread RebuildRows() call
+        // tab becomes selected; without this latch, Build()'s
+        // ThreadPool-thread RebuildRows() call
         // and TabChanged's main-thread RebuildRows() call landed on the
         // SAME instance at the same time, and two threads concurrently
         // Enqueue-ing into _renderedRows corrupted its internal array,
@@ -157,13 +155,10 @@ namespace GW2CraftingHelper.Views
         // the design doc warned about, not eviction.
         private readonly Queue<(long AbsoluteIndex, Label Control)> _renderedRows = new Queue<(long AbsoluteIndex, Label Control)>();
 
-        // Wave-3 quick win #4 (2026-08-06 field testing): the "Clear view"
-        // floor used to be a plain instance field here
-        // (_clearedBeforeVersion), which meant it reset to 0 every time
-        // Blish rebuilt this tab - Module.cs's Log tab view-factory
-        // constructs a brand new LogTabContent on every tab visit (see
-        // docs/ARCHITECTURE.md Section 1), so a user's "Clear view" click
-        // silently undid itself the moment they switched tabs and back.
+        // The "Clear view" floor must not be a plain instance field
+        // here: Blish constructs a brand new LogTabContent on every tab
+        // visit, so an instance field resets and a "Clear view" click
+        // silently undoes itself on the next tab switch.
         // Moved onto Module itself (Module._logViewClearedBeforeVersion -
         // see that field's own doc comment for the full threading
         // rationale), accessed here through this getter/setter delegate
@@ -275,7 +270,7 @@ namespace GW2CraftingHelper.Views
                 PositionToolbarButtons(newWidth);
             };
 
-            // FIELD CRASH (2026-08-06, docs/KNOWN-ISSUES.md): Build() itself
+            // FIELD CRASH (docs/KNOWN-ISSUES.md): Build() itself
             // runs on a ThreadPool thread (see _buildComplete's own doc
             // comment for the DoLoad().ContinueWith(...) pattern), so
             // calling RebuildRows() directly here raced against Module.cs's
@@ -401,7 +396,7 @@ namespace GW2CraftingHelper.Views
         /// reality, not a frozen view from before the tab was last closed.
         /// Gated on <see cref="_buildComplete"/> exactly like
         /// <see cref="PollForUpdates"/> - see that field's own doc comment
-        /// for why (the 2026-08-06 field crash was this method racing
+        /// for why (the field crash was this method racing
         /// Build()'s tail on two different threads; both are main-thread-
         /// only now, so the guard here is about avoiding a redundant
         /// rebuild, not a crash).
@@ -480,9 +475,8 @@ namespace GW2CraftingHelper.Views
             // (see that field's own doc comment), not a control mutation,
             // so a pre-build Clear still hides everything before this point
             // once Build's tail does its own initial RebuildRows() pass. It
-            // also now survives THIS instance being torn down and a fresh
-            // LogTabContent being built for the next tab visit - the whole
-            // point of wave-3 quick win #4.
+            // also survives this instance being torn down and a fresh
+            // LogTabContent being built for the next tab visit.
             _setClearedBeforeVersion(_log.Version);
             RebuildRowsIfBuilt();
         }
@@ -685,7 +679,7 @@ namespace GW2CraftingHelper.Views
         /// (confirmed present on Blish_HUD.Controls.Panel) - deliberately
         /// NOT the private-field Scrollbar.ScrollDistance reflection
         /// CraftingPlanView needs for its own much more exacting
-        /// restore/verify contract (KNOWN-ISSUES #12/#14); this tab carries
+        /// restore/verify contract; this tab carries
         /// none of that contract, so the simple public property is the
         /// correct, far cheaper choice. Overshoots (int.MaxValue) rather
         /// than measuring exact content height - a scroll offset past the

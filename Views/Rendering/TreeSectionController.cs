@@ -9,8 +9,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-25 (m38-a1-architecture.md S3b-T2, hardest of the Wave G
-    // extractions): moved verbatim out of CraftingPlanView's "8. Tree
+    // Moved verbatim out of CraftingPlanView's "8. Tree
     // rendering (state)"/"8. Tree rendering (continued)"/"9. Decision
     // pills" regions - the Recipe Tree section renderer AND the interactive
     // override loop it drives (Best Path/Craft All/Buy All presets, the
@@ -18,18 +17,18 @@ namespace GW2CraftingHelper.Views.Rendering
     // every field that loop owns: TreeNodeState, _treeNodeStates,
     // _treeRoots/_treeFlow (the current render pass's tree bookkeeping),
     // _nodeOverrides/_ignoredItemIds/_nodeExpansion (session-persistent
-    // decision/ignore/expansion state - M34-B2b, M21), and _lastResult (the
+    // decision/ignore/expansion state), and _lastResult (the
     // solve context the override loop re-resolves against).
     //
-    // Unlike the six section renderers WP-23/WP-23b/WP-23c/WP-23d/WP-24
+    // Unlike the six section renderers
     // extracted before it, this component owns a slice of application
     // state, not just presentation - the field group above survives across
     // every local re-solve (a pill click never rebuilds it) and is reset
     // only once per genuinely new Generate. It also cannot reach several
     // things it still needs purely through ISectionRelayoutSink, because
     // those things are NOT relayout registrations: PreserveScrollAcross
-    // (DO-NOT-TOUCH #3 - scroll preserve/restore/verify machinery, stays on
-    // CraftingPlanView per the WP-26 cut-scope decision - see
+    // (scroll preserve/restore/verify machinery, stays on
+    // CraftingPlanView - see
     // docs/KNOWN-ISSUES.md), SetStatus, the top-level RenderPlan rebuild
     // entry point, GetCurrentPanelWidth, the view's own _currentPlan/
     // _lastDebugLog fields, and CreateSectionHeader (shared chrome every
@@ -48,8 +47,8 @@ namespace GW2CraftingHelper.Views.Rendering
     // substitution every extracted renderer makes: (1) the DEBUG
     // must-register assert inside CreateTreeSection used to read
     // _relayoutActions.Count directly (a private CraftingPlanView field);
-    // it now reads the new ISectionRelayoutSink.RelayoutCount member added
-    // by this package specifically for that (see the interface's own doc
+    // it now reads ISectionRelayoutSink.RelayoutCount, added
+    // specifically for that (see the interface's own doc
     // comment - every other extracted renderer's equivalent assert stays
     // in CraftingPlanView.CreateCollapsibleSection, which still has direct
     // field access, so this is the first caller that needed it exposed
@@ -68,8 +67,8 @@ namespace GW2CraftingHelper.Views.Rendering
     // different (per-render-pass vs. per-generation - see each method's
     // own doc comment) so they stay two methods, not one.
     //
-    // See docs/ARCHITECTURE.md section 5 (M38 WP-27) for the state-ownership
-    // rationale and the WP-26 scroll/resize/wheel controller cut decision.
+    // See docs/ARCHITECTURE.md section 5 for the state-ownership
+    // rationale and the scroll/resize/wheel controller cut decision.
     internal sealed class TreeSectionController
     {
         private readonly ISectionRelayoutSink _sink;
@@ -125,7 +124,7 @@ namespace GW2CraftingHelper.Views.Rendering
         private readonly Dictionary<int, AcquisitionSource> _nodeOverrides =
             new Dictionary<int, AcquisitionSource>();
 
-        // Item ids manually marked "Ignore" this session (M34-B2b, gw2e
+        // Item ids manually marked "Ignore" this session (gw2e
         // parity) - keyed by ItemId (not NodeId), matching gw2e's own
         // "Ignore marks every occurrence of that item id, tree-wide"
         // semantics (see PlanSolver.Solve's ignoredItemIds parameter).
@@ -151,7 +150,7 @@ namespace GW2CraftingHelper.Views.Rendering
             public CraftingTreeNode Node;
             public int Depth;
 
-            // M33 C2b: PanelWidth removed - a captured build-time width
+            // PanelWidth removed - a captured build-time width
             // would go stale once resize no longer triggers a full rebuild
             // (see GetCurrentPanelWidth, which every remaining reader of
             // "current tree width" uses instead).
@@ -171,16 +170,16 @@ namespace GW2CraftingHelper.Views.Rendering
         // RefreshTreeContainerHeights - called from the tree row toggle
         // handler deep inside RenderTreeNode's recursion, as well as from
         // CreateTreeSection itself - can recompute treeFlow's own explicit
-        // Height without threading both through every recursive call. M35
-        // (gw2efficiency parity - multi-item plans): a single-item plan
-        // still populates this with exactly one root, so every consumer
+        // Height without threading both through every recursive call.
+        // A single-item plan still populates this with exactly one root,
+        // so every consumer
         // below is unchanged in that case (see MultiRootTreeFlowHeight's
         // own doc comment for the "N==1 is byte-identical" guarantee).
         private List<CraftingTreeNode> _treeRoots;
         private FlowPanel _treeFlow;
 
         /// <summary>
-        /// M38 WP-25: per-render-pass reset, called from
+        /// Per-render-pass reset, called from
         /// CraftingPlanView.RenderPlan before it disposes/rebuilds the
         /// content panel's children - moved verbatim from RenderPlan's own
         /// top-of-method _treeNodeStates.Clear()/_treeRoots = null/
@@ -199,7 +198,7 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// M38 WP-25: fresh-generation reset, called from
+        /// Fresh-generation reset, called from
         /// CraftingPlanView.TriggerGenerate right before its own RenderPlan
         /// call - moved verbatim from TriggerGenerate's own
         /// _nodeOverrides.Clear()/_ignoredItemIds.Clear()/
@@ -217,7 +216,7 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// Review-fix (W3D adversarial review, critical): re-seeds the
+        /// Re-seeds the
         /// override loop's decision/ignore state from a persisted plan,
         /// called from CraftingPlanView.ApplyRestoredPlan immediately after
         /// ResetForNewPlan(result) (which the restore path also calls, to
@@ -229,7 +228,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// prior overrides (it is the OUTPUT of applying them) - the very
         /// next pill click would then re-solve with only that ONE new
         /// override applied, silently discarding every override the user
-        /// set before restarting (W3D spec item 3's correctness bar).
+        /// set before restarting.
         /// <paramref name="nodeOverrides"/>/<paramref name="ignoredItemIds"/>
         /// are copied, not aliased - this instance owns its two collections
         /// for their entire lifetime (every other mutator below assumes
@@ -346,7 +345,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 "Clears every manual override, including Craft All/Buy All, and re-solves for the solver's " +
                 "cheapest plan. Ignore selections are left unchanged.");
 
-            // M33 C2b: right-to-left button placement is font-only (fixed
+            // Right-to-left button placement is font-only (fixed
             // widths) - pure reposition on every drag tick, same order as
             // PlaceButtonRight built them so the right-to-left offsets
             // reproduce identically.
@@ -364,12 +363,12 @@ namespace GW2CraftingHelper.Views.Rendering
 #if DEBUG
             int relayoutCountBeforeTree = _sink.RelayoutCount;
 #endif
-            // M35 (gw2efficiency parity - multi-item plans): a thin gap
+            // A thin gap
             // between consecutive roots so N stacked full item trees read
             // as N distinct blocks (PlanContentHeightMath.
             // MultiRootDividerHeight) - never inserted for a single root,
-            // which keeps that case's rendered rows byte-identical to
-            // pre-M35.
+            // which keeps that case's rendered rows byte-identical to the
+            // single-item render.
             for (int i = 0; i < _treeRoots.Count; i++)
             {
                 if (i > 0)
@@ -384,7 +383,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 RenderTreeNode(_treeRoots[i], treeFlow, panelWidth, 0, dimmed: false);
             }
 #if DEBUG
-            // M33 C2b (m2 risk 3): every RenderTreeNode call registers its
+            // Every RenderTreeNode call registers its
             // own relayout closure (see the field comment on
             // _relayoutActions) - a single root node still yields at least
             // one. Zero growth here would mean that mechanism itself
@@ -395,7 +394,7 @@ namespace GW2CraftingHelper.Views.Rendering
             }
 #endif
 
-            // M33 C2a (directive A): every container this initial build
+            // Every container this initial build
             // populated (treeFlow plus every childFlow created for a
             // default-expanded node) still reads its construction-time
             // Size.Y of 0 at this point - one synchronous pass now finalizes
@@ -481,7 +480,7 @@ namespace GW2CraftingHelper.Views.Rendering
             ApplyOverridesAndResolve();
         }
 
-        // M37 (KNOWN-ISSUES #22/#27): isBestPathPreset must come from which
+        // IsBestPathPreset must come from which
         // control fired this call, not be inferred from the resulting
         // _nodeOverrides count - see StatusText.ForOverrideResolve for why.
         // Moved verbatim from CraftingPlanView.ApplyOverridesAndResolve.
@@ -529,7 +528,7 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int TreeRightMargin = 8;
 
         /// <summary>
-        /// M33 C2a (directive A): recomputes and re-assigns the explicit
+        /// Recomputes and re-assigns the explicit
         /// Height of every tree childFlow container plus the top-level
         /// treeFlow, from the SAME PlanContentHeightMath arithmetic used to
         /// build the rows in the first place. Replaces the old
@@ -661,7 +660,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // Name column: fixed x regardless of depth's remaining width;
             // clipped with an ellipsis against the pill column so long names
             // never collide with the fixed-position columns to its right.
-            // M33 C2b: pillColX/costRightEdge/nameMaxWidth now come from
+            // PillColX/costRightEdge/nameMaxWidth now come from
             // PlanRelayoutMath.ComputeTreeColumnEdges - the SAME pure
             // function the relayout/re-ellipsis closures below call, so the
             // build and every later resize tick can never disagree about
@@ -718,7 +717,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = rowPanel
             };
 
-            // M33 C2b: extraTooltipLines never depends on panelWidth (unit
+            // ExtraTooltipLines never depends on panelWidth (unit
             // price / acquisition hint text is fixed), so it is computed
             // once and reused verbatim by the settle re-ellipsis pass -
             // only the "is the name actually truncated" line needs to be
@@ -735,10 +734,8 @@ namespace GW2CraftingHelper.Views.Rendering
             var currentPlan = _getCurrentPlan();
             var extraTooltipLines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, captionText, currentPlan);
 
-            // UI-bundle milestone, Feature A (wiki links): this module's
-            // FIRST external-URL launch (deliberate maintainer decision) -
-            // a context action (right-click), not a visible icon, per the
-            // maintainer's pre-authorized placement discretion. Every tree
+            // This module's only external-URL launch - a context action
+            // (right-click), not a visible icon. Every tree
             // row gets this, item leaf or internal node alike - a wiki page
             // that does not exist for an internal-only concept (e.g. a
             // synthesized cost-component "currency" name) just 404s rather
@@ -774,12 +771,10 @@ namespace GW2CraftingHelper.Views.Rendering
             // here, wanders off, and is released back over this row later
             // (from an unrelated gesture) cannot replay a stale arm.
             //
-            // Review-fix note: unlike toggleHandler below, this handler
-            // does NOT exclude clicks landing on a pill (pillPanels is not
-            // yet in scope at this point in the build - it is declared
-            // below by RenderDecisionPills). This divergence is intentional
-            // and considered harmless: decision pills carry no right-click
-            // meaning of their own, so a right-click that lands on one
+            // Unlike toggleHandler below, this handler does NOT exclude
+            // clicks landing on a pill (pillPanels is not yet in scope
+            // here). Intentional and harmless: decision pills carry no
+            // right-click meaning, so a right-click that lands on one
             // still falls through to this row's wiki-link handler rather
             // than doing nothing.
             if (WikiLinkBuilder.HasWikiPage(node.Name))
@@ -818,16 +813,14 @@ namespace GW2CraftingHelper.Views.Rendering
             // decision whose real cost is genuinely zero-and-uncosted
             // renders a dash instead of an invented "0".
             //
-            // W4B: a node whose children are the new synthesized cost-
+            // A node whose children are the new synthesized cost-
             // component leaves (see CraftingTreeBuilder.
             // BuildVendorCostComponentLeaves - every child of such a node is
             // a component leaf, never mixed with a reference branch or a
-            // real craft child) shows ONLY the compact gold total here - no
-            // currency segments - since the breakdown those segments used
-            // to cram into this one row now lives one expand-click away as
-            // real child rows. This is the fix for the exact collision the
-            // W4B field case hit (a mixed coin/currency/item vendor cost
-            // rendering as one very long segmented row).
+            // real craft child) shows ONLY the compact gold total here -
+            // the breakdown lives one expand-click away as real child
+            // rows, instead of one very long segmented row colliding with
+            // the layout.
             bool hasCostComponentChildren = node.Children.Count > 0 && node.Children[0].IsCostComponent;
             CoinCurrencyRenderer.ValueCellHandle costCell = null;
             if (node.SubtreeCost.HasValue)
@@ -852,7 +845,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 bool childDimmed = dimmed || node.Decision != CraftingDecision.Craft;
 
-                // M33 C2a (directive A): Standard (explicit) height, same
+                // Standard (explicit) height, same
                 // as the section header's contentFlow - see that
                 // construction site's comment. Starts at 0; the caller that
                 // ultimately owns this build pass (CreateTreeSection's
@@ -911,7 +904,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         if (!state.ChildrenBuilt)
                         {
-                            // M33 C2b: read the LIVE width rather than the
+                            // Read the LIVE width rather than the
                             // (possibly long-stale, since resize no longer
                             // triggers a rebuild) width this node itself was
                             // built at - see GetCurrentPanelWidth.
@@ -936,12 +929,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 rowPanel.Click += toggleHandler;
             }
 
-            // M33 C2b: pills/cost cell reposition every drag tick (no
+            // Pills/cost cell reposition every drag tick (no
             // MeasureString - pill widths are already-known control Width,
             // CoinCurrencyRenderer.RepositionValueCellRightAligned uses only cached segment text
             // widths); childFlow's width tracks panelWidth with its Height
-            // preserved exactly (never perturbs scroll - M33 C2a already
-            // made every row/container height explicit). The name label is
+            // preserved exactly (never perturbs scroll - every
+            // row/container height is explicit). The name label is
             // untouched here; it only re-ellipsizes at settle below.
             _sink.AddRelayout(w =>
             {
@@ -1013,7 +1006,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// the row's expand/collapse click handler can exclude them from
         /// its own hit-test (a pill click is a decision, not a toggle).
         ///
-        /// M34 fix (MustFix review finding): TreePillColumnWidth (240px) is
+        /// TreePillColumnWidth (240px) is
         /// a fixed budget, but DecisionPillPlanner.AppendOwnershipPills now
         /// unconditionally adds an "IGNORE" pill (plus "USING N OWNED" when
         /// applicable) to every ordinary node, on top of its 1-3 source
@@ -1035,7 +1028,7 @@ namespace GW2CraftingHelper.Views.Rendering
         private List<Panel> RenderDecisionPills(
             Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
         {
-            // currency-ux-package (Feature 2): plan-scope currency facts
+            // Plan-scope currency facts
             // for the new HAVE/TOTAL pill - see PlanViewModel.
             // CurrencyPlanTotals/OwnedCurrencyAmounts' own doc comments.
             var plan = _getCurrentPlan();
@@ -1062,7 +1055,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
                 // White, not borderColor: Selected/Available fills expose the
                 // border hue behind the label, so border-colored text has zero
-                // contrast against its own backdrop (M30 #11).
+                // contrast against its own backdrop.
                 Color textColor = Color.White;
                 if (dimmed)
                 {
@@ -1098,16 +1091,11 @@ namespace GW2CraftingHelper.Views.Rendering
                     Parent = inner
                 };
 
-                // Field-test finding D: tooltipText is resolved once below,
-                // then stamped onto outer/inner/label together right before
-                // the loop moves on - the inner fill panel and its label
-                // cover almost the entire pill (outer is only a 1px border
-                // ring once inset by inner's Location), so a tooltip set on
-                // outer alone is swallowed by whichever of inner/label is
-                // actually under the cursor (labels capture mouse - the
-                // same lesson M32 already established for hover/click
-                // targets elsewhere in this file) and the user never sees
-                // it hovering the pill body. Click/MouseEntered/MouseLeft
+                // tooltipText is resolved once below, then stamped onto
+                // outer/inner/label together - the inner fill panel and
+                // its label cover almost the entire pill, so a tooltip on
+                // outer alone is swallowed by whichever child is under
+                // the cursor (labels capture mouse). Click/MouseEntered/MouseLeft
                 // stay on outer only - unlike tooltip lookup, those already
                 // work correctly today.
                 string tooltipText = null;
@@ -1117,7 +1105,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (interactive)
                 {
                     tooltipText = $"Switch to {spec.Text}";
-                    // source-selection-simplification: a decisively-losing
+                    // A decisively-losing
                     // pill (Kind == Subdued) stays clickable - only its
                     // tooltip gains the "why" explanation, appended after
                     // the ordinary "Switch to X" line rather than replacing
@@ -1143,7 +1131,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (ignoreInteractive)
                 {
-                    // M34-B2b: toggles this ITEM id (not just this node) in
+                    // Toggles this ITEM id (not just this node) in
                     // or out of _ignoredItemIds, matching gw2e's own
                     // tree-wide-by-item-id "Ignore" semantics.
                     tooltipText = node.IsIgnored
@@ -1164,15 +1152,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.Locked)
                 {
-                    // W4B (2026-08-15): a cost-component leaf's "CURRENCY"
-                    // badge (BuildPillSpecs' IsCostComponent short-circuit) -
-                    // its cost cell is deliberately blank because the
-                    // quantity itself IS the cost, in a non-coin currency
-                    // (see CraftingTreeBuilder.
-                    // BuildVendorCostComponentLeaves' currency-line branch) -
-                    // never a "no source"/"no choice" situation like every
-                    // other Locked pill below, so it gets its own tooltip
-                    // before either of those checks run.
+                    // A cost-component leaf's "CURRENCY" badge - its cost
+                    // cell is deliberately blank because the quantity
+                    // itself IS the cost. Never a "no source" situation
+                    // like the other Locked pills, so it gets its own
+                    // tooltip first.
                     if (node.IsCostComponent)
                     {
                         tooltipText = "Paid in a non-coin currency - no gold value to show here";
@@ -1202,28 +1186,19 @@ namespace GW2CraftingHelper.Views.Rendering
                             ? node.AcquisitionHint
                             : "Requires a claimed Guild Hall upgrade";
                     }
-                    // Adversarial-review fix (guildupgrade-ingredients,
-                    // second pass): the UNRECOGNIZED pill (node.Decision ==
-                    // UnrecognizedIngredient - an ingredient type this
-                    // module does not recognize at all) is the same
-                    // "no available source" situation as UNKNOWN/GUILD
-                    // UPGRADE above, not "exactly one feasible source" -
-                    // without this branch it fell into the misleading
-                    // "Only available source" default below.
-                    // CraftingTreeBuilder's UnrecognizedIngredient branch
-                    // returns before ApplyAcquisitionHint ever runs, so
-                    // node.AcquisitionHint is always null here - no ternary
-                    // needed, unlike the Unknown/GuildUpgrade branches above.
+                    // The UNRECOGNIZED pill is the same "no available
+                    // source" situation as UNKNOWN/GUILD UPGRADE, not
+                    // "exactly one feasible source" - without this branch
+                    // it falls into the misleading "Only available source"
+                    // default. node.AcquisitionHint is always null here
+                    // (the builder returns before ApplyAcquisitionHint).
                     else if (node.Decision == CraftingDecision.UnrecognizedIngredient)
                     {
                         tooltipText = "Unrecognized ingredient type - no known acquisition source";
                     }
-                    // Adversarial-review fix (guildupgrade-ingredients,
-                    // final pass): the plain CURRENCY pill was falling into
-                    // the same misleading "Only available source" default -
-                    // a currency ingredient is paid from the wallet, not
-                    // sourced from a market/vendor/recipe at all, so there
-                    // is no "source" for this wording to describe.
+                    // The plain CURRENCY pill must not fall into the "Only
+                    // available source" default - a currency ingredient is
+                    // paid from the wallet, so no "source" wording applies.
                     else if (node.Decision == CraftingDecision.Currency)
                     {
                         tooltipText = "Paid from your wallet as a game currency - no purchase or crafting source applies";
@@ -1235,29 +1210,21 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.Selected)
                 {
-                    // Field-test finding D: the currently-committed source
-                    // pill (non-interactive - clicking it would be a no-op
-                    // re-solve, see BuildPillSpecs) previously had no
-                    // tooltip at all.
+                    // The currently-committed source pill is
+                    // non-interactive (clicking it would be a no-op
+                    // re-solve), but still gets a tooltip.
                     tooltipText = $"Current source: {spec.Text}";
                 }
                 else if ((spec.Kind == PillKind.Have || spec.Kind == PillKind.OwnedInfo) &&
                     (node.Decision == CraftingDecision.Currency ||
                      (node.IsCostComponent && !node.SubtreeCost.HasValue)))
                 {
-                    // currency-ux-package (Feature 2): the plan-scope
-                    // HAVE/TOTAL pill (DecisionPillPlanner.
-                    // AppendCurrencyOwnershipPill) reuses the SAME
-                    // PillKind.Have/OwnedInfo the ordinary item-ownership
-                    // pills use (matching item-pill vocabulary, per the
-                    // maintainer's design), so it must be intercepted here,
-                    // BEFORE the ordinary Have/OwnedInfo branches below,
-                    // which would otherwise apply ITEM-ownership wording
-                    // (node.OwnedQuantityUsed) that means nothing for a
-                    // currency leaf. The pill text alone is plan-scope only
-                    // ("HAVE {have}/{planTotal} TOTAL" - deliberately no
-                    // per-row allocation, see AppendCurrencyOwnershipPill's
-                    // own doc comment); the tooltip adds what the pill text
+                    // The plan-scope HAVE/TOTAL pill reuses the same
+                    // PillKind.Have/OwnedInfo the item-ownership pills
+                    // use, so it must be intercepted BEFORE the ordinary
+                    // branches below, whose item-ownership wording means
+                    // nothing for a currency leaf. The pill text is
+                    // plan-scope only; the tooltip adds what the pill text
                     // cannot: this row's own need (node.Quantity).
                     int have = 0;
                     plan?.OwnedCurrencyAmounts?.TryGetValue(node.ItemId, out have);
@@ -1270,55 +1237,33 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.Have)
                 {
-                    // W4B (2026-08-15): an ITEM cost-component leaf can
-                    // never reach this branch (BuildPillSpecs' IsCostComponent
-                    // short-circuit emits only the "OWN n"/"CURRENCY"
-                    // badges for one, never PillKind.Have) - a CURRENCY
-                    // cost-component leaf (or an ordinary currency leaf)
-                    // CAN reach PillKind.Have now (currency-ux-package
-                    // Feature 2's full-coverage collapse), but is always
-                    // intercepted by the currency-specific branch just
-                    // above first, so this tooltip only ever needs the
-                    // ordinary-item wording below.
-                    //
-                    // Maintainer's final wording pass (2026-08-06): matches
-                    // the OwnedInfo pill's "Needs N - ..." vocabulary below
-                    // instead of the old bare "Fully covered by your
-                    // materials". For a genuinely-owned Have node, Quantity
-                    // is 0 (the node's whole demand was already subtracted
-                    // during reduction), so OwnedQuantityUsed alone already
-                    // is the original total demand.
+                    // An ITEM cost-component leaf can never reach this
+                    // branch (it gets only badges, never PillKind.Have);
+                    // a currency leaf CAN, but is always intercepted by
+                    // the currency-specific branch above - so this
+                    // tooltip only needs the ordinary-item wording. For a
+                    // genuinely-owned Have node, Quantity is 0, so
+                    // OwnedQuantityUsed alone is the original total demand.
                     tooltipText = $"Needs {node.OwnedQuantityUsed} - all covered by your materials";
                 }
                 else if (spec.Kind == PillKind.OwnedInfo)
                 {
                     if (node.IsCostComponent)
                     {
-                        // W4B (2026-08-15): the "OWN n" badge's own tooltip -
-                        // unlike the ordinary OwnedInfo case below, owning
-                        // some of a cost component never reduces what still
-                        // has to be handed over as part of this purchase, or
-                        // this line's cost (see CraftingTreeNode.
-                        // ComponentOwnedQuantity's own doc comment) - purely
-                        // informational, stated explicitly so it is never
-                        // mistaken for the ordinary "reduced the plan"
-                        // OwnedInfo/HAVE vocabulary used everywhere else in
-                        // the tree.
+                        // The "OWN n" badge's tooltip - owning some of a
+                        // cost component never reduces what must be
+                        // handed over or this line's cost; stated
+                        // explicitly so it is never mistaken for the
+                        // "reduced the plan" vocabulary used elsewhere.
                         tooltipText =
                             $"You own {node.ComponentOwnedQuantity} - informational only, " +
                             "does not change the plan cost";
                     }
                     else
                     {
-                        // Field-test finding A's tooltip spelled out what the
-                        // pill text means in full sentences, alongside the tree
-                        // row's own remaining-need "Nx" prefix (node.Quantity);
-                        // the maintainer's final wording pass (2026-08-06, see
-                        // DecisionPillPlanner.AppendOwnershipPills) reworded the
-                        // pill itself to "HAVE {used}/{total} NEEDED" and this
-                        // tooltip to match, without changing what either number
-                        // means - remaining (node.Quantity) is still total minus
-                        // used.
+                        // Matches the "HAVE {used}/{total} NEEDED" pill
+                        // wording; remaining (node.Quantity) is total
+                        // minus used.
                         int totalDemand = node.OwnedQuantityUsed + node.Quantity;
                         tooltipText =
                             $"Needs {totalDemand} total - {node.OwnedQuantityUsed} covered by your materials, " +
@@ -1327,14 +1272,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.AchievementBitDeduped)
                 {
-                    // M37, KNOWN-ISSUES #26: explains the "COUNTED
+                    // KNOWN-ISSUES #26: explains the "COUNTED
                     // ELSEWHERE" semantics - nothing here is actually
                     // owned, this exact occurrence is just already required
                     // elsewhere in the tree.
                     tooltipText = "Already counted elsewhere in the tree - this item is obtained once, not needed again here";
                 }
 
-                // currency-ux-package (Feature 3): appends the value-detail
+                // Appends the value-detail
                 // hover (real gold vs. decision-only optimization price,
                 // plus a vendor cap line when applicable) onto the
                 // committed CRAFT/VENDOR pill's existing tooltip, only when

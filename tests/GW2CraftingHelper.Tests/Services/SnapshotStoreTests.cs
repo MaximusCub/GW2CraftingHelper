@@ -93,7 +93,7 @@ namespace GW2CraftingHelper.Tests.Services
             _store.Delete();
         }
 
-        // --- M39 (one-store-convention): atomic .tmp+Replace, matching
+        // --- One-store convention: atomic .tmp+Replace, matching
         // StatusStore/VendorOfferStore - previously a plain, non-atomic
         // File.WriteAllText (tab-roadmap-proposal.md Section 2.2's
         // correction). ---
@@ -118,7 +118,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(2, _store.LoadLatest().CoinCopper);
         }
 
-        // --- M39 (WP-16 shape): onError callback, real IO failure. ---
+        // --- onError callback: real IO failure. ---
 
         [Fact]
         public void Save_DirectoryCreationFails_InvokesOnErrorInsteadOfThrowing()
@@ -140,8 +140,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(capturedException);
         }
 
-        // --- W3C (per-character discipline display): real SnapshotStore
-        // round-trip with the new per-character discipline data. ---
+        // --- Per-character discipline display: real SnapshotStore
+        // round-trip with the per-character discipline data. ---
 
         [Fact]
         public void Save_Load_RoundTripsCharacterDisciplines()
@@ -178,8 +178,8 @@ namespace GW2CraftingHelper.Tests.Services
         public void Save_Load_NullCharacterDisciplines_RoundTripsAsNull()
         {
             // CreateSnapshot() never sets CharacterDisciplines - mirrors a
-            // pre-W3C snapshot object built by code that has not been
-            // updated to populate it (distinct from a post-W3C capture
+            // legacy snapshot object built by code that has not been
+            // updated to populate it (distinct from a newer capture
             // that legitimately came back empty - see AccountSnapshot.
             // CharacterDisciplines' own doc comment).
             var snapshot = CreateSnapshot();

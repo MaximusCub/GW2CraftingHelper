@@ -39,11 +39,10 @@ namespace GW2CraftingHelper.Services
             return _apiManager.HasPermissions(RequiredPermissions);
         }
 
-        // The 5 independent top-level account-data sources tallied below for
-        // success/failure (KNOWN-ISSUES 31/api-degradation F1). Per-character
-        // inventory failures are NOT counted individually here - they are
-        // already tolerated as a partial-Characters-source degradation by
-        // the inner try/catch around each character's own inventory fetch.
+        // The 5 independent top-level account-data sources tallied for
+        // success/failure. Per-character inventory failures are not
+        // counted individually - they are tolerated as a partial
+        // Characters-source degradation.
         private const int SourceCount = 5;
 
         public async Task<AccountSnapshot> FetchSnapshotAsync(CancellationToken ct)
@@ -51,13 +50,9 @@ namespace GW2CraftingHelper.Services
             var snapshot = new AccountSnapshot { CapturedAt = DateTime.UtcNow };
             int failedSources = 0;
 
-            // Per-source failure type names for SnapshotFailureClassifier
-            // (KNOWN-ISSUES api-degradation F1 follow-up, field-tested
-            // 2026-08-06): captured here, where real Gw2Sharp exception
-            // types are in scope, as plain type-name strings so the
-            // Blish-free classifier and SnapshotFetchFailedException never
-            // need a Gw2Sharp reference of their own - see
-            // SnapshotFailureClassifier's class doc comment.
+            // Per-source failure type names, captured here (where Gw2Sharp
+            // exception types are in scope) as plain strings so the
+            // Blish-free classifier never needs a Gw2Sharp reference.
             var failedSourceExceptionTypeNames = new List<string>();
 
             // Wallet (also extracts coins as currency ID 1)
@@ -171,18 +166,13 @@ namespace GW2CraftingHelper.Services
             {
                 var characterNames = await _apiManager.Gw2ApiClient.V2.Characters.IdsAsync(ct);
 
-                // W3C (per-character discipline display): non-null as soon
-                // as the character list itself is obtained - see
-                // AccountSnapshot.CharacterDisciplines' own doc comment for
-                // why null vs. empty is a meaningful distinction here. May
-                // still be reset to null below (see
-                // characterDisciplineDataDegraded) if any single
-                // character's crafting fetch fails - a partial list would
-                // read as an affirmative "not trained on any character"
-                // claim for a discipline this fetch simply never reached
-                // (W3C review-fix, critical: violates "never invent data"
-                // and the W3C spec's own "degraded fetch -> show nothing"
-                // requirement).
+                // Non-null as soon as the character list is obtained (null
+                // vs empty is meaningful - see
+                // AccountSnapshot.CharacterDisciplines). Reset to null
+                // below if any single character's crafting fetch fails: a
+                // partial list would read as an affirmative "not trained
+                // on any character" claim for characters never reached
+                // (never invent data).
                 snapshot.CharacterDisciplines = new List<SnapshotCharacterDiscipline>();
                 bool characterDisciplineDataDegraded = false;
 
@@ -190,49 +180,27 @@ namespace GW2CraftingHelper.Services
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    // W3C review-fix (mustFix): inventory and crafting-
-                    // discipline are two independent round trips per
-                    // character (previously sequential - one full await
-                    // after the other), which doubled this feature's
-                    // exposure to the hard SnapshotFetchTimeout budget
-                    // (Module.cs's CancelAfter) for large accounts. Firing
-                    // them concurrently restores the wall-clock cost to
-                    // roughly one round trip per character. Each awaited
-                    // task catches its own failures internally (see
-                    // FetchCharacterInventoryItemsAsync/
-                    // FetchCharacterCraftingAsync below), so Task.WhenAll
-                    // never faults on a per-character failure - only a
-                    // genuine cancellation propagates out of it.
+                    // Inventory and crafting are fired concurrently so the
+                    // wall-clock cost stays roughly one round trip per
+                    // character within the hard snapshot timeout. Each
+                    // task catches its own failures internally, so
+                    // Task.WhenAll only faults on genuine cancellation.
                     var inventoryTask = FetchCharacterInventoryItemsAsync(name, ct);
                     var craftingTask = FetchCharacterCraftingAsync(name, ct);
                     await Task.WhenAll(inventoryTask, craftingTask);
 
-                    // Inventory: a failure here is tolerated exactly like
-                    // every other per-character inventory failure always
-                    // has been - this character's items are simply missing
-                    // from Items, a conservative under-count (inflates buy
-                    // cost, never fabricates a claim). It does NOT set
-                    // characterDisciplineDataDegraded, since inventory and
-                    // discipline data are independent signals.
+                    // Inventory: a failure is tolerated - this character's
+                    // items are simply missing, a conservative under-count
+                    // (inflates buy cost, never fabricates a claim). Does
+                    // not set characterDisciplineDataDegraded; the two are
+                    // independent signals.
                     snapshot.Items.AddRange(inventoryTask.Result);
 
-                    // Crafting disciplines (W3C): its own small, lean
-                    // endpoint - needs only account+characters scopes (a
-                    // strict subset of Inventory's account+characters+
-                    // inventories above), both already covered by
-                    // RequiredPermissions, so no new permission requirement.
-                    // Unlike Inventory, ANY failure here (exception after
-                    // the bounded retry inside FetchCharacterCraftingAsync,
-                    // or a null response with no failure exception - both
-                    // defensive, since IBlobClient<T>.GetAsync should throw
-                    // rather than return null on failure) flips
-                    // characterDisciplineDataDegraded so the WHOLE
-                    // snapshot's CharacterDisciplines is discarded below,
-                    // even the entries already gathered from other,
-                    // successfully-fetched characters - see that flag's
-                    // doc comment above for why a partial list is
-                    // unacceptable here even though it is fine for
-                    // Inventory.
+                    // Crafting disciplines: unlike Inventory, ANY failure
+                    // flips characterDisciplineDataDegraded so the whole
+                    // snapshot's CharacterDisciplines is discarded - a
+                    // partial list is unacceptable here (see the flag's
+                    // comment) even though it is fine for Inventory.
                     var craftingOutcome = craftingTask.Result;
                     if (craftingOutcome.Degraded)
                     {
@@ -255,31 +223,18 @@ namespace GW2CraftingHelper.Services
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch character list: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
                 failedSourceExceptionTypeNames.Add(ex.GetType().Name);
-                // Adversarial-review fix (Critical #8): if anything escapes
-                // the per-character loop above (Task.WhenAll faulting,
-                // inventoryTask.Result/craftingTask.Result rethrowing - the
-                // loop's own doc comment that WhenAll "never faults on a
-                // per-character failure" is not a guarantee this catch can
-                // rely on), snapshot.CharacterDisciplines can already be a
-                // PARTIALLY populated, non-null list at this point (some
-                // characters' entries added before the failure). Before
-                // this fix that partial list survived into the returned
-                // snapshot and read as an affirmative "no character has
-                // this discipline" for every character the loop never
-                // reached - exactly the "never invent data" violation the
-                // characterDisciplineDataDegraded machinery above exists to
-                // prevent for a single character's failure. Null it here
-                // too, matching that same "degraded fetch -> show nothing"
-                // contract for a failure that escapes the loop entirely.
+                // If anything escapes the per-character loop,
+                // snapshot.CharacterDisciplines can already be a partially
+                // populated list, which would read as an affirmative "not
+                // trained" claim for characters never reached. Null it
+                // here too - same "degraded fetch -> show nothing"
+                // contract.
                 snapshot.CharacterDisciplines = null;
             }
 
-            // A partial or total failure must never silently masquerade as a
-            // full snapshot (KNOWN-ISSUES 31/api-degradation F1): throw
-            // instead of returning a snapshot with holes relative to what a
-            // prior good fetch may already have on disk/in memory. See
-            // SnapshotFetchFailedException's doc comment for the full
-            // conservative-persistence-rule rationale.
+            // A partial failure must never masquerade as a full snapshot:
+            // throw instead of returning a snapshot with holes relative to
+            // a prior good fetch (see SnapshotFetchFailedException).
             if (failedSources > 0)
             {
                 throw new SnapshotFetchFailedException(failedSources, SourceCount, failedSourceExceptionTypeNames);
@@ -292,19 +247,12 @@ namespace GW2CraftingHelper.Services
             return snapshot;
         }
 
-        // Pre-W3C narrow per-character endpoint, unchanged behavior
-        // (reverted from an earlier W3C-introduced full-record
-        // V2.Characters[name].GetAsync, which pulled in learned recipes/
-        // equipment/build-tab payloads never used here and widened this
-        // cheap cosmetic feature's failure blast radius onto plan-affecting
-        // owned-materials data - see docs/KNOWN-ISSUES.md's W3C section).
-        // Never throws - a failure is tolerated exactly like every other
-        // per-character inventory failure always has been, so the caller
-        // can await this concurrently with FetchCharacterCraftingAsync via
-        // Task.WhenAll without either one's failure short-circuiting the
-        // other (W3C review-fix, mustFix: extracted from an inline
-        // sequential await so the two per-character round trips run
-        // concurrently instead).
+        // Uses the narrow per-character inventory endpoint, not the full
+        // character record - the full record pulls in payloads never used
+        // here and widens this feature's failure blast radius. Never
+        // throws, so the caller can Task.WhenAll it with
+        // FetchCharacterCraftingAsync without either short-circuiting the
+        // other.
         private async Task<List<SnapshotItemEntry>> FetchCharacterInventoryItemsAsync(string characterName, CancellationToken ct)
         {
             var items = new List<SnapshotItemEntry>();
@@ -337,20 +285,10 @@ namespace GW2CraftingHelper.Services
             return items;
         }
 
-        // W3C review-fix (mustFix): one bounded retry on top of the
-        // existing single attempt - the all-or-nothing rule in
-        // FetchSnapshotAsync (a single failed character's crafting fetch
-        // discards CharacterDisciplines for the WHOLE account, see that
-        // call site's own comment for why a partial list is unacceptable)
-        // means a single transient 429/500 on just one character used to
-        // silently wipe this feature for every character on every refresh.
-        // Mirrors ItemMetadataService.GetMetadataAsync's own first-wave +
-        // retry-wave pattern, including that pattern's lack of an
-        // artificial delay between attempts. Never throws (except a
-        // genuine cancellation) - the Degraded flag on the returned tuple
-        // is how failure (including a defensive null payload with no
-        // exception - IBlobClient<T>.GetAsync should throw rather than
-        // return null on failure) is reported back to the caller.
+        // One bounded retry: the all-or-nothing rule means a single
+        // transient 429/500 on one character would otherwise wipe
+        // CharacterDisciplines for the whole account. Never throws (except
+        // genuine cancellation) - the Degraded flag reports failure.
         private async Task<(bool Degraded, List<SnapshotCharacterDiscipline> Disciplines)> FetchCharacterCraftingAsync(string characterName, CancellationToken ct)
         {
             var disciplines = new List<SnapshotCharacterDiscipline>();
@@ -375,13 +313,10 @@ namespace GW2CraftingHelper.Services
                         disciplines.Add(new SnapshotCharacterDiscipline
                         {
                             CharacterName = characterName,
-                            // RawValue (not ToEnumString()/Value): preserves
-                            // the literal string the API returned even for
-                            // a discipline Gw2Sharp's enum does not
-                            // recognize, and matches the plain-string shape
-                            // RequiredDiscipline.Discipline already uses
-                            // (from Recipe.Disciplines) so the two can be
-                            // compared directly.
+                            // RawValue preserves the literal API string
+                            // even for a discipline Gw2Sharp's enum does
+                            // not recognize, matching the plain-string
+                            // shape RequiredDiscipline.Discipline uses.
                             Discipline = cd.Discipline?.RawValue ?? "",
                             Rating = cd.Rating,
                             Active = cd.Active

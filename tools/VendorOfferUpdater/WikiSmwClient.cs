@@ -15,7 +15,7 @@ namespace VendorOfferUpdater
     /// Uses the action=ask endpoint with vendor-related properties.
     /// See docs/ARCHITECTURE.md section 9 in the main module repo (data
     /// pipeline: seeds, wiki scrapes, dev-only caches) for how this tool's
-    /// output feeds the shipped module (M38 WP-27).
+    /// output feeds the shipped module.
     /// </summary>
     public class WikiSmwClient
     {
@@ -62,7 +62,7 @@ namespace VendorOfferUpdater
         // TimegatedCapType.Seasonal (see KNOWN-ISSUES.md item 33 /
         // VendorBatchSolver.FinalizeVendorBatches).
         //
-        // M37 (KNOWN-ISSUES #24): "Has requirement" is populated by the
+        // "Has requirement" is populated by the
         // {{vendor table row|requirement=...}} parameter (confirmed live via
         // a direct SMW ask probe against Homestead Refinement-Metal Forge:
         // tier-0 rows return an empty array, tier-1/tier-2 rows return
@@ -390,7 +390,7 @@ namespace VendorOfferUpdater
                 .Select(c => $"{c.Value}:{c.Currency ?? ""}")
                 .ToArray();
 
-            // M37 (KNOWN-ISSUES #24): Requirement is folded in so two rows
+            // Requirement is folded in so two rows
             // that differ ONLY by requirement text are not conflated as
             // "the same row seen twice" - the real, wiki-documented Potato
             // anomaly (Homestead Refinement-Farm: the tier-1 row is not
@@ -535,7 +535,7 @@ namespace VendorOfferUpdater
                 result.SeasonalCap = seasonalCap[0].GetInt32();
             }
 
-            // Has requirement (M37, KNOWN-ISSUES #24) - a _txt property, so
+            // Has requirement - a _txt property, so
             // its array entries are plain strings (e.g. "one [[Homestead
             // Upgrade: Ore Trade Efficiency]]"), not page-link objects.
             // First non-empty entry only: confirmed live that Homestead
@@ -697,7 +697,7 @@ namespace VendorOfferUpdater
         /// already retries transient failures; a null here means the page
         /// itself does not have a "wikitext" result, not a network error).
         ///
-        /// Review fix (2026-08-18): action=parse does NOT resolve
+        /// Action=parse does NOT resolve
         /// redirects by default (unlike action=ask's SMW queries) -
         /// without &amp;redirects=1, a vendor page whose SMW subject title
         /// is a redirect returned "#REDIRECT [[Target]]" as its wikitext,
@@ -771,11 +771,11 @@ namespace VendorOfferUpdater
         // the PrintoutSuffix doc comment above.
         public int? SeasonalCap { get; set; }
 
-        // M37 (KNOWN-ISSUES #24): raw "Has requirement" text, or null if
+        // Raw "Has requirement" text, or null if
         // the row has none. See HomesteadTierResolver.
         public string? Requirement { get; set; }
 
-        // Festival-vendor auto-tagging follow-up (2026-08-16): the raw
+        // Festival-vendor auto-tagging follow-up: the raw
         // "seasonal="/"event=" value pulled from this vendor page's own
         // {{Temporary|...}} wikitext template by
         // TemporaryTemplateParser.ExtractSeasonalOrEventParameter, or null

@@ -5,7 +5,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // Field-tested pain, 2026-08-06: at CHARACTER SELECT, Blish has not yet
+    // Field-tested pain: at CHARACTER SELECT, Blish has not yet
     // resolved the game's Mumble identity, so every account data source
     // call fails with an invalid/missing API key - the Snapshot tab's
     // Refresh Now used to show only "Refresh Failed - {time}" with no hint

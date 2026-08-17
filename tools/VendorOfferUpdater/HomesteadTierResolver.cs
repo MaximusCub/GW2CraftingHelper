@@ -4,7 +4,7 @@ namespace VendorOfferUpdater
 {
     /// <summary>
     /// Resolves a wiki-scraped vendor row's Homestead Refinement efficiency
-    /// tier (M37, KNOWN-ISSUES #24) from its merchant name and raw "Has
+    /// tier from its merchant name and raw "Has
     /// requirement" SMW property text. Kept separate from ConvertToOffer so
     /// this pure resolution logic is covered by direct unit tests without a
     /// Gw2ApiHelper/HttpClient fixture.
@@ -18,7 +18,7 @@ namespace VendorOfferUpdater
     /// `.includes()` substring test would.
     ///
     /// Confirmed live (direct SMW ask probe against Homestead
-    /// Refinement-Metal Forge, 2026-07-21): a tier-0 row's "Has requirement"
+    /// Refinement-Metal Forge, ): a tier-0 row's "Has requirement"
     /// printout returns an empty array; a tier-1/tier-2 row returns exactly
     /// one _txt value, "one [[Homestead Upgrade: ...]]" or "two [[Homestead
     /// Upgrade: ...]]" respectively - the wiki's {{vendor table row}}

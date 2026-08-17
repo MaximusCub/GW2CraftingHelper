@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Models
         public int? DailyCap { get; set; }
         public int? WeeklyCap { get; set; }
 
-        // Astral Acclaim package (KNOWN-ISSUES #28/#33): Wizard's Vault
+        // Astral Acclaim package: Wizard's Vault
         // seasonal purchase cap (resets each Vault season, wiki property
         // "Has seasonal purchase cap"), or null for every non-Vault offer.
         // Additive, backward-compatible - existing offers deserialize with
@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Models
         // method's doc comment.
         public int? SeasonalCap { get; set; }
 
-        // M37 (KNOWN-ISSUES #24, gw2e parity): the Homestead Refinement
+        // The Homestead Refinement
         // efficiency tier (0/1/2) this specific offer row corresponds to,
         // or null for every non-Homestead-Refinement offer. Additive,
         // backward-compatible - existing offers deserialize with this null.
@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Models
         // re-deriving those bugs in code - see VendorBatchSolver.EvaluateVendorOffers.
         public int? HomesteadTier { get; set; }
 
-        // opportunity-notes (SEASONAL VENDOR TIP): the festival this offer
+        // The festival this offer
         // is only available during (Blish_HUD.Contexts.FestivalContext.
         // Festival.Name, e.g. "halloween" - lowercase, MEASURED, see
         // Gw2Constants.HalloweenFestivalName), or null for every regular,

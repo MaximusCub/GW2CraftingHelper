@@ -2,7 +2,7 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Pure decision for whether a queued generation-status update should
-    /// still be applied (M34-B1 #4 - CraftingPlanView's stale "Building
+    /// still be applied (CraftingPlanView's stale "Building
     /// final result..." status race).
     ///
     /// A generation's trailing progress tick and that same generation's own
@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Services
     /// race regardless of drain order. See
     /// CraftingPlanView.TriggerGenerate's statusProgress callback and its
     /// success/error MainThreadMarshal.Run callbacks.
-    /// <para>See docs/ARCHITECTURE.md section 6 (M38 WP-27).</para>
+    /// <para>See docs/ARCHITECTURE.md section 6.</para>
     /// </summary>
     public static class StatusUpdateGuard
     {

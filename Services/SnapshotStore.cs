@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Services
     {
         private readonly string _filePath;
 
-        // M39 (WP-16 shape, d2-log-system.md Section 4.2): see StatusStore's
+        // See StatusStore's
         // matching field comment.
         private readonly Action<string, Exception> _onError;
 
@@ -33,11 +33,7 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        // M39 (one-store-convention, tab-roadmap-proposal Section 2.2):
-        // previously a plain, non-atomic File.WriteAllText - the scout note
-        // three independent M38 design proposals (D2/D3/D4) each flagged as
-        // wrong (it claimed all three existing stores shared StatusStore's
-        // atomic .tmp+Replace pattern; this one did not). Switched to the
+        // Previously a plain, non-atomic File.WriteAllText. Switched to the
         // same atomic pattern StatusStore.Save/VendorOfferStore.SaveOverlay
         // already use, so a crash/power-loss mid-write can no longer leave
         // a half-written snapshot.json that LoadLatest then fails to parse.

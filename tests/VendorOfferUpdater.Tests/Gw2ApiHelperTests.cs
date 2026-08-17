@@ -90,7 +90,7 @@ namespace VendorOfferUpdater.Tests
         {
             var (helper, _, httpClient) = CreateHelper();
             using var __ = httpClient;
-            // No LoadCurrenciesAsync needed — aliases are hardcoded
+            // No LoadCurrenciesAsync needed - aliases are hardcoded
             Assert.Equal(1, helper.ResolveCurrencyId(alias));
         }
 

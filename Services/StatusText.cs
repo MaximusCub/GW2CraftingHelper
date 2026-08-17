@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Services
         public static string Normalize(string status) => status ?? "";
 
         /// <summary>
-        /// M37 (KNOWN-ISSUES #22/#27): the re-solve status line for
+        /// The re-solve status line for
         /// CraftingPlanView.ApplyOverridesAndResolve. "Best path restored"
         /// is the Best Path preset's own label and must only be written
         /// when that preset is the trigger - every other re-solve trigger
@@ -23,8 +23,8 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M39 (snapshot search, d1-snapshot-about-settings.md Feature 1):
-        /// formats a snapshot's age for the Snapshot tab's staleness suffix,
+        /// Formats a snapshot's age for the Snapshot tab's staleness
+        /// suffix (d1-snapshot-about-settings.md Feature 1),
         /// e.g. "Updated - Aug 15, 2026 3:41 PM (2m ago)". A negative age
         /// (CapturedAt momentarily ahead of the local clock - e.g. minor
         /// clock skew right after a fetch) is treated as zero rather than
@@ -58,7 +58,7 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Cause text for a failed Refresh Now (Views/MainView.cs), keyed
         /// by SnapshotFailureClassifier's classification - the field-tested
-        /// fix for the "Refresh Failed" dead end (2026-08-06: at CHARACTER
+        /// fix for the "Refresh Failed" dead end (at CHARACTER
         /// SELECT every account data source throws an invalid-token
         /// exception, and the bare status line gave no hint why). Callers
         /// append " - {time}" themselves, matching the pre-existing

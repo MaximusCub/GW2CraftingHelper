@@ -271,13 +271,13 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(store.HasAnyOffer(200));
         }
 
-        // --- M37 (KNOWN-ISSUES #24): shipped Homestead Refinement tier
+        // --- Shipped Homestead Refinement tier
         // data invariant. VendorBatchSolver.EvaluateVendorOffers admits any offer
         // whose HomesteadTier is null at every configured tier setting -
         // correct for the 21 one-time "Upgrade" purchase rows the same
         // three merchant pages also sell, but WRONG for a material-
         // conversion row, which would then silently reintroduce the
-        // pre-M37 always-max-tier defect PR #57 fixed. The solver has no
+        // always-max-tier defect PR #57 fixed. The solver has no
         // independent way to catch a mistagged row - this test is the
         // only defense against a future wiki re-scrape shipping one, since
         // otherwise the only existing check is a dev-time console warning
@@ -338,11 +338,11 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- M38 (WP-08 / tests T7): the shipped ref/vendor_offers.json
+        // --- The shipped ref/vendor_offers.json
         // (13.3MB) was already exercised through the production
         // VendorOfferLoader by the Homestead test above, but only for a
         // 237-row subset - this pins the loader's parse of the *entire*
-        // file, guarding the WP-08 ReadToEnd->DeserializeAsync(Stream)
+        // file, guarding the ReadToEnd->DeserializeAsync(Stream)
         // switch against silent drift (this file has no leading BOM;
         // the switch here is purely the perf P2a change, see
         // VendorOfferLoader.Load).
@@ -359,13 +359,13 @@ namespace GW2CraftingHelper.Tests.Services
                 var dataset = _loader.Load(stream);
 
                 Assert.Equal(1, dataset.SchemaVersion);
-                // Astral Acclaim package (KNOWN-ISSUES #28): a scoped
+                // Astral Acclaim package: a scoped
                 // Wizard's Vault re-scrape (--query + --merge-into) net
                 // added 7 offers (100 removed/replaced, 107 added) while
                 // seeding SeasonalCap - see the package's commit for the
                 // full accounting.
                 //
-                // Festival-vendor auto-tagging follow-up (2026-08-16): a
+                // Festival-vendor auto-tagging follow-up: a
                 // second scoped re-scrape (--query + --tag-seasonal-festivals
                 // + --merge-into) targeting the six known festival vendors
                 // OTHER than Candy Corn Vendor (Weekly) - Dragon Bash
@@ -411,7 +411,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // Review fix (finding 6, 2026-08-17): neither suite previously
+        // Neither suite previously
         // tied the shipped data's festival keys to the module's own
         // known-key/display-name table - VendorOfferUpdater.Tests.
         // SeasonalFestivalRoundTripTests only checks a hard-coded string
@@ -422,7 +422,7 @@ namespace GW2CraftingHelper.Tests.Services
         // dragonbash/wintersday/festivalofthefourwinds/lunarnewyear/
         // superadventurefestival all fell through
         // ResolveFestivalDisplayName's raw-key fallback before that fix).
-        // The six-key list below is independently MEASURED the same way
+        // The six-key list below is independently measured the same way
         // as FestivalDisplayNames itself (see that field's own doc
         // comment) - kept as its own literal, not copied from
         // FestivalDisplayNames.Keys, so a future accidental deletion from
@@ -469,7 +469,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- M39 (WP-16 shape): onError callback, real IO failure. ---
+        // --- onError callback: real IO failure. ---
 
         [Fact]
         public void LoadBaseline_StreamThrows_InvokesOnErrorInsteadOfThrowing()
@@ -503,7 +503,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // Astral Acclaim package (KNOWN-ISSUES #33): pins SeasonalCap for
+        // Astral Acclaim package: pins SeasonalCap for
         // the two task-named Wizard's Vault rows, mirroring the guard
         // docs/research/m37-r4-vendor-caps.md section 4f recommended for
         // the analogous daily/weekly case (item 28's Candy-Corn-Ecto

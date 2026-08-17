@@ -29,8 +29,7 @@ namespace GW2CraftingHelper.Tests.Services
         // its raw items list through this helper first, exactly like the
         // real caller, rather than passing the raw list to BuildItemRows
         // directly (BuildItemRows now takes the already-deduped map, not
-        // the raw per-source entry list - see the M39 fix-pass finding this
-        // signature change addresses).
+        // the raw per-source entry list).
         private static IReadOnlyDictionary<int, SnapshotItemEntry> ItemsById(IReadOnlyList<SnapshotItemEntry> items) =>
             SnapshotSearchResultBuilder.BuildRepresentativeIndex(items);
 

@@ -61,7 +61,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Total reclaimable value", total.Label);
             Assert.Equal(590, total.CoinValue);
 
-            // Review fix (nice-to-have): "Notes (N)" counts real entries
+            // "Notes (N)" counts real entries
             // (2 excess items), not section.Rows.Count (which is 3 once the
             // "Total reclaimable value" rollup row is included).
             Assert.Equal("Notes (2)", section.Title);
@@ -70,7 +70,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void PerItemRows_SortedAlphabeticallyByResolvedName()
         {
-            // Review fix (finding 3, MEASURED): different quantities so
+            // Different quantities so
             // this actually exercises the claimed "alphabetical by
             // resolved item name" contract - both fixtures previously used
             // ExcessQuantity = 1, which passed even when the code sorted on
@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void UnpricedNonAccountBoundEntry_LabeledNoSellPrice()
         {
-            // Review fix (finding 5, MEASURED): an unpriced row (no live
+            // An unpriced row (no live
             // sell price, and NOT account-bound) must be visibly
             // distinguished from a genuinely worthless one - it previously
             // rendered identically to a real 0-value row.
@@ -126,7 +126,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void TotalRow_QualifiedWhenAnyContributorUnpriced()
         {
-            // Review fix (finding 5, MEASURED): the total must not silently
+            // The total must not silently
             // understate itself when it folded in an unpriced (defaulted
             // to 0) contributor.
             var meta = MetaFor((10, "Iron Ingot", "iron.png"), (20, "Mystery Widget", "widget.png"));

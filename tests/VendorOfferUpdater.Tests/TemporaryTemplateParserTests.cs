@@ -4,7 +4,7 @@ using Xunit;
 namespace VendorOfferUpdater.Tests
 {
     /// <summary>
-    /// Festival-vendor auto-tagging follow-up (2026-08-16): exercises
+    /// Festival-vendor auto-tagging follow-up: exercises
     /// TemporaryTemplateParser against REAL wikitext captured live from
     /// the GW2 Wiki (api.guildwars2.com mirror,
     /// api.php?action=parse&amp;prop=wikitext) - not hand-invented
@@ -19,7 +19,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void CandyCornVendorWeekly_SeasonalHalloween_Extracted()
         {
-            // Captured verbatim (2026-08-16) from
+            // Captured verbatim from
             // "Candy Corn Vendor (Weekly)".
             const string wikitext =
                 "{{Temporary|release=Shadow of the Mad King 2019|seasonal=Halloween}}\n" +
@@ -41,7 +41,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void DragonBashMerchantWeekly_SeasonalDragonBash_Extracted()
         {
-            // Captured verbatim (2026-08-16) from
+            // Captured verbatim from
             // "Dragon Bash Merchant (Weekly)".
             const string wikitext = "{{Temporary|release=Dragon Bash 2019|seasonal=Dragon Bash}}\n" +
                 "{{NPC infobox\n| name = Dragon Bash Merchant\n}}";
@@ -52,7 +52,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void WintersdayTraderWeekly_SeasonalWintersday_Extracted()
         {
-            // Captured verbatim (2026-08-16) from
+            // Captured verbatim from
             // "Wintersday Trader (Weekly)".
             const string wikitext =
                 "{{Temporary|release=A Very Merry Wintersday 2019|seasonal=Wintersday}}\n" +
@@ -64,7 +64,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void FestivalRewardsVendorWeekly_SeasonalFestivalOfTheFourWinds_Extracted()
         {
-            // Captured verbatim (2026-08-16) from
+            // Captured verbatim from
             // "Festival Rewards Vendor (Weekly)".
             const string wikitext =
                 "{{Temporary|release=Festival of the Four Winds 2019|seasonal=Festival of the Four Winds}}\n" +
@@ -78,7 +78,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void NewYearVendor_SeasonalLunarNewYear_Extracted()
         {
-            // Captured verbatim (2026-08-16) from "New Year Vendor".
+            // Captured verbatim from "New Year Vendor".
             const string wikitext = "{{Temporary|release=Lunar New Year 2020|seasonal=Lunar New Year}}\n" +
                 "{{NPC infobox\n| name = New Year Vendor\n}}";
 
@@ -88,7 +88,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void SuperAdventureBoxWeeklyTrader_SeasonalSuperAdventureFestival_Extracted()
         {
-            // Captured verbatim (2026-08-16) from
+            // Captured verbatim from
             // "Super Adventure Box Weekly Trader".
             const string wikitext =
                 "{{Temporary|release=Super Adventure Festival 2019|seasonal=Super Adventure Festival}}\n" +
@@ -102,7 +102,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void TraderVendorPage_EventParameterVariant_Extracted()
         {
-            // Captured verbatim (2026-08-16) from "Trader" (the Bazaar of
+            // Captured verbatim from "Trader" (the Bazaar of
             // the Four Winds karma merchant) - a vendor NPC page using
             // "event=" instead of "seasonal=" for the identical purpose.
             const string wikitext =
@@ -117,7 +117,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void LowercaseTemplateName_StillMatches()
         {
-            // Captured verbatim (2026-08-16) from "Mad King's Realm" -
+            // Captured verbatim from "Mad King's Realm" -
             // confirms the lowercase "{{temporary|...}}" spelling used in
             // the wild resolves identically to "{{Temporary|...}}".
             const string wikitext = "{{temporary|release=Shadow of the Mad King 2012|seasonal=Halloween}}";
@@ -128,7 +128,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void KnownButUnmappedEventValue_StillExtracted_ResolverLeavesUntagged()
         {
-            // Captured verbatim (2026-08-16) from
+            // Captured verbatim from
             // "Consortium Trader (Fractal Rush)" - a real vendor NPC page
             // whose {{temporary|event=...}} value is a one-off in-game
             // event, not one of the six recognized festivals. The parser
@@ -161,7 +161,7 @@ namespace VendorOfferUpdater.Tests
             Assert.Null(TemporaryTemplateParser.ExtractSeasonalOrEventParameter(wikitext));
         }
 
-        // Nice-to-have fix (2026-08-17 review): a page with TWO
+        // A page with TWO
         // {{Temporary}} templates, where only the SECOND one carries
         // seasonal=, used to return null (only the first match was ever
         // inspected) - now every match is checked.

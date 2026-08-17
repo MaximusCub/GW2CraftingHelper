@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Services.Recipes
 
         public IReadOnlyList<int> TryGetSearch(int outputItemId)
         {
-            // Overlay first — it has newer content discovered after seed.
+            // Overlay first - it has newer content discovered after seed.
             var result = _overlay.TryGetSearch(outputItemId);
             if (result != null)
             {
@@ -44,7 +44,7 @@ namespace GW2CraftingHelper.Services.Recipes
 
         public RawRecipe TryGetRecipe(int recipeId)
         {
-            // Overlay first — it has newer content discovered after seed.
+            // Overlay first - it has newer content discovered after seed.
             var result = _overlay.TryGetRecipe(recipeId);
             if (result != null)
             {

@@ -4,10 +4,7 @@ namespace GW2CraftingHelper.Models
     /// How the plan values materials the player already owns and that
     /// inventory reduction consumes. An owned unit is always consumed
     /// first, at zero acquisition cost - this enum never makes an owned
-    /// unit "cost" anything. What it DOES control (M34-B2a #3, gw2efficiency
-    /// parity - see OwnedMaterialsForceBuyPrePass; VOM design Candidate A
-    /// extended this into a full decision-invariant reduction - see
-    /// InventoryReducer.Reduce's zeroOwnedDecisions parameter):
+    /// unit "cost" anything. What it DOES control:
     /// 1. Valued runs a zero-owned decision pass BEFORE the real solve
     ///    (reusing the same force-buy pre-pass baseline): a node is
     ///    excluded from crafting when buying it outright costs less than
@@ -22,11 +19,10 @@ namespace GW2CraftingHelper.Models
     ///    prices, and a Buy-decided node's ingredients are never
     ///    phantom-consumed into UsedMaterials.
     /// 3. Valued also deducts owned materials' trading-post sell
-    ///    opportunity cost from CraftingProfit (the original M28 behavior),
-    ///    now computed from the (smaller, correctly-scoped) decision-guided
-    ///    UsedMaterials list above rather than the old price-blind one.
+    ///    opportunity cost from CraftingProfit, computed from the
+    ///    decision-guided UsedMaterials list.
     /// In Free mode, reduction falls back to the legacy primary-recipe-
-    /// option heuristic (InventoryReducer's pre-VOM behavior) unchanged.
+    /// option heuristic unchanged.
     /// All of the above only takes effect when an account snapshot actually
     /// drove reduction (CraftingPlanPipeline's own gate) - with no
     /// snapshot, this setting is inert regardless of its value.

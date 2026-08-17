@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task FetchBatchIntoCache_DerivesIsAccountBound_FromRawItemFlags()
         {
-            // Review fix (finding 6): real-path coverage for
+            // Real-path coverage for
             // FetchBatchIntoCacheAsync's IsAccountBound derivation - every
             // other IsAccountBound assertion in this branch hand-sets the
             // field on an ItemMetadata fixture directly, which proves

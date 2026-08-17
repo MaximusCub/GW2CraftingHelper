@@ -173,12 +173,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.True(File.Exists(Path.Combine(cacheDir, "recipes_overlay.json")));
                 Assert.True(File.Exists(Path.Combine(cacheDir, "overlay_manifest.json")));
 
-                // Reload with same build ID (0 since null was used) — data preserved
+                // Reload with same build ID (0 since null was used) - data preserved
                 var overlay2 = new OverlayRecipeCacheStore(tempDir);
                 overlay2.Load(currentGw2BuildId: null);
                 Assert.NotNull(overlay2.TryGetSearch(100));
 
-                // Reload with different build ID — data cleared
+                // Reload with different build ID - data cleared
                 var overlay3 = new OverlayRecipeCacheStore(tempDir);
                 overlay3.Load(currentGw2BuildId: 12345);
                 Assert.Null(overlay3.TryGetSearch(100));
@@ -192,7 +192,7 @@ namespace GW2CraftingHelper.Tests.Services
             // Pre-populate a cache store with search + recipe data
             var cacheStore = new InMemoryRecipeCacheStore();
 
-            // Root item 100 → recipe 1 → ingredient 200 (leaf)
+            // Root item 100 -> recipe 1 -> ingredient 200 (leaf)
             cacheStore.PutSearch(100, new List<int> { 1 });
             cacheStore.PutRecipe(1, new RawRecipe
             {
@@ -220,7 +220,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(tree.Recipes);
             Assert.Equal(2, tree.Recipes[0].Ingredients[0].Quantity);
 
-            // API was NOT called — everything came from cache
+            // API was NOT called - everything came from cache
             Assert.Equal(0, api.SearchCallCount);
             Assert.Equal(0, api.RecipeCallCount);
         }
@@ -247,7 +247,7 @@ namespace GW2CraftingHelper.Tests.Services
                 MinRating = 400,
                 Flags = new List<string> { "AutoLearned" }
             });
-            // 200 is a leaf — no search results registered
+            // 200 is a leaf - no search results registered
 
             var service = new RecipeService(api, cacheStore: cacheStore);
             var tree = await service.BuildTreeAsync(100, 1, CancellationToken.None);
@@ -353,7 +353,7 @@ namespace GW2CraftingHelper.Tests.Services
                 store.LoadManifest(ms);
             }
 
-            // Same build — seed is fresh
+            // Same build - seed is fresh
             store.SetCurrentBuildId(100);
             Assert.False(store.SeedIsStale);
 

@@ -5,7 +5,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // tree-tooltip-composer milestone: TreeRowTooltipComposer is the
+    // TreeRowTooltipComposer is the
     // Blish-free half of the Recipe Tree row tooltip (see
     // TreeSectionController.RenderTreeNode for the actual
     // BasicTooltipText/right-click wiring, which cannot be unit tested per
@@ -80,7 +80,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ZeroCoinUnitCost_WithCurrencyCosts_SuppressesCoinLine()
         {
-            // Field-test finding B: a pure-currency vendor offer has
+            // A pure-currency vendor offer has
             // UnitCost == 0 (not null), which used to render a misleading
             // "0g 0s 0c" line - suppressed only when a currency cost line
             // exists to show instead of it.
@@ -116,7 +116,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void PriceSideFellBack_BuyFromTp_NullPlan_UsesBasisAgnosticSentence()
         {
-            // Nice-to-have (null-plan fallback, b18fb03 precedent): a null
+            // A null
             // plan cannot know the actual PriceBasis, so it must get a
             // basis-agnostic sentence rather than silently reading null as
             // "false" and picking one side's wording as an unearned claim.

@@ -26,14 +26,14 @@ namespace GW2CraftingHelper.Views
         //
         // Astral Acclaim (63) - addendum-astral-acclaim.md P1: added so a
         // user CAN value it if they choose to, but with no suggested rate
-        // (see the info line in BuildCurrencyValuationsSection below) - the
-        // maintainer explicitly rejected a single implied copper-per-AA
-        // anchor (the addendum's "REVISED" section), since AA's per-item
+        // (see the info line in BuildCurrencyValuationsSection below) - a
+        // single implied copper-per-AA
+        // anchor was rejected, since AA's per-item
         // deal quality varies across the Wizard's Vault and any one implied
         // rate would misrepresent that. Leaving this row blank (the
         // default) keeps AA out of price comparisons entirely, same as any
         // other unset currency.
-        // currency-ux-package review fix (finding 2, MEASURED): ids with no
+        // Ids with no
         // CurrencyDecisionDefaults entry but still worth surfacing for a
         // user to value by hand - see CurrencyDecisionDefaults' own doc
         // comment for why each is absent from that table: Astral Acclaim's
@@ -48,9 +48,6 @@ namespace GW2CraftingHelper.Views
             80  // Masterwork Rift Essence
         };
 
-        // currency-ux-package review fix (finding 2, MEASURED): previously
-        // a hand-picked 7-id list, of which only 3 (Karma/Laurels/Spirit
-        // Shards) actually had a CurrencyDecisionDefaults entry.
         // ModuleSettings.GetEffectiveCurrencyValuation applies EVERY entry
         // in that table to every real solve regardless of whether a
         // Settings row exists for it, so a defaulted currency with no row
@@ -99,7 +96,7 @@ namespace GW2CraftingHelper.Views
             public TextBox Input;
             public Label ErrorLabel;
 
-            // currency-ux-package (Feature 1): null for a currency with no
+            // Null for a currency with no
             // CurrencyDecisionDefaults entry (nothing to show/clear - see
             // AddCurrencyRow). DefaultStateLabel reflects the currently-
             // persisted default/cleared/overridden state; ClearCheckbox is
@@ -109,7 +106,7 @@ namespace GW2CraftingHelper.Views
             public Checkbox ClearCheckbox;
         }
 
-        // M37 (KNOWN-ISSUES #24): one row per Homestead Refinement material
+        // One row per Homestead Refinement material
         // family. MaterialItemId is internal-only bookkeeping (never
         // displayed - see MaterialLabel) used solely to route the parsed
         // tier back to the right ModuleSettings entry.
@@ -129,9 +126,9 @@ namespace GW2CraftingHelper.Views
         private Label _statusLabel;
         private Label _homesteadStatusLabel;
 
-        // M39 (log system, d2-log-system.md Section 5 / tab-roadmap-proposal
-        // Section 2.1): the ONE "Diagnostics" checkbox + the two log-file
-        // policy rows (max size / retention). No separate
+        // The ONE "Diagnostics" checkbox + the two log-file
+        // policy rows (max size / retention) - d2-log-system.md Section 5.
+        // No separate
         // ScrollDiagnosticsEnabled checkbox is surfaced here - see
         // ModuleSettings' own doc comment on that setting's backward-compat
         // read.
@@ -142,7 +139,7 @@ namespace GW2CraftingHelper.Views
         private Label _logRetentionDaysErrorLabel;
         private Label _logStatusLabel;
 
-        // M39 (d1-snapshot-about-settings.md Feature 3): standalone
+        // Standalone
         // "Snapshot" section, its own new section (not folded into "Plan
         // Defaults", which is about per-plan choices - a different
         // concern). TextBox+Save+error-label idiom, same shape as the
@@ -160,9 +157,7 @@ namespace GW2CraftingHelper.Views
         {
             _rows.Clear();
 
-            // Pre-existing gap found during M39 review (this same file's
-            // reused-instance-per-reopen shape is exactly why _rows.Clear()
-            // above already exists): Module.cs's Settings tab reuses this
+            // Module.cs's Settings tab reuses this
             // SAME SettingsTabContent instance across every tab re-open
             // (unlike the Log tab's "new instance per open" factory), so
             // without clearing here, re-opening Settings more than once
@@ -207,7 +202,7 @@ namespace GW2CraftingHelper.Views
             AddSectionHeader("Currency Valuations", panelWidth);
             AddInfoLine("Coin value per unit of each currency, used to compare vendor offers.", panelWidth);
             AddInfoLine("Leave a currency unset to keep it out of price comparisons.", panelWidth);
-            // currency-ux-package (Feature 1): a currency with a curated
+            // A currency with a curated
             // default (see CurrencyDecisionDefaults) is used automatically
             // even when its box is left blank - "unset" now means "use the
             // default, if any", not "excluded". Use Clear to suppress a
@@ -231,8 +226,8 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// VOM design (Section 5.3): the "Value own materials" checkbox
-        /// that used to live here (AddValueOwnMaterialsRow, M34-B2a #3) has
+        /// The "Value own materials" checkbox
+        /// that used to live here (AddValueOwnMaterialsRow) has
         /// been relocated inline into Views/CraftingPlanView.cs's controls
         /// panel, next to Use Own Materials/price basis - it is now a
         /// per-plan session choice (like those two neighbors), not a
@@ -250,7 +245,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M37 (KNOWN-ISSUES #24, gw2e parity): three per-material efficiency
+        /// Three per-material efficiency
         /// tier rows (Fiber/Metal/Wood), each an integer 0/1/2 entered as
         /// text and validated on Save - same TextBox+Save shape as the
         /// Currency Valuations section above (a plain Checkbox's immediate-
@@ -417,7 +412,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M39 (log system): one "Diagnostics" checkbox (idiom (a),
+        /// One "Diagnostics" checkbox (idiom (a),
         /// immediate-apply - matches ValueOwnMaterials above) plus two
         /// TextBox+Save rows (idiom (b) - matches the Homestead section
         /// above) for the log file's size cap and retention window. This is
@@ -677,7 +672,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M39 (d1-snapshot-about-settings.md Feature 3): one TextBox+Save
+        /// One TextBox+Save
         /// row for SnapshotRefreshIntervalMinutes - replaces Module.cs's
         /// previously-hardcoded StaleThreshold constant, so the Snapshot
         /// tab's own staleness indicator and Module's auto-refresh trigger
@@ -849,15 +844,11 @@ namespace GW2CraftingHelper.Views
             };
         }
 
-        // currency-ux-package review fix (finding 6, MEASURED): the
-        // default/cleared indicator and its Clear checkbox previously sat
-        // on the SAME line as ErrorLabel (x=454), only 20px to its right at
-        // x=474 - ErrorLabel is AutoSizeWidth and its "Must be a positive
-        // whole number" text comfortably overruns that gap, painting
-        // through the default label and potentially the Clear checkbox
-        // (the only control that can persist a cleared state). Moved to
-        // their own line below the name/input/hint/error line instead of
-        // trying to out-guess AutoSizeWidth text metrics - see
+        // The default/cleared indicator and its Clear checkbox sit on
+        // their own line below the name/input/hint/error line -
+        // ErrorLabel is AutoSizeWidth and its text comfortably overruns
+        // any same-line gap, painting through the default label and the
+        // Clear checkbox - see
         // CurrencyRowHeight/CurrencyDefaultLineY below. Both columns start
         // well left of the old ErrorX-relative positions (aligned under
         // the input box, not past the hint/error columns), so a
@@ -955,7 +946,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// currency-ux-package (Feature 1): refreshes one row's default/
+        /// Refreshes one row's default/
         /// cleared indicator label and Clear checkbox from the given
         /// (already-loaded or just-saved) valuation - shared by
         /// LoadCurrentValuations and SaveValuations so the two can never

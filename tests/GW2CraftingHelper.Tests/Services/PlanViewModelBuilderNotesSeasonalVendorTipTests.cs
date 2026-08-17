@@ -42,7 +42,7 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
-            // Review fix (finding 4): split into two rows so the trailing
+            // Split into two rows so the trailing
             // "cheaper than..." clause can never be the part an ellipsized
             // panel width cuts - see BuildNotesSection's own doc comment.
             Assert.Equal(2, section.Rows.Count);
@@ -65,7 +65,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Notes (1)", section.Title);
         }
 
-        // Review fix (finding 2, 2026-08-17): guards the exact regression
+        // Guards the exact regression
         // found - FestivalDisplayNames used to contain only Halloween, so
         // any of the five other known festivals rendered the raw internal
         // key verbatim ("During superadventurefestival:") instead of its

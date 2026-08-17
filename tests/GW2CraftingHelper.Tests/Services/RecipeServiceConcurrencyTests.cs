@@ -215,7 +215,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             using (var cts = new CancellationTokenSource())
             {
-                // Cancel after 150ms — enough for ~1 BFS level but not all 5
+                // Cancel after 150ms - enough for ~1 BFS level but not all 5
                 cts.CancelAfter(150);
 
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(

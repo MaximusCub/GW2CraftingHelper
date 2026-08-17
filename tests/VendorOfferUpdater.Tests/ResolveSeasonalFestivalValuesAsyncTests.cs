@@ -15,7 +15,7 @@ using Xunit;
 namespace VendorOfferUpdater.Tests
 {
     /// <summary>
-    /// Festival-vendor auto-tagging follow-up (2026-08-16): exercises the
+    /// Festival-vendor auto-tagging follow-up: exercises the
     /// full wikitext-fetch-and-cache pass (Program.ResolveSeasonalFestivalValuesAsync)
     /// end to end against a fake wiki API, including the SMW subobject-key
     /// stripping (Program.StripSubobjectSuffix) real "Sells item" subjects
@@ -180,7 +180,7 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
-        // Self-healing fix (2026-08-20): a from-scratch run against a real
+        // Self-healing fix: a from-scratch run against a real
         // dataset (thousands of distinct vendor pages) with no prior
         // ref/seasonal_wikitext_cache.json used to hit this exact shape -
         // more uncached pages than the budget - on its very first
@@ -243,7 +243,7 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
-        // Hard-abort fix (2026-08-20): a budget of 0 or less is not a
+        // Hard-abort fix: a budget of 0 or less is not a
         // normal "ran out of budget, continue next time" case - it means
         // no run could ever make progress at all, so it must keep throwing
         // SafetyLimitException rather than silently self-heal into an
@@ -310,7 +310,7 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
-        // Resilience fix (2026-08-17): a non-JSON/HTML 200 response (the
+        // Resilience fix: a non-JSON/HTML 200 response (the
         // shape a wiki maintenance page or a proxy error page would
         // return) used to throw an uncaught JsonException out of
         // FetchWitextAsync's JsonDocument.Parse, aborting the WHOLE method
@@ -353,7 +353,7 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
-        // Resilience fix (2026-08-17): an exception the per-page catches
+        // Resilience fix: an exception the per-page catches
         // don't handle (anything other than HttpRequestException/
         // JsonException - e.g. Ctrl-C's OperationCanceledException, or
         // any other unexpected failure) must still leave every page
@@ -402,7 +402,7 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
-        // Review fix (2026-08-18): a null FetchWikitextAsync result
+        // A null FetchWikitextAsync result
         // (missing/renamed page, or an "error" object in the API response
         // - valid JSON with no "parse" property) must NOT be cached as ""
         // ("checked - no {{Temporary}} template") the way a real, fetched-
@@ -451,7 +451,7 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
-        // Review fix (2026-08-18): a scoped --merge-into --query run's
+        // A scoped --merge-into --query run's
         // fetch budget (and --max-seasonal-pages check) must count only
         // the pages THIS run's --query returned (queryScopedResults), not
         // every distinct page in the full merged wiki_vendor_cache.json
@@ -504,7 +504,7 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
-        // Nice-to-have fix (2026-08-18 review): the cache-apply loop used
+        // The cache-apply loop used
         // to only ever ASSIGN a non-empty cached value onto
         // TemporarySeasonalValue and never CLEAR it - a value that had
         // already round-tripped in from a prior run (e.g. via
@@ -571,7 +571,7 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
-        // Throttle-class fix (2026-08-19): a null-wikitext `continue`
+        // Throttle-class fix: a null-wikitext `continue`
         // (and the two pre-existing HttpRequestException/JsonException
         // `continue`s) used to jump straight past the inter-request
         // Task.Delay, which only ran on the success path. A stretch of
@@ -622,7 +622,7 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
-        // Nice-to-have (2026-08-19): a cache file written before the
+        // A cache file written before the
         // &redirects=1 fix (WikiSmwClient.FetchWikitextAsync) may contain
         // "" entries that actually mean "this page's SMW subject was a
         // redirect and its wikitext came back as '#REDIRECT [[...]]',

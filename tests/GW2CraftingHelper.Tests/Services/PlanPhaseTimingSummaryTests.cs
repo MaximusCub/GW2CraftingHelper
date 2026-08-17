@@ -80,7 +80,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void FormatCompactSummary_WithWallClockMs_UsesWallClockAsTotalAndAppendsPhaseSum()
         {
-            // W3B review-fix: the phase-sum-only "total" this used to log
+            // The phase-sum-only "total" this used to log
             // silently under-reports the real duration a field tester
             // experiences by however long the un-instrumented gaps between
             // steps ran. When the caller supplies the wrapper's own

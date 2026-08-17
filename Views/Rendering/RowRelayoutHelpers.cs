@@ -4,13 +4,12 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-24 (m38-a2-simplify.md finding #3): factors the "row divider +
+    // Factors the "row divider +
     // width-only relayout closure" tail that closes every row builder in
     // CraftStepsSectionRenderer, DisciplinesSectionRenderer,
     // RecipesSectionRenderer, ShoppingListSectionRenderer, and
     // UsedMaterialsSectionRenderer - confirmed byte-identical in shape
-    // across all five (see the WP-24 constant-by-constant table in the
-    // PR/commit body):
+    // across all five:
     //   Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, bottomClearance);
     //   sink.AddRelayout(w =>
     //   {

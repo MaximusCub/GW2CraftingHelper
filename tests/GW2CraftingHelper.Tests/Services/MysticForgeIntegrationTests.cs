@@ -103,7 +103,7 @@ namespace GW2CraftingHelper.Tests.Services
         public async Task SingleMfRecipe_SolverChoosesCraftWhenCheaper()
         {
             // Gift of Magic: 250 each of 4 T6 mats
-            // Set TP buy-instantly price (sellUnitPrice → BuyInstant) very high
+            // Set TP buy-instantly price (sellUnitPrice -> BuyInstant) very high
             // so crafting is cheaper
             var api = new InMemoryRecipeApiClient();
             var mfData = LoadMfData();
@@ -153,7 +153,7 @@ namespace GW2CraftingHelper.Tests.Services
         public async Task SingleMfRecipe_SolverChoosesBuyWhenCheaper()
         {
             // Gift of Magic BuyInstant (sellUnitPrice) is cheap,
-            // ingredient BuyInstants are expensive → buy is cheaper than craft
+            // ingredient BuyInstants are expensive -> buy is cheaper than craft
             var api = new InMemoryRecipeApiClient();
             var mfData = LoadMfData();
             var composite = new CompositeRecipeApiClient(api, mfData);
@@ -181,7 +181,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             // BuyInstant for Gift of Magic = 100
             // Craft cost = 250*(500+400+450+600) = 487500
-            // 100 < 487500 → choose BuyFromTp
+            // 100 < 487500 -> choose BuyFromTp
             var buyStep = plan.Steps.FirstOrDefault(s => s.ItemId == GiftOfMagicId);
             Assert.NotNull(buyStep);
             Assert.Equal(AcquisitionSource.BuyFromTp, buyStep.Source);
@@ -212,7 +212,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("MysticForge", fortuneRecipe.Disciplines);
             Assert.Equal(4, fortuneRecipe.Ingredients.Count);
 
-            // Ingredient 0: Mystic Clover (77, leaf — no MF recipe for it in seed)
+            // Ingredient 0: Mystic Clover (77, leaf - no MF recipe for it in seed)
             var cloverNode = fortuneRecipe.Ingredients[0];
             Assert.Equal(MysticCloverId, cloverNode.Id);
             Assert.Equal(77, cloverNode.Quantity);
@@ -258,7 +258,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task ChainedMfRecipes_SolverComputesCorrectTotal()
         {
-            // Gift of Fortune → Gift of Magic + Gift of Might + Ecto + Clover
+            // Gift of Fortune -> Gift of Magic + Gift of Might + Ecto + Clover
             // All leaf ingredients priced, gifts are expensive to buy outright
             var api = new InMemoryRecipeApiClient();
             var mfData = LoadMfData();
@@ -338,7 +338,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task MysticForgeDiscipline_ExcludedFromRequiredDisciplines()
         {
-            // Field-test finding E (user-approved): the Mystic Forge is a
+            // The Mystic Forge is a
             // facility, not a player-levelable discipline, so it must never
             // appear in RequiredDisciplines - build a plan that crafts a MF
             // recipe and confirm it stays out.
@@ -493,7 +493,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task MysticForgeRecipe_NeverMarkedAsMissing()
         {
-            // MF recipes are inherently available — they must never show IsMissing=true,
+            // MF recipes are inherently available - they must never show IsMissing=true,
             // even when a learned recipe set is provided that doesn't contain them.
             var api = new InMemoryRecipeApiClient();
             var mfData = LoadMfData();
@@ -533,7 +533,7 @@ namespace GW2CraftingHelper.Tests.Services
             var mfRecipe = result.RequiredRecipes.FirstOrDefault(r => r.RecipeId == -4);
             Assert.NotNull(mfRecipe);
 
-            // IsMissing must be false — MF recipes don't need unlocking
+            // IsMissing must be false - MF recipes don't need unlocking
             Assert.False(mfRecipe.IsMissing,
                 "Mystic Forge recipes should never be marked as Missing");
         }
@@ -590,7 +590,7 @@ namespace GW2CraftingHelper.Tests.Services
             // RequiredRecipes includes MF recipe -4
             Assert.Contains(result.RequiredRecipes, r => r.RecipeId == -4);
 
-            // No snapshot → UsedMaterials is empty
+            // No snapshot -> UsedMaterials is empty
             Assert.Empty(result.UsedMaterials);
 
             // DebugLog is populated

@@ -5,34 +5,19 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// design-plan-notes.md (Notes section, excess/reclaim): pure,
-    /// Blish-free post-solve annotation pass, moved-out-for-testability
-    /// shape/placement precedent identical to SellSideEconomics - walks the
-    /// already-built display tree (CraftingTreeResult.CraftingTree for a
-    /// single-item plan, MultiItemRoots for a batch) and aggregates every
-    /// Decision == Craft occurrence's positive (CraftsNeeded *
-    /// RecipeExpectedOutputCount - Quantity) surplus (the EV basis, not the
-    /// nominal RecipeOutputCount - see the finding-1 comment on Walk
-    /// below), grouped by ItemId.
+    /// Pure, Blish-free post-solve annotation pass: walks the display
+    /// tree and aggregates every Craft occurrence's positive
+    /// (CraftsNeeded * RecipeExpectedOutputCount - Quantity) surplus,
+    /// grouped by ItemId.
     ///
-    /// Aggregation is deliberately by ItemId across every tree occurrence,
-    /// not per tree node: a shared sub-ingredient crafted in two unrelated
-    /// branches with independent rounding reports one merged excess figure.
-    /// This is correct for the reclaim-value math (both surpluses are
-    /// equally sellable/fungible on the Trading Post) - do not "fix" this
-    /// into a per-occurrence list. Nice-to-have callout: the Crafting Steps
-    /// section still MERGES those same occurrences into a single "Craft
-    /// Nx" step (e.g. 10x from two branches each needing 5), which alone
-    /// implies zero waste - a user reconciling that section against this
-    /// one's "Excess: 2x" can read the two as contradictory even though
-    /// both are correct; only this doc comment names the tension today.
+    /// Aggregation is deliberately by ItemId across occurrences, not per
+    /// node: surpluses are equally sellable/fungible, so do not "fix"
+    /// this into a per-occurrence list. (The Crafting Steps section still
+    /// merges the same occurrences into one "Craft Nx" step, which can
+    /// read as contradicting the excess figure; both are correct.)
     ///
-    /// Writes only CraftingPlanResult.ExcessCraftOutputs. Never mutates
-    /// Plan, Plan.TotalCoinCost, result.NetSaleValue, or
-    /// result.CraftingProfit - same "cosmetic display data only... never
-    /// fed back into any decision or total" contract SellSideEconomics'
-    /// own doc comment establishes for OwnedCurrencyAmounts/
-    /// OwnedVendorItemAmounts.
+    /// Writes only CraftingPlanResult.ExcessCraftOutputs - never fed back
+    /// into any decision or total.
     /// </summary>
     internal static class ExcessCraftOutputCalculator
     {
@@ -61,20 +46,10 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // Review fix (finding 6, MEASURED): SellSideEconomics.
-            // ComputePerItemEconomics already raises the ROOT item's own
-            // sellableQuantity (and therefore NetSaleValue/the Profit tile)
-            // to CraftsNeeded * ExpectedOutputCount (the same EV basis as
-            // finding 1 above - see the finding-8 fix on
-            // ComputePerItemEconomics itself) whenever the root recipe
-            // over-produces - the Total Cost section already advertises
-            // this exact surplus. The display-tree root is also a Craft
-            // node, so without this exclusion the walk above would emit
-            // the SAME surplus units again here, double-advertising the
-            // same coins under a different label. Exclude every requested
-            // root item id (single-item CraftingTree, or each MultiItemRoots
-            // entry) from the Notes list entirely - their over-production is
-            // already visible elsewhere.
+            // SellSideEconomics already raises the root item's
+            // sellableQuantity to the same EV surplus, so without this
+            // exclusion the walk would advertise the same coins twice
+            // under a different label. Exclude every requested root id.
             if (result.CraftingTree != null)
             {
                 excessByItemId.Remove(result.CraftingTree.ItemId);
@@ -122,27 +97,15 @@ namespace GW2CraftingHelper.Services
             result.ExcessCraftOutputs = outputs;
         }
 
-        // Recursive pre-order walk. A node contributes only when it is
-        // itself a Craft decision with both batch-shape fields populated
-        // (CraftingTreeBuilder only sets them for Decision == Craft - see
-        // CraftingTreeNode.CraftsNeeded's own doc comment) AND is not
-        // beneath a reference branch (finding 2, below); every node,
-        // Craft or not, still has its Children walked so a Craft node
-        // nested arbitrarily deep beneath a Buy/Have/Currency ancestor is
-        // never skipped.
+        // Pre-order walk. A node contributes only when it is a Craft
+        // decision with both batch-shape fields populated and is not
+        // beneath a reference branch; every node still has its Children
+        // walked so a deep Craft node is never skipped.
         //
-        // insideReferenceBranch (review fix, finding 2, MEASURED): true
-        // once the walk has passed a node with IsReferenceBranch == true -
-        // CraftingTreeBuilder.BuildNode synthesizes gw2e's "what it would
-        // cost to craft instead" hypothetical subtree under a BuyFromTp/
-        // BuyFromVendor node that also has a recipe, and those hypothetical
-        // children carry real solver decisions (often Craft) plus their own
-        // CraftsNeeded/RecipeOutputCount, even though nothing in that
-        // subtree is actually crafted. Propagated as-is to every descendant
-        // (never reset back to false), mirroring CraftingTreeBuilder's own
-        // "propagate insideReferenceBranch as-is" precedent for the same
-        // reason: a Craft decision reached while already inside a
-        // reference branch is still hypothetical content.
+        // insideReferenceBranch: a reference branch's hypothetical
+        // children carry real solver decisions (often Craft) even though
+        // nothing there is actually crafted; propagated as-is to every
+        // descendant, never reset.
         private static void Walk(
             CraftingTreeNode node, Dictionary<int, int> excessByItemId, bool insideReferenceBranch)
         {
@@ -155,25 +118,13 @@ namespace GW2CraftingHelper.Services
                 node.Decision == CraftingDecision.Craft &&
                 node.CraftsNeeded.HasValue && node.RecipeOutputCount.HasValue)
             {
-                // Review fix (finding 1, MEASURED): recover "produced" on
-                // the SAME basis CraftsNeeded was derived from
-                // (RecipeExpectedOutputCount), not the nominal
-                // RecipeOutputCount - see CraftingTreeNode.
-                // RecipeExpectedOutputCount's own doc comment. Falls back to
-                // RecipeOutputCount only for a pre-existing tree/fixture
-                // that never set the new field (old plan.json, direct test
-                // fixtures) - a real Craft node always has one of the two
-                // populated together with CraftsNeeded.
-                // Nice-to-have (review fix): an ordinary integer-yield
-                // recipe's basis is a double that merely happens to hold an
-                // integer (ExpectedOutputCount == OutputCount, ratio 1.0) -
-                // computing producedEv through floating point there exposes
-                // the whole "excess" figure to any future source of
-                // representation error (e.g. 2.9999999996 silently
-                // dropping a whole unit). Fast-pathed as plain integer math
-                // whenever the two bases are equal; only a genuine
-                // fractional-EV recipe (Mystic Clover-style) takes the
-                // double path below.
+                // Recover "produced" on the same basis CraftsNeeded was
+                // derived from (RecipeExpectedOutputCount), falling back
+                // to RecipeOutputCount only for old trees/fixtures that
+                // never set the field. Integer-yield recipes take a plain
+                // integer fast path so the excess figure is never exposed
+                // to floating-point representation error; only genuine
+                // fractional-EV recipes take the double path.
                 int excess;
                 if (node.RecipeExpectedOutputCount.HasValue &&
                     node.RecipeExpectedOutputCount.Value == node.RecipeOutputCount.Value)

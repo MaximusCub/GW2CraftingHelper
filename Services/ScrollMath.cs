@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Applies a pixel-space scroll delta to a scrollbar's current
-        /// ratio, returning the resulting ratio (M36, wheel-wrap fix -
+        /// ratio, returning the resulting ratio (wheel-wrap fix -
         /// KNOWN-ISSUES #12 reopened). Blish's own Scrollbar.
         /// HandleWheelScroll/ScrollAnimated operate in pixel space (a
         /// fixed per-notch pixel step added to the current pixel offset),

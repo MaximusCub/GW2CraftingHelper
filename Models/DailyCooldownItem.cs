@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Models
         /// <summary>
         /// Server-enforced cap on OUTPUT UNITS of this recipe per day, per
         /// account. Every curated entry today is 1, but the field is not
-        /// hard-coded to that value. Review note: PlanViewModelBuilder.
+        /// hard-coded to that value. PlanViewModelBuilder.
         /// AppendDailyCooldownNotices compares this directly against
         /// PlanStep.Quantity (also output units), which is only correct
         /// because every recipe id behind every seeded item today has

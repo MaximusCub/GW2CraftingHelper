@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class PlanSolverHomesteadTierTests
     {
-        // --- M37: Homestead Refinement efficiency tier gating (gw2e parity,
+        // --- Homestead Refinement efficiency tier gating (gw2e parity,
         // KNOWN-ISSUES #24) - the live defect fix: our seed already carries
         // all tier rows untagged, so before this gate the solver silently
         // assumed every account had every efficiency upgrade. ---

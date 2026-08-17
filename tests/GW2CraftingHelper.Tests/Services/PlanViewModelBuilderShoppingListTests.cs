@@ -139,7 +139,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(5000L, section.Rows[0].CoinValue);
         }
 
-        // --- Non-coin currency rows / dash rows (KNOWN-ISSUES #16) ---
+        // --- Non-coin currency rows / dash rows ---
 
         [Fact]
         public void ShoppingList_VendorRow_ZeroCoinWithCurrencyCost_PopulatesCurrencyCosts()
@@ -175,7 +175,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("s.png", row.CurrencyCosts[0].IconUrl);
         }
 
-        // --- M34-B2b: owned/needed split on shopping-row currency Total cells ---
+        // --- Owned/needed split on shopping-row currency Total cells ---
 
         [Fact]
         public void ShoppingList_VendorRow_OwnedCurrencyAmountsPresent_SetsOwnedQuantityOnCurrencyCosts()
@@ -273,7 +273,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ShoppingList_VendorRow_UnitCurrencyCosts_UsesWinningOfferRate()
         {
-            // M34-B1 #2: Each is the winning offer's own per-batch rate
+            // Each is the winning offer's own per-batch rate
             // (VendorOfferCurrencyCostLinesPerBatch / VendorOfferOutputCount
             // - here a 4-for-4 batch bought 100 times = 400 total), not a
             // total/Quantity average over the aggregated row.
@@ -360,10 +360,10 @@ namespace GW2CraftingHelper.Tests.Services
             // VendorCurrencyCosts for an UnknownSource step, so the row
             // ends up with CoinValue == 0 and CurrencyCosts == null - the
             // exact combination the view renders as a dash instead of a
-            // blank cell (KNOWN-ISSUES #16b). This test locks in the
+            // blank cell. This test locks in the
             // view-model side of that condition; the dash glyph itself is
             // rendered by CoinCurrencyRenderer.RenderValueCellRightAligned
-            // (Views/Rendering, M38 WP-21), which is Blish-only and not
+            // (Views/Rendering), which is Blish-only and not
             // covered here.
             var result = MakeResult(steps: new List<PlanStep>
             {

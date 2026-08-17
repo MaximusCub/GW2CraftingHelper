@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Total width of a horizontal run of "label, gap, icon, gap"
         /// segments - the same layout convention CraftingPlanView's coin
-        /// AND currency segments both use (KNOWN-ISSUES #16). Callers pass
+        /// AND currency segments both use. Callers pass
         /// their own already-measured (Blish-bound BitmapFont.MeasureString)
         /// per-segment text widths plus their own iconSize/labelIconGap/
         /// segmentGap constants, so this arithmetic can never drift from
@@ -79,7 +79,7 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// int[] twin of the IReadOnlyList&lt;int&gt; overload above, same
-        /// formula. Every M33 C2b per-frame relayout closure (replayed on
+        /// formula. Every per-frame relayout closure (replayed on
         /// every OnPanelResized drag tick) calls this with
         /// SegmentLayoutHandle.TextWidths, which is always a concrete
         /// int[]; without this overload the compiler binds those hot-path

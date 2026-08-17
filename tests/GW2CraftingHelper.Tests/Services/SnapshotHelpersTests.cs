@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Tests.Services
     public class SnapshotHelpersTests
     {
 
-        // ── SplitWalletAndCoins ─────────────────────────────────────
+        // -- SplitWalletAndCoins -------------------------------------
 
         [Fact]
         public void SplitWalletAndCoins_WithCurrencyId1_ExtractsCoinCopper()

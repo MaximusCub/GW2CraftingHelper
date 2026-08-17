@@ -3,8 +3,8 @@ using System.Collections.Generic;
 namespace GW2CraftingHelper.Models
 {
     /// <summary>
-    /// One grouped result row for the Snapshot tab's search list (M39
-    /// snapshot search, d1-snapshot-about-settings.md Feature 1): one row
+    /// One grouped result row for the Snapshot tab's search list
+    /// (d1-snapshot-about-settings.md Feature 1): one row
     /// per matching itemId, with its account-wide total and a per-source
     /// breakdown (ordered via the existing, unmodified
     /// AccountItemIndex.GetPrioritizedSources - see

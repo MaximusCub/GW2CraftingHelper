@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Tests.Models
                 {
                     new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 9999 }
                 },
-                // W3C polish (review nice-to-have): this test's name is a
+                // This test's name is a
                 // promise ("preserves ALL fields") that CharacterDisciplines
                 // broke when it was added without updating this fixture -
                 // two entries here exercise every field on
@@ -37,7 +37,7 @@ namespace GW2CraftingHelper.Tests.Models
                 // file's own established convention), not
                 // SnapshotHelpers.SerializeSnapshot/DeserializeSnapshot -
                 // SnapshotSerializationTests.cs already covers that path's
-                // CharacterDisciplines round-trip and the pre-W3C
+                // CharacterDisciplines round-trip and the legacy
                 // missing-field/null-defaulting behavior; this test only
                 // needs to stop lying about which fields it preserves.
                 CharacterDisciplines = new List<SnapshotCharacterDiscipline>

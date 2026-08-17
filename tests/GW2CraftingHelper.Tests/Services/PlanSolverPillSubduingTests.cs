@@ -9,7 +9,7 @@ using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// source-selection-simplification (maintainer-approved redesign,
+    /// (redesign,
     /// docs/gw2e-considerations.md): real Solve()-path coverage of
     /// PlanSolver.Evaluate's new per-source PillSourceCostBreakdown
     /// computation (CraftCostBreakdown/BuyFromTpCostBreakdown/
@@ -124,7 +124,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void WeightedCraftLosing_PureGoldNoValuation_HasNonCoinCostFalse()
         {
-            // Adversarial-review round-2 finding #1's exact real path: TP
+            // Regression: TP
             // (400c, selected) vs a craft recipe (losing) that consumes 5x
             // item 100 at 100c each (500c) - pure gold on both sides, NO
             // CurrencyValuation anywhere. BuildCraftCostBreakdown still

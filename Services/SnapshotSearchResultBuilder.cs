@@ -6,7 +6,7 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Blish-free search/filter/aggregation logic for the Snapshot tab's
-    /// account-inventory browser (M39 snapshot search,
+    /// account-inventory browser (snapshot search,
     /// d1-snapshot-about-settings.md Feature 1). MainView.cs is the only
     /// caller; every method here is a pure function over already-loaded
     /// AccountSnapshot/AccountItemIndex data - no I/O, no Blish_HUD/

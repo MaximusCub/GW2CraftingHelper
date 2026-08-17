@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Services
     /// </para>
     /// <para>
     /// Blish-free (see ModuleLogEntry's own doc comment for why) and takes
-    /// an <paramref name="onError"/> callback from day one (WP-16's shape) -
+    /// an <paramref name="onError"/> callback from day one -
     /// called instead of throwing on any IO failure, so a log store failure
     /// can never itself crash the caller. Never logs through ModuleLog on
     /// its own failure (that would be unbounded recursion into the sink

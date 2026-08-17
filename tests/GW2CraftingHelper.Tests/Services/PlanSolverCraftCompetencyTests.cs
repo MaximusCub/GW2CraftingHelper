@@ -8,7 +8,7 @@ using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// source-selection-simplification (maintainer-approved redesign,
+    /// (redesign,
     /// docs/gw2e-considerations.md): a Craft source only wins the
     /// AUTOMATIC buy-vs-craft-vs-vendor comparison when some character can
     /// actually craft it - see PlanSolver.Evaluate's craftExcludedFromAutoPick
@@ -160,7 +160,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiRecipeNode_OneCompetentOneNot_CompetentSiblingAutoWinsOverExcludedCheaperOne()
         {
-            // Adversarial-review Critical #1: a node with SEVERAL sibling
+            // Regression: a node with SEVERAL sibling
             // RecipeOptions (routine - CompositeRecipeApiClient merges API
             // recipe ids with MysticForgeRecipeData for the same output,
             // and the API itself can return more than one recipe per
@@ -196,7 +196,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(11, result.Decisions[0].RecipeId);
             Assert.True(result.Decisions[0].CanCraft);
 
-            // Adversarial-review round-2 fix (finding #5), shape (b): this
+            // Regression: this
             // node's craft did NOT get excluded (recipe 11 auto-won), but
             // the CHEAPEST recipe overall (recipe 10, untrained) is still
             // untrained - CheapestCraftUntrained must be true here even
@@ -213,7 +213,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void NonCompetentAccount_OnlyAlternativeIsFallbackTierVendor_StillAutoCraftsRatherThanDroppingCost()
         {
-            // Adversarial-review Critical #6: the "a genuine next-best
+            // Regression: the "a genuine next-best
             // source must exist" guard must NOT count a FALLBACK-tier
             // vendor offer (unvalued non-coin currency, e.g. karma-only) as
             // a real alternative. Node has a fully-priced comparable craft
@@ -270,7 +270,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
         }
 
-        // --- Adversarial-review round-2 fix (finding #5): real
+        // --- Regression: real
         // Solve() + CraftingTreeBuilder + CompetencyOpportunityCalculator
         // round trips for the two shapes CraftExcludedByCompetency alone
         // left unreported. Same production pipeline
@@ -381,7 +381,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ForceBuyOnlyNode_CompetencyIndependentForceBuy_ReportsNoOpportunity()
         {
-            // Verification-review fix (second pass): this node has a SINGLE
+            // This node has a SINGLE
             // recipe (Weaponsmith 500, untrained) - the force-buy pre-pass's
             // competency-resolved and competency-blind evaluations of the
             // 0.85 rule are therefore identical (both read the same 30c
@@ -439,7 +439,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CompetencyCausedForceBuy_UntrainedCheapestRecipe_ReportsOpportunity()
         {
-            // Verification-review fix (second pass) - the measured shape
+            // Regression - the measured shape
             // ebdf16c's fix wrongly silenced: root item 1 has TWO recipes -
             // RecipeId 10 (Weaponsmith 500, ingredient item 2 @ 30c - the
             // untrained, numerically CHEAPEST recipe overall) and RecipeId

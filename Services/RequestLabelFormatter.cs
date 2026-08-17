@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Services
     /// Caps the "name x quantity[, name x quantity...]" requestLabel
     /// CraftingPlanView.TriggerGenerate builds for
     /// CraftingPlanPipeline.GenerateStructuredAsync's rich ModuleLog lines
-    /// (W3B review-fix). Uncapped, that label joins EVERY filled item row's
+    ///. Uncapped, that label joins EVERY filled item row's
     /// resolved name and is written verbatim into the start/finish/cancel/
     /// fail Info/Warn lines - a 20-row plan of long GW2 item names produces
     /// a single ~700-character ModuleLog line. Pure, Blish-free string

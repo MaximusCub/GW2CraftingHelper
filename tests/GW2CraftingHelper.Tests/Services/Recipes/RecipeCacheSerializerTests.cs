@@ -11,7 +11,7 @@ using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
 namespace GW2CraftingHelper.Tests.Services.Recipes
 {
     /// <summary>
-    /// Adversarial-review fix-pass (M37, KNOWN-ISSUES #26): the real,
+    /// Regression: the real,
     /// hand-edited ref/recipes_seed.json / ref/recipe_search_seed.json were
     /// previously never loaded through the production deserialization path
     /// (RecipeCacheSerializer.LoadRecipeSeed/LoadSearchSeed, used at
@@ -34,7 +34,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var recipes = RecipeCacheSerializer.LoadRecipeSeed(stream);
 
-                // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): was
+                // KNOWN-ISSUES recipe-ingestion bug class: was
                 // 14736 before this fix re-ran the seeder with the schema
                 // version pinned (see Gw2RecipeApiClient.SchemaVersion) -
                 // +230 net new recipes: ~188 were previously invisible to
@@ -42,7 +42,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
                 // ingredient-era bug this fix closes, e.g. 14025 below),
                 // the remainder is ordinary game-content growth accrued
                 // since this seed was last regenerated (build 195497,
-                // 2026-02-20 -> build 205505, 2026-08-16 - about six
+                // -> build 205505, - about six
                 // months of real GW2 patches).
                 Assert.Equal(14966, recipes.Count);
 
@@ -106,7 +106,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
                 Assert.True(recipes.ContainsKey(-1591));
                 Assert.True(recipes.ContainsKey(-1));
 
-                // Review-fix (recipe-ingestion-fix, Critical): the reseed
+                // The reseed
                 // that added the rows above silently dropped recipe
                 // -1591's (Mystic Clover) fractional ExpectedOutputCount
                 // (0.31 -> null) - tools/GW2CraftingHelper.RecipeSeeder's
@@ -126,7 +126,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
         [Fact]
         public void LoadRecipeSeed_ShippedSeedFile_PreservesEveryMysticForgeExpectedOutputCount()
         {
-            // Review-fix (recipe-ingestion-fix, Must Fix): a defensive,
+            // A defensive,
             // class-level guard (not just the single -1591 pin above) - for
             // every recipe ref/mystic_forge_recipes.json declares a
             // fractional ExpectedOutputCount for, the shipped
@@ -183,7 +183,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var searches = RecipeCacheSerializer.LoadSearchSeed(stream);
 
-                // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): was
+                // KNOWN-ISSUES recipe-ingestion bug class: was
                 // 15774 before this fix - see the matching count-drift
                 // comment in LoadRecipeSeed_ShippedSeedFile_... above for
                 // the full breakdown.

@@ -198,11 +198,11 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GetRecipe_NegativeIdNotInMf_FallsThroughToPrimary()
         {
-            // Adversarial-review fix-pass: a negative recipeId is Mystic
+            // Regression: a negative recipeId is Mystic
             // Forge only if MysticForgeRecipeData actually recognizes it -
             // otherwise it must fall through to primary rather than being
             // silently swallowed as "not found" purely because it is
-            // negative. Guards against a real id-space collision: the M37
+            // negative. Guards against a real id-space collision: the
             // achievement/merchant seed recipes use negative ids (-1592..
             // -1595) adjacent to, but not part of, the Mystic Forge range,
             // and were previously never given a chance at primary on a
