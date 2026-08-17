@@ -364,7 +364,19 @@ namespace GW2CraftingHelper.Tests.Services
                 // added 7 offers (100 removed/replaced, 107 added) while
                 // seeding SeasonalCap - see the package's commit for the
                 // full accounting.
-                Assert.Equal(53536, dataset.Offers.Count);
+                //
+                // Festival-vendor auto-tagging follow-up (2026-08-16): a
+                // second scoped re-scrape (--query + --tag-seasonal-festivals
+                // + --merge-into) targeting the six known festival vendors
+                // OTHER than Candy Corn Vendor (Weekly) - Dragon Bash
+                // Merchant (Weekly), Wintersday Trader (Weekly), Festival
+                // Rewards Vendor (Weekly), Gauntlet Ticket Vendor, New Year
+                // Vendor, Super Adventure Box Weekly Trader - net added 2
+                // offers (52 removed/replaced, 54 added) while seeding
+                // SeasonalFestival for those merchants (see
+                // VendorOfferUpdater.Tests.SeasonalFestivalRoundTripTests
+                // for the full seasonalFestival-tag accounting).
+                Assert.Equal(53538, dataset.Offers.Count);
 
                 Assert.All(dataset.Offers, o =>
                 {
