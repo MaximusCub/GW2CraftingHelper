@@ -6996,4 +6996,8 @@ larger `SummarySectionLayoutMath`/`PlanContentHeightMath` fold-back - that
 remains a real behavior-bearing change awaiting the audit fleet's
 architecture findings, per this task's own instruction.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (non-visual change: docs policy rewrite plus dead-code
+deletion, so no desktop gate applies; evidence is the unreachability
+grep proof plus the suite arithmetic above - 1765 baseline to 1760
+passing with only the 5 dead/vacuous tests removed, 0 failures, build
+clean at b420460).
