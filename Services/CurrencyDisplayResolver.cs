@@ -66,6 +66,12 @@ namespace GW2CraftingHelper.Services
         /// min(line.Count, wallet amount) when the wallet holds any of that
         /// currency; null (not 0) when the caller has no wallet data at all
         /// or omits it, or the currency simply isn't in the wallet snapshot.
+        /// The same pass also sets RawOwnedQuantity to the real, UNCLAMPED
+        /// wallet amount under the identical null-vs-set conditions
+        /// (shoplist-have-format) - see CurrencyAmountViewModel.
+        /// RawOwnedQuantity's own doc comment for why the clamped and raw
+        /// figures both need to survive to callers.
+        ///
         /// Callers resolving a per-unit "Each" amount should not pass this
         /// (ownership is a total-quantity concept - see ResolveUnitAmounts,
         /// which never accepts it).

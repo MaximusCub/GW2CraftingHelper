@@ -51,7 +51,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void BuildCurrencyLines_Shortfall_RendersHaveNeedWithNoParenthetical()
+        public void BuildCurrencyLines_Shortfall_RendersHaveNeedWithRowScopeMarker()
         {
             var costs = new List<CurrencyAmountViewModel>
             {
@@ -66,11 +66,11 @@ namespace GW2CraftingHelper.Tests.Services
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
 
-            Assert.Equal(new[] { "Karma: HAVE 200/500, NEED 300" }, lines);
+            Assert.Equal(new[] { "Karma: HAVE 200/500 THIS ROW, NEED 300" }, lines);
         }
 
         [Fact]
-        public void BuildCurrencyLines_ExactlyCovered_RendersCoverageFractionWithNoAside()
+        public void BuildCurrencyLines_ExactlyCovered_RendersCoverageFractionWithRowScopeMarkerNoAside()
         {
             var costs = new List<CurrencyAmountViewModel>
             {
@@ -85,11 +85,11 @@ namespace GW2CraftingHelper.Tests.Services
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
 
-            Assert.Equal(new[] { "Spirit Shards: HAVE 500/500" }, lines);
+            Assert.Equal(new[] { "Spirit Shards: HAVE 500/500 THIS ROW" }, lines);
         }
 
         [Fact]
-        public void BuildCurrencyLines_CoveredWithSurplus_AppendsYouHoldAside()
+        public void BuildCurrencyLines_CoveredWithSurplus_AppendsWalletAside()
         {
             var costs = new List<CurrencyAmountViewModel>
             {
@@ -104,7 +104,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
 
-            Assert.Equal(new[] { "Spirit Shards: HAVE 500/500 (you hold 999999)" }, lines);
+            Assert.Equal(new[] { "Spirit Shards: HAVE 500/500 THIS ROW (wallet 999999)" }, lines);
         }
 
         [Fact]
@@ -127,7 +127,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
 
-            Assert.Equal(new[] { "Karma: HAVE 500/500" }, lines);
+            Assert.Equal(new[] { "Karma: HAVE 500/500 THIS ROW" }, lines);
         }
 
         [Fact]
@@ -144,26 +144,9 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(new[]
             {
-                "Karma: HAVE 200/500, NEED 300",
-                "Spirit Shards: HAVE 100/100 (you hold 250)"
+                "Karma: HAVE 200/500 THIS ROW, NEED 300",
+                "Spirit Shards: HAVE 100/100 THIS ROW (wallet 250)"
             }, lines);
-        }
-
-        [Fact]
-        public void BuildCurrencyLines_NeverMentionsPlanRequires()
-        {
-            // Review finding #2: cc.Amount is this row's own total, not
-            // the whole plan's requirement for that currency id - the old
-            // wording's "plan requires N" claim must never appear.
-            var costs = new List<CurrencyAmountViewModel>
-            {
-                new CurrencyAmountViewModel { Amount = 500, Name = "Karma", OwnedQuantity = 200, RawOwnedQuantity = 200 },
-                new CurrencyAmountViewModel { Amount = 100, Name = "Spirit Shards", OwnedQuantity = 100, RawOwnedQuantity = 250 }
-            };
-
-            var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
-
-            Assert.All(lines, line => Assert.DoesNotContain("plan requires", line));
         }
     }
 }

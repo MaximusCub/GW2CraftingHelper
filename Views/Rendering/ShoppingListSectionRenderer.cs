@@ -175,6 +175,33 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
+        // shoplist-have-format review finding #2: a ValueCellHandle's own
+        // controls (the coin/currency icon+label segments, or the single
+        // DashLabel for an unpriceable row) have no BasicTooltipText of
+        // their own, so they silently swallow the row's tooltip exactly
+        // like nameLabel does - see CreateShoppingRow's BuildTooltip doc
+        // comment. Segment counts are always small (one row's worth of
+        // coin/currency denominations), so this is cheap even called on
+        // every BuildTooltip rebuild.
+        private static void SetValueCellTooltip(CoinCurrencyRenderer.ValueCellHandle cell, string tooltipText)
+        {
+            if (cell.DashLabel != null)
+            {
+                cell.DashLabel.BasicTooltipText = tooltipText;
+                return;
+            }
+            foreach (var (label, icon) in cell.CoinSegments.Controls)
+            {
+                label.BasicTooltipText = tooltipText;
+                icon.BasicTooltipText = tooltipText;
+            }
+            foreach (var (label, icon) in cell.CurrencySegments.Controls)
+            {
+                label.BasicTooltipText = tooltipText;
+                icon.BasicTooltipText = tooltipText;
+            }
+        }
+
         // Moved verbatim from CraftingPlanView.CreateShoppingRow, then
         // WP-24-refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
         // the class doc comment above) - same geometry, same constants.
@@ -215,22 +242,6 @@ namespace GW2CraftingHelper.Views.Rendering
             // finding #1).
             var currencyLines = ShoppingRowTooltipFormatter.BuildCurrencyLines(row.CurrencyCosts);
 
-            void BuildTooltip()
-            {
-                var tooltipParts = new List<string>();
-                if (nameLabel.Text != fullName)
-                {
-                    tooltipParts.Add(fullName);
-                }
-                if (!string.IsNullOrEmpty(hintText))
-                {
-                    tooltipParts.Add(hintText);
-                }
-                tooltipParts.AddRange(currencyLines);
-                rowPanel.BasicTooltipText = tooltipParts.Count > 0 ? string.Join("\n", tooltipParts) : null;
-            }
-            BuildTooltip();
-
             string sourceTag = ShoppingSourceTag(row);
             Panel tagPanel = null;
             if (!string.IsNullOrEmpty(sourceTag))
@@ -259,6 +270,42 @@ namespace GW2CraftingHelper.Views.Rendering
             // never a blank cell (KNOWN-ISSUES #16).
             var eachCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
             var totalCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
+
+            // shoplist-have-format review finding #2, TOOLTIP SWALLOWED BY
+            // CHILD CONTROLS: a container's BasicTooltipText never fires
+            // when a child control with no tooltip of its own covers the
+            // hover point - the row's children (nameLabel, tagPanel,
+            // qtyLabel, the Each/Total cells) all capture the mouse before
+            // rowPanel's own tooltip is ever reached, exactly the class
+            // KNOWN-ISSUES.md's "Field-test UX wave" finding D and the
+            // "Ellipsized currency-name tooltip swallowed" fix
+            // (SummarySectionRenderer.cs) already root-caused and fixed
+            // once each. The HAVE/NEED text this whole feature adds is
+            // therefore stamped on nameLabel and the Total cell's own
+            // controls too - the two places a user hovering "do I have
+            // enough?" actually looks - not just the row's blank gaps.
+            // BuildTooltip/SetValueCellTooltip below and the initial call
+            // are deliberately placed AFTER nameLabel/totalCell exist so
+            // both are in scope for every (re)build, including the
+            // AddReellipsis rebuild further down.
+            void BuildTooltip()
+            {
+                var tooltipParts = new List<string>();
+                if (nameLabel.Text != fullName)
+                {
+                    tooltipParts.Add(fullName);
+                }
+                if (!string.IsNullOrEmpty(hintText))
+                {
+                    tooltipParts.Add(hintText);
+                }
+                tooltipParts.AddRange(currencyLines);
+                string tooltipText = tooltipParts.Count > 0 ? string.Join("\n", tooltipParts) : null;
+                rowPanel.BasicTooltipText = tooltipText;
+                nameLabel.BasicTooltipText = tooltipText;
+                SetValueCellTooltip(totalCell, tooltipText);
+            }
+            BuildTooltip();
 
             // M33 C2b: qty + Each/Total cells reposition every drag tick
             // (no MeasureString - CoinCurrencyRenderer.RepositionValueCellRightAligned uses only

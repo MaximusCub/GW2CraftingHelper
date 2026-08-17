@@ -37,24 +37,48 @@ namespace GW2CraftingHelper.Services
         /// "nothing to say" lets callers AddRange without a null check.
         ///
         /// Shortfall rows (wallet holding &lt; Amount) render
-        /// "HAVE owned/Amount, NEED shortfall". OwnedQuantity is never
-        /// clamped below Amount, so it already equals the real unclamped
-        /// holding here - nothing more to add.
+        /// "HAVE owned/Amount THIS ROW, NEED shortfall". In this branch the
+        /// OwnedQuantity clamp is inert (raw &lt; Amount), so OwnedQuantity
+        /// already IS the real unclamped holding - nothing more to add.
         ///
         /// Covered rows (wallet holding &gt;= Amount) render
-        /// "HAVE Amount/Amount", plus a "(you hold N)" aside only when the
-        /// real unclamped holding (RawOwnedQuantity) exceeds Amount - the
-        /// clamp on OwnedQuantity hides that surplus, so the aside is the
-        /// only place it survives.
+        /// "HAVE Amount/Amount THIS ROW", plus a "(wallet N)" aside only
+        /// when the real unclamped holding (RawOwnedQuantity) exceeds
+        /// Amount - the clamp on OwnedQuantity hides that surplus, so the
+        /// aside is the only place it survives.
+        ///
+        /// The "THIS ROW" suffix on both halves is deliberate (shoplist-
+        /// have-format review finding #1, SCOPE COLLISION): both numbers
+        /// are this ROW's own total (cc.Amount, one PlanStep's own
+        /// VendorCurrencyCosts - see the class doc comment), never the
+        /// whole plan's requirement for that currency id. Without a scope
+        /// marker, two shopping rows drawing on the SAME wallet currency
+        /// (e.g. Karma split across two vendor rows) can each independently
+        /// read as "fully covered" and double-count the one wallet balance
+        /// - the same misreading class DecisionPillPlanner's PLAN-scope
+        /// "HAVE {have}/{planTotal} TOTAL" pill (AppendCurrencyOwnershipPill)
+        /// exists to avoid, via its own explicit "TOTAL" suffix. "THIS ROW"
+        /// is this method's row-scope mirror of that same convention - the
+        /// vocabulary must never look plan-scope when it isn't. The "(wallet
+        /// N)" aside is worded the same way for the same reason: "wallet" is
+        /// the one term this codebase now uses for a raw account-wide
+        /// holding figure, matching the Summary c-table's "Have" column and
+        /// the tree's "HAVE x/y TOTAL" pill - a THIS ROW/wallet line can
+        /// never be mistaken for the plan-scope facts those two show.
         /// </summary>
-        public static List<string> BuildCurrencyLines(IReadOnlyList<CurrencyAmountViewModel> currencyCosts)
+        public static IReadOnlyList<string> BuildCurrencyLines(IReadOnlyList<CurrencyAmountViewModel> currencyCosts)
         {
-            var lines = new List<string>();
-            if (currencyCosts == null)
+            if (currencyCosts == null || currencyCosts.Count == 0)
             {
-                return lines;
+                // Shared empty instance for the common no-cost row (every
+                // TP-buy row) - avoids a per-row List<string> allocation
+                // that AddReellipsis's closure would otherwise retain for
+                // the plan's lifetime for no reason (build-time only, not a
+                // hot per-frame path, but free to avoid).
+                return System.Array.Empty<string>();
             }
 
+            var lines = new List<string>();
             foreach (var cc in currencyCosts)
             {
                 if (!cc.OwnedQuantity.HasValue || cc.Amount <= 0)
@@ -65,7 +89,7 @@ namespace GW2CraftingHelper.Services
                 long needed = cc.Amount - cc.OwnedQuantity.Value;
                 if (needed > 0)
                 {
-                    lines.Add($"{cc.Name}: HAVE {cc.OwnedQuantity.Value}/{cc.Amount}, NEED {needed}");
+                    lines.Add($"{cc.Name}: HAVE {cc.OwnedQuantity.Value}/{cc.Amount} THIS ROW, NEED {needed}");
                     continue;
                 }
 
@@ -74,10 +98,10 @@ namespace GW2CraftingHelper.Services
                 // only guards against a future caller constructing this
                 // view model directly with just OwnedQuantity set.
                 long rawHeld = cc.RawOwnedQuantity ?? cc.OwnedQuantity.Value;
-                string line = $"{cc.Name}: HAVE {cc.Amount}/{cc.Amount}";
+                string line = $"{cc.Name}: HAVE {cc.Amount}/{cc.Amount} THIS ROW";
                 if (rawHeld > cc.Amount)
                 {
-                    line += $" (you hold {rawHeld})";
+                    line += $" (wallet {rawHeld})";
                 }
                 lines.Add(line);
             }
