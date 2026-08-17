@@ -66,8 +66,6 @@ namespace GW2CraftingHelper.Services
             rows = rows ?? Array.Empty<PlanRowViewModel>();
             switch (sectionType)
             {
-                case PlanSectionType.Summary:
-                    return SummaryBodyHeight(rows);
                 case PlanSectionType.UsedMaterials:
                     return rows.Count * UsedMaterialRowHeight;
                 case PlanSectionType.ShoppingList:
@@ -106,25 +104,6 @@ namespace GW2CraftingHelper.Services
                     : CraftStepRowHeight;
             }
             return height;
-        }
-
-        private static int SummaryBodyHeight(IReadOnlyList<PlanRowViewModel> rows)
-        {
-            bool hasCoinRow = false;
-            int currencyRowCount = 0;
-            int noteRowCount = 0;
-            foreach (var row in rows)
-            {
-                if (row.RowType == PlanRowType.CoinTotal) hasCoinRow = true;
-                // M35 (gw2efficiency parity - multi-item plans): the
-                // multi-item batch note renders via the plain-text row
-                // pattern (FallbackTextRowHeight), not a CurrencyCost tile.
-                else if (row.RowType == PlanRowType.MultiItemNote) noteRowCount++;
-                else currencyRowCount++;
-            }
-            return (hasCoinRow ? CostTileRowHeight : 0)
-                + currencyRowCount * CurrencyRowHeight
-                + noteRowCount * FallbackTextRowHeight;
         }
 
         private static int RecipeRowsHeight(IReadOnlyList<PlanRowViewModel> rows)

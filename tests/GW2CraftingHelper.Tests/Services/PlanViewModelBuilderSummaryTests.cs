@@ -374,6 +374,35 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(vm.OwnedCurrencyAmounts);
         }
 
+        // Adversarial-review round-2 finding (merged-ceil-remainder quorum,
+        // 2026-08): BuildCurrencyTableRows used to narrow
+        // CurrencyCost.Amount (long) to int with a plain unchecked
+        // `(int)` cast. An Amount past int.MaxValue silently wraps to a
+        // NEGATIVE required quantity, which then made
+        // `fullyCovered = owned >= required` true for almost any owned
+        // amount (even 0) - a plan that in reality needs billions of a
+        // currency would have displayed as fully covered. Fixed with a
+        // clamp to int.MaxValue (same convention as VendorBatchSolver.
+        // ClampToInt) rather than a raw cast.
+        [Fact]
+        public void CurrencyTable_AmountExceedsIntRange_ClampsRatherThanWrapsNegative()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 2, Amount = 3_000_000_000L }
+            });
+            result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 2, 0 } };
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal(int.MaxValue, ccRow.Quantity);
+            // The bug's own failure mode: a wrapped-negative required
+            // quantity made this true even with 0 owned.
+            Assert.False(ccRow.CurrencyFullyCovered);
+            Assert.Equal(int.MaxValue, ccRow.CurrencyNeededQuantity);
+        }
+
         [Fact]
         public void VendorCapsByItemId_PopulatedFromPlanTimegatedItems()
         {

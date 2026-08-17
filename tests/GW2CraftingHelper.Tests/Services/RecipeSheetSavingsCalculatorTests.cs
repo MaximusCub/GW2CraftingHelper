@@ -540,5 +540,44 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(200, result.RecipeSheetSavingsOpportunities[0].SheetCost);
         }
+
+        // --- Review finding 7 correction (merged-ceil-remainder stream,
+        // MEASURED): despite the name, this is NOT a real downstream
+        // consumer of AllocateVendorNodeCosts - it hand-constructs a
+        // CraftingTreeNode tree directly via BoughtNodeWithReferenceBranch
+        // and feeds `ingredientSubtreeCost` in as a plain constructor
+        // constant. It never calls PlanSolver.Solve or
+        // AllocateVendorNodeCosts, so it cannot exercise the merge/
+        // apportionment code path at all and cannot detect a regression
+        // in it - only in RecipeSheetSavingsCalculator's own craftUnitCost
+        // = SubtreeCost / Quantity arithmetic. The 500 below was chosen by
+        // hand to EQUAL what AllocateVendorNodeCosts' fair proportional
+        // share would be for a two-occurrence "100 for 1000c" bulk offer
+        // (see MultiOccurrenceEqualQuantityBulkVendorOffer_BatchOverrun-
+        // SharedProportionally in PlanSolverVendorBatchingTests for the
+        // actual integration coverage of that shape) - it is illustrative
+        // context for why 500, not evidence the calculator was ever wired
+        // to it.
+        [Fact]
+        public void MergedVendorLeafIngredient_FairProportionalShare_NoOverstatedSavings()
+        {
+            // node.Quantity (item 100's own quantity) = 10, chosen unit
+            // cost 50/unit, ingredient craftTotal = 500 (the fair
+            // proportional share). craftUnitCost = 500 / 10 = 50, exactly
+            // matching chosenUnitCost - correctly zero real savings, so
+            // nothing is emitted at all (savingsPerUnit <= 0 bails before
+            // ever constructing an opportunity).
+            var node = BoughtNodeWithReferenceBranch(unitCost: 50, quantity: 10, ingredientSubtreeCost: 500);
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var store = MakeStore(CoinSheetOffer(500, 200));
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
+
+            Assert.Empty(result.RecipeSheetSavingsOpportunities);
+        }
     }
 }

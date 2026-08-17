@@ -3486,11 +3486,14 @@ namespace GW2CraftingHelper.Views
             //
             // W4A (Total Cost section redesign): Summary is special-cased
             // to its own SummarySectionLayoutMath.BodyHeight instead of
-            // PlanContentHeightMath.SectionBodyHeight -
-            // Services/PlanContentHeightMath.cs is DO-NOT-TOUCH for that
-            // package, so its own private SummaryBodyHeight method (and its
-            // existing test coverage) is left completely unmodified and is
-            // simply no longer reached for a real Summary section. See
+            // PlanContentHeightMath.SectionBodyHeight. PlanContentHeightMath
+            // is a high-evidence zone (formerly DO-NOT-TOUCH; see
+            // docs/KNOWN-ISSUES.md's policy note), so W4A left its private
+            // SummaryBodyHeight method and PlanSectionType.Summary case
+            // unmodified rather than folding this special-case away; a
+            // later pass (high-evidence-zones, 2026-08-17), with proof that
+            // SummaryBodyHeight/PlanRowType.CoinTotal were unreachable for
+            // a real Summary section, deleted both outright. See
             // SummarySectionLayoutMath's own doc comment for the full
             // rationale.
             int bodyHeight = section.SectionType == PlanSectionType.Summary

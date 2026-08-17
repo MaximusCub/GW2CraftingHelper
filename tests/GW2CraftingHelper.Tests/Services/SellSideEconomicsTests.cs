@@ -3,6 +3,7 @@ using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
 using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
+using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
@@ -174,6 +175,71 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(425, result.NetSaleValue);
             Assert.Equal(85, result.MaterialOpportunityCost);
             Assert.Equal(-60, result.CraftingProfit);
+        }
+
+        // --- Characterization: ApplyBatchSellSideEconomics/CraftingProfit
+        // is a real downstream consumer of AllocateVendorNodeCosts' merged-
+        // ceil remainder shape (quorum verdict C6, merged-ceil-remainder
+        // stream) - a REAL PlanSolver.Solve() round trip (not a hand-built
+        // SolveResult like the sibling tests above), since itemCraftCost
+        // here must be the actual corrected memo TotalCost AllocateVendorNodeCosts
+        // wrote, not a value the test invents. Item 99 is requested
+        // directly as one root AND needed again inside a second root's own
+        // craft (two 1-unit occurrences total, merged under the SAME
+        // "100 for 1000c" bulk offer used by the VendorBatchSolver-level
+        // characterization). Root 99 is the first-seen (non-last)
+        // occurrence in DFS order.
+        [Fact]
+        public void ApplyBatchSellSideEconomics_RootIsMergedVendorLeaf_CraftingProfitUsesFairProportionalShare()
+        {
+            var root99 = Craftable(99, 1);
+            var rootOther = Craftable(500, 1, Option(50, 1, 1, Craftable(99, 1)));
+            var wrapperTree = WrapperOf(root99, rootOther);
+
+            // No price entry at all for the solve pass: item 99 has no
+            // TP-buy path (GetUnitPrice's own same-item cross-side
+            // fallback means even a SellInstant-only entry would still be
+            // usable as a synthetic buy cost - see GetUnitPrice's doc
+            // comment - so it must be absent from THIS dictionary
+            // entirely), forcing the vendor offer below to win.
+            var pricesForSolve = new Dictionary<int, ItemPrice>();
+            // Separate dictionary, with a live SellInstant, for the
+            // economics pass below - ApplyBatchSellSideEconomics only
+            // ever reads SellInstant, so reusing the solve-side prices
+            // would have hidden this consumer-level characterization
+            // behind the cross-side buy fallback above.
+            var pricesForEconomics = new Dictionary<int, ItemPrice>
+            {
+                { 99, new ItemPrice { ItemId = 99, SellInstant = 1000 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } }
+            };
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 99, Quantity = 1 },
+                new PlanRequestItem { ItemId = 500, Quantity = 1 }
+            };
+
+            var solver = new PlanSolver();
+            var solveResult = solver.Solve(wrapperTree, pricesForSolve, vendorOffers);
+
+            Assert.Equal(AcquisitionSource.BuyFromVendor, solveResult.Decisions[root99.NodeId].Source);
+            // Fair proportional share (1000 * 1/2 = 500), regardless of
+            // root99 being the non-last occurrence in DFS order.
+            Assert.Equal(500, solveResult.Decisions[root99.NodeId].TotalCost);
+
+            var result = new CraftingPlanResult();
+            SellSideEconomics.ApplyBatchSellSideEconomics(
+                result, wrapperTree, solveResult, pricesForEconomics, items,
+                PriceBasis.InstantBuy, usedMaterials: null, OwnMaterialsMode.Free);
+
+            // 1 unit @ 1000c = 1000c total; -50 listing -100 exchange = 850.
+            Assert.Equal(850, result.NetSaleValue);
+            // 850 - 500 = 350. Item 500 contributes nothing (no live sell
+            // price).
+            Assert.Equal(350, result.CraftingProfit);
         }
     }
 }

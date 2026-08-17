@@ -147,6 +147,15 @@ namespace GW2CraftingHelper.Services
             if (!NoNullEntries(result.RequiredDisciplines, "RequiredDisciplines", out reason)) return false;
             if (!NoNullEntries(result.RequiredRecipes, "RequiredRecipes", out reason)) return false;
 
+            // Quality-audit B2 (docs/KNOWN-ISSUES.md): these four lists are
+            // not recomputed on the restore path and had the same per-entry
+            // gap as the checks above - BuildNotesSection dereferences each
+            // entry unguarded.
+            if (!NoNullEntries(result.CompetencyOpportunities, "CompetencyOpportunities", out reason)) return false;
+            if (!NoNullEntries(result.ExcessCraftOutputs, "ExcessCraftOutputs", out reason)) return false;
+            if (!NoNullEntries(result.RecipeSheetSavingsOpportunities, "RecipeSheetSavingsOpportunities", out reason)) return false;
+            if (!NoNullEntries(result.SeasonalVendorTips, "SeasonalVendorTips", out reason)) return false;
+
             // PlanViewModelBuilder.BuildMultiItemTitle dereferences
             // items[0].ItemId with no null check once isMultiItem gates on
             // Count > 1.
