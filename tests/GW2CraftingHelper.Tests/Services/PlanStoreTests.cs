@@ -543,6 +543,33 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void LoadLatest_QualityAuditSchemaVersion2File_ReturnsNullAndLogsWarn()
+        {
+            // Quality-audit fix (B1): CurrentSchemaVersion bumped 2 -> 3
+            // because the persisted graph grew ~275 lines of new members
+            // (see PersistedPlan.CurrentSchemaVersion's own doc comment)
+            // after the 1 -> 2 bump with no matching version bump. A
+            // genuinely realistic old file - SchemaVersion 2 (the actual
+            // previous CurrentSchemaVersion) - must be rejected exactly
+            // the same way as the SchemaVersion-1 file above, degrading
+            // to Module's "no restored plan" fresh-start path, not
+            // silently restoring with the newer members (CraftCostBreakdown,
+            // CompetencyIndependentForceBuyNodeIds, UnreducedTree, etc.)
+            // null.
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": 2, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string capturedMessage = null;
+            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.NotNull(capturedMessage);
+        }
+
+        [Fact]
         public void Save_Load_ExplicitCurrentSchemaVersion_RoundTrips()
         {
             // Round 2 review-fix (mustFix): PersistedPlan.SchemaVersion has

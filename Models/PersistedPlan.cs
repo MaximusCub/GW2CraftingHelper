@@ -53,8 +53,28 @@ namespace GW2CraftingHelper.Models
         /// log line, empty Crafting Plan tab on first load after upgrade) -
         /// a known, already-exercised, safe fresh-start, not a crash.
         /// </para>
+        /// <para>
+        /// Quality-audit fix (B1): bumped 2 -&gt; 3 because the graph this
+        /// version number is supposed to cover grew ~275 lines of new
+        /// members (CraftingTreeNode's CraftCostBreakdown/
+        /// BuyFromTpCostBreakdown/BuyFromVendorCostBreakdown among others,
+        /// PlanSolveContext's CompetencyIndependentForceBuyNodeIds/
+        /// UnreducedTree/AccountItems/ActiveCharacterName,
+        /// CraftingPlanResult's ExcessCraftOutputs/
+        /// RecipeSheetSavingsOpportunities/SeasonalVendorTips among
+        /// others) after the 1 -&gt; 2 bump without a matching version bump -
+        /// exactly the silent-default failure this constant's doc comment
+        /// says it exists to reject: a SchemaVersion-2 file written by an
+        /// older build would have restored with all of those fields
+        /// silently null instead of being rejected. See
+        /// tests/Models/PersistedPlanSchemaMemberSetTests.cs for the guard
+        /// that now catches a repeat of this - it fails, independent of
+        /// SchemaVersion, whenever the public member set of PersistedPlan,
+        /// CraftingPlanResult, PlanSolveContext, or CraftingTreeNode
+        /// changes, which is the prompt to bump this constant again.
+        /// </para>
         /// </summary>
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why
