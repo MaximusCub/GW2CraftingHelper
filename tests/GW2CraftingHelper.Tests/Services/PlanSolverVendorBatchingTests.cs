@@ -620,5 +620,65 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(150, leafTotalCostSum);
             Assert.Equal(650, leafComparisonSum);
         }
+
+        // --- Characterization: AllocateVendorNodeCosts' pre-fix
+        // last-occurrence-absorbs-everything remainder shape (quorum
+        // verdict C6, merged-ceil-remainder stream) ---
+        //
+        // AllocateVendorNodeCosts (VendorBatchSolver.cs) currently gives
+        // every occurrence EXCEPT the last exactly UnitCost * quantity
+        // (the offer's own per-unit rate, floor-exact since UnitCost is
+        // already an integer), then dumps the ENTIRE remaining balance -
+        // including the full cost of any unused/wasted batch overrun -
+        // onto whichever occurrence happens to be last in first-seen DFS
+        // order. For occurrences of EQUAL quantity this is unbounded: two
+        // 1-unit occurrences of a "100 for 1000c" bulk offer (must buy a
+        // whole 100-unit batch to cover a 2-unit need) currently render
+        // 10 and 990 - a 980-copper divergence between two structurally
+        // identical purchases, entirely an artifact of tree position.
+        //
+        // This test pins TODAY'S numbers. The next commit (largest-
+        // remainder apportionment, sharing the batch-overrun cost
+        // proportionally to each occurrence's own quantity) re-baselines
+        // both assertions to 500/500 - see that commit's message for the
+        // arithmetic (1000 * 1/2 = 500 exactly for each, no remainder to
+        // distribute at all).
+
+        [Fact]
+        public void MultiOccurrenceEqualQuantityBulkVendorOffer_PreFix_LastOccurrenceAbsorbsEntireBatchOverrun()
+        {
+            var leafA = Leaf(99, 1);
+            var leafB = Leaf(99, 1);
+            var tree = Craftable(1, 1, Option(10, 1, 1, leafA, leafB));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } }
+            };
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers);
+            var plan = result.Plan;
+
+            var vendorStep = Assert.Single(plan.Steps, s => s.ItemId == 99);
+            Assert.Equal(2, vendorStep.Quantity);
+            Assert.Equal(1000, vendorStep.TotalCost);
+            Assert.Equal(10, vendorStep.UnitCost);
+
+            // TODAY (pre-fix): first-seen occurrence (leafA) gets the
+            // floor share (UnitCost * quantity = 10 * 1 = 10); the last
+            // occurrence (leafB) absorbs everything else (1000 - 10 =
+            // 990) - re-baseline to 500/500 in the fix commit.
+            Assert.Equal(10, result.Decisions[leafA.NodeId].TotalCost);
+            Assert.Equal(990, result.Decisions[leafB.NodeId].TotalCost);
+
+            // Sum invariant: unaffected by the fix - both algorithms must
+            // always allocate the corrected step.TotalCost exactly, no
+            // drift, no invented precision. Stays true before and after.
+            Assert.Equal(
+                1000,
+                result.Decisions[leafA.NodeId].TotalCost.Value +
+                result.Decisions[leafB.NodeId].TotalCost.Value);
+        }
     }
 }

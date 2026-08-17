@@ -540,5 +540,45 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(200, result.RecipeSheetSavingsOpportunities[0].SheetCost);
         }
+
+        // --- Characterization: RecipeSheetSavingsCalculator is a real
+        // downstream consumer of AllocateVendorNodeCosts' merged-ceil
+        // remainder shape (quorum verdict C6, merged-ceil-remainder
+        // stream). The reference branch's one ingredient (item 200) is
+        // fed the exact per-occurrence corrected SubtreeCost
+        // AllocateVendorNodeCosts would assign a non-last occurrence of
+        // the SAME "100 for 1000c" bulk offer used by the
+        // VendorBatchSolver-level characterization (two 1-unit
+        // occurrences; TODAY the first-seen, non-last occurrence gets the
+        // artificially cheap floor share of 10; the fix re-baselines it
+        // to the fair proportional share of 500).
+        [Fact]
+        public void MergedVendorLeafIngredient_PreFixSkewedShare_OverstatesSavingsPerUnit()
+        {
+            // node.Quantity (item 100's own quantity) = 10, chosen unit
+            // cost 50/unit. craftUnitCost = craftTotal / 10.
+            // TODAY (pre-fix): craftTotal = 10 (the non-last occurrence's
+            // artificially cheap floor share) -> craftUnitCost = 1 ->
+            // savingsPerUnit = 50 - 1 = 49: a savings opportunity this
+            // module cannot actually prove exists, purely an artifact of
+            // which occurrence happened to land last in DFS order.
+            var node = BoughtNodeWithReferenceBranch(unitCost: 50, quantity: 10, ingredientSubtreeCost: 10);
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var store = MakeStore(CoinSheetOffer(500, 200));
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
+
+            var opp = Assert.Single(result.RecipeSheetSavingsOpportunities);
+            // TODAY (pre-fix): 49 - re-baselined to 0/no-opportunity
+            // (craftUnitCost = 500 / 10 = 50 = chosenUnitCost exactly, so
+            // savingsPerUnit <= 0 and nothing is emitted at all) in the
+            // fix commit. This flips from "over-claims a nonexistent
+            // savings" to "correctly claims none".
+            Assert.Equal(49, opp.SavingsPerUnit);
+        }
     }
 }
