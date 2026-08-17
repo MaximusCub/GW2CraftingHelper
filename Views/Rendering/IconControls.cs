@@ -49,8 +49,8 @@ namespace GW2CraftingHelper.Views.Rendering
             return frame;
         }
 
-        // tooltipText (field-test finding B's name-tooltip sweep principle:
-        // anywhere a currency icon shows, its name must be available)
+        // tooltipText (anywhere a currency icon shows, its name must be
+        // available on hover)
         // defaults to null - every pre-existing caller (item icons, whose
         // name already renders as adjacent text) is unaffected; only a new
         // caller that opts in by passing it gets a hover tooltip.

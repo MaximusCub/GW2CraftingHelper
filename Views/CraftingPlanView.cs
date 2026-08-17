@@ -15,15 +15,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-// M38 WP-04 (m38-a1-architecture.md S3c/S11): this file is the one deliberate,
-// reviewed use of #region in the codebase - navigation markers for an
-// ~4800-line class pending the Wave F/G extraction the architecture report
-// recommends, mirroring its 11-responsibility map. SA1124 exists to stop
-// regions hiding code from review, not to block a documented, plan-mandated
-// mapping pass; scoped to this file only, not the shared ruleset.
-// See docs/ARCHITECTURE.md sections 1, 3, and 5 for the durable rationale
-// behind this file's FrameTicker/scroll preserve-restore-verify machinery
-// and the M38 section-renderer decomposition (M38 WP-27).
+// The one deliberate use of #region in the codebase - navigation markers
+// for a very large class pending further extraction; scoped to this file
+// only, not the shared ruleset. See docs/ARCHITECTURE.md sections 1, 3,
+// and 5 for the FrameTicker/scroll preserve-restore-verify rationale and
+// the section-renderer decomposition.
 #pragma warning disable SA1124 // Do not use regions
 
 namespace GW2CraftingHelper.Views
@@ -40,14 +36,10 @@ namespace GW2CraftingHelper.Views
         private const int RowHeight = 35;
         private const int InputRowY = 5;
 
-        // M35 (gw2efficiency parity - multi-item plans): the top strip used
-        // to be four fixed rows (search+qty, controls, status, separator);
-        // it is now InputRowsAreaHeight(N) item rows (N = _itemRows.Count)
-        // followed by the same three rows, at a gap identical to the old
-        // fixed spacing - see ComputeTopRegionLayout. With N == 1 every Y
-        // offset below reproduces the old constants exactly (5, 43, 81,
-        // 102, 107, 112), so the single-row case is byte-identical to
-        // pre-M35 layout.
+        // The top strip is InputRowsAreaHeight(N) item rows followed by
+        // the controls/status/separator rows (see ComputeTopRegionLayout);
+        // with N == 1 every Y offset reproduces the original fixed
+        // single-row layout exactly.
         private const int TopRegionRowGap = 3;
         private const int StatusToSeparatorGap = 21;
         private const int SeparatorToContentGap = 5;
@@ -59,7 +51,7 @@ namespace GW2CraftingHelper.Views
         // tier below the 180-grey structural separators (window chrome,
         // unrelated to this). The row-divider twin (RowDividerColor) moved
         // to Views/Rendering/LabelHelpers.cs alongside
-        // LabelHelpers.CreateRowDivider (M38 WP-21) - it had no other caller.
+        // LabelHelpers.CreateRowDivider - it had no other caller.
         private static readonly Color SectionDividerColor = new Color(130, 130, 130);
 
         /// <summary>
@@ -97,16 +89,9 @@ namespace GW2CraftingHelper.Views
             };
         }
 
-        // W3B: gained IProgress<PlanPhaseEvent> (live coarse-phase events for
-        // the status strip's spinner + phase text - see PlanPhaseEvent's own
-        // doc comment) and a best-effort item-name label (requestLabel, e.g.
-        // "Orrax Manifested x1" - see CraftingPlanPipeline.GenerateStructuredAsync's
-        // matching parameter) as two new trailing arguments.
-        // VOM design: gained a second bool (valueOwnMaterials, grouped
-        // right after useOwn - both are per-plan generation choices),
-        // replacing Module.cs's previous _settings.GetOwnMaterialsMode()
-        // read with this per-plan session value - see the matching
-        // _valueOwnMaterials field's own doc comment.
+        // phaseProgress carries live coarse-phase events for the status
+        // strip; requestLabel is a best-effort item-name label; the
+        // valueOwnMaterials bool is a per-plan session choice, like useOwn.
         private readonly Func<IReadOnlyList<PlanRequestItem>, bool, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> _generateAsync;
         private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
@@ -116,41 +101,21 @@ namespace GW2CraftingHelper.Views
 
         private PlanViewModel _currentPlan;
 
-        // M38 WP-25: _lastResult moved onto _treeController (the override
-        // loop's own solve-context baseline) - see TreeSectionController's
-        // class doc comment.
         private DateTime _planGeneratedAt;
-        // Wave-3 quick win #1: defaults to true (checked) for a fresh plan
-        // session, per explicit maintainer direction during 2026-08-06 field
-        // testing - a deliberate divergence from gw2efficiency, whose own
-        // default is unchecked. Purely in-memory session state (never read
-        // from/written to ModuleSettings), so this only changes what a brand
-        // new session starts with; it is reset to this default on every
-        // module reload, same as _itemRows/_priceBasis above.
+        // Defaults to true - a deliberate divergence from gw2efficiency,
+        // whose default is unchecked. Purely in-memory session state,
+        // reset on every module reload.
         private bool _useOwnMaterials = true;
-        // M33 spec item 8 (r1 section 2.1): gw2efficiency's own default is
-        // "buy price" (buy orders - patient, usually cheaper), with a
-        // per-item fallback to instant-buy only when a listing is missing.
-        // Echo that default here so a fresh plan matches gw2e's own view
-        // rather than systematically overpricing every material.
+        // gw2efficiency's own default is "buy price" (buy orders); echoed
+        // here so a fresh plan matches gw2e's view rather than
+        // systematically overpricing every material.
         private PriceBasis _priceBasis = PriceBasis.BuyOrder;
-        // VOM design (Section 5.2/5.3): the "Value own materials"
-        // (decision-invariant reduction + 15% sell-back guard) toggle,
-        // relocated inline from the global ModuleSettings.ValueOwnMaterials
-        // setting (see that field's own doc comment) - now a per-plan
-        // session choice exactly like _useOwnMaterials/_priceBasis above:
-        // never WRITTEN back to ModuleSettings, and never re-read from it
-        // after construction. This field initializer's `true` is only the
-        // fallback for a null `settings` (unreachable via the module's own
-        // single construction site); the constructor overwrites it with
-        // `settings.ValueOwnMaterials.Value` (post-review fix) so an
-        // already-persisted user choice still applies to the first plan of
-        // a fresh session, matching ModuleSettings.ValueOwnMaterials' own
-        // default TRUE (gw2e parity - see that setting's doc comment) when
-        // nothing was ever persisted. Only meaningful while
-        // _useOwnMaterials is also on (see OnOwnMaterialsToggled's
-        // Enabled-sync); the last-chosen value is preserved, not reset,
-        // while disabled, so re-enabling Use Own Materials restores it.
+        // The "Value own materials" toggle - a per-plan session choice,
+        // never written back to ModuleSettings and never re-read after
+        // construction (the constructor seeds it from the persisted
+        // setting so a prior user choice applies to a fresh session's
+        // first plan). Only meaningful while _useOwnMaterials is on; the
+        // last-chosen value is preserved while disabled.
         private bool _valueOwnMaterials = true;
 
         #endregion // General: shared layout constants, colors, top-region geometry & dependencies
@@ -177,14 +142,9 @@ namespace GW2CraftingHelper.Views
             public TextBox QtyInput;
         }
 
-        // Session-persistent row list (M35) - mirrors gw2e's own
-        // `e.recipes` array (`[{id: null, amount: 1}]` initial state - see
-        // docs/gw2e-parity-spec.md, the M34 r1 multi-item research report).
-        // Populated with one empty row the first time Build() ever runs;
-        // survives every later Build() call (tab switch) exactly like
-        // _nodeOverrides/_ignoredItemIds - no new file/URL persistence (gw2e
-        // itself only persists via its own URL, not applicable here - see
-        // docs/KNOWN-ISSUES.md's M35 section).
+        // Session-persistent row list, mirroring gw2e's `e.recipes`
+        // array. Populated with one empty row on the first Build();
+        // survives every later Build() (tab switch). No file persistence.
         private readonly List<ItemRowState> _itemRows = new List<ItemRowState>();
 
         #endregion // 1. Input rows (state) - M35 gw2efficiency parity, multi-item plans
@@ -200,21 +160,12 @@ namespace GW2CraftingHelper.Views
         // overlap in flight.
         private int _generateSequence;
 
-        // W3B gate round 1 fix (pull-based module-level status - see
-        // docs/KNOWN-ISSUES.md's W3B section and
-        // Services/PlanStripStatusBoard.cs's own doc comment): the
-        // module-owned, thread-safe holder of record for the status
-        // strip's live phase text and final completion/error text.
-        // Constructor-injected (owned by Module, survives independently of
-        // any single Build() cycle). Replaces the pre-fix instance fields
-        // _statusClosedForCurrentGeneration/_currentPhaseText/
-        // _currentPhaseOrdinal/_generationInFlight - every write the
-        // phaseProgress callback and TriggerGenerate's success/cancel/
-        // failure paths used to make directly to those fields (each
-        // re-checking StatusUpdateGuard/PhaseOrdinalGuard itself) now goes
-        // through this board instead, which applies the exact same guards
-        // internally. SpinnerTick/RenderFromBoard/Build()'s own re-arm
-        // block all PULL from it instead.
+        // The module-owned, thread-safe holder of record for the status
+        // strip's live phase text and final completion/error text (see
+        // PlanStripStatusBoard). Constructor-injected so it survives any
+        // single Build() cycle; every writer goes through the board's own
+        // internal guards, and SpinnerTick/RenderFromBoard/Build()'s
+        // re-arm block all PULL from it.
         private readonly PlanStripStatusBoard _statusBoard;
         private int _spinnerFrameIndex;
         private DateTime _lastSpinnerTickUtc;
@@ -225,18 +176,11 @@ namespace GW2CraftingHelper.Views
 
         #region 8. Tree rendering (state)
 
-        // M38 WP-25 (m38-a1-architecture.md S3b-T2): the tree section
-        // renderer AND its interactive override loop - previously
-        // _nodeOverrides/_ignoredItemIds/_nodeExpansion/_lastResult plus
-        // CreateTreeSection/RenderTreeNode/RefreshTreeContainerHeights/
-        // UpdateTreeRowTooltip/ApplyPreset/ApplyOverridesAndResolve/
-        // RenderDecisionPills - moved onto TreeSectionController, a single
-        // persistent instance (constructed once below, in the ctor, since
-        // its state must survive across every RenderPlan call - unlike the
-        // stateless WP-23/WP-23b/WP-23c/WP-23d section renderers, which are
-        // freshly constructed per CreateCollapsibleSection call). See that
-        // class's own doc comment for the full field/method inventory and
-        // every non-move edit.
+        // The tree section renderer and its interactive override loop
+        // (see TreeSectionController) - a single persistent instance,
+        // constructed once in the ctor since its state must survive every
+        // RenderPlan call, unlike the stateless section renderers that
+        // are freshly constructed per section.
         private readonly TreeSectionController _treeController;
 
         #endregion // 8. Tree rendering (state)
@@ -245,17 +189,10 @@ namespace GW2CraftingHelper.Views
         private readonly Dictionary<PlanSectionType, bool> _sectionExpansion =
             new Dictionary<PlanSectionType, bool>();
 
-        // Wave-3 quick win #3 (2026-08-06 field testing): "Hide Unlocked
-        // Recipes" checkbox in the Required Recipes section header.
-        // Default-checked per session - not persisted in ModuleSettings
-        // (no per-plan-view boolean setting precedent exists there today;
-        // ModuleSettings.ValueOwnMaterials/other entries are all
-        // account-level pricing/display toggles, not per-render filters).
-        // Plain session state exactly like _useOwnMaterials/_priceBasis
-        // above: resets to this default on every module reload.
-        // RequiredRecipesVisibility (Blish-free, Services/) owns the actual
-        // filter predicate/header-text logic so it can be unit-tested; this
-        // field is only the live UI toggle state.
+        // "Hide Unlocked Recipes" checkbox state - default-checked, plain
+        // session state, not persisted. RequiredRecipesVisibility
+        // (Blish-free) owns the filter predicate/header-text logic; this
+        // field is only the live toggle state.
         private bool _hideUnlockedRecipes = true;
 
         #endregion // 7. Section builders (state: section expand/collapse)
@@ -275,7 +212,7 @@ namespace GW2CraftingHelper.Views
 
         // UI controls (stored for resize handler)
 
-        // M35: the Container Build() was called with, retained so
+        // The Container Build() was called with, retained so
         // AddItemRow/RemoveItemRow (fired by a row button's Click, long
         // after Build() returns) can re-read ContentRegion and reflow the
         // top strip - see ReflowInputRegion.
@@ -296,35 +233,21 @@ namespace GW2CraftingHelper.Views
         // Resize tracking
         private int _lastRenderedWidth;
 
-        // M33 C2b: per-render relayout registry, lifecycle mirrors
-        // _treeNodeStates (cleared and repopulated by every full RenderPlan
-        // rebuild; appended to by lazy tree-node expansion afterwards).
-        // _relayoutActions holds cheap, position/width-only closures (no
-        // MeasureString) replayed on EVERY resize tick via OnPanelResized -
-        // see ReplayRelayout. _reellipsisActions holds the small subset of
-        // sections that truncate text (Used Materials name, Shopping row
-        // name, Tree row name - the 3 LabelHelpers.EllipsizeToWidth call sites m2's
-        // research inventoried); these are text-only (Label.Text/tooltip)
-        // updates on already-existing controls, replayed only once at drag
-        // settle - see RunReellipsis. Neither list ever changes a control's
-        // Height, so neither can perturb AutoSize/scroll state (M33 C2a
-        // made every row height explicit; a pure width/text write on a
-        // fixed-height row cannot re-trigger convergence).
+        // Per-render relayout registry, cleared and repopulated by every
+        // full RenderPlan rebuild and appended to by lazy tree expansion.
+        // _relayoutActions holds cheap position/width-only closures (no
+        // MeasureString) replayed on every resize tick; _reellipsisActions
+        // holds the text-truncating subset, replayed only at drag settle.
+        // Neither list ever changes a control's Height, so neither can
+        // perturb AutoSize/scroll state.
         private readonly List<Action<int>> _relayoutActions = new List<Action<int>>();
         private readonly List<Action<int>> _reellipsisActions = new List<Action<int>>();
 
-        // M38 WP-23 (m38-a1-architecture.md S3b-T2 pilot): ISectionRelayoutSink
-        // implementation. Explicit-interface (not public) so extracted
-        // section renderers can register through the seam without this
-        // widening CraftingPlanView's public surface. Both members are a
-        // direct pass-through to the two lists immediately above - same
-        // list, same append order - so every invariant that reads those
-        // lists (CreateCollapsibleSection's DEBUG must-register check,
-        // ReplayRelayout's DEBUG scroll-neutral assert, ReplayRelayout/
-        // RunReellipsis's own foreach) sees a sink-registered closure
-        // exactly as it would have seen one added inline. Zero semantic
-        // change - see ISectionRelayoutSink's doc comment for the full
-        // rationale.
+        // ISectionRelayoutSink implementation - explicit-interface so
+        // extracted renderers register through the seam without widening
+        // the public surface. Both members pass straight through to the
+        // two lists above, so every invariant reading those lists sees a
+        // sink-registered closure exactly like an inline one.
         void ISectionRelayoutSink.AddRelayout(Action<int> closure)
         {
             _relayoutActions.Add(closure);
@@ -335,8 +258,6 @@ namespace GW2CraftingHelper.Views
             _reellipsisActions.Add(closure);
         }
 
-        // M38 WP-25: added alongside TreeSectionController - see
-        // ISectionRelayoutSink.RelayoutCount's own doc comment for why.
         int ISectionRelayoutSink.RelayoutCount => _relayoutActions.Count;
 
         // Trailing debounce for the resize-settle re-ellipsis pass. Every
@@ -368,22 +289,15 @@ namespace GW2CraftingHelper.Views
 
         #region 5. Resize relayout (state, continued) - KNOWN-ISSUES #13/#19
 
-        // M33 C2c (resize-scroll-preserve regression fix): set by
-        // PreserveScrollAcrossResize whenever a height-changing resize tick
-        // (dragging the window's bottom edge or a corner) wrote a per-tick
-        // scroll-preserve during the current drag. ResizeSettleStep arms a
-        // single bounded verify window for it at drag settle (not per
-        // tick) via StartResizeScrollVerify, then clears the flag.
+        // Set by PreserveScrollAcrossResize whenever a height-changing
+        // resize tick wrote a per-tick scroll-preserve; ResizeSettleStep
+        // arms one bounded verify window at drag settle, then clears it.
         // _resizeScrollSavedOffset holds the last known-good pre-tick
-        // pixel offset to verify against - PreserveScrollAcrossResize only
-        // updates it when a tick's freshly captured offset is > 0, so an
-        // uncontested reset that lands on some frame between two ticks
-        // (and would otherwise corrupt the NEXT tick's own capture to 0)
-        // cannot erase the real target. PreserveScrollAcross (the rebuild
-        // path) clears _resizeScrollRestorePending up front, since a
-        // rebuild disposes and recreates the content panel's children -
-        // any resize-drag offset captured against the old content is
-        // meaningless once that happens.
+        // offset and is only updated when a tick's capture is > 0, so an
+        // uncontested reset landing between ticks cannot erase the real
+        // target. PreserveScrollAcross (the rebuild path) clears the
+        // pending flag up front - an offset captured against disposed
+        // content is meaningless.
         private bool _resizeScrollRestorePending;
         private int _resizeScrollSavedOffset;
 
@@ -403,28 +317,20 @@ namespace GW2CraftingHelper.Views
         private FrameTicker _scrollVerifyTicker;
         private FrameTicker _resizeDebounceTicker;
 
-        // W3B (generation progress + rich logging): drives the status
-        // strip's rotating spinner glyph during TriggerGenerate - see the
-        // SpinnerTick/RenderFromBoard/ArmSpinnerTicker instance methods
-        // below and StopLiveTickers. W3B gate round 1 fix: re-armed by
-        // Build() whenever _statusBoard reports a generation still in
-        // flight across a tab switch (see ArmSpinnerTicker and Build()'s
-        // own re-arm block).
+        // Drives the status strip's rotating spinner during
+        // TriggerGenerate; re-armed by Build() whenever _statusBoard
+        // reports a generation still in flight across a tab switch.
         private FrameTicker _spinnerTicker;
 
         #endregion // 6. The FrameTicker control (ticker instance fields) - KNOWN-ISSUES #12/#13
 
         #region 4. Wheel-wrap correction (state) - KNOWN-ISSUES #12 (reopened)
 
-        // M36 fix-pass (KNOWN-ISSUES #12, CRITICAL-1): defensive one-shot
-        // re-assert ticker for ApplyWheelWrapCorrection - see
-        // StartWheelWrapVerify's own doc comment. Kept as its own field
-        // (not shared with _scrollVerifyTicker above) since the two guard
-        // unrelated writers with different targets/semantics (a ratio
-        // derived from a saved pixel offset vs. an already-computed
-        // absolute ScrollDistance) and a rebuild/resize verify could
-        // otherwise cancel-and-replace an in-flight wheel-wrap verify (or
-        // vice versa) for no reason.
+        // Defensive one-shot re-assert ticker for
+        // ApplyWheelWrapCorrection (see StartWheelWrapVerify). Its own
+        // field, not shared with _scrollVerifyTicker: the two guard
+        // unrelated writers with different targets, and one verify must
+        // not cancel-and-replace the other.
         private FrameTicker _wheelWrapVerifyTicker;
 
         private const int WheelWrapVerifyMaxFrames = 2;
@@ -436,49 +342,34 @@ namespace GW2CraftingHelper.Views
 
         #region 3. Scroll preserve/restore/verify (state, continued) - KNOWN-ISSUES #12/#14/#19
 
-        // M33 C2a (directive B): with container heights now finalized
-        // synchronously during build (PlanContentHeightMath), the restore
-        // ratio is correct the instant PreserveScrollAcross writes it - no
-        // multi-frame AutoSize convergence remains to wait out. The
-        // FrameTicker that used to run RestoreScrollOffset's up-to-30-frame
-        // convergence loop, then hand off to a further 20-frame (up to
-        // 120-frame hard-capped) guard, shrinks to a short defensive verify
-        // that only exists to contest a genuine LATE Blish-internal
-        // scrollbar reset (Scrollbar.RecalculateLayout zeroes ScrollDistance
-        // whenever _scrollbarPercent changes, which can still land on the
-        // frame or two right after the synchronous write) and to yield
-        // immediately the moment real user input is observed.
+        // With container heights finalized synchronously during build
+        // (PlanContentHeightMath), the restore ratio is correct the
+        // instant PreserveScrollAcross writes it. This short defensive
+        // verify exists only to contest a genuinely LATE Blish-internal
+        // scrollbar reset (RecalculateLayout zeroes ScrollDistance when
+        // _scrollbarPercent changes, which can land a frame or two after
+        // the synchronous write) and yields the moment real user input is
+        // observed.
         private const int ScrollVerifyMaxFrames = 3;
 
-        // M33 C2a (directive C): bounds the guard's zero-reassert
-        // back-and-forth (Blish resets the bar to 0, we contest, it resets
-        // again...) so a user genuinely holding the bar at top through
-        // repeated library resets eventually wins rather than being fought
-        // forever - see docs/KNOWN-ISSUES.md's carried follow-up note.
-        // Naturally bounded further by ScrollVerifyMaxFrames itself now
-        // that the window is only 2-3 frames long.
+        // Bounds the guard's zero-reassert back-and-forth (Blish resets
+        // the bar to 0, we contest, it resets again...) so a user
+        // genuinely holding the bar at top eventually wins rather than
+        // being fought forever.
         private const int ScrollVerifyZeroReassertCap = 4;
 
-        // M33 C2a (directive C): timestamp of the most recent user
-        // mouse-wheel event observed over the content panel. Tracked
-        // unconditionally - not gated on ScrollDiagnosticsEnabled, unlike
-        // the diagnostic wheel logging below - because StartScrollVerify
-        // uses it for one real behavioral decision: any wheel event
-        // observed since a verify window armed yields that window
-        // immediately, no further contest. (M33 fix-pass: a second,
-        // recency-only "suppress the zero-reassert" use of this timestamp
-        // was removed - it could only ever fire for a wheel that predated
-        // the window's arm time, in which case suppressing was wrong: see
-        // StartScrollVerify's zero-reassert comment.) Reset at the top of
-        // every Build() so a stale value from a previous render cannot
-        // influence a brand new one.
+        // Timestamp of the most recent user mouse-wheel event over the
+        // content panel. Tracked unconditionally (not diagnostics-gated):
+        // any wheel event observed since a verify window armed yields
+        // that window immediately. Reset at the top of every Build() so
+        // a stale value cannot influence a new render.
         private DateTime? _lastWheelEventUtc;
 
         #endregion // 3. Scroll preserve/restore/verify (state, continued) - KNOWN-ISSUES #12/#14/#19
 
         #region 4. Wheel-wrap correction (state, continued) - KNOWN-ISSUES #12 (reopened)
 
-        // M36 (KNOWN-ISSUES #12 reopened/root-caused): Blish HUD's
+        // Blish HUD's
         // Scrollbar.SCROLL_WHEEL private const (vendored Controls/
         // Scrollbar.cs, BlishHUD v1.3.0, confirmed by decompiling the
         // shipped "Blish HUD.exe") - one wheel EVENT (regardless of how
@@ -495,12 +386,10 @@ namespace GW2CraftingHelper.Views
 
         #region Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
 
-        // M33 C1 (#12 diagnostics): instrumentation-only. Gated on
-        // ModuleSettings.ScrollDiagnosticsEnabled (default false); every
-        // call site below checks the live setting value BEFORE doing any
-        // work so the cost when disabled is a single bool read, not a
-        // formatted-string allocation. Never read by, or fed back into,
-        // any scroll/guard/restore decision - diagnostics only observe.
+        // Instrumentation-only, gated on ScrollDiagnosticsEnabled; every
+        // call site checks the setting before doing any work, so the
+        // disabled cost is a single bool read. Diagnostics only observe -
+        // never fed back into any scroll/guard/restore decision.
         private const string ScrollDiagTag = "[scrolldiag]";
 
         // Monotonic frame index shared by every scroll-diagnostic log line
@@ -527,33 +416,19 @@ namespace GW2CraftingHelper.Views
             return _scrollDiagFrameCounter;
         }
 
-        // M38 WP-04: single read-through for the ~7 call sites below that
-        // used to repeat "_settings != null && _settings.ScrollDiagnosticsEnabled.Value"
-        // verbatim. Pure property, same short-circuit null-guard, no behavior
-        // change - see docs/KNOWN-ISSUES.md #12 for why this stays gated.
-        // M39 (log system, docs/dev-notes/m38-plan/proposals/
-        // tab-roadmap-proposal.md Section 2.1): ALSO true when
-        // the new unified LogDiagnosticsEnabled setting is on -
-        // LogDiagnosticsEnabled subsumes ScrollDiagnosticsEnabled (one
-        // Settings-tab checkbox for the whole module going forward), but
-        // ScrollDiagnosticsEnabled itself is kept readable here (a plain
-        // bool OR - trivially cheap, no extra I/O) so an already-persisted
-        // true for the old setting keeps gating this channel exactly as
-        // before, rather than silently losing it on upgrade - see
-        // ModuleSettings.ScrollDiagnosticsEnabled's own doc comment.
+        // Single read-through for the diagnostics gate. Also true when
+        // the unified LogDiagnosticsEnabled setting is on - it subsumes
+        // ScrollDiagnosticsEnabled, but the old setting stays readable so
+        // an already-persisted true keeps gating this channel across the
+        // upgrade.
         private bool ScrollDiagEnabled => _settings != null &&
             (_settings.LogDiagnosticsEnabled.Value || _settings.ScrollDiagnosticsEnabled.Value);
 
         /// <summary>
-        /// M39 (log system, docs/dev-notes/m38-plan/proposals/
-        /// d2-log-system.md Section 8): routes every
-        /// [scrolldiag] line to BOTH sinks - Blish's own Logger (unchanged,
-        /// additive) and the new module-wide ModuleLog at Debug level, tag
-        /// "scrolldiag" - so the channel is visible in-module via the Log
-        /// tab, gated on the same ScrollDiagEnabled the call sites already
-        /// check before formatting anything. Centralized here (rather than
-        /// duplicating the ModuleLog.Shared.Write call at each of the ~14
-        /// sites) so the tag/level is defined exactly once.
+        /// Routes every [scrolldiag] line to both sinks - Blish's Logger
+        /// and the module-wide ModuleLog (Debug, tag "scrolldiag") - so
+        /// the channel is visible in the Log tab. Centralized so the
+        /// tag/level is defined exactly once.
         /// </summary>
         private void LogScrollDiag(string message)
         {
@@ -579,30 +454,20 @@ namespace GW2CraftingHelper.Views
             _statusBoard = statusBoard ?? throw new ArgumentNullException(nameof(statusBoard));
             _resolveOverridesSync = resolveOverridesSync;
 
-            // Post-review fix: seed the per-plan default from the
-            // still-persisted ModuleSettings.ValueOwnMaterials value
-            // (kept around for exactly this - see that setting's own doc
-            // comment) instead of the field initializer's hardcoded
-            // `true`, so a user who deliberately turned the old global
-            // "Value own materials" checkbox off is not silently switched
-            // back to Valued mode on module reload. Session-only from
-            // here on, same as _useOwnMaterials/_priceBasis above -
+            // Seed the per-plan default from the persisted setting so a
+            // user who turned "Value own materials" off is not silently
+            // switched back on module reload. Session-only from here on -
             // never written back to settings.
             if (settings != null)
             {
                 _valueOwnMaterials = settings.ValueOwnMaterials.Value;
             }
 
-            // M38 WP-25: wires TreeSectionController's collaborator
-            // delegates. PreserveScrollAcross/SetStatus/RenderPlan/
-            // GetCurrentPanelWidth are bound as plain method groups (this
-            // constructor has access to its own private members regardless
-            // of the delegate variable's declared type elsewhere); the
-            // remaining three are small adapters over state that has no
-            // existing method to bind: _currentPlan's get/set, _lastDebugLog's
-            // set, and CreateSectionHeader's private SectionHeaderHandle
-            // return unpacked into a plain ValueTuple so the private nested
-            // type itself never needs to become visible outside this class.
+            // Wires TreeSectionController's collaborator delegates: four
+            // plain method groups, plus three small adapters over state
+            // with no method to bind (including unpacking the private
+            // SectionHeaderHandle into a ValueTuple so the nested type
+            // never becomes visible outside this class).
             _treeController = new TreeSectionController(
                 this,
                 _resolveOverridesSync,
@@ -630,85 +495,33 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// W3D (plan persistence across module restarts): applies a plan
-        /// loaded from disk at module load, rendering it INSTANTLY - no
-        /// network call, no re-solve, no auto-anything - see
-        /// Services/PlanStore.cs's own doc comment. Called from
-        /// Module.Update()'s dirty-flag drain (main thread), the same
-        /// "Applying snapshot to view" pattern MainView.SetSnapshot
-        /// mirrors: this runs at most once per module session, always
-        /// before the user can possibly have clicked Generate (nothing
-        /// else sets _currentPlan this early in a fresh module load).
-        /// Mirrors TriggerGenerate's own success-path shape - adopts
-        /// <paramref name="result"/> as the override loop's new baseline
-        /// (_treeController.ResetForNewPlan, so a restored plan's decision
-        /// pills keep re-solving correctly with no network call), restores
-        /// the user's prior decision-pill overrides (RestoreOverrides -
-        /// review-fix, critical - see TreeSectionController.RestoreOverrides'
-        /// own doc comment for why this is required, not optional), resets
-        /// section expansion, rebuilds the view model, and seeds the status
-        /// board with the staleness banner text (PlanStripStatusBoard.
-        /// SeedRestored) so the existing pull-based strip renders it with
-        /// zero new layout.
+        /// Applies a plan loaded from disk at module load, rendering it
+        /// instantly - no network call, no re-solve. Called from
+        /// Module.Update()'s dirty-flag drain (main thread), at most once
+        /// per session, always before the user could have clicked
+        /// Generate. Mirrors TriggerGenerate's success-path shape: adopts
+        /// <paramref name="result"/> as the override loop's baseline,
+        /// restores the user's prior decision-pill overrides
+        /// (RestoreOverrides - required, not optional), resets section
+        /// expansion, rebuilds the view model, and seeds the status board
+        /// with the staleness banner text.
         /// <para>
-        /// Render guard mirrors TriggerGenerate's own liveness check: the
-        /// Crafting Plan tab has usually not been Build() yet at this point
-        /// (the common case - a fresh module load, before the user has
-        /// switched to this tab at all), in which case only the state
-        /// fields above are set and Build()'s own
-        /// "if (_currentPlan != null) RenderPlan(_currentPlan)" tail
-        /// renders it on first visit (see Build's own body); if the tab
-        /// instead happens to already be live, this renders into it
-        /// directly rather than waiting for a rebuild that may never come -
-        /// review-fix (mustFix): that live-tab branch now also calls
-        /// RenderFromBoard right after seeding the board, alongside
-        /// RenderPlan, since Build()'s own "read a fresh Snapshot() on
-        /// every rebuild" re-arm never runs again for an already-live tab -
-        /// without it the staleness banner text stayed invisible until the
-        /// user switched tabs away and back.
+        /// The tab has usually not been Build() yet, in which case only
+        /// the state fields are set and Build()'s render tail renders on
+        /// first visit; a live tab renders directly, and also calls
+        /// RenderFromBoard since Build()'s re-arm never runs again for it.
         /// </para>
         /// <para>
-        /// Review-fix (mustFix): wrapped in two narrow try/catches instead
-        /// of running unguarded straight out of Module.Update() (Blish
-        /// HUD's own per-frame call, with no surrounding try/catch of its
-        /// own visible to this module) - PlanStoreHelpers' tolerance gate
-        /// only checks Result?.Plan/SchemaVersion structurally, so a
-        /// structurally valid but still-degraded plan.json (e.g. a null
-        /// Steps/UsedMaterials/RequiredDisciplines entry from a future
-        /// schema change) can still throw inside _vmBuilder.Build/RenderPlan.
-        /// The vm build happens BEFORE any state field is mutated (matching
-        /// TriggerGenerate's own established ordering - it builds vm first,
-        /// then mutates _treeController/_currentPlan/_planGeneratedAt in a
-        /// later callback), so a build failure leaves _currentPlan at
-        /// whatever it already held (null, on the ordinary restore path) -
-        /// a clean "fresh start" (spec item 4), not a half-applied one.
-        /// </para>
-        /// <para>
-        /// Round 2 review-fix (mustFix): the SECOND try/catch (around the
-        /// live-tab RenderPlan call below) used to only log on failure,
-        /// leaving _currentPlan/_lastDebugLog/the tree controller's baseline
-        /// already committed to a vm that just proved it cannot render.
-        /// PlanViewModelBuilder copies the crafting tree by REFERENCE
-        /// (TreeRoot = result.CraftingTree) rather than validating it, so a
-        /// null child inside CraftingTreeNode.Children (a structurally
-        /// valid but degraded plan.json - passes PlanStoreHelpers' gate,
-        /// survives the first try/catch's vm build untouched) is only ever
-        /// dereferenced once RenderPlan actually walks the tree here.
-        /// </para>
-        /// <para>
-        /// Round 3 review-fix (mustFix x2): round 2's rollback above was
-        /// itself incomplete two ways, and additionally only covered THIS
-        /// live-tab branch - not the far more common "tab not yet built"
-        /// path, where the very same poisoned vm was committed to
-        /// _currentPlan with no guard at all, then re-thrown by Build()'s
-        /// own unguarded render tail on the tab's first visit (and every
-        /// visit after, since nothing ever cleared _currentPlan). Both
-        /// gaps are now closed by <see cref="RollBackFailedPlanRender"/>,
-        /// a single shared rollback both this catch and Build()'s now-
-        /// guarded tail call into - see that method's own doc comment for
-        /// what it restores and why (the status board's seeded banner and
-        /// _contentPanel's own partially-built children were the two
-        /// pieces round 2 left behind).
+        /// Two narrow try/catches guard this: PlanStoreHelpers' tolerance
+        /// gate is only structural, so a degraded plan.json can still
+        /// throw inside the vm build or RenderPlan (the builder copies
+        /// the tree by reference, so a null child is only dereferenced
+        /// when RenderPlan walks it). The vm build happens before any
+        /// state field is mutated, so a build failure leaves a clean
+        /// fresh start; a render failure rolls back via
+        /// <see cref="RollBackFailedPlanRender"/>, shared with Build()'s
+        /// guarded tail so a poisoned vm can never be committed on either
+        /// path.
         /// </para>
         /// </summary>
         public void ApplyRestoredPlan(
@@ -716,7 +529,7 @@ namespace GW2CraftingHelper.Views
             DateTime generatedAt,
             IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides,
             IReadOnlyList<int> ignoredItemIds,
-            // Post-review fix (VOM finding #4): "Value Own Materials"
+            // "Value Own Materials"
             // checkbox state at the GENERATION time this plan was
             // persisted (PersistedPlan.ValueOwnMaterials) - restoring it
             // here is the whole reason that field was added to the schema
@@ -753,7 +566,7 @@ namespace GW2CraftingHelper.Views
             _currentPlan = vm;
             _planGeneratedAt = generatedAt;
 
-            // Post-review fix (VOM finding #4): restore the checkbox's
+            // Restore the checkbox's
             // backing field AND its displayed Checked state - see this
             // method's valueOwnMaterials parameter doc comment.
             _valueOwnMaterials = valueOwnMaterials;
@@ -792,55 +605,27 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Round 3 review-fix (mustFix x2): shared rollback for a RenderPlan
-        /// call that threw while rendering a restored plan - called from
-        /// both places that can reach a still-unvalidated restored vm:
-        /// ApplyRestoredPlan's own live-tab branch above (the rare case -
-        /// the Crafting Plan tab already built before module load finished
-        /// restoring), and Build()'s render tail (the common case - see
-        /// ApplyRestoredPlan's own doc comment). Round 2 only ever wired
-        /// this rollback into the first of those two, leaving the far more
-        /// likely path (a fresh module load, tab not yet visited) able to
-        /// commit a poisoned _currentPlan with no guard at all - Build()'s
-        /// tail is guarded the same way now (see Build()'s own render-tail
-        /// try/catch).
-        /// <para>
-        /// Restores every piece of state either call site may have
-        /// committed back to the exact "nothing restored, nothing
-        /// generated yet" shape a fresh module load's Crafting Plan tab
-        /// starts in:
-        /// </para>
+        /// Shared rollback for a RenderPlan call that threw while
+        /// rendering a restored plan - called from both places that can
+        /// reach a still-unvalidated restored vm: ApplyRestoredPlan's
+        /// live-tab branch and Build()'s guarded render tail. Restores
+        /// every piece of state either call site may have committed back
+        /// to the "nothing restored, nothing generated yet" shape:
         /// <list type="bullet">
         /// <item><description>_treeController's override/ignore/expansion
-        /// baseline (ResetForNewPlan(null) undoes ResetForNewPlan(result)+
-        /// RestoreOverrides together - see that method's own doc comment
-        /// for why null is safe here) and its per-render tree state
-        /// (ResetContentPanelToEmpty's own ResetTreeRenderState half -
-        /// CreateTreeSection may have partially populated it before the
-        /// exception).</description></item>
-        /// <item><description>_lastDebugLog / _currentPlan /
-        /// _planGeneratedAt - leaving _currentPlan set to a vm that just
-        /// proved it cannot render would re-throw the SAME exception out
-        /// of Build()'s render tail on every later visit to this tab, not
-        /// just this one; _planGeneratedAt has no other reader once
-        /// _currentPlan is null, but is reset anyway so no stale timestamp
-        /// can outlive the plan it described.</description></item>
-        /// <item><description>_contentPanel's children (round 3, mustFix:
-        /// RenderPlan disposes-then-rebuilds in place, so a mid-build
-        /// exception - e.g. CreateTreeSection dereferencing a null child
-        /// partway through - can leave a partially-built plan parented in
-        /// a live panel; ResetContentPanelToEmpty sweeps it, same as a
-        /// fresh RenderPlan call's own top would).</description></item>
+        /// baseline (ResetForNewPlan(null)) and its per-render tree
+        /// state.</description></item>
+        /// <item><description>_lastDebugLog/_currentPlan/_planGeneratedAt
+        /// - a committed vm that cannot render would re-throw out of
+        /// Build()'s tail on every later visit.</description></item>
+        /// <item><description>_contentPanel's children - a mid-build
+        /// exception can leave a partially-built plan parented in a live
+        /// panel; ResetContentPanelToEmpty sweeps it.</description></item>
         /// <item><description>the status board's seeded staleness banner
-        /// and the label text that already painted it (round 3, mustFix:
-        /// PlanStripStatusBoard.ClearRestoredSeed, plus an explicit
-        /// SetStatus("Ready") since RenderFromBoard is pull-based and
-        /// never overwrites a label with an empty FinalStatusText) - both
-        /// skipped whenever ClearRestoredSeed's own guard reports a real
-        /// Generate has raced in between the original seed and this
-        /// rollback, so an in-flight or already-finished generation's
-        /// status is never clobbered by a rollback for a plan it has
-        /// already superseded.</description></item>
+        /// and its painted label text - both skipped when
+        /// ClearRestoredSeed reports a real Generate has raced in, so a
+        /// superseding generation's status is never
+        /// clobbered.</description></item>
         /// </list>
         /// </summary>
         private void RollBackFailedPlanRender(Exception ex, string context)
@@ -879,30 +664,22 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Runs a layout-mutating action and restores the content panel's
-        /// scroll position afterwards. M33 C2a (directive A/B): every
-        /// container mutate() rebuilds now finalizes its explicit Height
-        /// synchronously (PlanContentHeightMath), so mutate()'s return means
-        /// the new content's true height is already valid - no nested
-        /// AutoSize convergence remains to wait out. The restore ratio is
-        /// therefore computed and written to the scrollbar synchronously,
-        /// in this same call, before the next paint (ApplySavedScrollSynchronously);
-        /// a short FrameTicker-driven verify then only defends against a
-        /// LATE Blish-internal scrollbar reset over the following couple of
-        /// real frames (StartScrollVerify).
+        /// scroll position afterwards. Every mutate() rebuild finalizes
+        /// its explicit Height synchronously (PlanContentHeightMath), so
+        /// the restore ratio is computed and written synchronously before
+        /// the next paint; a short FrameTicker verify then only defends
+        /// against a late Blish-internal scrollbar reset
+        /// (StartScrollVerify).
         /// </summary>
         private void PreserveScrollAcross(Action mutate)
         {
             int saved = _contentPanel?.VerticalScrollOffset ?? 0;
             int capturedGeneration = ++_scrollRestoreGeneration;
 
-            // M33 C2c: a rebuild is about to dispose and recreate every
-            // content-panel child, so any resize-drag scroll-preserve still
-            // pending from before it (see _resizeScrollRestorePending) is
-            // now meaningless - clear it so a later ResizeSettleStep tick
-            // never arms a stale-offset verify (StartResizeScrollVerify)
-            // against the new content using the old content's dimensions,
-            // which could otherwise cancel and replace this rebuild's own
-            // in-flight verify with wrong math.
+            // A rebuild disposes and recreates every content-panel child,
+            // so a still-pending resize-drag scroll-preserve is now
+            // meaningless - clear it so a later settle tick never arms a
+            // stale-offset verify against the new content.
             _resizeScrollRestorePending = false;
 
             mutate();
@@ -941,14 +718,10 @@ namespace GW2CraftingHelper.Views
             private TimeSpan? _lastFrameTime;
             private bool _canceled;
 
-            // M33 C1 (#12 diagnostics): observation-only - lets external
-            // code (the wheel diagnostic handler) ask "is this ticker still
-            // running" without altering any ticker behavior. _scrollVerifyTicker
-            // is never nulled out when a ticker self-cancels (only
-            // reassigned or explicitly cleared at the top of the next
-            // Build()), so a plain null-check on that field cannot tell
-            // "never started" apart from "ran once and finished long ago" -
-            // this property is the accurate signal.
+            // Observation-only. _scrollVerifyTicker is never nulled when
+            // a ticker self-cancels, so a plain null-check cannot tell
+            // "never started" from "finished long ago" - this property is
+            // the accurate signal.
             public bool IsActive => !_canceled;
 
             public FrameTicker(Func<GameTime, bool> step)
@@ -1024,32 +797,13 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Cancels every live FrameTicker (scroll-verify, resize-debounce,
-        /// wheel-wrap-verify, spinner) and resets their associated pending
-        /// state. Two callers: the top of every <see cref="Build"/> (a
-        /// fresh build cycle supersedes any ticker from the previous one -
-        /// unchanged behavior, just factored out of that method) and
-        /// Module.Unload (M39/WP-17: these tickers are parented to the
-        /// SpriteScreen, not this view's own control tree - see the ticker
-        /// fields' own comments - so nothing else tears them down if the
-        /// module unloads while a tab holding this view is open and a
-        /// ticker is mid-flight; each ticker also bails itself out on its
-        /// own next frame as a second line of defense, but Unload should
-        /// not depend on "one more frame runs after unload" being true).
-        ///
-        /// W3B gate round 1 fix: this method only ever cancels the LOCAL
-        /// _spinnerTicker Control - it has no live-phase-text state of its
-        /// own to reset any more (that moved to the module-owned
-        /// _statusBoard, which a mere ticker cancel never touches - see
-        /// that field's own doc comment). Build() calls this at its own
-        /// top, then (this method having just canceled the previous
-        /// ticker) re-arms a fresh one immediately below whenever
-        /// _statusBoard.Snapshot().InFlight is still true - reading the
-        /// board fresh on every rebuild is what actually removes the
-        /// "stuck on Ready/last phase text until the next phase event"
-        /// freeze this fix closes, not anything this method itself does.
-        /// Module.Unload tearing down the whole view without clearing
-        /// these ticker fields is harmless: a fresh CraftingPlanView
-        /// instance is constructed on the module's next load.
+        /// wheel-wrap-verify, spinner) and resets their pending state.
+        /// Two callers: the top of every <see cref="Build"/>, and
+        /// Module.Unload - the tickers are parented to the SpriteScreen,
+        /// so nothing else tears them down if the module unloads while
+        /// one is mid-flight. This only cancels the local ticker
+        /// controls; live-phase-text state lives on the module-owned
+        /// _statusBoard, which Build() re-reads fresh on every rebuild.
         /// </summary>
         public void StopLiveTickers()
         {
@@ -1072,13 +826,10 @@ namespace GW2CraftingHelper.Views
         #region 3. Scroll preserve/restore/verify (continued) - KNOWN-ISSUES #12/#14/#19
 
         /// <summary>
-        /// M33 C2a (directive B): writes the restore ratio to the scrollbar
-        /// synchronously, using the content height that mutate() already
-        /// finalized before this method runs (directive A). This is the
-        /// change that eliminates the #14 flash: nothing paints between
-        /// mutate() returning and this write landing, so the viewport never
-        /// visibly reaches a wrong position at all - there is no "restore a
-        /// frame late" gap left to close.
+        /// Writes the restore ratio to the scrollbar synchronously, using
+        /// the content height mutate() already finalized. Nothing paints
+        /// between mutate() returning and this write landing, so the
+        /// viewport never visibly reaches a wrong position at all.
         /// </summary>
         private void ApplySavedScrollSynchronously(int savedOffset, int capturedGeneration)
         {
@@ -1137,39 +888,21 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M33 C2a (directives A-C): short defensive verify that runs after
-        /// ApplySavedScrollSynchronously's write. With container heights
-        /// finalized synchronously at build time, no multi-frame AutoSize
-        /// convergence remains to race - this only exists to contest a
-        /// single expected class of LATE write: Blish's own
+        /// Short defensive verify after ApplySavedScrollSynchronously's
+        /// write. With heights finalized synchronously at build time, this
+        /// only contests one expected class of LATE write: Blish's
         /// Scrollbar.RecalculateLayout zeroes ScrollDistance whenever the
-        /// panel's content/viewport ratio changes, which the scrollbar
-        /// re-evaluates every real frame (Scrollbar.DoUpdate calls
-        /// Invalidate() unconditionally) and so can still land on the frame
-        /// or two immediately following our synchronous write. The window
-        /// exits on the FIRST frame that confirms the write is holding
-        /// (directive B - no multi-frame stable streak required, since
-        /// height is not still drifting) and is capped at
-        /// ScrollVerifyMaxFrames regardless.
+        /// content/viewport ratio changes, which can land a frame or two
+        /// after our synchronous write. Exits on the first frame that
+        /// confirms the write is holding, capped at ScrollVerifyMaxFrames.
         ///
-        /// Directive C: any user wheel event observed since this window
-        /// armed yields it immediately and unconditionally - no
-        /// heightUnchanged precondition, since height is already valid at
-        /// arm time. This is the ONLY wheel-driven exit: a zero-reassert
-        /// (scrollbar reads exactly 0 while target sits well above it) is
-        /// always contested and never suppressed by wheel recency. A wheel
-        /// at or after armedAtUtc already exits via the check above before
-        /// reaching the zero-reassert branch; a wheel that predates
-        /// armedAtUtc is the input that produced savedOffset in the first
-        /// place (PreserveScrollAcross captures it before mutate() runs),
-        /// so treating it as "user meant to land at the top" would abandon
-        /// restoring their real, non-top position - exactly the #14 flash
-        /// this window exists to prevent. (An earlier revision suppressed
-        /// the reassert on any wheel within a short recency window
-        /// regardless of arm time; that bled across the mutation boundary
-        /// and was removed in the M33 fix-pass.) The zero-reassert cap
-        /// (ScrollVerifyZeroReassertCap) is kept as a last-resort guarantee
-        /// that a persistent fight eventually ends.
+        /// Any user wheel event observed since the window armed yields it
+        /// immediately - the ONLY wheel-driven exit. A zero-reassert is
+        /// always contested, never suppressed by wheel recency: a wheel
+        /// predating the arm time is the input that produced savedOffset
+        /// in the first place, so treating it as "user meant the top"
+        /// would abandon their real position. The zero-reassert cap
+        /// guarantees a persistent fight eventually ends.
         /// </summary>
         private void StartScrollVerify(Panel capturedPanel, int capturedGeneration, int savedOffset, Scrollbar scrollbar)
         {
@@ -1224,22 +957,15 @@ namespace GW2CraftingHelper.Views
 
                     if (current <= 0.0005f && target > 0.01f)
                     {
-                        // Scrollbar reads exactly zero while our target sits
-                        // well above it: Blish's own reset landed on this
-                        // frame (see the class doc comment). This is
-                        // ALWAYS a library reset, never a genuine "user
-                        // wheeled to exactly top" - any wheel event at or
-                        // after armedAtUtc already exited via the
-                        // wheel-observed check above before reaching this
-                        // line, and a wheel event that predates armedAtUtc
-                        // reflects the user's real pre-mutation position
-                        // (the ratio ApplySavedScrollSynchronously just
-                        // wrote), which this reassert must restore rather
-                        // than treat as "user meant to be at the top".
-                        // (M33 fix-pass: a recency-only suppression here
-                        // previously let a wheel just BEFORE the mutation
-                        // veto the restore of a real non-top position -
-                        // see git history for the removed check.)
+                        // Scrollbar reads exactly zero while our target
+                        // sits well above it: always a library reset,
+                        // never a genuine "user wheeled to top" - a wheel
+                        // at or after arm time already exited above, and
+                        // one predating it reflects the user's real
+                        // pre-mutation position, which this reassert must
+                        // restore. Do not add recency-only suppression
+                        // here - it lets a wheel just before the mutation
+                        // veto restoring a real non-top position.
                         scrollbar.ScrollDistance = target;
                         zeroReassert++;
 
@@ -1317,29 +1043,21 @@ namespace GW2CraftingHelper.Views
         #region 4. Wheel-wrap correction (continued) - KNOWN-ISSUES #12 (reopened)
 
         /// <summary>
-        /// M33 C2a (directive C): unconditional (NOT diagnostics-gated) tap
-        /// on the same MouseWheelScrolled event OnScrollDiagWheelScrolled
-        /// below observes, recording only a timestamp. StartScrollVerify
-        /// reads _lastWheelEventUtc to yield a live verify window
-        /// immediately the moment a wheel event lands in it (scoped to
-        /// wheels at or after the window's arm time - see that method's
-        /// doc comment). This is a real behavioral decision now, not
-        /// diagnostics, so unlike the tap below this must run regardless
-        /// of ScrollDiagnosticsEnabled - cost is a single DateTime.UtcNow
-        /// call per wheel notch, not per frame.
+        /// Unconditional (not diagnostics-gated) tap on the same
+        /// MouseWheelScrolled event the diagnostic handler observes,
+        /// recording only a timestamp. StartScrollVerify reads it to
+        /// yield a live verify window the moment a wheel event lands -
+        /// a real behavioral decision, so it must run regardless of
+        /// ScrollDiagnosticsEnabled.
         /// </summary>
         private void OnContentWheelObserved(object sender, MouseEventArgs e)
         {
             _lastWheelEventUtc = DateTime.UtcNow;
 
-            // M36 (KNOWN-ISSUES #12 reopened/root-caused): classification
-            // is unconditional (zero-allocation, a plain value tuple) - see
-            // WheelDeltaSanitizer's own doc comment for the full root
-            // cause and threshold derivation. GameService.Input.Mouse.
-            // State.ScrollWheelValue is the SAME raw value
-            // OnScrollDiagWheelScrolled's diagnostic log already reads as
-            // "raw" - this is the field the live 2026-07-21 histogram was
-            // measured from.
+            // Classification is unconditional (zero-allocation) - see
+            // WheelDeltaSanitizer for the root cause and threshold
+            // derivation. ScrollWheelValue is the same raw value the
+            // diagnostic log reads.
             try
             {
                 int raw = GameService.Input.Mouse.State.ScrollWheelValue;
@@ -1364,76 +1082,36 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M36 (KNOWN-ISSUES #12 reopened/root-caused): corrects the
-        /// damage from a wrapped wheel delta. Blish HUD's own
+        /// Corrects the damage from a wrapped wheel delta. Blish's
         /// Scrollbar.HandleWheelScroll looks only at Math.Sign of the
-        /// (here, corrupted-negative) raw delta, so for every wrapped
-        /// up-flick it has already queued exactly ONE step DOWN via
-        /// ScrollAnimated by the time this handler runs - OnContentWheel-
-        /// Observed is subscribed after Blish's own Scrollbar (see
-        /// OnScrollDiagWheelScrolled's doc comment), so Blish's own
-        /// HandleWheelScroll for this same event has always already run.
+        /// corrupted-negative raw delta, so it has already queued exactly
+        /// one step DOWN by the time this handler runs (this handler is
+        /// subscribed after Blish's own Scrollbar).
         ///
-        /// MECHANISM (M36 fix-pass, re-verified against the decompiled
-        /// Glide source rather than assumed): an earlier revision of this
-        /// comment claimed Tweener.TargetCancel was a no-op here, on the
-        /// theory that Glide defers a freshly-created Tween's by-target
-        /// dictionary registration to the NEXT Tweener.Update() call. That
-        /// theory is FALSE for the vendored Glide (decompiled from the
-        /// shipped "Blish HUD.exe", Glide.Tween.TweenerImpl.Tween&lt;T&gt;()):
-        /// the SAME method that enqueues a new tween onto its private
-        /// toAdd queue also calls its own AddAndRemove() synchronously,
-        /// before returning - which dequeues toAdd and registers the
-        /// tween in the by-target "tweens" ConcurrentDictionary right
-        /// there, not deferred to any later frame. So by the time
-        /// Scrollbar.ScrollAnimated's call to Tweener.Tween(...) returns
-        /// (still inside Blish's own HandleWheelScroll, still before this
-        /// handler ever runs for the same event), the wrong duration-0
-        /// tween is ALREADY registered in that dictionary. TargetCancel
-        /// therefore finds it immediately: Tween.Cancel(string[]) nulls
-        /// the tween's own vars/lerpers slot for "ScrollDistance"
-        /// synchronously, so even if the tween's Update() runs before it
-        /// is fully removed from the per-target list (removal itself is
-        /// queued, applied by the next AddAndRemove() pass), that Update()
-        /// skips writing ScrollDistance entirely (Tween.Update() null-
-        /// guards every var/lerper slot before writing) - the wrong step
-        /// never lands, full stop, not merely "canceled one frame late".
-        /// This is why the cancel-then-direct-write shape below is kept
-        /// rather than replaced with a counter-tween or a one-frame-
-        /// deferred correction: TargetCancel already wins synchronously,
-        /// in the same call stack, with no wrong frame ever rendered - a
-        /// counter-tween would add complexity for no behavioral gain, and
-        /// a deferred correction would manufacture a wrong frame this
-        /// mechanism does not actually have.
-        /// (Also corrected: an earlier revision claimed Scrollbar.
-        /// ScrollAnimated "implicitly relies on" this same public
-        /// TargetCancel API for its own between-events overwrite
-        /// behavior. False on the literal text - decompiled Scrollbar.cs
-        /// calls only Tweener.Tween(this, new { ScrollDistance = ... },
-        /// 0f).Ease(...), with no TargetCancel call and no explicit
-        /// "overwrite: true" anywhere in that file. The real mechanism
-        /// for two rapid ScrollAnimated calls in a row is Tween&lt;T&gt;'s own
-        /// overwrite PARAMETER, true by default whenever the caller omits
-        /// it (as Scrollbar always does), which internally cancels any
-        /// PRE-EXISTING same-target/same-property tween via its own
-        /// private ForAllTweens+Cancel loop - conceptually similar to
-        /// TargetCancel, but a distinct, internal-only code path, never
-        /// the public API this method calls.)
+        /// Mechanism (verified against the decompiled vendored Glide):
+        /// TweenerImpl.Tween registers a new tween in the by-target
+        /// dictionary synchronously, before returning - so by the time
+        /// this handler runs, the wrong duration-0 tween is already
+        /// registered and TargetCancel finds it immediately.
+        /// Tween.Cancel nulls the "ScrollDistance" lerper slot
+        /// synchronously, so even an Update() that runs before removal
+        /// skips the write - the wrong step never lands, not merely
+        /// "canceled one frame late". That is why the
+        /// cancel-then-direct-write shape is kept over a counter-tween or
+        /// a deferred correction, which would add a wrong frame this
+        /// mechanism does not have. (Scrollbar itself never calls
+        /// TargetCancel; rapid ScrollAnimated calls overwrite each other
+        /// via Tween's default overwrite parameter, an internal-only
+        /// path.)
         ///
-        /// Despite the above, a bounded defensive re-assert
-        /// (StartWheelWrapVerify) still runs for a frame or two after this
-        /// write - insurance against a future Blish/Glide vendor change or
-        /// an interaction this analysis missed, not evidence this
-        /// mechanism is expected to fail.
+        /// A bounded defensive re-assert (StartWheelWrapVerify) still
+        /// runs for a frame or two - insurance against a future
+        /// Blish/Glide vendor change, not an expected failure.
         ///
-        /// The KNOWN-ISSUES #19 "stale-cached-percent" hazard (Scrollbar.
-        /// RecalculateLayout resetting ScrollDistance to 0 the first time
-        /// _scrollbarPercent's cached value goes stale-to-fresh) does NOT
-        /// apply here: that hazard is specific to a resize tick changing
-        /// the viewport/content ratio for the first time since the last
-        /// RecalculateLayout call. A wheel event alone never changes
-        /// content or viewport height, so _scrollbarPercent is already
-        /// fresh and RecalculateLayout is not needed before this write.
+        /// The stale-cached-percent hazard does not apply here: a wheel
+        /// event alone never changes content or viewport height, so
+        /// _scrollbarPercent is already fresh and RecalculateLayout is
+        /// not needed before this write.
         /// </summary>
         private void ApplyWheelWrapCorrection(int rawIn, int intendedDelta)
         {
@@ -1467,33 +1145,18 @@ namespace GW2CraftingHelper.Views
                 GameService.Animation.Tweener.TargetCancel(scrollbar, nameof(Scrollbar.ScrollDistance));
             }
 
-            // Blish's own per-notch step convention (Scrollbar.
-            // HandleWheelScroll/ScrollAnimated, see BlishScrollWheelStep-
-            // Pixels' own provenance comment): one wheel EVENT moves the
-            // bar by BlishScrollWheelStepPixels * MouseWheelScrollLines
-            // pixels, sign-only (never magnitude-scaled). Read live here
-            // too, matching Blish's own live read, so this stays correct
-            // for any POSITIVE MouseWheelScrollLines value if the user
-            // changes their OS mouse-wheel-lines setting. MUSTFIX-2:
-            // Windows' "one screen at a time" setting reports
-            // MouseWheelScrollLines == -1, which would flip deltaPixels'
-            // sign if used directly - Blish's own HandleWheelScroll has
-            // this identical defect (its Math.Sign(...) * -30 *
-            // MouseWheelScrollLines scrolls the WRONG direction for every
-            // wheel event under that setting, wrapped or not - we cannot
-            // fix Blish's own arithmetic). WheelDeltaSanitizer.
-            // SanitizeScrollLines substitutes Windows' documented default
-            // of 3 lines whenever the raw value is not a usable positive
-            // count, which keeps THIS correction's direction right; it
-            // cannot make a corrected flick match Blish's own (equally
-            // wrong) step size under that setting - direction-correctness
-            // is chosen over unreachable step-parity for this one OS
-            // setting value.
-            // intendedDelta is always a clean multiple of 120 in practice
-            // (the wrap always adds back a whole ushort span to a raw
-            // value that started as N*120), but this scales proportionally
-            // rather than assuming an exact multiple, so a non-multiple
-            // value degrades gracefully instead of losing a partial notch.
+            // Blish's per-notch convention: one wheel event moves the bar
+            // by BlishScrollWheelStepPixels * MouseWheelScrollLines
+            // pixels, sign-only. Read live so any positive OS
+            // wheel-lines setting stays correct. Windows' "one screen at
+            // a time" setting reports -1, which would flip the sign;
+            // SanitizeScrollLines substitutes the documented default of 3
+            // to keep this correction's direction right (Blish's own
+            // arithmetic has the same defect, which we cannot fix, so
+            // direction-correctness is chosen over unreachable
+            // step-parity there). intendedDelta scales proportionally
+            // rather than assuming a clean multiple of 120, so a
+            // non-multiple value degrades gracefully.
             double notches = intendedDelta / 120.0;
             int lines = WheelDeltaSanitizer.SanitizeScrollLines(System.Windows.Forms.SystemInformation.MouseWheelScrollLines);
             int deltaPixels = (int)System.Math.Round(-notches * BlishScrollWheelStepPixels * lines);
@@ -1511,19 +1174,11 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M36 fix-pass (KNOWN-ISSUES #12, CRITICAL-1 finding response): a
-        /// bounded, one-shot defensive re-assert for
-        /// ApplyWheelWrapCorrection's write. That method's own doc comment
-        /// verifies Tweener.TargetCancel is synchronously effective
-        /// against Blish's wrong tween here, so this ticker exists as
-        /// insurance against a future Blish/Glide vendor change or an
-        /// interaction this analysis missed - not evidence of an expected
-        /// failure. Unlike StartScrollVerify's zero-reassert loop (which
-        /// fights a KNOWN recurring adversary up to a cap), this re-
-        /// asserts AT MOST ONCE and then stops regardless of outcome - a
-        /// mundane insurance check, not an ongoing contest - and yields
-        /// immediately to any NEWER wheel event so it can never contest
-        /// genuine subsequent user input.
+        /// A bounded, one-shot defensive re-assert for
+        /// ApplyWheelWrapCorrection's write - insurance against a future
+        /// Blish/Glide vendor change, not an expected failure. Unlike
+        /// StartScrollVerify's zero-reassert loop, this re-asserts at
+        /// most once and yields immediately to any newer wheel event.
         /// </summary>
         private void StartWheelWrapVerify(Scrollbar scrollbar, float target)
         {
@@ -1576,15 +1231,11 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M33 C1 (#12 diagnostics): observation-only wheel handler.
-        /// Subscribes to the same MouseWheelScrolled event Blish's own
-        /// Scrollbar subscribes to in its constructor (which runs before
-        /// this handler is ever wired up, since _contentPanel must exist
-        /// first) - so this always observes the scrollbar AFTER Blish's own
-        /// HandleWheelScroll has already run for the same event (tween
-        /// created, not yet applied). Never writes to the scrollbar, never
-        /// influences restore/verify decisions - purely a read-and-log tap
-        /// (OnContentWheelObserved above is what actually drives behavior).
+        /// Observation-only wheel handler, always observing the scrollbar
+        /// after Blish's own HandleWheelScroll has run for the same event
+        /// (Blish's Scrollbar subscribes first, in its constructor).
+        /// Never writes to the scrollbar or influences restore/verify
+        /// decisions - purely a read-and-log tap.
         /// </summary>
         private void OnScrollDiagWheelScrolled(object sender, MouseEventArgs e)
         {
@@ -1664,14 +1315,10 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// One input row's controls: search box + qty (unchanged from the
-        /// pre-M35 single row), plus a Remove button (gw2e's own
-        /// `ng-if="recipes.length > 1"` gate - ItemRowRequestBuilder.
-        /// CanRemoveRow) and, on the last row only, an Add button (echoing
-        /// gw2e's own single trailing "Add another item" link, attached to
-        /// the last row instead of its own separate strip row so the
-        /// single-row case keeps today's exact row height/position - see
-        /// the TopRegionRowGap constants' own doc comment).
+        /// One input row's controls: search box + qty, a Remove button
+        /// (gw2e's own 2+-rows gate), and on the last row only an Add
+        /// button - attached to the last row rather than its own strip
+        /// row so the single-row case keeps the exact original layout.
         /// </summary>
         private void CreateItemRowControls(ItemRowState row, int index, int w)
         {
@@ -1831,18 +1478,15 @@ namespace GW2CraftingHelper.Views
             // every row already routes through - no separate loop needed
             // here.
 
-            // Cleanup for any leftover scroll-verify/resize-debounce/
-            // wheel-wrap-verify tickers from the previous build cycle, plus
-            // their associated pending state - see StopLiveTickers' own
-            // doc comment (M39 factored this block out into a named method
-            // so Module.Unload can also call it - see that method's doc
-            // comment for why unload needs the same cleanup).
+            // Cleanup for any leftover tickers from the previous build
+            // cycle, plus their pending state - see StopLiveTickers,
+            // which Module.Unload also calls.
             StopLiveTickers();
 
             _buildPanel = buildPanel;
             int w = buildPanel.ContentRegion.Width;
 
-            // M35: gw2e's own initial state is one empty row
+            // Gw2e's own initial state is one empty row
             // (`e.recipes = [{id: null, amount: 1}]`) - see _itemRows' own
             // doc comment. Only ever seeded once; every later Build() call
             // (tab switch) reuses whatever the session already has.
@@ -1877,13 +1521,11 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, 7),
                 Parent = _controlsPanel
             };
-            // Review-fix: CheckedChanged is wired further down, AFTER
-            // _valueOwnMaterialsCheckbox is constructed below - not here.
-            // OnOwnMaterialsToggled dereferences _valueOwnMaterialsCheckbox
-            // unconditionally in all three of its Enabled-sync sites; wiring
-            // the handler before that field exists would leave a live
-            // handler that NREs on the very first click if construction of
-            // any control between here and there ever throws.
+            // CheckedChanged is wired further down, AFTER
+            // _valueOwnMaterialsCheckbox is constructed - the handler
+            // dereferences that field unconditionally, and wiring it
+            // earlier would leave a live handler that NREs on the first
+            // click if any intervening construction throws.
 
             // Price basis selector; applies on the next Generate.
             new Label()
@@ -1912,14 +1554,11 @@ namespace GW2CraftingHelper.Views
                     : PriceBasis.InstantBuy;
             };
 
-            // VOM design (Section 5.2): inline per-plan toggle, next to
-            // Use Own Materials/price basis - disabled (not hidden) when
-            // Use Own Materials is off, since its own effect is fully inert
-            // without a snapshot driving reduction (see
-            // CraftingPlanPipeline's useForceBuyPrePass gate). Placed after
-            // the price-basis dropdown (which ends at x=328), well clear of
-            // the right-anchored Generate button even at this window's
-            // minimum width (930x710 -> ~884px content region).
+            // Inline per-plan toggle, disabled (not hidden) when Use Own
+            // Materials is off - its effect is inert without a snapshot
+            // driving reduction. Placed after the price-basis dropdown,
+            // clear of the right-anchored Generate button even at minimum
+            // window width.
             _valueOwnMaterialsCheckbox = new Checkbox()
             {
                 Text = "Value Own Materials",
@@ -1927,23 +1566,12 @@ namespace GW2CraftingHelper.Views
                 Enabled = _useOwnMaterials,
                 Location = new Point(350, 7),
                 Parent = _controlsPanel,
-                // Review-fix: with this ON, owned materials are priced at
-                // market rate up front - the plan may then tell you to buy
-                // ingredients you already have on hand instead of using
-                // them, whenever a different recipe option is cheaper at
-                // fresh market prices. Off uses whatever you already own
-                // first, even down a pricier path.
-                //
-                // Post-review fix (VOM finding #5): the tooltip used to
-                // describe only this recipe-option/market-price half of
-                // the toggle. It also gates the 15% force-buy sell-back
-                // guard and the MaterialOpportunityCost deduction from
-                // CraftingProfit (SettingsTabContent's own info line for
-                // the now-relocated global setting already mentions the
-                // guard - see AddInfoLine's "decision-invariant reduction
-                // + 15% sell-back guard" text) - both of which change
-                // numbers this same plan displays, so the live control's
-                // own tooltip should say so too.
+                // With this ON, owned materials are priced at market rate
+                // up front - the plan may tell you to buy ingredients you
+                // already have when a different option is cheaper fresh.
+                // The tooltip also mentions the 15% force-buy guard and
+                // the MaterialOpportunityCost deduction, both of which
+                // change numbers this plan displays.
                 BasicTooltipText = "Compare recipe options at fresh market prices, as if you owned nothing - may recommend buying materials you already have instead of using them, if a different option is cheaper. Also force-buys materials where buying beats crafting by more than 15%, and deducts owned materials' sell value from Crafting Profit. Off: always uses what you already own first, treated as free."
             };
             _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
@@ -1951,10 +1579,8 @@ namespace GW2CraftingHelper.Views
                 _valueOwnMaterials = e.Checked;
             };
 
-            // Review-fix: wired here (after _valueOwnMaterialsCheckbox
-            // above is fully constructed), not immediately after
-            // _ownMaterialsCheckbox's own construction - see the comment at
-            // that construction site.
+            // Wired here, after _valueOwnMaterialsCheckbox is fully
+            // constructed - see the comment at that construction site.
             _ownMaterialsCheckbox.CheckedChanged += OnOwnMaterialsToggled;
 
             _generateButton = new StandardButton()
@@ -1996,32 +1622,21 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
-            // M33 C2a (directive C): unconditional wheel-recency tracking
-            // that StartScrollVerify's yield/suppress logic depends on,
-            // plus the pre-existing diagnostic-only tap (gated inside the
-            // handler on ScrollDiagnosticsEnabled). _contentPanel is a
-            // fresh instance every Build() call, so there is nothing stale
-            // to unsubscribe here - the previous cycle's panel (and its
-            // subscriptions) is discarded with the previous buildPanel.
+            // Unconditional wheel-recency tracking StartScrollVerify
+            // depends on, plus the diagnostic-only tap. _contentPanel is
+            // a fresh instance every Build(), so there is nothing stale
+            // to unsubscribe.
             _contentPanel.MouseWheelScrolled += OnContentWheelObserved;
             _contentPanel.MouseWheelScrolled += OnScrollDiagWheelScrolled;
 
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
 
-            // W3B gate round 1 fix (pull-based module-level status - see
-            // docs/KNOWN-ISSUES.md's W3B section, Services/
-            // PlanStripStatusBoard.cs's own doc comment): the fresh
-            // _statusLabel created above starts on the hardcoded "Ready"
-            // text, which is only correct for the "nothing has ever been
-            // generated this session" case. Every rebuild - not just one
-            // that happens to land mid-generation - now consults the
-            // module-owned _statusBoard directly instead of trusting any
-            // instance field of this view's own (which the pre-fix
-            // _generationInFlight/_currentPhaseText approach relied on, and
-            // which a completion callback landing while this view's panel
-            // was torn down could leave stale or never even set - the
-            // exact round-1 gate failure). Three cases:
+            // The fresh _statusLabel starts on "Ready", only correct for
+            // "nothing generated this session". Every rebuild consults
+            // the module-owned _statusBoard directly rather than any
+            // instance field a torn-down panel could leave stale. Three
+            // cases:
             //   in-flight            -> arm a fresh ticker, which
             //                            immediately renders the board's
             //                            current phase text (no waiting for
@@ -2032,25 +1647,12 @@ namespace GW2CraftingHelper.Views
             //                            "Ready" despite an already-
             //                            completed plan.
             //   nothing yet          -> leave "Ready" as set above.
-            // This MUST run after _contentPanel above is reassigned to the
-            // new FlowPanel, not before - RenderFromBoard (called
-            // synchronously by ArmSpinnerTicker, and directly below for the
-            // not-in-flight case) bails out whenever _contentPanel is null
-            // or already-disposed (see that method's own doc comment), and
-            // until the reassignment above runs, _contentPanel still holds
-            // the PREVIOUS build cycle's panel, which ViewAdapter.Build
-            // already disposed before invoking this Build() call at all.
-            //
-            // Gate round 2 review-fix: the not-in-flight branch used to
-            // re-derive its own "has a final status -> SetStatus it,
-            // otherwise leave Ready" copy of RenderFromBoard's own ladder
-            // inline here, duplicating the render decision in two places
-            // that could silently drift apart (RenderFromBoard's doc
-            // comment already claimed to be "the ONLY place" that writes a
-            // snapshot into _statusLabel - now actually true). Calling
-            // RenderFromBoard(boardSnapshot) directly covers both the
-            // "finished, has status" and "nothing yet" cases identically to
-            // what this branch computed by hand.
+            // This MUST run after _contentPanel is reassigned to the new
+            // FlowPanel: RenderFromBoard bails when _contentPanel is null
+            // or disposed, and until the reassignment it still holds the
+            // previous build cycle's already-disposed panel. The
+            // not-in-flight branch calls RenderFromBoard directly rather
+            // than re-deriving its render ladder inline - one place only.
             var boardSnapshot = _statusBoard.Snapshot();
             if (boardSnapshot.InFlight)
             {
@@ -2061,25 +1663,14 @@ namespace GW2CraftingHelper.Views
                 RenderFromBoard(boardSnapshot);
             }
 
-            // Round 3 review-fix (mustFix, finding 1): this is the DOMINANT
-            // restore-render path, not a rare corner case - ApplyRestoredPlan
-            // runs at module load, before the user can possibly have
-            // switched to this tab yet (see its own doc comment), so a
-            // restored plan is committed to _currentPlan here first and
-            // only actually rendered on the tab's first Build() - which is
-            // THIS call. Previously unguarded: a structurally valid but
-            // degraded plan.json (e.g. a null CraftingTreeNode.Children
-            // entry - passes PlanStoreHelpers' tolerance gate and
-            // PlanViewModelBuilder's reference-copying vm build untouched,
-            // only ever dereferenced once RenderPlan actually walks the
-            // tree) would throw here with no try/catch, escape into Blish's
-            // own view construction (Views/ViewAdapter.cs's _buildAction
-            // call wraps no try/catch of its own either), and re-throw the
-            // SAME exception on every subsequent visit to this tab, since
-            // nothing ever cleared _currentPlan. Shares
-            // RollBackFailedPlanRender with ApplyRestoredPlan's own
-            // live-tab branch - see that method's own doc comment for what
-            // it restores and why.
+            // The DOMINANT restore-render path: ApplyRestoredPlan runs at
+            // module load, so a restored plan is committed to
+            // _currentPlan and only actually rendered on the tab's first
+            // Build() - this call. Unguarded, a degraded plan.json would
+            // throw here, escape into Blish's view construction, and
+            // re-throw on every visit since nothing cleared _currentPlan.
+            // Shares RollBackFailedPlanRender with ApplyRestoredPlan's
+            // live-tab branch.
             if (_currentPlan != null)
             {
                 _lastRenderedWidth = w;
@@ -2103,7 +1694,7 @@ namespace GW2CraftingHelper.Views
             int w = container.ContentRegion.Width;
             int h = container.ContentRegion.Height;
 
-            // M33 C2c: capture the content panel's absolute scroll offset
+            // Capture the content panel's absolute scroll offset
             // (pixels) and height BEFORE either changes below - see
             // PreserveScrollAcrossResize's doc comment for why this must
             // happen pre-mutation.
@@ -2139,7 +1730,7 @@ namespace GW2CraftingHelper.Views
             bool widthChanged = w != _lastRenderedWidth;
             bool heightChanged = _contentPanel.Height != previousContentHeight;
 
-            // M33 C2c (KNOWN-ISSUES resize-scroll regression): a
+            // A
             // height-changing drag tick (dragging the window's bottom edge
             // or a corner) resets Blish's own scrollbar to top one real
             // frame later - see PreserveScrollAcrossResize's doc comment
@@ -2152,7 +1743,7 @@ namespace GW2CraftingHelper.Views
                 PreserveScrollAcrossResize(savedScrollOffset, _contentPanel.Height);
             }
 
-            // M33 C2b: live in-place relayout, every real drag tick - no
+            // Live in-place relayout, every real drag tick - no
             // dispose+rebuild, no debounce wait. Perf guard: skip entirely
             // when the width genuinely did not change (e.g. a height-only
             // resize, or a duplicate event) so an idle window never pays
@@ -2165,7 +1756,7 @@ namespace GW2CraftingHelper.Views
                 ReplayRelayout(panelWidth);
             }
 
-            // M33 C2c: the trailing settle pass (re-ellipsis, a defensive
+            // The trailing settle pass (re-ellipsis, a defensive
             // relayout replay, and now the resize-scroll verify armed by
             // PreserveScrollAcrossResize above) must be scheduled whenever
             // EITHER dimension changed. Previously this ticker was
@@ -2190,7 +1781,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M33 C2c: per-tick counterpart to ApplySavedScrollSynchronously
+        /// Per-tick counterpart to ApplySavedScrollSynchronously
         /// for a resize drag that changes the content panel's viewport
         /// HEIGHT, as opposed to a content rebuild (PreserveScrollAcross's
         /// case). Root cause, confirmed by decompiling the vendor assembly
@@ -2297,7 +1888,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M33 C2c: arms StartScrollVerify's existing bounded window once,
+        /// Arms StartScrollVerify's existing bounded window once,
         /// at resize-drag settle, using the last known-good offset a
         /// resize tick captured via PreserveScrollAcrossResize. Reuses
         /// StartScrollVerify unmodified, so the existing wheel-yield,
@@ -2324,7 +1915,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M33 C2b: replays every registered relayout closure at the given
+        /// Replays every registered relayout closure at the given
         /// panelWidth - position/width writes on already-existing controls
         /// only, never a MeasureString call, never a Height change (see the
         /// _relayoutActions field comment). Wrapped in the vendor
@@ -2346,7 +1937,7 @@ namespace GW2CraftingHelper.Views
         /// for vertical position anyway - SingleTopToBottom flow positions
         /// children from cumulative Height, not Width.
         ///
-        /// PERF CAVEAT (KNOWN-ISSUES #13): this replaces a ONE-TIME
+        /// PERF CAVEAT: this replaces a ONE-TIME
         /// dispose+rebuild 150ms after the drag settled with a full replay
         /// of _relayoutActions on EVERY real drag frame - a genuine change
         /// in perf character, not just a different trigger. The mitigation
@@ -2408,7 +1999,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M33 C2b: the settle-only text-measurement pass. Every relayout
+        /// The settle-only text-measurement pass. Every relayout
         /// closure already ran (and re-ran) synchronously on every drag
         /// tick via ReplayRelayout; this only re-runs the 3 LabelHelpers.EllipsizeToWidth
         /// call sites' MEASURE work (Used Materials, Shopping List, Tree row
@@ -2466,7 +2057,7 @@ namespace GW2CraftingHelper.Views
                 Logger.Warn(ex, "Resize settle pass skipped; content panel unavailable");
             }
 
-            // M33 C2c: bounded to a single window per settled drag (not per
+            // Bounded to a single window per settled drag (not per
             // tick) - see PreserveScrollAcrossResize's doc comment for why
             // one settle-time window is sufficient to contest the trailing
             // Blish-internal reset.
@@ -2480,7 +2071,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// M33 C2b: replays every registered re-ellipsis closure - see
+        /// Replays every registered re-ellipsis closure - see
         /// ResizeSettleStep and the _reellipsisActions field comment.
         /// </summary>
         private void RunReellipsis(int panelWidth)
@@ -2505,7 +2096,7 @@ namespace GW2CraftingHelper.Views
                 // Show modal confirmation before regenerating
                 _useOwnMaterials = newValue;
                 _ownMaterialsCheckbox.Enabled = false;
-                // VOM design (Section 5.2): keep the Value Own Materials
+                // Keep the Value Own Materials
                 // checkbox's Enabled state in lockstep with the optimistic
                 // _useOwnMaterials value at every point it changes here -
                 // its own Checked value is preserved either way, only
@@ -2536,7 +2127,7 @@ namespace GW2CraftingHelper.Views
 
         private async Task TriggerGenerate()
         {
-            // M35 (gw2efficiency parity - multi-item plans): gather every
+            // Gather every
             // row's selection + quantity into the request list the
             // pipeline needs. Per-row quantity validation mirrors the
             // pre-M35 single-quantity-box behavior exactly (invalid/blank/
@@ -2544,7 +2135,7 @@ namespace GW2CraftingHelper.Views
             // just applied once per row instead of once total.
             bool anyQtyInvalid = false;
             var rowInputs = new List<ItemRowRequestBuilder.RowInput>(_itemRows.Count);
-            // W3B review-fix: folded together with the label-part collection
+            // Folded together with the label-part collection
             // below (previously a separate foreach over the same _itemRows)
             // now that both need nothing from each other but this loop's own
             // per-row qty correction - see RequestLabelFormatter's own doc
@@ -2562,7 +2153,7 @@ namespace GW2CraftingHelper.Views
                 row.QuantityText = qty.ToString();
                 rowInputs.Add(new ItemRowRequestBuilder.RowInput(row.ItemId, row.QuantityText));
 
-                // W3B: best-effort "name x quantity[, name x quantity...]"
+                // Best-effort "name x quantity[, name x quantity...]"
                 // label (e.g. "Orrax Manifested x1") for the pipeline's rich
                 // ModuleLog lines - see
                 // CraftingPlanPipeline.GenerateStructuredAsync's requestLabel
@@ -2579,7 +2170,7 @@ namespace GW2CraftingHelper.Views
             var requestItems = ItemRowRequestBuilder.Build(rowInputs);
             if (requestItems.Count == 0)
             {
-                // KNOWN-ISSUES 31a-F2: this no-op validation failure must
+                // This no-op validation failure must
                 // NOT consume a generation-sequence slot. Bumping
                 // _generateSequence before this early-return (the previous
                 // behavior) would invalidate an in-flight generation's
@@ -2592,7 +2183,7 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            // W3B review-fix: capped to the first 3 names (+ "N more") -
+            // Capped to the first 3 names (+ "N more") -
             // see RequestLabelFormatter's own doc comment for why an
             // uncapped label is a ModuleLog-line-length hazard on large
             // plans.
@@ -2607,7 +2198,7 @@ namespace GW2CraftingHelper.Views
             // deferred callback below reads _generateSequence from the main
             // thread too (inside a MainThreadMarshal.Run callback).
             int myGen = ++_generateSequence;
-            // W3B gate round 1 fix: Begin() atomically resets the board's
+            // Begin() atomically resets the board's
             // own phase-text/final-status state for this new generation
             // (replacing the old direct _statusClosedForCurrentGeneration/
             // _currentPhaseText/_currentPhaseOrdinal resets here) - see
@@ -2617,7 +2208,7 @@ namespace GW2CraftingHelper.Views
             _generateButton.Enabled = false;
             _lastDebugLog = null;
 
-            // W3B: live spinner + phase-text status strip, replacing the old
+            // Live spinner + phase-text status strip, replacing the old
             // static "Generating..." for the whole run. ArmSpinnerTicker
             // (an instance method, not a TriggerGenerate-local closure) lets
             // Build() also call it later to re-arm a generation that
@@ -2628,49 +2219,24 @@ namespace GW2CraftingHelper.Views
             {
                 // A one-shot notice takes priority over the very first
                 // spinner frame; the next phase event or spinner tick
-                // replaces it exactly like any other status text, same as
-                // the pre-W3B behavior of "Generating..." being immediately
-                // followed by the first progress message.
+                // replaces it like any other status text.
                 SetStatus("Quantity was invalid - reset to 1. Generating...");
             }
 
-            // W3B: live coarse-phase events drive the status strip's phase
-            // text (see PlanPhaseEvent's own doc comment). Progress<T>
-            // captures the SynchronizationContext at construction time and
-            // posts callbacks through it; with none installed (see
-            // MainThreadMarshal), the callback runs on a ThreadPool thread,
-            // so this callback's own body must marshal before touching
-            // _currentPhaseText/_statusLabel. The old, finer-grained
-            // IProgress<PlanStatus> channel is no longer wired to the
-            // status label at all (see the `progress: null` argument
-            // below) - its frequent, static-feeling per-step text is
-            // exactly what this milestone replaces with the spinner +
-            // coarse phase text above. W3B review-fix: passing null here
-            // does NOT silently drop PlanStatus's two genuinely important
-            // diagnostics (the first-run recipe-discovery notice and the
-            // stale-recipe-seed warning) - CraftingPlanPipeline now writes
-            // both straight to ModuleLog regardless of whether a live
-            // PlanStatus consumer is attached (see its OnStatusUpdate
-            // closures), and the tree-building phase's own "(may take
-            // several seconds on first run)" hint now rides PlanPhaseEvent.
-            // Detail into FormatPhaseText instead. Every OTHER PlanStatus
-            // message really is routine per-step text now superseded by
-            // the 5 coarse phase events above, so this remains an
-            // intentional null, not a regression.
-            // W3B gate round 1 fix: writes straight to the thread-safe
-            // _statusBoard - no MainThreadMarshal hop needed any more,
-            // since nothing here touches a Blish control (the spinner
-            // ticker pulls this on the main thread instead - see
-            // SpinnerTick/RenderFromBoard below). Progress<T> with no
-            // SynchronizationContext posts every Report through an
-            // independent ThreadPool.QueueUserWorkItem, so two events
-            // reported milliseconds apart (a warm cache, a small plan) can
-            // still be applied out of order by two different worker
-            // threads racing each other into UpdatePhase - the board
-            // internally re-applies PhaseOrdinalGuard (and
-            // StatusUpdateGuard) under its own lock to reject exactly that,
-            // same as this callback used to check directly. See
-            // PlanStripStatusBoard.UpdatePhase's own doc comment.
+            // Live coarse-phase events drive the status strip's phase
+            // text. The finer-grained IProgress<PlanStatus> channel is
+            // intentionally passed null below - its two genuinely
+            // important diagnostics now reach ModuleLog directly, and the
+            // first-run hint rides PlanPhaseEvent.Detail; everything else
+            // was routine per-step text the coarse events supersede.
+            // This callback writes straight to the thread-safe
+            // _statusBoard (no marshal hop - nothing here touches a Blish
+            // control; the spinner ticker pulls on the main thread).
+            // Progress<T> with no SynchronizationContext posts each
+            // Report on an independent ThreadPool work item, so two
+            // events milliseconds apart can arrive out of order - the
+            // board re-applies PhaseOrdinalGuard/StatusUpdateGuard under
+            // its own lock to reject exactly that.
             var phaseProgress = new Progress<PlanPhaseEvent>(pe =>
             {
                 if (pe == null) return;
@@ -2704,7 +2270,7 @@ namespace GW2CraftingHelper.Views
                     // Plain-state writes happen before any control mutation
                     // so a disposed-control bail below can never strand this
                     // generation's state half-applied.
-                    // M38 WP-25: the per-generation override/ignore/
+                    // The per-generation override/ignore/
                     // expansion reset plus adopting `result` as the
                     // override loop's new baseline now lives on
                     // _treeController - see TreeSectionController.
@@ -2715,19 +2281,11 @@ namespace GW2CraftingHelper.Views
                     _currentPlan = vm;
                     _planGeneratedAt = DateTime.Now;
 
-                    // W3B gate round 1 fix: unconditional board write, on
-                    // purpose - deliberately BEFORE the panel-liveness bail
-                    // below, and no longer gated on it at all. The pre-fix
-                    // version wrote the completion text to _statusLabel
-                    // only after this same liveness check, so a completion
-                    // landing while this view's panel was torn down (tab
-                    // switched away) silently dropped the "Plan generated"
-                    // text forever - nothing about a LATER rebuild knew it
-                    // had ever happened. Finish() can never be skipped this
-                    // way: a future Build() (this instance's own, on any
-                    // later tab revisit) pulls this text straight from the
-                    // board instead. See PlanStripStatusBoard.Finish's own
-                    // doc comment.
+                    // Unconditional board write, deliberately BEFORE the
+                    // panel-liveness bail: a completion landing while the
+                    // panel is torn down must not drop the "Plan
+                    // generated" text - a later Build() pulls it from the
+                    // board instead.
                     _statusBoard.Finish(myGen, $"Plan generated - {_planGeneratedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}");
 
                     // Plan CONTENT still requires a live panel to render
@@ -2756,11 +2314,8 @@ namespace GW2CraftingHelper.Views
 
                     _lastDebugLog = new[] { $"Generation failed: {ex.Message}" };
 
-                    // W3B gate round 1 fix: unconditional board write - see
-                    // the matching comment on the success path above. No
-                    // panel-liveness check needed here at all any more:
-                    // that check existed ONLY to guard the strip's direct
-                    // label write this replaces.
+                    // Unconditional board write - see the matching comment
+                    // on the success path.
                     _statusBoard.Finish(myGen, $"Error: {ex.Message}");
                 });
             }
@@ -2782,38 +2337,18 @@ namespace GW2CraftingHelper.Views
                 MainThreadMarshal.Run(() =>
                 {
                     if (myGen != _generateSequence) return;
-                    // W3B gate round 1 fix: no _generationInFlight field to
-                    // clear here any more - the success/catch path above
-                    // already called _statusBoard.Finish(myGen, ...)
-                    // unconditionally, which is the board's own "no longer
-                    // in flight" transition (see PlanStripStatusBoard.Finish's
-                    // own doc comment).
-                    //
-                    // Gate round 2 review-fix (critical): this callback is
-                    // queued via MainThreadMarshal.Run immediately after the
-                    // success/catch callback above (no await between them),
-                    // and GameService.Overlay.QueueMainThreadUpdate drains
-                    // its whole queue in one pass - so both callbacks run
-                    // back-to-back in the SAME drain, with no real engine
-                    // frame (no Control.DoUpdate) able to land between them.
-                    // The line below used to be a bare _spinnerTicker?.Cancel()
-                    // with a comment claiming this "just avoids one wasted
-                    // tick" - that was wrong: Cancel() synchronously
-                    // Dispose()s the ticker (Parent = null, removed from
-                    // SpriteScreen's children) before SpinnerTick ever gets
-                    // a DoUpdate to observe this generation's own Finish()
-                    // write, which was the ONLY remaining renderer of the
-                    // final status text (Finish() itself is a pure state
-                    // write with no render side effect, by design). Net
-                    // effect pre-fix: the strip froze on the last phase
-                    // text + a spinner glyph forever on the ordinary
-                    // no-tab-switch path, never showing "Plan generated -
-                    // <time>" / "Error: ..." until the next Generate or a
-                    // tab flip. Rendering the board's current snapshot here,
-                    // through the same RenderFromBoard every other writer
-                    // funnels through, flushes the final text deterministically
-                    // before the ticker that would otherwise have to do it
-                    // is torn down.
+                    // This callback runs back-to-back with the
+                    // success/catch callback in the same main-thread
+                    // drain - no engine frame can land between them. A
+                    // bare _spinnerTicker?.Cancel() here would dispose
+                    // the ticker before SpinnerTick ever observes this
+                    // generation's Finish() write (a pure state write
+                    // with no render side effect), freezing the strip on
+                    // the last phase text forever on the ordinary
+                    // no-tab-switch path. Rendering the board's snapshot
+                    // first, through the same RenderFromBoard every
+                    // writer funnels through, flushes the final text
+                    // before the ticker is torn down.
                     RenderFromBoard(_statusBoard.Snapshot());
                     _spinnerTicker?.Cancel();
                     _spinnerTicker = null;
@@ -2824,7 +2359,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// W3B gate round 1 fix (pull-based module-level status): renders
+        /// Renders
         /// whatever <paramref name="snapshot"/> says the strip should show
         /// right now - the live spinner-glyph + phase text while in
         /// flight, or the final completion/error text once finished. This
@@ -2850,7 +2385,7 @@ namespace GW2CraftingHelper.Views
             if (snapshot.InFlight)
             {
                 string text = string.IsNullOrEmpty(snapshot.PhaseText) ? "Generating..." : snapshot.PhaseText;
-                // W3B review-fix (spinner jitter): the glyph goes at the END
+                // The glyph goes at the END
                 // of the string, not the start. SpinnerFrames' proportional-
                 // font glyphs ('|' '/' '-' '\') each have a different
                 // advance width; with the glyph first, every character
@@ -2873,19 +2408,16 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// W3B gate round 1 fix: FrameTicker step for generation
+        /// FrameTicker step for generation
         /// <paramref name="myGen"/>. Pulls a fresh snapshot from
         /// _statusBoard every real frame and hands it, together with
         /// <paramref name="myGen"/>, to the pure
         /// <see cref="PlanStripTickDecision.Decide"/> - the race-sensitive
         /// "stop, render the spinner, or render the final text and stop"
-        /// decision itself lives there (Blish-free, directly testable), not
-        /// here; this method only carries out whatever it returns and owns
-        /// the spinner-glyph throttling (see below). Gate round 2
-        /// review-fix: extracted out of this method so the "finish landed
-        /// before the first tick" / "finish landed between two ticks"
-        /// orderings can be asserted without any Blish control in the loop
-        /// - see PlanStripTickDecisionTests.
+        /// decision itself lives there (Blish-free, so the "finish landed
+        /// before/between ticks" orderings are directly testable); this
+        /// method only carries out whatever it returns and owns the
+        /// spinner-glyph throttling.
         /// <see cref="PlanStripTickAction.RenderFinalAndStop"/> is what
         /// makes "the board reports finished -> render final status and
         /// stop" true without any separate completion-callback write into
@@ -2925,7 +2457,7 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// W3B gate round 1 fix: (re-)arms the spinner ticker for
+        /// (re-)arms the spinner ticker for
         /// generation <paramref name="myGen"/> and renders the board's
         /// current snapshot immediately (so the strip never waits up to a
         /// full SpinnerTickInterval to show something after arming). Two
@@ -2949,13 +2481,6 @@ namespace GW2CraftingHelper.Views
             RenderFromBoard(_statusBoard.Snapshot());
         }
 
-        // tree-tooltip-composer milestone: FormatPhaseText moved verbatim to
-        // Services/PlanStripTickDecision.cs (PlanStripTickDecision.
-        // FormatPhaseText) - pure, Blish-free, no instance-state dependency
-        // of its own, so it belongs alongside its sibling status-strip
-        // decision rather than as a private method here. See that method's
-        // own doc comment and docs/ARCHITECTURE.md section 5's STANDING
-        // RULE.
         #endregion // 2. Generate orchestration (continued)
 
         #region General: current panel width helper
@@ -2982,7 +2507,7 @@ namespace GW2CraftingHelper.Views
         #region 7. Section builders
 
         /// <summary>
-        /// Round-3 review-fix (mustFix, finding 2): factored out of
+        /// Factored out of
         /// RenderPlan's own top so the restore-render rollback helper
         /// below can reach the exact same "nothing rendered yet" starting
         /// point RenderPlan itself builds from - drops the tree render
@@ -3050,7 +2575,7 @@ namespace GW2CraftingHelper.Views
                 CreateCollapsibleSection(summarySection, panelWidth);
             }
 
-            // M35 (gw2efficiency parity - multi-item plans): a multi-item
+            // A multi-item
             // batch supplies N roots directly (vm.MultiItemRoots); a
             // single-item plan is wrapped into a one-element list here so
             // CreateTreeSection/RefreshTreeContainerHeights always deal
@@ -3191,7 +2716,7 @@ namespace GW2CraftingHelper.Views
                 Parent = tsPanel
             };
 
-            // M33 C2b: every measured width here (prefixWidth, nameWidth,
+            // Every measured width here (prefixWidth, nameWidth,
             // qtyWidth, tsWidth) is font-only and invariant to panelWidth -
             // only the centering/right-alignment anchors shift, so this is a
             // pure reposition, no re-measure, on every drag tick.
@@ -3263,16 +2788,11 @@ namespace GW2CraftingHelper.Views
             headerPanel.MouseEntered += (_, __) => headerPanel.BackgroundColor = Color.White * 0.05f;
             headerPanel.MouseLeft += (_, __) => headerPanel.BackgroundColor = Color.Transparent;
 
-            // ASCII "v"/">" rather than the U+25BC/U+25B6 triangle glyphs used
-            // by the tree's own node carets. Re-attempted during the M24
-            // adversarial-review pass on the theory that a separate
-            // default-font Label (the tree's own pattern) would render the
-            // triangle correctly here too; a pixel-level scan of a fresh
-            // screenshot showed the triangle failing to render for BOTH the
-            // section header AND, in that same session, the tree's own row
-            // caret (previously "confirmed working") - so the premise that
-            // motivated re-attempting Unicode did not hold this time either,
-            // and ASCII remains the only glyph confirmed to render here.
+            // ASCII "v"/">" rather than the U+25BC/U+25B6 triangle glyphs:
+            // pixel-level screenshot scans showed the triangles failing to
+            // render here (and even on the tree's own row caret), so ASCII
+            // is the only glyph confirmed to render. Do not re-attempt
+            // Unicode without a fresh render check.
             var headerArrow = new Label()
             {
                 Text = expanded ? "v" : ">",
@@ -3294,10 +2814,10 @@ namespace GW2CraftingHelper.Views
             };
 
             // Divider under the header - identical chrome for every section.
-            // M36: 2px, bottom-anchored inside the 30px headerPanel
+            // 2px, bottom-anchored inside the 30px headerPanel
             // (Location.Y = 28, i.e. headerPanel.Height - 2) - see
             // LabelHelpers.CreateRowDivider's doc comment for why 1px is unsafe under
-            // Blish's non-integer UI-scale GPU transform (KNOWN-ISSUES #23).
+            // Blish's non-integer UI-scale GPU transform.
             // NOT built via LabelHelpers.CreateRowDivider (headerPanel is not a row of a
             // list, it has its own fixed 30px height) but it is built the
             // SAME way (a Panel child bottom-anchored near its parent's
@@ -3316,7 +2836,7 @@ namespace GW2CraftingHelper.Views
                 Parent = headerPanel
             };
 
-            // M33 C2a (directive A): Standard (explicit) height, not
+            // Standard (explicit) height, not
             // AutoSize - every row this FlowPanel will ever hold is a fixed
             // constant height (PlanContentHeightMath), so the caller sets
             // Height synchronously right after populating rows instead of
@@ -3349,7 +2869,7 @@ namespace GW2CraftingHelper.Views
                 });
             };
 
-            // M33 C2b: shared chrome relayout for every section (and the
+            // Shared chrome relayout for every section (and the
             // tree) - width-only writes, contentFlow's Height is preserved
             // exactly (whatever it was most recently finalized to by
             // PlanContentHeightMath) so this can never disturb scroll
@@ -3372,13 +2892,10 @@ namespace GW2CraftingHelper.Views
 
         private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
         {
-            // Wave-3 quick win #3: Required Recipes is the only section
-            // whose header needs BOTH a non-static title
-            // (RequiredRecipesVisibility.BuildHeaderTitle) and a
-            // suppressToggle-guarded extra header-row control (the "Hide
-            // Unlocked" checkbox) - handled by its own dedicated method
-            // rather than threading special cases through the shared path
-            // below. See CreateRequiredRecipesSection's own doc comment.
+            // Required Recipes is the only section whose header needs
+            // both a non-static title and an extra header-row control
+            // (the "Hide Unlocked" checkbox) - handled by its own method
+            // rather than special-casing the shared path.
             if (section.SectionType == PlanSectionType.RequiredRecipes)
             {
                 CreateRequiredRecipesSection(section, panelWidth);
@@ -3389,11 +2906,9 @@ namespace GW2CraftingHelper.Views
             var contentFlow = header.ContentFlow;
 
 #if DEBUG
-            // M33 C2b (m2 risk 3): a section type added later without
-            // registering its own width relayout would silently freeze at
-            // build-time width on every future resize - labels just stop
-            // moving, easy to miss in review. Fail loud in DEBUG builds
-            // instead of relying on call-site discipline alone.
+            // A section type added without registering its own width
+            // relayout would silently freeze at build-time width on every
+            // future resize; fail loud in DEBUG builds instead.
             int relayoutCountBeforeBody = _relayoutActions.Count;
 #endif
 
@@ -3403,23 +2918,23 @@ namespace GW2CraftingHelper.Views
             switch (section.SectionType)
             {
                 case PlanSectionType.Summary:
-                    // M38 WP-23d: row rendering (the cost-tile row, the
+                    // Row rendering (the cost-tile row, the
                     // MultiItemNote banner, and the per-currency rows) moved
                     // to Views/Rendering/SummarySectionRenderer.
                     new SummarySectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.UsedMaterials:
-                    // M38 WP-23b: row rendering moved to
+                    // Row rendering moved to
                     // Views/Rendering/UsedMaterialsSectionRenderer.
                     new UsedMaterialsSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.ShoppingList:
-                    // M38 WP-23b: row rendering moved to
+                    // Row rendering moved to
                     // Views/Rendering/ShoppingListSectionRenderer.
                     new ShoppingListSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.CraftingSteps:
-                    // M38 WP-23c: row rendering (including the TimegatedNotice
+                    // Row rendering (including the TimegatedNotice
                     // informational rows) moved to
                     // Views/Rendering/CraftStepsSectionRenderer.
                     new CraftStepsSectionRenderer(this).Render(section, contentFlow, panelWidth);
@@ -3470,24 +2985,15 @@ namespace GW2CraftingHelper.Views
             }
 #endif
 
-            // M33 C2a (directive A): finalize contentFlow's real height
+            // Finalize contentFlow's real height
             // synchronously now that every row is populated, instead of
             // leaving it to Blish's per-frame AutoSize convergence. Pure
             // function of the same section data just rendered above, so it
             // cannot drift from what was actually built.
             //
-            // W4A (Total Cost section redesign): Summary is special-cased
-            // to its own SummarySectionLayoutMath.BodyHeight instead of
-            // PlanContentHeightMath.SectionBodyHeight. PlanContentHeightMath
-            // is a high-evidence zone (formerly DO-NOT-TOUCH; see
-            // docs/KNOWN-ISSUES.md's policy note), so W4A left its private
-            // SummaryBodyHeight method and PlanSectionType.Summary case
-            // unmodified rather than folding this special-case away; a
-            // later pass (high-evidence-zones, 2026-08-17), with proof that
-            // SummaryBodyHeight/PlanRowType.CoinTotal were unreachable for
-            // a real Summary section, deleted both outright. See
-            // SummarySectionLayoutMath's own doc comment for the full
-            // rationale.
+            // Summary is special-cased to SummarySectionLayoutMath.
+            // BodyHeight instead of PlanContentHeightMath.SectionBodyHeight
+            // - see SummarySectionLayoutMath's own doc comment.
             int bodyHeight = section.SectionType == PlanSectionType.Summary
                 ? SummarySectionLayoutMath.BodyHeight(section.Rows)
                 : PlanContentHeightMath.SectionBodyHeight(section.SectionType, section.Rows);
@@ -3495,11 +3001,10 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Wave-3 quick win #3 (2026-08-06 field testing): Required Recipes'
-        /// own CreateCollapsibleSection variant. section.Rows is guaranteed
-        /// non-empty here (PlanViewModelBuilder only adds this section when
-        /// at least one non-Mystic-Forge recipe survives its own filter -
-        /// wave-3 #2), so this method's job is purely the SECOND,
+        /// Required Recipes' own CreateCollapsibleSection variant.
+        /// section.Rows is guaranteed non-empty here (the builder only
+        /// adds this section when a non-Mystic-Forge recipe survives its
+        /// filter), so this method's job is purely the second,
         /// session-toggleable filter: RequiredRecipesVisibility.ApplyFilter
         /// hides Learned/Auto-learned rows when _hideUnlockedRecipes is
         /// checked (the default), and the header title always states the
@@ -3606,13 +3111,13 @@ namespace GW2CraftingHelper.Views
 
         // --- Used Materials section ---
         //
-        // M38 WP-23b: row rendering moved to
+        // Row rendering moved to
         // Views/Rendering/UsedMaterialsSectionRenderer (see the
         // RequiredDisciplines-style call in CreateCollapsibleSection above).
 
         // --- Shopping List section ---
         //
-        // M38 WP-23b: row rendering, header row, and the ShoppingSourceTag
+        // Row rendering, header row, and the ShoppingSourceTag
         // helper moved to Views/Rendering/ShoppingListSectionRenderer (see
         // the RequiredDisciplines-style call in CreateCollapsibleSection
         // above). GetPillColors, which CreateShoppingRow used for its
@@ -3624,7 +3129,7 @@ namespace GW2CraftingHelper.Views
 
         // --- Crafting Steps section ---
         //
-        // M38 WP-23c: row rendering (including the TimegatedNotice
+        // Row rendering (including the TimegatedNotice
         // informational rows and the step-number badge) moved to
         // Views/Rendering/CraftStepsSectionRenderer (see the
         // RequiredDisciplines-style call in CreateCollapsibleSection above).
@@ -3641,7 +3146,7 @@ namespace GW2CraftingHelper.Views
 
         // --- Summary / Total Cost section ---
         //
-        // M38 WP-23d: row rendering (the cost-tile row and its
+        // Row rendering (the cost-tile row and its
         // CostTileHandle/TileCaptionFor helpers, the M35 MultiItemNote
         // banner row, and the per-currency CreateCurrencyRow rows) moved to
         // Views/Rendering/SummarySectionRenderer (see the
@@ -3651,7 +3156,7 @@ namespace GW2CraftingHelper.Views
 
         #region 8. Tree rendering (continued)
 
-        // M38 WP-25 (m38-a1-architecture.md S3b-T2): the Recipe Tree
+        // The Recipe Tree
         // section renderer (TreeNodeState, CreateTreeSection,
         // RenderTreeNode, RefreshTreeContainerHeights,
         // UpdateTreeRowTooltip), the interactive override loop

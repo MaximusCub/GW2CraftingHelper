@@ -31,7 +31,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // directly, exactly as DisciplinesSectionRenderer now does, rather than
     // relying on CraftingPlanView to call it first.
     //
-    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateRecipeRow's
+    // CreateRecipeRow's
     // divider+relayout tail now goes through RowRelayoutHelpers.FinishRow -
     // the shared "row panel resize + extra reposition + divider resize"
     // shape confirmed identical across all five extracted renderers' row
@@ -78,7 +78,7 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // M36 fix-pass (MUSTFIX-3): the no-sublabel branch's rowHeight (32)
+        // The no-sublabel branch's rowHeight (32)
         // left the 34px CreateRarityFramedIcon default frame at y=1
         // overflowing rowHeight by 3px even BEFORE the M36 divider-width
         // change (icon bottom = 1 + 34 = 35, rowHeight = 32) - pre-existing
@@ -104,11 +104,10 @@ namespace GW2CraftingHelper.Views.Rendering
 
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            // UI-bundle milestone, Feature A (wiki links): a context action
+            // A context action
             // (right-click), not a visible icon - the row already packs an
             // icon/name/optional sublabel/right-aligned status tag into a
-            // fixed height with no spare column, and the maintainer
-            // pre-authorized either placement (see the milestone spec).
+            // fixed height with no spare column.
             // Right-click also cannot collide with the row's existing
             // interactions (this row has none - unlike the Recipe Tree,
             // Required Recipes rows are not expand/collapse toggles), and
@@ -200,7 +199,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // LabelHelpers.CreateRowDivider's doc comment) - icon frame bottom (1 + 34 =
             // 35) leaves ample headroom below rowHeight-3 (41). The
             // no-sublabel branch (36px, RecipeRowHeightNoSublabel) is
-            // immune and flush-fit with zero slack (M36); giving it
+            // immune and flush-fit with zero slack; giving it
             // clearance it doesn't need would reintroduce that overlap.
             RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, hasSublabel ? 1 : 0, _sink, w =>
             {

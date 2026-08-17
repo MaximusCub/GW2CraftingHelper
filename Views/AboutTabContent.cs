@@ -15,7 +15,7 @@ using Newtonsoft.Json;
 namespace GW2CraftingHelper.Views
 {
     /// <summary>
-    /// The About tab (M39, d1-snapshot-about-settings.md Feature 2): static,
+    /// The About tab: static,
     /// mostly-derived information about the module itself - name, version,
     /// author/contributors, source URL, the Blish HUD version it targets,
     /// this repo's own license, a Blish HUD MIT-license credit line, and
@@ -55,29 +55,22 @@ namespace GW2CraftingHelper.Views
         private const string UnknownText = "unknown";
         private const string BlishHudDependencyNamespace = "bh.blishhud";
 
-        // d1 Feature 2's "Licenses & Attributions" section: the Blish HUD
-        // MIT-license credit line. d1 flags this exact wording as MEASURED
-        // (verified via WebSearch against Blish HUD's own repo) and
-        // low-risk to ship. Kept as its own constant (not folded into the
+        // The Blish HUD MIT-license credit line, verified against
+        // Blish HUD's own repo. Kept as its own constant (not folded into the
         // "Built with:" row) because "Built with:" reports the live
         // SemVer.Range this module targets - a distinct, manifest-derived
         // value - while this is fixed attribution text.
         private const string BlishHudCreditLine = "Built on Blish HUD (MIT License) - github.com/blish-hud/Blish-HUD";
 
-        // d1 Feature 2's GW2/ArenaNet fan-content disclaimer. Unlike
-        // BlishHudCreditLine above, this wording previously stayed out of
-        // the build pending maintainer sign-off on the exact required
-        // legal text; the maintainer has since approved this exact wording
-        // for use in the "Licenses & Attributions" section. Ship this
-        // literal string as-is - do not derive it from ModuleDisplayName
-        // or otherwise reword it, since the approval covers this exact
-        // text.
+        // The GW2/ArenaNet fan-content disclaimer. The maintainer
+        // approved this exact wording - ship the literal string as-is, do
+        // not derive or reword it.
         private const string ArenaNetDisclaimerText =
             "GW2 Crafting Helper is a fan-made tool and is not affiliated with, endorsed by, or supported by ArenaNet or NCSOFT. Guild Wars 2 and all associated trademarks are the property of NCSOFT Corporation. All game data comes from the official Guild Wars 2 API.";
 
-        // d1 Feature 2's gw2efficiency design-reference credit. Same
-        // approval status as ArenaNetDisclaimerText above: the maintainer
-        // has approved this exact wording for the "Licenses & Attributions"
+        // The gw2efficiency design-reference credit. Like
+        // ArenaNetDisclaimerText, the maintainer
+        // approved this exact wording for the "Licenses & Attributions"
         // section. Ship this literal string as-is - do not derive it from
         // other constants or otherwise reword it, since the approval covers
         // this exact text (including the Patreon/PayPal URLs, which render

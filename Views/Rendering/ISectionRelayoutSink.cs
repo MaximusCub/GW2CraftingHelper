@@ -3,9 +3,9 @@ using System;
 namespace GW2CraftingHelper.Views.Rendering
 {
     /// <summary>
-    /// M38 WP-23 (m38-a1-architecture.md S3b-T2 pilot): the minimal seam a
+    /// The minimal seam a
     /// section renderer needs from CraftingPlanView to participate in the
-    /// M33 C2b resize-relayout contract (KNOWN-ISSUES #13/#19) without
+    /// M33 C2b resize-relayout contract without
     /// holding a reference to the view itself.
     ///
     /// CraftingPlanView implements this over its existing private
@@ -69,10 +69,9 @@ namespace GW2CraftingHelper.Views.Rendering
     /// analogous to PillColors/RarityColors, that also need to register a
     /// relayout closure the way a section renderer's own row builders do.
     ///
-    /// M38 WP-24 (m38-a2-simplify.md finding #3) added two more sink-as-
-    /// plain-parameter shared helpers on this same pattern, this time
-    /// factoring duplication BETWEEN already-extracted section renderers'
-    /// row builders rather than resolving a stay-in-the-view fork:
+    /// Two more sink-as-plain-parameter shared helpers follow this same
+    /// pattern, factoring duplication between section renderers'
+    /// row builders:
     /// RowRelayoutHelpers.FinishRow (the "row panel resize + per-row extra
     /// reposition + divider resize" AddRelayout closure every row builder
     /// across Crafting Steps/Disciplines/Recipes/Shopping List/Used
@@ -93,7 +92,7 @@ namespace GW2CraftingHelper.Views.Rendering
     /// longer inside CraftingPlanView to read the field directly. Kept
     /// read-only and additive to AddRelayout/AddReellipsis rather than
     /// widening either of those - this is observation, not registration.
-    /// <para>See docs/ARCHITECTURE.md section 5 (M38 WP-27).</para>
+    /// <para>See docs/ARCHITECTURE.md section 5.</para>
     /// </summary>
     internal interface ISectionRelayoutSink
     {
@@ -121,7 +120,7 @@ namespace GW2CraftingHelper.Views.Rendering
         void AddReellipsis(Action<int> closure);
 
         /// <summary>
-        /// M38 WP-25: how many relayout closures are registered right now -
+        /// How many relayout closures are registered right now -
         /// see the interface doc comment above for why this exists (a
         /// DEBUG-only must-register assert moved out of CraftingPlanView
         /// alongside TreeSectionController).

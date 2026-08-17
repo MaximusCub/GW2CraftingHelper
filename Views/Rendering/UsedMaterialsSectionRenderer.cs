@@ -22,7 +22,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // PlanRelayoutMath statics the pilot also used, so this section needed
     // no further dependency resolution.
     //
-    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateUsedMaterialRow's
+    // CreateUsedMaterialRow's
     // icon+ellipsized-name construction and its divider+relayout tail now
     // go through the two shared row-shape helpers - IconNameRowHelpers
     // (build via CreateIconAndEllipsizedName, re-ellipsize via
@@ -75,7 +75,7 @@ namespace GW2CraftingHelper.Views.Rendering
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
 
-            // M36: icon y=0 (was 1) - the 34px icon frame previously left
+            // Icon y=0 (was 1) - the 34px icon frame previously left
             // only 1px of clearance above rowHeight (36), which was exactly
             // enough for the old 1px divider but would overlap the new 2px
             // divider's top pixel by 1 row. Moving the icon up by 1 makes
@@ -100,7 +100,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = rowPanel
             };
 
-            // M33 C2b: qty label position is a pure reposition (qtyWidth is
+            // Qty label position is a pure reposition (qtyWidth is
             // font-only); the name is left untouched during drag ticks and
             // only re-ellipsized at settle (RunReellipsis) to avoid a
             // MeasureString call per row per tick.

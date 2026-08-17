@@ -15,10 +15,9 @@ namespace GW2CraftingHelper.Views.Rendering
     // LabelHelpers.CreateRightAlignedLabel / LabelHelpers.CreateSmallTag /
     // LabelHelpers.EllipsizeToWidth. This class takes no dependency back on
     // CraftingPlanView (CreateSmallTag's pill colors are resolved by the
-    // caller and passed in) - review fix (WP-21 findings pass): the initial
-    // move had CreateSmallTag call CraftingPlanView.GetPillColors directly,
-    // which was a reverse Rendering -> CraftingPlanView edge; removed so
-    // this namespace stays a true leaf.
+    // caller and passed in), so
+    // this namespace stays a true leaf with no reverse edge back into
+    // CraftingPlanView.
     internal static class LabelHelpers
     {
         // Only consumer is CreateRowDivider below - moved alongside it from
@@ -31,7 +30,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// 2px divider at the bottom edge of a row panel - the shared "list
         /// row" chrome used by every table-style section except the tree
         /// (which uses indent guidelines instead, per gw2e's own convention).
-        /// M36: was 1px, bottom-anchored via rowHeight - 1. Blish applies
+        /// Was 1px, bottom-anchored via rowHeight - 1. Blish applies
         /// its UI-scale (e.g. the "Normal" GW2 UI size's 0.897) as a real
         /// GPU scale matrix, not an integer-pixel-snapped one, so a 1px-tall
         /// quad rasterizes to 0.897 physical pixels - guaranteed physical
@@ -41,7 +40,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// least one covered physical scanline for the divider's OWN
         /// quad-vs-scissor math analyzed in isolation.
         ///
-        /// M36b (KNOWN-ISSUES #23 follow-up): that isolated argument is
+        /// M36b: that isolated argument is
         /// necessary but not sufficient. rowPanel is itself a Container, and
         /// every Container.Paint() performs a SECOND, independent
         /// floor/ceil round trip - it unscales the physical scissor it was
@@ -137,7 +136,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // White, not border: the fill exposes the border hue behind
                 // the label, so border-colored text has zero contrast
                 // against its own backdrop - same fix as RenderDecisionPills
-                // (M30 #11); KNOWN-ISSUES #15 is this same bug on this tag.
+                //; KNOWN-ISSUES #15 is this same bug on this tag.
                 TextColor = Color.White,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,

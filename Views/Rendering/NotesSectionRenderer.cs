@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // the same fixed rowHeight; the DEBUG assert at the end of CreateNoteRow
     // is the load-bearing check this class's own correctness depends on.
     //
-    // Review fix (findings 2/3): the label is now ellipsized against the
+    // The label is now ellipsized against the
     // available width (rightEdge minus the coin cell, when present) rather
     // than a raw AutoSizeWidth label with no cap - matching every other
     // label+right-value row shape in this codebase (UsedMaterialsSectionRenderer
@@ -149,7 +149,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // DEBUG rather than silently drifting the section's real height
             // out of sync with what CraftingPlanView computed for it.
             //
-            // Review fix (finding 3): re-reading rowPanel.Height here (set
+            // Re-reading rowPanel.Height here (set
             // from the same const rowHeight two statements above the
             // original version of this assert) can never fail - it guards
             // nothing. The real ways a NoteLine could break the 28px

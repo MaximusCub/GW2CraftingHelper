@@ -5,7 +5,7 @@ using MonoGame.Extended.BitmapFonts;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-24 (m38-a2-simplify.md finding #3): factors the "icon +
+    // Factors the "icon +
     // ellipsized name label, re-ellipsized on drag-settle" shape that
     // UsedMaterialsSectionRenderer.CreateUsedMaterialRow and
     // ShoppingListSectionRenderer.CreateShoppingRow both build byte-for-byte

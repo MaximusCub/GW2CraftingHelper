@@ -31,7 +31,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // CraftingPlanView's private CreateTextRow, resolved via TextRowRenderer
     // as described above.
     //
-    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateCraftStepRow's
+    // CreateCraftStepRow's
     // divider+relayout tail now goes through RowRelayoutHelpers.FinishRow -
     // the shared "row panel resize + extra reposition + divider resize"
     // shape confirmed identical across all five extracted renderers' row
@@ -64,7 +64,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            // M34-B1 #3: a TimegatedNotice row (vendor-cap informational
+            // A TimegatedNotice row (vendor-cap informational
             // line) is a plain text row, not a numbered craft step - render
             // it via the same generic TextRowRenderer pattern every other
             // section's fallback rows use, and don't consume a step number
@@ -167,7 +167,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // (rowHeight-3 = 41), so the 1px shift is free of
             // icon-clearance side effects.
             //
-            // M33 C2b: name/qty labels sit at a fixed x (font-only, not
+            // Name/qty labels sit at a fixed x (font-only, not
             // width-dependent - textX never depended on panelWidth); only
             // the row width, its divider, and the right-aligned sublabel
             // need to move.

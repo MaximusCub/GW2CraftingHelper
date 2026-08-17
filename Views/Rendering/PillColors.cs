@@ -34,7 +34,7 @@ namespace GW2CraftingHelper.Views.Rendering
             switch (kind)
             {
                 case PillKind.Selected:
-                    // Field-test finding C: the original #2DC50E border
+                    // The original #2DC50E border
                     // measured 2.31:1 against white, below the 3:1 WCAG
                     // non-text contrast minimum. Darkened toward #1F8F0C
                     // (4.21:1) - same hue, same fill*0.15 fill, same white
@@ -54,7 +54,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 case PillKind.OwnedInfo:
                     // Muted gold, distinct from every other pill hue -
                     // informational only, never confused with a selectable
-                    // source (M34-B2b). Field-test finding C: the original
+                    // source. The original
                     // #C9A227 border measured 2.42:1 against white; darkened
                     // to #8A6D1F (4.90:1), same hue.
                     border = new Color(138, 109, 31); // #8A6D1F
@@ -64,8 +64,8 @@ namespace GW2CraftingHelper.Views.Rendering
                     // Amber when active ("IGNORED", currently toggled on);
                     // plain clickable grey (matching Available) otherwise -
                     // never Selected's green, to avoid reading as "the
-                    // chosen acquisition source" (M34-B2b). Field-test
-                    // finding C: the original active-amber #E5A83C border
+                    // chosen acquisition source". The original
+                    // active-amber #E5A83C border
                     // measured 2.10:1 against white; darkened to #9C7327
                     // (4.29:1), same hue.
                     border = isIgnoreActive ? new Color(156, 115, 39) : new Color(138, 138, 138); // #9C7327 / #8A8A8A
@@ -74,15 +74,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 case PillKind.AchievementBitDeduped:
                     // Muted violet - distinct from Have's blue and
                     // OwnedInfo's gold: nothing here is actually owned, just
-                    // already required elsewhere (M37, KNOWN-ISSUES #26).
+                    // already required elsewhere.
                     border = new Color(155, 118, 219); // #9B76DB
                     fill = border * 0.15f;
                     break;
                 case PillKind.Subdued:
-                    // source-selection-simplification: literally Locked's
-                    // own RGB values below - "reuse an existing muted
-                    // PillKind, no new colors" (the maintainer's own
-                    // wording) - kept as its own switch arm (not folded
+                    // Literally Locked's
+                    // own RGB values below - reuse an existing muted
+                    // PillKind, no new colors - kept as its own switch arm (not folded
                     // into the Locked case) only so a future edit to
                     // Locked's color doesn't silently retint Subdued too
                     // without a deliberate choice; the two case bodies

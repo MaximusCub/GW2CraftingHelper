@@ -70,7 +70,7 @@ namespace GW2CraftingHelper.Views.Rendering
             return segments;
         }
 
-        // private -> internal (M38 WP-22): MainView needs to build its own
+        // private -> internal: MainView needs to build its own
         // 3-segment gold/silver/copper spec list (its own show-all/no-
         // padding formatting - a deliberate MainView behavior, out of this
         // package's scope to change) without duplicating this measure-
@@ -98,7 +98,7 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// M33 C2b: a coin/currency segment run's already-created controls
+        /// A coin/currency segment run's already-created controls
         /// plus each segment's cached (font-only, panelWidth-invariant)
         /// text width, so a relayout closure can reposition the whole run
         /// at a new x without ever calling MeasureString again - see
@@ -159,7 +159,7 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// M33 C2b: non-allocating reposition twin to LayoutCoinSegments/
+        /// Non-allocating reposition twin to LayoutCoinSegments/
         /// LayoutCurrencySegments (m2 3.7/4) - moves EXISTING segment
         /// controls to new x-positions using the cached TextWidths, never
         /// creating a control or calling MeasureString. Shared by both coin
@@ -191,7 +191,7 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // --- Currency + mixed value display helpers (KNOWN-ISSUES #16) ---
+        // --- Currency + mixed value display helpers ---
         //
         // A BuyFromVendor decision can be priced wholly or partly in a
         // non-coin currency (spirit shards, karma, ...). CurrencyAmountViewModel
@@ -209,7 +209,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
         // ASCII-only source rule: em dash via escape, never a raw pasted
         // Unicode character - this IS the gw2e-style unpriceable dash
-        // itself (KNOWN-ISSUES #16b), not incidental prose.
+        // itself, not incidental prose.
         private const string UnpricedDashText = "\u2014";
         private static readonly Color UnpricedDashColor = new Color(140, 140, 140);
 
@@ -221,7 +221,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
             foreach (var amount in amounts)
             {
-                // M34-B1 #2: a fractional-per-unit "Each" amount carries a
+                // A fractional-per-unit "Each" amount carries a
                 // literal "N for M" bundle label instead of a whole-number
                 // Amount (CurrencyDisplayResolver.ResolveUnitAmounts) -
                 // render that text verbatim rather than the numeric amount.
@@ -274,7 +274,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Parent = parent
                 };
 
-                // Field-test finding B: a currency icon carries no visible
+                // A currency icon carries no visible
                 // name text anywhere in this cell (unlike SummarySectionRenderer.
                 // CreateCurrencyRow, which prints the name as a label before
                 // the icon) - a hover tooltip is the only way to identify it.
@@ -308,7 +308,7 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// M33 C2b: everything a relayout closure needs to reposition an
+        /// Everything a relayout closure needs to reposition an
         /// already-rendered value cell (RenderValueCellRightAligned's
         /// result) at a new rightEdgeX without any MeasureString call -
         /// either DashLabel is set (genuinely unpriceable row) or the two
@@ -353,7 +353,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// LayoutValueSegmentsRightAligned unchanged from (or, for
         /// currency/mixed, newly matching) the coin invariant; a value with
         /// neither a coin price nor a currency cost renders a plain dash
-        /// instead of a blank cell or an invented "0" (KNOWN-ISSUES #16b).
+        /// instead of a blank cell or an invented "0".
         /// Returns a handle so a relayout closure can reposition the cell
         /// at a new rightEdgeX later - see RepositionValueCellRightAligned.
         /// </summary>
@@ -380,7 +380,7 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// M33 C2b: non-allocating reposition twin to
+        /// Non-allocating reposition twin to
         /// RenderValueCellRightAligned - moves an EXISTING value cell's
         /// controls to a new rightEdgeX, using only the cached per-segment
         /// TextWidths (ShoppingColumnMath.SegmentRunWidth, the same pure

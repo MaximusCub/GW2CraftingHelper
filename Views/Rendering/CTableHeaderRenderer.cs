@@ -25,8 +25,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // all for either section (see the RequiredDisciplines/RequiredRecipes
     // cases).
     //
-    // W3C polish (per-character discipline display header, gw2efficiency
-    // parity): optional middleLabel/middleX added so Required Disciplines
+    // Optional middleLabel/middleX so Required Disciplines
     // can honestly label its per-character availability text with a
     // "Characters" header once that text lines up on a fixed column (see
     // DisciplinesSectionRenderer's own comment on Render() for why the

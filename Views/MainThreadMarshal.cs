@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Views
     /// For multi-frame work, drive it from Control.DoUpdate instead - see
     /// FrameTicker in CraftingPlanView.
     /// </para>
-    /// <para>See docs/ARCHITECTURE.md section 1 (M38 WP-27).</para>
+    /// <para>See docs/ARCHITECTURE.md section 1.</para>
     /// </summary>
     internal static class MainThreadMarshal
     {

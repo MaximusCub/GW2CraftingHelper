@@ -38,7 +38,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // CraftingPlanView -> Views/Rendering call, never the reverse edge the
     // WP-21 findings fix (commit 5c56b2a) already reverted once.
     //
-    // M38 WP-24 (m38-a2-simplify.md finding #3): CreateShoppingRow's
+    // CreateShoppingRow's
     // icon+ellipsized-name construction and its divider+relayout tail now
     // go through the two shared row-shape helpers - IconNameRowHelpers
     // (build via CreateIconAndEllipsizedName, re-ellipsize via
@@ -142,7 +142,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var eachLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
             var totalLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Total", font, color, edges.TotalRightEdge, 4);
 
-            // M33 C2b: header column labels are font-only (fixed text) -
+            // Header column labels are font-only (fixed text) -
             // pure reposition on every drag tick, recomputing edges from
             // the SAME cached maxEachWidth/maxTotalWidth ComputeEdges was
             // built with (ShoppingColumnMath is the single source of truth
@@ -175,7 +175,7 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // shoplist-have-format review finding #2: a ValueCellHandle's own
+        // A ValueCellHandle's own
         // controls (the coin/currency icon+label segments, or the single
         // DashLabel for an unpriceable row) have no BasicTooltipText of
         // their own, so they silently swallow the row's tooltip exactly
@@ -218,7 +218,7 @@ namespace GW2CraftingHelper.Views.Rendering
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
 
-            // M36: icon y=0 (was 1) - see the identical note in
+            // Icon y=0 (was 1) - see the identical note in
             // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
             // shape, same 1px shortfall against the new 2px divider.
             string fullName = row.Label ?? "";
@@ -227,7 +227,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, edges.QtyRightEdge, qtyWidth, 12, nameX, 9);
             var nameLabel = nameHandle.NameLabel;
 
-            // M34-B2b: owned/needed split for this row's currency cost(s),
+            // Owned/needed split for this row's currency cost(s),
             // cosmetic-only tooltip (avoids new inline layout math for a
             // fixed-height shopping row - see PlanContentHeightMath).
             // shoplist-have-format: line text now built by the Blish-free
@@ -235,11 +235,9 @@ namespace GW2CraftingHelper.Views.Rendering
             // HAVE/NEED wording and why "plan requires" was dropped -
             // cc.Amount is this row's own total, never the whole plan's
             // requirement for that currency id, which this renderer is
-            // never handed - review finding #2). currencyLines is captured
-            // once and reused by both BuildTooltip below and the
-            // AddReellipsis rebuild further down - the two used to diverge,
-            // silently dropping these lines on every resize (review
-            // finding #1).
+            // never handed). currencyLines is captured once and reused by
+            // both BuildTooltip below and the AddReellipsis rebuild, so
+            // the two can never diverge on a resize.
             var currencyLines = ShoppingRowTooltipFormatter.BuildCurrencyLines(row.CurrencyCosts);
 
             string sourceTag = ShoppingSourceTag(row);
@@ -267,20 +265,16 @@ namespace GW2CraftingHelper.Views.Rendering
             // vendor offer paid in spirit shards) renders currency segments
             // alongside/instead of coin; a row with neither (genuinely
             // unpriceable - gw2e: "Not sold or crafted") renders a dash,
-            // never a blank cell (KNOWN-ISSUES #16).
+            // never a blank cell.
             var eachCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
             var totalCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
 
-            // shoplist-have-format review finding #2, TOOLTIP SWALLOWED BY
+            // TOOLTIP SWALLOWED BY
             // CHILD CONTROLS: a container's BasicTooltipText never fires
             // when a child control with no tooltip of its own covers the
             // hover point - the row's children (nameLabel, tagPanel,
             // qtyLabel, the Each/Total cells) all capture the mouse before
-            // rowPanel's own tooltip is ever reached, exactly the class
-            // KNOWN-ISSUES.md's "Field-test UX wave" finding D and the
-            // "Ellipsized currency-name tooltip swallowed" fix
-            // (SummarySectionRenderer.cs) already root-caused and fixed
-            // once each. The HAVE/NEED text this whole feature adds is
+            // rowPanel's own tooltip is ever reached. The HAVE/NEED text is
             // therefore stamped on nameLabel and the Total cell's own
             // controls too - the two places a user hovering "do I have
             // enough?" actually looks - not just the row's blank gaps.
@@ -307,7 +301,7 @@ namespace GW2CraftingHelper.Views.Rendering
             }
             BuildTooltip();
 
-            // M33 C2b: qty + Each/Total cells reposition every drag tick
+            // Qty + Each/Total cells reposition every drag tick
             // (no MeasureString - CoinCurrencyRenderer.RepositionValueCellRightAligned uses only
             // cached segment text widths). The name label and its source
             // tag are untouched here; both depend on ellipsis truncation
