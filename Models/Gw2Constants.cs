@@ -59,6 +59,54 @@ namespace GW2CraftingHelper.Models
         public static readonly IReadOnlyList<int> HomesteadRefinementMaterialIds =
             new[] { RefinedHomesteadFiberItemId, RefinedHomesteadMetalItemId, RefinedHomesteadWoodItemId };
 
+        /// <summary>
+        /// opportunity-notes (SEASONAL VENDOR TIP): the festival name key
+        /// this module uses for Halloween - MEASURED (2026-08-16, via
+        /// System.Reflection against packages/BlishHUD.1.3.0/lib/net472/
+        /// Blish HUD.exe) to be the exact runtime value of
+        /// Blish_HUD.Contexts.FestivalContext.Festival.Halloween.Name:
+        /// lowercase, "halloween" - NOT the capitalized DisplayName (see
+        /// FestivalDisplayNames below for that). Matches both Module.cs's
+        /// own festival-name projection (Festival.Name, not DisplayName -
+        /// see that class's own comment) and ref/vendor_offers.json's
+        /// seeded "seasonalFestival" value for the three known Candy Corn
+        /// Vendor (Weekly) ecto offers.
+        /// </summary>
+        public const string HalloweenFestivalName = "halloween";
+
+        /// <summary>
+        /// opportunity-notes (SEASONAL VENDOR TIP): internal festival name
+        /// key (Blish's own Festival.Name, e.g. "halloween") -> human-
+        /// readable display name (Blish's own Festival.DisplayName, e.g.
+        /// "Halloween") - MEASURED the same way as HalloweenFestivalName
+        /// above. A small curated table (same shape/precedent as
+        /// KnownCurrencyNames above), NOT a generic capitalizer: Blish's
+        /// own DisplayName values are not a simple first-letter-uppercase
+        /// of Name for every festival (e.g. "superadventurefestival" ->
+        /// "Super Adventure Festival"), so guessing would risk a wrong
+        /// display string for any FUTURE festival added here without also
+        /// being measured. Kept intentionally scoped to festivals this
+        /// module actually seeds vendor data for (Halloween only, today) -
+        /// PlanViewModelBuilder.ResolveFestivalDisplayName falls back to
+        /// the internal key verbatim for anything not listed here, which
+        /// can never happen today (SeasonalVendorTipCalculator only ever
+        /// surfaces a tip for a festival present in ref/vendor_offers.json's
+        /// own seeded SeasonalFestival values).
+        /// </summary>
+        public static readonly Dictionary<string, string> FestivalDisplayNames = new Dictionary<string, string>
+        {
+            { HalloweenFestivalName, "Halloween" }
+        };
+
+        public static string ResolveFestivalDisplayName(string festivalName)
+        {
+            if (festivalName != null && FestivalDisplayNames.TryGetValue(festivalName, out var display))
+            {
+                return display;
+            }
+            return festivalName;
+        }
+
         // Currency names are sourced from api.guildwars2.com/v2/currencies.
         // Review-fix (recipe-ingestion-fix, Must Fix): re-verified every
         // entry live (curl api.guildwars2.com/v2/currencies?ids=all,

@@ -187,6 +187,80 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
+        /// opportunity-notes (RECIPE-SHEET SAVINGS): a bought node's
+        /// reference branch also surfaces node.Recipes[0]'s own RecipeId/
+        /// Disciplines/MinRating/LearnedFromItem flag onto the tree node -
+        /// see CraftingTreeNode.ReferenceRecipeId's own doc comment.
+        /// </summary>
+        [Fact]
+        public void BoughtNode_WithRecipe_SurfacesReferenceRecipeInfo()
+        {
+            var option = Option(20, 1, 1, Leaf(4, 2));
+            option.Disciplines = new List<string> { "Chef" };
+            option.MinRating = 400;
+            option.Flags = new List<string> { "LearnedFromItem" };
+            var tree = Craftable(2, 5, option);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 5 } },
+                { 4, new ItemPrice { ItemId = 4, BuyInstant = 1000 } }
+            };
+            var metadata = Meta((2, "Bought Item", "b.png"), (4, "Raw", "r.png"));
+
+            var root = BuildViaRealSolver(tree, prices, metadata);
+
+            Assert.True(root.IsReferenceBranch);
+            Assert.Equal(20, root.ReferenceRecipeId);
+            Assert.Equal(new List<string> { "Chef" }, root.ReferenceRecipeDisciplines);
+            Assert.Equal(400, root.ReferenceRecipeMinRating);
+            Assert.True(root.ReferenceRecipeIsLearnedFromItem);
+        }
+
+        [Fact]
+        public void BoughtNode_WithRecipe_NotLearnedFromItem_FlagFalse()
+        {
+            var option = Option(20, 1, 1, Leaf(4, 2));
+            option.Disciplines = new List<string> { "Chef" };
+            option.Flags = new List<string> { "AutoLearned" };
+            var tree = Craftable(2, 5, option);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 5 } },
+                { 4, new ItemPrice { ItemId = 4, BuyInstant = 1000 } }
+            };
+            var metadata = Meta((2, "Bought Item", "b.png"), (4, "Raw", "r.png"));
+
+            var root = BuildViaRealSolver(tree, prices, metadata);
+
+            Assert.True(root.IsReferenceBranch);
+            Assert.False(root.ReferenceRecipeIsLearnedFromItem);
+        }
+
+        [Fact]
+        public void CraftNode_NeverSetsReferenceRecipeInfo()
+        {
+            // Item 1 crafts from item 2 - a real Craft decision, not a
+            // reference branch - must not populate the Reference* fields at
+            // all (they are exclusively a reference-branch concept).
+            var option = Option(10, 1, 1, Leaf(2, 2));
+            option.ExpectedOutputCount = 1.0;
+            var tree = Craftable(1, 1, option);
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+            };
+            var metadata = Meta((1, "Sword", "sword.png"), (2, "Ingot", "ingot.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata);
+
+            Assert.Equal(CraftingDecision.Craft, node.Decision);
+            Assert.Null(node.ReferenceRecipeId);
+            Assert.Null(node.ReferenceRecipeDisciplines);
+            Assert.False(node.ReferenceRecipeIsLearnedFromItem);
+        }
+
+        /// <summary>
         /// Regression test for the exact bug class that caused a real hang:
         /// an initial fix reset the "inside a reference branch" state to
         /// false on every Craft step, so a chain that alternates

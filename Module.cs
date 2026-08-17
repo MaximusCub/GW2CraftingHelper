@@ -472,6 +472,31 @@ namespace GW2CraftingHelper
                 dailyCooldownItems = null;
             }
 
+            // Recipe-sheet seed (opportunity-notes, RECIPE-SHEET SAVINGS
+            // review-fix): recipe id -> unlocking recipe-sheet item id,
+            // for RecipeSheetSavingsCalculator via
+            // CraftingPlanPipeline._recipeSheetItemIdByRecipeId. Same
+            // static-local-file loading shape as the acquisition hints/
+            // daily cooldown seeds just above - no async fetch needed.
+            // Before this, nothing ever populated this map, so the
+            // calculator's own "empty map -> nothing" gate meant the
+            // feature could never fire for a real plan (docs/KNOWN-ISSUES.md
+            // RECIPE-SHEET SAVINGS entry).
+            IReadOnlyDictionary<int, int> recipeSheetItemIdByRecipeId = null;
+            try
+            {
+                using (var recipeSheetStream = ContentsManager.GetFileStream("recipe_sheet_items.json"))
+                {
+                    recipeSheetItemIdByRecipeId = RecipeSheetItemSeedService.Load(recipeSheetStream);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Info("Recipe sheet items unavailable: [{0}] {1}", ex.GetType().Name, ex.Message);
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe sheet items unavailable: [{ex.GetType().Name}] {ex.Message}");
+                recipeSheetItemIdByRecipeId = null;
+            }
+
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir, onStoreError);
             recipeOverlay.Load(currentGw2BuildId: null);
 
@@ -503,7 +528,9 @@ namespace GW2CraftingHelper
                 accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager),
                 currencyMetadataService: new CurrencyMetadataService(_httpClient),
                 acquisitionHints: acquisitionHints,
-                dailyCooldownItems: dailyCooldownItems);
+                dailyCooldownItems: dailyCooldownItems,
+                recipeSheetItemIdByRecipeId: recipeSheetItemIdByRecipeId,
+                activeFestivalNames: ReadActiveFestivalNames);
 
             try
             {
@@ -774,6 +801,66 @@ namespace GW2CraftingHelper
             {
                 _mainWindow.ToggleWindow();
             };
+        }
+
+        // opportunity-notes (SEASONAL VENDOR TIP, review-fix #3): reads
+        // Blish's FestivalContext and projects it to plain strings - the
+        // Func<IReadOnlyList<string>> _craftingPipeline's own constructor
+        // captures (see CraftingPlanPipeline._activeFestivalNames' own doc
+        // comment for the full rationale), invoked LAZILY at
+        // plan-generation time rather than once, eagerly, during
+        // Initialize() - a one-shot Initialize()-time read could observe
+        // NotReady (the context loads asynchronously) and silently disable
+        // the feature for the whole session. GetContext<T> returns null
+        // when the context type is not registered at all;
+        // TryGetActiveFestivals returns ContextAvailability.NotReady/
+        // Unavailable/Failed (instead of Available) for every other
+        // failure state. Every non-Available outcome is now logged (Info -
+        // an expected, common, benign state early in the session, not a
+        // warning-worthy problem), so "seasonal tips disabled by
+        // <availability>" is distinguishable in the module log from "no
+        // festival active" (Available with an empty festival list, which
+        // logs nothing - not a guess, not a problem). Only the exception
+        // path still logs at Warn, matching the previous behavior.
+        // CraftingPlanPipeline (and everything it calls) must stay
+        // Blish-free for its own tests - this method is the one place in
+        // that whole call chain that touches GameService.Contexts.
+        private IReadOnlyList<string> ReadActiveFestivalNames()
+        {
+            var activeFestivalNames = new List<string>();
+            try
+            {
+                var festivalContext = GameService.Contexts.GetContext<Blish_HUD.Contexts.FestivalContext>();
+                if (festivalContext == null)
+                {
+                    ModuleLog.Shared.Write(ModuleLogLevel.Info, "plan", "Festival context not registered - seasonal vendor tips disabled for this plan.");
+                    return activeFestivalNames;
+                }
+
+                var availability = festivalContext.TryGetActiveFestivals(out var festivalResult);
+                if (availability != Blish_HUD.Contexts.ContextAvailability.Available)
+                {
+                    ModuleLog.Shared.Write(ModuleLogLevel.Info, "plan", $"Festival context not available ({availability}) - seasonal vendor tips disabled for this plan.");
+                    return activeFestivalNames;
+                }
+
+                if (festivalResult.Value != null)
+                {
+                    foreach (var festival in festivalResult.Value)
+                    {
+                        if (!string.IsNullOrEmpty(festival.Name))
+                        {
+                            activeFestivalNames.Add(festival.Name);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan", $"Festival context unavailable, seasonal vendor tips disabled: {ex.GetType().Name} - {ex.Message}");
+            }
+
+            return activeFestivalNames;
         }
 
         protected override async Task LoadAsync()

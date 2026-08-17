@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-16T00:00:00Z",
+  "source": "api.guildwars2.com /v2/recipes, /v2/items (measured 2026-08-16) - see docs/KNOWN-ISSUES.md RECIPE-SHEET SAVINGS entry for why this map cannot be built from any existing seed/API field",
+  "items": [
+    {
+      "recipeId": 13853,
+      "sheetItemId": 96274,
+      "sheetItemName": "Recipe: Bowl of Fish Stew",
+      "craftedItemId": 96707,
+      "craftedItemName": "Bowl of Fish Stew",
+      "discipline": "Chef",
+      "minRating": 400,
+      "note": "GET /v2/recipes/13853 flags == [\"LearnedFromItem\"]; GET /v2/items/96274 details.recipe_id == 13853. ref/vendor_offers.json already carries multiple pure-coin (5000 copper) vendor offers for item 96274 (Researcher, Peddler, Daxx, Archaeologist, Winn Schwartzmeier, Merchant (Mori Village), Elder (merchant)), so this entry is priceable/exercisable end-to-end today, not just wired.",
+      "sourceUrl": "https://api.guildwars2.com/v2/recipes/13853",
+      "lastVerified": "2026-08-16"
+    }
+  ]
+}

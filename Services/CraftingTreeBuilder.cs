@@ -365,6 +365,7 @@ namespace GW2CraftingHelper.Services
                             ownedVendorItemAmounts: ownedVendorItemAmounts);
                         componentLeaves.AddRange(referenceChildren);
                         treeNode.IsReferenceBranch = true;
+                        ApplyReferenceRecipeInfo(treeNode, node.Recipes[0]);
                     }
                     treeNode.Children = componentLeaves;
                 }
@@ -376,11 +377,29 @@ namespace GW2CraftingHelper.Services
                         currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
                         ownedVendorItemAmounts: ownedVendorItemAmounts);
                     treeNode.IsReferenceBranch = true;
+                    ApplyReferenceRecipeInfo(treeNode, node.Recipes[0]);
                 }
             }
 
             ApplyAcquisitionHint(treeNode, hints);
             return treeNode;
+        }
+
+        /// <summary>
+        /// opportunity-notes (RECIPE-SHEET SAVINGS): surfaces the reference
+        /// branch's own recipe (node.Recipes[0] - the same option whose
+        /// ingredients the reference branch just costed out) onto the tree
+        /// node, so RecipeSheetSavingsCalculator can check its Disciplines/
+        /// MinRating/Flags without re-walking the solver's RecipeNode tree.
+        /// See CraftingTreeNode.ReferenceRecipeId's own doc comment.
+        /// </summary>
+        private static void ApplyReferenceRecipeInfo(CraftingTreeNode treeNode, RecipeOption referenceRecipe)
+        {
+            treeNode.ReferenceRecipeId = referenceRecipe.RecipeId;
+            treeNode.ReferenceRecipeDisciplines = referenceRecipe.Disciplines;
+            treeNode.ReferenceRecipeMinRating = referenceRecipe.MinRating;
+            treeNode.ReferenceRecipeIsLearnedFromItem =
+                referenceRecipe.Flags != null && referenceRecipe.Flags.Contains("LearnedFromItem");
         }
 
         /// <summary>

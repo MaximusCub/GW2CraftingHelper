@@ -198,5 +198,23 @@ namespace GW2CraftingHelper.Models
         /// matching RequiredDisciplines/RequiredRecipes' own convention.
         /// </summary>
         public List<int> ProbabilisticForgeOutputItemIds { get; set; }
+
+        /// <summary>
+        /// opportunity-notes (RECIPE-SHEET SAVINGS): see
+        /// Services/RecipeSheetSavingsCalculator.Apply, the sole producer.
+        /// Cosmetic display data only; null until the calculator runs,
+        /// empty (not null) when it found nothing - same convention as
+        /// ExcessCraftOutputs.
+        /// </summary>
+        public List<RecipeSheetSavingsOpportunity> RecipeSheetSavingsOpportunities { get; set; }
+
+        /// <summary>
+        /// opportunity-notes (SEASONAL VENDOR TIP): see
+        /// Services/SeasonalVendorTipCalculator.Apply, the sole producer.
+        /// Cosmetic display data only; null until the calculator runs,
+        /// empty (not null) when no active festival beats this plan - same
+        /// convention as ExcessCraftOutputs.
+        /// </summary>
+        public List<SeasonalVendorTip> SeasonalVendorTips { get; set; }
     }
 }

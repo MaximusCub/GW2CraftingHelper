@@ -41,3 +41,6 @@ jobs:
 
       - name: Run recipe seeder tests
         run: dotnet test tests/GW2CraftingHelper.RecipeSeeder.Tests/GW2CraftingHelper.RecipeSeeder.Tests.csproj -p:Platform=x64 -c Release
+
+      - name: Run vendor offer updater tests
+        run: dotnet test tests/VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj -c Release
