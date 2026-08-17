@@ -546,23 +546,26 @@ namespace GW2CraftingHelper.Tests.Services
         // remainder shape (quorum verdict C6, merged-ceil-remainder
         // stream). The reference branch's one ingredient (item 200) is
         // fed the exact per-occurrence corrected SubtreeCost
-        // AllocateVendorNodeCosts would assign a non-last occurrence of
-        // the SAME "100 for 1000c" bulk offer used by the
-        // VendorBatchSolver-level characterization (two 1-unit
-        // occurrences; TODAY the first-seen, non-last occurrence gets the
-        // artificially cheap floor share of 10; the fix re-baselines it
-        // to the fair proportional share of 500).
+        // AllocateVendorNodeCosts assigns a non-last occurrence of the
+        // SAME "100 for 1000c" bulk offer used by the VendorBatchSolver-
+        // level characterization (two 1-unit occurrences, fair
+        // proportional share 500 each).
+        //
+        // PRE-FIX, the old algorithm's floor share for a non-last
+        // occurrence (10, not 500) fed a craftUnitCost of 1 (10 / node.
+        // Quantity 10), reporting a 49/unit "savings" this module could
+        // not actually prove existed - purely an artifact of which
+        // occurrence happened to land last in DFS order.
         [Fact]
-        public void MergedVendorLeafIngredient_PreFixSkewedShare_OverstatesSavingsPerUnit()
+        public void MergedVendorLeafIngredient_FairProportionalShare_NoOverstatedSavings()
         {
             // node.Quantity (item 100's own quantity) = 10, chosen unit
-            // cost 50/unit. craftUnitCost = craftTotal / 10.
-            // TODAY (pre-fix): craftTotal = 10 (the non-last occurrence's
-            // artificially cheap floor share) -> craftUnitCost = 1 ->
-            // savingsPerUnit = 50 - 1 = 49: a savings opportunity this
-            // module cannot actually prove exists, purely an artifact of
-            // which occurrence happened to land last in DFS order.
-            var node = BoughtNodeWithReferenceBranch(unitCost: 50, quantity: 10, ingredientSubtreeCost: 10);
+            // cost 50/unit, ingredient craftTotal = 500 (the fair
+            // proportional share). craftUnitCost = 500 / 10 = 50, exactly
+            // matching chosenUnitCost - correctly zero real savings, so
+            // nothing is emitted at all (savingsPerUnit <= 0 bails before
+            // ever constructing an opportunity).
+            var node = BoughtNodeWithReferenceBranch(unitCost: 50, quantity: 10, ingredientSubtreeCost: 500);
             var result = new CraftingPlanResult { CraftingTree = node };
             var store = MakeStore(CoinSheetOffer(500, 200));
             var sheetMap = new Dictionary<int, int> { { 999, 500 } };
@@ -572,13 +575,7 @@ namespace GW2CraftingHelper.Tests.Services
                 priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
                 recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
 
-            var opp = Assert.Single(result.RecipeSheetSavingsOpportunities);
-            // TODAY (pre-fix): 49 - re-baselined to 0/no-opportunity
-            // (craftUnitCost = 500 / 10 = 50 = chosenUnitCost exactly, so
-            // savingsPerUnit <= 0 and nothing is emitted at all) in the
-            // fix commit. This flips from "over-claims a nonexistent
-            // savings" to "correctly claims none".
-            Assert.Equal(49, opp.SavingsPerUnit);
+            Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
     }
 }

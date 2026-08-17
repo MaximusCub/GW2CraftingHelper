@@ -190,7 +190,7 @@ namespace GW2CraftingHelper.Tests.Services
         // characterization). Root 99 is the first-seen (non-last)
         // occurrence in DFS order.
         [Fact]
-        public void ApplyBatchSellSideEconomics_RootIsMergedVendorLeaf_CraftingProfitReflectsPreFixSkewedShare()
+        public void ApplyBatchSellSideEconomics_RootIsMergedVendorLeaf_CraftingProfitUsesFairProportionalShare()
         {
             var root99 = Craftable(99, 1);
             var rootOther = Craftable(500, 1, Option(50, 1, 1, Craftable(99, 1)));
@@ -226,10 +226,9 @@ namespace GW2CraftingHelper.Tests.Services
             var solveResult = solver.Solve(wrapperTree, pricesForSolve, vendorOffers);
 
             Assert.Equal(AcquisitionSource.BuyFromVendor, solveResult.Decisions[root99.NodeId].Source);
-            // TODAY (pre-fix): root99 is the non-last occurrence, so it
-            // gets the artificially cheap floor share (10) - re-baselined
-            // to 500 (the fair proportional share) in the fix commit.
-            Assert.Equal(10, solveResult.Decisions[root99.NodeId].TotalCost);
+            // Fair proportional share (1000 * 1/2 = 500), regardless of
+            // root99 being the non-last occurrence in DFS order.
+            Assert.Equal(500, solveResult.Decisions[root99.NodeId].TotalCost);
 
             var result = new CraftingPlanResult();
             SellSideEconomics.ApplyBatchSellSideEconomics(
@@ -238,10 +237,9 @@ namespace GW2CraftingHelper.Tests.Services
 
             // 1 unit @ 1000c = 1000c total; -50 listing -100 exchange = 850.
             Assert.Equal(850, result.NetSaleValue);
-            // TODAY (pre-fix): 850 - 10 = 840 - re-baselined to
-            // 850 - 500 = 350 in the fix commit. Item 500 contributes
-            // nothing (no live sell price) regardless of either algorithm.
-            Assert.Equal(840, result.CraftingProfit);
+            // 850 - 500 = 350. Item 500 contributes nothing (no live sell
+            // price).
+            Assert.Equal(350, result.CraftingProfit);
         }
     }
 }

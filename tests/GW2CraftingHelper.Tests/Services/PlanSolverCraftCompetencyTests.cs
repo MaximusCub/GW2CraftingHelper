@@ -535,16 +535,17 @@ namespace GW2CraftingHelper.Tests.Services
         // the tree - so which occurrence's (possibly skewed) allocated
         // share gets reported depends on AllocateVendorNodeCosts' own
         // per-occurrence math:
-        //   TODAY (pre-fix): occ1's floor share (10) does not clear the
-        //   100 gate, so the walk falls through to occ2, whose skewed
-        //   remainder share (990) does - reporting an inflated 890 delta
-        //   that only exists because of tree position, not real economics.
-        //   Re-baselined in the fix commit to 400 (occ1's fair
-        //   proportional share of 500 clears the gate on first encounter;
-        //   occ2 is never evaluated for recording once item 200 is
-        //   already in byItemId).
+        //   PRE-FIX, this used to report an inflated 890 delta: occ1's
+        //   floor share (10) did not clear the 100 gate, so the walk fell
+        //   through to occ2, whose skewed remainder share (990) did -
+        //   reporting a number that only existed because of tree
+        //   position, not real economics.
+        //   FIXED: occ1's fair proportional share (500) now clears the
+        //   gate on first encounter, reporting the true 400 delta; occ2
+        //   is never evaluated for recording once item 200 is already in
+        //   byItemId.
         [Fact]
-        public void MergedVendorLeaf_UnequalOccurrenceShares_CompetencyDeltaDependsOnWhichOccurrenceClearsGate()
+        public void MergedVendorLeaf_UnequalOccurrenceShares_CompetencyDeltaUsesFairProportionalShare()
         {
             var occ1 = Craftable(200, 1,
                 Option(20, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(300, 1)));
@@ -567,10 +568,10 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(2, root.Children.Count);
             Assert.Equal(CraftingDecision.BuyFromVendor, root.Children[0].Decision);
             Assert.Equal(CraftingDecision.BuyFromVendor, root.Children[1].Decision);
-            // TODAY (pre-fix): 10/990 - re-baselined to 500/500 in the fix
-            // commit, matching the VendorBatchSolver-level characterization.
-            Assert.Equal(10, root.Children[0].SubtreeCost);
-            Assert.Equal(990, root.Children[1].SubtreeCost);
+            // Fair proportional split (500/500), matching the
+            // VendorBatchSolver-level characterization.
+            Assert.Equal(500, root.Children[0].SubtreeCost);
+            Assert.Equal(500, root.Children[1].SubtreeCost);
 
             var result = new CraftingPlanResult { CraftingTree = root };
             CompetencyOpportunityCalculator.Apply(result);
@@ -578,8 +579,7 @@ namespace GW2CraftingHelper.Tests.Services
             var opportunity = Assert.Single(result.CompetencyOpportunities);
             Assert.Equal(200, opportunity.ItemId);
             Assert.Equal(100, opportunity.CraftCost);
-            // TODAY (pre-fix): 890 - re-baselined to 400 in the fix commit.
-            Assert.Equal(890, opportunity.DeltaCost);
+            Assert.Equal(400, opportunity.DeltaCost);
         }
     }
 }

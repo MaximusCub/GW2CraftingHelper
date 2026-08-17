@@ -622,30 +622,30 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Characterization: AllocateVendorNodeCosts' pre-fix
-        // last-occurrence-absorbs-everything remainder shape (quorum
+        // bounded-divergence largest-remainder apportionment (quorum
         // verdict C6, merged-ceil-remainder stream) ---
         //
-        // AllocateVendorNodeCosts (VendorBatchSolver.cs) currently gives
+        // AllocateVendorNodeCosts (VendorBatchSolver.cs) used to give
         // every occurrence EXCEPT the last exactly UnitCost * quantity
         // (the offer's own per-unit rate, floor-exact since UnitCost is
-        // already an integer), then dumps the ENTIRE remaining balance -
+        // already an integer), then dump the ENTIRE remaining balance -
         // including the full cost of any unused/wasted batch overrun -
-        // onto whichever occurrence happens to be last in first-seen DFS
-        // order. For occurrences of EQUAL quantity this is unbounded: two
+        // onto whichever occurrence happened to be last in first-seen DFS
+        // order. For occurrences of EQUAL quantity this was unbounded: two
         // 1-unit occurrences of a "100 for 1000c" bulk offer (must buy a
-        // whole 100-unit batch to cover a 2-unit need) currently render
+        // whole 100-unit batch to cover a 2-unit need) used to render
         // 10 and 990 - a 980-copper divergence between two structurally
         // identical purchases, entirely an artifact of tree position.
         //
-        // This test pins TODAY'S numbers. The next commit (largest-
-        // remainder apportionment, sharing the batch-overrun cost
-        // proportionally to each occurrence's own quantity) re-baselines
-        // both assertions to 500/500 - see that commit's message for the
-        // arithmetic (1000 * 1/2 = 500 exactly for each, no remainder to
-        // distribute at all).
+        // Fixed via largest-remainder (Hamilton) apportionment,
+        // proportional to each occurrence's own quantity share of demand -
+        // see AllocateVendorNodeCosts' own doc comment. For this shape:
+        // 1000 * 1 / 2 = 500 exactly for each occurrence, no remainder
+        // left to distribute at all - the divergence is now 0, well
+        // within the fix's <=1-copper bound for equal quantities.
 
         [Fact]
-        public void MultiOccurrenceEqualQuantityBulkVendorOffer_PreFix_LastOccurrenceAbsorbsEntireBatchOverrun()
+        public void MultiOccurrenceEqualQuantityBulkVendorOffer_BatchOverrunSharedProportionally()
         {
             var leafA = Leaf(99, 1);
             var leafB = Leaf(99, 1);
@@ -665,12 +665,11 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(1000, vendorStep.TotalCost);
             Assert.Equal(10, vendorStep.UnitCost);
 
-            // TODAY (pre-fix): first-seen occurrence (leafA) gets the
-            // floor share (UnitCost * quantity = 10 * 1 = 10); the last
-            // occurrence (leafB) absorbs everything else (1000 - 10 =
-            // 990) - re-baseline to 500/500 in the fix commit.
-            Assert.Equal(10, result.Decisions[leafA.NodeId].TotalCost);
-            Assert.Equal(990, result.Decisions[leafB.NodeId].TotalCost);
+            // Both equal-quantity occurrences now share the batch overrun
+            // evenly (500/500), regardless of DFS position - the fix for
+            // the unbounded pre-fix 10/990 split.
+            Assert.Equal(500, result.Decisions[leafA.NodeId].TotalCost);
+            Assert.Equal(500, result.Decisions[leafB.NodeId].TotalCost);
 
             // Sum invariant: unaffected by the fix - both algorithms must
             // always allocate the corrected step.TotalCost exactly, no
