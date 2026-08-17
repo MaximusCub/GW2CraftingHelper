@@ -40,12 +40,21 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     internal static class RecipeSheetSavingsCalculator
     {
+        // B8 shape fix: narrowed from the full VendorOfferStore to the one
+        // method this calculator ever calls on it (GetOffersForItem) - a
+        // plain Func<int, IReadOnlyList<VendorOffer>> is both a smaller
+        // surface (this class cannot reach any other VendorOfferStore
+        // member, e.g. LoadBaseline/AddOffersToOverlay) and lets a caller
+        // (or test) hand in ANY offer source, not only a real store
+        // instance. The null-delegate guard below replaces the old
+        // `vendorOfferStore != null` check with the exact same meaning:
+        // "no offer source available -> emit nothing".
         internal static void Apply(
             CraftingPlanResult result,
             ISet<int> learnedRecipeIds,
             IReadOnlyDictionary<int, ItemPrice> prices,
             PriceBasis priceBasis,
-            VendorOfferStore vendorOfferStore,
+            Func<int, IReadOnlyList<VendorOffer>> offersForItem,
             IReadOnlyDictionary<int, int> recipeSheetItemIdByRecipeId,
             IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines)
         {
@@ -57,20 +66,20 @@ namespace GW2CraftingHelper.Services
             }
 
             // Every one of these is required to safely determine "missing"
-            // (learnedRecipeIds), "purchasable" (vendorOfferStore/prices),
-            // or "worth the note" (recipeSheetItemIdByRecipeId non-empty) -
-            // a missing input means the answer is genuinely unknown, so no
+            // (learnedRecipeIds), "purchasable" (offersForItem/prices), or
+            // "worth the note" (recipeSheetItemIdByRecipeId non-empty) - a
+            // missing input means the answer is genuinely unknown, so no
             // opportunity is ever fabricated. Mirrors BuildNotesSection's
             // own "characterDisciplines == null -> never renders a
             // competency line" null-safety contract.
-            if (learnedRecipeIds != null && prices != null && vendorOfferStore != null &&
+            if (learnedRecipeIds != null && prices != null && offersForItem != null &&
                 recipeSheetItemIdByRecipeId != null && recipeSheetItemIdByRecipeId.Count > 0)
             {
                 var seenItemIds = new HashSet<int>();
 
                 if (result.CraftingTree != null)
                 {
-                    Walk(result.CraftingTree, learnedRecipeIds, prices, priceBasis, vendorOfferStore,
+                    Walk(result.CraftingTree, learnedRecipeIds, prices, priceBasis, offersForItem,
                         recipeSheetItemIdByRecipeId, characterDisciplines, seenItemIds, opportunities);
                 }
 
@@ -78,7 +87,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var root in result.MultiItemRoots)
                     {
-                        Walk(root, learnedRecipeIds, prices, priceBasis, vendorOfferStore,
+                        Walk(root, learnedRecipeIds, prices, priceBasis, offersForItem,
                             recipeSheetItemIdByRecipeId, characterDisciplines, seenItemIds, opportunities);
                     }
                 }
@@ -92,7 +101,7 @@ namespace GW2CraftingHelper.Services
             ISet<int> learnedRecipeIds,
             IReadOnlyDictionary<int, ItemPrice> prices,
             PriceBasis priceBasis,
-            VendorOfferStore vendorOfferStore,
+            Func<int, IReadOnlyList<VendorOffer>> offersForItem,
             IReadOnlyDictionary<int, int> recipeSheetItemIdByRecipeId,
             IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines,
             HashSet<int> seenItemIds,
@@ -123,13 +132,13 @@ namespace GW2CraftingHelper.Services
                 !seenItemIds.Contains(node.ItemId) &&
                 recipeSheetItemIdByRecipeId.TryGetValue(node.ReferenceRecipeId.Value, out int sheetItemId))
             {
-                TryEmit(node, sheetItemId, prices, priceBasis, vendorOfferStore, characterDisciplines,
+                TryEmit(node, sheetItemId, prices, priceBasis, offersForItem, characterDisciplines,
                     seenItemIds, opportunities);
             }
 
             foreach (var child in node.Children)
             {
-                Walk(child, learnedRecipeIds, prices, priceBasis, vendorOfferStore,
+                Walk(child, learnedRecipeIds, prices, priceBasis, offersForItem,
                     recipeSheetItemIdByRecipeId, characterDisciplines, seenItemIds, opportunities);
             }
         }
@@ -139,7 +148,7 @@ namespace GW2CraftingHelper.Services
             int sheetItemId,
             IReadOnlyDictionary<int, ItemPrice> prices,
             PriceBasis priceBasis,
-            VendorOfferStore vendorOfferStore,
+            Func<int, IReadOnlyList<VendorOffer>> offersForItem,
             IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines,
             HashSet<int> seenItemIds,
             List<RecipeSheetSavingsOpportunity> opportunities)
@@ -238,7 +247,13 @@ namespace GW2CraftingHelper.Services
             // cost), same undocumented-but-conservative posture as
             // VendorBatchSolver's own per-unit math. Not corrected here -
             // just flagged, since the UI presents these as exact numbers.
-            var offers = vendorOfferStore.GetOffersForItem(sheetItemId);
+            // Defensive: VendorOfferStore.GetOffersForItem (the sole
+            // production delegate target) never returns null (falls back
+            // to Array.Empty<VendorOffer>() itself), but offersForItem is
+            // now caller-suppliable (B8 narrowing) rather than a call
+            // guaranteed by that one class's own contract, so a null
+            // result degrades to "no offers" instead of an NRE.
+            var offers = offersForItem(sheetItemId) ?? Array.Empty<VendorOffer>();
             long? cheapestSheetCost = null;
             foreach (var offer in offers)
             {
