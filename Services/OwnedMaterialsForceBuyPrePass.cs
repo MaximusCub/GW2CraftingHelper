@@ -34,8 +34,10 @@ namespace GW2CraftingHelper.Services
     /// Never touches InventoryReducer's pool, PlanSolver's own Decision
     /// memo, or any owned-materials data directly - it only reads the
     /// (buyCost, craftCost) diagnostics PlanSolver.Solve already computes
-    /// for every node, via a throwaway solve pass, and returns a NodeId set
-    /// for the real solve's forceBuyOnlyNodeIds parameter.
+    /// for every node, via a throwaway solve pass, and returns two NodeId
+    /// sets (see ForceBuyPrePassResult's own doc comment): the real solve's
+    /// forceBuyOnlyNodeIds, plus a narrower, competency-independent subset
+    /// used only to gate Decision.CheapestCraftUntrained.
     /// </summary>
     public static class OwnedMaterialsForceBuyPrePass
     {
@@ -44,6 +46,42 @@ namespace GW2CraftingHelper.Services
         // a standalone approximation reused here for parity, not derived
         // from TradingPostMath.
         private const double ForceBuyDiscountFactor = 0.85;
+
+        /// <summary>
+        /// Verification-review fix: the two outputs of
+        /// ComputeForceBuyOnlyNodeIds, kept as two distinct sets rather than
+        /// one. ForceBuyOnlyNodeIds alone can be competency-CAUSED: this
+        /// throwaway pre-pass solve is competency-aware (characterDisciplines
+        /// threaded through, see that parameter's own doc comment), so its
+        /// craft diagnostic is the COMPETENCY-RESOLVED cost - a node whose
+        /// cheap recipe is untrained can land in ForceBuyOnlyNodeIds purely
+        /// because competency demoted the diagnostic to a costlier competent
+        /// recipe, when the untrained recipe itself would never have been
+        /// forced. CompetencyIndependentForceBuyNodeIds is the (always
+        /// smaller-or-equal) subset forced under BOTH that evaluation AND a
+        /// second, competency-BLIND evaluation using the RAW cheapest recipe
+        /// regardless of training - i.e. genuinely forced no matter what the
+        /// account is trained in. PlanSolver.Evaluate gates
+        /// Decision.CheapestCraftUntrained on THIS narrower set (via
+        /// Solve's competencyIndependentForceBuyNodeIds parameter), not on
+        /// ForceBuyOnlyNodeIds membership, so a competency-caused force-buy
+        /// never silently suppresses a real training opportunity -
+        /// PillSourceCostBreakdown/the solver's own forceBuyOnlyNodeIds
+        /// parameter (solve behavior itself) still use ForceBuyOnlyNodeIds
+        /// exactly as before this fix.
+        /// </summary>
+        public readonly struct ForceBuyPrePassResult
+        {
+            public ISet<int> ForceBuyOnlyNodeIds { get; }
+            public ISet<int> CompetencyIndependentForceBuyNodeIds { get; }
+
+            public ForceBuyPrePassResult(
+                ISet<int> forceBuyOnlyNodeIds, ISet<int> competencyIndependentForceBuyNodeIds)
+            {
+                ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds;
+                CompetencyIndependentForceBuyNodeIds = competencyIndependentForceBuyNodeIds;
+            }
+        }
 
         /// <summary>
         /// Computes the set of NodeIds that should have craft excluded from
@@ -73,7 +111,7 @@ namespace GW2CraftingHelper.Services
         /// - competency UNKNOWN, matching every other caller of
         /// PlanSolver.Solve that omits this parameter.
         /// </param>
-        public static ISet<int> ComputeForceBuyOnlyNodeIds(
+        public static ForceBuyPrePassResult ComputeForceBuyOnlyNodeIds(
             PlanSolver solver,
             RecipeNode tree,
             IReadOnlyDictionary<int, ItemPrice> prices,
@@ -83,24 +121,46 @@ namespace GW2CraftingHelper.Services
             IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
             var diagnostics = new Dictionary<int, (long? BuyCost, long? CraftCost)>();
+            // Verification-review fix: the RAW (competency-BLIND) twin of
+            // diagnostics above - see ForceBuyPrePassResult's own doc
+            // comment and PlanSolver.Solve's rawCraftCostDiagnostics
+            // parameter for why this comes from the SAME throwaway solve
+            // pass rather than a second Solve() call.
+            var rawCraftCostDiagnostics = new Dictionary<int, long?>();
 
             solver.Solve(
                 tree, prices, vendorOffers, priceBasis,
                 overrides: null, currencyValuation: currencyValuation,
                 forceBuyOnlyNodeIds: null, costDiagnostics: diagnostics,
+                rawCraftCostDiagnostics: rawCraftCostDiagnostics,
                 characterDisciplines: characterDisciplines);
 
             var forced = new HashSet<int>();
+            var competencyIndependentForced = new HashSet<int>();
             foreach (var kvp in diagnostics)
             {
                 var (buyCost, craftCost) = kvp.Value;
-                if (buyCost.HasValue && craftCost.HasValue &&
-                    buyCost.Value < craftCost.Value * ForceBuyDiscountFactor)
+                bool forcedHere = buyCost.HasValue && craftCost.HasValue &&
+                    buyCost.Value < craftCost.Value * ForceBuyDiscountFactor;
+                if (!forcedHere)
                 {
-                    forced.Add(kvp.Key);
+                    continue;
+                }
+                forced.Add(kvp.Key);
+
+                // Second, competency-BLIND evaluation of the SAME 0.85 rule
+                // - the RAW cheapest craft cost regardless of training. Only
+                // a node forced under BOTH evaluations is genuinely forced
+                // no matter what the account is trained in - see
+                // ForceBuyPrePassResult's own doc comment.
+                if (rawCraftCostDiagnostics.TryGetValue(kvp.Key, out long? rawCraftCost) &&
+                    rawCraftCost.HasValue &&
+                    buyCost.Value < rawCraftCost.Value * ForceBuyDiscountFactor)
+                {
+                    competencyIndependentForced.Add(kvp.Key);
                 }
             }
-            return forced;
+            return new ForceBuyPrePassResult(forced, competencyIndependentForced);
         }
     }
 }

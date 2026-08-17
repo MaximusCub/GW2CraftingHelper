@@ -379,21 +379,25 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ForceBuyOnlyNode_UntrainedCheapestRecipe_ReportsNoOpportunity()
+        public void ForceBuyOnlyNode_CompetencyIndependentForceBuy_ReportsNoOpportunity()
         {
-            // Verification-review fix: the force-buy pre-pass (gw2e "Value
-            // Own Materials") excludes craft at this node REGARDLESS of
-            // competency - training Weaponsmith 500 here would unlock
-            // nothing. Before this fix, CheapestCraftUntrained was computed
-            // purely from competency (ignoring forceBuyOnlyNodeIds
-            // entirely), so a force-buy-excluded node with an untrained
-            // cheapest recipe and a committed buy cost genuinely higher
-            // than that recipe's real cost (100c committed vs 30c the
-            // recipe would have cost) still satisfied
-            // CompetencyOpportunityCalculator's SubtreeCost >
-            // CheapestCraftRealCost delta check - producing a Plan Note
-            // promising a concrete saving from training a discipline that
-            // would change nothing about this node's outcome.
+            // Verification-review fix (second pass): this node has a SINGLE
+            // recipe (Weaponsmith 500, untrained) - the force-buy pre-pass's
+            // competency-resolved and competency-blind evaluations of the
+            // 0.85 rule are therefore identical (both read the same 30c
+            // craft cost, since there is no competent sibling recipe for
+            // competency to swap in), so this node is genuinely forced
+            // REGARDLESS of training: training Weaponsmith 500 here would
+            // unlock nothing. Gating solely on raw forceBuyOnlyNodeIds
+            // membership (the original fix) happened to give the right
+            // answer for this SPECIFIC shape too, but for the wrong reason
+            // - see CompetencyCausedForceBuy_UntrainedCheapestRecipe_
+            // ReportsOpportunity below for the shape where that gate was
+            // actually wrong (a force-buy exclusion that is ITSELF
+            // competency-caused). Passing competencyIndependentForceBuyNodeIds
+            // explicitly (mirroring what OwnedMaterialsForceBuyPrePass would
+            // itself compute for this fixture) is what PlanSolver.Evaluate
+            // now gates on.
             var tree = Craftable(1, 1,
                 Option(10, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(2, 1)));
             var prices = new Dictionary<int, ItemPrice>
@@ -412,6 +416,7 @@ namespace GW2CraftingHelper.Tests.Services
                 tree, prices, null, PriceBasis.InstantBuy,
                 overrides: null, currencyValuation: null,
                 forceBuyOnlyNodeIds: forceBuyOnly,
+                competencyIndependentForceBuyNodeIds: forceBuyOnly,
                 characterDisciplines: characterDisciplines);
             var builder = new CraftingTreeBuilder();
             var root = builder.BuildTree(tree, solveResult.Decisions, new Dictionary<int, ItemMetadata>());
@@ -426,6 +431,92 @@ namespace GW2CraftingHelper.Tests.Services
             CompetencyOpportunityCalculator.Apply(result);
 
             Assert.Empty(result.CompetencyOpportunities);
+        }
+
+        [Fact]
+        public void CompetencyCausedForceBuy_UntrainedCheapestRecipe_ReportsOpportunity()
+        {
+            // Verification-review fix (second pass) - the measured shape
+            // ebdf16c's fix wrongly silenced: root item 1 has TWO recipes -
+            // RecipeId 10 (Weaponsmith 500, ingredient item 2 @ 30c - the
+            // untrained, numerically CHEAPEST recipe overall) and RecipeId
+            // 20 (MysticForge - a non-levelable tag, inherently "competent"
+            // regardless of training, see
+            // CraftCompetencyEvaluator.NonLevelableDisciplineTags -
+            // ingredient item 3 @ 1000c). TP buy = 100c. Nobody is trained
+            // in Weaponsmith 500.
+            //
+            // Run through the REAL pre-pass -> solve -> calculator pipeline
+            // (unlike the hand-fed forceBuyOnlyNodeIds fixture above):
+            // OwnedMaterialsForceBuyPrePass's own throwaway solve is
+            // competency-aware, so its craft diagnostic resolves to the
+            // COMPETENT MysticForge recipe (1000c) - buy (100c) is less
+            // than 1000c*0.85=850c, so root lands in ForceBuyOnlyNodeIds.
+            // But the SECOND, competency-BLIND evaluation (the RAW cheapest
+            // craft cost, 30c, ignoring training) does NOT force it (100c
+            // is not less than 30c*0.85=25.5c) - so root is NOT in
+            // CompetencyIndependentForceBuyNodeIds: this force-buy
+            // exclusion is ITSELF competency-caused. Training Weaponsmith
+            // 500 would empty the force-buy set entirely and let the plan
+            // craft at 30c instead of buying at 100c - a genuine 70c
+            // opportunity.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(2, 1)),
+                Option(20, 1, 1, new List<string> { "MysticForge" }, 0, Leaf(3, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 1000 } }
+            };
+            var characterDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+            };
+
+            var solver = new PlanSolver();
+
+            // Real pre-pass: computes BOTH sets from one throwaway solve
+            // pass - see OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult's
+            // own doc comment.
+            var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                solver, tree, prices, null, PriceBasis.InstantBuy, null,
+                characterDisciplines: characterDisciplines);
+
+            Assert.Contains(0, forceBuyPrePassResult.ForceBuyOnlyNodeIds);
+            Assert.DoesNotContain(0, forceBuyPrePassResult.CompetencyIndependentForceBuyNodeIds);
+
+            // Real solve: reuses the SAME tree (its NodeIds were already
+            // stably assigned by the pre-pass's own throwaway solve above,
+            // matching CraftingPlanPipeline's own assignNodeIds:false
+            // production wiring at Step 7).
+            var solveResult = solver.Solve(
+                tree, prices, null, PriceBasis.InstantBuy,
+                overrides: null, currencyValuation: null,
+                forceBuyOnlyNodeIds: forceBuyPrePassResult.ForceBuyOnlyNodeIds,
+                competencyIndependentForceBuyNodeIds: forceBuyPrePassResult.CompetencyIndependentForceBuyNodeIds,
+                assignNodeIds: false,
+                characterDisciplines: characterDisciplines);
+
+            var builder = new CraftingTreeBuilder();
+            var root = builder.BuildTree(tree, solveResult.Decisions, new Dictionary<int, ItemMetadata>());
+
+            // Force-buy still wins the real solve (solver behavior itself
+            // is UNCHANGED by this fix) - the plan commits BuyFromTp@100.
+            Assert.Equal(CraftingDecision.BuyFromTp, root.Decision);
+            Assert.Equal(100, root.SubtreeCost);
+            // But CheapestCraftUntrained is no longer suppressed - this
+            // force-buy exclusion is competency-caused, not genuine.
+            Assert.True(root.CheapestCraftUntrained);
+            Assert.Equal(30, root.CheapestCraftRealCost);
+
+            var result = new CraftingPlanResult { CraftingTree = root };
+            CompetencyOpportunityCalculator.Apply(result);
+
+            var opportunity = Assert.Single(result.CompetencyOpportunities);
+            Assert.Equal(1, opportunity.ItemId);
+            Assert.Equal(30, opportunity.CraftCost);
+            Assert.Equal(70, opportunity.DeltaCost);
         }
     }
 }

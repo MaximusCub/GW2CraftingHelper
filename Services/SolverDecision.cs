@@ -142,14 +142,22 @@ namespace GW2CraftingHelper.Services
         // describe that cheap recipe - only meaningful when
         // CheapestCraftUntrained is true.
         //
-        // Verification-review fix: always false for a node the force-buy
-        // pre-pass excluded craft from (never for a competency-caused
-        // reason) - see PlanSolver.Evaluate's isForceBuyOnly/
-        // cheapestCraftUntrained local variables for why: the pre-pass's
-        // own exclusion set is computed on a zero-owned, unreduced solve
-        // and can disagree with this (possibly reduced) solve's real
-        // craft cost, which would otherwise let this field fire for a
-        // node whose craft was never actually gated on competency at all.
+        // Verification-review fix (second pass): always false for a node
+        // the force-buy pre-pass excluded craft from under BOTH a
+        // competency-resolved AND a competency-BLIND evaluation of its
+        // 0.85 rule - see PlanSolver.Evaluate's isCompetencyIndependentForceBuy/
+        // cheapestCraftUntrained local variables and
+        // OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult's own doc
+        // comment for why. The original fix here gated on raw
+        // forceBuyOnlyNodeIds membership instead, which over-corrected:
+        // that set's own exclusion CAN itself be competency-caused (the
+        // pre-pass's throwaway solve is competency-aware, so a node whose
+        // cheap recipe is untrained can land in forceBuyOnlyNodeIds purely
+        // because competency demoted the pre-pass's own craft-cost
+        // diagnostic to a costlier competent recipe) - silencing this field
+        // in exactly that shape hid a real, concrete training opportunity.
+        // This field now only ever suppresses for a node genuinely forced
+        // regardless of training, never for a competency-caused reason.
         public bool CheapestCraftUntrained { get; internal set; }
         public long? CheapestCraftRealCost { get; internal set; }
         public IReadOnlyList<string> CheapestCraftDisciplines { get; internal set; }

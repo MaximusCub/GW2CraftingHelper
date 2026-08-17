@@ -25,10 +25,16 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var forced = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+            var result = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                 solver, tree, prices, null, PriceBasis.InstantBuy, null);
 
-            Assert.Contains(0, forced); // root NodeId
+            Assert.Contains(0, result.ForceBuyOnlyNodeIds); // root NodeId
+            // Verification-review fix (second pass): no discipline
+            // requirement anywhere in this tree, so competency can never
+            // demote anything - the competency-resolved and competency-
+            // blind evaluations are identical, and this node is forced
+            // under BOTH.
+            Assert.Contains(0, result.CompetencyIndependentForceBuyNodeIds);
         }
 
         [Fact]
@@ -44,10 +50,11 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var forced = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+            var result = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                 solver, tree, prices, null, PriceBasis.InstantBuy, null);
 
-            Assert.DoesNotContain(0, forced);
+            Assert.DoesNotContain(0, result.ForceBuyOnlyNodeIds);
+            Assert.DoesNotContain(0, result.CompetencyIndependentForceBuyNodeIds);
         }
 
         [Fact]
@@ -61,10 +68,11 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var forced = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+            var result = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                 solver, tree, prices, null, PriceBasis.InstantBuy, null);
 
-            Assert.Empty(forced);
+            Assert.Empty(result.ForceBuyOnlyNodeIds);
+            Assert.Empty(result.CompetencyIndependentForceBuyNodeIds);
         }
 
         // Adversarial-review fix (Critical #3, source-selection-
@@ -102,9 +110,9 @@ namespace GW2CraftingHelper.Tests.Services
             // competency-UNKNOWN, so item 2 commits Craft@5 (cheapest,
             // never checked) - parent's craftCost reads 5, nowhere near
             // buy's 150, so root is NOT forced (150 is not < 5*0.85).
-            var forcedWithout = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+            var resultWithout = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                 solver, tree, prices, null, PriceBasis.InstantBuy, null);
-            Assert.DoesNotContain(0, forcedWithout);
+            Assert.DoesNotContain(0, resultWithout.ForceBuyOnlyNodeIds);
 
             // With characterDisciplines threaded through: item 2's own
             // Craft option is now correctly competency-excluded (untrained,
@@ -114,10 +122,18 @@ namespace GW2CraftingHelper.Tests.Services
             // two calls produce DIFFERENT results purely because of this
             // parameter, proving it actually reaches the child's own
             // decision inside this throwaway solve.
-            var forcedWith = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+            //
+            // Root (item 1) has only ONE recipe option of its own (no
+            // discipline requirement), so its OWN competency-resolved and
+            // competency-blind evaluations always agree (both read the
+            // SAME single-recipe craftCost) regardless of what the CHILD
+            // committed to further down - root therefore also lands in
+            // CompetencyIndependentForceBuyNodeIds here.
+            var resultWith = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                 solver, tree, prices, null, PriceBasis.InstantBuy, null,
                 characterDisciplines: characterDisciplines);
-            Assert.Contains(0, forcedWith);
+            Assert.Contains(0, resultWith.ForceBuyOnlyNodeIds);
+            Assert.Contains(0, resultWith.CompetencyIndependentForceBuyNodeIds);
         }
 
         [Fact]
@@ -132,10 +148,11 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var forced = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+            var result = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                 solver, tree, prices, null, PriceBasis.InstantBuy, null);
 
-            Assert.Empty(forced);
+            Assert.Empty(result.ForceBuyOnlyNodeIds);
+            Assert.Empty(result.CompetencyIndependentForceBuyNodeIds);
         }
 
         [Fact]
@@ -151,10 +168,11 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var solver = new PlanSolver();
 
-            var forced = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+            var result = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                 solver, tree, prices, null, PriceBasis.InstantBuy, null);
 
-            Assert.Empty(forced);
+            Assert.Empty(result.ForceBuyOnlyNodeIds);
+            Assert.Empty(result.CompetencyIndependentForceBuyNodeIds);
         }
     }
 }

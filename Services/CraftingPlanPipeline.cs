@@ -259,6 +259,14 @@ namespace GW2CraftingHelper.Services
             // leaves InventoryReducer's legacy primary-option heuristic
             // fully in charge, unchanged.
             ISet<int> forceBuyOnlyNodeIds = null;
+            // Verification-review fix: the narrower, competency-independent
+            // subset of forceBuyOnlyNodeIds - see
+            // OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult's own doc
+            // comment. Threaded to every Solve() call below alongside
+            // forceBuyOnlyNodeIds so Decision.CheapestCraftUntrained is
+            // gated correctly at every solve of this generation, not just
+            // the real one.
+            ISet<int> competencyIndependentForceBuyNodeIds = null;
             IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
             if (useForceBuyPrePass)
             {
@@ -267,14 +275,17 @@ namespace GW2CraftingHelper.Services
                 // through so this throwaway solve is competency-aware too -
                 // see ComputeForceBuyOnlyNodeIds' own characterDisciplines
                 // doc comment for the propagation failure this closes.
-                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                     _solver, tree, prices, vendorOffers, priceBasis, valuation,
                     characterDisciplines: effectiveCharacterDisciplines);
+                forceBuyOnlyNodeIds = forceBuyPrePassResult.ForceBuyOnlyNodeIds;
+                competencyIndependentForceBuyNodeIds = forceBuyPrePassResult.CompetencyIndependentForceBuyNodeIds;
 
                 var zeroOwnedSolve = _solver.Solve(
                     tree, prices, vendorOffers, priceBasis,
                     overrides: null, currencyValuation: valuation,
                     forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                    competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
                     homesteadTiers: tiers,
                     characterDisciplines: effectiveCharacterDisciplines);
                 zeroOwnedDecisions = zeroOwnedSolve.Decisions;
@@ -314,6 +325,12 @@ namespace GW2CraftingHelper.Services
                 treeUsedForSolve, prices, vendorOffers, priceBasis,
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                // Verification-review fix: see the declaration site's own
+                // doc comment - this is the call whose Decisions feed the
+                // real Plan/CraftingTree, so gating
+                // Decision.CheapestCraftUntrained correctly here is what
+                // actually fixes the Plan Notes bug.
+                competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
                 assignNodeIds: !useForceBuyPrePass,
                 homesteadTiers: tiers,
                 characterDisciplines: effectiveCharacterDisciplines,
@@ -481,6 +498,7 @@ namespace GW2CraftingHelper.Services
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
                 OwnedVendorItemAmounts = ownedVendorItemAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
+                CompetencyIndependentForceBuyNodeIds = competencyIndependentForceBuyNodeIds,
                 HomesteadTiers = tiers,
                 CharacterDisciplines = result.CharacterDisciplines,
                 // VOM finding #1 fix: only populated when the force-buy
@@ -759,6 +777,9 @@ namespace GW2CraftingHelper.Services
             // wrapper batch at once, moved ahead of Step 6 so its output can
             // guide InventoryReducer.Reduce below.
             ISet<int> forceBuyOnlyNodeIds = null;
+            // Verification-review fix: see the single-item overload's
+            // matching declaration for the full rationale.
+            ISet<int> competencyIndependentForceBuyNodeIds = null;
             IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
             if (useForceBuyPrePass)
             {
@@ -767,14 +788,17 @@ namespace GW2CraftingHelper.Services
                 // through so this throwaway solve is competency-aware too -
                 // see ComputeForceBuyOnlyNodeIds' own characterDisciplines
                 // doc comment for the propagation failure this closes.
-                forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
+                var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                     _solver, tree, prices, vendorOffers, priceBasis, valuation,
                     characterDisciplines: effectiveCharacterDisciplines);
+                forceBuyOnlyNodeIds = forceBuyPrePassResult.ForceBuyOnlyNodeIds;
+                competencyIndependentForceBuyNodeIds = forceBuyPrePassResult.CompetencyIndependentForceBuyNodeIds;
 
                 var zeroOwnedSolve = _solver.Solve(
                     tree, prices, vendorOffers, priceBasis,
                     overrides: null, currencyValuation: valuation,
                     forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                    competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
                     homesteadTiers: tiers,
                     characterDisciplines: effectiveCharacterDisciplines);
                 zeroOwnedDecisions = zeroOwnedSolve.Decisions;
@@ -812,6 +836,12 @@ namespace GW2CraftingHelper.Services
                 treeUsedForSolve, prices, vendorOffers, priceBasis,
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                // Verification-review fix: see the declaration site's own
+                // doc comment - this is the call whose Decisions feed the
+                // real Plan/CraftingTree, so gating
+                // Decision.CheapestCraftUntrained correctly here is what
+                // actually fixes the Plan Notes bug.
+                competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
                 assignNodeIds: !useForceBuyPrePass,
                 homesteadTiers: tiers,
                 characterDisciplines: effectiveCharacterDisciplines,
@@ -958,6 +988,7 @@ namespace GW2CraftingHelper.Services
                 OwnedCurrencyAmounts = ownedCurrencyAmounts,
                 OwnedVendorItemAmounts = ownedVendorItemAmounts,
                 ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds,
+                CompetencyIndependentForceBuyNodeIds = competencyIndependentForceBuyNodeIds,
                 RequestedItems = items,
                 HomesteadTiers = tiers,
                 CharacterDisciplines = result.CharacterDisciplines,
@@ -1061,6 +1092,12 @@ namespace GW2CraftingHelper.Services
                     context.UnreducedTree, context.Prices, context.VendorOffers,
                     context.PriceBasis, overrides, context.CurrencyValuation,
                     forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
+                    // Verification-review fix: see
+                    // PlanSolveContext.CompetencyIndependentForceBuyNodeIds'
+                    // own doc comment - reapplied alongside
+                    // ForceBuyOnlyNodeIds so a local re-solve stays in sync
+                    // with the original generation.
+                    competencyIndependentForceBuyNodeIds: context.CompetencyIndependentForceBuyNodeIds,
                     assignNodeIds: false,
                     ignoredItemIds: ignoredItemIds,
                     homesteadTiers: context.HomesteadTiers,
@@ -1095,6 +1132,13 @@ namespace GW2CraftingHelper.Services
                 solveTree, context.Prices, context.VendorOffers,
                 context.PriceBasis, overrides, context.CurrencyValuation,
                 forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
+                // Verification-review fix: see
+                // PlanSolveContext.CompetencyIndependentForceBuyNodeIds' own
+                // doc comment - this is the call whose Decisions feed the
+                // re-solved Plan/CraftingTree, so gating
+                // Decision.CheapestCraftUntrained correctly here is what
+                // actually keeps a local re-solve's Plan Notes correct.
+                competencyIndependentForceBuyNodeIds: context.CompetencyIndependentForceBuyNodeIds,
                 assignNodeIds: false,
                 ignoredItemIds: ignoredItemIds,
                 homesteadTiers: context.HomesteadTiers,

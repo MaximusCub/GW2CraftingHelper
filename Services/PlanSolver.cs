@@ -291,6 +291,23 @@ namespace GW2CraftingHelper.Services
             // its automatic pre-pass (docs/gw2e-parity-spec.md /
             // m34-r2-gw2e-owned-materials.md Section 3.2).
             ISet<int> forceBuyOnlyNodeIds = null,
+            // Verification-review fix (source-selection-simplification):
+            // nodes in THIS set are force-buy-excluded under BOTH the
+            // competency-resolved AND a competency-BLIND (raw cheapest
+            // recipe, regardless of training) evaluation of the 0.85 rule -
+            // see OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult's own
+            // doc comment. A node can be in forceBuyOnlyNodeIds above
+            // WITHOUT being in this set (its force-buy exclusion is itself
+            // competency-caused - training would change the raw evaluation
+            // and empty the force-buy set). Used ONLY to gate
+            // cheapestCraftUntrained below, never craftExcludedFromAutoPick
+            // (forceBuyOnlyNodeIds/isForceBuyOnly alone still decides that,
+            // unchanged) - see cheapestCraftUntrained's own doc comment for
+            // why the two sets must stay separate. Null (the default, and
+            // every caller that never ran the pre-pass) disables the
+            // distinction entirely - isCompetencyIndependentForceBuy is
+            // then always false, same as before this parameter existed.
+            ISet<int> competencyIndependentForceBuyNodeIds = null,
             // M34-B2a #3: when non-null, populated with this node's raw
             // (buyCost, craftCost) - the SAME numbers Evaluate already
             // computes for every "Item" node regardless of decision - so a
@@ -299,6 +316,16 @@ namespace GW2CraftingHelper.Services
             // duplicating this method's cost-aggregation logic. Never
             // affects this solve's own Decisions/Plan.
             Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
+            // Verification-review fix: when non-null, populated with this
+            // node's RAW cheapest craft real cost - cheapestCraftRealCostOverall
+            // below, the SAME competency-BLIND figure cheapestCraftUntrained
+            // itself compares against, ignoring training entirely (unlike
+            // costDiagnostics' CraftCost, which is competency-RESOLVED). Lets
+            // OwnedMaterialsForceBuyPrePass run its second, competency-blind
+            // 0.85 evaluation from this SAME throwaway solve pass, without a
+            // second Solve() call. Never affects this solve's own Decisions/
+            // Plan.
+            Dictionary<int, long?> rawCraftCostDiagnostics = null,
             // M34-B2a #3: when false, this tree's existing node.NodeId
             // values are trusted as-is instead of being reassigned from
             // scratch - see RecipeNodeIds' doc comment for why a caller
@@ -374,7 +401,7 @@ namespace GW2CraftingHelper.Services
             }
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds, tiers, bestRatingByDiscipline, ownedQuantityUsedByNode);
+            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, competencyIndependentForceBuyNodeIds, costDiagnostics, rawCraftCostDiagnostics, ignoredItemIds, tiers, bestRatingByDiscipline, ownedQuantityUsedByNode);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -703,7 +730,15 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, AcquisitionSource> overrides,
             CurrencyValuation currencyValuation,
             ISet<int> forceBuyOnlyNodeIds = null,
+            // Verification-review fix: see Solve's own matching parameter
+            // doc comment - threaded through the recursion unchanged, same
+            // as forceBuyOnlyNodeIds above.
+            ISet<int> competencyIndependentForceBuyNodeIds = null,
             Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
+            // Verification-review fix: see Solve's own matching parameter
+            // doc comment - threaded through the recursion unchanged, same
+            // as costDiagnostics above.
+            Dictionary<int, long?> rawCraftCostDiagnostics = null,
             ISet<int> ignoredItemIds = null,
             HomesteadEfficiencyTiers homesteadTiers = null,
             // source-selection-simplification: precomputed account best-
@@ -1006,7 +1041,8 @@ namespace GW2CraftingHelper.Services
 
                     long? ingredientCost = Evaluate(
                         ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation,
-                        forceBuyOnlyNodeIds, costDiagnostics, ignoredItemIds, tiers, bestRatingByDiscipline,
+                        forceBuyOnlyNodeIds, competencyIndependentForceBuyNodeIds, costDiagnostics,
+                        rawCraftCostDiagnostics, ignoredItemIds, tiers, bestRatingByDiscipline,
                         ownedQuantityUsedByNode);
                     craftCost += ingredientCost ?? 0L;
                     var ingredientDecision = memo[ingredient.NodeId];
@@ -1147,13 +1183,13 @@ namespace GW2CraftingHelper.Services
             // below - a manual override (checked next, using the
             // unmodified canCraft flag above) still always wins, matching
             // gw2e's own manual pill always beating its automatic pre-pass.
-            // Captured separately from craftExcludedFromAutoPick below (which
-            // also gets folded into by craftExcludedByCompetency further
-            // down) - CheapestCraftUntrained needs the RAW "was this node's
-            // craft forced off by the force-buy pre-pass" answer, not the
-            // combined flag, or it would fire for a node whose craft was
-            // excluded for a reason that has nothing to do with competency
-            // at all. See cheapestCraftUntrained's own doc comment below.
+            // Solver behavior here is UNCHANGED by the
+            // competencyIndependentForceBuyNodeIds distinction further down
+            // - forceBuyOnlyNodeIds/isForceBuyOnly alone still decides
+            // craftExcludedFromAutoPick, exactly as before. See
+            // cheapestCraftUntrained's own doc comment below for why THAT
+            // field needs a separate, competency-independent answer instead
+            // of this raw membership check.
             bool isForceBuyOnly = forceBuyOnlyNodeIds != null &&
                 forceBuyOnlyNodeIds.Contains(node.NodeId);
             bool craftExcludedFromAutoPick = isForceBuyOnly;
@@ -1313,21 +1349,36 @@ namespace GW2CraftingHelper.Services
             // first override, so this can be untrained even while
             // autoPickCraftOption itself resolved to a different
             // (competent) recipe.
-            //
-            // Verification-review fix: also gated on !isForceBuyOnly - the
-            // force-buy pre-pass decides forceBuyOnlyNodeIds on a zero-owned,
-            // unreduced solve, while THIS solve may run reduced (owned
-            // materials applied), so the committed buy cost here can exceed
-            // this cheap recipe's real cost for a node whose craft was
-            // excluded by force-buy, not by competency. Without this guard,
-            // CompetencyOpportunityCalculator would promise the user a
-            // saving from training a discipline that unlocks nothing - the
-            // force-buy pre-pass excludes craft here regardless of rating.
             RecipeOption cheapestCraftOptionOverall = bestComparableOption ?? bestFallbackOption;
             long? cheapestCraftRealCostOverall = bestComparableOption != null
                 ? bestComparableCraftRealCost
                 : bestFallbackCraftRealCost;
-            bool cheapestCraftUntrained = !isForceBuyOnly &&
+
+            // Verification-review fix (second pass): gated on
+            // !isCompetencyIndependentForceBuy, NOT !isForceBuyOnly - see
+            // competencyIndependentForceBuyNodeIds' own doc comment on
+            // Solve() for the full rationale. The original fix (gating on
+            // raw forceBuyOnlyNodeIds membership) over-corrected: force-buy
+            // membership can ITSELF be competency-caused, because
+            // CraftingPlanPipeline threads characterDisciplines into
+            // OwnedMaterialsForceBuyPrePass's own throwaway solve, whose
+            // craft diagnostic is the COMPETENCY-RESOLVED cost (this same
+            // method's craftBreakdownDecisionValue ?? autoPickCraftRealCost,
+            // recorded into costDiagnostics further down). A node whose
+            // cheap recipe is untrained can therefore land in
+            // forceBuyOnlyNodeIds ONLY because competency demoted the
+            // pre-pass's own craft cost to a costlier competent recipe -
+            // training would empty the force-buy set and let the cheap
+            // recipe win for real, which is exactly the opportunity this
+            // field exists to report. isCompetencyIndependentForceBuy is
+            // true only for a node forced under BOTH the competency-
+            // resolved AND a competency-BLIND evaluation of the 0.85 rule -
+            // i.e. genuinely forced regardless of training, where reporting
+            // an opportunity here would indeed promise a saving training
+            // can never unlock.
+            bool isCompetencyIndependentForceBuy = competencyIndependentForceBuyNodeIds != null &&
+                competencyIndependentForceBuyNodeIds.Contains(node.NodeId);
+            bool cheapestCraftUntrained = !isCompetencyIndependentForceBuy &&
                 cheapestCraftOptionOverall != null &&
                 bestRatingByDiscipline != null &&
                 !CraftCompetencyEvaluator.AccountCanCraft(
@@ -1390,6 +1441,17 @@ namespace GW2CraftingHelper.Services
             if (costDiagnostics != null)
             {
                 costDiagnostics[node.NodeId] = (buyTotalCost, craftBreakdownDecisionValue ?? autoPickCraftRealCost);
+            }
+
+            // Verification-review fix: the RAW (competency-BLIND) twin of
+            // the costDiagnostics write above - cheapestCraftRealCostOverall
+            // is already computed regardless of training (see its own doc
+            // comment), so recording it here lets OwnedMaterialsForceBuyPrePass
+            // run its second 0.85 evaluation from this SAME throwaway solve
+            // pass, without a second Solve() call.
+            if (rawCraftCostDiagnostics != null)
+            {
+                rawCraftCostDiagnostics[node.NodeId] = cheapestCraftRealCostOverall;
             }
 
             // Adversarial-review fix (Critical #4): true when ANY direct

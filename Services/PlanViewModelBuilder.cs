@@ -1035,14 +1035,17 @@ namespace GW2CraftingHelper.Services
             // committed Craft step); this one surfaces disciplines that
             // would let the plan cost LESS than it currently does, for a
             // node the automatic pick excluded craft from specifically on
-            // competency grounds (PlanSolver never sets
+            // competency grounds (PlanSolver only suppresses
             // Decision.CheapestCraftUntrained for a node the force-buy
-            // pre-pass excluded craft from - see cheapestCraftUntrained's
-            // own doc comment in PlanSolver.Evaluate - and
-            // CompetencyOpportunityCalculator itself filters out manual-
-            // override-to-craft nodes and cost-neutral-or-worse cases;
-            // every entry here is a genuine, concrete "train this and
-            // save N" opportunity).
+            // pre-pass excluded craft from REGARDLESS of training - see
+            // cheapestCraftUntrained's own doc comment in
+            // PlanSolver.Evaluate and OwnedMaterialsForceBuyPrePass.
+            // ForceBuyPrePassResult's own doc comment; a force-buy
+            // exclusion that is ITSELF competency-caused still reports here
+            // - and CompetencyOpportunityCalculator itself filters out
+            // manual-override-to-craft nodes and cost-neutral-or-worse
+            // cases; every entry here is a genuine, concrete "train this
+            // and save N" opportunity).
             if (result.CompetencyOpportunities != null && result.CompetencyOpportunities.Count > 0)
             {
                 var opportunityRows = new List<(string Name, PlanRowViewModel Row)>(
