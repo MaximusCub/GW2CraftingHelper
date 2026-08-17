@@ -7005,10 +7005,18 @@ this verdict, not merely out of scope.
    shape-mirroring comments or test files), of which 13 are comment-only;
    the actual compile-time coupling is 2 references, both in
    `Views/CraftingPlanView.cs` (the field declaration and the constructor
-   call site) - plus 3 mentions in `docs/ARCHITECTURE.md` and
-   `docs/ROADMAP.md` (`docs/KNOWN-ISSUES.md` carries 42 more as
-   historical narrative) - not 18. (The file count moved from a
-   pre-change 13 to 14 because this same milestone's own new
+   call site) - plus, as measured pre-change at `ce64423`, 3 mentions in
+   `docs/ARCHITECTURE.md` and `docs/ROADMAP.md` (`docs/KNOWN-ISSUES.md`
+   carried 42 more as historical narrative) - not 18. (That doc-mention
+   count is a snapshot, not a live figure: this same commit's own doc
+   edits add mentions on landing, so as of this commit
+   `TreeSectionController` is named 81 times across 7 doc files instead
+   of 3 across 2 - `docs/ARCHITECTURE.md` 6, `docs/ROADMAP.md` 1,
+   `docs/KNOWN-ISSUES.md` 57, `CONTRIBUTING.md` 3,
+   `docs/gw2e-considerations.md` 2, `docs/dev-notes/HISTORY.md` 4,
+   `docs/research/gw2e-convergence-matrix.md` 8 - per
+   `git grep -c TreeSectionController -- '*.md'`.) (The file count moved
+   from a pre-change 13 to 14 because this same milestone's own new
    `TreeRowTooltipComposer.cs` documents its provenance with a
    "TreeSectionController.RenderTreeNode" reference in its own doc
    comment - a real, verified `grep` count taken after the change, not
@@ -7022,7 +7030,7 @@ this verdict, not merely out of scope.
    that split is rejected by decision, cross-referenced to the
    `docs/ARCHITECTURE.md` entry above.
 3. **`Services/TreeRowTooltipComposer.cs` (new) + real-path tests
-   (`TreeRowTooltipComposerTests.cs`, 21 test methods / 25 test cases).**
+   (`TreeRowTooltipComposerTests.cs`, 24 test methods / 28 test cases).**
    Extracted the `extraTooltipLines` build (`Views/Rendering/
    TreeSectionController.cs`, formerly ~726-940) verbatim into a static,
    Blish-free `BuildExtraTooltipLines(node, captionText, currentPlan)`
@@ -7095,22 +7103,45 @@ this verdict, not merely out of scope.
 **Validation performed:**
 - Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
   C:/Dev/Blish/wt-qtooltip/GW2CraftingHelper.csproj -p:Platform=x64
-  -t:Rebuild` - 0 errors, 1782 pre-existing StyleCop warnings, none newly
-  introduced in
+  -t:Rebuild` - 0 errors, 1781 StyleCop warnings, none newly introduced in
   any touched file (`Services/TreeRowTooltipComposer.cs`, `Views/Rendering/
   TreeSectionController.cs`, `Services/PlanStripTickDecision.cs`,
   `Views/CraftingPlanView.cs`, `Services/CraftingPlanPipeline.cs`,
   `Services/PlanPhaseEvent.cs`) - one transient SA1512 warning
   (single-line comment followed by blank line) introduced by the
   `FormatPhaseText` removal was caught and fixed before the final build.
+  (This entry previously claimed 1782 pre-existing warnings with none
+  newly introduced; an independent `-t:Rebuild` found that claim false in
+  two ways. First, the underlying `c1c52e3` commit's "0 warnings, 0
+  errors" was an incremental-build artifact - `dotnet build` without
+  `-t:Rebuild` reports "Nothing to do" when nothing changed since the
+  last build, not a true warning count. Second, a real `-t:Rebuild`
+  surfaced 6 warning sites in the two changed pure files:
+  `Services/PlanStripTickDecision.cs` (52,65)/(86,69)/(87,36)/(88,51)
+  SA1503 and `Services/TreeRowTooltipComposer.cs` (67,18)/(225,14)
+  SA1513. Five are the same warnings moved verbatim from their
+  pre-extraction locations (the four `FormatPhaseText` single-line `if`s
+  and the (67,18) construct, character-identical to `ce64423`'s
+  `TreeSectionController.cs:740-744`), so the total warning count was
+  unaffected by their relocation. The sixth, (225,14) in the new private
+  `FormatCoin`, was on genuinely new code - a multi-line
+  `if (copper < 0) { copper = 0; }` missing the blank line after its
+  closing brace that `CoinCurrencyRenderer.FormatCoinText`'s single-line
+  form never needed - and has been fixed by adding that blank line,
+  dropping the true total from 1782 to 1781.)
 - Tests: `"/mnt/c/Program Files/dotnet/dotnet.exe" test
   C:/Dev/Blish/wt-qtooltip/tests/GW2CraftingHelper.Tests/
-  GW2CraftingHelper.Tests.csproj` - 1799/1799 green (baseline 1768 + 31
-  new: 25 `TreeRowTooltipComposerTests` cases, 6
-  `PlanStripTickDecisionTests` cases). Two tests failed on first run
-  (the two null-caption/null-hint composer tests did not account for the
-  default test-fixture item name also triggering the wiki-link line) and
-  were corrected before the final green run.
+  GW2CraftingHelper.Tests.csproj` - 1802/1802 green (baseline 1768 + 34
+  new: 28 `TreeRowTooltipComposerTests` cases, 6
+  `PlanStripTickDecisionTests` cases; independently re-run and confirmed
+  at HEAD). Two tests failed on first run (the two null-caption/null-hint
+  composer tests did not account for the default test-fixture item name
+  also triggering the wiki-link line) and were corrected before the final
+  green run. (This figure previously read 1799/1799 with 25
+  `TreeRowTooltipComposerTests` cases; the c1c52e3 follow-up commit added
+  3 more branch-coverage cases to that file without updating this record
+  - the same stale-validation defect class the ARCHITECTURE.md coupling
+  figure above was corrected for.)
 - Manual: `git status --short` confirmed no intermediate cache files
   (`ref/wiki_vendor_cache.json`/`ref/item_id_cache.json`) were touched; a
   full-diff ASCII scan (`grep -P '[^\x00-\x7F]'`) over every file this

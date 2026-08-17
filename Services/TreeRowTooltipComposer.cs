@@ -223,6 +223,7 @@ namespace GW2CraftingHelper.Services
             {
                 copper = 0;
             }
+
             long gold = copper / 10000;
             long silver = (copper % 10000) / 100;
             long cop = copper % 100;

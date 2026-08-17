@@ -311,12 +311,21 @@ production `.cs` files (`Module.cs` plus 9 `Services/` files and 4
 `Views/` files, not counting `Models/` shape-mirroring comments or test
 files), of which 13 are comment-only; the actual compile-time coupling is
 2 references, both in `Views/CraftingPlanView.cs` (the field declaration
-and the constructor call site) - plus 3 doc mentions (this section's own
-bullet and "Where:" line, plus `docs/ROADMAP.md`; `docs/KNOWN-ISSUES.md`
-carries 42 more as historical narrative) - not 18, an earlier over-count
-that conflated this figure with something wider. A state/render split would not shrink that
-coupling, only relocate half of it across a new seam. The accepted
-alternative for future tree-row/pill features is not a class bisection: per
+and the constructor call site) - plus, as measured pre-change at `ce64423`,
+3 doc mentions (this section's own bullet and "Where:" line, plus
+`docs/ROADMAP.md`; `docs/KNOWN-ISSUES.md` carried 42 more as historical
+narrative) - not 18, an earlier over-count that conflated this figure with
+something wider. That doc-mention count is a snapshot, not a live figure:
+this very paragraph and the milestone entry that accompanies it both add
+mentions on landing, so as of this commit `TreeSectionController` is named
+81 times across 7 doc files instead of 3 across 2 -
+`docs/ARCHITECTURE.md` 6, `docs/ROADMAP.md` 1, `docs/KNOWN-ISSUES.md` 57,
+`CONTRIBUTING.md` 3, `docs/gw2e-considerations.md` 2,
+`docs/dev-notes/HISTORY.md` 4, `docs/research/gw2e-convergence-matrix.md`
+8 (`git grep -c TreeSectionController -- '*.md'`). A state/render split
+would not shrink that coupling, only relocate half of it across a new
+seam. The accepted alternative for future tree-row/pill features is not
+a class bisection: per
 the STANDING RULE (`CONTRIBUTING.md`), extract the pure text/decision
 computation for a given feature into a Blish-free, unit-tested composer
 under `Services/` first - `TreeRowTooltipComposer` (tree-tooltip-composer
