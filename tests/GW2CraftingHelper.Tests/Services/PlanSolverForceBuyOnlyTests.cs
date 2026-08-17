@@ -39,6 +39,53 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void CostDiagnostics_CompetencyResolved_UsesCompetentRecipeNotCheapestOverall()
+        {
+            // Adversarial-review round-2 finding #2: two recipes for item
+            // 1 - RecipeId 10 (Weaponsmith 400, ingredient item 2 x1 @
+            // 30c = the numerically cheapest overall) and RecipeId 20
+            // (Armorsmith 400, ingredient item 3 x1 @ 100c = costlier, but
+            // the ONLY one this account is actually trained for).
+            // costDiagnostics' CraftCost figure must track the SAME
+            // competency-resolved recipe the real solve commits to (100c,
+            // RecipeId 20) - never the cheapest-overall untrained recipe
+            // (30c, RecipeId 10) the real solve would never actually pick.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, new List<string> { "Weaponsmith" }, 400, Leaf(2, 1)),
+                Option(20, 1, 1, new List<string> { "Armorsmith" }, 400, Leaf(3, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 5000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100 } }
+            };
+            var solver = new PlanSolver();
+            var characterDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Armorsmith", Rating = 400 }
+            };
+
+            var diagnostics = new Dictionary<int, (long? BuyCost, long? CraftCost)>();
+            solver.Solve(
+                tree, prices, null, PriceBasis.InstantBuy, overrides: null, currencyValuation: null,
+                forceBuyOnlyNodeIds: null, costDiagnostics: diagnostics,
+                characterDisciplines: characterDisciplines);
+
+            Assert.True(diagnostics.TryGetValue(0, out var rootDiag));
+            Assert.Equal(5000, rootDiag.BuyCost);
+            Assert.Equal(100, rootDiag.CraftCost);
+
+            // Confirms the diagnostic figure actually matches what the real
+            // solve commits to, not merely a value in isolation.
+            var result = solver.Solve(
+                tree, prices, null, PriceBasis.InstantBuy, overrides: null, currencyValuation: null,
+                characterDisciplines: characterDisciplines);
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.Equal(20, result.Decisions[0].RecipeId);
+            Assert.Equal(100, result.Decisions[0].TotalCost);
+        }
+
+        [Fact]
         public void ForceBuyOnlyNodeIds_ExcludesCraftFromAutomaticPick()
         {
             // Craft (60) would normally beat buy (100); force-buy-only

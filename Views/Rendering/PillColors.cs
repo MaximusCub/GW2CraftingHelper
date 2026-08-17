@@ -78,6 +78,18 @@ namespace GW2CraftingHelper.Views.Rendering
                     border = new Color(155, 118, 219); // #9B76DB
                     fill = border * 0.15f;
                     break;
+                case PillKind.Subdued:
+                    // source-selection-simplification: literally Locked's
+                    // own RGB values below - "reuse an existing muted
+                    // PillKind, no new colors" (the maintainer's own
+                    // wording) - kept as its own switch arm (not folded
+                    // into the Locked case) only so a future edit to
+                    // Locked's color doesn't silently retint Subdued too
+                    // without a deliberate choice; the two case bodies
+                    // must stay byte-for-byte identical.
+                    border = new Color(107, 107, 107); // #6B6B6B
+                    fill = Color.Black * 0.3f;
+                    break;
                 case PillKind.Locked:
                 default:
                     border = new Color(107, 107, 107); // #6B6B6B

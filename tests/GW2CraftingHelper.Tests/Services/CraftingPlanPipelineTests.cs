@@ -982,6 +982,70 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Same(result.CharacterDisciplines, result.SolveContext.CharacterDisciplines);
         }
 
+        // Adversarial-review fix (#7, source-selection-simplification
+        // design-law gap): real pipeline round-trip (recipe API -> solve
+        // -> CraftingTreeBuilder -> CompetencyOpportunityCalculator),
+        // proving the whole CraftExcludedByCompetency threading actually
+        // reaches CraftingPlanResult.CompetencyOpportunities end-to-end,
+        // not just the isolated calculator unit coverage in
+        // CompetencyOpportunityCalculatorTests.
+        [Fact]
+        public async Task GenerateStructuredAsync_CraftExcludedByCompetency_PopulatesCompetencyOpportunities()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+
+            var snapshot = new AccountSnapshot
+            {
+                CharacterDisciplines = new List<SnapshotCharacterDiscipline>
+                {
+                    // Untrained relative to the recipe's MinRating 400 -
+                    // craft (10c) is excluded from the automatic pick even
+                    // though far cheaper than the TP buy (5000c).
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 100, Active = true }
+                }
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            var targetStep = Assert.Single(result.Plan.Steps, s => s.ItemId == 1);
+            Assert.Equal(AcquisitionSource.BuyFromTp, targetStep.Source);
+            Assert.NotNull(result.CompetencyOpportunities);
+            var opportunity = Assert.Single(result.CompetencyOpportunities);
+            Assert.Equal(1, opportunity.ItemId);
+            Assert.Equal(targetStep.TotalCost - opportunity.CraftCost, opportunity.DeltaCost);
+            Assert.True(opportunity.DeltaCost > 0);
+            Assert.Equal("Weaponsmith", Assert.Single(opportunity.Disciplines));
+            Assert.Equal(400, opportunity.MinRating);
+        }
+
         [Fact]
         public async Task GenerateStructuredAsync_NullSnapshot_CharacterDisciplinesIsNull()
         {
