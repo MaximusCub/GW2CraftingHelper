@@ -738,6 +738,60 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(result.RequiredRecipes[0].IsAutoLearned);
         }
 
+        // UI-bundle milestone, Feature A (wiki links): same Flags-membership
+        // pattern as RequiredRecipes_AutoLearnedFlag above.
+        [Fact]
+        public void RequiredRecipes_LearnedFromItemFlag()
+        {
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith" }, 400,
+                new List<string> { "LearnedFromItem" },
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Single(result.RequiredRecipes);
+            Assert.True(result.RequiredRecipes[0].IsLearnedFromItem);
+        }
+
+        [Fact]
+        public void RequiredRecipes_NoLearnedFromItemFlag_DefaultsFalse()
+        {
+            var tree = TreeWithCraftStep(
+                1, 10, 1,
+                new List<string> { "Weaponsmith" }, 400,
+                new List<string>(),
+                Leaf(2, 1));
+
+            var plan = new CraftingPlan
+            {
+                TargetItemId = 1,
+                TargetQuantity = 1,
+                Steps = new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                }
+            };
+
+            var metadata = new Dictionary<int, ItemMetadata>();
+            var result = _builder.Build(plan, tree, metadata, null, null);
+
+            Assert.Single(result.RequiredRecipes);
+            Assert.False(result.RequiredRecipes[0].IsLearnedFromItem);
+        }
+
         [Fact]
         public void RequiredRecipes_MissingFlag_WithLearnedSet()
         {

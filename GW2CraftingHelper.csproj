@@ -118,10 +118,17 @@
     <Compile Include="Models\CraftingPlanResult.cs" />
     <Compile Include="Models\ExcessCraftOutput.cs" />
     <Compile Include="Models\CompetencyOpportunity.cs" />
+    <Compile Include="Services\CompetencyOpportunityCalculator.cs" />
+    <Compile Include="Models\RecipeSheetSavingsOpportunity.cs" />
+    <Compile Include="Models\SeasonalVendorTip.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
     <Compile Include="Services\ExcessCraftOutputCalculator.cs" />
-    <Compile Include="Services\CompetencyOpportunityCalculator.cs" />
+    <Compile Include="Services\CostLineValuation.cs" />
+    <Compile Include="Services\SeasonalOfferFilter.cs" />
+    <Compile Include="Services\RecipeSheetSavingsCalculator.cs" />
+    <Compile Include="Services\RecipeSheetItemSeedService.cs" />
+    <Compile Include="Services\SeasonalVendorTipCalculator.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />
@@ -201,6 +208,9 @@
     <Compile Include="Models\PlanViewModel.cs" />
     <Compile Include="Services\PlanViewModelBuilder.cs" />
     <Compile Include="Services\RequiredRecipesVisibility.cs" />
+    <Compile Include="Services\WikiLinkBuilder.cs" />
+    <Compile Include="Services\WikiLinkLauncher.cs" />
+    <Compile Include="Services\ReceiptCaptionHelper.cs" />
     <Compile Include="Services\Gw2AccountRecipeClient.cs" />
     <Compile Include="Services\IMysticForgeRecipeSource.cs" />
     <Compile Include="Services\FileMysticForgeRecipeSource.cs" />
@@ -351,6 +361,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ref\daily_cooldown_items.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ref\recipe_sheet_items.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

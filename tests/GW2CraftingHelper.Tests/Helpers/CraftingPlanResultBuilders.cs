@@ -30,7 +30,9 @@ namespace GW2CraftingHelper.Tests.Helpers
             List<SnapshotCharacterDiscipline> characterDisciplines = null,
             Dictionary<int, DailyCooldownItem> dailyCooldownItems = null,
             List<ExcessCraftOutput> excessCraftOutputs = null,
-            List<int> probabilisticForgeOutputItemIds = null)
+            List<int> probabilisticForgeOutputItemIds = null,
+            List<RecipeSheetSavingsOpportunity> recipeSheetSavingsOpportunities = null,
+            List<SeasonalVendorTip> seasonalVendorTips = null)
         {
             return new CraftingPlanResult
             {
@@ -67,7 +69,14 @@ namespace GW2CraftingHelper.Tests.Helpers
                 // null" default above - production (ExcessCraftOutputCalculator/
                 // PlanResultBuilder) never leaves either field null once run.
                 ExcessCraftOutputs = excessCraftOutputs ?? new List<ExcessCraftOutput>(),
-                ProbabilisticForgeOutputItemIds = probabilisticForgeOutputItemIds ?? new List<int>()
+                ProbabilisticForgeOutputItemIds = probabilisticForgeOutputItemIds ?? new List<int>(),
+                // opportunity-notes: same "empty list, not null" default as
+                // ExcessCraftOutputs/ProbabilisticForgeOutputItemIds above -
+                // production (RecipeSheetSavingsCalculator/
+                // SeasonalVendorTipCalculator) never leaves either field
+                // null once run.
+                RecipeSheetSavingsOpportunities = recipeSheetSavingsOpportunities ?? new List<RecipeSheetSavingsOpportunity>(),
+                SeasonalVendorTips = seasonalVendorTips ?? new List<SeasonalVendorTip>()
             };
         }
 

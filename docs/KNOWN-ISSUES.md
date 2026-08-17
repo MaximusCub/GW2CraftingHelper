@@ -4038,7 +4038,7 @@ only - see git log for full per-commit detail):
    closed the structurally identical unrecognized-`CostLine.Type` gap in
    `VendorBatchSolver`; 2 tests.
 
-Gate: not yet run live - queued for the next batched desktop session. Merged after five adversarial review rounds, a targeted fix pass, and an independent verification review resolved every finding (zero blocking), under the maintainer's standing merge directive (2026-08-16). Solver behavior is fully covered by the suite; the deferred item is visual confirmation of the new labels/tooltips only.
+Gate: PARTIAL PASS 2026-08-16 (orchestrator live desktop session). Solver-side safety fully suite-covered; the GuildUpgrade pill/label visuals were unreachable live (no guild-decoration output is plannable via the search list) - visual slice rides the next natural opportunity.
 ## AUDIT ROW 20/38: TP price-side fallback parity (2026-08-16)
 
 **Bug**: `PlanSolver.GetUnitPrice` returned 0 whenever the selected
@@ -4268,7 +4268,7 @@ history - `TreeSectionController.cs` is Blish-bound and outside this
 repo's test-runnable surface, same constraint every UI-adjacent entry
 in this file notes.
 
-Gate: not yet run live - queued for the next batched desktop session. Merged after five adversarial review rounds, a targeted fix pass, and an independent verification review resolved every finding (zero blocking, 1383/1383 suite), under the maintainer's standing merge directive (2026-08-16). Solver behavior is fully covered by the suite; the deferred item is visual confirmation of the caveat tooltips only.
+Gate: PARTIAL PASS 2026-08-16 (orchestrator live desktop session). Fallback pricing exercised implicitly throughout live plans; the caveat tooltip's specific fallen-back shape did not occur in the tested plans - suite-covered, visual slice deferred.
 
 ## AUDIT ROW 56: daily craft-cooldown notices + three small fixes (2026-08-16)
 
@@ -4616,7 +4616,7 @@ I/O. IDs remain internal-only - the new/changed hint text never
 surfaces an item id. No live desktop verification was performed (same
 Blish-bound surface as PART A/B/C).
 
-Gate: not yet run live - queued for the next batched desktop session. Merged after the full review pipeline resolved every finding, under the maintainer's standing merge directive (2026-08-16).
+Gate: PASS 2026-08-16 (orchestrator live desktop session). Deldrimor Steel Ingot x5 rendered the timegate notice verbatim ('Lump of Mithrillium is timegated - 1 per day per account - crafting 5 will take about 5 days'); the empty-IconUrl magenta fix verified on the Snapshot tab (Spirit Shards row degrades to no icon); currency-name corrections suite-covered.
 ## Currency UX package: defaults, plan-scope pills, value-detail hover (2026-08-16)
 
 Three maintainer-approved currency-UX features shipped as one coherent
@@ -4771,7 +4771,7 @@ value already behaves in a saved snapshot (both are frozen at solve time),
 so it is arguably correct snapshot semantics rather than a bug - noted
 here so it is not rediscovered as one.
 
-Gate: not yet run live - queued for the next batched desktop session. Merged after the full review pipeline resolved every finding (independent verification zero-blocking, 1480/1480 suite; the verified ComparisonValue fallback-tier regression fixed in fc11dff), under the maintainer's standing merge directive (2026-08-16).
+Gate: PASS with one deferred slice 2026-08-16 (orchestrator live desktop session). Plan-scope currency pills verified live in collapsed full-coverage form (plain HAVE on all covered leaves incl. W4B component leaves - the unified vocabulary); Settings defaults suite-covered; value-detail hover: all three suppression paths verified live correct (unvalued ARE, component leaves, non-diverging rows) but no positive render occurred in the tested shapes - a propagation question (vendor-child currency valuations folding into a craft root's DecisionValue) is under investigation on branch gate-fixes.
 ## Decision-invariant "Value Own Materials" (VOM, 2026-08-16)
 
 **Bug (audit row 31)**: `InventoryReducer.Reduce` walked the recipe
@@ -5127,7 +5127,7 @@ re-reducing re-solve. Build: `dotnet build GW2CraftingHelper.csproj
 -p:Platform=x64` - clean, 0 errors. Tests: 1428 passed, 0 failed (1425
 + the 3 new `PlanStoreTests` facts above).
 
-Gate: not yet run live - queued for the next batched desktop session. Merged after the full review pipeline resolved every finding (2 adversarial rounds, verification zero-blocking, 1428/1428 pre-merge), under the maintainer's standing merge directive (2026-08-16). Note: first PersistedPlan schema bump (v2) - saved plans regenerate once on upgrade.
+Gate: PASS 2026-08-16 (orchestrator live desktop session). Inline toggle renders next to Use Own Materials (checked default); schema-v2 one-time plan reset consumed the old v1 file cleanly (strip showed Ready, no restored plan); decision behavior suite-covered.
 
 ## Plan Notes section: excess/reclaim, competency, forge scope (2026-08-16)
 
@@ -5301,6 +5301,369 @@ entry in this file notes. The Notes section's real on-screen layout
 collapse/expand) has not been visually confirmed in a running Blish HUD
 client.
 
+Gate: PASS (hidden-when-empty) 2026-08-16 (orchestrator live desktop session). Verified hidden on two plans that generate zero notes - correct per design; positive note rendering is suite-covered (cooldown notice, a sibling feature, rendered live); a notes-generating live fixture rides the next natural field test.
+## UI bundle: wiki links, snapshot status row, receipt/what-if captions (2026-08-16)
+
+Three maintainer-approved UI features, developed together in one
+worktree (`ui-bundle` branch) since they touch disjoint files except
+where noted.
+
+**Feature A (wiki links)**: two placements, both maintainer-authorized
+context actions rather than visible icons.
+
+1. Recipe Tree rows (`TreeSectionController.RenderTreeNode`): every row
+   (item leaf, internal node, cost-component leaf, reference-branch
+   child alike) gets a right-click handler that opens the item's GW2
+   wiki page (`WikiLinkBuilder.BuildItemPageUrl(node.Name)`) in the
+   default browser, plus a "Right-click: Open wiki page" tooltip line.
+   This is the module's first external-URL launch
+   (`WikiLinkLauncher.Open`, a thin try/caught `Process.Start` wrapper
+   logging failures to `ModuleLog` rather than crashing the row click).
+   Right-click was chosen over a visible icon because the row's fixed
+   column grid (caret/icon/name/pill column/cost column, all
+   right-anchored per `PlanRelayoutMath.ComputeTreeColumnEdges`) has no
+   spare pixels at typical window widths, and right-click cannot
+   collide with the row's existing left-click expand/collapse toggle.
+2. Required Recipes rows (`RecipesSectionRenderer`): same right-click
+   pattern, scoped to `StatusTag == "Missing!"` rows only (a row the
+   user has nothing left to unlock for gets no wiki affordance at all)
+   - per the spec's own "Required Recipes Missing! rows" wording, a
+   narrower scope than the tree row affordance's "each item row".
+   Target is flag-based (`RequiredRecipe.IsLearnedFromItem`, set from
+   `RecipeOption.Flags.Contains("LearnedFromItem")` in
+   `PlanResultBuilder`, mirroring the existing `IsAutoLearned` flag
+   exactly): a LearnedFromItem recipe links to its own
+   "Recipe: &lt;output item name&gt;" wiki sheet page
+   (`WikiLinkBuilder.BuildRecipeSheetUrl`); every other recipe links to
+   the output item's own page with a "#Acquisition" anchor
+   (`BuildItemAcquisitionUrl`) - anchors degrade gracefully to page-top
+   on a wiki page with no such section, and page titles match item
+   names via wiki redirects, as the spec assumes.
+
+URL construction (`Services/WikiLinkBuilder.cs`) is a pure, unit-tested
+helper: spaces become underscores, then the whole title is percent-
+encoded via `Uri.EscapeDataString` (RFC 3986 unreserved characters -
+letters/digits/`-`/`.`/`_`/`~` - survive unescaped, so the underscores
+just inserted are untouched) - except the recipe sheet page's literal
+`Recipe:_` namespace prefix, built separately so its colon is never
+percent-encoded (`%3A` would not match the site's real URLs). Tested
+against both spec-named examples: `"Zojja's Claymore"` ->
+`Zojja%27s_Claymore` (and `Recipe:_Zojja%27s_Claymore` for the sheet
+page), `"Bolt of Damask"` -> `Bolt_of_Damask`. No item/vendor id is
+ever part of a built URL or displayed anywhere - IDs stay internal-only
+throughout, unchanged.
+
+**Feature B (status own row)**: `Views/MainView.cs`'s Snapshot tab
+status label (`_statusLabel`, the "Updated - &lt;date&gt; (age)"/
+failure-status text) moved out of `_headerPanel` - where it shared a
+fixed x=140 slot with the Clear Cache/Refresh Now buttons, a layout the
+method's own long-standing "Layout risk" doc comment already flagged as
+capable of running out of room at the window's clamped 930x710 minimum
+size - into its own new full-width `_statusPanel` row directly beneath
+the header. Every row below (search box, source-filter checkboxes,
+coin panel, scrollable content) shifts down by `StatusRowHeight` (24px)
+plus the same 5px gap the header already used before the search row;
+every other existing gap in the chain is preserved exactly via the same
+additive `const` pattern the file already used for its row Y positions.
+Verified before touching layout, per the milestone's own caution: the
+Snapshot tab's rows are plain fixed-Y `Panel`s sized from local
+`private const int` fields in `MainView.cs` itself, not
+`PlanContentHeightMath`/`PlanRelayoutMath` - those two frozen files
+size only the Crafting Plan tab's section/tree rows and are untouched
+by this change. Both duplicated status-string build sites
+(`MainView.ApplyStatusDisplay` and `Module.cs`'s Updated/Cache
+Cleared/failure-status string composition) are unedited and keep
+producing the same text; only the label's layout home moved.
+
+**Feature C (receipt/what-if captions)**: under a `BuyFromVendor` node
+whose `Children` stack BOTH W4B's synthesized cost-component leaves
+(`IsCostComponent == true`) AND the dimmed "what it would cost to craft
+instead" reference branch appended after them
+(`CraftingTreeBuilder.BuildNode`'s `componentLeaves != null &&
+wantsReferenceBranch` case - `node.IsReferenceBranch` true with
+`Children[0].IsCostComponent` true is exactly this case, detectable
+from the node alone with no new model field), two subdued captions mark
+the group boundary: "Vendor price:" ahead of the component leaves,
+"If crafted instead:" ahead of the reference-branch children.
+
+**Substitution from the spec's own sanctioned fallback**: implemented
+as extra tooltip lines on each group's first child row, NOT as real
+inserted tree rows. Reason, per the spec's own caution: tree row
+heights flow through `PlanContentHeightMath`'s tree arm
+(`ChildrenHeight`/`TreeChildFlowHeight`/`TreeNodeHeight`, all frozen,
+untouched), which sums `TreeRowHeight` over exactly
+`node.Children.Count` - a caption is not one of this node's existing
+children, so inserting a real row would desync the height math
+(computed from `Children.Count`) from the actually-rendered row count,
+reproducing the exact multi-frame flash/stutter class M33 C2a's
+explicit-height rework was written to eliminate (see that section's own
+entry above). `Services/ReceiptCaptionHelper.cs` (pure, Blish-free,
+12 unit tests) computes `ComputeCaptionSplitIndex` (the child index
+where the component-leaf run ends and the reference-branch run begins,
+or -1 when a node is not this stacked case) once per node, and
+`CaptionForChildIndex` maps a child index to caption text or null.
+`TreeSectionController.RenderTreeNode` gained an optional
+`captionText` parameter (default null, so every pre-existing call site
+compiles unchanged) threaded through all three places children are
+rendered - the initial default-expanded pass, the lazy-build
+expand/collapse toggle handler, and the Expand All button's lazy-build
+loop - each computing the split index once and passing the right
+child's caption text down. The row itself already carries a tooltip
+(`UpdateTreeRowTooltip`/`extraTooltipLines`); the caption is inserted
+at the front of that same list so it reads first, ahead of any
+unit-price/caveat lines a component leaf or reference-branch child
+already shows.
+
+**Risk/follow-up (reported, not fixed)**: because the caption is
+tooltip-only, a user who never hovers the first row of either group
+will not see it - the row-insertion approach the spec preferred would
+be strictly more discoverable, but requires either widening
+`PlanContentHeightMath`'s tree arm to understand a new "caption pseudo-
+row" concept or synthesizing captions as real (Blish-free-serializable)
+`CraftingTreeNode` children the existing math would count for free;
+both are real design changes to a frozen file's contract or the
+solver-adjacent tree-node model, out of scope for this milestone's
+"tooltip fallback, report the substitution" instruction.
+
+Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - clean,
+0 errors (StyleCop warning count unchanged from before this milestone;
+no new warning codes introduced by any edited/added file's own lines).
+Tests: 1576 passed, 0 failed after two review-fix commits (84538e6, cc99f3f; initially 1549 = baseline 1519 + 30 new: 15
+`WikiLinkBuilderTests` + 12 `ReceiptCaptionHelperTests` + 2
+`PlanResultBuilderTests` [`RequiredRecipes_LearnedFromItemFlag`/
+`_NoLearnedFromItemFlag_DefaultsFalse`] + 4
+`PlanViewModelBuilderStepSectionsTests` [wiki-URL scoping/flag-target
+cases] = 1549) via `dotnet test
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`. No
+Blish HUD/`BlishHUD.exe`/`Gw2Sharp` reference in any test file; every
+new test exercises a real production entry point (`WikiLinkBuilder`'s
+public static methods, `ReceiptCaptionHelper`'s public static methods,
+`PlanResultBuilder.Build`, `PlanViewModelBuilder.Build`), no contract
+mirrors, no fake file I/O. `WikiLinkLauncher`/the `RightMouseButtonPressed`
+handlers and Feature B's layout are Blish-bound UI surface outside this
+repo's test-runnable boundary, same constraint every UI-adjacent entry
+in this file notes - not live-verified in a running Blish HUD/GW2
+client this session (browser automation requires asking the user
+first, per this repo's own rule, and was not requested this session).
+No `PersistedPlan` schema bump: `RequiredRecipe.IsLearnedFromItem` and
+`PlanRowViewModel.WikiUrl` are both additive with safe defaults
+(`false`/`null`) - the same precedent `IsCostComponent`'s own doc
+comment already established - and `PlanRowViewModel` itself is never
+persisted at all (only `CraftingPlanResult`, which
+`PlanViewModelBuilder.Build` rebuilds fresh on every render/restore).
+IDs remain internal-only throughout; coin icons unaffected (no
+coin-rendering code touched by any of the three features).
+
+Gate: MIXED 2026-08-16 (orchestrator live desktop session). Status own-row PASS (full-width, dated failure status, no button collision); wiki-link affordance PASS-visual ('Right-click: Open wiki page' tooltip renders on rows; the actual browser launch deliberately untested with guests present); receipt/what-if captions FAIL - they do not render in the reachable override-re-solve state (ARE vendor flip showed both child groups uncaptioned); root-cause + fix in flight on branch gate-fixes.
+
+## Opportunity notes: recipe-sheet savings + seasonal vendor tips (2026-08-16)
+
+Extended the Plan Notes section (previous entry, immediately above) with
+two maintainer-directed OPPORTUNITY note kinds, both carrying concrete
+numbers, per the maintainer's design law: structured sections show the
+BEST-NOW option; opportunities/considerations go to Plan Notes.
+
+**1. RECIPE-SHEET SAVINGS.** For a bought (not crafted) item whose
+reference branch (`CraftingTreeBuilder`'s "what it would cost to craft
+instead" hypothetical subtree) is blocked on a missing, `LearnedFromItem`
+recipe that a curated map says is purchasable, and where crafting would
+actually be cheaper: "Buy the `<output>` recipe (`<sheet cost>`) to craft
+it instead - saves `<delta>` per unit", or the training variant when no
+character meets the recipe's own discipline/rating.
+
+**Design decision worth flagging explicitly (data-availability gap, not
+a scope cut):** the task's own join ("VendorOfferStore offers whose
+output is the sheet item") requires a recipe-id -> unlocking-sheet-item-id
+mapping. Neither the real GW2 `/v2/recipes` API nor this repo's existing
+data (recipes seed, vendor offers, item metadata) captures that
+linkage anywhere - the GW2 API only exposes it from the OTHER direction
+(an item's own `details.recipe_id`, on `/v2/items`, for `Unlock`/
+`CraftingRecipe` consumables), and building a live index over that
+(fetch-and-cross-reference every vendor offer's own item metadata to
+find which are recipe sheets) is exactly the "reverse-sheet-index
+plumbing" the task explicitly ruled out. Rather than fabricate a
+recipe/sheet pairing I could not verify against a real wiki source (repo
+invariant: never invent data), `RecipeSheetSavingsCalculator.Apply`
+takes `recipeSheetItemIdByRecipeId` as an injectable, optional
+dictionary - `CraftingPlanPipeline`'s own constructor default is empty.
+**Since fixed (review-fix round):** `Module.cs`'s `Initialize()` now
+loads a small, wiki-verified `ref/recipe_sheet_items.json` seed via the
+new `Services/RecipeSheetItemSeedService.Load` (same try/catch,
+Blish-`ContentsManager`-stream loading shape as the neighboring
+`acquisition_hints_seed.json`/`daily_cooldown_items.json` reads
+immediately above it) and passes the result as
+`recipeSheetItemIdByRecipeId:` on the real `CraftingPlanPipeline`
+construction - **this note now fires in production** whenever a plan's
+reference branch matches a seeded recipe. Every other piece of the
+feature (missing+LearnedFromItem detection, craft-vs-chosen-cost delta
+math, "not comparable" skip rules, discipline-training-blocked
+detection, sheet-price lookup via the ordinary
+`VendorOfferStore.GetOffersForItem`, and the two-row Notes rendering) is
+fully implemented and covered by real, injected fixture data in
+`RecipeSheetSavingsCalculatorTests`/
+`PlanViewModelBuilderNotesRecipeSheetSavingsTests`, plus the now-real
+`ref/recipe_sheet_items.json` seed wiring exercised via
+`RecipeSheetItemSeedService`.
+
+**2. SEASONAL VENDOR TIP.** Blish's `FestivalContext` is read via
+`Module.cs`'s `ReadActiveFestivalNames()` and projected to plain
+`Festival.Name` strings (e.g. `"halloween"`) before crossing into the
+Blish-free `Services`/`Models` layers. **Since fixed (review-fix round
+#3):** the read is no longer a one-shot `Initialize()`-time call - it is
+now a `Func<IReadOnlyList<string>>` (`CraftingPlanPipeline`'s
+`activeFestivalNames` constructor parameter) that `Module.cs` passes as
+`ReadActiveFestivalNames`, invoked LAZILY at plan-generation time
+instead. A one-shot `Initialize()`-time read could observe `NotReady`
+(the context loads asynchronously) and silently disable the feature for
+the whole session; the lazy read re-checks on every plan instead. Every
+failure state (context not registered, `NotReady`/`Unavailable`/`Failed`,
+or any exception) still collapses to an empty list, now logged at Info
+(an expected, common, benign state) so "seasonal tips disabled by
+<availability>" is distinguishable in the module log from "no festival
+active" (Available with an empty list, which logs nothing). Only the
+exception path still logs at Warn. **MEASURED, not guessed:** `Festival.Name` and
+`Festival.DisplayName` were read via `System.Reflection` directly against
+the shipped `packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe` (no live
+game client needed - `Festival` instances are plain static fields) -
+`Name` is lowercase (`"halloween"`), NOT the capitalized `DisplayName`
+(`"Halloween"`) an unverified guess would likely have used, which would
+have silently broken every string match. `Gw2Constants.
+FestivalDisplayNames` is a small curated Name->DisplayName table (same
+measurement), not a capitalizer, since Blish's own DisplayName is not a
+simple capitalization of Name for every festival (`"superadventurefestival"`
+-> `"Super Adventure Festival"`).
+
+`VendorOffer.SeasonalFestival` seeds exactly the three real
+Candy Corn Vendor (Weekly) ecto (Glob of Ectoplasm, item 19721) offers
+already present in `ref/vendor_offers.json`'s wiki-scraped baseline -
+every other offer in that 53,536-row file is untouched. Per the
+maintainer's explicit decision, seasonal offers are excluded from the
+solver's own candidate set UNCONDITIONALLY (`SeasonalOfferFilter.
+ExcludeSeasonal`, applied only at the actual `_solver.Solve`/
+`OwnedMaterialsForceBuyPrePass` call sites in `CraftingPlanPipeline` -
+every other consumer of the vendor-offers dictionary, e.g. metadata
+widening, keeps seeing the raw/unfiltered data unchanged) - a plan
+always assumes the regular market, active festival or not.
+`SeasonalVendorTipCalculator` is the separate, purely-informational pass
+that surfaces an active, cheaper festival offer as a Notes row; its cost
+description is built ONLY from Item-type cost lines (the only kind the
+three seeded offers have) - a coin cost line would have no safe way to
+render inline as text without violating the "coin icons right of the
+number" invariant with the row's one `CoinValue` slot already spent on
+the plan's own price, so that case is skipped entirely rather than
+rendered incorrectly (currently unreachable with the seeded data, but a
+real restriction, not a hypothetical one).
+
+The wiki-scrape-updater-side automation to detect/tag FUTURE seasonal
+offers from the wiki's Temporary template (so new festival vendors don't
+need a hand edit like this one) is a recorded follow-up, not this pass.
+
+**What changed:** `Models/CraftingTreeNode.cs` (`ReferenceRecipeId`/
+`Disciplines`/`MinRating`/`IsLearnedFromItem`, reference-branch-only),
+`Models/RecipeSheetSavingsOpportunity.cs`, `Models/SeasonalVendorTip.cs`,
+`Models/CraftingPlanResult.cs` (+2 fields), `Models/VendorOffer.cs`
+(+`SeasonalFestival`), `Models/Gw2Constants.cs` (+`HalloweenFestivalName`,
+`FestivalDisplayNames`), `Services/CraftingTreeBuilder.cs`
+(`ApplyReferenceRecipeInfo`), `Services/CostLineValuation.cs` (new,
+shared coin-valuation helper - never touches `VendorBatchSolver`, one of
+the DO-NOT-TOUCH files), `Services/SeasonalOfferFilter.cs` (new),
+`Services/RecipeSheetSavingsCalculator.cs` (new),
+`Services/SeasonalVendorTipCalculator.cs` (new),
+`Services/CraftingPlanPipeline.cs` (two new optional constructor
+parameters, both default-empty; wired at all three result-building call
+sites), `Services/PlanViewModelBuilder.cs` (`BuildNotesSection` gains the
+two new note kinds), `Module.cs` (`FestivalContext` read, now lazy;
+loads and wires the `ref/recipe_sheet_items.json` seed),
+`ref/vendor_offers.json` (3 rows tagged),
+`ref/recipe_sheet_items.json` (new, curated recipe-id ->
+unlocking-sheet-item-id seed), `Services/RecipeSheetItemSeedService.cs`
+(new, loads the seed file), `tools/VendorOfferUpdater/Models/VendorOffer.cs`
+(seasonal-festival tagging support for the updater side),
+`tests/VendorOfferUpdater.Tests/SeasonalFestivalRoundTripTests.cs` (new),
+`.github/workflows/tests.yml` (updated to run the updater/seeder test
+projects alongside the main suite).
+
+**Repo Invariants Checklist:**
+- [x] No Blish HUD references added to tests (both new calculators and
+  `SeasonalOfferFilter`/`CostLineValuation` are plain `internal static`
+  classes over `Models` types only; `Module.cs`'s own `FestivalContext`
+  read is the ONLY place in this whole package that touches Blish, and
+  it is the one file this repo does not unit-test).
+- [x] Tests exercise real production paths (real `VendorOfferStore`
+  backed by a temp-directory baseline in
+  `RecipeSheetSavingsCalculatorTests`, not a fake/mirrored store -
+  matches `VendorOfferStoreTests`' own precedent).
+- [x] No fake file I/O tests introduced.
+- [x] Pricing logic preserves multi-source correctness (`CostLineValuation`
+  refuses - never guesses - on a non-coin currency line, an unpriced Item
+  line, or any unrecognized `CostLine.Type`, mirroring `VendorBatchSolver.
+  EvaluateVendorOffers`' own posture without touching that DO-NOT-TOUCH
+  file).
+- [x] IDs remain internal-only (every note resolves item/recipe/discipline
+  **names**, never raw ids).
+
+**Validation performed:** `dotnet build GW2CraftingHelper.csproj
+-p:Platform=x64` - clean, 0 errors (only pre-existing StyleCop warnings,
+none in new/edited files). `dotnet test tests/GW2CraftingHelper.Tests/
+GW2CraftingHelper.Tests.csproj` (measured, at this pass's own commit):
+1554 (baseline) -> 1601 (+47): `CostLineValuationTests` (7),
+`SeasonalOfferFilterTests` (5), `RecipeSheetSavingsCalculatorTests` (12),
+`SeasonalVendorTipCalculatorTests` (10 - includes a review-fix-round
+addition, see below), `PlanViewModelBuilderNotesRecipeSheetSavingsTests`
+(4), `PlanViewModelBuilderNotesSeasonalVendorTipTests` (5), plus 3 new
+cases appended to the existing `CraftingTreeBuilderTests`, plus one
+existing test file gained two new constructor parameters
+(`CraftingPlanResultBuilders`, not itself a test). All 1601 green at
+that point.
+
+**Updated (later review-fix rounds, measured 2026-08-16):** further
+review-fix rounds (activating the recipe-sheet seed, seasonal tag
+round-trip/lazy festival read/tip wrap/craft-cost math fixes, the
+recursive vendor-currency guard, and the updater CI gap) added more
+tests and a new CI-wired test project. Current totals: `dotnet test
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` - 1616
+green. `dotnet test tests/VendorOfferUpdater.Tests/
+VendorOfferUpdater.Tests.csproj` - 136 green (includes the new
+`SeasonalFestivalRoundTripTests`). `dotnet test
+tests/GW2CraftingHelper.RecipeSeeder.Tests/
+GW2CraftingHelper.RecipeSeeder.Tests.csproj -p:Platform=x64` - 3 green.
+All three suites green as of this pass.
+
+**Review-fix round (self-review, before handoff):**
+`SeasonalVendorTipCalculator` was picking the FIRST qualifying seasonal
+offer per item rather than the cheapest - the three real seeded ecto
+offers are exactly this case (three Halloween candy colors, each its
+own TP price, all trading for the same 5x ecto), so a plan could have
+surfaced a real but non-optimal deal. Fixed to scan every qualifying
+offer and keep the cheapest, mirroring `RecipeSheetSavingsCalculator`'s
+own identical "cheapest priceable offer wins" precedent - new test
+`MultipleQualifyingOffers_PicksCheapest`.
+
+**Risks / follow-ups:**
+- `recipeSheetItemIdByRecipeId` now ships from `ref/recipe_sheet_items.json`
+  (see the RECIPE-SHEET SAVINGS section above) - the seed is small and
+  curated by hand; growing its coverage (more wiki-verified recipe/sheet
+  pairs) is the natural next step to widen when the feature can fire,
+  not to activate it for the first time.
+- Seasonal-offer detection is a one-time hand tag of three known rows,
+  not an automated wiki-scrape pass - see the SEASONAL VENDOR TIP section
+  above.
+- No live desktop verification was performed - `Views/CraftingPlanView.cs`
+  and `Views/Rendering/NotesSectionRenderer.cs` are Blish-bound and
+  outside this repo's test-runnable surface, same constraint every
+  UI-adjacent entry in this file notes (including the immediately
+  preceding Plan Notes entry, which this one extends without touching
+  `NotesSectionRenderer.cs`/`PlanContentHeightMath.cs`/
+  `PlanRelayoutMath.cs`/scroll machinery at all - every new row is a
+  plain `NoteLine`, already covered by that renderer's existing 28px
+  contract). The two new note kinds' real on-screen wording/wrapping have
+  not been visually confirmed in a running Blish HUD client - the
+  RECIPE-SHEET SAVINGS row shape has been verified via injected test
+  fixtures and is now wired to a real, non-empty
+  `recipeSheetItemIdByRecipeId` seed in production (see above), but has
+  not yet been confirmed against a real generated plan on-screen.
+
+Gate: PASS (negative checks) 2026-08-16 (orchestrator live desktop session). Seasonal exclusion verified as the headline: the ARE craft path now prices ectos at the real TP rate (~26s vs the old ~4s26 phantom Halloween vendor), the ecto row's vendor source is gone entirely, and the Candy Corn tip correctly does NOT render out of season; sheet-savings positive render suite-covered.
 Gate: not yet run live - queued for the next batched desktop session (maintainer is currently holding the desktop). Merged after the full review pipeline resolved every finding (2 adversarial rounds, verification zero-blocking, 1536/1536 pre-merge), under the maintainer's standing merge directive (2026-08-16).
 
 ## Source selection simplification: competency-aware default + subdued losing pills (2026-08-16)
@@ -5490,7 +5853,7 @@ constraint every UI-adjacent entry in this file notes. The Subdued
 pill's actual on-screen color/tooltip rendering has not been visually
 confirmed in a running Blish HUD client.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: not yet run live - queued for the next desktop session (subdued-pill + competency-default visuals). Merged after the deepest pipeline of the wave: implementation, two adversarial rounds, three verification passes (the second MEASURED an overcorrection suppressing a real 70c opportunity; the third revert-tested both direction pins on the final design), under the maintainer's standing merge directive (2026-08-16).
 
 ## Source selection simplification: adversarial-review fix round (8 findings) (2026-08-16)
 

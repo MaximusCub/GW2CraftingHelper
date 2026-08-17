@@ -260,6 +260,14 @@ namespace GW2CraftingHelper.Models
         // inline in the row itself - HintText never renders inline.
         public string HintText { get; set; }
 
+        // UI-bundle milestone, Feature A (wiki links): the GW2 wiki page
+        // this row's row-level wiki affordance should open (see
+        // WikiLinkBuilder). Currently populated only for RecipeRow rows
+        // (RequiredRecipes section - see PlanViewModelBuilder.
+        // BuildRecipesSection); null for every other row type, which
+        // suppresses the affordance entirely rather than guessing a URL.
+        public string WikiUrl { get; set; }
+
         // Short pill/tag label (e.g. "SALVAGE", "EXPLORE") for
         // ShoppingUnknown rows, from the same seeded hint entry as
         // HintText. Null when the hint has no badge (or no hint at all) -

@@ -22,6 +22,31 @@ namespace GW2CraftingHelper.Services
         private readonly IReadOnlyDictionary<int, AcquisitionHint> _acquisitionHints;
         private readonly IReadOnlyDictionary<int, DailyCooldownItem> _dailyCooldownItems;
 
+        // opportunity-notes (RECIPE-SHEET SAVINGS): recipe id -> unlocking
+        // recipe-sheet item id, for RecipeSheetSavingsCalculator - see that
+        // class's own doc comment for why this is an injectable, curated
+        // lookup rather than a discovery pipeline. Empty (never null) when
+        // the caller passes none, so the calculator's own "no data ->
+        // nothing" gate is always exercised rather than an NRE.
+        private readonly IReadOnlyDictionary<int, int> _recipeSheetItemIdByRecipeId;
+
+        // opportunity-notes (SEASONAL VENDOR TIP, review-fix #3): the
+        // currently-active festival name keys, read LAZILY at
+        // plan-generation time via this Func rather than once, eagerly, at
+        // Module.cs's Initialize() - Blish's FestivalContext loads
+        // asynchronously (Blish HUD's own binary carries "Festival request
+        // was cancelled early." / "Active festival(s): {...}" strings,
+        // INFERRED not measured), so a one-shot Initialize()-time read
+        // could observe NotReady and silently disable the feature for the
+        // WHOLE session. Invoked once per Apply() call below (three call
+        // sites) - GameService.Contexts.GetContext/TryGetActiveFestivals
+        // just returns already-cached state, so this is not a new network
+        // call per plan generation, just a later, retried read. Defaults
+        // to an always-empty provider when the caller passes none (every
+        // pre-existing test/caller), so SeasonalVendorTipCalculator's own
+        // "no active festival -> nothing" gate is always exercised.
+        private readonly Func<IReadOnlyList<string>> _activeFestivalNames;
+
         // VOM finding #3 fix: ResolveWithOverrides rebuilds an
         // AccountItemIndex from context.AccountItems - an immutable,
         // GENERATION-time snapshot (see PlanSolveContext.AccountItems' own
@@ -67,7 +92,14 @@ namespace GW2CraftingHelper.Services
             CurrencyMetadataService currencyMetadataService = null,
             IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null,
             ModuleLog moduleLog = null,
-            IReadOnlyDictionary<int, DailyCooldownItem> dailyCooldownItems = null)
+            IReadOnlyDictionary<int, DailyCooldownItem> dailyCooldownItems = null,
+            // opportunity-notes: see _recipeSheetItemIdByRecipeId/
+            // _activeFestivalNames' own field doc comments. Both optional/
+            // default null -> normalized to an empty dict/always-empty
+            // provider below, so every pre-existing caller (Module.cs
+            // before this feature, every pipeline test) is unaffected.
+            IReadOnlyDictionary<int, int> recipeSheetItemIdByRecipeId = null,
+            Func<IReadOnlyList<string>> activeFestivalNames = null)
         {
             _recipeService = recipeService;
             _tradingPostService = tradingPostService;
@@ -80,6 +112,8 @@ namespace GW2CraftingHelper.Services
             _acquisitionHints = acquisitionHints;
             _moduleLog = moduleLog ?? ModuleLog.Shared;
             _dailyCooldownItems = dailyCooldownItems;
+            _recipeSheetItemIdByRecipeId = recipeSheetItemIdByRecipeId ?? new Dictionary<int, int>();
+            _activeFestivalNames = activeFestivalNames ?? (() => Array.Empty<string>());
         }
 
         public async Task<CraftingPlanResult> GenerateStructuredAsync(
@@ -192,6 +226,16 @@ namespace GW2CraftingHelper.Services
             var vendorOffers = vendorContext.VendorOffers;
             prices = vendorContext.Prices;
 
+            // opportunity-notes (SEASONAL VENDOR TIP, maintainer decision):
+            // the solver's own offer set unconditionally excludes seasonal
+            // offers - see SeasonalOfferFilter's own doc comment. `vendorOffers`
+            // above stays the RAW dictionary (unfiltered) for everything
+            // else in this method (metadata widening, owned-amount
+            // annotation, PlanSolveContext, and the SeasonalVendorTipCalculator
+            // call below); only the three _solver.Solve/ComputeForceBuyOnlyNodeIds
+            // call sites below use this filtered copy.
+            var solverVendorOffers = SeasonalOfferFilter.ExcludeSeasonal(vendorOffers);
+
             // M34-B2a #3: gw2e's "Value Own Materials" force-buy pre-pass -
             // only runs when the setting is Valued AND a snapshot actually
             // drives reduction (see OwnedMaterialsForceBuyPrePass's and
@@ -276,13 +320,13 @@ namespace GW2CraftingHelper.Services
                 // see ComputeForceBuyOnlyNodeIds' own characterDisciplines
                 // doc comment for the propagation failure this closes.
                 var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, vendorOffers, priceBasis, valuation,
+                    _solver, tree, prices, solverVendorOffers, priceBasis, valuation,
                     characterDisciplines: effectiveCharacterDisciplines);
                 forceBuyOnlyNodeIds = forceBuyPrePassResult.ForceBuyOnlyNodeIds;
                 competencyIndependentForceBuyNodeIds = forceBuyPrePassResult.CompetencyIndependentForceBuyNodeIds;
 
                 var zeroOwnedSolve = _solver.Solve(
-                    tree, prices, vendorOffers, priceBasis,
+                    tree, prices, solverVendorOffers, priceBasis,
                     overrides: null, currencyValuation: valuation,
                     forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
                     competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
@@ -322,7 +366,7 @@ namespace GW2CraftingHelper.Services
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
             var solveResult = _solver.Solve(
-                treeUsedForSolve, prices, vendorOffers, priceBasis,
+                treeUsedForSolve, prices, solverVendorOffers, priceBasis,
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
                 // Verification-review fix: see the declaration site's own
@@ -469,6 +513,16 @@ namespace GW2CraftingHelper.Services
             // annotation-only, same architectural role as SellSideEconomics
             // above - writes only result.ExcessCraftOutputs.
             ExcessCraftOutputCalculator.Apply(result, prices, metadata);
+
+            // opportunity-notes (RECIPE-SHEET SAVINGS / SEASONAL VENDOR
+            // TIP): annotation-only, same architectural role as
+            // ExcessCraftOutputCalculator above. Uses the RAW `vendorOffers`
+            // (not solverVendorOffers) - see that variable's own comment.
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds, prices, priceBasis, _vendorOfferStore,
+                _recipeSheetItemIdByRecipeId, effectiveCharacterDisciplines);
+            SeasonalVendorTipCalculator.Apply(
+                result, vendorOffers, prices, priceBasis, _activeFestivalNames());
 
             // Adversarial-review fix (#7, source-selection-simplification
             // design-law gap): same annotation-only role, writes only
@@ -752,6 +806,10 @@ namespace GW2CraftingHelper.Services
             var vendorOffers = vendorContext.VendorOffers;
             prices = vendorContext.Prices;
 
+            // opportunity-notes (SEASONAL VENDOR TIP): see the single-item
+            // overload's matching declaration for the full rationale.
+            var solverVendorOffers = SeasonalOfferFilter.ExcludeSeasonal(vendorOffers);
+
             // M34-B2a #3: same force-buy pre-pass as the single-item path,
             // applied to the WHOLE wrapper batch at once.
             bool useForceBuyPrePass = ownMaterialsMode == OwnMaterialsMode.Valued &&
@@ -789,13 +847,13 @@ namespace GW2CraftingHelper.Services
                 // see ComputeForceBuyOnlyNodeIds' own characterDisciplines
                 // doc comment for the propagation failure this closes.
                 var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, vendorOffers, priceBasis, valuation,
+                    _solver, tree, prices, solverVendorOffers, priceBasis, valuation,
                     characterDisciplines: effectiveCharacterDisciplines);
                 forceBuyOnlyNodeIds = forceBuyPrePassResult.ForceBuyOnlyNodeIds;
                 competencyIndependentForceBuyNodeIds = forceBuyPrePassResult.CompetencyIndependentForceBuyNodeIds;
 
                 var zeroOwnedSolve = _solver.Solve(
-                    tree, prices, vendorOffers, priceBasis,
+                    tree, prices, solverVendorOffers, priceBasis,
                     overrides: null, currencyValuation: valuation,
                     forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
                     competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
@@ -833,7 +891,7 @@ namespace GW2CraftingHelper.Services
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
             var solveResult = _solver.Solve(
-                treeUsedForSolve, prices, vendorOffers, priceBasis,
+                treeUsedForSolve, prices, solverVendorOffers, priceBasis,
                 overrides: null, currencyValuation: valuation,
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
                 // Verification-review fix: see the declaration site's own
@@ -962,6 +1020,15 @@ namespace GW2CraftingHelper.Services
             // call site walks CraftingTree.
             ExcessCraftOutputCalculator.Apply(result, prices, metadata);
 
+            // opportunity-notes (RECIPE-SHEET SAVINGS / SEASONAL VENDOR
+            // TIP): see the single-item overload's matching call site for
+            // the full rationale.
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds, prices, priceBasis, _vendorOfferStore,
+                _recipeSheetItemIdByRecipeId, effectiveCharacterDisciplines);
+            SeasonalVendorTipCalculator.Apply(
+                result, vendorOffers, prices, priceBasis, _activeFestivalNames());
+
             // Adversarial-review fix (#7, source-selection-simplification
             // design-law gap): same annotation-only role, writes only
             // result.CompetencyOpportunities - see that calculator's own
@@ -1086,10 +1153,18 @@ namespace GW2CraftingHelper.Services
             // comment), but guard against a mismatched pipeline instance
             // (context generated by one CraftingPlanPipeline, resolved
             // against another with no _reducer wired up) rather than NRE.
+
+            // opportunity-notes (SEASONAL VENDOR TIP): context.VendorOffers
+            // is the RAW dictionary generation time stored (unfiltered -
+            // see the generation-time call sites' own comments); this local
+            // re-solve must still unconditionally exclude seasonal offers
+            // from the solver, exactly like generation did.
+            var solverVendorOffers = SeasonalOfferFilter.ExcludeSeasonal(context.VendorOffers);
+
             if (context.UnreducedTree != null && _reducer != null)
             {
                 var guideSolve = _solver.Solve(
-                    context.UnreducedTree, context.Prices, context.VendorOffers,
+                    context.UnreducedTree, context.Prices, solverVendorOffers,
                     context.PriceBasis, overrides, context.CurrencyValuation,
                     forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
                     // Verification-review fix: see
@@ -1129,7 +1204,7 @@ namespace GW2CraftingHelper.Services
             // non-contiguous ids from scratch and desync them from
             // forceBuyOnlyNodeIds' keys.
             var solveResult = _solver.Solve(
-                solveTree, context.Prices, context.VendorOffers,
+                solveTree, context.Prices, solverVendorOffers,
                 context.PriceBasis, overrides, context.CurrencyValuation,
                 forceBuyOnlyNodeIds: context.ForceBuyOnlyNodeIds,
                 // Verification-review fix: see
@@ -1213,6 +1288,18 @@ namespace GW2CraftingHelper.Services
             // BuildCraftingTreeResult populated, so it needs no single-vs-
             // batch branch of its own.
             ExcessCraftOutputCalculator.Apply(result, context.Prices, context.Metadata);
+
+            // opportunity-notes (RECIPE-SHEET SAVINGS / SEASONAL VENDOR
+            // TIP): a local override/Ignore re-solve must recompute these
+            // exactly like it recomputes ExcessCraftOutputs above (the
+            // chosen cost an opportunity compares against can change with
+            // an override) - context.VendorOffers (RAW) is used here, same
+            // as at generation time.
+            RecipeSheetSavingsCalculator.Apply(
+                result, context.LearnedRecipeIds, context.Prices, context.PriceBasis, _vendorOfferStore,
+                _recipeSheetItemIdByRecipeId, context.CharacterDisciplines);
+            SeasonalVendorTipCalculator.Apply(
+                result, context.VendorOffers, context.Prices, context.PriceBasis, _activeFestivalNames());
 
             // Adversarial-review fix (#7, source-selection-simplification
             // design-law gap): same annotation-only role, writes only

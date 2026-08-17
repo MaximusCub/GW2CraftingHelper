@@ -906,13 +906,15 @@ namespace GW2CraftingHelper.Services
         /// fixed order - excess/reclaim lines, then a total (only when 2+
         /// excess lines exist), then competency lines (disciplines a
         /// COMMITTED Craft step already needs), then competency
-        /// OPPORTUNITY lines (adversarial-review fix #7 - disciplines that
-        /// would make the plan cost LESS, for a node craft was excluded
-        /// from on competency grounds), then the gambling-forge scope line
-        /// (0 or 1) - so re-solves and screenshots stay diffable. Returns a
-        /// section with zero rows when every note kind is empty; the
-        /// caller (Build()) only appends it to vm.Sections when Rows.Count
-        /// &gt; 0, so an empty Notes section never renders a header at all.
+        /// OPPORTUNITY lines (disciplines that would make the plan cost
+        /// LESS, for a node craft was excluded from on competency
+        /// grounds), then (opportunity-notes) RECIPE-SHEET SAVINGS
+        /// opportunities, then SEASONAL VENDOR TIP opportunities, then
+        /// the gambling-forge scope line (0 or 1) - so re-solves and
+        /// screenshots stay diffable. Returns a section with zero rows
+        /// when every note kind is empty; the caller (Build()) only
+        /// appends it to vm.Sections when Rows.Count > 0, so an empty
+        /// Notes section never renders a header at all.
         /// </summary>
         private PlanSectionViewModel BuildNotesSection(CraftingPlanResult result)
         {
@@ -1072,7 +1074,132 @@ namespace GW2CraftingHelper.Services
                     .Select(r => r.Row));
             }
 
-            // 3. Gambling-forge scope note (0 or 1 logical entry). Wording
+            // 3. RECIPE-SHEET SAVINGS opportunities (opportunity-notes),
+            // alphabetical by resolved item name - same stable-sort
+            // precedent as the excess/reclaim rows above. Two physical rows
+            // per opportunity (the sheet's own cost, then the per-unit
+            // savings once learned) - NoteLine only has ONE CoinValue slot
+            // per row (NotesSectionRenderer), and this note carries two
+            // distinct concrete numbers, so it is split the same way the
+            // forge-scope note below is split for a different reason (line-
+            // wrap avoidance) - one logical note, two/three physical rows.
+            if (result.RecipeSheetSavingsOpportunities != null && result.RecipeSheetSavingsOpportunities.Count > 0)
+            {
+                var sheetRows = new List<(string Name, List<PlanRowViewModel> Rows)>(
+                    result.RecipeSheetSavingsOpportunities.Count);
+                foreach (var opp in result.RecipeSheetSavingsOpportunities)
+                {
+                    string itemName = ResolveName(opp.ItemId, result.ItemMetadata);
+                    var rows = new List<PlanRowViewModel>(2);
+
+                    string leadIn = opp.DisciplineBlocked && !string.IsNullOrEmpty(opp.Discipline)
+                        ? $"Train {opp.Discipline} to {opp.RequiredRating} and buy the {itemName} recipe to craft it instead - recipe costs"
+                        : $"Buy the {itemName} recipe to craft it instead of buying it - recipe costs";
+
+                    rows.Add(new PlanRowViewModel
+                    {
+                        RowType = PlanRowType.NoteLine,
+                        Label = leadIn,
+                        CoinValue = opp.SheetCost
+                    });
+                    rows.Add(new PlanRowViewModel
+                    {
+                        RowType = PlanRowType.NoteLine,
+                        Label = "  Saves per unit crafted",
+                        CoinValue = opp.SavingsPerUnit
+                    });
+
+                    sheetRows.Add((itemName, rows));
+                    noteEntryCount++;
+                }
+
+                foreach (var entry in sheetRows.OrderBy(r => r.Name, StringComparer.Ordinal))
+                {
+                    section.Rows.AddRange(entry.Rows);
+                }
+            }
+
+            // 4. SEASONAL VENDOR TIP opportunities (opportunity-notes),
+            // alphabetical by resolved item name. Two physical rows per
+            // tip (review fix, finding 4) - the trade description, then
+            // the "cheaper than this plan's price" comparison - same
+            // NotesSectionRenderer.LabelHelpers.EllipsizeToWidth exposure
+            // the RECIPE-SHEET SAVINGS note above was already split to
+            // avoid: a single ~150-char combined label ellipsizes at the
+            // panel edge, and the trailing clause (what the CoinValue on
+            // the SAME row actually means) is exactly what gets cut,
+            // leaving a bare coin number with no stated meaning. Splitting
+            // also resolves the "5x Glob of Ectoplasm" / "PlanUnitPrice"
+            // adjacency ambiguity (PlanUnitPrice is a PER-UNIT price, not
+            // the price of the 5x bundle just before it) by saying "per
+            // unit" explicitly on the row that actually carries the
+            // CoinValue. The tip's own "cost" description is built ONLY
+            // from Item-type cost lines (see BuildSeasonalCostDescription's
+            // own doc comment for why a coin-priced cost line is skipped
+            // entirely rather than rendered as raw text) - the only offers
+            // this module seeds today (Candy Corn Vendor (Weekly)) are
+            // pure single-Item-cost-line, so this never fires in practice
+            // yet.
+            if (result.SeasonalVendorTips != null && result.SeasonalVendorTips.Count > 0)
+            {
+                var tipRows = new List<(string Name, List<PlanRowViewModel> Rows)>(result.SeasonalVendorTips.Count);
+                foreach (var tip in result.SeasonalVendorTips)
+                {
+                    string costDescription = BuildSeasonalCostDescription(tip.CostLines, result.ItemMetadata);
+                    if (costDescription == null)
+                    {
+                        continue;
+                    }
+
+                    string itemName = ResolveName(tip.ItemId, result.ItemMetadata);
+                    // Review fix (finding 2): the cap number here is a
+                    // PURCHASE/trade limit, not an output-unit limit - see
+                    // ref/vendor_offers.json's own outputCount/weeklyCap
+                    // pairs (e.g. Dragon Bash Merchant, outputCount 50 /
+                    // weeklyCap 1) and VendorBatchSolver.FinalizeVendorBatches,
+                    // which compares this same cap against unitsNeeded
+                    // (a purchase count), never against an output-unit
+                    // count. The old "(capped N/week)" wording, placed
+                    // right after "Nx <item>", read as "N <item>s/week"
+                    // - off by a factor of OutputCount whenever OutputCount
+                    // != 1. Wording it as a purchase count instead removes
+                    // the ambiguity without needing the multiply-through.
+                    string capClause = tip.WeeklyCap.HasValue
+                        ? $" (limit {tip.WeeklyCap.Value} purchase{(tip.WeeklyCap.Value == 1 ? "" : "s")}/week)"
+                        : tip.DailyCap.HasValue
+                            ? $" (limit {tip.DailyCap.Value} purchase{(tip.DailyCap.Value == 1 ? "" : "s")}/day)"
+                            : "";
+
+                    string festivalDisplayName = Gw2Constants.ResolveFestivalDisplayName(tip.Festival);
+                    string tradeLabel = $"During {festivalDisplayName}: {tip.MerchantName} trades {costDescription} for " +
+                        $"{tip.OutputCount}x {itemName}{capClause}";
+
+                    var rows = new List<PlanRowViewModel>(2)
+                    {
+                        new PlanRowViewModel
+                        {
+                            RowType = PlanRowType.NoteLine,
+                            Label = tradeLabel
+                        },
+                        new PlanRowViewModel
+                        {
+                            RowType = PlanRowType.NoteLine,
+                            Label = "  Cheaper than this plan's price per unit",
+                            CoinValue = tip.PlanUnitPrice
+                        }
+                    };
+
+                    tipRows.Add((itemName, rows));
+                    noteEntryCount++;
+                }
+
+                foreach (var entry in tipRows.OrderBy(r => r.Name, StringComparer.Ordinal))
+                {
+                    section.Rows.AddRange(entry.Rows);
+                }
+            }
+
+            // 5. Gambling-forge scope note (0 or 1 logical entry). Wording
             // deliberately distinguishes the two mechanics design-plan-
             // notes.md section 9 flags as easy to conflate: this plan's own
             // Mystic-Clover-style fractional yield IS probability-adjusted
@@ -1200,6 +1327,27 @@ namespace GW2CraftingHelper.Services
                 string sublabel = FormatDisciplineSublabel(
                     recipe.Disciplines, recipe.MinRating, planDiscNames);
 
+                // UI-bundle milestone, Feature A (wiki links): scoped to
+                // "Required Recipes Missing!" rows only, per the spec's own
+                // wording (contrast Feature A's tree-row affordance, which
+                // the spec calls out for "each item row" with no such
+                // scoping) - a row the user has nothing left to unlock for
+                // (Learned/Auto-learned) gets no wiki affordance at all.
+                // Flag-based target: a LearnedFromItem recipe links to its
+                // own "Recipe: <name>" sheet page; every other recipe links
+                // to the output item's page + "#Acquisition" anchor.
+                // Review-fix: gated on the semantic flags (not the display
+                // string) so a tag rename cannot silently drop every wiki
+                // link. Verification-fix: IsAutoLearned excluded explicitly -
+                // an auto-learned recipe can be IsMissing (rating below
+                // threshold) yet has nothing to unlock via the wiki, so it
+                // must keep getting no affordance, exactly as the spec
+                // comment above states (the statusTag chain checks
+                // Auto-learned first for the same reason).
+                string wikiUrl = !recipe.IsAutoLearned && recipe.IsMissing == true
+                    ? WikiLinkBuilder.BuildRequiredRecipeUrl(name, recipe.IsLearnedFromItem)
+                    : null;
+
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.RecipeRow,
@@ -1207,7 +1355,8 @@ namespace GW2CraftingHelper.Services
                     Sublabel = sublabel,
                     IconUrl = iconUrl,
                     Rarity = rarity,
-                    StatusTag = statusTag
+                    StatusTag = statusTag,
+                    WikiUrl = wikiUrl
                 });
             }
 
@@ -1247,6 +1396,41 @@ namespace GW2CraftingHelper.Services
                 }
             }
             return true;
+        }
+
+        /// <summary>
+        /// opportunity-notes (SEASONAL VENDOR TIP): renders an offer's cost
+        /// lines as a plain "{Count}x {Name}[ + {Count}x {Name}...]" phrase
+        /// for the note's inline text. Returns null (never a partial/
+        /// misleading description) when costLines is null/empty or contains
+        /// ANY non-Item line - a coin (or other currency) cost line has no
+        /// safe way to render inline as raw text without violating the
+        /// repo's "coin icons MUST appear to the right of the number"
+        /// invariant, and NoteLine only has ONE CoinValue slot per row
+        /// (already spent on the plan's own price at the end of this same
+        /// row - see BuildNotesSection). The three offers this module seeds
+        /// today are pure single-Item-cost-line, so this restriction never
+        /// bites in practice yet.
+        /// </summary>
+        private static string BuildSeasonalCostDescription(
+            List<CostLine> costLines, IReadOnlyDictionary<int, ItemMetadata> metadata)
+        {
+            if (costLines == null || costLines.Count == 0)
+            {
+                return null;
+            }
+
+            var parts = new List<string>(costLines.Count);
+            foreach (var line in costLines)
+            {
+                if (line == null || !string.Equals(line.Type, "Item", StringComparison.Ordinal))
+                {
+                    return null;
+                }
+                parts.Add($"{line.Count}x {ResolveName(line.Id, metadata)}");
+            }
+
+            return string.Join(" + ", parts);
         }
 
         private static PlanRowType MapShoppingRowType(AcquisitionSource source)
