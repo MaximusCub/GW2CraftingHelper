@@ -5726,8 +5726,64 @@ follow-up asked for). Instead, a SCOPED live run
 live-tagged the six OTHER known festival vendor NPC pages: Dragon Bash
 Merchant (Weekly), Wintersday Trader (Weekly), Festival Rewards Vendor
 (Weekly), Gauntlet Ticket Vendor, New Year Vendor, Super Adventure Box
-Weekly Trader - 63 wiki rows -> 54 converted offers, net +2 vs the prior
-baseline (53536 -> 53538; 52 stale rows for those 6 merchants replaced).
+Weekly Trader - 63 wiki rows -> 54 converted offers, reported at the time
+as net +2 vs the prior baseline (53536 -> 53538; 52 stale rows for those
+6 merchants replaced).
+
+**Correction (2026-08-17 review fix, Critical): that "net +2" figure
+CONCEALED a real data-loss bug.** The scoped run's own
+`ref/wiki_vendor_cache.json` had 9 rows resolve `GameId 0` (a wiki-query
+defect in that pass, not the wiki actually dropping the items - live-
+reconfirmed after the fact via `api.php?action=ask` that the wiki still
+serves real game ids for every one of them). `Program.cs`'s
+`GameId <= 0` filter silently skipped those 9 rows before conversion,
+and `MergeIntoBaseline`'s per-merchant WHOLESALE replacement then deleted
+the baseline's only copies of the offers those rows would have replaced,
+with no fresh row to take their place: Wintersday Trader (Weekly) and
+Festival Rewards Vendor (Weekly) each lost `outputItemId` 64736
+(Transmutation Charge), 79431 (Chest of Legendary Shards), and 86804
+(Tyrian Exchange Voucher) - 6 shipped offers gone. (The same mechanism
+also means Super Adventure Box Weekly Trader shipped incomplete - 9
+cache rows produced only 6 offers - but that merchant had no prior
+baseline row to lose, so nothing was deleted there, only under-added.)
+Fixed by (1) restoring the 6 deleted offers byte-for-byte from the
+pre-rescrape baseline (merge-base `4735064`) rather than re-guessing
+their content, bringing the baseline to 53544 offers, and (2)
+`MergeIntoBaseline` now refuses to wholesale-drop a merchant's baseline
+rows when this pass's own fresh batch had a `GameId <= 0` row for that
+merchant (see its updated doc comment and
+`MergeIntoBaselineTests.ProtectedMerchant_*` /
+`MixOfProtectedAndUnprotectedMerchants_*`) - a future scoped run with the
+same kind of incomplete resolution now keeps the stale baseline rows
+(visible, fixable by a follow-up run) instead of silently deleting them.
+Also fixed in the same review pass: `Gw2Constants.FestivalDisplayNames`
+(`Models/Gw2Constants.cs`) was missing a display-name entry for five of
+the six newly-tagged festival keys (only `halloween` was present), so an
+active-festival Plan Notes tip for dragonbash/wintersday/
+festivalofthefourwinds/lunarnewyear/superadventurefestival would have
+rendered the raw internal key verbatim (e.g. "During
+superadventurefestival:") - all six now have a MEASURED display name.
+Also fixed in this review pass, lower-severity: `WikiVendorResult.
+TemporarySeasonalValue`'s doc comment claimed the raw wiki value "still
+round-trips through `wiki_vendor_cache.json` for a later run" - false as
+written, because `Program.cs` saved that cache BEFORE the seasonal-tag
+pass populated the field, so every row in a run's own cache had it as
+null; the cache is now re-saved after tagging so the claim is true.
+`ResolveSeasonalFestivalValuesAsync` also used to save its wikitext
+cache only after its whole fetch loop completed and catch only
+`HttpRequestException` per page, so a malformed/non-JSON response or
+Ctrl-C anywhere in the loop discarded every page already fetched that
+run; it now saves in a `finally` around the loop and treats a JSON parse
+failure the same as an HTTP failure (warn, leave that one page
+uncached, continue). A stray U+2500 box-drawing comment separator (the
+only non-ASCII byte in any file this follow-up touched) was replaced
+with ASCII hyphens per the repo's ASCII-only-in-`.cs` rule. Finally, a
+module-side test now asserts every distinct `seasonalFestival` value in
+the shipped `ref/vendor_offers.json` has a `Gw2Constants.
+FestivalDisplayNames` entry and is one of the six known
+`FestivalContext` keys, closing the regression-guard gap that let the
+display-name bug above ship unnoticed in the first place.
+
 Candy Corn Vendor (Weekly) was deliberately EXCLUDED from this scoped
 `--query` (confirmed by first attempting a run that included it, which
 recomputed new `OfferId` hashes for all nine of its rows via
@@ -5790,6 +5846,30 @@ count, `VendorOfferStoreTests.ShippedSeedFile_VendorOfferLoader_
 ParsesAllOffers`, updated from 53536 to 53538 to match the regenerated
 baseline). Both suites fully green.
 
+**Review-fix pass re-validation (2026-08-17, measured, after the
+Critical/Must-Fix corrections above):**
+`"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-festivalscrape/tools/VendorOfferUpdater/
+VendorOfferUpdater.csproj` - 0 errors, 0 warnings.
+`"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-festivalscrape/GW2CraftingHelper.csproj -p:Platform=x64`
+- 0 errors (1685 warnings, all pre-existing StyleCop findings, none in
+any file this review-fix pass touched - confirmed by grepping the build
+output for each touched file's name). `"/mnt/c/Program Files/dotnet/
+dotnet.exe" test C:/Dev/Blish/wt-festivalscrape/tests/
+VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj` - 191 green (6
+new: 3 `MergeIntoBaselineTests` DATA LOSS-guard cases, 2
+`ResolveSeasonalFestivalValuesAsyncTests` resilience cases, 1
+`TemporaryTemplateParserTests` multi-template case). `"/mnt/c/Program
+Files/dotnet/dotnet.exe" test C:/Dev/Blish/wt-festivalscrape/tests/
+GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` - 1675 green (2
+new: `PlanViewModelBuilderNotesSeasonalVendorTipTests.
+ItemCostTip_NonHalloweenFestival_*` and `VendorOfferStoreTests.
+ShippedSeedFile_EveryDistinctSeasonalFestivalValue_*`; one existing
+pinned count, `ShippedSeedFile_VendorOfferLoader_ParsesAllOffers`,
+updated from 53538 to 53544 for the 6 restored offers). Both suites
+fully green.
+
 **Risks / follow-ups:**
 - Partial coverage, restated: only 7 vendor pages total (the 3
   already-tagged Candy Corn Vendor (Weekly) rows left untouched, plus 6
@@ -5814,11 +5894,33 @@ baseline). Both suites fully green.
   rather than fixing the hasher itself (out of scope: it is not this
   pass's task, and a hash-format change would ripple across all ~53.5k
   offers in the shipped dataset).
-- No live desktop verification was performed for this pass specifically
-  - it is a pure data/tooling change (no new runtime UI-facing code
-  path; `SeasonalOfferFilter`/`SeasonalVendorTipCalculator` already
-  exist and are already covered by the prior SEASONAL VENDOR TIP pass's
-  live desktop gate above, and now simply see more tagged offers to act
-  on).
+- **Correction (2026-08-17 review fix, Must Fix): the claim above that
+  this pass adds "no new runtime UI-facing code path" is WRONG.** The
+  data change alone alters runtime behavior in two measured ways, so a
+  live desktop gate is warranted (not optional) before this can be
+  considered fully validated:
+  - (a) the display-name gap described above (now fixed in this review
+    pass) - before the fix, any plan touching an active dragonbash/
+    wintersday/festivalofthefourwinds/lunarnewyear/superadventurefestival
+    vendor tip would have rendered the raw internal key in the Notes
+    section.
+  - (b) six items now have their ONLY vendor offer tagged seasonal and
+    are therefore unconditionally removed from the solver by
+    `Services/SeasonalOfferFilter`: Blood Ruby (79280), Petrified Wood
+    (79469), Fresh Winterberry (79899), Jade Shard (80332), Fire Orchid
+    Blossom (81127), Orrian Pearl (81706) each go from 1 vendor offer to
+    0 usable ones, with no compensating Plan Notes tip (their Festival
+    Token cost has no coin price, so `SeasonalVendorTipCalculator`'s
+    `TryGetCoinCost` fails for them). This is arguably the correct
+    policy (an out-of-season festival offer should not silently count as
+    always-available), but it is an undisclosed PLANNING-BEHAVIOR
+    change for those six items, not a purely internal data update, and
+    was not stated or gated before now. `SeasonalOfferFilter`/
+    `SeasonalVendorTipCalculator` are pre-existing, prior-gated code
+    paths, but this pass changed what data flows through them.
+  - Live desktop verification for (a)/(b) above has not yet been
+    performed as part of this review-fix pass either - flagging it here
+    so the orchestrator's gate step (below) covers it rather than
+    treating this as settled.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
