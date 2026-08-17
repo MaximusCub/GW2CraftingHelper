@@ -255,6 +255,23 @@ namespace GW2CraftingHelper.Services
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch character list: {ex.GetType().Name} - {ex.Message}");
                 failedSources++;
                 failedSourceExceptionTypeNames.Add(ex.GetType().Name);
+                // Adversarial-review fix (Critical #8): if anything escapes
+                // the per-character loop above (Task.WhenAll faulting,
+                // inventoryTask.Result/craftingTask.Result rethrowing - the
+                // loop's own doc comment that WhenAll "never faults on a
+                // per-character failure" is not a guarantee this catch can
+                // rely on), snapshot.CharacterDisciplines can already be a
+                // PARTIALLY populated, non-null list at this point (some
+                // characters' entries added before the failure). Before
+                // this fix that partial list survived into the returned
+                // snapshot and read as an affirmative "no character has
+                // this discipline" for every character the loop never
+                // reached - exactly the "never invent data" violation the
+                // characterDisciplineDataDegraded machinery above exists to
+                // prevent for a single character's failure. Null it here
+                // too, matching that same "degraded fetch -> show nothing"
+                // contract for a failure that escapes the loop entirely.
+                snapshot.CharacterDisciplines = null;
             }
 
             // A partial or total failure must never silently masquerade as a
