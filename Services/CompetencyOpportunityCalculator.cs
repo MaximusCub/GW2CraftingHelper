@@ -9,16 +9,28 @@ namespace GW2CraftingHelper.Services
     /// placement precedent as ExcessCraftOutputCalculator - walks the
     /// already-built display tree (CraftingTreeResult.CraftingTree for a
     /// single-item plan, MultiItemRoots for a batch) looking for a node
-    /// where CraftCompetencyEvaluator excluded craft from the AUTOMATIC
-    /// pick (CraftingTreeNode.CraftExcludedByCompetency), the node did NOT
-    /// end up crafted anyway (a manual override can still choose Craft
-    /// despite the flag - nothing to report there, the user already made
-    /// the tradeoff explicitly), and crafting would genuinely have been
-    /// cheaper than what the plan actually committed to. Without this, the
-    /// competency flip silently raised the plan's cost with no user-
-    /// visible explanation anywhere - the CRAFT pill is not subdued (it is
-    /// CHEAPER, not more expensive, so neither PillSubduingRule fires) and
-    /// gets no tooltip either.
+    /// where the numerically cheapest raw craft recipe overall is untrained
+    /// (CraftingTreeNode.CheapestCraftUntrained) and the plan's actual
+    /// committed cost is genuinely higher than that cheap recipe's real
+    /// cost. Without this, the competency flip silently raised the plan's
+    /// cost with no user-visible explanation anywhere - the CRAFT pill (if
+    /// it wins at all) is not subdued (it is CHEAPER-than-what-it-should-
+    /// have-been, not more expensive than the committed source, so neither
+    /// PillSubduingRule fires) and gets no tooltip either.
+    ///
+    /// Adversarial-review round-2 fix (finding #5): reads
+    /// CheapestCraftUntrained/CheapestCraftRealCost instead of the
+    /// narrower CraftExcludedByCompetency/CraftExcludedRealCost pair (which
+    /// only ever populate when NO option in EITHER tier is competent) - see
+    /// CheapestCraftUntrained's own doc comment for the two additional
+    /// shapes this now also catches. The delta check below (SubtreeCost
+    /// strictly greater than the cheap recipe's real cost) subsumes the
+    /// old explicit "node.Decision != Craft" guard: a manual override to
+    /// Craft, or an automatic pick that lands on that SAME cheap recipe,
+    /// always makes SubtreeCost equal CheapestCraftRealCost exactly (delta
+    /// 0, naturally excluded) - while an automatic pick that lands on a
+    /// DIFFERENT, costlier competent recipe (Decision == Craft, but not
+    /// the cheap one) now correctly still reports the gap.
     ///
     /// Writes only CraftingPlanResult.CompetencyOpportunities. Never
     /// mutates Plan, Plan.TotalCoinCost, or any other displayed total -
@@ -75,20 +87,19 @@ namespace GW2CraftingHelper.Services
             }
 
             if (!insideReferenceBranch &&
-                node.CraftExcludedByCompetency &&
-                node.Decision != CraftingDecision.Craft &&
-                node.CraftExcludedRealCost.HasValue &&
+                node.CheapestCraftUntrained &&
+                node.CheapestCraftRealCost.HasValue &&
                 node.SubtreeCost.HasValue &&
-                node.SubtreeCost.Value > node.CraftExcludedRealCost.Value &&
+                node.SubtreeCost.Value > node.CheapestCraftRealCost.Value &&
                 !byItemId.ContainsKey(node.ItemId))
             {
                 byItemId[node.ItemId] = new CompetencyOpportunity
                 {
                     ItemId = node.ItemId,
-                    CraftCost = node.CraftExcludedRealCost.Value,
-                    DeltaCost = node.SubtreeCost.Value - node.CraftExcludedRealCost.Value,
-                    Disciplines = node.CraftExcludedDisciplines,
-                    MinRating = node.CraftExcludedMinRating
+                    CraftCost = node.CheapestCraftRealCost.Value,
+                    DeltaCost = node.SubtreeCost.Value - node.CheapestCraftRealCost.Value,
+                    Disciplines = node.CheapestCraftDisciplines,
+                    MinRating = node.CheapestCraftMinRating
                 };
             }
 

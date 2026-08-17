@@ -16,9 +16,9 @@ namespace GW2CraftingHelper.Tests.Services
     public class CompetencyOpportunityCalculatorTests
     {
         private static CraftingTreeNode ExcludedNode(
-            int itemId, CraftingDecision decision, long? subtreeCost, long? excludedRealCost,
+            int itemId, CraftingDecision decision, long? subtreeCost, long? cheapestCraftRealCost,
             IReadOnlyList<string> disciplines = null, int minRating = 400,
-            bool craftExcludedByCompetency = true, bool isReferenceBranch = false,
+            bool cheapestCraftUntrained = true, bool isReferenceBranch = false,
             params CraftingTreeNode[] children)
         {
             return new CraftingTreeNode
@@ -26,10 +26,10 @@ namespace GW2CraftingHelper.Tests.Services
                 ItemId = itemId,
                 Decision = decision,
                 SubtreeCost = subtreeCost,
-                CraftExcludedByCompetency = craftExcludedByCompetency,
-                CraftExcludedRealCost = excludedRealCost,
-                CraftExcludedDisciplines = disciplines ?? new List<string> { "Weaponsmith" },
-                CraftExcludedMinRating = minRating,
+                CheapestCraftUntrained = cheapestCraftUntrained,
+                CheapestCraftRealCost = cheapestCraftRealCost,
+                CheapestCraftDisciplines = disciplines ?? new List<string> { "Weaponsmith" },
+                CheapestCraftMinRating = minRating,
                 IsReferenceBranch = isReferenceBranch,
                 Children = children
             };
@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = ExcludedNode(
                 itemId: 2, decision: CraftingDecision.BuyFromTp,
-                subtreeCost: 1000, excludedRealCost: 60);
+                subtreeCost: 1000, cheapestCraftRealCost: 60);
             var root = WrapAsRoot(1, node);
             var result = new CraftingPlanResult { CraftingTree = root };
 
@@ -66,15 +66,19 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ManualOverrideToCraft_NotReported_UserAlreadyChoseIt()
+        public void CraftUsingTheCheapestUntrainedRecipeItself_NotReported_NoDelta()
         {
-            // CraftExcludedByCompetency can still be true even when the
-            // COMMITTED decision is Craft (a manual override always wins
-            // over the automatic exclusion) - nothing to report, the user
-            // already made the tradeoff explicitly.
+            // Adversarial-review round-2 fix (finding #5): CheapestCraftUntrained
+            // can still be true even when the COMMITTED decision is Craft
+            // (a manual override, or an automatic pick that lands on this
+            // SAME cheap recipe because competency is unknown/irrelevant
+            // to it) - SubtreeCost equals CheapestCraftRealCost exactly in
+            // that case, so the delta-based check naturally reports
+            // nothing, without needing an explicit "Decision != Craft"
+            // guard.
             var node = ExcludedNode(
                 itemId: 2, decision: CraftingDecision.Craft,
-                subtreeCost: 60, excludedRealCost: 60);
+                subtreeCost: 60, cheapestCraftRealCost: 60);
             var root = WrapAsRoot(1, node);
             var result = new CraftingPlanResult { CraftingTree = root };
 
@@ -84,12 +88,36 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void NotExcludedByCompetency_NotReported()
+        public void CraftUsingACostlierCompetentSiblingRecipe_StillReported()
+        {
+            // Adversarial-review round-2 fix (finding #5), shape (b): a
+            // costlier COMPETENT sibling recipe won Craft (Decision ==
+            // Craft) over the cheaper untrained one - the plan still
+            // crafts, so the old "Decision != Craft -> nothing to report"
+            // guard would have silently suppressed this, even though the
+            // user never got the cheap recipe and genuinely could save
+            // more by training the cheap one's discipline instead.
+            var node = ExcludedNode(
+                itemId: 2, decision: CraftingDecision.Craft,
+                subtreeCost: 100, cheapestCraftRealCost: 60);
+            var root = WrapAsRoot(1, node);
+            var result = new CraftingPlanResult { CraftingTree = root };
+
+            CompetencyOpportunityCalculator.Apply(result);
+
+            var opp = Assert.Single(result.CompetencyOpportunities);
+            Assert.Equal(2, opp.ItemId);
+            Assert.Equal(60, opp.CraftCost);
+            Assert.Equal(40, opp.DeltaCost);
+        }
+
+        [Fact]
+        public void CheapestCraftNotUntrained_NotReported()
         {
             var node = ExcludedNode(
                 itemId: 2, decision: CraftingDecision.BuyFromTp,
-                subtreeCost: 1000, excludedRealCost: 60,
-                craftExcludedByCompetency: false);
+                subtreeCost: 1000, cheapestCraftRealCost: 60,
+                cheapestCraftUntrained: false);
             var root = WrapAsRoot(1, node);
             var result = new CraftingPlanResult { CraftingTree = root };
 
@@ -105,7 +133,7 @@ namespace GW2CraftingHelper.Tests.Services
             // the committed source - nothing genuinely lost here.
             var node = ExcludedNode(
                 itemId: 2, decision: CraftingDecision.BuyFromTp,
-                subtreeCost: 60, excludedRealCost: 1000);
+                subtreeCost: 60, cheapestCraftRealCost: 1000);
             var root = WrapAsRoot(1, node);
             var result = new CraftingPlanResult { CraftingTree = root };
 
@@ -122,7 +150,7 @@ namespace GW2CraftingHelper.Tests.Services
             // but represents nothing actually in the plan.
             var node = ExcludedNode(
                 itemId: 2, decision: CraftingDecision.BuyFromTp,
-                subtreeCost: 1000, excludedRealCost: 60);
+                subtreeCost: 1000, cheapestCraftRealCost: 60);
             var referenceRoot = new CraftingTreeNode
             {
                 ItemId = 3,
@@ -143,10 +171,10 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var nodeA = ExcludedNode(
                 itemId: 2, decision: CraftingDecision.BuyFromTp,
-                subtreeCost: 1000, excludedRealCost: 60);
+                subtreeCost: 1000, cheapestCraftRealCost: 60);
             var nodeB = ExcludedNode(
                 itemId: 2, decision: CraftingDecision.BuyFromTp,
-                subtreeCost: 500, excludedRealCost: 30);
+                subtreeCost: 500, cheapestCraftRealCost: 30);
             var root = WrapAsRoot(1, nodeA, nodeB);
             var result = new CraftingPlanResult { CraftingTree = root };
 

@@ -14,13 +14,15 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Both options' PillSourceCostBreakdown.DecisionValue are non-null
         /// (every cost component of both is valued) and the losing option
-        /// is strictly more expensive - "more expensive at your current
-        /// currency values". Any strictly-positive margin counts: a pill
-        /// only reaches this comparison at all when it is one of 2-3 real,
-        /// offered choices (DecisionPillPlanner's own "pill count is the
-        /// affordance" contract), so an objectively (if narrowly) worse
-        /// valued option is still worth flagging rather than silently
-        /// under-reporting it behind an arbitrary percentage threshold.
+        /// is strictly more expensive by a DECISIVE margin - "more
+        /// expensive at your current currency values". Adversarial-review
+        /// round-2 finding #3: a bare strictly-positive margin used to
+        /// count on its own, but the brief calls for "decisive" and a
+        /// genuinely near-equal alternative (e.g. a 1-copper difference on
+        /// a multi-gold purchase) rendered in Locked's exact muted gray
+        /// and told the user it was "more expensive" is not a decisive
+        /// reading of that word - see IsDecisiveMargin's own doc comment
+        /// for the applied absolute-and-relative floor.
         /// </summary>
         Weighted,
 
@@ -72,17 +74,25 @@ namespace GW2CraftingHelper.Services
         public IReadOnlyList<PillCostDelta> Deltas { get; }
 
         /// <summary>
-        /// Weighted only (adversarial-review finding): true when either
-        /// side's PillSourceCostBreakdown.CostLines is non-empty, i.e. a
-        /// non-coin (Currency/Item) cost participates SOMEWHERE in this
-        /// comparison. Weighted very commonly fires on a pure-gold
-        /// difference with no currency valuation involved at all
-        /// (StrictDomination cannot fire whenever the losing side's
-        /// RawCoin is LOWER than the selected side's - e.g. losing craft
-        /// beats selected TP on raw coin but loses on DecisionValue for an
-        /// unrelated reason), so the tooltip wording must not blame "your
-        /// current currency values" for a difference that never touched a
-        /// currency valuation. False (the default) for every other rule.
+        /// Weighted only (adversarial-review finding, round 2 correction):
+        /// true when either side's PillSourceCostBreakdown.CostLines
+        /// contains a Type == "Currency" line, i.e. a non-coin CURRENCY
+        /// cost - the only CostLine kind a CurrencyValuation can ever
+        /// apply to - participates SOMEWHERE in this comparison. Type ==
+        /// "Item" lines do NOT count: BuildCraftCostBreakdown emits one
+        /// for every craft ingredient regardless of valuation (they are
+        /// TP-priced, never user-valued), so a round-1 fix that counted
+        /// ANY non-empty CostLines still mis-fired "at your current
+        /// currency values" on a plain-gold TP-vs-craft comparison purely
+        /// because the craft side has ingredient lines. Weighted very
+        /// commonly fires on a pure-gold difference with no currency
+        /// valuation involved at all (StrictDomination cannot fire
+        /// whenever the losing side's RawCoin is LOWER than the selected
+        /// side's - e.g. losing craft beats selected TP on raw coin but
+        /// loses on DecisionValue for an unrelated reason), so the
+        /// tooltip wording must not blame "your current currency values"
+        /// for a difference that never touched a currency valuation.
+        /// False (the default) for every other rule.
         /// </summary>
         public bool HasNonCoinCost { get; }
 
@@ -111,6 +121,54 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     public static class PillSubduingEvaluator
     {
+        // Adversarial-review round-2 finding #3: Weighted used to fire on
+        // ANY strictly-positive DecisionValue margin (e.g. a genuine field
+        // case - 1 copper more on a multi-gold purchase), rendering a
+        // near-equal alternative in Locked's exact muted gray and telling
+        // the user it was "more expensive" - not a "decisive" reading of
+        // the brief's own word. Gated on BOTH an absolute floor (a margin
+        // must clear a non-trivial coin amount even for a very cheap item)
+        // AND a relative floor (a margin must also clear a non-trivial
+        // percentage even for a very expensive item, where a fixed copper
+        // floor alone would be trivial) - requiring both, rather than
+        // either, is the more conservative reading: a margin that only
+        // clears one of the two (e.g. 101c on a 10g/100000c purchase - well
+        // past the absolute floor but only 0.1%) still is not "decisive"
+        // by the other measure. No maintainer-specified numbers exist for
+        // either constant (docs/KNOWN-ISSUES.md previously deferred this
+        // exact gate for maintainer sign-off) - these are a deliberately
+        // modest, easily-tunable starting point, not a precisely-derived
+        // figure like OwnedMaterialsForceBuyPrePass's gw2e-sourced 0.85.
+        private const long MinDecisiveMarginCopper = 100; // 1 silver
+        private const double MinDecisiveMarginFraction = 0.01; // 1%
+
+        /// <summary>
+        /// True when <paramref name="marginCopper"/> (always &gt; 0 at the
+        /// call site) is large enough, both in absolute copper and as a
+        /// fraction of <paramref name="selectedValueCopper"/>, to call the
+        /// losing option "more expensive" rather than "near-equal". See
+        /// this class's MinDecisiveMarginCopper/MinDecisiveMarginFraction
+        /// fields for the exact floors and their rationale.
+        /// </summary>
+        private static bool IsDecisiveMargin(long marginCopper, long selectedValueCopper)
+        {
+            if (marginCopper < MinDecisiveMarginCopper)
+            {
+                return false;
+            }
+            // selectedValueCopper is always >= 0 (RawCoin/DecisionValue are
+            // never negative); a selected value of exactly 0 (e.g. a
+            // free/fully-owned source) makes ANY strictly-positive margin
+            // an infinite relative jump - the absolute floor above already
+            // gates that case, so the relative floor is skipped rather
+            // than dividing by zero.
+            if (selectedValueCopper <= 0)
+            {
+                return true;
+            }
+            return marginCopper >= selectedValueCopper * MinDecisiveMarginFraction;
+        }
+
         public static PillSubduingResult Evaluate(PillSourceCostBreakdown selected, PillSourceCostBreakdown losing)
         {
             if (selected == null || losing == null || !selected.IsAvailable || !losing.IsAvailable)
@@ -153,8 +211,19 @@ namespace GW2CraftingHelper.Services
                 losing.DecisionValue.Value > selected.DecisionValue.Value)
             {
                 long margin = losing.DecisionValue.Value - selected.DecisionValue.Value;
-                bool hasNonCoinCost = (selected.CostLines != null && selected.CostLines.Count > 0) ||
-                    (losing.CostLines != null && losing.CostLines.Count > 0);
+
+                // Adversarial-review round-2 fix (finding #3): a bare
+                // strictly-positive margin is not "decisive" - see
+                // IsDecisiveMargin's own doc comment. A near-equal losing
+                // option that fails this floor stays None (normal
+                // rendering), same as a genuine tie already does just
+                // above.
+                if (!IsDecisiveMargin(margin, selected.DecisionValue.Value))
+                {
+                    return PillSubduingResult.None;
+                }
+
+                bool hasNonCoinCost = HasCurrencyLine(selected.CostLines) || HasCurrencyLine(losing.CostLines);
                 return new PillSubduingResult(PillSubduingRule.Weighted, margin, null, hasNonCoinCost);
             }
 
@@ -208,6 +277,28 @@ namespace GW2CraftingHelper.Services
             }
 
             return deltas.Count > 0 ? deltas : null;
+        }
+
+        /// <summary>
+        /// True when at least one line is Type == "Currency" - the only
+        /// CostLine kind a CurrencyValuation ever prices (see
+        /// HasNonCoinCost's own doc comment). Type == "Item" lines are
+        /// TP-priced and never count, regardless of how many are present.
+        /// </summary>
+        private static bool HasCurrencyLine(IReadOnlyList<CostLine> lines)
+        {
+            if (lines == null)
+            {
+                return false;
+            }
+            foreach (var line in lines)
+            {
+                if (line.Type == "Currency")
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static Dictionary<(string Type, int Id), int> ToLookup(IReadOnlyList<CostLine> lines)

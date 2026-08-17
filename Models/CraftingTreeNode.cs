@@ -262,6 +262,27 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyList<string> CraftExcludedDisciplines { get; set; }
         public int CraftExcludedMinRating { get; set; }
 
+        // Adversarial-review round-2 fix (finding #5): straight
+        // passthrough of SolverDecision's own matching fields - true
+        // whenever the numerically cheapest raw craft recipe overall is
+        // untrained, independent of whether the AUTOMATIC pick itself got
+        // excluded. Closes two gaps CraftExcludedByCompetency alone left
+        // unreported: (a) the cheapest COMPARABLE recipe is untrained but
+        // a competent recipe exists only in the FALLBACK tier (craft never
+        // even enters the comparable-tier PickCheapest race); (b) a
+        // costlier competent SIBLING recipe wins Craft over the cheaper
+        // untrained one (the plan still crafts, so CraftExcludedByCompetency's
+        // own "Decision == Craft -> nothing to report" precedent does not
+        // apply - the user still never got the cheap recipe). Consumed by
+        // CompetencyOpportunityCalculator; never fed back into any
+        // displayed cost. CheapestCraftRealCost/Disciplines/MinRating
+        // describe that cheap recipe - only meaningful when
+        // CheapestCraftUntrained is true.
+        public bool CheapestCraftUntrained { get; set; }
+        public long? CheapestCraftRealCost { get; set; }
+        public IReadOnlyList<string> CheapestCraftDisciplines { get; set; }
+        public int CheapestCraftMinRating { get; set; }
+
         public IReadOnlyList<CraftingTreeNode> Children
         {
             get => _children;

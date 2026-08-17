@@ -195,6 +195,19 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(800, result.Decisions[0].TotalCost);
             Assert.Equal(11, result.Decisions[0].RecipeId);
             Assert.True(result.Decisions[0].CanCraft);
+
+            // Adversarial-review round-2 fix (finding #5), shape (b): this
+            // node's craft did NOT get excluded (recipe 11 auto-won), but
+            // the CHEAPEST recipe overall (recipe 10, untrained) is still
+            // untrained - CheapestCraftUntrained must be true here even
+            // though CraftExcludedByCompetency stays false, so
+            // CompetencyOpportunityCalculator can report "you could save
+            // 200c by training Weaponsmith 500" instead of staying silent.
+            Assert.False(result.Decisions[0].CraftExcludedByCompetency);
+            Assert.True(result.Decisions[0].CheapestCraftUntrained);
+            Assert.Equal(600, result.Decisions[0].CheapestCraftRealCost);
+            Assert.Equal("Weaponsmith", Assert.Single(result.Decisions[0].CheapestCraftDisciplines));
+            Assert.Equal(500, result.Decisions[0].CheapestCraftMinRating);
         }
 
         [Fact]
@@ -255,6 +268,114 @@ namespace GW2CraftingHelper.Tests.Services
                 characterDisciplines: new List<SnapshotCharacterDiscipline>());
 
             Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+        }
+
+        // --- Adversarial-review round-2 fix (finding #5): real
+        // Solve() + CraftingTreeBuilder + CompetencyOpportunityCalculator
+        // round trips for the two shapes CraftExcludedByCompetency alone
+        // left unreported. Same production pipeline
+        // PlanSolverPillSubduingTests already exercises for the subduing
+        // feature - proves the whole CheapestCraftUntrained threading, not
+        // just the isolated calculator/Decision-field coverage above.
+
+        private static CraftingTreeNode SolveAndBuildRootNode(
+            RecipeNode tree, Dictionary<int, ItemPrice> prices,
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
+            IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines)
+        {
+            var solver = new PlanSolver();
+            var solveResult = solver.Solve(
+                tree, prices, vendorOffers, PriceBasis.InstantBuy,
+                overrides: null, currencyValuation: null,
+                characterDisciplines: characterDisciplines);
+            var builder = new CraftingTreeBuilder();
+            return builder.BuildTree(tree, solveResult.Decisions, new Dictionary<int, ItemMetadata>());
+        }
+
+        [Fact]
+        public void FallbackTierCompetentRecipe_CheaperComparableUntrained_ReportsOpportunity()
+        {
+            // Shape (a): recipe 10 (Weaponsmith 500, comparable-tier, 30c)
+            // is the numerically cheapest craft option but untrained;
+            // recipe 20 (Armorsmith 400, FALLBACK-tier - an unvalued
+            // Currency ingredient) is competent but never competes on coin
+            // cost at all (fallback-tier craft never enters the
+            // comparable-tier PickCheapest race). TP buy (1000c) wins by
+            // default - CraftExcludedByCompetency stays false (a competent
+            // option DOES exist, just in the wrong tier), so only the
+            // generalized CheapestCraftUntrained fix reports the missed
+            // 970c saving.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(2, 1)),
+                Option(20, 1, 1, new List<string> { "Armorsmith" }, 400, Leaf(3, 1), Leaf(999, 5, "Currency")));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 20 } }
+            };
+            var characterDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Armorsmith", Rating = 400 }
+            };
+
+            var root = SolveAndBuildRootNode(tree, prices, null, characterDisciplines);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, root.Decision);
+            Assert.Equal(1000, root.SubtreeCost);
+            Assert.False(root.CraftExcludedByCompetency);
+            Assert.True(root.CheapestCraftUntrained);
+            Assert.Equal(30, root.CheapestCraftRealCost);
+
+            var result = new CraftingPlanResult { CraftingTree = root };
+            CompetencyOpportunityCalculator.Apply(result);
+
+            var opp = Assert.Single(result.CompetencyOpportunities);
+            Assert.Equal(1, opp.ItemId);
+            Assert.Equal(30, opp.CraftCost);
+            Assert.Equal(970, opp.DeltaCost);
+            Assert.Equal("Weaponsmith", Assert.Single(opp.Disciplines));
+            Assert.Equal(500, opp.MinRating);
+        }
+
+        [Fact]
+        public void CostlierCompetentSiblingWinsCraft_CheaperUntrainedSibling_ReportsOpportunity()
+        {
+            // Shape (b), full round trip: same tree as
+            // MultiRecipeNode_OneCompetentOneNot_CompetentSiblingAutoWinsOverExcludedCheaperOne
+            // above - recipe 11 (MysticForge, 800c) auto-wins Craft over
+            // the cheaper but untrained recipe 10 (Weaponsmith 500, 600c).
+            // The plan DOES craft (Decision == Craft), so the pre-fix
+            // "Decision != Craft" guard would have suppressed this - the
+            // generalized delta check reports it anyway.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(2, 1)),
+                Option(11, 1, 1, new List<string> { "MysticForge" }, 0, Leaf(3, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 600 } },
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 800 } }
+            };
+            var characterDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+            };
+
+            var root = SolveAndBuildRootNode(tree, prices, null, characterDisciplines);
+
+            Assert.Equal(CraftingDecision.Craft, root.Decision);
+            Assert.Equal(800, root.SubtreeCost);
+
+            var result = new CraftingPlanResult { CraftingTree = root };
+            CompetencyOpportunityCalculator.Apply(result);
+
+            var opp = Assert.Single(result.CompetencyOpportunities);
+            Assert.Equal(1, opp.ItemId);
+            Assert.Equal(600, opp.CraftCost);
+            Assert.Equal(200, opp.DeltaCost);
+            Assert.Equal("Weaponsmith", Assert.Single(opp.Disciplines));
+            Assert.Equal(500, opp.MinRating);
         }
     }
 }

@@ -130,5 +130,20 @@ namespace GW2CraftingHelper.Services
         public long? CraftExcludedRealCost { get; internal set; }
         public IReadOnlyList<string> CraftExcludedDisciplines { get; internal set; }
         public int CraftExcludedMinRating { get; internal set; }
+
+        // Adversarial-review round-2 fix (finding #5): straight
+        // passthrough of PlanSolver.Decision's own matching fields - see
+        // that field's own doc comment. True whenever the numerically
+        // cheapest raw craft recipe overall is untrained, independent of
+        // whether the AUTOMATIC pick itself got excluded (unlike
+        // CraftExcludedByCompetency above, this also covers a competent
+        // fallback-tier/costlier-sibling recipe winning instead of the
+        // cheap untrained one). CheapestCraftRealCost/Disciplines/MinRating
+        // describe that cheap recipe - only meaningful when
+        // CheapestCraftUntrained is true.
+        public bool CheapestCraftUntrained { get; internal set; }
+        public long? CheapestCraftRealCost { get; internal set; }
+        public IReadOnlyList<string> CheapestCraftDisciplines { get; internal set; }
+        public int CheapestCraftMinRating { get; internal set; }
     }
 }

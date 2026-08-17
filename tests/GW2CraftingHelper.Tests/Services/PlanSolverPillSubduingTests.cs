@@ -122,6 +122,53 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void WeightedCraftLosing_PureGoldNoValuation_HasNonCoinCostFalse()
+        {
+            // Adversarial-review round-2 finding #1's exact real path: TP
+            // (400c, selected) vs a craft recipe (losing) that consumes 5x
+            // item 100 at 100c each (500c) - pure gold on both sides, NO
+            // CurrencyValuation anywhere. BuildCraftCostBreakdown still
+            // emits an "Item" CostLine for the ingredient (every craft
+            // breakdown has one), so this isolates the round-1 regression:
+            // HasNonCoinCost must be false (and the tooltip must NOT say
+            // "at your current currency values") because that Item line
+            // was never priced by a user valuation - only a Type ==
+            // "Currency" line could ever have been.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(100, 5)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 400 } },
+                { 100, new ItemPrice { ItemId = 100, BuyInstant = 100 } }
+            };
+
+            var root = SolveAndBuildRootNode(tree, prices);
+
+            Assert.Equal(CraftingDecision.BuyFromTp, root.Decision);
+            Assert.Equal(400, root.SubtreeCost);
+
+            Assert.True(root.CraftCostBreakdown.IsAvailable);
+            Assert.Equal(500, root.CraftCostBreakdown.DecisionValue);
+            var craftLine = Assert.Single(root.CraftCostBreakdown.CostLines);
+            Assert.Equal("Item", craftLine.Type);
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(root);
+            var craftPill = specs.Single(s => s.Text == "CRAFT");
+            Assert.Equal(PillKind.Subdued, craftPill.Kind);
+            Assert.Equal(PillSubduingRule.Weighted, craftPill.SubduingResult.Rule);
+            Assert.Equal(100, craftPill.SubduingResult.ValueMarginCopper);
+            Assert.False(craftPill.SubduingResult.HasNonCoinCost);
+
+            var tooltip = PillSubduingTooltipBuilder.Build(
+                craftPill.SubduingResult,
+                new Dictionary<int, ItemMetadata>(),
+                new Dictionary<int, CurrencyMetadata>());
+            Assert.DoesNotContain("currency values", tooltip);
+
+            var tpPill = specs.Single(s => s.Text == "TP");
+            Assert.Equal(PillKind.Selected, tpPill.Kind);
+        }
+
+        [Fact]
         public void UnvaluedNonDominatedAlternative_StaysAvailable_NotSubdued()
         {
             // A vendor offer priced ONLY in an unvalued currency (no

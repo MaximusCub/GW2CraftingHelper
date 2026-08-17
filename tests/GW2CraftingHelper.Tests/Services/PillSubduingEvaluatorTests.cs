@@ -94,6 +94,117 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void Weighted_ItemLinesOnlyNoCurrencyLine_HasNonCoinCostFalse()
+        {
+            // Adversarial-review round-2 finding #1: BuildCraftCostBreakdown
+            // emits an "Item" CostLine for EVERY Item ingredient regardless
+            // of valuation (TP-priced, never user-valued) - so a craft
+            // breakdown very commonly has non-empty CostLines with no
+            // Currency line at all. The round-1 fix (any non-empty
+            // CostLines) mis-fired here; only a Type == "Currency" line
+            // (the only kind a CurrencyValuation can price) should count.
+            var selected = Available(rawCoin: 400, decisionValue: 400);
+            var losing = Available(rawCoin: 0, decisionValue: 500, Item(100, 5));
+
+            var result = PillSubduingEvaluator.Evaluate(selected, losing);
+
+            Assert.Equal(PillSubduingRule.Weighted, result.Rule);
+            Assert.Equal(100, result.ValueMarginCopper);
+            Assert.False(result.HasNonCoinCost);
+        }
+
+        [Fact]
+        public void Weighted_CurrencyLinePresent_HasNonCoinCostTrue()
+        {
+            // Contrast case: a genuine Type == "Currency" line (the only
+            // kind a CurrencyValuation prices) must still set the flag,
+            // even alongside an Item line that does not count.
+            var selected = Available(rawCoin: 400, decisionValue: 400);
+            var losing = Available(rawCoin: 0, decisionValue: 500, Item(100, 5), Currency(23, 10));
+
+            var result = PillSubduingEvaluator.Evaluate(selected, losing);
+
+            Assert.Equal(PillSubduingRule.Weighted, result.Rule);
+            Assert.True(result.HasNonCoinCost);
+        }
+
+        [Fact]
+        public void Weighted_OneCopperMarginOnMultiGoldPurchase_NotDecisive_NotSubdued()
+        {
+            // Adversarial-review round-2 finding #3: the exact reported
+            // shape - TP selected at 400c, craft losing at 401c (a
+            // genuine 1-copper margin, clears neither the absolute nor
+            // the relative floor on a value this size) - must stay None,
+            // not render the losing pill subdued/muted over a margin no
+            // reasonable person would call "decisive".
+            // losing needs LESS raw coin than selected (a genuine tradeoff,
+            // priced higher via a valued currency ingredient elsewhere -
+            // not modeled as a CostLine here, same precedent
+            // Weighted_BothValued_LosingStrictlyMoreExpensive_Subdued
+            // above already establishes) so StrictDomination cannot fire
+            // first and mask the margin gate this test targets.
+            var selected = Available(rawCoin: 400, decisionValue: 400);
+            var losing = Available(rawCoin: 0, decisionValue: 401);
+
+            Assert.Equal(PillSubduingRule.None, PillSubduingEvaluator.Evaluate(selected, losing).Rule);
+        }
+
+        [Fact]
+        public void Weighted_MarginClearsAbsoluteButNotRelativeFloor_NotSubdued()
+        {
+            // 101c margin on a 100000c (10g) purchase clears the 100c
+            // absolute floor but is only 0.101% - well under the 1%
+            // relative floor. Both floors must clear (AND, not OR).
+            var selected = Available(rawCoin: 100000, decisionValue: 100000);
+            var losing = Available(rawCoin: 0, decisionValue: 100101);
+
+            Assert.Equal(PillSubduingRule.None, PillSubduingEvaluator.Evaluate(selected, losing).Rule);
+        }
+
+        [Fact]
+        public void Weighted_MarginClearsRelativeButNotAbsoluteFloor_NotSubdued()
+        {
+            // 5c margin on a 50c purchase is a full 10% relative jump, but
+            // still under the 100c absolute floor - both floors must
+            // clear, so this stays None too (prevents a trivially cheap
+            // item's tiny copper difference from reading as "decisive"
+            // purely because it is a large percentage of a tiny number).
+            var selected = Available(rawCoin: 50, decisionValue: 50);
+            var losing = Available(rawCoin: 0, decisionValue: 55);
+
+            Assert.Equal(PillSubduingRule.None, PillSubduingEvaluator.Evaluate(selected, losing).Rule);
+        }
+
+        [Fact]
+        public void Weighted_MarginClearsBothFloors_Subdued()
+        {
+            var selected = Available(rawCoin: 10000, decisionValue: 10000);
+            var losing = Available(rawCoin: 0, decisionValue: 10200); // +200c, 2%
+
+            var result = PillSubduingEvaluator.Evaluate(selected, losing);
+
+            Assert.Equal(PillSubduingRule.Weighted, result.Rule);
+            Assert.Equal(200, result.ValueMarginCopper);
+        }
+
+        [Fact]
+        public void Weighted_SelectedValueZero_AnyPositiveMarginClearingAbsoluteFloorIsDecisive()
+        {
+            // A free/fully-owned selected source (DecisionValue 0) makes
+            // any relative-percentage floor divide-by-zero/meaningless -
+            // the absolute floor alone governs here. losing.RawCoin stays
+            // equal to selected's (both 0, not negative) with no CostLines
+            // on either side, so StrictDomination correctly finds nothing
+            // to compare and falls through to Weighted.
+            var selected = Available(rawCoin: 0, decisionValue: 0);
+            var losing = Available(rawCoin: 0, decisionValue: 150);
+
+            var result = PillSubduingEvaluator.Evaluate(selected, losing);
+
+            Assert.Equal(PillSubduingRule.Weighted, result.Rule);
+        }
+
+        [Fact]
         public void Weighted_ExactTie_NotSubdued()
         {
             var selected = Available(500, 500);
