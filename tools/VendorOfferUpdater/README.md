@@ -34,7 +34,7 @@ Both passes of the wrapper script (`tools/refresh-vendor-data.sh`) pass `--merge
 
 - Without `--tag-seasonal-festivals` on Pass 1, freshly-queried `WikiVendorResult` rows never carry a seasonal value, and `Program.MergeWikiCache` overwrites any existing cache entry for a re-queried page in full - including a previously-resolved seasonal value, which gets nulled out with nothing to restore it.
 - Without `--merge-into` on either pass, that pass's `finalOffers` is simply `uniqueOffers` (Program.cs's own "merge into an existing baseline, if requested" step is skipped entirely) - a full, `--query`-less refresh's fresh batch touches every merchant, so this wholesale-replaces the whole dataset with whatever this run resolved, dropping any offer (tagged or not) this run's own scrape/resolution did not reproduce.
-- `Program.MergeIntoBaseline`'s protected-merchant and OfferId-collision rules both prefer whichever side of a collision carries a `SeasonalFestival` tag, so even a page whose wikitext fetch transiently fails mid-refresh (left uncached, warned, and retried on the next run - see `ResolveSeasonalFestivalValuesAsync`) does not lose a previously-shipped tag: the merge carries the baseline's tag forward onto the surviving fresh row.
+- `Program.MergeIntoBaseline`'s protected-merchant and OfferId-collision rules both prefer whichever side of a collision carries a `SeasonalFestival` tag, so even a page whose wikitext fetch transiently fails mid-refresh (left uncached, warned, and retried on the next run - see `ResolveSeasonalFestivalValuesAsync`) does not lose a previously-shipped tag: the merge carries the baseline's tag forward onto the surviving fresh row. This holds for every merchant, not just protected ones: an ORDINARY merchant's replaced baseline rows are harvested for their tags (keyed by OfferId and by content, to survive a hash-format migration) before being dropped, and any harvested tag is applied onto that merchant's untagged fresh rows - never overwriting a fresh row that already carries its own tag.
 
 Running Pass 1 or Pass 2 manually (not via the wrapper script) without both flags reproduces the wholesale-replace behavior above - always pass `--tag-seasonal-festivals` and `--merge-into <output-path> <output-path>` together for any refresh that should preserve existing seasonal tags.
 
@@ -65,7 +65,7 @@ The tool auto-detects the repository root by walking up the directory tree looki
 | `--delay <ms>` | 250 | Delay between wiki API requests (minimum enforced: 200 ms) |
 | `--dry-run` | off | Print query plan only, no HTTP calls to wiki |
 | `--tag-seasonal-festivals` | off | Fetch each distinct vendor page's wikitext and tag offers whose page carries a `{{Temporary\|...\|seasonal=}}`/`{{Temporary\|...\|event=}}` value matching one of the six known GW2 festivals. Opt-in: adds one extra HTTP request per distinct, not-yet-cached vendor page (see `--max-seasonal-pages`) |
-| `--max-seasonal-pages <n>` | 500 | Safety limit on how many new (uncached) vendor pages `--tag-seasonal-festivals` will fetch in one run |
+| `--max-seasonal-pages <n>` | 500 | Self-healing per-run budget on how many new (uncached) vendor pages `--tag-seasonal-festivals` will fetch in one run - if there are more uncached pages than the budget, it fetches up to the budget, saves the cache, and leaves the rest for a subsequent run (only a value `<= 0` is rejected outright) |
 
 ### Environment Overrides (wrapper script)
 
@@ -77,6 +77,7 @@ The `refresh-vendor-data.sh` script accepts these environment variables:
 | `MAX_REQUESTS` | 2000 | Pass 1 `--max-requests` |
 | `DELAY_PASS1` | 250 | Pass 1 `--delay` |
 | `DELAY_PASS2` | 1500 | Pass 2 `--delay` |
+| `MAX_SEASONAL_PAGES` | 2500 | Pass 1 `--max-seasonal-pages` - sized to cover a from-scratch sweep of the measured ~2,088 distinct vendor pages in one run |
 
 Example:
 

@@ -7,10 +7,19 @@
 #   ./tools/refresh-vendor-data.sh --help       # Print usage
 #
 # Environment overrides (optional):
-#   MAX_RUNTIME   Max wiki scrape time in minutes  (default: 20)
-#   MAX_REQUESTS  Max HTTP requests for wiki scrape (default: 2000)
-#   DELAY_PASS1   Delay between wiki requests in ms (default: 250)
-#   DELAY_PASS2   Delay between resolution requests (default: 1500)
+#   MAX_RUNTIME        Max wiki scrape time in minutes  (default: 20)
+#   MAX_REQUESTS       Max HTTP requests for wiki scrape (default: 2000)
+#   DELAY_PASS1        Delay between wiki requests in ms (default: 250)
+#   DELAY_PASS2        Delay between resolution requests (default: 1500)
+#   MAX_SEASONAL_PAGES Max NEW seasonal-tag wiki pages fetched by Pass 1
+#                       in one run (default: 2500). A from-scratch refresh
+#                       needs one fetch per distinct vendor page (~2,088
+#                       measured); the self-healing budget in
+#                       ResolveSeasonalFestivalValuesAsync fetches up to
+#                       this many and leaves the rest for a subsequent run
+#                       rather than aborting, but the default here is sized
+#                       to cover a full refresh in one run under normal
+#                       conditions.
 #
 # Requires: .NET 8 SDK, Git Bash on Windows, internet access.
 # jq is optional - used for offer count in the summary if available.
@@ -60,6 +69,7 @@ for arg in "$@"; do
             echo "  MAX_REQUESTS=${MAX_REQUESTS:-2000}  Max HTTP requests for wiki scrape"
             echo "  DELAY_PASS1=${DELAY_PASS1:-250}   Delay between wiki requests (ms)"
             echo "  DELAY_PASS2=${DELAY_PASS2:-1500}  Delay between resolution requests (ms)"
+            echo "  MAX_SEASONAL_PAGES=${MAX_SEASONAL_PAGES:-2500}  Max new seasonal-tag pages fetched by Pass 1"
             exit 0
             ;;
         *)
@@ -100,6 +110,18 @@ if [[ "$PASS2_ONLY" == false ]]; then
     # untagged fresh scrape, silently dropping every previously-tagged
     # festival-vendor row. See tools/VendorOfferUpdater/README.md's
     # "Seasonal Tag Preservation" section for the full explanation.
+    #
+    # Safety-limit fix (2026-08-20): --max-seasonal-pages caps how many NEW
+    # (uncached) vendor pages this run's seasonal-tag pass will fetch. On a
+    # fresh clone, ref/seasonal_wikitext_cache.json (gitignored, dev-local)
+    # does not exist, so a full refresh needs a fetch for every one of the
+    # ~2,088 distinct vendor pages the live dataset has. The default here
+    # (2500) is sized to cover that in one run; if the live page count ever
+    # grows past it, ResolveSeasonalFestivalValuesAsync's budget is
+    # self-healing - it fetches up to the budget, saves the cache, and
+    # leaves the remainder for a subsequent run rather than aborting, so
+    # repeated runs still converge on full coverage without needing this
+    # default raised.
     echo "=== Pass 1: Wiki scrape (--skip-item-resolution --tag-seasonal-festivals) ==="
     mapfile -t MERGE_FLAGS < <(merge_flags)
     dotnet run --project "$PROJ" -c Release --no-build -- \
@@ -109,6 +131,7 @@ if [[ "$PASS2_ONLY" == false ]]; then
         --max-runtime "${MAX_RUNTIME:-20}" \
         --max-requests "${MAX_REQUESTS:-2000}" \
         --delay "${DELAY_PASS1:-250}" \
+        --max-seasonal-pages "${MAX_SEASONAL_PAGES:-2500}" \
         "$OUTPUT"
     echo ""
 else

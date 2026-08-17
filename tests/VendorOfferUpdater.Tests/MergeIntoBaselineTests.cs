@@ -359,5 +359,86 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal("dragonbash", result.Merged[0].SeasonalFestival);
             Assert.Equal("new-hash-format", result.Merged[0].OfferId);
         }
+
+        // Data-loss fix (2026-08-20, festival-scrape tag-carry follow-up):
+        // `kept` used to drop EVERY replaced (non-protected) merchant's
+        // baseline rows outright, before the fresh/kept GroupBy tag-carry
+        // logic above ever ran - that logic only ever sees a baseline row
+        // for PROTECTED merchants. This measured scenario is a
+        // --pass2-only run against a pre-tagging wiki_vendor_cache.json:
+        // the merchant is NOT protected (no skippedRows), its baseline row
+        // is already tagged from a prior --tag-seasonal-festivals run, and
+        // the fresh row (recomputed from the pre-tagging cache) carries no
+        // tag at all. The tag must survive by being harvested from the
+        // baseline row before it is dropped and carried onto the matching
+        // fresh row - the SAME OfferId here (a stable hash across the two
+        // runs), so this covers the OfferId-keyed side of the harvest
+        // lookup.
+        [Fact]
+        public void UnprotectedMerchant_HarvestsBaselineTag_OntoUntaggedFreshRow_ByOfferId()
+        {
+            var baseline = new List<VendorOffer>
+            {
+                MakeOffer("shared-id", "Miyani", 1, seasonalFestival: "halloween")
+            };
+            var fresh = new List<VendorOffer>
+            {
+                MakeOffer("shared-id", "Miyani", 1)
+            };
+
+            var result = Program.MergeIntoBaseline(baseline, fresh);
+
+            Assert.Single(result.Merged);
+            Assert.Equal("halloween", result.Merged[0].SeasonalFestival);
+        }
+
+        // Companion to the above: covers the content-key side of the
+        // harvest lookup, for a baseline row that predates a
+        // VendorOfferHasher hash-format change and so carries a DIFFERENT
+        // OfferId than its content-identical fresh counterpart. The OfferId
+        // lookup alone would miss this pair; ComputeContentKey (which
+        // deliberately excludes SeasonalFestival) still matches them.
+        [Fact]
+        public void UnprotectedMerchant_HarvestsBaselineTag_OntoUntaggedFreshRow_ByContentKey_WhenOfferIdDiffers()
+        {
+            var baseline = new List<VendorOffer>
+            {
+                MakeOffer("old-hash-format", "Miyani", 1, seasonalFestival: "halloween")
+            };
+            var fresh = new List<VendorOffer>
+            {
+                MakeOffer("new-hash-format", "Miyani", 1)
+            };
+
+            var result = Program.MergeIntoBaseline(baseline, fresh);
+
+            Assert.Single(result.Merged);
+            Assert.Equal("halloween", result.Merged[0].SeasonalFestival);
+            Assert.Equal("new-hash-format", result.Merged[0].OfferId);
+        }
+
+        // Non-overwrite companion: a fresh row for an unprotected merchant
+        // that already carries its OWN (possibly different) tag must never
+        // be overwritten by the harvested baseline tag - fresh always wins
+        // when both sides are tagged, same rule as the protected-merchant
+        // path (MergedResult_DedupesByOfferId_PreferringFreshRow_...
+        // above).
+        [Fact]
+        public void UnprotectedMerchant_FreshRowWithDifferentTag_FreshTagWins_NotOverwrittenByHarvest()
+        {
+            var baseline = new List<VendorOffer>
+            {
+                MakeOffer("shared-id", "Miyani", 1, seasonalFestival: "halloween")
+            };
+            var fresh = new List<VendorOffer>
+            {
+                MakeOffer("shared-id", "Miyani", 1, seasonalFestival: "dragonbash")
+            };
+
+            var result = Program.MergeIntoBaseline(baseline, fresh);
+
+            Assert.Single(result.Merged);
+            Assert.Equal("dragonbash", result.Merged[0].SeasonalFestival);
+        }
     }
 }

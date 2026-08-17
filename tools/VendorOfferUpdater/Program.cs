@@ -687,6 +687,18 @@ namespace VendorOfferUpdater
         /// "never silently deletes shipped data" - the former is visible
         /// and fixable by a follow-up run once every row resolves a game
         /// id; the latter is not.
+        ///
+        /// NOTE (non-purity, nice-to-have documented 2026-08-20): this
+        /// method mutates rows it does not own. Both the ordinary-merchant
+        /// tag-harvest pass and the protected-merchant content-key dedupe
+        /// pass below assign directly onto <c>SeasonalFestival</c>/<c>
+        /// OfferId</c> of <see cref="VendorOffer"/> instances that live in
+        /// the caller's own <paramref name="fresh"/> (and, via the
+        /// content-key winner swap, occasionally <paramref name="baseline"/>)
+        /// lists, rather than cloning first - a caller that keeps its own
+        /// reference to those lists after calling this method will observe
+        /// the mutation even though only <see cref="BaselineMergeResult.Merged"/>
+        /// is documented as the return value.
         /// </summary>
         // internal for testability (VendorOfferUpdater.Tests)
         internal static BaselineMergeResult MergeIntoBaseline(
@@ -711,6 +723,80 @@ namespace VendorOfferUpdater
                 .Where(m => !merchantsWithSkippedRows.Contains(m))
                 .ToList();
             var merchantsReplacedSet = new HashSet<string>(merchantsReplaced, StringComparer.Ordinal);
+
+            // Data-loss fix (2026-08-20, festival-scrape tag-carry
+            // follow-up): an ORDINARY (non-protected) replaced merchant's
+            // baseline rows are about to be dropped entirely by `kept`
+            // below, before the fresh/kept GroupBy tag-carry-forward logic
+            // further down ever runs - that logic only ever sees a
+            // baseline row for PROTECTED merchants, since `kept` excludes
+            // every replaced merchant's rows outright. This made the
+            // README's claimed property ("a transiently failed fetch does
+            // not lose a previously-shipped tag") false for every ordinary
+            // merchant: a --pass2-only run against a pre-tagging
+            // wiki_vendor_cache.json produces fresh rows with no
+            // SeasonalFestival at all, and the merchant's previously-
+            // shipped tags were silently gone with no fresh counterpart to
+            // carry them forward from. Harvest each replaced merchant's
+            // tagged baseline rows into a lookup BEFORE `kept` drops them,
+            // keyed by both OfferId and ComputeContentKey - a
+            // VendorOfferHasher hash-format migration can leave either as
+            // the only field still matching between the baseline and fresh
+            // copies of the same offer (see the protected-merchant
+            // content-key dedupe pass further below for the same
+            // reasoning) - then apply the harvested tag onto that
+            // merchant's fresh rows that have no tag of their own. A fresh
+            // row that already carries its own (possibly different) tag is
+            // never overwritten - fresh always wins when both sides are
+            // tagged.
+            if (merchantsReplacedSet.Count > 0)
+            {
+                var replacedTagsByOfferId = new Dictionary<string, string>(StringComparer.Ordinal);
+                var replacedTagsByContentKey = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var o in baseline)
+                {
+                    if (o.SeasonalFestival == null)
+                    {
+                        continue;
+                    }
+                    if (!merchantsReplacedSet.Contains(o.MerchantName ?? string.Empty))
+                    {
+                        continue;
+                    }
+
+                    if (o.OfferId != null)
+                    {
+                        replacedTagsByOfferId[o.OfferId] = o.SeasonalFestival;
+                    }
+                    replacedTagsByContentKey[ComputeContentKey(o)] = o.SeasonalFestival;
+                }
+
+                if (replacedTagsByOfferId.Count > 0 || replacedTagsByContentKey.Count > 0)
+                {
+                    foreach (var o in fresh)
+                    {
+                        if (o.SeasonalFestival != null)
+                        {
+                            continue;
+                        }
+                        if (!merchantsReplacedSet.Contains(o.MerchantName ?? string.Empty))
+                        {
+                            continue;
+                        }
+
+                        if (o.OfferId != null
+                            && replacedTagsByOfferId.TryGetValue(o.OfferId, out var tagById))
+                        {
+                            o.SeasonalFestival = tagById;
+                        }
+                        else if (replacedTagsByContentKey.TryGetValue(
+                            ComputeContentKey(o), out var tagByContent))
+                        {
+                            o.SeasonalFestival = tagByContent;
+                        }
+                    }
+                }
+            }
 
             var kept = baseline
                 .Where(o => !merchantsReplacedSet.Contains(o.MerchantName ?? string.Empty))
@@ -1056,11 +1142,18 @@ namespace VendorOfferUpdater
         /// next to the other dev-local caches (gitignored, like
         /// wiki_vendor_cache.json/item_id_cache.json) so a repeat run
         /// never re-fetches a page it has already checked.
-        /// <paramref name="maxSeasonalPages"/> is a safety limit
-        /// (SafetyLimitException, same pattern WikiSmwClient's own query
-        /// safety limits use) on how many NEW pages a single run will
-        /// fetch, so an accidental full-dataset run with the flag set does
-        /// not silently attempt thousands of live requests.
+        /// <paramref name="maxSeasonalPages"/> is a self-healing per-run
+        /// budget (2026-08-20 fix; only a genuinely invalid budget &lt;= 0
+        /// still throws SafetyLimitException, same pattern WikiSmwClient's
+        /// own query safety limits use) on how many NEW pages a single run
+        /// will fetch, so an accidental full-dataset run with the flag set
+        /// does not silently attempt thousands of live requests in one go.
+        /// When there are more uncached pages than the budget allows, this
+        /// method fetches only up to the budget, saves the cache as usual,
+        /// and logs how many pages remain - it does NOT throw. The next
+        /// run's own toFetch list is smaller (this run's fetches are now
+        /// cached), so repeated runs converge on full coverage instead of
+        /// every run past the first throwing on the same unmet budget.
         ///
         /// WikiVendorResult.PageName is the SMW subject key of the vendor's
         /// "Sells item" SUBOBJECT, not the vendor's own wiki page title -
@@ -1100,6 +1193,21 @@ namespace VendorOfferUpdater
             CancellationToken ct,
             IReadOnlyList<WikiVendorResult>? queryScopedResults = null)
         {
+            // Hard-abort fix (2026-08-20): defense in depth - Program.cs's
+            // own arg parsing already rejects --max-seasonal-pages <= 0
+            // before this method is ever called from RunAsync, but this
+            // method is also called directly by tests and could in
+            // principle be called by a future caller that skips that
+            // check. A budget of 0 or less is not a normal "run out of
+            // budget, continue next time" case (see the self-healing fetch-
+            // up-to-budget logic below) - it means no run could ever make
+            // progress, so it stays a genuine SafetyLimitException.
+            if (maxSeasonalPages <= 0)
+            {
+                throw new SafetyLimitException(
+                    $"--max-seasonal-pages must be a positive integer, got {maxSeasonalPages}.");
+            }
+
             var cache = LoadSeasonalWikitextCache(cachePath);
 
             var fetchScope = queryScopedResults ?? (IReadOnlyList<WikiVendorResult>)wikiResults;
@@ -1118,18 +1226,41 @@ namespace VendorOfferUpdater
 
             if (toFetch.Count > 0)
             {
-                Console.WriteLine(
-                    $"Resolving seasonal festival tags for {toFetch.Count} " +
-                    $"uncached vendor page(s) ({distinctPageNames.Count - toFetch.Count} already cached)...");
+                int totalUncached = toFetch.Count;
 
+                // Self-healing fix (2026-08-20): a from-scratch run against
+                // a real dataset (thousands of distinct vendor pages) with
+                // no prior ref/seasonal_wikitext_cache.json (gitignored,
+                // empty on a fresh clone) used to hit this budget on its
+                // very first invocation and throw SafetyLimitException
+                // BEFORE fetching anything - the run exited non-zero, Pass
+                // 2 never ran, and a re-run made no progress at all (same
+                // empty cache, same over-budget toFetch, same throw).
+                // Instead, fetch only UP TO the budget this run, save
+                // whatever was fetched (the existing try/finally below
+                // already does this), and leave the rest for a later run -
+                // next time, this run's own newly-cached pages shrink
+                // toFetch, so repeated runs make steady forward progress
+                // and the overall process converges instead of looping
+                // forever on the same failure. See the maxSeasonalPages
+                // <= 0 check above for the one budget shape that still
+                // hard-aborts.
                 if (toFetch.Count > maxSeasonalPages)
                 {
-                    throw new SafetyLimitException(
-                        $"Seasonal festival tagging would fetch {toFetch.Count} new wiki " +
-                        $"page(s), exceeding --max-seasonal-pages ({maxSeasonalPages}). " +
-                        "Increase --max-seasonal-pages or narrow --query to a smaller " +
-                        "set of vendors.");
+                    int remaining = toFetch.Count - maxSeasonalPages;
+                    Console.WriteLine(
+                        $"NOTE: {toFetch.Count} vendor page(s) need seasonal tagging, but " +
+                        $"the --max-seasonal-pages budget for this run is {maxSeasonalPages}. " +
+                        $"Fetching {maxSeasonalPages} page(s) now; {remaining} page(s) remain " +
+                        "and will be picked up by a subsequent run (this run's cache save " +
+                        "covers everything fetched below, so the remaining count only shrinks " +
+                        "from here).");
+                    toFetch = toFetch.Take(maxSeasonalPages).ToList();
                 }
+
+                Console.WriteLine(
+                    $"Resolving seasonal festival tags for {toFetch.Count} " +
+                    $"uncached vendor page(s) ({distinctPageNames.Count - totalUncached} already cached)...");
 
                 int effectiveDelay = Math.Max(200, delayMs);
 

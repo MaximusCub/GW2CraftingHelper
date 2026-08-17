@@ -180,8 +180,19 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
+        // Self-healing fix (2026-08-20): a from-scratch run against a real
+        // dataset (thousands of distinct vendor pages) with no prior
+        // ref/seasonal_wikitext_cache.json used to hit this exact shape -
+        // more uncached pages than the budget - on its very first
+        // invocation and throw SafetyLimitException BEFORE fetching
+        // anything, so tools/refresh-vendor-data.sh exited non-zero, Pass 2
+        // never ran, and a re-run made no progress (same empty cache, same
+        // over-budget count, same throw). The budget is now self-healing:
+        // fetch up to it, save the cache, and continue without throwing -
+        // the remaining pages are picked up by a later run once this run's
+        // fetches are cached.
         [Fact]
-        public async Task TooManyUncachedPages_ThrowsSafetyLimitException()
+        public async Task TooManyUncachedPages_FetchesUpToBudget_SavesCache_DoesNotThrow()
         {
             var handler = new FakeHttpHandler();
             using var httpClient = new HttpClient(handler);
@@ -199,12 +210,63 @@ namespace VendorOfferUpdater.Tests
             string cachePath = TempCachePath();
             try
             {
+                // No exception - the run completes and fetches only up to
+                // the budget (2 of the 3 uncached pages).
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    results, client, cachePath, maxSeasonalPages: 2, delayMs: 0, CancellationToken.None);
+
+                Assert.Equal(2, handler.RequestedUrls.Count(u => u.Contains("action=parse")));
+
+                // The cache was saved with exactly the pages fetched this
+                // run (the outer finally's SaveSeasonalWikitextCache call) -
+                // a clean partial save, not an all-or-nothing one.
+                Assert.True(File.Exists(cachePath), "Cache file should be saved after a partial fetch.");
+
+                // A clean follow-up run picks up where this one left off:
+                // whichever page(s) were not fetched this run are still
+                // uncached and get fetched now (still within budget), with
+                // no exception either.
+                handler.RequestedUrls.Clear();
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    results, client, cachePath, maxSeasonalPages: 2, delayMs: 0, CancellationToken.None);
+
+                // At most the 1 remaining uncached page is fetched this
+                // second run (never more than the budget), and every
+                // result now has its (untagged, per the fixture's
+                // {{NPC infobox}} response) value resolved.
+                Assert.True(handler.RequestedUrls.Count(u => u.Contains("action=parse")) <= 1);
+                Assert.All(results, r => Assert.Null(r.TemporarySeasonalValue));
+            }
+            finally
+            {
+                File.Delete(cachePath);
+            }
+        }
+
+        // Hard-abort fix (2026-08-20): a budget of 0 or less is not a
+        // normal "ran out of budget, continue next time" case - it means
+        // no run could ever make progress at all, so it must keep throwing
+        // SafetyLimitException rather than silently self-heal into an
+        // infinite no-op.
+        [Fact]
+        public async Task NonPositiveMaxSeasonalPages_ThrowsSafetyLimitException()
+        {
+            var handler = new FakeHttpHandler();
+            using var httpClient = new HttpClient(handler);
+            var client = new WikiSmwClient(httpClient);
+
+            var results = new List<WikiVendorResult>
+            {
+                new WikiVendorResult { PageName = "Vendor A#vendor1", GameId = 1 },
+            };
+
+            string cachePath = TempCachePath();
+            try
+            {
                 await Assert.ThrowsAsync<SafetyLimitException>(() =>
                     Program.ResolveSeasonalFestivalValuesAsync(
-                        results, client, cachePath, maxSeasonalPages: 2, delayMs: 0, CancellationToken.None));
+                        results, client, cachePath, maxSeasonalPages: 0, delayMs: 0, CancellationToken.None));
 
-                // No requests should have been made - the limit is checked
-                // before any fetch starts.
                 Assert.Empty(handler.RequestedUrls);
             }
             finally

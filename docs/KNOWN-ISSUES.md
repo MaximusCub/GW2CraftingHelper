@@ -5876,9 +5876,26 @@ fully green.
   freshly live-tagged) have ever been checked for a `{{Temporary}}` tag.
   Every other vendor in the ~53.5k-offer dataset is unswept - a future
   full Pass 1 re-scrape + `--tag-seasonal-festivals` run is needed for
-  real coverage, and per this file's own conservative safety-limit
-  design (`--max-seasonal-pages`, default 500) would need explicit
-  raising for a from-scratch sweep of every distinct vendor page.
+  real coverage.
+  **Correction (2026-08-20 fix): the "would need explicit raising"
+  framing above is stale.** `--max-seasonal-pages` (default 500 at the
+  `Program.cs` CLI level) used to throw `SafetyLimitException` and abort
+  the WHOLE run - before fetching anything - the moment the uncached-page
+  count exceeded the budget, which a from-scratch sweep of the measured
+  ~2,088 distinct vendor pages against an empty (gitignored,
+  fresh-clone-absent) `ref/seasonal_wikitext_cache.json` hit
+  unconditionally on its very first invocation; `tools/refresh-vendor-
+  data.sh` exited 2, Pass 2 never ran, and a re-run made no progress at
+  all (same empty cache, same over-budget count, same throw).
+  `ResolveSeasonalFestivalValuesAsync`'s budget is now self-healing
+  instead: it fetches up to the budget, saves the cache (as before), and
+  logs how many pages remain for a subsequent run rather than aborting -
+  only a budget `<= 0` still throws `SafetyLimitException`. The script
+  also now exposes the budget as `MAX_SEASONAL_PAGES` (matching
+  `MAX_RUNTIME`/`MAX_REQUESTS`/`DELAY_PASS1`/`DELAY_PASS2`), defaulted to
+  2500 there so the documented one-command full refresh completes the
+  seasonal-tag sweep in one run under normal conditions instead of
+  needing the limit raised by hand.
 - The six wiki-display-name -> internal-key mappings are Halloween,
   Dragon Bash, Wintersday, Festival of the Four Winds, Lunar New Year,
   and Super Adventure Festival ONLY - if Blish HUD's `FestivalContext`
