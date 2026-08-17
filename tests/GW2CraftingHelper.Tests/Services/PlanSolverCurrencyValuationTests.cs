@@ -315,6 +315,73 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(250, result.Decisions[0].ComparisonValue);
         }
 
+        /// <summary>
+        /// Gate finding 2026-08-16 (value-detail hover, live repro): the
+        /// live case reported a CRAFT root's value-detail hover
+        /// (ValueDetailTooltipBuilder) not firing for a Deldrimor Steel
+        /// Ingot-shaped plan whose subtree contains a Philosopher's Stone-
+        /// style BuyFromVendor child priced entirely in a valued non-coin
+        /// currency (spirit shards, curated default 3600 copper/unit -
+        /// Models/CurrencyDecisionDefaults.cs). The sibling test above
+        /// (ComparisonValue_RollsUpThroughAncestorCraft_MatchesDecisionOnlyExpectation)
+        /// already proves the raw SolverDecision.ComparisonValue rolls up
+        /// correctly through the solver; this test walks the SAME shape one
+        /// layer further - through CraftingTreeBuilder.BuildTree (which
+        /// copies decision.ComparisonValue verbatim onto
+        /// CraftingTreeNode.DecisionValue) and then
+        /// ValueDetailTooltipBuilder.TryBuild, the exact two production
+        /// steps between a solved decision and the tooltip a CRAFT pill
+        /// hover renders - to determine whether the fold-up genuinely
+        /// reaches the pill, or is lost somewhere between the two.
+        /// CurrencyDecisionDefaults' own curated value is used (via
+        /// CurrencyValuation.WithDefaults) rather than a hand-picked test
+        /// valuation, matching the live report's own "curated default
+        /// value" wording exactly.
+        /// </summary>
+        [Fact]
+        public void CraftRoot_VendorChildValuedInCuratedCurrency_ValueDetailTooltipFires()
+        {
+            const int SpiritShardCurrencyId = 23;
+
+            // Root (item 1): craft from 1x item 2 (Philosopher's Stone-
+            // style vendor-only item). No TP price/vendor offer of its own,
+            // so craft is the only source and wins outright.
+            var tree = Craftable(1, 5, Option(10, 1, 1, Leaf(2, 5)));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                // Bought purely with 20 spirit shards per unit - no coin,
+                // no TP price at all for item 2 either, so BuyFromVendor is
+                // the only source and wins outright too.
+                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, SpiritShardCurrencyId, 20) } }
+            };
+            var valuation = CurrencyValuation.WithDefaults(CurrencyValuation.None);
+            var solver = new PlanSolver();
+
+            var solveResult = solver.Solve(
+                tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation);
+
+            var builder = new CraftingTreeBuilder();
+            var root = builder.BuildTree(tree, solveResult.Decisions, metadata: null);
+
+            Assert.Equal(CraftingDecision.Craft, root.Decision);
+            // Real gold cost is 0 (the vendor child's own coin part is 0);
+            // DecisionValue is the shard cost folded up via the curated
+            // 3600 copper/unit default: 5x item 2 needed, 20 shards/unit ->
+            // 100 shards * 3600 = 360000 - the two must diverge for the
+            // hover to fire.
+            Assert.Equal(0, root.SubtreeCost);
+            Assert.Equal(360000, root.DecisionValue);
+
+            bool fired = ValueDetailTooltipBuilder.TryBuild(root, null, out string tooltipText);
+
+            Assert.True(fired);
+            Assert.NotNull(tooltipText);
+            Assert.Contains("Crafting gold price:", tooltipText);
+            Assert.Contains("Currencies:", tooltipText);
+            Assert.Contains("Optimization price:", tooltipText);
+        }
+
         [Fact]
         public void ComparisonValue_NoCurrencyContribution_EqualsTotalCost()
         {
