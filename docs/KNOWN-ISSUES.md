@@ -4038,7 +4038,7 @@ only - see git log for full per-commit detail):
    closed the structurally identical unrecognized-`CostLine.Type` gap in
    `VendorBatchSolver`; 2 tests.
 
-Gate: not yet run live - queued for the next batched desktop session. Merged after five adversarial review rounds, a targeted fix pass, and an independent verification review resolved every finding (zero blocking), under the maintainer's standing merge directive (2026-08-16). Solver behavior is fully covered by the suite; the deferred item is visual confirmation of the new labels/tooltips only.
+Gate: PARTIAL PASS 2026-08-16 (orchestrator live desktop session). Solver-side safety fully suite-covered; the GuildUpgrade pill/label visuals were unreachable live (no guild-decoration output is plannable via the search list) - visual slice rides the next natural opportunity.
 ## AUDIT ROW 20/38: TP price-side fallback parity (2026-08-16)
 
 **Bug**: `PlanSolver.GetUnitPrice` returned 0 whenever the selected
@@ -4268,7 +4268,7 @@ history - `TreeSectionController.cs` is Blish-bound and outside this
 repo's test-runnable surface, same constraint every UI-adjacent entry
 in this file notes.
 
-Gate: not yet run live - queued for the next batched desktop session. Merged after five adversarial review rounds, a targeted fix pass, and an independent verification review resolved every finding (zero blocking, 1383/1383 suite), under the maintainer's standing merge directive (2026-08-16). Solver behavior is fully covered by the suite; the deferred item is visual confirmation of the caveat tooltips only.
+Gate: PARTIAL PASS 2026-08-16 (orchestrator live desktop session). Fallback pricing exercised implicitly throughout live plans; the caveat tooltip's specific fallen-back shape did not occur in the tested plans - suite-covered, visual slice deferred.
 
 ## AUDIT ROW 56: daily craft-cooldown notices + three small fixes (2026-08-16)
 
@@ -4616,7 +4616,7 @@ I/O. IDs remain internal-only - the new/changed hint text never
 surfaces an item id. No live desktop verification was performed (same
 Blish-bound surface as PART A/B/C).
 
-Gate: not yet run live - queued for the next batched desktop session. Merged after the full review pipeline resolved every finding, under the maintainer's standing merge directive (2026-08-16).
+Gate: PASS 2026-08-16 (orchestrator live desktop session). Deldrimor Steel Ingot x5 rendered the timegate notice verbatim ('Lump of Mithrillium is timegated - 1 per day per account - crafting 5 will take about 5 days'); the empty-IconUrl magenta fix verified on the Snapshot tab (Spirit Shards row degrades to no icon); currency-name corrections suite-covered.
 ## Currency UX package: defaults, plan-scope pills, value-detail hover (2026-08-16)
 
 Three maintainer-approved currency-UX features shipped as one coherent
@@ -4771,7 +4771,7 @@ value already behaves in a saved snapshot (both are frozen at solve time),
 so it is arguably correct snapshot semantics rather than a bug - noted
 here so it is not rediscovered as one.
 
-Gate: not yet run live - queued for the next batched desktop session. Merged after the full review pipeline resolved every finding (independent verification zero-blocking, 1480/1480 suite; the verified ComparisonValue fallback-tier regression fixed in fc11dff), under the maintainer's standing merge directive (2026-08-16).
+Gate: PASS with one deferred slice 2026-08-16 (orchestrator live desktop session). Plan-scope currency pills verified live in collapsed full-coverage form (plain HAVE on all covered leaves incl. W4B component leaves - the unified vocabulary); Settings defaults suite-covered; value-detail hover: all three suppression paths verified live correct (unvalued ARE, component leaves, non-diverging rows) but no positive render occurred in the tested shapes - a propagation question (vendor-child currency valuations folding into a craft root's DecisionValue) is under investigation on branch gate-fixes.
 ## Decision-invariant "Value Own Materials" (VOM, 2026-08-16)
 
 **Bug (audit row 31)**: `InventoryReducer.Reduce` walked the recipe
@@ -5127,7 +5127,7 @@ re-reducing re-solve. Build: `dotnet build GW2CraftingHelper.csproj
 -p:Platform=x64` - clean, 0 errors. Tests: 1428 passed, 0 failed (1425
 + the 3 new `PlanStoreTests` facts above).
 
-Gate: not yet run live - queued for the next batched desktop session. Merged after the full review pipeline resolved every finding (2 adversarial rounds, verification zero-blocking, 1428/1428 pre-merge), under the maintainer's standing merge directive (2026-08-16). Note: first PersistedPlan schema bump (v2) - saved plans regenerate once on upgrade.
+Gate: PASS 2026-08-16 (orchestrator live desktop session). Inline toggle renders next to Use Own Materials (checked default); schema-v2 one-time plan reset consumed the old v1 file cleanly (strip showed Ready, no restored plan); decision behavior suite-covered.
 
 ## Plan Notes section: excess/reclaim, competency, forge scope (2026-08-16)
 
@@ -5301,7 +5301,7 @@ entry in this file notes. The Notes section's real on-screen layout
 collapse/expand) has not been visually confirmed in a running Blish HUD
 client.
 
-Gate: not yet run live - queued for the next batched desktop session (maintainer is currently holding the desktop). Merged after the full review pipeline resolved every finding (2 adversarial rounds, verification zero-blocking, 1536/1536 pre-merge), under the maintainer's standing merge directive (2026-08-16).
+Gate: PASS (hidden-when-empty) 2026-08-16 (orchestrator live desktop session). Verified hidden on two plans that generate zero notes - correct per design; positive note rendering is suite-covered (cooldown notice, a sibling feature, rendered live); a notes-generating live fixture rides the next natural field test.
 ## UI bundle: wiki links, snapshot status row, receipt/what-if captions (2026-08-16)
 
 Three maintainer-approved UI features, developed together in one
@@ -5454,7 +5454,7 @@ persisted at all (only `CraftingPlanResult`, which
 IDs remain internal-only throughout; coin icons unaffected (no
 coin-rendering code touched by any of the three features).
 
-Gate: not yet run live - scheduled for tonight's 7:15 PM batched desktop session. Merged after the full review pipeline resolved every finding (2 adversarial rounds + verification whose three holds were fixed and re-tested, 1576/1576), under the maintainer's standing merge directive (2026-08-16).
+Gate: MIXED 2026-08-16 (orchestrator live desktop session). Status own-row PASS (full-width, dated failure status, no button collision); wiki-link affordance PASS-visual ('Right-click: Open wiki page' tooltip renders on rows; the actual browser launch deliberately untested with guests present); receipt/what-if captions FAIL - they do not render in the reachable override-re-solve state (ARE vendor flip showed both child groups uncaptioned); root-cause + fix in flight on branch gate-fixes.
 
 ## Opportunity notes: recipe-sheet savings + seasonal vendor tips (2026-08-16)
 
@@ -5663,4 +5663,4 @@ own identical "cheapest priceable offer wins" precedent - new test
   `recipeSheetItemIdByRecipeId` seed in production (see above), but has
   not yet been confirmed against a real generated plan on-screen.
 
-Gate: not yet run live - scheduled for tonight's 7:15 PM batched desktop session (recipe-sheet savings row and seasonal-tip negative check are explicit scenarios). Merged after the full review pipeline resolved every finding (verification's docs-staleness hold corrected in 30d66de), under the maintainer's standing merge directive (2026-08-16).
+Gate: PASS (negative checks) 2026-08-16 (orchestrator live desktop session). Seasonal exclusion verified as the headline: the ARE craft path now prices ectos at the real TP rate (~26s vs the old ~4s26 phantom Halloween vendor), the ecto row's vendor source is gone entirely, and the Candy Corn tip correctly does NOT render out of season; sheet-savings positive render suite-covered.
