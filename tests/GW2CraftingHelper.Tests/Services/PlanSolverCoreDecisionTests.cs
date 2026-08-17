@@ -280,8 +280,8 @@ namespace GW2CraftingHelper.Tests.Services
             var unknownStep = plan.Steps.Single(s => s.ItemId == 2);
             Assert.Equal(AcquisitionSource.UnknownSource, unknownStep.Source);
 
-            // Finding-1 fix: item 2 still gets its own decision entry even
-            // though it contributed nothing to item 1's craft cost.
+            // Item 2 still gets its own decision entry even though it
+            // contributed nothing to item 1's craft cost.
             Assert.True(result.Decisions.ContainsKey(1)); // item 2 is NodeId 1 (DFS)
             Assert.Equal(AcquisitionSource.UnknownSource, result.Decisions[1].Source);
         }

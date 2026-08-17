@@ -8038,17 +8038,17 @@ code-identical (comment-stripped before/after diff clean per commit).
 
 **Per-area line deltas (files touched, comment lines +added/-removed;
 measured via `git diff --numstat` against the master merge-base,
-including the findings-fix pass below):**
+including the findings-fix and verification passes below):**
 
-- Services (incl. Diagnostics/Recipes): 75 files, +1871 -4651
-- Models: 31 files, +364 -848
-- Views (incl. Rendering): 25 files, +854 -1680
+- Services (incl. Diagnostics/Recipes): 75 files, +1877 -4658
+- Models: 31 files, +369 -853
+- Views (incl. Rendering): 25 files, +855 -1682
 - Module.cs: 1 file, +149 -426
 - Contracts: 1 file, +4 -4
 - tools (VendorOfferUpdater/RecipeSeeder/Harness/MysticForgeSeeder):
   9 files, +99 -175
-- tests (module + updater suites): 118 files, +567 -615
-- Total: 260 files, +3,908 -8,399, net -4,491 lines. 12 touched files
+- tests (module + updater suites): 118 files, +569 -617
+- Total: 260 files, +3,922 -8,415, net -4,493 lines. 12 touched files
   had non-ASCII bytes (em-dashes/arrows/box glyphs) converted to ASCII,
   including Contracts/IItemSearchProvider.cs (missed by the original
   sweep, fixed in the findings-fix pass); a repo-wide
