@@ -6767,6 +6767,43 @@ fully green.
   would give dataset-wide coverage with no separate opt-in fetch pass and
   no `--max-seasonal-pages` trap - worth a future pass, out of scope here
   since this pass was explicitly asked for `{{Temporary}}` parsing.
+- **Accepted limitation of the 2026-08-20 tag harvest (recorded, not
+  fixed): a shipped `seasonalFestival` tag is now sticky, and a vendor
+  that genuinely stops being seasonal will not un-tag itself.**
+  `MergeIntoBaseline`'s harvest carries a replaced merchant's baseline
+  tag onto its untagged fresh rows, and at that point an untagged fresh
+  row is indistinguishable from a transiently-missed one: "the wikitext
+  fetch failed / the page was left uncached this run" and "the wiki
+  genuinely dropped the `{{Temporary}}` template, so this vendor is
+  year-round now" both arrive as `SeasonalFestival == null`. The
+  cache-apply loop's `"" -> null` clear (2026-08-18 nice-to-have above)
+  un-sets the value on the `WikiVendorResult`, but the harvest then puts
+  the old tag straight back, so the tag survives until someone edits
+  `ref/vendor_offers.json` by hand. Accepted deliberately: a stale
+  seasonal tag only makes `SeasonalOfferFilter` EXCLUDE that offer
+  outside its festival window, i.e. the solver ignores a source it could
+  legally have used (a missed-saving, visible in a plan) - the opposite
+  failure, dropping a shipped tag, re-introduces the phantom
+  year-round-vendor mispricing this whole feature exists to close, and
+  is silent. Same "never silently delete shipped data" trade the
+  protected-merchant path already makes. A future pass wanting real
+  un-tagging needs a positive "this page was fetched successfully AND
+  carries no `{{Temporary}}`" signal threaded from
+  `ResolveSeasonalFestivalValuesAsync` into the merge, rather than
+  inferring it from a null.
+- Nice-to-have (recorded, not fixed) on the 2026-08-20 self-healing
+  budget: `toFetch` is deterministic (wiki-result order, uncached pages
+  only) and `Take(maxSeasonalPages)` takes its head, so a truncated run
+  converges only via the pages it actually CACHES - a failed fetch is
+  deliberately left uncached and retried. A block of permanently-failing
+  pages at least as large as the budget, sitting at the head of
+  `toFetch`, would therefore be re-attempted every run and starve the
+  pages behind it; the run-time NOTE's "the remaining count only shrinks
+  from here" is accurate for successful fetches, not for that
+  pathological shape. Not reachable under the shipped defaults (budget
+  2500 vs the measured ~2,088 distinct vendor pages, so the truncation
+  branch never runs at all); a future fix would rotate the fetch window
+  or track per-page failure counts.
 
 **Review-fix pass re-validation (2026-08-18, measured, after the
 `MergeIntoBaseline`/`ResolveSeasonalFestivalValuesAsync`/
@@ -6796,4 +6833,17 @@ review-fix pass (no live wiki run performed) - the `MergeIntoBaseline`/
 verified by unit test only; the per-vendor tag-coverage gap noted above
 is documentation-only for the same reason.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+**Post-merge re-validation (2026-08-20, measured, on the
+`origin/master` merge commit that precedes this entry):**
+`"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-festivalscrape/GW2CraftingHelper.csproj -p:Platform=x64`
+- 0 errors (pre-existing StyleCop warnings only).
+`"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-festivalscrape/tools/VendorOfferUpdater/
+VendorOfferUpdater.csproj` - 0 errors, 0 warnings.
+`GW2CraftingHelper.Tests` - 1765/1765 green (the 1675 figure recorded
+above was measured pre-merge; master added 90 tests of its own).
+`VendorOfferUpdater.Tests` - 205/205 green. `ref/vendor_offers.json`
+untouched by the merge, 57 `seasonalFestival` tags intact.
+
+Gate: not yet run live - updater-side tooling verified by suite; the 57 seasonal tags and solver exclusion were live-gated 2026-08-16. Merged after the full review pipeline (three verification rounds) resolved every finding, under the maintainer's standing merge directive (2026-08-16).
