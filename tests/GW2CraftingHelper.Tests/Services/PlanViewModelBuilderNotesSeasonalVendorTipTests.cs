@@ -55,7 +55,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("Candy Corn Vendor (Weekly)", tradeRow.Label);
             Assert.Contains("1x Candy Corn", tradeRow.Label);
             Assert.Contains("5x Glob of Ectoplasm", tradeRow.Label);
-            Assert.Contains("capped 1/week", tradeRow.Label);
+            Assert.Contains("limit 1 purchase/week", tradeRow.Label);
             Assert.Equal(0, tradeRow.CoinValue);
             // "per unit" stated explicitly - PlanUnitPrice is a PER-UNIT
             // price, not the price of the "5x Glob of Ectoplasm" bundle
@@ -117,7 +117,7 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
-            Assert.Contains("capped 3/day", section.Rows[0].Label);
+            Assert.Contains("limit 3 purchases/day", section.Rows[0].Label);
         }
 
         [Fact]
@@ -143,7 +143,7 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
-            Assert.DoesNotContain("capped", section.Rows[0].Label);
+            Assert.DoesNotContain("limit", section.Rows[0].Label);
         }
 
         [Fact]

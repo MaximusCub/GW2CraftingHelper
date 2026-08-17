@@ -172,6 +172,14 @@ namespace GW2CraftingHelper.Services
             // uniform regardless of that mode, and never fabricates a
             // savings number this calculator cannot actually prove.
             long craftTotal = 0;
+            // Nice-to-have: counts children actually summed into
+            // craftTotal (cost-component leaves don't count) - a reference
+            // branch with zero of them (e.g. a mixed componentLeaves node
+            // whose only real ingredient was itself a cost-component leaf)
+            // would otherwise leave craftTotal/craftUnitCost at 0 and
+            // report the full chosen price as SavingsPerUnit, same failure
+            // shape as every other "unprovable" bail in this loop.
+            int countedChildren = 0;
             foreach (var child in node.Children)
             {
                 if (child.IsCostComponent)
@@ -188,7 +196,29 @@ namespace GW2CraftingHelper.Services
                 {
                     return;
                 }
+                // Review fix (finding 1): child.SubtreeCost already rolls
+                // up an arbitrarily-deep vendor subtree (CraftingTreeBuilder
+                // sets SubtreeCost = decision.TotalCost, which is the
+                // COIN-only part of a BuyFromVendor decision - see
+                // VendorBatchSolver.EvaluateVendorOffers' own doc comment:
+                // any non-coin currency valuation "affects comparison only,
+                // never the amounts committed to the plan"). A karma/spirit-
+                // shard-priced descendant anywhere under this child would
+                // silently vanish from craftTotal exactly like the direct-
+                // child case this method already guards against just above
+                // (this same rationale, applied one level up). Bail rather
+                // than under-count it - mirrors the sibling check on the
+                // CHOSEN side just before this loop.
+                if (SubtreeHasVendorCurrencyCosts(child))
+                {
+                    return;
+                }
                 craftTotal += child.SubtreeCost.Value;
+                countedChildren++;
+            }
+            if (countedChildren == 0)
+            {
+                return;
             }
 
             // Nice-to-have: floor (integer) division - see the matching
@@ -213,6 +243,17 @@ namespace GW2CraftingHelper.Services
             foreach (var offer in offers)
             {
                 if (offer == null || offer.OutputCount <= 0)
+                {
+                    continue;
+                }
+                // Nice-to-have: skip a seasonal-only offer for the sheet
+                // itself - SeasonalOfferFilter's "the plan always assumes
+                // the regular market" law (see VendorOffer.SeasonalFestival's
+                // own doc comment) applies here too. No such data exists in
+                // ref/vendor_offers.json today (no recipe-sheet offer is
+                // seasonal), so this is a no-op guard against a future one
+                // being priced as if it were available year-round.
+                if (!string.IsNullOrEmpty(offer.SeasonalFestival))
                 {
                     continue;
                 }
@@ -278,6 +319,34 @@ namespace GW2CraftingHelper.Services
                 Discipline = discipline,
                 RequiredRating = requiredRating
             });
+        }
+
+        /// <summary>
+        /// True when node or any descendant beneath it carries a non-empty
+        /// VendorCurrencyCosts (finding 1) - i.e. the subtree's rolled-up
+        /// SubtreeCost is not fully representable in coin. Recursive
+        /// because a Craft child's own SubtreeCost already sums an
+        /// arbitrarily-deep chain of grandchildren, any one of which could
+        /// be a BuyFromVendor node priced partly in karma/spirit shards/etc.
+        /// </summary>
+        private static bool SubtreeHasVendorCurrencyCosts(CraftingTreeNode node)
+        {
+            if (node == null)
+            {
+                return false;
+            }
+            if (node.VendorCurrencyCosts != null && node.VendorCurrencyCosts.Count > 0)
+            {
+                return true;
+            }
+            foreach (var child in node.Children)
+            {
+                if (SubtreeHasVendorCurrencyCosts(child))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

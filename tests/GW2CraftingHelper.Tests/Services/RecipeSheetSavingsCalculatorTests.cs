@@ -201,6 +201,73 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
 
+        // Nice-to-have: a sheet offer that is ONLY available during a
+        // festival must not be priced as if it were a year-round offer
+        // (SeasonalOfferFilter's "the plan always assumes the regular
+        // market" law - see VendorOffer.SeasonalFestival's own doc
+        // comment). No such offer exists in shipped data today; this
+        // proves the guard rather than a real-data regression.
+        [Fact]
+        public void SheetOfferIsSeasonalOnly_SkippedForPricing_EmitsNothing()
+        {
+            var node = BoughtNodeWithReferenceBranch();
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var seasonalOffer = CoinSheetOffer(500, 200);
+            seasonalOffer.SeasonalFestival = Gw2Constants.HalloweenFestivalName;
+            var store = MakeStore(seasonalOffer);
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
+
+            Assert.Empty(result.RecipeSheetSavingsOpportunities);
+        }
+
+        // Nice-to-have: a reference branch whose only children are
+        // cost-component leaves (IsCostComponent) has zero children
+        // actually counted into craftTotal - without the countedChildren
+        // guard this would leave craftUnitCost at 0 and report the full
+        // chosen price as SavingsPerUnit.
+        [Fact]
+        public void OnlyCostComponentChildren_NoOpportunity()
+        {
+            var node = new CraftingTreeNode
+            {
+                ItemId = 100,
+                Quantity = 10,
+                Decision = CraftingDecision.BuyFromTp,
+                UnitCost = 50,
+                IsReferenceBranch = true,
+                ReferenceRecipeId = 999,
+                ReferenceRecipeDisciplines = new List<string> { "Chef" },
+                ReferenceRecipeMinRating = 400,
+                ReferenceRecipeIsLearnedFromItem = true,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 200,
+                        Quantity = 20,
+                        Decision = CraftingDecision.BuyFromVendor,
+                        SubtreeCost = 300,
+                        IsCostComponent = true
+                    }
+                }
+            };
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var store = MakeStore(CoinSheetOffer(500, 200));
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
+
+            Assert.Empty(result.RecipeSheetSavingsOpportunities);
+        }
+
         [Fact]
         public void NonPositiveSavings_NoOpportunity()
         {
@@ -285,6 +352,46 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = BoughtNodeWithReferenceBranch(
                 vendorCurrencyCosts: new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 10 } });
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var store = MakeStore(CoinSheetOffer(500, 200));
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, vendorOfferStore: store,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
+
+            Assert.Empty(result.RecipeSheetSavingsOpportunities);
+        }
+
+        // Review fix (finding 1): VendorCurrencyCostsPresent_NotComparable_
+        // NoOpportunity above only sets VendorCurrencyCosts on the PARENT
+        // fixture's direct BuyFromTp child - it never proves the guard
+        // walks deeper. This fixture puts the karma-priced vendor node two
+        // levels down (a Craft child whose own child is the BuyFromVendor
+        // node), so a direct-child-only check would wrongly count the
+        // Craft child's SubtreeCost as pure coin and still emit an
+        // opportunity.
+        [Fact]
+        public void NestedVendorCurrencyCosts_RecursivelyDetected_NoOpportunity()
+        {
+            var karmaGrandchild = new CraftingTreeNode
+            {
+                ItemId = 300,
+                Quantity = 1,
+                Decision = CraftingDecision.BuyFromVendor,
+                SubtreeCost = 1,
+                VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 2000 } }
+            };
+            var craftChild = new CraftingTreeNode
+            {
+                ItemId = 301,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                SubtreeCost = 1,
+                Children = new List<CraftingTreeNode> { karmaGrandchild }
+            };
+            var node = BoughtNodeWithReferenceBranch(extraChildren: new[] { craftChild });
             var result = new CraftingPlanResult { CraftingTree = node };
             var store = MakeStore(CoinSheetOffer(500, 200));
             var sheetMap = new Dictionary<int, int> { { 999, 500 } };

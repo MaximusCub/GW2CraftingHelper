@@ -1100,10 +1100,22 @@ namespace GW2CraftingHelper.Services
                     }
 
                     string itemName = ResolveName(tip.ItemId, result.ItemMetadata);
+                    // Review fix (finding 2): the cap number here is a
+                    // PURCHASE/trade limit, not an output-unit limit - see
+                    // ref/vendor_offers.json's own outputCount/weeklyCap
+                    // pairs (e.g. Dragon Bash Merchant, outputCount 50 /
+                    // weeklyCap 1) and VendorBatchSolver.FinalizeVendorBatches,
+                    // which compares this same cap against unitsNeeded
+                    // (a purchase count), never against an output-unit
+                    // count. The old "(capped N/week)" wording, placed
+                    // right after "Nx <item>", read as "N <item>s/week"
+                    // - off by a factor of OutputCount whenever OutputCount
+                    // != 1. Wording it as a purchase count instead removes
+                    // the ambiguity without needing the multiply-through.
                     string capClause = tip.WeeklyCap.HasValue
-                        ? $" (capped {tip.WeeklyCap.Value}/week)"
+                        ? $" (limit {tip.WeeklyCap.Value} purchase{(tip.WeeklyCap.Value == 1 ? "" : "s")}/week)"
                         : tip.DailyCap.HasValue
-                            ? $" (capped {tip.DailyCap.Value}/day)"
+                            ? $" (limit {tip.DailyCap.Value} purchase{(tip.DailyCap.Value == 1 ? "" : "s")}/day)"
                             : "";
 
                     string festivalDisplayName = Gw2Constants.ResolveFestivalDisplayName(tip.Festival);
