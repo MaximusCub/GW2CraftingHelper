@@ -364,7 +364,30 @@ namespace GW2CraftingHelper.Tests.Services
                 // added 7 offers (100 removed/replaced, 107 added) while
                 // seeding SeasonalCap - see the package's commit for the
                 // full accounting.
-                Assert.Equal(53536, dataset.Offers.Count);
+                //
+                // Festival-vendor auto-tagging follow-up (2026-08-16): a
+                // second scoped re-scrape (--query + --tag-seasonal-festivals
+                // + --merge-into) targeting the six known festival vendors
+                // OTHER than Candy Corn Vendor (Weekly) - Dragon Bash
+                // Merchant (Weekly), Wintersday Trader (Weekly), Festival
+                // Rewards Vendor (Weekly), Gauntlet Ticket Vendor, New Year
+                // Vendor, Super Adventure Box Weekly Trader - reported net
+                // +2 offers (52 removed/replaced, 54 added) while seeding
+                // SeasonalFestival for those merchants (see
+                // VendorOfferUpdater.Tests.SeasonalFestivalRoundTripTests
+                // for the full seasonalFestival-tag accounting), but that
+                // count concealed a real DATA LOSS: the scoped run's own
+                // wiki_vendor_cache.json had 9 rows with GameId 0 (a wiki-
+                // query defect, not the wiki actually dropping the items -
+                // live-reconfirmed the game ids still resolve), and
+                // MergeIntoBaseline's wholesale per-merchant replacement
+                // silently deleted the 6 baseline offers those rows would
+                // have replaced (outputItemId 64736/79431/86804, each for
+                // both Wintersday Trader (Weekly) and Festival Rewards
+                // Vendor (Weekly)) with no content-equivalent successor.
+                // Restored here byte-for-byte from the pre-rescrape
+                // baseline (merge-base 4735064) rather than re-guessed.
+                Assert.Equal(53544, dataset.Offers.Count);
 
                 Assert.All(dataset.Offers, o =>
                 {
@@ -385,6 +408,64 @@ namespace GW2CraftingHelper.Tests.Services
                     o.OfferId == "00012ce13cdf45c768ceb6edb81af590edf658e90a582b02b65ccf89834024be");
                 Assert.Equal(84618, knownOffer.OutputItemId);
                 Assert.Equal("Drojkor, Spirit Squall", knownOffer.MerchantName);
+            }
+        }
+
+        // Review fix (finding 6, 2026-08-17): neither suite previously
+        // tied the shipped data's festival keys to the module's own
+        // known-key/display-name table - VendorOfferUpdater.Tests.
+        // SeasonalFestivalRoundTripTests only checks a hard-coded string
+        // array local to that test project, and the assertion above only
+        // pins the total offer count. Nothing would have caught a
+        // seasonalFestival value shipping with no
+        // Gw2Constants.FestivalDisplayNames entry (exactly Critical #2:
+        // dragonbash/wintersday/festivalofthefourwinds/lunarnewyear/
+        // superadventurefestival all fell through
+        // ResolveFestivalDisplayName's raw-key fallback before that fix).
+        // The six-key list below is independently MEASURED the same way
+        // as FestivalDisplayNames itself (see that field's own doc
+        // comment) - kept as its own literal, not copied from
+        // FestivalDisplayNames.Keys, so a future accidental deletion from
+        // that dictionary is still caught rather than the test silently
+        // agreeing with whatever the dictionary currently contains.
+        [Fact]
+        public void ShippedSeedFile_EveryDistinctSeasonalFestivalValue_HasDisplayNameAndIsKnownFestivalKey()
+        {
+            var knownFestivalContextKeys = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "halloween", "dragonbash", "wintersday",
+                "festivalofthefourwinds", "lunarnewyear", "superadventurefestival"
+            };
+
+            string path = FindRepoFile(Path.Combine("ref", "vendor_offers.json"));
+            Assert.False(
+                string.IsNullOrEmpty(path),
+                "Could not locate ref/vendor_offers.json by walking up from the test assembly's directory.");
+
+            using (var stream = File.OpenRead(path))
+            {
+                var dataset = _loader.Load(stream);
+
+                var distinctFestivals = dataset.Offers
+                    .Select(o => o.SeasonalFestival)
+                    .Where(f => !string.IsNullOrEmpty(f))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+
+                Assert.NotEmpty(distinctFestivals);
+
+                Assert.All(distinctFestivals, festival =>
+                {
+                    Assert.True(
+                        Gw2Constants.FestivalDisplayNames.ContainsKey(festival),
+                        $"Shipped seasonalFestival value \"{festival}\" has no " +
+                        "Gw2Constants.FestivalDisplayNames entry - a Plan Notes tip for " +
+                        "it would render the raw internal key verbatim.");
+                    Assert.True(
+                        knownFestivalContextKeys.Contains(festival),
+                        $"Shipped seasonalFestival value \"{festival}\" is not one of the " +
+                        "six known Blish HUD FestivalContext keys.");
+                });
             }
         }
 

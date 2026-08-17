@@ -35,7 +35,8 @@ namespace VendorOfferUpdater.Tests
             int? dailyCap = null,
             int? weeklyCap = null,
             int? seasonalCap = null,
-            string requirement = null)
+            string requirement = null,
+            string temporarySeasonalValue = null)
         {
             return new WikiVendorResult
             {
@@ -47,7 +48,8 @@ namespace VendorOfferUpdater.Tests
                 DailyCap = dailyCap,
                 WeeklyCap = weeklyCap,
                 SeasonalCap = seasonalCap,
-                Requirement = requirement
+                Requirement = requirement,
+                TemporarySeasonalValue = temporarySeasonalValue
             };
         }
 
@@ -437,6 +439,97 @@ namespace VendorOfferUpdater.Tests
 
             Assert.NotNull(offer);
             Assert.Null(offer.HomesteadTier);
+        }
+
+        // Festival-vendor auto-tagging follow-up (2026-08-16):
+        // SeasonalFestival threading through ConvertToOffer, mirroring the
+        // HomesteadTier wiring block above.
+
+        [Fact]
+        public async Task NoTemporarySeasonalValue_SeasonalFestivalStaysNull()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(merchantName: "Candy Corn Vendor (Weekly)");
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Null(offer.SeasonalFestival);
+        }
+
+        [Fact]
+        public async Task KnownSeasonalValue_ResolvedToInternalFestivalKey()
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(
+                merchantName: "Candy Corn Vendor (Weekly)",
+                temporarySeasonalValue: "Halloween");
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Equal("halloween", offer.SeasonalFestival);
+        }
+
+        [Theory]
+        [InlineData("Dragon Bash", "dragonbash")]
+        [InlineData("Wintersday", "wintersday")]
+        [InlineData("Festival of the Four Winds", "festivalofthefourwinds")]
+        [InlineData("Lunar New Year", "lunarnewyear")]
+        [InlineData("Super Adventure Festival", "superadventurefestival")]
+        public async Task EachKnownFestival_ResolvedToInternalFestivalKey(
+            string wikiDisplayName, string expectedKey)
+        {
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(temporarySeasonalValue: wikiDisplayName);
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Equal(expectedKey, offer.SeasonalFestival);
+        }
+
+        [Fact]
+        public async Task UnrecognizedSeasonalValue_LeftUntagged_NeverGuessed()
+        {
+            // Real, live-confirmed unmapped event value (Consortium Trader
+            // (Fractal Rush)) - must be left untagged, not guessed into
+            // one of the six known festivals.
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var result = MakeResult(temporarySeasonalValue: "Fractal Rush");
+
+            var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
+
+            Assert.NotNull(offer);
+            Assert.Null(offer.SeasonalFestival);
+        }
+
+        [Fact]
+        public async Task SeasonalFestival_DoesNotChangeOfferId()
+        {
+            // VendorOffer.SeasonalFestival's own doc comment: deliberately
+            // NOT hashed by VendorOfferHasher, so tagging an
+            // already-shipped offer never changes its OfferId (which
+            // would otherwise look like a brand-new offer to any consumer
+            // keyed on OfferId).
+            var (helper, httpClient) = await CreateLoadedHelper();
+            using var _ = httpClient;
+            var untagged = Program.ConvertToOffer(
+                MakeResult(merchantName: "Candy Corn Vendor (Weekly)"),
+                helper, new Dictionary<string, int>());
+            var tagged = Program.ConvertToOffer(
+                MakeResult(merchantName: "Candy Corn Vendor (Weekly)", temporarySeasonalValue: "Halloween"),
+                helper, new Dictionary<string, int>());
+
+            Assert.NotNull(untagged);
+            Assert.NotNull(tagged);
+            Assert.Equal(untagged.OfferId, tagged.OfferId);
+            Assert.Null(untagged.SeasonalFestival);
+            Assert.Equal("halloween", tagged.SeasonalFestival);
         }
     }
 }

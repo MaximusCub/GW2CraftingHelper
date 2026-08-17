@@ -584,5 +584,27 @@ namespace VendorOfferUpdater.Tests
             Assert.True(resolved.ContainsKey("Iron Ore"));
             Assert.False(resolved.ContainsKey("Fake Item"));
         }
+
+        // Review fix (2026-08-18): action=parse does not resolve redirects
+        // by default, unlike action=ask - without &redirects=1 a vendor
+        // page whose SMW subject title is a redirect returns "#REDIRECT
+        // [[Target]]" as its wikitext, which the {{Temporary}} parser
+        // finds no template in, silently miscaching it as "checked - not
+        // tagged". See WikiSmwClient.FetchWikitextAsync's own doc comment.
+        [Fact]
+        public async Task FetchWikitextAsync_RequestsRedirectResolution()
+        {
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
+
+            handler.MapUrl(
+                url => url.Contains("action=parse"),
+                "{\"parse\":{\"wikitext\":{\"*\":\"body\"}}}");
+
+            await client.FetchWikitextAsync("Some Vendor");
+
+            Assert.Single(handler.RequestedUrls);
+            Assert.Contains("redirects=1", handler.RequestedUrls[0]);
+        }
     }
 }

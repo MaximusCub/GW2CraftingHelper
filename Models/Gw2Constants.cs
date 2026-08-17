@@ -85,17 +85,48 @@ namespace GW2CraftingHelper.Models
         /// of Name for every festival (e.g. "superadventurefestival" ->
         /// "Super Adventure Festival"), so guessing would risk a wrong
         /// display string for any FUTURE festival added here without also
-        /// being measured. Kept intentionally scoped to festivals this
-        /// module actually seeds vendor data for (Halloween only, today) -
-        /// PlanViewModelBuilder.ResolveFestivalDisplayName falls back to
-        /// the internal key verbatim for anything not listed here, which
-        /// can never happen today (SeasonalVendorTipCalculator only ever
-        /// surfaces a tip for a festival present in ref/vendor_offers.json's
-        /// own seeded SeasonalFestival values).
+        /// being measured.
+        ///
+        /// Festival-vendor auto-tagging follow-up (2026-08-16) review fix:
+        /// this table used to be scoped to Halloween only, on the claim
+        /// that the fallback below "can never happen today" because only
+        /// a festival present in ref/vendor_offers.json's own seeded
+        /// SeasonalFestival values could ever surface a tip - that claim
+        /// was already false the moment that same commit's live run
+        /// seeded dragonbash/wintersday/festivalofthefourwinds/
+        /// lunarnewyear/superadventurefestival tags alongside halloween,
+        /// so an active-festival tip for any of those five would have
+        /// rendered the raw internal key verbatim (e.g. "During
+        /// superadventurefestival:"). The five entries below close that
+        /// gap; each display string is MEASURED, not guessed, from two
+        /// independent sources agreeing verbatim: the GW2 Wiki's own
+        /// festival vendor {{Temporary|...|seasonal=...}} display text
+        /// (see tools/VendorOfferUpdater/Models/Gw2Constants.cs's
+        /// FestivalKeysByWikiDisplayName, whose keys ARE these display
+        /// strings) and a raw `strings -e s` (single-byte/ASCII) scan of
+        /// packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe, which
+        /// contains the literal resource text "Dragon Bash", "Festival of
+        /// the Four Winds", "Lunar New Year", "Super Adventure Festival",
+        /// and "Wintersday" verbatim (the earlier `-e l` UTF-16LE scan
+        /// that found "halloween" found only the internal keys and
+        /// property-getter names for these five, not their DisplayName
+        /// text, because that text is UTF-8/ASCII-encoded resource data,
+        /// not a UTF-16LE user-string-heap literal).
+        ///
+        /// PlanViewModelBuilder.ResolveFestivalDisplayName still falls
+        /// back to the internal key verbatim for any key NOT listed here -
+        /// now genuinely unreachable only for a SEVENTH, not-yet-existing
+        /// festival Blish HUD's FestivalContext might add in the future,
+        /// not for any of the six it recognizes today.
         /// </summary>
         public static readonly Dictionary<string, string> FestivalDisplayNames = new Dictionary<string, string>
         {
-            { HalloweenFestivalName, "Halloween" }
+            { HalloweenFestivalName, "Halloween" },
+            { "dragonbash", "Dragon Bash" },
+            { "wintersday", "Wintersday" },
+            { "festivalofthefourwinds", "Festival of the Four Winds" },
+            { "lunarnewyear", "Lunar New Year" },
+            { "superadventurefestival", "Super Adventure Festival" }
         };
 
         public static string ResolveFestivalDisplayName(string festivalName)

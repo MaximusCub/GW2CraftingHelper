@@ -65,6 +65,42 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Notes (1)", section.Title);
         }
 
+        // Review fix (finding 2, 2026-08-17): guards the exact regression
+        // found - FestivalDisplayNames used to contain only Halloween, so
+        // any of the five other known festivals rendered the raw internal
+        // key verbatim ("During superadventurefestival:") instead of its
+        // DisplayName. Picks a non-Halloween key deliberately so a
+        // regression to "Halloween only" trips this test even though
+        // ItemCostTip_RendersFullSentenceWithDisplayFestivalName above
+        // would keep passing.
+        [Fact]
+        public void ItemCostTip_NonHalloweenFestival_RendersDisplayFestivalNameNotInternalKey()
+        {
+            var meta = MetaFor((19721, "Glob of Ectoplasm", "e.png"), (999, "Zhaitaffy", "c.png"));
+            var result = MakeResult(
+                metadata: meta,
+                seasonalVendorTips: new List<SeasonalVendorTip>
+                {
+                    new SeasonalVendorTip
+                    {
+                        ItemId = 19721,
+                        Festival = "superadventurefestival",
+                        MerchantName = "Super Adventure Box Weekly Trader",
+                        CostLines = new List<CostLine> { new CostLine { Type = "Item", Id = 999, Count = 1 } },
+                        OutputCount = 1,
+                        OfferUnitCost = 10,
+                        PlanUnitPrice = 100,
+                        WeeklyCap = 1
+                    }
+                });
+
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
+            Assert.Contains("During Super Adventure Festival:", section.Rows[0].Label);
+            Assert.DoesNotContain("superadventurefestival", section.Rows[0].Label);
+        }
+
         [Fact]
         public void CoinCostLine_SkippedEntirely_CannotRenderInlineWithoutIcon()
         {

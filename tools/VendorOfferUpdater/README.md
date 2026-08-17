@@ -7,10 +7,10 @@ Offline tool that scrapes vendor-sold items from the [GW2 Wiki](https://wiki.gui
 The easiest way to refresh vendor data is the wrapper script. Requires **Git Bash on Windows** and the **.NET 8 SDK**.
 
 ```bash
-# Full refresh — wiki scrape + currency resolution (~15 min)
+# Full refresh - wiki scrape + currency resolution (~15 min)
 ./tools/refresh-vendor-data.sh
 
-# Currency resolution only — uses cached wiki data (~3 min)
+# Currency resolution only - uses cached wiki data (~3 min)
 ./tools/refresh-vendor-data.sh --pass2-only
 ```
 
@@ -20,18 +20,28 @@ The script builds the tool, runs the appropriate passes, and prints a summary wi
 
 A full refresh takes ~15 minutes because the GW2 Wiki rate-limits API requests. To keep individual runs manageable and allow recovery from interruptions, the tool splits work into two passes:
 
-**Pass 1 — Wiki scrape** (`--skip-item-resolution`):
-Queries all vendor items from the wiki via Semantic MediaWiki `action=ask`. Saves raw results to `ref/wiki_vendor_cache.json` (merges with any existing cache). Generates a partial `ref/vendor_offers.json` without item-based currency resolution.
+**Pass 1 - Wiki scrape** (`--skip-item-resolution --tag-seasonal-festivals --merge-into ref/vendor_offers.json`):
+Queries all vendor items from the wiki via Semantic MediaWiki `action=ask`. Saves raw results to `ref/wiki_vendor_cache.json` (merges with any existing cache). Re-resolves each vendor page's seasonal festival tag. Merges into the existing `ref/vendor_offers.json` (rather than replacing it wholesale) and generates a partial output without item-based currency resolution.
 
-**Pass 2 — Currency resolution** (`--resolve-item-currencies-only`):
-Loads the cached wiki results from `ref/wiki_vendor_cache.json`. Resolves item-based currency names (e.g. "Mystic Coin", "Glob of Ectoplasm") to GW2 game IDs by querying the wiki. Generates the final `ref/vendor_offers.json`.
+**Pass 2 - Currency resolution** (`--resolve-item-currencies-only --merge-into ref/vendor_offers.json`):
+Loads the cached wiki results from `ref/wiki_vendor_cache.json`. Resolves item-based currency names (e.g. "Mystic Coin", "Glob of Ectoplasm") to GW2 game IDs by querying the wiki. Merges into `ref/vendor_offers.json` again and generates the final output.
 
 If Pass 1 is interrupted (safety limit, rate-limit block, timeout), the wiki cache preserves all partial results. Re-running Pass 1 merges new results into the existing cache. Once the cache is complete, Pass 2 can be run independently.
+
+## Seasonal Tag Preservation
+
+Both passes of the wrapper script (`tools/refresh-vendor-data.sh`) pass `--merge-into ref/vendor_offers.json` against their own output file (a self-merge: the current on-disk baseline is read before it is overwritten - see `Program.MergeIntoBaseline`'s doc comment). This is required, not optional, for the default refresh to be safe:
+
+- Without `--tag-seasonal-festivals` on Pass 1, freshly-queried `WikiVendorResult` rows never carry a seasonal value, and `Program.MergeWikiCache` overwrites any existing cache entry for a re-queried page in full - including a previously-resolved seasonal value, which gets nulled out with nothing to restore it.
+- Without `--merge-into` on either pass, that pass's `finalOffers` is simply `uniqueOffers` (Program.cs's own "merge into an existing baseline, if requested" step is skipped entirely) - a full, `--query`-less refresh's fresh batch touches every merchant, so this wholesale-replaces the whole dataset with whatever this run resolved, dropping any offer (tagged or not) this run's own scrape/resolution did not reproduce.
+- `Program.MergeIntoBaseline`'s protected-merchant and OfferId-collision rules both prefer whichever side of a collision carries a `SeasonalFestival` tag, so even a page whose wikitext fetch transiently fails mid-refresh (left uncached, warned, and retried on the next run - see `ResolveSeasonalFestivalValuesAsync`) does not lose a previously-shipped tag: the merge carries the baseline's tag forward onto the surviving fresh row. This holds for every merchant, not just protected ones: an ORDINARY merchant's replaced baseline rows are harvested for their tags (keyed by OfferId and by content, to survive a hash-format migration) before being dropped, and any harvested tag is applied onto that merchant's untagged fresh rows - never overwriting a fresh row that already carries its own tag.
+
+Running Pass 1 or Pass 2 manually (not via the wrapper script) without both flags reproduces the wholesale-replace behavior above - always pass `--tag-seasonal-festivals` and `--merge-into <output-path> <output-path>` together for any refresh that should preserve existing seasonal tags.
 
 ## Prerequisites
 
 - .NET 8 SDK
-- Internet access (no API key needed — both endpoints are public)
+- Internet access (no API key needed - both endpoints are public)
 - Git Bash on Windows (for the wrapper script)
 
 ## CLI Reference
@@ -54,6 +64,8 @@ The tool auto-detects the repository root by walking up the directory tree looki
 | `--max-runtime <minutes>` | 30 | Safety limit on total execution time |
 | `--delay <ms>` | 250 | Delay between wiki API requests (minimum enforced: 200 ms) |
 | `--dry-run` | off | Print query plan only, no HTTP calls to wiki |
+| `--tag-seasonal-festivals` | off | Fetch each distinct vendor page's wikitext and tag offers whose page carries a `{{Temporary\|...\|seasonal=}}`/`{{Temporary\|...\|event=}}` value matching one of the six known GW2 festivals. Opt-in: adds one extra HTTP request per distinct, not-yet-cached vendor page (see `--max-seasonal-pages`) |
+| `--max-seasonal-pages <n>` | 500 | Self-healing per-run budget on how many new (uncached) vendor pages `--tag-seasonal-festivals` will fetch in one run - if there are more uncached pages than the budget, it fetches up to the budget, saves the cache, and leaves the rest for a subsequent run (only a value `<= 0` is rejected outright) |
 
 ### Environment Overrides (wrapper script)
 
@@ -65,6 +77,7 @@ The `refresh-vendor-data.sh` script accepts these environment variables:
 | `MAX_REQUESTS` | 2000 | Pass 1 `--max-requests` |
 | `DELAY_PASS1` | 250 | Pass 1 `--delay` |
 | `DELAY_PASS2` | 1500 | Pass 2 `--delay` |
+| `MAX_SEASONAL_PAGES` | 2500 | Pass 1 `--max-seasonal-pages` - sized to cover a from-scratch sweep of the measured ~2,088 distinct vendor pages in one run |
 
 Example:
 
@@ -76,20 +89,21 @@ DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
 
 | File | Size | Role |
 |------|------|------|
-| `ref/vendor_offers.json` | ~13 MB | **Baseline vendor offers** — loaded by the Blish HUD module at runtime. Contains deduplicated, ID-resolved vendor offers. Committed to repo and embedded in the `.bhm` package. |
-| `ref/wiki_vendor_cache.json` | ~16 MB | **Wiki query cache** — raw SMW results from Pass 1. Used by Pass 2 for currency resolution. Supports incremental merging across multiple scrape runs. Committed to repo for developer convenience. |
-| `ref/item_id_cache.json` | ~40 KB | **Item ID cache** — maps item currency names to GW2 game IDs. Avoids re-resolving known items on subsequent runs. Committed to repo. |
+| `ref/vendor_offers.json` | ~13 MB | **Baseline vendor offers** - loaded by the Blish HUD module at runtime. Contains deduplicated, ID-resolved vendor offers. Committed to repo and embedded in the `.bhm` package. |
+| `ref/wiki_vendor_cache.json` | ~16 MB | **Wiki query cache** - raw SMW results from Pass 1. Used by Pass 2 for currency resolution. Supports incremental merging across multiple scrape runs. Committed to repo for developer convenience. |
+| `ref/item_id_cache.json` | ~40 KB | **Item ID cache** - maps item currency names to GW2 game IDs. Avoids re-resolving known items on subsequent runs. Committed to repo. |
+| `ref/seasonal_wikitext_cache.json` | small | **Seasonal festival tag cache** - maps vendor page name to its raw wiki `{{Temporary\|...}}` seasonal/event value (or `""` for "checked, not tagged"). Only populated by `--tag-seasonal-festivals`. Gitignored (dev-local, like `wiki_vendor_cache.json`/`item_id_cache.json`). |
 
 ## What It Queries
 
-1. **GW2 API** `/v2/currencies` — loads all currency IDs and names so wiki currency strings (e.g. "Coin", "Volatile Magic") can be mapped to numeric IDs.
-2. **GW2 Wiki SMW API** `action=ask` — queries vendor subobject pages (`[[Sells item::+]]`) and pulls:
-   - `Sells item.Has game id` — item's GW2 game ID
-   - `Sells item` — item page name
-   - `Has item quantity` — output count (defaults to 1)
-   - `Has item cost` — record type with `Has item value` (amount) and `Has item currency` (name)
-   - `Has vendor` — NPC vendor page
-   - `Located in` — location pages
+1. **GW2 API** `/v2/currencies` - loads all currency IDs and names so wiki currency strings (e.g. "Coin", "Volatile Magic") can be mapped to numeric IDs.
+2. **GW2 Wiki SMW API** `action=ask` - queries vendor subobject pages (`[[Sells item::+]]`) and pulls:
+   - `Sells item.Has game id` - item's GW2 game ID
+   - `Sells item` - item page name
+   - `Has item quantity` - output count (defaults to 1)
+   - `Has item cost` - record type with `Has item value` (amount) and `Has item currency` (name)
+   - `Has vendor` - NPC vendor page
+   - `Located in` - location pages
    - `Has daily purchase cap` - daily purchase limit (absent = uncapped)
    - `Has weekly purchase cap` - weekly purchase limit (absent = uncapped)
    - `Has seasonal purchase cap` - Wizard's Vault seasonal purchase limit (absent = uncapped or not a Vault offer)
@@ -129,7 +143,7 @@ Offers are deduplicated by `offerId` and sorted alphabetically. Null fields are 
 
 | Code | Meaning | Action |
 |------|---------|--------|
-| 0 | Success — offers written | Commit updated `ref/vendor_offers.json` |
+| 0 | Success - offers written | Commit updated `ref/vendor_offers.json` |
 | 1 | Error (network failure, unexpected exception) | Check error message; retry if transient |
 | 2 | Safety limit exceeded (max requests or max runtime) | Partial results saved to wiki cache. Increase `--max-runtime` or `--max-requests` and re-run |
 | 130 | Cancelled (Ctrl+C) | Partial results may be saved to wiki cache |

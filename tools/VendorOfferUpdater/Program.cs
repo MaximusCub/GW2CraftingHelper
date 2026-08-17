@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -62,6 +63,8 @@ namespace VendorOfferUpdater
             int maxRequests = 2000;
             int maxRuntimeMinutes = 30;
             int delayMs = 250;
+            bool tagSeasonalFestivals = false;
+            int maxSeasonalPages = 500;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -101,10 +104,32 @@ namespace VendorOfferUpdater
                 {
                     mergeIntoPath = args[++i];
                 }
+                else if (args[i] == "--tag-seasonal-festivals")
+                {
+                    tagSeasonalFestivals = true;
+                }
+                else if (args[i] == "--max-seasonal-pages" && i + 1 < args.Length)
+                {
+                    maxSeasonalPages = int.Parse(args[++i]);
+                }
                 else if (!args[i].StartsWith("--"))
                 {
                     outputPath = args[i];
                 }
+            }
+
+            // Nice-to-have fix (2026-08-18 review): unlike every other
+            // int.Parse'd flag in this loop, --max-seasonal-pages is a
+            // safety LIMIT - 0 or a negative value made every
+            // --tag-seasonal-festivals run with any uncached page throw
+            // SafetyLimitException immediately, with a message that reads
+            // like a data problem ("exceeding --max-seasonal-pages (0)")
+            // rather than a misconfigured argument.
+            if (maxSeasonalPages <= 0)
+            {
+                Console.Error.WriteLine(
+                    $"ERROR: --max-seasonal-pages must be a positive integer, got {maxSeasonalPages}.");
+                return 1;
             }
 
             var queryOptions = new QueryOptions
@@ -148,6 +173,14 @@ namespace VendorOfferUpdater
                 var wikiClient = new WikiSmwClient(httpClient);
                 List<WikiVendorResult> wikiResults;
 
+                // Review fix (2026-08-18): the pages actually touched by
+                // THIS run's --query (null for --resolve-item-currencies-
+                // only, which has no --query and processes the whole
+                // cache by design) - see ResolveSeasonalFestivalValuesAsync's
+                // queryScopedResults parameter doc comment for why this
+                // must NOT be wikiResults after Step 2's cache merge.
+                List<WikiVendorResult>? queryScopedResults = null;
+
                 string wikiCachePath = Path.Combine(
                     Path.GetDirectoryName(outputPath) ?? ".",
                     "wiki_vendor_cache.json");
@@ -179,6 +212,7 @@ namespace VendorOfferUpdater
                     var (results, queryStats) =
                         await wikiClient.QueryVendorItemsAsync(queryCondition, queryOptions, ct);
                     wikiResults = results;
+                    queryScopedResults = results;
                     Console.WriteLine($"Total wiki results: {wikiResults.Count}");
                     Console.WriteLine();
 
@@ -288,17 +322,66 @@ namespace VendorOfferUpdater
                     }
                 }
 
+                // Step 3.5: Resolve festival-vendor seasonal tags via wiki
+                // (opt-in, --tag-seasonal-festivals - see
+                // ResolveSeasonalFestivalValuesAsync's own doc comment for
+                // why this is a separate, explicitly-requested pass rather
+                // than part of every default run).
+                if (tagSeasonalFestivals)
+                {
+                    string seasonalCachePath = Path.Combine(
+                        Path.GetDirectoryName(outputPath) ?? ".",
+                        "seasonal_wikitext_cache.json");
+
+                    await ResolveSeasonalFestivalValuesAsync(
+                        wikiResults, wikiClient, seasonalCachePath, maxSeasonalPages, delayMs, ct,
+                        queryScopedResults);
+
+                    // Round-trip fix (2026-08-17): WikiVendorResult.
+                    // TemporarySeasonalValue's own doc comment claims this
+                    // value "still round-trips through wiki_vendor_cache.
+                    // json for a later run without needing to re-fetch the
+                    // page" - false as written, because Step 2 above wrote
+                    // wikiCachePath BEFORE this pass populated the field,
+                    // so every row in that file had it as null. Re-save
+                    // now that wikiResults carries the resolved values, so
+                    // a later --resolve-item-currencies-only (or any other
+                    // run that loads wikiCachePath) actually gets them
+                    // without re-fetching every vendor page's wikitext.
+                    string cacheJsonWithSeasonalTags = JsonSerializer.Serialize(wikiResults);
+                    await File.WriteAllTextAsync(wikiCachePath, cacheJsonWithSeasonalTags);
+                    Console.WriteLine(
+                        $"Re-saved wiki vendor cache ({wikiResults.Count} results, now including " +
+                        $"resolved seasonal festival tags) to {wikiCachePath}");
+                    Console.WriteLine();
+                }
+
                 // Step 4: Convert to VendorOffers
                 Console.WriteLine("Converting to vendor offers...");
                 var offers = new List<VendorOffer>();
                 int skippedNoId = 0;
                 int skippedUnresolved = 0;
 
+                // DATA LOSS fix (2026-08-17, festival-vendor auto-tagging
+                // live run post-mortem): a merchant with a GameId<=0 row
+                // in THIS pass means the pass's own wiki query failed to
+                // resolve a game id for at least one of that merchant's
+                // items (a query defect, not proof the wiki dropped the
+                // item - a scoped festival-vendor run measured the wiki
+                // still serving real ids for rows its own cache recorded
+                // as GameId 0). MergeIntoBaseline's per-merchant wholesale
+                // replacement must not be allowed to delete that
+                // merchant's baseline offers on the strength of an
+                // incomplete fresh result - see the set built below and
+                // its use at the --merge-into call site.
+                var skippedNoIdMerchants = new HashSet<string>(StringComparer.Ordinal);
+
                 foreach (var result in wikiResults)
                 {
                     if (result.GameId <= 0)
                     {
                         skippedNoId++;
+                        skippedNoIdMerchants.Add(result.MerchantName ?? string.Empty);
                         continue;
                     }
 
@@ -374,7 +457,7 @@ namespace VendorOfferUpdater
                         }
                     }
 
-                    var mergeResult = MergeIntoBaseline(baseline.Offers, uniqueOffers);
+                    var mergeResult = MergeIntoBaseline(baseline.Offers, uniqueOffers, skippedNoIdMerchants);
                     finalOffers = mergeResult.Merged;
                     Console.WriteLine(
                         $"Merged into baseline ({baseline.Offers.Count} offers): " +
@@ -382,6 +465,16 @@ namespace VendorOfferUpdater
                         $"{mergeResult.MerchantNamesReplaced.Count} merchant(s), " +
                         $"added {finalOffers.Count - (baseline.Offers.Count - mergeResult.RemovedFromBaseline)} " +
                         $"=> {finalOffers.Count} total");
+
+                    if (mergeResult.MerchantNamesProtected.Count > 0)
+                    {
+                        Console.WriteLine(
+                            $"  WARNING: {mergeResult.MerchantNamesProtected.Count} merchant(s) had " +
+                            "row(s) with no game id this pass, so their baseline offers were NOT " +
+                            "dropped (DATA LOSS guard) - re-run once every row resolves a game id " +
+                            "to clean up any now-stale baseline rows for: " +
+                            string.Join(", ", mergeResult.MerchantNamesProtected));
+                    }
                     Console.WriteLine();
                 }
 
@@ -544,6 +637,13 @@ namespace VendorOfferUpdater
             public List<VendorOffer> Merged { get; set; } = new();
             public int RemovedFromBaseline { get; set; }
             public List<string> MerchantNamesReplaced { get; set; } = new();
+
+            // DATA LOSS fix (2026-08-17): merchants that appeared in the
+            // fresh batch but were EXCLUDED from wholesale replacement
+            // because merchantsWithSkippedRows flagged them - their
+            // baseline offers were kept, not dropped. See
+            // MergeIntoBaseline's own doc comment.
+            public List<string> MerchantNamesProtected { get; set; } = new();
         }
 
         /// <summary>
@@ -561,28 +661,251 @@ namespace VendorOfferUpdater
         /// fresh offer for that merchant is added - never a partial,
         /// offer-by-offer union that could leave stale rows alongside new
         /// ones for the same merchant.
+        ///
+        /// DATA LOSS fix (2026-08-17): the wholesale-replace rule above is
+        /// exactly what silently deleted 6 shipped offers in a real run -
+        /// the fresh batch's own wiki query had 9 rows with GameId 0 for
+        /// two merchants (a query defect; the wiki still served real ids
+        /// for those rows, confirmed live after the fact), Program.cs's
+        /// GameId&lt;=0 filter dropped them before they ever reached this
+        /// method, and wholesale replacement then deleted the baseline's
+        /// only copies with no fresh row to replace them. <paramref
+        /// name="merchantsWithSkippedRows"/> (merchant names with at least
+        /// one such GameId&lt;=0 row this pass, built by the caller from
+        /// the same wikiResults list before the GameId filter runs) opts a
+        /// merchant OUT of wholesale replacement: its baseline offers are
+        /// kept alongside whatever fresh offers this pass did resolve for
+        /// it (union, deduplicated by OfferId with the FRESH row preferred
+        /// on collision - but a losing row's SeasonalFestival tag is
+        /// carried forward onto the winner if the winner itself has none,
+        /// so an untagged fresh row can never silently erase a shipped
+        /// tag - plus a content-key pass - see ComputeContentKey - for a
+        /// baseline row that predates a hash-format change and so
+        /// collides on content but not OfferId), rather than dropped and
+        /// replaced by a known-incomplete fresh set. This trades "some
+        /// possibly-stale baseline rows survive an extra run or two" for
+        /// "never silently deletes shipped data" - the former is visible
+        /// and fixable by a follow-up run once every row resolves a game
+        /// id; the latter is not.
+        ///
+        /// NOTE (non-purity, nice-to-have documented 2026-08-20): this
+        /// method mutates rows it does not own. Both the ordinary-merchant
+        /// tag-harvest pass and the protected-merchant content-key dedupe
+        /// pass below assign directly onto <c>SeasonalFestival</c>/<c>
+        /// OfferId</c> of <see cref="VendorOffer"/> instances that live in
+        /// the caller's own <paramref name="fresh"/> (and, via the
+        /// content-key winner swap, occasionally <paramref name="baseline"/>)
+        /// lists, rather than cloning first - a caller that keeps its own
+        /// reference to those lists after calling this method will observe
+        /// the mutation even though only <see cref="BaselineMergeResult.Merged"/>
+        /// is documented as the return value.
         /// </summary>
         // internal for testability (VendorOfferUpdater.Tests)
         internal static BaselineMergeResult MergeIntoBaseline(
             List<VendorOffer> baseline,
-            List<VendorOffer> fresh)
+            List<VendorOffer> fresh,
+            ISet<string>? merchantsWithSkippedRows = null)
         {
             baseline ??= new List<VendorOffer>();
             fresh ??= new List<VendorOffer>();
+            merchantsWithSkippedRows ??= new HashSet<string>(StringComparer.Ordinal);
 
-            var merchantsReplaced = fresh
+            var merchantsInFresh = fresh
                 .Select(o => o.MerchantName ?? string.Empty)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(m => m, StringComparer.Ordinal)
                 .ToList();
+
+            var merchantsProtected = merchantsInFresh
+                .Where(m => merchantsWithSkippedRows.Contains(m))
+                .ToList();
+            var merchantsReplaced = merchantsInFresh
+                .Where(m => !merchantsWithSkippedRows.Contains(m))
+                .ToList();
             var merchantsReplacedSet = new HashSet<string>(merchantsReplaced, StringComparer.Ordinal);
+
+            // Data-loss fix (2026-08-20, festival-scrape tag-carry
+            // follow-up): an ORDINARY (non-protected) replaced merchant's
+            // baseline rows are about to be dropped entirely by `kept`
+            // below, before the fresh/kept GroupBy tag-carry-forward logic
+            // further down ever runs - that logic only ever sees a
+            // baseline row for PROTECTED merchants, since `kept` excludes
+            // every replaced merchant's rows outright. This made the
+            // README's claimed property ("a transiently failed fetch does
+            // not lose a previously-shipped tag") false for every ordinary
+            // merchant: a --pass2-only run against a pre-tagging
+            // wiki_vendor_cache.json produces fresh rows with no
+            // SeasonalFestival at all, and the merchant's previously-
+            // shipped tags were silently gone with no fresh counterpart to
+            // carry them forward from. Harvest each replaced merchant's
+            // tagged baseline rows into a lookup BEFORE `kept` drops them,
+            // keyed by both OfferId and ComputeContentKey - a
+            // VendorOfferHasher hash-format migration can leave either as
+            // the only field still matching between the baseline and fresh
+            // copies of the same offer (see the protected-merchant
+            // content-key dedupe pass further below for the same
+            // reasoning) - then apply the harvested tag onto that
+            // merchant's fresh rows that have no tag of their own. A fresh
+            // row that already carries its own (possibly different) tag is
+            // never overwritten - fresh always wins when both sides are
+            // tagged.
+            if (merchantsReplacedSet.Count > 0)
+            {
+                var replacedTagsByOfferId = new Dictionary<string, string>(StringComparer.Ordinal);
+                var replacedTagsByContentKey = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var o in baseline)
+                {
+                    if (o.SeasonalFestival == null)
+                    {
+                        continue;
+                    }
+                    if (!merchantsReplacedSet.Contains(o.MerchantName ?? string.Empty))
+                    {
+                        continue;
+                    }
+
+                    if (o.OfferId != null)
+                    {
+                        replacedTagsByOfferId[o.OfferId] = o.SeasonalFestival;
+                    }
+                    replacedTagsByContentKey[ComputeContentKey(o)] = o.SeasonalFestival;
+                }
+
+                if (replacedTagsByOfferId.Count > 0 || replacedTagsByContentKey.Count > 0)
+                {
+                    foreach (var o in fresh)
+                    {
+                        if (o.SeasonalFestival != null)
+                        {
+                            continue;
+                        }
+                        if (!merchantsReplacedSet.Contains(o.MerchantName ?? string.Empty))
+                        {
+                            continue;
+                        }
+
+                        if (o.OfferId != null
+                            && replacedTagsByOfferId.TryGetValue(o.OfferId, out var tagById))
+                        {
+                            o.SeasonalFestival = tagById;
+                        }
+                        else if (replacedTagsByContentKey.TryGetValue(
+                            ComputeContentKey(o), out var tagByContent))
+                        {
+                            o.SeasonalFestival = tagByContent;
+                        }
+                    }
+                }
+            }
 
             var kept = baseline
                 .Where(o => !merchantsReplacedSet.Contains(o.MerchantName ?? string.Empty))
                 .ToList();
             int removed = baseline.Count - kept.Count;
 
-            var merged = kept.Concat(fresh)
+            // Review fix (2026-08-18, festival-scrape follow-up review):
+            // fresh must come FIRST in the concat so an OfferId collision
+            // resolves to the FRESH row via GroupBy(...).Select(g =>
+            // g.First()) below. The old kept.Concat(fresh) order let the
+            // BASELINE row win every collision - for a protected merchant
+            // (kept includes its baseline rows; SeasonalFestival is
+            // deliberately NOT hashed by VendorOfferHasher, so a row whose
+            // content is otherwise unchanged collides on OfferId) this
+            // silently discarded the freshly-derived SeasonalFestival tag,
+            // i.e. exactly the merchants the protected-merchant guard
+            // exists to preserve data for kept shipping untagged.
+            // Data-loss fix (2026-08-19): this pass used to just take
+            // g.First() unconditionally, so a FRESH row with no
+            // SeasonalFestival (e.g. one whose page's wikitext fetch
+            // missed this run - see ResolveSeasonalFestivalValuesAsync's
+            // null-wikitext handling) silently deleted a shipped, tagged
+            // baseline row on an OfferId collision - the exact opposite of
+            // the content-key pass below, which already prefers whichever
+            // side carries the tag. Same rule now applies here: keep the
+            // winning row (fresh, if present in the group, for freshness
+            // of everything else), but carry a losing sibling's tag
+            // forward if the winner itself has none.
+            var merged = fresh.Concat(kept)
+                .GroupBy(o => o.OfferId, StringComparer.Ordinal)
+                .Select(g =>
+                {
+                    var winner = g.First();
+                    if (winner.SeasonalFestival == null)
+                    {
+                        var taggedSibling = g.FirstOrDefault(o => o.SeasonalFestival != null);
+                        if (taggedSibling != null)
+                        {
+                            winner.SeasonalFestival = taggedSibling.SeasonalFestival;
+                        }
+                    }
+                    return winner;
+                })
+                .ToList();
+
+            // A protected merchant's baseline row can also predate a
+            // VendorOfferHasher hash-format change (see that file's own
+            // doc comment: "any offer's OfferId changes the first time it
+            // is recomputed") - the fresh, content-identical row then gets
+            // a DIFFERENT OfferId, the GroupBy above does not catch the
+            // duplicate, and the union would ship two rows (one tagged,
+            // one untagged) for the same vendor+item. Only protected
+            // merchants can have this cross-duplication (a replaced
+            // merchant's `kept` excludes it entirely), so scope the
+            // content-based dedupe to them; prefer whichever survivor
+            // carries a fresh SeasonalFestival tag.
+            if (merchantsProtected.Count > 0)
+            {
+                var protectedSet = new HashSet<string>(merchantsProtected, StringComparer.Ordinal);
+
+                // Nice-to-have (2026-08-19): when a content-key collision
+                // resolves to the baseline (kept) row because it carries
+                // the tag and the fresh row does not, the swap below used
+                // to keep the baseline row's OfferId wholesale - stale,
+                // pre-hash-format-change - discarding the fresh row's
+                // current-format OfferId even though the fresh row is
+                // otherwise thrown away. Track which OfferId strings came
+                // from THIS run's fresh batch so the winning row can be
+                // migrated onto the current-format id instead of carrying
+                // the stale one forward indefinitely.
+                var freshOfferIds = new HashSet<string>(
+                    fresh.Where(o => o.OfferId != null).Select(o => o.OfferId!),
+                    StringComparer.Ordinal);
+
+                var byContentKey = new Dictionary<string, VendorOffer>(StringComparer.Ordinal);
+                var result = new List<VendorOffer>();
+                foreach (var offer in merged)
+                {
+                    if (!protectedSet.Contains(offer.MerchantName ?? string.Empty))
+                    {
+                        result.Add(offer);
+                        continue;
+                    }
+
+                    string contentKey = ComputeContentKey(offer);
+                    if (byContentKey.TryGetValue(contentKey, out var survivor))
+                    {
+                        if (survivor.SeasonalFestival == null && offer.SeasonalFestival != null)
+                        {
+                            if (offer.OfferId != null && survivor.OfferId != null
+                                && freshOfferIds.Contains(survivor.OfferId)
+                                && !freshOfferIds.Contains(offer.OfferId))
+                            {
+                                offer.OfferId = survivor.OfferId;
+                            }
+                            byContentKey[contentKey] = offer;
+                        }
+                    }
+                    else
+                    {
+                        byContentKey[contentKey] = offer;
+                    }
+                }
+
+                result.AddRange(byContentKey.Values);
+                merged = result;
+            }
+
+            merged = merged
                 .OrderBy(o => o.OfferId, StringComparer.Ordinal)
                 .ToList();
 
@@ -590,8 +913,70 @@ namespace VendorOfferUpdater
             {
                 Merged = merged,
                 RemovedFromBaseline = removed,
-                MerchantNamesReplaced = merchantsReplaced
+                MerchantNamesReplaced = merchantsReplaced,
+                MerchantNamesProtected = merchantsProtected
             };
+        }
+
+        /// <summary>
+        /// Canonical content key for a VendorOffer, used by
+        /// MergeIntoBaseline's protected-merchant dedupe pass to catch two
+        /// rows that describe the identical offer but carry different
+        /// OfferId hash strings (e.g. a baseline row that predates a
+        /// VendorOfferHasher hash-format change). Mirrors the same fields
+        /// VendorOfferHasher.ComputeOfferId hashes, EXCEPT OfferId itself
+        /// and SeasonalFestival - the latter deliberately excluded so a
+        /// freshly-tagged row and its untagged baseline counterpart are
+        /// recognized as the same offer rather than two different ones.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string ComputeContentKey(VendorOffer offer)
+        {
+            var sb = new StringBuilder();
+
+            sb.Append("merchant=");
+            sb.Append(offer.MerchantName ?? "");
+
+            sb.Append(";output=");
+            sb.Append(offer.OutputItemId);
+            sb.Append('/');
+            sb.Append(offer.OutputCount);
+
+            sb.Append(";costs=");
+            var sortedCosts = (offer.CostLines ?? new List<CostLine>())
+                .OrderBy(c => c.Type, StringComparer.Ordinal)
+                .ThenBy(c => c.Id)
+                .ThenBy(c => c.Count)
+                .ToList();
+            for (int i = 0; i < sortedCosts.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append(sortedCosts[i].Type);
+                sb.Append(':');
+                sb.Append(sortedCosts[i].Id);
+                sb.Append(':');
+                sb.Append(sortedCosts[i].Count);
+            }
+
+            sb.Append(";locations=");
+            var sortedLocations = (offer.Locations ?? new List<string>())
+                .OrderBy(l => l, StringComparer.Ordinal)
+                .ToList();
+            sb.Append(string.Join(",", sortedLocations));
+
+            sb.Append(";dailyCap=");
+            sb.Append(offer.DailyCap.HasValue ? offer.DailyCap.Value.ToString() : "null");
+
+            sb.Append(";weeklyCap=");
+            sb.Append(offer.WeeklyCap.HasValue ? offer.WeeklyCap.Value.ToString() : "null");
+
+            sb.Append(";homesteadTier=");
+            sb.Append(offer.HomesteadTier.HasValue ? offer.HomesteadTier.Value.ToString() : "null");
+
+            sb.Append(";seasonalCap=");
+            sb.Append(offer.SeasonalCap.HasValue ? offer.SeasonalCap.Value.ToString() : "null");
+
+            return sb.ToString();
         }
 
         /// <summary>
@@ -684,6 +1069,25 @@ namespace VendorOfferUpdater
                     $"has unrecognized requirement text \"{result.Requirement}\" - left untagged.");
             }
 
+            // Festival-vendor auto-tagging follow-up (2026-08-16): resolves
+            // the raw wiki "seasonal="/"event=" value (if any, from a
+            // separate ResolveSeasonalFestivalValuesAsync pass) to the
+            // internal festival key. A present-but-unrecognized value
+            // (e.g. a one-off non-festival event like "Fractal Rush") is
+            // deliberately left untagged with a warning rather than
+            // guessed - never hashed into OfferId either way, matching
+            // VendorOffer.SeasonalFestival's own doc comment (this field
+            // is deliberately not hashed by VendorOfferHasher, so tagging
+            // an already-shipped offer never changes its OfferId).
+            string? seasonalFestival = Gw2Constants.ResolveSeasonalFestivalKey(result.TemporarySeasonalValue);
+            if (seasonalFestival == null && !string.IsNullOrWhiteSpace(result.TemporarySeasonalValue))
+            {
+                Console.WriteLine(
+                    $"  WARNING: Vendor \"{merchant}\" has an unrecognized wiki " +
+                    $"seasonal/event value \"{result.TemporarySeasonalValue}\" in its " +
+                    "{{Temporary}} template - left untagged (no invented festival mapping).");
+            }
+
             string offerId = VendorOfferHasher.ComputeOfferId(
                 result.GameId,
                 outputCount,
@@ -706,8 +1110,408 @@ namespace VendorOfferUpdater
                 DailyCap = result.DailyCap,
                 WeeklyCap = result.WeeklyCap,
                 HomesteadTier = homesteadTier,
-                SeasonalCap = result.SeasonalCap
+                SeasonalCap = result.SeasonalCap,
+                SeasonalFestival = seasonalFestival
             };
+        }
+
+        /// <summary>
+        /// Festival-vendor auto-tagging follow-up (2026-08-16): fetches
+        /// each distinct wiki vendor PAGE's raw wikitext (via
+        /// WikiSmwClient.FetchWikitextAsync) and extracts its
+        /// {{Temporary|...}} template's seasonal/event value
+        /// (TemporaryTemplateParser), so ConvertToOffer can resolve every
+        /// vendor's offers to a festival tag - not just the three
+        /// Candy Corn Vendor (Weekly) rows this module previously
+        /// hand-tagged.
+        ///
+        /// Deliberately opt-in (--tag-seasonal-festivals), not part of
+        /// every default run: unlike every other field on WikiVendorResult
+        /// (which come from the SMW "ask" printouts already fetched by
+        /// QueryVendorItemsAsync/ResolveItemGameIdsAsync), there is no
+        /// Semantic MediaWiki property for a page's {{Temporary}} template
+        /// - unioning a distinct-PageName wikitext-parse request into
+        /// every full refresh would add one HTTP request per distinct
+        /// vendor page (thousands, for a from-scratch scrape) on top of
+        /// the existing two-pass budget, silently changing the cost/time
+        /// profile of the default `./tools/refresh-vendor-data.sh` workflow.
+        /// A developer who wants full coverage passes the flag explicitly.
+        ///
+        /// Results are cached by real wiki page title (raw wiki value, or
+        /// "" for "checked - no seasonal/event tag") in a small JSON file
+        /// next to the other dev-local caches (gitignored, like
+        /// wiki_vendor_cache.json/item_id_cache.json) so a repeat run
+        /// never re-fetches a page it has already checked.
+        /// <paramref name="maxSeasonalPages"/> is a self-healing per-run
+        /// budget (2026-08-20 fix; only a genuinely invalid budget &lt;= 0
+        /// still throws SafetyLimitException, same pattern WikiSmwClient's
+        /// own query safety limits use) on how many NEW pages a single run
+        /// will fetch, so an accidental full-dataset run with the flag set
+        /// does not silently attempt thousands of live requests in one go.
+        /// When there are more uncached pages than the budget allows, this
+        /// method fetches only up to the budget, saves the cache as usual,
+        /// and logs how many pages remain - it does NOT throw. The next
+        /// run's own toFetch list is smaller (this run's fetches are now
+        /// cached), so repeated runs converge on full coverage instead of
+        /// every run past the first throwing on the same unmet budget.
+        ///
+        /// WikiVendorResult.PageName is the SMW subject key of the vendor's
+        /// "Sells item" SUBOBJECT, not the vendor's own wiki page title -
+        /// confirmed live (api.php?action=ask against
+        /// "[[Has vendor::Candy Corn Vendor (Weekly)]]"): every row's
+        /// subject is "Candy Corn Vendor (Weekly)#vendor1",
+        /// "...#vendor2", etc. (one subobject per sold item). The real,
+        /// fetchable page title is everything before the first '#' - see
+        /// StripSubobjectSuffix. Caching (and fetching) by the STRIPPED
+        /// title, not the raw subobject key, is also what keeps this pass
+        /// cheap: one wikitext fetch per distinct VENDOR, not per sold item.
+        ///
+        /// Review fix (2026-08-18): <paramref name="queryScopedResults"/>
+        /// (null for --resolve-item-currencies-only, which has no --query
+        /// and processes the whole cache by design) scopes which pages
+        /// count toward the <paramref name="maxSeasonalPages"/> fetch
+        /// budget to the ones THIS RUN's --query actually returned.
+        /// <paramref name="wikiResults"/> at the caller's call site is the
+        /// FULL merged wiki_vendor_cache.json (Program.cs Step 2's
+        /// MergeWikiCache union), not just this run's query - scoping the
+        /// fetch budget to it meant a narrow --query on a real dev-machine
+        /// cache (thousands of distinct vendor pages) computed thousands
+        /// of "uncached" pages, exceeded --max-seasonal-pages, and threw
+        /// SafetyLimitException BEFORE Steps 4-6 ever wrote output,
+        /// discarding the scoped run's already-completed live work. The
+        /// cache-apply loop below still runs over the full
+        /// <paramref name="wikiResults"/>, since applying an
+        /// already-cached tag is a cheap dictionary lookup, not a fetch.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static async Task ResolveSeasonalFestivalValuesAsync(
+            List<WikiVendorResult> wikiResults,
+            WikiSmwClient wikiClient,
+            string cachePath,
+            int maxSeasonalPages,
+            int delayMs,
+            CancellationToken ct,
+            IReadOnlyList<WikiVendorResult>? queryScopedResults = null)
+        {
+            // Hard-abort fix (2026-08-20): defense in depth - Program.cs's
+            // own arg parsing already rejects --max-seasonal-pages <= 0
+            // before this method is ever called from RunAsync, but this
+            // method is also called directly by tests and could in
+            // principle be called by a future caller that skips that
+            // check. A budget of 0 or less is not a normal "run out of
+            // budget, continue next time" case (see the self-healing fetch-
+            // up-to-budget logic below) - it means no run could ever make
+            // progress, so it stays a genuine SafetyLimitException.
+            if (maxSeasonalPages <= 0)
+            {
+                throw new SafetyLimitException(
+                    $"--max-seasonal-pages must be a positive integer, got {maxSeasonalPages}.");
+            }
+
+            var cache = LoadSeasonalWikitextCache(cachePath);
+
+            var fetchScope = queryScopedResults ?? (IReadOnlyList<WikiVendorResult>)wikiResults;
+
+            var distinctPageNames = fetchScope
+                .Select(r => r.PageName)
+                .Where(p => !string.IsNullOrEmpty(p))
+                .Select(p => StripSubobjectSuffix(p!))
+                .Where(p => p.Length > 0)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            var toFetch = distinctPageNames
+                .Where(p => !cache.ContainsKey(p))
+                .ToList();
+
+            if (toFetch.Count > 0)
+            {
+                int totalUncached = toFetch.Count;
+
+                // Self-healing fix (2026-08-20): a from-scratch run against
+                // a real dataset (thousands of distinct vendor pages) with
+                // no prior ref/seasonal_wikitext_cache.json (gitignored,
+                // empty on a fresh clone) used to hit this budget on its
+                // very first invocation and throw SafetyLimitException
+                // BEFORE fetching anything - the run exited non-zero, Pass
+                // 2 never ran, and a re-run made no progress at all (same
+                // empty cache, same over-budget toFetch, same throw).
+                // Instead, fetch only UP TO the budget this run, save
+                // whatever was fetched (the existing try/finally below
+                // already does this), and leave the rest for a later run -
+                // next time, this run's own newly-cached pages shrink
+                // toFetch, so repeated runs make steady forward progress
+                // and the overall process converges instead of looping
+                // forever on the same failure. See the maxSeasonalPages
+                // <= 0 check above for the one budget shape that still
+                // hard-aborts.
+                if (toFetch.Count > maxSeasonalPages)
+                {
+                    int remaining = toFetch.Count - maxSeasonalPages;
+                    Console.WriteLine(
+                        $"NOTE: {toFetch.Count} vendor page(s) need seasonal tagging, but " +
+                        $"the --max-seasonal-pages budget for this run is {maxSeasonalPages}. " +
+                        $"Fetching {maxSeasonalPages} page(s) now; {remaining} page(s) remain " +
+                        "and will be picked up by a subsequent run (this run's cache save " +
+                        "covers everything fetched below, so the remaining count only shrinks " +
+                        "from here).");
+                    toFetch = toFetch.Take(maxSeasonalPages).ToList();
+                }
+
+                Console.WriteLine(
+                    $"Resolving seasonal festival tags for {toFetch.Count} " +
+                    $"uncached vendor page(s) ({distinctPageNames.Count - totalUncached} already cached)...");
+
+                int effectiveDelay = Math.Max(200, delayMs);
+
+                // Resilience fix (2026-08-17): the ONLY save call used to
+                // sit after this loop, and the per-page catch only caught
+                // HttpRequestException. A JsonException from a non-JSON/
+                // HTML response (JsonDocument.Parse in
+                // WikiSmwClient.FetchWikitextAsync), an
+                // OperationCanceledException from Ctrl-C
+                // (ct.ThrowIfCancellationRequested/Task.Delay), or any
+                // other exception then aborted the whole method and
+                // discarded every page already fetched THIS run - a
+                // re-run would re-fetch all of them, and the caller
+                // (RunAsync) never even reaches Step 4/5/6 to write any
+                // output. The try/finally below saves whatever this pass
+                // fetched no matter how the loop exits; a parse failure is
+                // now treated exactly like an HTTP failure (warn, leave
+                // this one page uncached, continue with the rest).
+                try
+                {
+                    for (int i = 0; i < toFetch.Count; i++)
+                    {
+                        ct.ThrowIfCancellationRequested();
+
+                        string pageName = toFetch[i];
+
+                        // Throttle-class fix (2026-08-19): the inter-
+                        // request delay used to sit ONLY after a
+                        // successful fetch+parse, guarded by the same
+                        // "not the last item" check now on the finally
+                        // below. Every `continue` above it (HTTP failure,
+                        // JSON parse failure, null wikitext) skipped the
+                        // delay entirely, so a stretch of missing/failing
+                        // pages issued back-to-back requests against
+                        // api.guildwars2.com with no throttling at all,
+                        // defeating both --delay and the 200ms floor. A
+                        // `finally` runs on every exit from the try below
+                        // - success, a `continue`, or an uncaught
+                        // exception propagating out - so moving the delay
+                        // here makes every iteration throttle uniformly,
+                        // not just the ones that happen to succeed.
+                        try
+                        {
+                            string? wikitext;
+                            try
+                            {
+                                wikitext = await wikiClient.FetchWikitextAsync(pageName, ct);
+                            }
+                            catch (HttpRequestException ex)
+                            {
+                                Console.WriteLine(
+                                    $"  WARNING: Failed to fetch wikitext for \"{pageName}\": {ex.Message} - left uncached.");
+                                continue;
+                            }
+                            catch (JsonException ex)
+                            {
+                                Console.WriteLine(
+                                    $"  WARNING: Failed to parse wikitext response for \"{pageName}\": {ex.Message} - left uncached.");
+                                continue;
+                            }
+
+                            // Review fix (2026-08-18): a null wikitext (missing/
+                            // renamed page, or an "error" object in the API
+                            // response - see WikiSmwClient.FetchWikitextAsync's
+                            // own doc comment) is NOT the same thing as "page
+                            // fetched fine, no {{Temporary}} template found" -
+                            // the latter legitimately caches as "" below. Caching
+                            // a null the same way baked a false "checked - not
+                            // tagged" negative into the cache permanently, with
+                            // no warning and no future retry. Warn and leave the
+                            // page uncached instead, same as an HTTP/JSON failure.
+                            if (wikitext == null)
+                            {
+                                Console.WriteLine(
+                                    $"  WARNING: No wikitext returned for \"{pageName}\" " +
+                                    "(missing/renamed page, or a wiki API error response) - left uncached.");
+                                continue;
+                            }
+
+                            string? raw = TemporaryTemplateParser.ExtractSeasonalOrEventParameter(wikitext);
+                            cache[pageName] = raw ?? string.Empty;
+                        }
+                        finally
+                        {
+                            if (i + 1 < toFetch.Count)
+                            {
+                                await Task.Delay(effectiveDelay, ct);
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    SaveSeasonalWikitextCache(cachePath, cache);
+                }
+            }
+            else if (distinctPageNames.Count > 0)
+            {
+                Console.WriteLine(
+                    $"All {distinctPageNames.Count} vendor page(s) already checked for seasonal festival tags.");
+            }
+
+            foreach (var result in wikiResults)
+            {
+                if (string.IsNullOrEmpty(result.PageName))
+                {
+                    continue;
+                }
+
+                string pageTitle = StripSubobjectSuffix(result.PageName);
+                if (pageTitle.Length > 0 && cache.TryGetValue(pageTitle, out var value))
+                {
+                    // Nice-to-have fix (2026-08-18 review): assign
+                    // unconditionally (including "" -> null) rather than
+                    // only ever ASSIGNING a non-empty value - the old
+                    // guard never CLEARED one. Combined with Program.cs
+                    // Step 3.5's re-save of wiki_vendor_cache.json, a
+                    // value that once round-tripped into the cache could
+                    // never be un-set: if the wiki later drops a
+                    // {{Temporary}} template, this now un-tags the vendor
+                    // instead of re-tagging it forever off a stale value.
+                    result.TemporarySeasonalValue = string.IsNullOrEmpty(value) ? null : value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Strips a Semantic MediaWiki subobject suffix ("#vendor1", etc.)
+        /// off a "Sells item" subject key, returning the vendor's real,
+        /// fetchable wiki page title. A subject with no '#' (already a
+        /// plain page title) is returned unchanged. See
+        /// ResolveSeasonalFestivalValuesAsync's own doc comment for the
+        /// live-confirmed subject-key shape this un-does.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string StripSubobjectSuffix(string subjectKey)
+        {
+            int hashIndex = subjectKey.IndexOf('#');
+            return hashIndex >= 0 ? subjectKey.Substring(0, hashIndex) : subjectKey;
+        }
+
+        // Nice-to-have (2026-08-19): reserved dictionary key (not a real
+        // wiki page title - none contain "__") that stores the cache
+        // format version alongside the real page entries, so a version
+        // bump can force a one-time recheck of entries written before a
+        // fix that changes what "" ("checked - no tag") means. See
+        // SeasonalWikitextCacheVersion's own doc comment.
+        private const string SeasonalWikitextCacheVersionKey = "__cache_version__";
+
+        // Bump this when a fix changes the MEANING of an already-cached
+        // value, so LoadSeasonalWikitextCache purges the affected entries
+        // instead of trusting them forever. Current bump (2 - the
+        // &redirects=1 fix, WikiSmwClient.FetchWikitextAsync): before that
+        // fix, a redirected vendor page's wikitext came back as
+        // "#REDIRECT [[Target]]", TemplateRegex found no {{Temporary}}
+        // template in that, and the caller cached it as "" - identical to
+        // a real, deliberate "checked, not tagged" - so those pages were
+        // never retried even though the fix would resolve them correctly.
+        // A missing/older version number purges every "" entry (the only
+        // ones that ambiguity could have affected; a non-empty resolved
+        // value was never subject to it) so they get one clean re-fetch.
+        private const int SeasonalWikitextCacheVersion = 2;
+
+        private static Dictionary<string, string> LoadSeasonalWikitextCache(string path)
+        {
+            var cache = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (!File.Exists(path))
+            {
+                return cache;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(path);
+                using var doc = JsonDocument.Parse(json);
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    cache[prop.Name] = prop.Value.GetString() ?? string.Empty;
+                }
+
+                bool isCurrentVersion = cache.TryGetValue(SeasonalWikitextCacheVersionKey, out var versionText)
+                    && versionText == SeasonalWikitextCacheVersion.ToString(CultureInfo.InvariantCulture);
+                cache.Remove(SeasonalWikitextCacheVersionKey);
+
+                if (!isCurrentVersion)
+                {
+                    var staleEmptyKeys = cache
+                        .Where(kv => kv.Value.Length == 0)
+                        .Select(kv => kv.Key)
+                        .ToList();
+                    foreach (var key in staleEmptyKeys)
+                    {
+                        cache.Remove(key);
+                    }
+                    if (staleEmptyKeys.Count > 0)
+                    {
+                        Console.WriteLine(
+                            $"Seasonal wikitext cache version bump: cleared {staleEmptyKeys.Count} " +
+                            "pre-redirects-fix \"\" entr" +
+                            (staleEmptyKeys.Count == 1 ? "y" : "ies") +
+                            " for recheck.");
+                    }
+                }
+
+                Console.WriteLine($"Loaded seasonal wikitext cache ({cache.Count} entries) from {path}");
+            }
+            catch
+            {
+                // Ignore corrupt cache
+            }
+
+            return cache;
+        }
+
+        private static void SaveSeasonalWikitextCache(string path, Dictionary<string, string> cache)
+        {
+            var toWrite = new Dictionary<string, string>(cache, StringComparer.Ordinal)
+            {
+                [SeasonalWikitextCacheVersionKey] =
+                    SeasonalWikitextCacheVersion.ToString(CultureInfo.InvariantCulture)
+            };
+
+            var sorted = toWrite
+                .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(sorted, options);
+
+            // Nice-to-have fix (2026-08-17 review): unlike
+            // Services/VendorOfferStore.SaveOverlay's temp-file +
+            // File.Replace pattern, this used to write path directly - a
+            // crash mid-write left a truncated cache. Bounded impact
+            // (LoadSeasonalWikitextCache swallows a parse failure and
+            // returns empty, so the only cost was a silent full re-fetch
+            // next run), but this pass's own resilience fix now calls
+            // this method from a `finally` block specifically to survive
+            // a mid-run crash/cancellation, so the write itself should be
+            // no less durable than that.
+            string tmpPath = path + ".tmp";
+            File.WriteAllText(tmpPath, json);
+            if (File.Exists(path))
+            {
+                File.Replace(tmpPath, path, null);
+            }
+            else
+            {
+                File.Move(tmpPath, path);
+            }
+
+            Console.WriteLine($"  Saved seasonal wikitext cache ({cache.Count} entries) to {path}");
         }
 
         private static Dictionary<string, int> LoadItemIdCache(string path)

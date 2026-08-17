@@ -684,6 +684,53 @@ namespace VendorOfferUpdater
 
             return result;
         }
+
+        /// <summary>
+        /// Fetches a single wiki page's raw wikitext via
+        /// action=parse&amp;prop=wikitext - used by the festival-vendor
+        /// auto-tagging pass (Program.ResolveSeasonalFestivalValuesAsync)
+        /// to read a vendor NPC page's own {{Temporary|...}} template,
+        /// which (unlike "Has requirement"/"Has seasonal purchase cap")
+        /// has no equivalent Semantic MediaWiki property to query via
+        /// action=ask. Returns null if the page does not exist or the API
+        /// response otherwise has no wikitext (reused FetchWithRetryAsync
+        /// already retries transient failures; a null here means the page
+        /// itself does not have a "wikitext" result, not a network error).
+        ///
+        /// Review fix (2026-08-18): action=parse does NOT resolve
+        /// redirects by default (unlike action=ask's SMW queries) -
+        /// without &amp;redirects=1, a vendor page whose SMW subject title
+        /// is a redirect returned "#REDIRECT [[Target]]" as its wikitext,
+        /// which TemplateRegex then correctly finds no {{Temporary}}
+        /// template in, so the caller's cache[pageName] = "" ("checked -
+        /// no tag") looked identical to a real, deliberate absence and
+        /// never got retried. See ResolveSeasonalFestivalValuesAsync's own
+        /// caller-side fix for the companion "wikitext came back null at
+        /// all" (missing/renamed page, API error object) case - that one
+        /// is now warned about and left uncached rather than baked into
+        /// the cache as "", precisely because a null return here does NOT
+        /// mean "checked, no template" the way an empty wikitext body
+        /// legitimately can.
+        /// </summary>
+        public async Task<string?> FetchWikitextAsync(string pageName, CancellationToken ct = default)
+        {
+            var url = $"{WikiApiUrl}?action=parse&page={Uri.EscapeDataString(pageName)}" +
+                       "&prop=wikitext&redirects=1&format=json";
+
+            string response = await FetchWithRetryAsync(url, ct);
+
+            using var doc = JsonDocument.Parse(response);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("parse", out var parse) &&
+                parse.TryGetProperty("wikitext", out var wikitext) &&
+                wikitext.TryGetProperty("*", out var text))
+            {
+                return text.GetString();
+            }
+
+            return null;
+        }
     }
 
     public class WikiCostEntry
@@ -727,5 +774,21 @@ namespace VendorOfferUpdater
         // M37 (KNOWN-ISSUES #24): raw "Has requirement" text, or null if
         // the row has none. See HomesteadTierResolver.
         public string? Requirement { get; set; }
+
+        // Festival-vendor auto-tagging follow-up (2026-08-16): the raw
+        // "seasonal="/"event=" value pulled from this vendor page's own
+        // {{Temporary|...}} wikitext template by
+        // TemporaryTemplateParser.ExtractSeasonalOrEventParameter, or null
+        // if the page has no such template/parameter. This is NOT sourced
+        // from the SMW "ask" printouts (there is no semantic property for
+        // it) - it comes from a separate, opt-in wikitext-fetch pass (see
+        // Program.ResolveSeasonalFestivalValuesAsync), populated onto each
+        // result sharing that page's PageName before ConvertToOffer runs.
+        // ConvertToOffer resolves this raw wiki string to the internal
+        // festival key (Gw2Constants.ResolveSeasonalFestivalKey) - kept
+        // raw here, not pre-resolved, so a value this pass could not map
+        // yet still round-trips through wiki_vendor_cache.json for a
+        // later run without needing to re-fetch the page.
+        public string? TemporarySeasonalValue { get; set; }
     }
 }
