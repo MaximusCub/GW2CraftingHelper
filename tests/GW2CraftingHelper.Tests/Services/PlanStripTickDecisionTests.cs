@@ -91,5 +91,76 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Equal(PlanStripTickAction.Stop, PlanStripTickDecision.Decide(null, myGen: 1));
         }
+
+        [Fact]
+        public void FormatPhaseText_NullEvent_ReturnsGenerating()
+        {
+            Assert.Equal("Generating...", PlanStripTickDecision.FormatPhaseText(null));
+        }
+
+        [Fact]
+        public void FormatPhaseText_EmptyDisplayName_ReturnsGenerating()
+        {
+            var pe = new PlanPhaseEvent { Phase = PlanPhase.BuildingTree, DisplayName = "" };
+
+            Assert.Equal("Generating...", PlanStripTickDecision.FormatPhaseText(pe));
+        }
+
+        [Fact]
+        public void FormatPhaseText_WithTotal_AppendsItemCount()
+        {
+            var pe = new PlanPhaseEvent { Phase = PlanPhase.FetchingPrices, DisplayName = "Fetching prices", Total = 418 };
+
+            Assert.Equal("Fetching prices (418 items)...", PlanStripTickDecision.FormatPhaseText(pe));
+        }
+
+        [Fact]
+        public void FormatPhaseText_NoTotal_WithDetail_AppendsDetail()
+        {
+            // The documented Detail-fallback regression case: the very
+            // first "Building recipe tree" event of a cold recipe cache
+            // carries no item count (Total) but does carry the first-run
+            // hint as Detail (CraftingPlanPipeline.FirstRunTreeHint) - this
+            // is the ONLY way that hint still reaches the live status strip
+            // now that CraftingPlanView passes progress: null to the old
+            // IProgress<PlanStatus> channel. A regression here (e.g.
+            // reordering the Total/Detail checks, or dropping the Detail
+            // branch) would silently make the hint unreachable again.
+            var pe = new PlanPhaseEvent
+            {
+                Phase = PlanPhase.BuildingTree,
+                DisplayName = "Building recipe tree",
+                Total = null,
+                Detail = "may take several seconds on first run"
+            };
+
+            Assert.Equal(
+                "Building recipe tree (may take several seconds on first run)...",
+                PlanStripTickDecision.FormatPhaseText(pe));
+        }
+
+        [Fact]
+        public void FormatPhaseText_TotalAndDetailBothPresent_TotalTakesPriority()
+        {
+            // Total is checked before Detail - a phase that somehow carries
+            // both must never render both onto the same line.
+            var pe = new PlanPhaseEvent
+            {
+                Phase = PlanPhase.FetchingPrices,
+                DisplayName = "Fetching prices",
+                Total = 5,
+                Detail = "should not appear"
+            };
+
+            Assert.Equal("Fetching prices (5 items)...", PlanStripTickDecision.FormatPhaseText(pe));
+        }
+
+        [Fact]
+        public void FormatPhaseText_NoTotalNoDetail_PlainEllipsis()
+        {
+            var pe = new PlanPhaseEvent { Phase = PlanPhase.SolvingDecisions, DisplayName = "Solving decisions" };
+
+            Assert.Equal("Solving decisions...", PlanStripTickDecision.FormatPhaseText(pe));
+        }
     }
 }

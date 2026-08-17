@@ -2682,7 +2682,7 @@ namespace GW2CraftingHelper.Views
             var phaseProgress = new Progress<PlanPhaseEvent>(pe =>
             {
                 if (pe == null) return;
-                _statusBoard.UpdatePhase(myGen, (int)pe.Phase, FormatPhaseText(pe));
+                _statusBoard.UpdatePhase(myGen, (int)pe.Phase, PlanStripTickDecision.FormatPhaseText(pe));
             });
 
             try
@@ -2957,30 +2957,13 @@ namespace GW2CraftingHelper.Views
             RenderFromBoard(_statusBoard.Snapshot());
         }
 
-        /// <summary>
-        /// W3B: renders a PlanPhaseEvent as status-strip text, e.g.
-        /// "Fetching prices (418 items)..." - no spinner prefix (added by
-        /// RenderFromBoard). Falls back to "Generating..." for a null
-        /// event or one with no display name, matching the pre-first-event
-        /// text TriggerGenerate already shows. W3B review-fix: when a phase
-        /// carries no item count but does carry Detail (currently only the
-        /// very first "Building recipe tree" event, shown unconditionally
-        /// regardless of whether the cache actually turns out warm or cold -
-        /// see CraftingPlanPipeline.FirstRunTreeHint's call sites), that
-        /// detail is appended instead - this is the pre-W3B "(may take
-        /// several seconds on first run)" hint, otherwise silently lost now
-        /// that CraftingPlanView passes progress: null to the old,
-        /// finer-grained IProgress&lt;PlanStatus&gt; channel (see the
-        /// `progress: null` argument's own comment above).
-        /// </summary>
-        private static string FormatPhaseText(PlanPhaseEvent pe)
-        {
-            if (pe == null || string.IsNullOrEmpty(pe.DisplayName)) return "Generating...";
-            if (pe.Total.HasValue) return $"{pe.DisplayName} ({pe.Total.Value} items)...";
-            if (!string.IsNullOrEmpty(pe.Detail)) return $"{pe.DisplayName} ({pe.Detail})...";
-            return $"{pe.DisplayName}...";
-        }
-
+        // tree-tooltip-composer milestone: FormatPhaseText moved verbatim to
+        // Services/PlanStripTickDecision.cs (PlanStripTickDecision.
+        // FormatPhaseText) - pure, Blish-free, no instance-state dependency
+        // of its own, so it belongs alongside its sibling status-strip
+        // decision rather than as a private method here. See that method's
+        // own doc comment and docs/ARCHITECTURE.md section 5's STANDING
+        // RULE.
         #endregion // 2. Generate orchestration (continued)
 
         #region General: current panel width helper

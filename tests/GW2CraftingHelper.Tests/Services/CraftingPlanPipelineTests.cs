@@ -2228,7 +2228,7 @@ namespace GW2CraftingHelper.Tests.Services
             // first run)" PlanStatus hint is now unreachable once the view
             // passes progress: null - it must still surface somewhere live,
             // via PlanPhaseEvent.Detail on the BuildingTree event (see
-            // CraftingPlanView.FormatPhaseText).
+            // PlanStripTickDecision.FormatPhaseText).
             var recipeApi = new InMemoryRecipeApiClient();
             recipeApi.AddSearchResult(1, 10);
             recipeApi.AddRecipe(new RawRecipe
