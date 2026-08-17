@@ -54,7 +54,7 @@ namespace GW2CraftingHelper.Services
 
         private readonly string _filePath;
 
-        // M39 (WP-16 shape, d2-log-system.md Section 4.2): see StatusStore's
+        // See StatusStore's
         // matching field comment.
         private readonly Action<string, Exception> _onError;
 
@@ -90,7 +90,7 @@ namespace GW2CraftingHelper.Services
         }
 
         // Atomic .tmp+Replace write, matching SnapshotStore/StatusStore/
-        // VendorOfferStore's own one-store-convention (M39) - a crash/
+        // VendorOfferStore's own one-store-convention - a crash/
         // power-loss mid-write can never leave a half-written plan.json
         // that LoadLatest then fails to parse.
         public void Save(PersistedPlan plan)

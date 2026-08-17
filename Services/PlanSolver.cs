@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// See docs/ARCHITECTURE.md section 8 (solver decision rules: TP-buy
     /// baseline, strict-cheaper craft/vendor comparisons, Mystic Clover EV
-    /// pricing, force-craft) for the durable rationale (M38 WP-27).
+    /// pricing, force-craft) for the durable rationale.
     /// </summary>
     public class PlanSolver
     {
@@ -260,7 +260,7 @@ namespace GW2CraftingHelper.Services
 
             Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
 
-            // Pass 2b (M34-B1 #1/#3): re-derive each merged vendor step's
+            // Pass 2b: re-derive each merged vendor step's
             // true cost from its AGGREGATE Quantity and the winning offer's
             // batch shape, ceiling once instead of trusting the sum of
             // several already-per-occurrence-ceil'd costs; also folds the

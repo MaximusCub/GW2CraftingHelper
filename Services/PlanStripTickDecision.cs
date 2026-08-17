@@ -55,7 +55,7 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W3B: renders a PlanPhaseEvent as status-strip text, e.g.
+        /// Renders a PlanPhaseEvent as status-strip text, e.g.
         /// "Fetching prices (418 items)..." - no spinner prefix (added by
         /// CraftingPlanView.RenderFromBoard). Falls back to "Generating..."
         /// for a null event or one with no display name, matching the

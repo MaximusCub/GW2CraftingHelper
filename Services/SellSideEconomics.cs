@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Sell-side economics arithmetic (SellableQuantity/NetSaleValue/
     /// TargetUnitSellPrice/CraftingProfit/MaterialOpportunityCost), moved
-    /// out of CraftingPlanPipeline (M38 WP-12, architecture S4b) as a pure,
+    /// out of CraftingPlanPipeline as a pure,
     /// move-only extraction - same fields, same order, same arithmetic. See
     /// docs/KNOWN-ISSUES.md #25 for the full M37 design rationale this
     /// class implements (single-item vs batch rollup, its documented
@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Services
             // fees, and profit versus the plan's coin cost. Coin-only by
             // design - non-coin currency costs have no coin value here.
             //
-            // M37 (KNOWN-ISSUES #25): the per-root arithmetic (over-
+            // The per-root arithmetic (over-
             // production bump, sell-price lookup) is now shared with the
             // batch path via ComputePerItemEconomics - a pure extraction,
             // not a behavior change (see that method's own doc comment).
@@ -141,7 +141,7 @@ namespace GW2CraftingHelper.Services
         /// NetSaleValue/TargetUnitSellPrice arithmetic factored out of
         /// ApplySellSideEconomics (M20/M37) so both the single-item path
         /// (one call, on the plan's own tree root) and
-        /// ApplyBatchSellSideEconomics (M37, one call per requested root)
+        /// ApplyBatchSellSideEconomics
         /// share IDENTICAL fee math and instant-sell revenue basis - no
         /// parallel/duplicate costing logic. itemId is passed explicitly
         /// rather than read from itemRoot.Id: both call sites already
@@ -241,7 +241,7 @@ namespace GW2CraftingHelper.Services
         /// value of the owned materials inventory reduction consumed -
         /// pure extraction of ApplySellSideEconomics' own-materials
         /// opportunity-cost arithmetic (M28/M34-B2a #3) so
-        /// ApplyBatchSellSideEconomics (M37) can reuse it unchanged over a
+        /// ApplyBatchSellSideEconomics can reuse it unchanged over a
         /// batch's merged UsedMaterials list (already aggregated across
         /// every requested root by the shared InventoryReducer pool - no
         /// per-root split needed or meaningful here). Preserves

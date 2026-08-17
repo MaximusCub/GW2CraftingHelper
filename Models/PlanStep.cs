@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Models
         // VendorOfferCurrencyCostLinesPerBatch is that offer's UNSCALED
         // non-coin currency cost for ONE purchase (not this step's
         // aggregated total). Used to derive the shopping list's currency
-        // "Each" cell as the offer's true per-unit rate (M34-B1 #2) rather
+        // "Each" cell as the offer's true per-unit rate rather
         // than a truncated total/Quantity average. OutputCount stays 0 (and
         // VendorOfferCurrencyCostLinesPerBatch null) when not applicable -
         // a non-vendor step, or a vendor step whose occurrences resolved to

@@ -4,25 +4,18 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Which of the two maintainer-specified rules (docs/gw2e-considerations.md,
-    /// source-selection-simplification) caused a pill to be subdued.
+    /// Which of the two rules caused a pill to be subdued.
     /// </summary>
     public enum PillSubduingRule
     {
         None,
 
         /// <summary>
-        /// Both options' PillSourceCostBreakdown.DecisionValue are non-null
-        /// (every cost component of both is valued) and the losing option
-        /// is strictly more expensive by a DECISIVE margin - "more
-        /// expensive at your current currency values". Adversarial-review
-        /// round-2 finding #3: a bare strictly-positive margin used to
-        /// count on its own, but the brief calls for "decisive" and a
-        /// genuinely near-equal alternative (e.g. a 1-copper difference on
-        /// a multi-gold purchase) rendered in Locked's exact muted gray
-        /// and told the user it was "more expensive" is not a decisive
-        /// reading of that word - see IsDecisiveMargin's own doc comment
-        /// for the applied absolute-and-relative floor.
+        /// Both options' DecisionValue are non-null and the losing option
+        /// is strictly more expensive by a DECISIVE margin (see
+        /// IsDecisiveMargin) - a bare positive margin is not enough; a
+        /// 1-copper difference on a multi-gold purchase must not render
+        /// as "more expensive".
         /// </summary>
         Weighted,
 
@@ -74,25 +67,12 @@ namespace GW2CraftingHelper.Services
         public IReadOnlyList<PillCostDelta> Deltas { get; }
 
         /// <summary>
-        /// Weighted only (adversarial-review finding, round 2 correction):
-        /// true when either side's PillSourceCostBreakdown.CostLines
-        /// contains a Type == "Currency" line, i.e. a non-coin CURRENCY
-        /// cost - the only CostLine kind a CurrencyValuation can ever
-        /// apply to - participates SOMEWHERE in this comparison. Type ==
-        /// "Item" lines do NOT count: BuildCraftCostBreakdown emits one
-        /// for every craft ingredient regardless of valuation (they are
-        /// TP-priced, never user-valued), so a round-1 fix that counted
-        /// ANY non-empty CostLines still mis-fired "at your current
-        /// currency values" on a plain-gold TP-vs-craft comparison purely
-        /// because the craft side has ingredient lines. Weighted very
-        /// commonly fires on a pure-gold difference with no currency
-        /// valuation involved at all (StrictDomination cannot fire
-        /// whenever the losing side's RawCoin is LOWER than the selected
-        /// side's - e.g. losing craft beats selected TP on raw coin but
-        /// loses on DecisionValue for an unrelated reason), so the
-        /// tooltip wording must not blame "your current currency values"
-        /// for a difference that never touched a currency valuation.
-        /// False (the default) for every other rule.
+        /// Weighted only: true when either side has a Type == "Currency"
+        /// cost line - the only kind a CurrencyValuation ever prices.
+        /// Type == "Item" lines do NOT count (they are TP-priced, never
+        /// user-valued), so the tooltip never blames "your current
+        /// currency values" for a plain-gold difference. False for every
+        /// other rule.
         /// </summary>
         public bool HasNonCoinCost { get; }
 
@@ -108,37 +88,19 @@ namespace GW2CraftingHelper.Services
     }
 
     /// <summary>
-    /// source-selection-simplification (maintainer-approved redesign,
-    /// docs/gw2e-considerations.md): pure, Blish-free detection of whether
-    /// a losing acquisition-source pill should render subdued - see
-    /// PillSubduingRule's own two-case doc comments for the exact rules.
-    /// Pure comparison of two PillSourceCostBreakdown values; never reads
-    /// a CraftingTreeNode, never resolves a name, never decides which pill
-    /// is Selected (DecisionPillPlanner's job) - the SAME "detection is a
-    /// pure testable Services class" pattern CraftCompetencyEvaluator
-    /// already established for the competency-aware-default rule in this
-    /// same redesign.
+    /// Pure, Blish-free detection of whether a losing acquisition-source
+    /// pill should render subdued (see PillSubduingRule for the two
+    /// rules). Compares two PillSourceCostBreakdown values only; never
+    /// reads a CraftingTreeNode, resolves a name, or decides which pill
+    /// is Selected.
     /// </summary>
     public static class PillSubduingEvaluator
     {
-        // Adversarial-review round-2 finding #3: Weighted used to fire on
-        // ANY strictly-positive DecisionValue margin (e.g. a genuine field
-        // case - 1 copper more on a multi-gold purchase), rendering a
-        // near-equal alternative in Locked's exact muted gray and telling
-        // the user it was "more expensive" - not a "decisive" reading of
-        // the brief's own word. Gated on BOTH an absolute floor (a margin
-        // must clear a non-trivial coin amount even for a very cheap item)
-        // AND a relative floor (a margin must also clear a non-trivial
-        // percentage even for a very expensive item, where a fixed copper
-        // floor alone would be trivial) - requiring both, rather than
-        // either, is the more conservative reading: a margin that only
-        // clears one of the two (e.g. 101c on a 10g/100000c purchase - well
-        // past the absolute floor but only 0.1%) still is not "decisive"
-        // by the other measure. No maintainer-specified numbers exist for
-        // either constant (docs/KNOWN-ISSUES.md previously deferred this
-        // exact gate for maintainer sign-off) - these are a deliberately
-        // modest, easily-tunable starting point, not a precisely-derived
-        // figure like OwnedMaterialsForceBuyPrePass's gw2e-sourced 0.85.
+        // "Decisive" requires BOTH an absolute floor (non-trivial coin
+        // even for a cheap item) AND a relative floor (non-trivial
+        // percentage even for an expensive one) - requiring both is the
+        // conservative reading. The constants are a modest, tunable
+        // starting point, not maintainer-derived figures.
         private const long MinDecisiveMarginCopper = 100; // 1 silver
         private const double MinDecisiveMarginFraction = 0.01; // 1%
 
@@ -176,25 +138,18 @@ namespace GW2CraftingHelper.Services
                 return PillSubduingResult.None;
             }
 
-            // Adversarial-review fix (Critical #5): an incomplete
-            // breakdown (a real cost component with no representable
-            // line - see PillSourceCostBreakdown.IsIncomplete's own doc
-            // comment) cannot honestly support ANY subduing claim on
-            // either side - the same conservative posture
-            // VendorComponentCostsUnreliable already takes elsewhere.
+            // An incomplete breakdown (a real cost component with no
+            // representable line) cannot honestly support any subduing
+            // claim on either side.
             if (selected.IsIncomplete || losing.IsIncomplete)
             {
                 return PillSubduingResult.None;
             }
 
-            // Adversarial-review fix (Critical #4): a raw-quantity
-            // StrictDomination claim is unreliable the moment either side
-            // is a CRAFT breakdown whose ingredients were discounted by
-            // owned stock the other (vendor) side never sees - see
-            // PillSourceCostBreakdown.RawQuantitiesReducedByOwnedStock's
-            // own doc comment. Weighted (below) is unaffected - its
-            // DecisionValue figures already reflect the real, correctly-
-            // discounted economics on both sides.
+            // A raw-quantity StrictDomination claim is unreliable when
+            // either side's craft ingredients were discounted by owned
+            // stock the other side never sees. Weighted is unaffected -
+            // its DecisionValue already reflects the discounted economics.
             if (!selected.RawQuantitiesReducedByOwnedStock && !losing.RawQuantitiesReducedByOwnedStock)
             {
                 // STRICT DOMINATION checked first - a stronger, valuation-
@@ -212,12 +167,8 @@ namespace GW2CraftingHelper.Services
             {
                 long margin = losing.DecisionValue.Value - selected.DecisionValue.Value;
 
-                // Adversarial-review round-2 fix (finding #3): a bare
-                // strictly-positive margin is not "decisive" - see
-                // IsDecisiveMargin's own doc comment. A near-equal losing
-                // option that fails this floor stays None (normal
-                // rendering), same as a genuine tie already does just
-                // above.
+                // A near-equal losing option that fails the decisive
+                // floor stays None, same as a genuine tie.
                 if (!IsDecisiveMargin(margin, selected.DecisionValue.Value))
                 {
                     return PillSubduingResult.None;

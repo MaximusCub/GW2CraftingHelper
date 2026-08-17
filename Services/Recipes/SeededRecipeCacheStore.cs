@@ -102,17 +102,17 @@ namespace GW2CraftingHelper.Services.Recipes
 
         public void PutSearch(int outputItemId, IReadOnlyList<int> recipeIds)
         {
-            // Read-only store — no-op.
+            // Read-only store - no-op.
         }
 
         public void PutRecipe(int recipeId, RawRecipe recipe)
         {
-            // Read-only store — no-op.
+            // Read-only store - no-op.
         }
 
         public void Flush(bool force = false)
         {
-            // Read-only store — nothing to persist.
+            // Read-only store - nothing to persist.
         }
     }
 }

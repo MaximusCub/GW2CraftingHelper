@@ -117,7 +117,7 @@ namespace GW2CraftingHelper.Services
         // ComputeEdges' "clamp to a fixed minimum, widen from an actual
         // per-render widest-value measurement" shape.
         //
-        // Review fix (W4A adversarial pass): the fixed-60px-only version of
+        // Review fix: the fixed-60px-only version of
         // this comment claimed Required/Have/Needed have "no realistic risk
         // of a value needing more than a handful of digits" - untrue once
         // the W4A spec UNCLAMPED the Have column to the real wallet

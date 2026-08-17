@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Attempts to parse <paramref name="text"/> as a Homestead
-        /// Refinement efficiency tier (M37, KNOWN-ISSUES #24): exactly "0",
+        /// Refinement efficiency tier: exactly "0",
         /// "1", or "2" (optionally with surrounding whitespace). Returns
         /// false (with <paramref name="tier"/> set to 0) for null, blank,
         /// non-numeric, or any integer outside 0-2 - mirrors
@@ -82,7 +82,7 @@ namespace GW2CraftingHelper.Services
             return true;
         }
 
-        // M39 (log system, d2-log-system.md Section 5): the Settings tab
+        // The Settings tab
         // accepts a human-friendly MB value for LogMaxSizeBytes ("2", not a
         // raw byte count) and converts here. 1-1000 MB is a generous but
         // still sane bound - large enough that no realistic retention
@@ -160,7 +160,7 @@ namespace GW2CraftingHelper.Services
             return true;
         }
 
-        // M39 (d1-snapshot-about-settings.md Feature 3): the Settings tab's
+        // The Settings tab's
         // new "Snapshot" section accepts the refresh interval in minutes
         // (1-120) - same shape as TryParseRetentionDays above, just a
         // different range.

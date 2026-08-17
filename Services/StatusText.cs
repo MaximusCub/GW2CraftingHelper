@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Services
         public static string Normalize(string status) => status ?? "";
 
         /// <summary>
-        /// M37 (KNOWN-ISSUES #22/#27): the re-solve status line for
+        /// The re-solve status line for
         /// CraftingPlanView.ApplyOverridesAndResolve. "Best path restored"
         /// is the Best Path preset's own label and must only be written
         /// when that preset is the trigger - every other re-solve trigger

@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Services
     }
 
     /// <summary>
-    /// One "a new phase has started" notification (W3B). Blish-free (no
+    /// One "a new phase has started" notification. Blish-free (no
     /// Blish_HUD/Gw2Sharp/Microsoft.Xna usings, matching every other type in
     /// this namespace - see ModuleLogEntry's own doc comment for why) so
     /// CraftingPlanPipeline stays independently testable. Reported via an

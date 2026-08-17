@@ -6,7 +6,7 @@ namespace GW2CraftingHelper.Models
     /// <summary>
     /// Which Trading Post price is used to cost material acquisition.
     /// </summary>
-    // Review-fix (W3D adversarial review, mustFix): serialized as its enum
+    // Review-fix: serialized as its enum
     // NAME rather than Newtonsoft's bare-int default - PersistedPlan.
     // PriceBasis is the only member of this enum's type ever written to
     // disk (see Models/PersistedPlan.cs), so this is a type-level attribute

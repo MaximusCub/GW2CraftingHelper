@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Services
         /// Serializes a PersistedPlan to a JSON string. Returns null if
         /// plan is null.
         /// <para>
-        /// Review-fix (W3D adversarial review, mustFix): compact
+        /// Review-fix: compact
         /// (Formatting.None), NOT Indented like SnapshotHelpers'/
         /// StatusStore's own precedent - a PersistedPlan carries the FULL
         /// SolveContext (the whole reduced crafting tree, every priced
@@ -60,7 +60,7 @@ namespace GW2CraftingHelper.Services
             // an old schema missing the fields this feature actually needs,
             // or a JSON document that happened to parse but was never a
             // real PersistedPlan at all) must not be handed back as if it
-            // were usable - "never partially render" (W3D spec item 4).
+            // were usable - "never partially render".
             // The SchemaVersion check (review-fix, mustFix) is what makes
             // this actually enforceable going forward: a future member
             // rename/removal elsewhere on this graph would otherwise still

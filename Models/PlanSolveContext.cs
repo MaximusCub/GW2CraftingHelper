@@ -75,63 +75,42 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyDictionary<int, DailyCooldownItem> DailyCooldownItems { get; set; }
 
         /// <summary>
-        /// Per-node owned-quantity attribution snapshotted at GENERATION
-        /// time (M34-B2a #1, see ReducedTreeResult.OwnedQuantityUsedByNode
-        /// and CraftingPlanPipeline.BuildOwnedQuantityUsedByNodeId) - NodeId
-        /// is stable across repeat Solve() calls on the same Tree object, so
-        /// ResolveWithOverrides' local re-solve reuses this as-is rather
-        /// than recomputing it (reduction itself never re-runs locally -
-        /// see Tree's own doc comment).
+        /// Per-node owned-quantity attribution snapshotted at generation
+        /// time. NodeId is stable across repeat Solve() calls on the same
+        /// Tree, so a local re-solve reuses this as-is.
         /// </summary>
         public IReadOnlyDictionary<int, int> OwnedQuantityUsedByNodeId { get; set; }
 
         /// <summary>
         /// Owned amount per currency id referenced by the plan's
-        /// CurrencyCosts, snapshotted at GENERATION time (M34-B2a #4 - see
-        /// AccountCurrencyIndex). Cosmetic display data only; null when no
-        /// wallet snapshot was available or the plan needed no currency.
+        /// CurrencyCosts, snapshotted at generation time. Cosmetic only;
+        /// null when no wallet snapshot or no currency need.
         /// </summary>
         public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
 
         /// <summary>
-        /// W4B (vendor cost-component leaves): owned amount per item id
-        /// that appears as a TP-valued Item cost line on any winning
-        /// BuyFromVendor decision in the plan, snapshotted at GENERATION
-        /// time the same way OwnedCurrencyAmounts is (see
-        /// CraftingPlanPipeline.BuildOwnedVendorItemComponentAmounts) -
-        /// cosmetic display data only, feeding ONLY a component leaf's
-        /// informational HAVE pill (CraftingTreeNode.ComponentOwnedQuantity)
-        /// - never consulted by InventoryReducer or PlanSolver, so it can
-        /// never affect a decision, a total, or Quantity itself. Null under
-        /// the same conditions as OwnedCurrencyAmounts (no wallet/inventory
-        /// snapshot, or no vendor Item cost component anywhere in the plan).
+        /// Owned amount per item id appearing as a vendor Item cost line,
+        /// snapshotted at generation time. Cosmetic only - feeds a
+        /// component leaf's informational pill, never consulted by the
+        /// reducer or solver. Null under the same conditions as
+        /// OwnedCurrencyAmounts.
         /// </summary>
         public IReadOnlyDictionary<int, int> OwnedVendorItemAmounts { get; set; }
 
         /// <summary>
-        /// NodeIds gw2e's "Value Own Materials" force-buy pre-pass excluded
-        /// from crafting at GENERATION time (M34-B2a #3 - see
-        /// OwnedMaterialsForceBuyPrePass), snapshotted here so
-        /// ResolveWithOverrides' local re-solve keeps applying it to every
-        /// node the user hasn't manually overridden, rather than forgetting
-        /// it the moment any single pill is clicked. Null in
-        /// OwnMaterialsMode.Free (the pre-pass never ran).
+        /// NodeIds the force-buy pre-pass excluded from crafting at
+        /// generation time, snapshotted so a local re-solve keeps
+        /// applying it rather than forgetting it on the first pill click.
+        /// Null when the pre-pass never ran.
         /// </summary>
         public ISet<int> ForceBuyOnlyNodeIds { get; set; }
 
         /// <summary>
-        /// Verification-review fix: the narrower, competency-independent
-        /// subset of ForceBuyOnlyNodeIds above, snapshotted at GENERATION
-        /// time alongside it - see OwnedMaterialsForceBuyPrePass.
-        /// ForceBuyPrePassResult's own doc comment for what distinguishes
-        /// the two sets. ResolveWithOverrides' local re-solve reapplies
-        /// this to PlanSolver.Solve's competencyIndependentForceBuyNodeIds
-        /// parameter on every re-solve, the same way it already reapplies
-        /// ForceBuyOnlyNodeIds - without it, a local override re-solve
-        /// would silently fall back to "never suppress
-        /// CheapestCraftUntrained" (null default), diverging from the
-        /// original generation's own Plan Notes. Null under the exact same
-        /// conditions as ForceBuyOnlyNodeIds (the pre-pass never ran).
+        /// The competency-independent subset of ForceBuyOnlyNodeIds (see
+        /// OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult),
+        /// reapplied on every local re-solve so Plan Notes never diverge
+        /// from the original generation. Null under the same conditions
+        /// as ForceBuyOnlyNodeIds.
         /// </summary>
         public ISet<int> CompetencyIndependentForceBuyNodeIds { get; set; }
 
@@ -149,7 +128,7 @@ namespace GW2CraftingHelper.Models
 
         /// <summary>
         /// The Homestead Refinement efficiency tier configuration in effect
-        /// at GENERATION time (M37, KNOWN-ISSUES #24), snapshotted here for
+        /// at GENERATION time, snapshotted here for
         /// the same reason as CurrencyValuation/OwnMaterialsMode above: a
         /// local override re-solve (ResolveWithOverrides) must keep gating
         /// Homestead offers the way the original Generate did, not whatever
@@ -160,7 +139,7 @@ namespace GW2CraftingHelper.Models
 
         /// <summary>
         /// Per-character crafting discipline data snapshotted at GENERATION
-        /// time (W3C - see AccountSnapshot.CharacterDisciplines), for the
+        /// time, for the
         /// same reason as OwnedCurrencyAmounts above: so a local override
         /// re-solve (ResolveWithOverrides) can keep populating
         /// CraftingPlanResult.CharacterDisciplines on every re-solve, not

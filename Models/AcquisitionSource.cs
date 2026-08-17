@@ -7,8 +7,8 @@ namespace GW2CraftingHelper.Models
     /// The solver's own acquisition vocabulary - what <see cref="Services.PlanSolver"/>
     /// decided for a node (<see cref="Services.SolverDecision.Source"/>) and what a
     /// <see cref="Models.PlanStep"/> was aggregated under. This is a deliberately separate
-    /// enum from the display-layer <see cref="Models.CraftingDecision"/> (M38 DO-NOT-TOUCH
-    /// #15) - the two vocabularies diverge because the solver never needs an "owned/ignored"
+    /// enum from the display-layer <see cref="Models.CraftingDecision"/> -
+    /// the two vocabularies diverge because the solver never needs an "owned/ignored"
     /// state (that is display-only, see <see cref="Models.CraftingDecision.Have"/>) while
     /// the tree builder never needs a distinct currency-leaf source (currency nodes are
     /// intercepted before any <see cref="AcquisitionSource"/> lookup - see below). The single
@@ -35,15 +35,9 @@ namespace GW2CraftingHelper.Models
     /// directly by <see cref="Services.CraftingTreeBuilder"/> for zero-quantity/owned and
     /// manually-ignored nodes, never derived from an <see cref="AcquisitionSource"/> value.
     /// </summary>
-    // Review-fix (W3D adversarial review, mustFix): serialized as its enum
-    // NAME rather than Newtonsoft's bare-int default - PersistedPlan.
-    // NodeOverrides' dictionary values, and every AcquisitionSource-typed
-    // member reachable from PersistedPlan.Result/SolveContext (PlanStep.
-    // Source, SolverDecision.Source, ...), are now written to plan.json
-    // (see Models/PersistedPlan.cs), matching the same StringEnumConverter
-    // precedent Services/ModuleLogEntry.cs already uses for
-    // ModuleLogLevel. A future member reorder can no longer silently remap
-    // an already-persisted plan's decisions to a different source.
+    // Serialized as its enum NAME, not Newtonsoft's bare-int default:
+    // this type is persisted into plan.json, and a future member reorder
+    // must not silently remap an already-persisted plan's decisions.
     [JsonConverter(typeof(StringEnumConverter))]
     public enum AcquisitionSource
     {

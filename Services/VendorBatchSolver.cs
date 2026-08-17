@@ -6,30 +6,13 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// WP-15 (architecture S4a): the vendor-batching sub-engine extracted
-    /// from PlanSolver - the batch-shape state types plus the six methods
-    /// that turn per-occurrence vendor-offer evaluations into one true
-    /// per-item merged-ceil cost and post-solve "timegated" cap notice
-    /// (EvaluateVendorOffers, FinalizeVendorBatches, AllocateVendorNodeCosts,
-    /// MergeVendorCurrencyCosts, VendorBatchesEqual, ScaleCostLines).
-    /// PlanSolver holds one instance as an injected collaborator (see its
-    /// constructor); every method here was byte-for-byte the same body it
-    /// had as a PlanSolver private static at the time of this move - a
-    /// class move, not a rewrite. The merged-ceil arithmetic itself was
-    /// DO-NOT-TOUCH at the time (m38-cleanup-plan.md #7, KNOWN-ISSUES
-    /// #20.1/#20.2/#28 - the Obsidian Shard 179-&gt;180-not-186 repro) and
-    /// was unchanged by the move itself. That freeze was retired
-    /// 2026-08-17 (characterization-first proof required, see
-    /// KNOWN-ISSUES) and AllocateVendorNodeCosts has since been rewritten
-    /// (largest-remainder/Hamilton apportionment - see that method's own
-    /// doc comment), so "byte-for-byte"/"unchanged" no longer describes
-    /// the class as a whole. The nested types below were `private` on
-    /// PlanSolver; they are
-    /// `internal` here only because PlanSolver (a different class, same
-    /// assembly) still needs to declare fields/locals of these types -
-    /// still no wider than the original private scope from outside this
-    /// assembly.
-    /// <para>See docs/ARCHITECTURE.md section 7 (M38 WP-27).</para>
+    /// The vendor-batching sub-engine: batch-shape state types plus the
+    /// methods that turn per-occurrence vendor-offer evaluations into one
+    /// true per-item merged-ceil cost and post-solve "timegated" cap
+    /// notices. PlanSolver holds one instance as an injected collaborator.
+    /// The nested types are `internal` only because PlanSolver needs to
+    /// declare fields/locals of them.
+    /// <para>See docs/ARCHITECTURE.md section 7.</para>
     /// </summary>
     public class VendorBatchSolver
     {
@@ -42,11 +25,9 @@ namespace GW2CraftingHelper.Services
             public int? DailyCap;
             public int? WeeklyCap;
 
-            // Astral Acclaim package (KNOWN-ISSUES #33): Wizard's Vault
-            // seasonal purchase cap. Independent of DailyCap/WeeklyCap -
-            // see FinalizeVendorBatches, which checks it separately so an
-            // offer carrying both a Seasonal cap and a Daily/Weekly cap can
-            // surface both notices.
+            // Wizard's Vault seasonal purchase cap. Independent of
+            // DailyCap/WeeklyCap - FinalizeVendorBatches checks it
+            // separately so an offer carrying both can surface both notices.
             public int? SeasonalCap;
         }
 
@@ -65,27 +46,17 @@ namespace GW2CraftingHelper.Services
             public VendorOfferBatch Batch;
             public bool Conflict;
 
-            // Do NOT add a coarser (CapDailyCap, CapWeeklyCap, CapConflict)
-            // ratchet here to sum cap notices for mixed-offer steps: the
-            // wiki's per-row WeeklyCap is a template parameter, not a
-            // confirmed per-station aggregate (dev-notes/HISTORY.md, M37
-            // "Cap data" note), so occurrences agreeing on the raw tuple
-            // does not mean a real shared limit worth summing against.
-            // Conflict alone suppresses the notice - see
-            // FinalizeVendorBatches and the
-            // MixedOffer*_DocumentedLimitation tests in PlanSolverTests.
+            // Do NOT add a coarser cap ratchet here to sum cap notices for
+            // mixed-offer steps: the wiki's per-row cap is a template
+            // parameter, not a confirmed per-station aggregate, so
+            // occurrences agreeing on the raw tuple does not mean a real
+            // shared limit. Conflict alone suppresses the notice.
         }
 
         /// <summary>
-        /// EvaluateVendorOffers' result (WP-11, simplify #4 - was 7
-        /// out-params). Pure data carrier, mirrors the M37
-        /// SellSideEconomics.PerItemEconomics pattern: a readonly
-        /// struct returned by value from a single call site instead of
-        /// mutated out-parameters. Field meanings are exactly the former
-        /// out-params of the same name (see EvaluateVendorOffers' own doc
-        /// comment for the comparable/fallback split, valuation rules, and
-        /// cap-notice plumbing this carries) - this is a shape change
-        /// only, not a behavior change.
+        /// EvaluateVendorOffers' result - a pure data carrier; see that
+        /// method's doc comment for the comparable/fallback split,
+        /// valuation rules, and cap-notice plumbing this carries.
         /// </summary>
         internal readonly struct VendorOfferEvaluation
         {
@@ -97,15 +68,14 @@ namespace GW2CraftingHelper.Services
             public readonly List<CostLine> FallbackCurrencyCosts;
             public readonly VendorOfferBatch? FallbackBatch;
 
-            // W4B (vendor cost-component leaves): additive outputs alongside
-            // the pre-existing fields above - captured at the SAME per-line
-            // multiplication EvaluateVendorOffers already performed for
-            // every offer (never a second/divergent computation), purely so
-            // a display-tree leaf can be built from real, already-computed
-            // numbers. BestComparableItemCosts/FallbackItemCosts are the
-            // winning offer's TP-valued Item cost lines (Type=="Item" on the
-            // raw offer), scaled to this occurrence's unitsNeeded - null
-            // when the winning offer had none. BestComparableHasRawCoin/
+            // Additive outputs captured at the same per-line
+            // multiplication EvaluateVendorOffers already performs (never
+            // a second, divergent computation), so a display-tree leaf can
+            // be built from real, already-computed numbers.
+            // BestComparableItemCosts/FallbackItemCosts are the winning
+            // offer's TP-valued Item cost lines, scaled to this
+            // occurrence's unitsNeeded - null when the winning offer had
+            // none. BestComparableHasRawCoin/
             // FallbackHasRawCoin report only whether the winning offer had a
             // genuine raw coin cost line (Type=="Currency",
             // Id==Gw2Constants.CoinCurrencyId) with Count > 0 - distinct
@@ -147,15 +117,11 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M37 (KNOWN-ISSUES #24, gw2e parity): before any of the above, a
-        /// Homestead Refinement offer (VendorOffer.HomesteadTier.HasValue)
-        /// whose tagged tier exceeds <paramref name="homesteadTiers"/>'
-        /// configured tier for that output material is skipped entirely -
-        /// it never competes as comparable OR fallback. Fixes a live
-        /// defect (not merely a modeling gap): the baseline seed already
-        /// carries all 236 wiki-scraped Homestead Refinement rows
-        /// unconditionally, so before this gate the solver silently
-        /// behaved as if every account had every efficiency upgrade.
+        /// A Homestead Refinement offer whose tagged tier exceeds
+        /// <paramref name="homesteadTiers"/>' configured tier for that
+        /// material is skipped entirely - the seed carries every
+        /// refinement row unconditionally, so without this gate the solver
+        /// behaves as if every account had every efficiency upgrade.
         ///
         /// Splits vendor offers into two tiers. An offer is COMPARABLE (competes
         /// with TP/craft coin costs in PickCheapest) when it has no non-coin
@@ -180,17 +146,12 @@ namespace GW2CraftingHelper.Services
         /// no exchange rate and unit counts of different currencies must never
         /// be compared.
         ///
-        /// V2 purchase-cap semantics (M34-B1 #3, gw2efficiency parity): a
-        /// DailyCap/WeeklyCap NEVER excludes an offer or affects which tier
-        /// it lands in - gw2efficiency itself only ever surfaces a cap as a
-        /// post-solve "this is timegated" notice (dailyCooldowns.ts), it
-        /// never re-routes the tree. Both tiers below carry the offer's raw
-        /// DailyCap/WeeklyCap through via <see cref="VendorOfferBatch"/> so
-        /// FinalizeVendorBatches can produce that notice once, against the
-        /// item's AGGREGATE (post-merge) demand rather than any single tree
-        /// occurrence's local quantity. SeasonalCap (Astral Acclaim package,
-        /// KNOWN-ISSUES #33) is carried through the exact same way and
-        /// checked independently of Daily/Weekly by FinalizeVendorBatches.
+        /// A DailyCap/WeeklyCap NEVER excludes an offer or affects its
+        /// tier - gw2e only ever surfaces a cap as a post-solve notice,
+        /// never re-routing the tree. Both tiers carry the raw caps
+        /// through so FinalizeVendorBatches can produce the notice once,
+        /// against aggregate demand; SeasonalCap is carried the same way
+        /// and checked independently.
         /// </summary>
         internal VendorOfferEvaluation EvaluateVendorOffers(
             RecipeNode node,
@@ -210,7 +171,6 @@ namespace GW2CraftingHelper.Services
             long fallbackCurrencyUnits = 0;
             int fallbackSingleCurrencyId = -1;
 
-            // W4B: see VendorOfferEvaluation's own doc comment.
             List<VendorItemCostLine> bestComparableItemCosts = null;
             bool bestComparableHasRawCoin = false;
             List<VendorItemCostLine> fallbackItemCosts = null;
@@ -236,21 +196,10 @@ namespace GW2CraftingHelper.Services
                     continue;
                 }
 
-                // M37 (KNOWN-ISSUES #24, gw2e parity): a Homestead
-                // Refinement offer whose tagged tier exceeds the user's
-                // configured tier for that output material is excluded
-                // entirely - never comparable, never a fallback. Keyed on
-                // offer.OutputItemId (not a merchant-name string match at
-                // this hot-path call site) because HomesteadTier is only
-                // ever set on rows the seeding pass already confirmed carry
-                // a merchant name containing "Homestead Refinement" (see
-                // ConvertToOffer/HomesteadTierResolver) - the family
-                // mapping gw2e itself keys on (cheapestTree.ts's
-                // merchant.name.includes('Homestead Refinement') check) is
-                // therefore already baked into which rows have a non-null
-                // tag, so re-checking the merchant name string here on
-                // every offer/every solve would be redundant string work in
-                // a loop that already runs per vendor offer per tree node.
+                // Keyed on OutputItemId, not a merchant-name match:
+                // HomesteadTier is only set on rows the seeding pass
+                // already confirmed are Homestead Refinement, so a string
+                // check here would be redundant work in a hot loop.
                 if (offer.HomesteadTier.HasValue &&
                     offer.HomesteadTier.Value > homesteadTiers.GetTier(offer.OutputItemId))
                 {
@@ -261,17 +210,13 @@ namespace GW2CraftingHelper.Services
                 bool priceable = true;
                 var currencyCosts = new List<CostLine>();
 
-                // W4B: raw (unscaled, per-batch) capture of this offer's
-                // coin-presence and Item cost lines, purely additive - read
-                // alongside the existing coinCost fold below, never
-                // altering it. hasRawCoin distinguishes a genuine coin cost
-                // line from coin that only exists because an Item line was
-                // folded in (see VendorOfferEvaluation.BestComparableHasRawCoin's
-                // doc comment). itemCostRaw's (Count, UnitPrice) pair is
-                // exactly what already fed the `coinCost += cost.Count *
-                // unitPrice` line below - captured here so a display leaf
-                // can be built from it after unitsNeeded scaling, without
-                // ever recomputing the multiplication. PriceSideFellBack
+                // Raw (unscaled, per-batch) capture of this offer's
+                // coin-presence and Item cost lines, purely additive.
+                // hasRawCoin distinguishes a genuine coin line from coin
+                // that only exists because an Item line was folded in.
+                // itemCostRaw is exactly what feeds the coinCost fold
+                // below - captured so a display leaf can be built without
+                // recomputing the multiplication. PriceSideFellBack
                 // is this same line's own
                 // GetUnitPrice out param, carried alongside so the scaled
                 // VendorItemCostLine below can flag it the same way a
@@ -389,14 +334,11 @@ namespace GW2CraftingHelper.Services
 
                 long totalCoinCost = coinCost * unitsNeeded;
 
-                // W4B: scale itemCostRaw by this occurrence's unitsNeeded -
-                // the exact same scale factor totalCoinCost above just
-                // applied. GoldValue below is (unscaled Count * unitPrice)
-                // * unitsNeeded, i.e. byte-for-byte the same arithmetic
-                // that line's own contribution to totalCoinCost already
-                // used - never a second, potentially-diverging computation.
-                // Guarded the same way the currency scaling below guards
-                // CostLine.Count (int): a scaled quantity too large for
+                // Scale itemCostRaw by the same unitsNeeded factor
+                // totalCoinCost just applied - the same arithmetic, never
+                // a second, potentially-diverging computation. Guarded the
+                // same way the currency scaling guards CostLine.Count: a
+                // scaled quantity too large for
                 // VendorItemCostLine.Quantity (int) skips the offer rather
                 // than truncating it silently.
                 //
@@ -617,63 +559,34 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M34-B1 #1/#3: re-derives every merged BuyFromVendor PlanStep's
-        /// true cost from its AGGREGATE Quantity (summed across every tree
-        /// occurrence by AggregateStep) and the winning offer's batch shape,
-        /// ceiling the purchase count exactly ONCE - matching gw2efficiency's
-        /// own documented convention for bulk-output steps (`docs/gw2e-parity-spec.md`
-        /// Section 6.5: quantities are merged across the whole tree before
-        /// `Math.ceil` ever runs). This replaces the sum of several
-        /// already-independently-ceil'd per-occurrence costs (AggregateStep's
-        /// running total), which overstates the true cost whenever the same
-        /// item is needed via 2+ tree occurrences and bought via a bulk
-        /// (OutputCount > 1) offer - see PlanSolverTests for the exact
-        /// 4/4/4/83/84 -&gt; 179 -&gt; 180 (not 186) live repro.
+        /// Re-derives every merged BuyFromVendor PlanStep's true cost from
+        /// its AGGREGATE Quantity and the winning offer's batch shape,
+        /// ceiling the purchase count exactly once (gw2e's convention).
+        /// The sum of independently-ceil'd per-occurrence costs overstates
+        /// the true cost whenever an item is needed via 2+ occurrences and
+        /// bought via a bulk offer.
         ///
-        /// Only applied when every occurrence of that item resolved to the
-        /// IDENTICAL winning offer (vendorBatchTracking's Conflict flag is
-        /// false) - a node's own per-occurrence ceil can, at a different
-        /// local quantity, legitimately prefer a different offer (bulk
-        /// discount thresholds), and re-deriving a single "true" cost across
-        /// genuinely different offers has no principled answer. When
-        /// occurrences disagree, this step is left exactly as AggregateStep
-        /// already computed it (sum of real, individually-correct
-        /// per-occurrence purchases) - a documented, intentionally
-        /// conservative fallback, not a regression.
+        /// Only applied when every occurrence resolved to the identical
+        /// winning offer (Conflict false) - re-deriving one "true" cost
+        /// across genuinely different offers has no principled answer, so
+        /// a Conflict step keeps AggregateStep's sum of real
+        /// per-occurrence purchases, a deliberately conservative fallback.
         ///
-        /// Also folds every vendor step's final (possibly just-recomputed)
-        /// VendorCurrencyCosts into currencyMap - the single place vendor
-        /// currency contributions reach the plan-wide currency total, now
-        /// that Collect no longer folds the still-per-occurrence amounts in
-        /// directly (see PlanSolver.Collect's BuyFromVendor branch) - and
-        /// collects a post-solve "timegated" notice (gw2e parity, M34-B1
-        /// #3) for any uniform step whose aggregate purchase count exceeds
-        /// the winning offer's daily (preferred) or weekly cap, PLUS an
-        /// independent second notice (Astral Acclaim package, KNOWN-ISSUES
-        /// #33) when that same offer also carries a SeasonalCap the
-        /// aggregate exceeds - the two checks do not suppress each other,
-        /// since Daily/Weekly and Seasonal are unrelated real-world limits
-        /// (e.g. a Wizard's Vault offer's per-season Astral Acclaim cap).
-        /// Caps never exclude an offer or change Source/TotalCost - purely
-        /// informational.
+        /// Also folds every vendor step's final VendorCurrencyCosts into
+        /// currencyMap (the single place vendor currency reaches the
+        /// plan-wide total) and collects timegated notices for any uniform
+        /// step whose aggregate purchase count exceeds the daily
+        /// (preferred) or weekly cap, plus an independent Seasonal-cap
+        /// notice - the checks do not suppress each other. Caps never
+        /// exclude an offer or change Source/TotalCost.
         ///
-        /// The recomputed step.UnitCost (M34 fix, sibling to B1 #2's
-        /// identical currency-side fix) is the winning offer's own
-        /// CoinCostPerBatch/OutputCount rate, not a truncating total/
-        /// Quantity average of the just-corrected aggregate - see the
-        /// inline comment at the assignment for the exact misleading-price
-        /// example this replaces. Unlike the currency "Each" cell
-        /// (CurrencyDisplayResolver.ResolveUnitAmounts), PlanStep.UnitCost/
-        /// PlanRowViewModel.UnitCoinValue are plain non-nullable longs with
-        /// no "N for M" bundle-label concept, so a non-evenly-divisible rate
-        /// still truncates here rather than gaining new model/UI surface for
-        /// a MustFix-level display nuance - a deliberate, narrower scope
-        /// than the currency fix, not an oversight.
+        /// The recomputed step.UnitCost is the winning offer's own
+        /// CoinCostPerBatch/OutputCount rate, not a truncating
+        /// total/Quantity average.
         ///
-        /// Do not re-add a branch that sums a cap notice for Conflict steps
-        /// whose occurrences agree on the raw (DailyCap, WeeklyCap) tuple -
-        /// the premise is false, see VendorBatchState's own comment.
-        /// Conflict alone suppresses the notice.
+        /// Do not re-add a branch that sums a cap notice for Conflict
+        /// steps whose occurrences agree on the raw cap tuple - the
+        /// premise is false, see VendorBatchState's own comment.
         /// </summary>
         internal List<TimegatedItem> FinalizeVendorBatches(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
@@ -732,16 +645,10 @@ namespace GW2CraftingHelper.Services
                         });
                     }
 
-                    // Astral Acclaim package (KNOWN-ISSUES #33): SeasonalCap
-                    // is checked independently of Daily/Weekly above - not
-                    // folded into the same "pick one" cap variable - so an
-                    // offer carrying both a Seasonal cap and a Daily/Weekly
-                    // cap surfaces BOTH notices when both are exceeded,
-                    // rather than one suppressing the other the way Daily
-                    // takes precedence over Weekly. Same warn-only semantics
-                    // (never gates or reroutes the solve) and zero-cap
-                    // convention (an explicit 0 means uncapped) as the
-                    // Daily/Weekly check above.
+                    // SeasonalCap is checked independently of Daily/Weekly
+                    // so an offer carrying both surfaces both notices.
+                    // Same warn-only semantics and zero-means-uncapped
+                    // convention as above.
                     if (batch.SeasonalCap.HasValue && batch.SeasonalCap.Value > 0 &&
                         unitsNeeded > batch.SeasonalCap.Value)
                     {
@@ -754,13 +661,9 @@ namespace GW2CraftingHelper.Services
                         });
                     }
                 }
-                // Conflict == true (occurrences disagreed on the winning
-                // offer's exact batch shape) intentionally produces no cap
-                // notice here - see this method's doc comment and the M37
-                // "Cap data" note in dev-notes/HISTORY.md for why a cap notice
+                // Conflict intentionally produces no cap notice - a cap
                 // cannot be soundly computed across genuinely different
-                // offers with only a wiki-scraped per-row cap number to
-                // compare against.
+                // offers (see this method's doc comment).
 
                 if (step.VendorCurrencyCosts != null)
                 {
@@ -806,47 +709,20 @@ namespace GW2CraftingHelper.Services
         /// ties broken by first-seen (DFS) order for determinism. The
         /// allocated shares always sum to precisely step.TotalCost - no
         /// drift, no invented precision - and any two occurrences of
-        /// EQUAL quantity now diverge by at most 1 copper. The multiply
-        /// widens to decimal (see the loop below) specifically so this
-        /// holds unconditionally - no long overflow is possible for any
-        /// step.TotalCost/Quantity pair either field's own type can hold.
+        /// equal quantity diverge by at most 1 copper. The multiply
+        /// widens to decimal so this holds unconditionally - no long
+        /// overflow is possible for any step.TotalCost/Quantity pair.
+        /// A "last occurrence absorbs the remainder" shape is not
+        /// acceptable here: it dumps the entire batch-overrun cost,
+        /// unbounded for equal-quantity occurrences, onto whichever
+        /// occurrence lands last in DFS order.
         ///
-        /// Quorum verdict C6 (merged-ceil-remainder stream, 2026-08):
-        /// replaces the prior "UnitCost * quantity per occurrence, last
-        /// occurrence absorbs everything else" shape, which gave every
-        /// non-last occurrence only its own per-unit rate (no share of
-        /// any wasted batch-overrun cost) while dumping the ENTIRE
-        /// overrun - unbounded for equal-quantity occurrences - onto
-        /// whichever occurrence happened to land last in DFS order. See
-        /// PlanSolverVendorBatchingTests.
-        /// MultiOccurrenceEqualQuantityBulkVendorOffer_BatchOverrunSharedProportionally
-        /// (renamed from ..._PreFix_LastOccurrenceAbsorbsEntireBatchOverrun by
-        /// this same fix) for the canonical repro: two 1-unit
-        /// occurrences of a "100 for 1000c" bulk offer used to render
-        /// 10/990; now render 500/500 (1000 * 1/2 = 500 exactly, no
-        /// remainder to distribute). The flagship 179-unit/"3 for 3"
-        /// regression shape (4/4/4/83/84 quantities, step.TotalCost 180)
-        /// is UNCHANGED by this: floors 4/4/4/83/84 sum to 179, leaving a
-        /// single leftover copper that lands on the 84-quantity occurrence
-        /// (remainder 84/179, the largest), giving the same 4/4/4/83/85
-        /// split the prior algorithm happened to also produce for that
-        /// specific shape - see
-        /// MultiOccurrenceBulkVendorOffer_CorrectionPropagatesThroughFourCraftLevelsAndBranches.
-        ///
-        /// A component leaf's raw VendorItemCosts/
-        /// VendorCurrencyCosts (captured pre-merge, per occurrence, by
-        /// EvaluateVendorOffers) are NOT re-derived here the way TotalCost
-        /// is - they can disagree with the corrected share this method
-        /// computes whenever a step merges 2+ tree occurrences, and that
-        /// stays true across the C6 largest-remainder rewrite above: only
-        /// the TotalCost allocation shape changed, not this gap. (Formerly
-        /// DO-NOT-TOUCH: merged-ceil batching math - retired 2026-08-17;
-        /// changes here now require characterization-first proof, see
-        /// KNOWN-ISSUES.) The caller (PlanSolver.Solve, see FlagUnreliableVendorComponentCosts)
-        /// reads this method's own already-public outputs (vendorOccurrences,
-        /// stepMap) AFTER it returns to mark which decisions must suppress
-        /// component-leaf display for that reason - see
-        /// CraftingTreeBuilder.BuildVendorCostComponentLeaves.
+        /// A component leaf's raw VendorItemCosts/VendorCurrencyCosts
+        /// (captured pre-merge, per occurrence) are NOT re-derived here -
+        /// they can disagree with the corrected share whenever a step
+        /// merges 2+ occurrences. The caller reads this method's outputs
+        /// afterward to mark which decisions must suppress component-leaf
+        /// display (see FlagUnreliableVendorComponentCosts).
         /// </summary>
         internal void AllocateVendorNodeCosts(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,

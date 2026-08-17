@@ -193,7 +193,7 @@ namespace GW2CraftingHelper.Services
                 extraTooltipLines.Insert(0, captionText);
             }
 
-            // UI-bundle milestone, Feature A (wiki links): the tooltip-line
+            // The tooltip-line
             // half of the affordance only - see this class's own doc
             // comment for why the actual right-click wiring stays in
             // TreeSectionController. WikiLinkBuilder.HasWikiPage/

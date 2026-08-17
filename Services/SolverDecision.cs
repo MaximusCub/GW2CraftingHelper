@@ -9,21 +9,13 @@ namespace GW2CraftingHelper.Services
         public int RecipeId { get; internal set; }
         public long? TotalCost { get; internal set; }
 
-        // currency-ux-package (Feature 3): the internal comparison figure
-        // PlanSolver actually ranked this decision on (real coin/craft cost
-        // PLUS any valued currency contribution, recursively rolled up
-        // through descendants - see PlanSolver.Evaluate's Decision.
-        // ComparisonValue doc comment, the private counterpart this is
-        // copied from). DECISION-ONLY (repo invariant, restated here since
-        // this is the one place that internal figure crosses into public
-        // API surface): TotalCost above remains the sole real/displayed
-        // coin figure everywhere in the app; ComparisonValue exists only so
-        // a hover detail (TreeSectionController's value-detail tooltip) can
-        // explain WHY a CRAFT/BuyFromVendor decision won, never to be
-        // summed into any displayed total. Equal to TotalCost whenever no
-        // currency valuation contributed anywhere in this decision's own
-        // subtree (the common case) - null only when TotalCost is also
-        // null (UnknownSource).
+        // The comparison figure PlanSolver actually ranked this decision
+        // on (see PlanSolver's Decision.ComparisonValue). DECISION-ONLY:
+        // TotalCost remains the sole displayed coin figure; this exists
+        // only so the value-detail tooltip can explain WHY a decision
+        // won, never to be summed into any displayed total. Equal to
+        // TotalCost when no currency valuation contributed; null only
+        // when TotalCost is also null.
         public long? ComparisonValue { get; internal set; }
 
         // Non-coin currency lines of a winning BuyFromVendor decision (e.g.
@@ -33,39 +25,26 @@ namespace GW2CraftingHelper.Services
         // A later display task threads this into the tree/shopping UI.
         public IReadOnlyList<CostLine> VendorCurrencyCosts { get; internal set; }
 
-        // W4B (vendor cost-component leaves): TP-valued Item cost lines of
-        // a winning BuyFromVendor decision (e.g. Globs of Ectoplasm),
-        // already scaled to this occurrence's own quantity - null/empty for
-        // every other Source, and also null for a BuyFromVendor decision
-        // whose offer had no Item cost lines at all. Each entry's GoldValue
-        // is the exact amount already folded into TotalCost for that line
-        // (see VendorItemCostLine's own doc comment) - CraftingTreeBuilder
-        // reads this to synthesize display-only cost-component leaves
-        // without ever recomputing the fold.
+        // TP-valued Item cost lines of a winning BuyFromVendor decision,
+        // already scaled to this occurrence's quantity - null for every
+        // other Source or when the offer had no Item lines. Each entry's
+        // GoldValue is the exact amount already folded into TotalCost, so
+        // CraftingTreeBuilder can synthesize component leaves without
+        // recomputing the fold.
         public IReadOnlyList<VendorItemCostLine> VendorItemCosts { get; internal set; }
 
-        // W4B: true only when the winning BuyFromVendor decision's offer
-        // had a genuine raw coin cost line (Type=="Currency",
-        // Id==Gw2Constants.CoinCurrencyId, Count > 0) - distinct from coin
-        // that exists only because an Item cost line got TP-valued and
-        // folded in. False for every other Source. Used solely to decide
-        // whether "coin" counts as one of the offer's 2+ cost KINDS when
-        // deciding whether to synthesize component leaves (see
-        // CraftingTreeBuilder.BuildVendorCostComponentLeaves) - a raw coin
-        // component never gets its own leaf either way (see that method's
-        // doc comment for why).
+        // True only when the winning offer had a genuine raw coin cost
+        // line - distinct from coin that exists only because an Item line
+        // got TP-valued and folded in. Used solely to decide whether
+        // "coin" counts as one of the offer's 2+ cost kinds for
+        // component-leaf synthesis.
         public bool VendorHasRawCoin { get; internal set; }
 
-        // W4B review-fix (Critical): true when this decision's
-        // VendorCurrencyCosts/VendorItemCosts are stale relative to the
-        // corrected TotalCost above - set only when PlanSolver.Solve's
-        // AllocateVendorNodeCosts pass has reallocated a merged vendor
-        // step's true cost across 2+ tree occurrences of the same item (see
-        // PlanSolver.FlagUnreliableVendorComponentCosts' own doc comment).
-        // CraftingTreeBuilder reads this to suppress cost-component leaf
-        // synthesis whenever it is true, rather than display a component
-        // number that can no longer be proven to sum to this decision's own
-        // (corrected) TotalCost.
+        // True when VendorCurrencyCosts/VendorItemCosts are stale
+        // relative to the corrected TotalCost (a merged vendor step's
+        // cost was reallocated across 2+ occurrences).
+        // CraftingTreeBuilder suppresses component-leaf synthesis then,
+        // rather than display numbers that no longer sum to TotalCost.
         public bool VendorComponentCostsUnreliable { get; internal set; }
 
         // Which acquisition paths were feasible for this node, independent
@@ -92,72 +71,38 @@ namespace GW2CraftingHelper.Services
         public bool CanBuyTp { get; internal set; }
         public bool CanBuyVendor { get; internal set; }
 
-        // AUDIT ROW 20/38 (gw2e price-side fallback parity): true only when
-        // Source is BuyFromTp and this node's committed unit price came
-        // from the item's NON-preferred TP side because the preferred side
-        // (per the solve's PriceBasis) had no listings - see
-        // PlanSolver.GetUnitPrice's fallback overload. Always false for
-        // every other Source. CraftingTreeBuilder reads this to flag the
-        // matching CraftingTreeNode so the recipe-tree unit-price tooltip
-        // can tell the user which side was actually used.
+        // True only when Source is BuyFromTp and the committed unit price
+        // came from the non-preferred TP side because the preferred side
+        // had no listings. Drives the unit-price tooltip caveat.
         public bool PriceSideFellBack { get; internal set; }
 
-        // source-selection-simplification (maintainer-approved redesign,
-        // docs/gw2e-considerations.md): raw cost breakdowns for EVERY
-        // feasible source at this node, straight passthrough of
-        // PlanSolver.Decision's own matching fields - see
-        // PillSourceCostBreakdown's own doc comment for why these exist
-        // independent of Source/TotalCost above (unlike VendorCurrencyCosts/
-        // VendorItemCosts, populated for every source, not just the
-        // winner). Always non-null (IsAvailable reflects CanCraft/CanBuyTp/
-        // CanBuyVendor above). Feeds CraftingTreeNode's own matching fields
-        // via CraftingTreeBuilder, ultimately consumed by
-        // PillSubduingEvaluator - never read by any cost total.
+        // Raw cost breakdowns for every feasible source (not just the
+        // winner). Always non-null; IsAvailable reflects the flags above.
+        // Ultimately consumed by PillSubduingEvaluator - never read by
+        // any cost total.
         public PillSourceCostBreakdown CraftCostBreakdown { get; internal set; }
         public PillSourceCostBreakdown BuyFromTpCostBreakdown { get; internal set; }
         public PillSourceCostBreakdown BuyFromVendorCostBreakdown { get; internal set; }
 
-        // Adversarial-review fix (#7, source-selection-simplification
-        // design-law gap): straight passthrough of PlanSolver.Decision's
-        // own matching fields - see that field's own doc comment. True
-        // only when craft was excluded from the AUTOMATIC pick because no
-        // character meets the winning recipe's discipline requirement
-        // (never for the force-buy pre-pass's own, separately-explained
-        // exclusion). CraftExcludedRealCost/Disciplines/MinRating describe
-        // the recipe that would have won - only meaningful when
-        // CraftExcludedByCompetency is true.
+        // True only when craft was excluded from the automatic pick
+        // because no character meets the winning recipe's discipline
+        // requirement (never for the force-buy pre-pass's exclusion).
+        // The companion fields describe the recipe that would have won -
+        // only meaningful when CraftExcludedByCompetency is true.
         public bool CraftExcludedByCompetency { get; internal set; }
         public long? CraftExcludedRealCost { get; internal set; }
         public IReadOnlyList<string> CraftExcludedDisciplines { get; internal set; }
         public int CraftExcludedMinRating { get; internal set; }
 
-        // Adversarial-review round-2 fix (finding #5): straight
-        // passthrough of PlanSolver.Decision's own matching fields - see
-        // that field's own doc comment. True whenever the numerically
-        // cheapest raw craft recipe overall is untrained, independent of
-        // whether the AUTOMATIC pick itself got excluded (unlike
-        // CraftExcludedByCompetency above, this also covers a competent
-        // fallback-tier/costlier-sibling recipe winning instead of the
-        // cheap untrained one). CheapestCraftRealCost/Disciplines/MinRating
-        // describe that cheap recipe - only meaningful when
-        // CheapestCraftUntrained is true.
-        //
-        // Verification-review fix (second pass): always false for a node
-        // the force-buy pre-pass excluded craft from under BOTH a
-        // competency-resolved AND a competency-BLIND evaluation of its
-        // 0.85 rule - see PlanSolver.Evaluate's isCompetencyIndependentForceBuy/
-        // cheapestCraftUntrained local variables and
-        // OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult's own doc
-        // comment for why. The original fix here gated on raw
-        // forceBuyOnlyNodeIds membership instead, which over-corrected:
-        // that set's own exclusion CAN itself be competency-caused (the
-        // pre-pass's throwaway solve is competency-aware, so a node whose
-        // cheap recipe is untrained can land in forceBuyOnlyNodeIds purely
-        // because competency demoted the pre-pass's own craft-cost
-        // diagnostic to a costlier competent recipe) - silencing this field
-        // in exactly that shape hid a real, concrete training opportunity.
-        // This field now only ever suppresses for a node genuinely forced
-        // regardless of training, never for a competency-caused reason.
+        // True whenever the numerically cheapest raw craft recipe overall
+        // is untrained, independent of whether the automatic pick got
+        // excluded - unlike CraftExcludedByCompetency, this also covers a
+        // competent costlier/other-tier recipe winning instead. The
+        // companion fields describe that cheap recipe. Always false only
+        // for a node genuinely force-bought regardless of training (see
+        // OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult) - a
+        // competency-caused force-buy must not hide a real training
+        // opportunity.
         public bool CheapestCraftUntrained { get; internal set; }
         public long? CheapestCraftRealCost { get; internal set; }
         public IReadOnlyList<string> CheapestCraftDisciplines { get; internal set; }

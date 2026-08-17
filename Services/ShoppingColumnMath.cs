@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Total width of a horizontal run of "label, gap, icon, gap"
         /// segments - the same layout convention CraftingPlanView's coin
-        /// AND currency segments both use (KNOWN-ISSUES #16). Callers pass
+        /// AND currency segments both use. Callers pass
         /// their own already-measured (Blish-bound BitmapFont.MeasureString)
         /// per-segment text widths plus their own iconSize/labelIconGap/
         /// segmentGap constants, so this arithmetic can never drift from

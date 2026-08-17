@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// See docs/ARCHITECTURE.md section 9 (data pipeline: seeds, wiki
     /// scrapes, dev-only caches) for where this fits in the offline
-    /// seed-generation pipeline (M38 WP-27).
+    /// seed-generation pipeline.
     /// </summary>
     public class VendorOfferLoader
     {
@@ -31,7 +31,7 @@ namespace GW2CraftingHelper.Services
             // fully materialized the file as a UTF-16 string (and then
             // System.Text.Json re-encoded that string back to UTF-8
             // internally to parse it), doubling the transient memory/CPU
-            // cost on the largest shipped seed file (M38 WP-08 / perf P2a).
+            // cost on the largest shipped seed file.
             // System.Text.Json 5.0.0 (net461) has no synchronous
             // Deserialize(Stream) overload, only DeserializeAsync(Stream);
             // blocking on it here is safe because Blish's XNA host has no

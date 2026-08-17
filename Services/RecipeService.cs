@@ -275,7 +275,7 @@ namespace GW2CraftingHelper.Services
         private async Task<RecipeNode> BuildNodeAsync(
             int id, string ingredientType, int quantity,
             HashSet<int> visiting, CancellationToken ct,
-            // M37 (KNOWN-ISSUES #26): carried straight from the parent
+            // Carried straight from the parent
             // RawIngredient that produced this node - null for the tree
             // root (never itself an ingredient) and for every ordinary
             // ingredient. See RecipeNode.AchievementBit's doc comment.

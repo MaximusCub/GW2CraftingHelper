@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Models
         public int OutputItemId { get; set; }
         public bool IsAutoLearned { get; set; }
 
-        // UI-bundle milestone, Feature A (wiki links): true when this
+        // True when this
         // recipe's unlock method is a consumable recipe sheet
         // (RecipeOption.Flags contains "LearnedFromItem" - see
         // PlanResultBuilder). Drives which wiki page the Required Recipes

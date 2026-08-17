@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Services.Recipes
             // of StreamReader.ReadToEnd() + Deserialize<string>: it avoids
             // ReadToEnd's full UTF-16 string materialization (and the
             // internal UTF-8 re-encoding System.Text.Json performs to parse
-            // a string) on this seed file (M38 WP-08 / perf P2a).
+            // a string) on this seed file.
             var data = JsonSerializer.DeserializeAsync<RecipeSearchSeedData>(stream, Options)
                 .GetAwaiter().GetResult();
             if (data?.Searches == null)
@@ -83,7 +83,7 @@ namespace GW2CraftingHelper.Services.Recipes
             // of StreamReader.ReadToEnd() + Deserialize<string>: it avoids
             // ReadToEnd's full UTF-16 string materialization (and the
             // internal UTF-8 re-encoding System.Text.Json performs to parse
-            // a string) on this seed file (M38 WP-08 / perf P2a).
+            // a string) on this seed file.
             var data = JsonSerializer.DeserializeAsync<RecipeSeedData>(stream, Options)
                 .GetAwaiter().GetResult();
             if (data?.Recipes == null)

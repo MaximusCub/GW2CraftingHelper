@@ -52,7 +52,7 @@ namespace GW2CraftingHelper.Models
         // M35 (gw2efficiency parity - multi-item plans): a single plain
         // informational line appended to the Summary/Total Cost section
         // ONLY for a genuine multi-item batch (2+ requested items). M37
-        // (KNOWN-ISSUES #25) added a real batch-level Sell value/Profit
+        // added a real batch-level Sell value/Profit
         // rollup - see SellSideEconomics.ApplyBatchSellSideEconomics
         // and PlanViewModelBuilder.BuildSummarySection - and reworded
         // this note's Label text to describe it. The rollup has NO
@@ -79,7 +79,7 @@ namespace GW2CraftingHelper.Models
         // SummarySectionRenderer.
         CostFormulaTile,
 
-        // W4A: one tile of the Total Cost section's second formula band -
+        // One tile of the Total Cost section's second formula band -
         // "Sell Value - Total Materials Value = Profit/Loss if Sold" -
         // present only when the plan has a live sell price
         // (CraftingPlanResult.NetSaleValue.HasValue). Always exactly 3 rows
@@ -87,7 +87,7 @@ namespace GW2CraftingHelper.Models
         // is meaningless with fewer than 3 terms.
         ProfitFormulaTile,
 
-        // W4A: the Total Cost section's single subdued trading-post
+        // The Total Cost section's single subdued trading-post
         // pricing-basis footnote row, always present exactly once at the
         // bottom of the section.
         SummaryFootnote,
@@ -146,14 +146,14 @@ namespace GW2CraftingHelper.Models
         // establishes. Null under the same conditions as the source field.
         public IReadOnlyDictionary<int, ItemMetadata> ItemMetadata { get; set; }
 
-        // AUDIT ROW 20/38 (gw2e price-side fallback parity): passthrough of
+        // Passthrough of
         // CraftingPlanResult.PriceBasis so the recipe-tree renderer can word
         // a fallen-back node's unit-price tooltip caveat with the correct
         // side names ("buy-order price unavailable" vs. "instant-buy price
         // unavailable") instead of a basis-agnostic message.
         public PriceBasis PriceBasis { get; set; }
 
-        // currency-ux-package (Feature 2): plan-scope currency facts for
+        // Plan-scope currency facts for
         // the Recipe Tree's per-leaf "HAVE {have}/{planTotal} TOTAL" pill
         // (DecisionPillPlanner.BuildPillSpecs/TreeSectionController.
         // RenderDecisionPills) - deliberately whole-PLAN totals, not any
@@ -260,7 +260,7 @@ namespace GW2CraftingHelper.Models
         // inline in the row itself - HintText never renders inline.
         public string HintText { get; set; }
 
-        // UI-bundle milestone, Feature A (wiki links): the GW2 wiki page
+        // The GW2 wiki page
         // this row's row-level wiki affordance should open (see
         // WikiLinkBuilder). Currently populated only for RecipeRow rows
         // (RequiredRecipes section - see PlanViewModelBuilder.
@@ -298,7 +298,7 @@ namespace GW2CraftingHelper.Models
         // below is the (still-clamped-to-zero) gap derived from this value.
         public int? CurrencyOwnedQuantity { get; set; }
 
-        // W4A: still-to-acquire gap for a CurrencyCost row in the
+        // Still-to-acquire gap for a CurrencyCost row in the
         // redesigned currency table's "Needed" column - max(0, Quantity -
         // CurrencyOwnedQuantity). Null (not 0) whenever CurrencyOwnedQuantity
         // is null (no wallet snapshot) - mirrors that field's own null
@@ -306,7 +306,7 @@ namespace GW2CraftingHelper.Models
         // rows.
         public int? CurrencyNeededQuantity { get; set; }
 
-        // W4A: true when CurrencyOwnedQuantity is present AND covers the
+        // True when CurrencyOwnedQuantity is present AND covers the
         // full Required amount (CurrencyOwnedQuantity >= Quantity) - drives
         // the currency table's green full-coverage marker. Always false
         // when no wallet snapshot exists (CurrencyOwnedQuantity null) -

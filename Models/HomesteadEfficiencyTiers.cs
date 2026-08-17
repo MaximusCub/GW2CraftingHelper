@@ -5,7 +5,7 @@ namespace GW2CraftingHelper.Models
 {
     /// <summary>
     /// User-configured Homestead Refinement efficiency tier per material
-    /// family (M37, KNOWN-ISSUES #24 - gw2e parity). Echoes gw2efficiency's
+    /// family. Echoes gw2efficiency's
     /// own cheapestTree.ts userEfficiencyTiers exactly: a per-output-material
     /// integer tier 0/1/2, defaulting to 0 (no upgrade) for every material
     /// with no entry - matching gw2e's own hardcoded default AND its

@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Models
         public List<UsedMaterial> UsedMaterials { get; set; } = new List<UsedMaterial>();
 
         /// <summary>
-        /// Per-node owned-quantity attribution (M34-B2a #1): how many units
+        /// Per-node owned-quantity attribution: how many units
         /// EACH tree node (not aggregated by item id, unlike UsedMaterials)
         /// consumed from the owned pool during reduction. Keyed by the
         /// RecipeNode object reference INSIDE ReducedTree (reference

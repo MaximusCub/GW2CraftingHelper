@@ -3,24 +3,16 @@ using System.Collections.Generic;
 namespace GW2CraftingHelper.Models
 {
     /// <summary>
-    /// Maintainer-curated default DECISION-ONLY currency valuations (copper
-    /// per unit), adapted from gw2efficiency's own CURRENCY_DECISION_PRICES
-    /// table so the module ships usable comparison values out of the box
-    /// instead of requiring every user to hand-populate the Settings tab
-    /// before a currency-priced vendor offer or recipe can ever compete
-    /// against a Trading Post price (currency-ux-package, Feature 1).
+    /// Curated default DECISION-ONLY currency valuations (copper per
+    /// unit), adapted from gw2efficiency's CURRENCY_DECISION_PRICES table
+    /// so the module ships usable comparison values out of the box.
     ///
     /// Source (MIT-licensed): @gw2efficiency/recipe-calculation,
     /// src/static/currencyDecisionPrices.ts -
     /// https://github.com/gw2efficiency/recipe-calculation
     /// License: MIT, Copyright (c) 2016 queicherius (David Reess).
-    ///
-    /// currency-ux-package review fix (nice-to-have): the MIT license
-    /// requires the permission notice below be included with substantial
-    /// portions of the licensed work, not just the copyright line -
-    /// included here verbatim (source: the upstream repo's own LICENCE
-    /// file) alongside the attribution above, since this table IS a
-    /// substantial, verbatim-adapted portion of that work.
+    /// The MIT permission notice is included verbatim below, as the
+    /// license requires for substantial portions of the work.
     ///
     /// Permission is hereby granted, free of charge, to any person
     /// obtaining a copy of this software and associated documentation
@@ -41,49 +33,21 @@ namespace GW2CraftingHelper.Models
     /// ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
     /// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     /// SOFTWARE.
-    /// Extracted and cross-checked entry-by-entry against the live GW2 API
-    /// (api.guildwars2.com/v2/currencies?ids=all) 2026-08-16 - every key
-    /// below is the OFFICIAL GW2 wallet currency id (numerically identical
-    /// to gw2efficiency's own table; no id remapping was needed - see
-    /// docs/research/gw2e-currency-decision-prices.md for the full
-    /// provenance writeup, byte offsets, and live cross-check this run
-    /// performed).
     ///
-    /// Maintainer decision (currency-ux-package): shipping this curated
-    /// table as defaults is an explicit, one-time waiver of the repo's
-    /// "do not invent data" rule for THIS table only - every value below is
-    /// sourced and attributed to the upstream MIT package above, not
-    /// invented by this module.
+    /// Every key below is the official GW2 wallet currency id,
+    /// cross-checked against the live API. Shipping this curated table as
+    /// defaults is an explicit, one-time waiver of the repo's "do not
+    /// invent data" rule for this table only - every value is sourced and
+    /// attributed to the upstream MIT package, not invented.
     ///
-    /// DECISION-ONLY, same invariant as the hand-entered CurrencyValuation
-    /// table this augments: a value here may tip a craft-vs-buy/vendor-vs-TP
-    /// comparison, but must never be surfaced as, or folded into, any
-    /// displayed gold total (plan.TotalCoinCost, a step's TotalCost, ...).
-    /// See CurrencyValuation.TryGetEffectiveCopperValue for the
-    /// user-override/cleared/default precedence this table participates in
-    /// (currency-ux-package review fix, finding 3: that method is not read
-    /// by the solver at runtime - it is CurrencyValuation.WithDefaults'
-    /// own implementation detail, which materializes this table's defaults
-    /// into a plain dictionary before the solver ever runs - see
-    /// TryGetEffectiveCopperValue's doc comment for the full seam). Direct
-    /// readers of this table's keys/values are WithDefaults,
-    /// CurrencyDecisionDefaults.TryGetDefault below, and (for the curated
-    /// id list only) SettingsTabContent.BuildCuratedCurrencyIds.
+    /// DECISION-ONLY: a value here may tip a comparison but must never be
+    /// folded into any displayed gold total. See
+    /// CurrencyValuation.TryGetEffectiveCopperValue for the
+    /// user-override/cleared/default precedence.
     ///
-    /// Entries gw2efficiency's own table marks `undefined` (meaning gw2e
-    /// itself assigns that currency no decision value, not zero) are simply
-    /// absent below, matching gw2e exactly. Among the currencies this
-    /// module knows by name (Gw2Constants.KnownCurrencyNames - a broader
-    /// set than what SettingsTabContent.CuratedCurrencyIds actually
-    /// surfaces as a row; neither of these two named ids is curated for
-    /// that or any other reason), that means Transmutation Charges (18),
-    /// PvP League Tickets (30), and Racing Medallions (47) have no entry
-    /// here. Astral Acclaim (63)
-    /// and the three Rift Essence tiers (78/79/80) have no row at all in
-    /// gw2e's table (it does not reach those ids) and so are also absent -
-    /// the Settings tab and the solver alike must leave them blank/unvalued
-    /// rather than invent a rate for them (see SettingsTabContent's own
-    /// Astral Acclaim info line).
+    /// Entries gw2e's own table marks `undefined` are simply absent here,
+    /// matching gw2e exactly - currencies with no entry must stay
+    /// blank/unvalued rather than gain an invented rate.
     /// </summary>
     public static class CurrencyDecisionDefaults
     {

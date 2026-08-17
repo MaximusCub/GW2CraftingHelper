@@ -12,55 +12,19 @@ namespace GW2CraftingHelper.Models
     public class PersistedPlan
     {
         /// <summary>
-        /// Review-fix (W3D adversarial review, mustFix): bumped only when
-        /// this schema's SHAPE changes (a member renamed/removed/retyped on
-        /// this class, CraftingPlanResult, or PlanSolveContext in a way
-        /// that would leave old data silently defaulted instead of
-        /// rejected). PlanStoreHelpers.DeserializePersistedPlan rejects any
-        /// file whose SchemaVersion does not match exactly - the only
-        /// "old-schema file" detection PersistedPlan had before this fix
-        /// was the purely structural `Result?.Plan != null` check, which a
-        /// future rename could still pass while every renamed/removed
-        /// member came back silently null - a "partial render" spec item 4
-        /// forbids.
+        /// Bump whenever the persisted graph's SHAPE changes (a member
+        /// renamed/removed/retyped anywhere reachable from PersistedPlan)
+        /// - PlanStoreHelpers.DeserializePersistedPlan rejects any file
+        /// whose SchemaVersion does not match exactly, degrading to the
+        /// safe "no restored plan" path instead of a partial render.
+        /// PersistedPlanSchemaMemberSetTests reflectively guards the
+        /// whole graph against an unbumped shape change.
         /// <para>
-        /// Round 2 review-fix (mustFix): <see cref="SchemaVersion"/> has NO
-        /// property initializer (see that property) - the CLR default for
-        /// an unset int is 0, distinct from CurrentSchemaVersion (1) above.
-        /// This is deliberate, not an oversight: Newtonsoft.Json only
-        /// overwrites properties that are actually PRESENT in the source
-        /// JSON, so a `= CurrentSchemaVersion` initializer here would run
-        /// in the object's default constructor and then survive untouched
-        /// for any file whose JSON omits "SchemaVersion" entirely (every
-        /// file written before this field existed) - deserializing it as
-        /// CurrentSchemaVersion, sailing straight through the mismatch
-        /// check below, and rendering whatever members that older schema
-        /// happened to be missing as silently null. Both real construction
-        /// sites (Module.cs's PersistAfterGenerateAsync/
-        /// PersistResolvedPlanInBackground) set SchemaVersion =
-        /// CurrentSchemaVersion explicitly instead, so every file this
-        /// module itself ever writes still carries the current value; only
-        /// a file this code never wrote (missing the field, or carrying an
-        /// explicit old value) deserializes as anything else.
-        /// </para>
-        /// <para>
-        /// VOM design (Section 5.4): bumped 1 -&gt; 2 for the new <see
-        /// cref="ValueOwnMaterials"/> field below - the first real exercise
-        /// of this reject-and-regenerate mechanism since it was introduced.
-        /// A SchemaVersion-1 file is now rejected (not silently defaulted
-        /// to <c>false</c>) by PlanStoreHelpers.DeserializePersistedPlan,
-        /// degrading to Module's existing "no restored plan" path (one Warn
-        /// log line, empty Crafting Plan tab on first load after upgrade) -
-        /// a known, already-exercised, safe fresh-start, not a crash.
-        /// </para>
-        /// <para>
-        /// Bumped 2 -&gt; 3 (quality-audit B1: the persisted graph grew
-        /// members with no matching version bump). See
-        /// docs/KNOWN-ISSUES.md ("Quality-audit cleanup, phase 1") for
-        /// the rationale and tests/Models/PersistedPlanSchemaMemberSetTests.cs
-        /// for the reflective guard - it now walks the whole graph
-        /// reachable from PersistedPlan, not just the four types named
-        /// above, and fails on any rename/add/remove/retype.
+        /// <see cref="SchemaVersion"/> deliberately has NO property
+        /// initializer: Newtonsoft only overwrites properties present in
+        /// the JSON, so an initializer would make a file that omits the
+        /// field entirely deserialize as current and sail through the
+        /// mismatch check. Construction sites set it explicitly instead.
         /// </para>
         /// </summary>
         public const int CurrentSchemaVersion = 3;
@@ -121,28 +85,20 @@ namespace GW2CraftingHelper.Models
         public CraftingPlanResult Result { get; set; }
 
         /// <summary>
-        /// Review-fix (W3D adversarial review, critical): the user's
-        /// per-node decision-pill overrides (Craft/Buy TP/Buy Vendor) in
-        /// effect when this plan was last persisted, keyed by the same
-        /// solver NodeId TreeSectionController's own _nodeOverrides
-        /// dictionary uses. <see cref="Result"/> already reflects these
-        /// overrides (it is the OUTPUT of applying them), but without
-        /// persisting the overrides themselves too, a restored session's
-        /// override loop starts from empty - the very next pill click would
-        /// re-solve with only that ONE new override applied, silently
-        /// discarding every override the user set before restarting. Empty
-        /// (never null) for a plan persisted straight after a fresh
-        /// Generate, which has no overrides yet.
+        /// The user's per-node decision-pill overrides in effect when this
+        /// plan was persisted, keyed by solver NodeId. Result already
+        /// reflects them, but without persisting the overrides themselves
+        /// a restored session's next pill click would re-solve with only
+        /// that one override, discarding the rest. Empty (never null) for
+        /// a fresh Generate.
         /// </summary>
         public IReadOnlyDictionary<int, AcquisitionSource> NodeOverrides { get; set; }
 
         /// <summary>
-        /// Review-fix (W3D adversarial review, critical): item ids manually
-        /// marked "Ignore" (see TreeSectionController's own _ignoredItemIds
-        /// doc comment) in effect when this plan was last persisted - the
-        /// other half of the override-restoration fix <see
-        /// cref="NodeOverrides"/> documents. Empty (never null) for a plan
-        /// persisted straight after a fresh Generate.
+        /// Item ids manually marked "Ignore" when this plan was persisted
+        /// - the other half of the override restoration
+        /// <see cref="NodeOverrides"/> documents. Empty (never null) for
+        /// a fresh Generate.
         /// </summary>
         public IReadOnlyList<int> IgnoredItemIds { get; set; }
     }

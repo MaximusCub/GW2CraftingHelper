@@ -9,12 +9,9 @@ namespace GW2CraftingHelper.Services
     {
         public PlanViewModel Build(CraftingPlanResult result)
         {
-            // M35 (gw2efficiency parity - multi-item plans): RequestedItems
-            // is populated ONLY for a genuine multi-item batch (2+ items -
-            // see CraftingPlanResult.RequestedItems' own doc comment); a
-            // single-item request, including one made through the
-            // multi-item entry point, always has it null and continues
-            // through the untouched single-item branch below byte-for-byte.
+            // RequestedItems is populated only for a genuine multi-item
+            // batch (2+); a single-item request always has it null and
+            // takes the single-item branch.
             bool isMultiItem = result.RequestedItems != null && result.RequestedItems.Count > 1;
 
             var vm = new PlanViewModel
@@ -23,32 +20,23 @@ namespace GW2CraftingHelper.Services
                 TreeRoot = isMultiItem ? null : result.CraftingTree,
                 MultiItemRoots = isMultiItem ? result.MultiItemRoots : null,
                 CurrencyMetadata = result.CurrencyMetadata,
-                // source-selection-simplification: see PlanViewModel.
-                // ItemMetadata's own doc comment.
                 ItemMetadata = result.ItemMetadata,
                 PriceBasis = result.PriceBasis,
-                // currency-ux-package (Feature 2): whole-plan currency
-                // totals/holding, unaffected by isMultiItem - result.Plan
-                // is already the single combined Plan object for a batch
-                // (same source BuildCurrencyTableRows already reads for the
-                // Summary section's currency table), so this passthrough
-                // needs no branching.
+                // Whole-plan currency totals/holding; result.Plan is
+                // already the single combined Plan for a batch, so no
+                // branching is needed.
                 CurrencyPlanTotals = BuildCurrencyPlanTotals(result.Plan.CurrencyCosts),
                 OwnedCurrencyAmounts = result.OwnedCurrencyAmounts,
-                // currency-ux-package (Feature 3): same whole-plan-source
-                // reasoning as CurrencyPlanTotals above - result.Plan is
-                // already the single combined Plan for a multi-item batch.
                 VendorCapsByItemId = BuildVendorCapsByItemId(result.Plan.TimegatedItems)
             };
 
             if (isMultiItem)
             {
-                // No single target item/icon/rarity exists for a batch - the
-                // header instead shows gw2e's own document-title convention
-                // ("Gift of Exordium and 2 others" - see the M34 r1 multi-
-                // item research report) and TargetQuantity is suppressed
-                // (0) so CraftingPlanView's existing "x{qty}" suffix never
-                // renders a meaningless combined number.
+                // No single target item/icon/rarity exists for a batch -
+                // the header shows gw2e's document-title convention
+                // ("Gift of Exordium and 2 others") and TargetQuantity is
+                // suppressed so the "x{qty}" suffix never renders a
+                // meaningless combined number.
                 vm.TargetItemName = BuildMultiItemTitle(result.RequestedItems, result.ItemMetadata);
                 vm.TargetIconUrl = null;
                 vm.TargetRarity = null;
@@ -105,11 +93,9 @@ namespace GW2CraftingHelper.Services
                 vm.Sections.Add(BuildDisciplinesSection(result));
             }
 
-            // 5. Required Recipes section (only if there is at least one
-            // non-Mystic-Forge recipe left to learn once BuildRecipesSection
-            // filters MF-only rows out - wave-3 quick win #2. A plan whose
-            // only "recipes" are Mystic Forge combinations now surfaces no
-            // Required Recipes section at all rather than an empty one.
+            // 5. Required Recipes section (only if at least one
+            // non-Mystic-Forge recipe remains once BuildRecipesSection
+            // filters MF-only rows out)
             if (result.RequiredRecipes != null && result.RequiredRecipes.Count > 0)
             {
                 var recipesSection = BuildRecipesSection(result);
@@ -119,21 +105,17 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // 6. Crafting Steps section (only if non-empty, OR there is a
-            // timegated notice to show - M34-B1 #3) - last, per gw2e order
+            // 6. Crafting Steps section (only if non-empty, or there is a
+            // timegated notice to show) - last, per gw2e order
             bool hasTimegatedItems = result.Plan.TimegatedItems != null && result.Plan.TimegatedItems.Count > 0;
             if (craftSteps.Count > 0 || hasTimegatedItems)
             {
                 vm.Sections.Add(BuildCraftingStepsSection(craftSteps, result));
             }
 
-            // 7. Notes section (design-plan-notes.md, Option 1) - only if
-            // it has at least one note to show. Last, per that design's
-            // section 5: every note kind is a caveat ABOUT facts shown in
-            // an earlier section (excess reclaim references craft-step
-            // quantities; competency notes reference the Required
-            // Disciplines rows just above; the forge-scope note is a
-            // "read this after you've seen the plan" caveat).
+            // 7. Notes section - only if it has at least one note. Last:
+            // every note kind is a caveat about facts shown in an earlier
+            // section.
             var notesSection = BuildNotesSection(result);
             if (notesSection.Rows.Count > 0)
             {
@@ -144,10 +126,9 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// gw2e's own document-title convention for a multi-item batch
-        /// (M34 r1 report): the first requested item's name, plus " and N
-        /// other(s)" when 2+ items are selected. items is guaranteed
-        /// non-empty by the isMultiItem gate above (2+ entries).
+        /// gw2e's document-title convention for a multi-item batch: the
+        /// first requested item's name plus " and N other(s)". items is
+        /// guaranteed non-empty by the isMultiItem gate.
         /// </summary>
         private static string BuildMultiItemTitle(
             IReadOnlyList<PlanRequestItem> items, IReadOnlyDictionary<int, ItemMetadata> metadata)
@@ -161,11 +142,9 @@ namespace GW2CraftingHelper.Services
             return $"{firstName} and {rest} other" + (rest > 1 ? "s" : "");
         }
 
-        // W4A (Total Cost section redesign) tooltip bodies - shared between
-        // the collapsed and uncollapsed cost-band branches below (both
-        // still show an "Actual Cost to Craft" tile with the identical
-        // meaning) and reused verbatim by the tests, so the exact wording
-        // lives in exactly one place.
+        // Tooltip bodies shared between the collapsed and uncollapsed
+        // cost-band branches and reused verbatim by the tests, so the
+        // exact wording lives in one place.
         internal const string TotalMaterialsValueTooltip =
             "Full market value of everything this craft consumes - coins you spend plus the sell value of your own materials used.";
         internal const string YourMaterialsUsedTooltip =
@@ -179,14 +158,9 @@ namespace GW2CraftingHelper.Services
         internal const string FootnoteText =
             "Prices are Trading Post data - actual purchase and sale prices are likely to vary.";
 
-        // Review fix: distinct caption for Band 2's middle tile in a
-        // multi-item batch - see BuildProfitFormulaBand's own doc comment
-        // for why the two bands' "Total Materials Value" can legitimately
-        // hold DIFFERENT numbers for a batch with a partially-unsellable
-        // root. A tooltip-only distinction was not enough: two
-        // identically-captioned tiles ~56px apart showing different
-        // numbers reads as a bug, not a scoping nuance, in a section whose
-        // whole point is to read as a balancing formula at a glance.
+        // Distinct caption for Band 2's middle tile in a multi-item batch
+        // (see BuildProfitFormulaBand): two identically-captioned tiles
+        // showing different numbers reads as a bug, not a scoping nuance.
         internal const string MaterialsValueSellableLabel = "Materials Value (sellable)";
 
         private PlanSectionViewModel BuildSummarySection(CraftingPlanResult result, bool isMultiItem)
@@ -202,21 +176,11 @@ namespace GW2CraftingHelper.Services
             BuildProfitFormulaBand(section, result, isMultiItem);
             BuildCurrencyTableRows(section, result);
 
-            // M35 (gw2efficiency parity - multi-item plans): echoes gw2e's
-            // own Cost Breakdown banner concept for a multi-item batch (M34
-            // r1 report). M37 (KNOWN-ISSUES #25) added the real batch-level
-            // Sell value/Profit rows above (see
-            // SellSideEconomics.ApplyBatchSellSideEconomics) - gated on
-            // the SAME result.NetSaleValue.HasValue condition as those rows
-            // (mirroring gw2e's own shared ng-show condition, research
-            // report Section 1.3b) so this note never references a profit
-            // figure that is not actually on the page (e.g. every requested
-            // root bought outright, or none tradable). The wording is NOT
-            // gw2e's own verbatim banner text ("...sum of all crafted
-            // recipes") because this module's rollup has no craft-vs-buy
-            // filter at all (SellSideEconomics.ApplyBatchSellSideEconomics'
-            // own doc comment, divergence item 1) - a bought-but-tradable
-            // root can contribute too, so "crafted recipes" would be
+            // Gated on the same NetSaleValue.HasValue condition as the
+            // Sell value/Profit rows so this note never references a
+            // profit figure not actually on the page. The wording is not
+            // gw2e's verbatim banner text: this module's rollup has no
+            // craft-vs-buy filter, so "crafted recipes" would be
             // inaccurate.
             if (isMultiItem && result.NetSaleValue.HasValue)
             {
@@ -227,8 +191,8 @@ namespace GW2CraftingHelper.Services
                 });
             }
 
-            // W4A (user-mandated): a single subdued footnote, always
-            // present, at the very bottom of the section.
+            // A single subdued footnote, always present, at the very
+            // bottom of the section.
             section.Rows.Add(new PlanRowViewModel
             {
                 RowType = PlanRowType.SummaryFootnote,
@@ -239,29 +203,20 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W4A formula band 1 ("Total Materials Value - Your Materials Used
-        /// = Actual Cost to Craft"). COLLAPSE RULE (user-mandated): when
-        /// MaterialOpportunityCost is null or 0 (Value-own-materials off,
-        /// or nothing owned consumed) the formula's middle term does not
-        /// exist, so the band collapses to a single "Actual Cost to Craft"
-        /// tile instead of a meaningless 3-term formula. Actual Cost to
-        /// Craft is exactly the pre-W4A "Total" row (result.Plan.
-        /// TotalCoinCost, unchanged math) - the "(buy-order prices)" basis
-        /// qualifier that used to live in that row's Label now lives in
-        /// this tile's tooltip instead (spec: "keep it somewhere sensible",
-        /// and a formula-band caption needs to stay short).
+        /// Formula band 1 ("Total Materials Value - Your Materials Used
+        /// = Actual Cost to Craft"). When MaterialOpportunityCost is null
+        /// or 0 the middle term does not exist, so the band collapses to a
+        /// single "Actual Cost to Craft" tile. Actual Cost to Craft is
+        /// result.Plan.TotalCoinCost; the price-basis qualifier lives in
+        /// this tile's tooltip.
         /// </summary>
         private static void BuildCostFormulaBand(PlanSectionViewModel section, CraftingPlanResult result)
         {
             long actualCost = result.Plan.TotalCoinCost;
 
-            // Nice-to-have (soften unconditional basis claim): the old
-            // suffix (" (buy-order prices)") read as an unqualified claim
-            // that every item in this total priced on the buy-order side.
-            // AUDIT ROW 20/38's per-item TP price-side fallback means that
-            // is not always true - an item with no buy orders at all
-            // still prices via its instant-buy side and folds into this
-            // same total. The suffix now says so instead of overclaiming.
+            // The per-item TP price-side fallback means not every item in
+            // this total priced on the preferred side; the suffix says so
+            // instead of overclaiming.
             string actualCostTooltip = result.PriceBasis == PriceBasis.BuyOrder
                 ? ActualCostTooltip + " (buy-order prices, or instant-buy where an item has none)"
                 : ActualCostTooltip;
@@ -300,39 +255,19 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W4A formula band 2 ("Sell Value (after fees) - Total Materials
-        /// Value = Profit if Sold"), only when result.NetSaleValue.HasValue -
-        /// mirroring band 1, but never present without it (the profit
-        /// formula is meaningless with no sell price at all).
+        /// Formula band 2 ("Sell Value (after fees) - Total Materials
+        /// Value = Profit if Sold"), only when NetSaleValue.HasValue - the
+        /// profit formula is meaningless with no sell price.
         ///
-        /// IDENTITY VERIFICATION (task-mandated): SellSideEconomics proves
-        /// CraftingProfit == NetSaleValue - Plan.TotalCoinCost -
-        /// (MaterialOpportunityCost ?? 0) for a SINGLE-ITEM plan
-        /// (ApplySellSideEconomics, line ~66) but explicitly NOT for a
-        /// multi-item batch (ApplyBatchSellSideEconomics subtracts only the
-        /// SELLABLE roots' own cost, never Plan.TotalCoinCost, which also
-        /// includes every unsellable requested root - see
-        /// CraftingPlanResult.CraftingProfit's own doc comment, "NOT
-        /// Plan.TotalCoinCost"). Band 1's "Total Materials Value" (Plan.
-        /// TotalCoinCost + MaterialOpportunityCost) would therefore NOT
-        /// balance this band's visible formula for a multi-item batch with
-        /// any unsellable requested root - the middle tile is instead
-        /// derived as NetSaleValue - CraftingProfit, reusing ONLY the two
-        /// already-stored, already-correct fields (never recomputing
-        /// CraftingProfit itself, never touching Plan.TotalCoinCost here).
-        /// This is algebraically IDENTICAL to Band 1's Total Materials
-        /// Value for every single-item plan (the identity above rearranges
-        /// to exactly that), so the two bands always show the same number
-        /// there; for a multi-item batch with a partially-unsellable root
-        /// mix the two bands can legitimately differ (Band 1 prices the
-        /// WHOLE batch, Band 2 only the batch's sellable portion, matching
-        /// what CraftingProfit itself measures) - the tooltip below flags
-        /// that case, AND (review fix) the tile's own Label changes to
-        /// MaterialsValueSellableLabel for a multi-item batch so the
-        /// divergence is visible without a mouseover: two tiles sharing
-        /// the "Total Materials Value" caption but showing different
-        /// numbers would read as a bug in the plan, not as a legitimate
-        /// scoping difference.
+        /// The middle tile is derived as NetSaleValue - CraftingProfit
+        /// rather than Band 1's Plan.TotalCoinCost + MaterialOpportunityCost:
+        /// the single-item identity (CraftingProfit == NetSaleValue -
+        /// TotalCoinCost - MaterialOpportunityCost) does not hold for a
+        /// multi-item batch, whose CraftingProfit subtracts only the
+        /// sellable roots' cost. For single-item plans the two derivations
+        /// are algebraically identical; for a batch with unsellable roots
+        /// the bands legitimately differ, so the tile's label changes to
+        /// MaterialsValueSellableLabel there and the tooltip flags it.
         /// </summary>
         private static void BuildProfitFormulaBand(PlanSectionViewModel section, CraftingPlanResult result, bool isMultiItem)
         {
@@ -368,19 +303,12 @@ namespace GW2CraftingHelper.Services
                 profitQualifier = hasCurrencyCosts ? " (coin costs only)" : "";
             }
 
-            // See this method's own doc comment - only a multi-item batch
-            // can make this band's Total Materials Value diverge from Band
-            // 1's own (whole-plan) figure, so only that case gets the extra
-            // disambiguating clause.
+            // Only a multi-item batch can make this band's figure diverge
+            // from Band 1's, so only that case gets the extra clause.
             string totalMaterialsValueTooltip = isMultiItem
                 ? TotalMaterialsValueTooltip + " (this band only covers items with a live sell price)"
                 : TotalMaterialsValueTooltip;
 
-            // Review fix: a multi-item batch gets its own caption for this
-            // tile (see this method's own doc comment) - single-item plans
-            // keep the plain "Total Materials Value" label, matching Band
-            // 1 exactly (the identity proven above guarantees the two
-            // numbers always agree there).
             string totalMaterialsValueLabel = isMultiItem
                 ? MaterialsValueSellableLabel
                 : "Total Materials Value";
@@ -400,13 +328,8 @@ namespace GW2CraftingHelper.Services
                 TooltipText = totalMaterialsValueTooltip
             });
 
-            // Review fix (round 2): FormulaResultIsExact false exactly when
-            // profit < 0 - see that field's own doc comment. This is the
-            // ONLY row in either band where it is ever set false; both
-            // Band 1's collapsed/expanded tiles and this band's Sell
-            // Value/Total Materials Value tiles keep the true default
-            // (nothing to falsify - the field is only read on a band's
-            // last tile).
+            // FormulaResultIsExact is false exactly when profit < 0 - the
+            // only row in either band where it is ever set false.
             section.Rows.Add(new PlanRowViewModel
             {
                 RowType = PlanRowType.ProfitFormulaTile,
@@ -418,15 +341,10 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W4A currency table rows, replacing the pre-W4A plain-text
-        /// CurrencyCost rows: Label is now just the resolved currency name
-        /// (the Required amount moved to its own Quantity-driven column,
-        /// rendered by SummarySectionRenderer's c-table), rows are sorted
-        /// alphabetically by that name (user-mandated), and
-        /// CurrencyOwnedQuantity is now the RAW unclamped wallet holding -
-        /// see that field's own updated doc comment. CurrencyNeededQuantity/
-        /// CurrencyFullyCovered are derived from it here so the c-table
-        /// renderer stays a dumb read of already-computed fields.
+        /// Currency table rows: Label is the resolved currency name, rows
+        /// sort alphabetically by it, and CurrencyOwnedQuantity is the raw
+        /// unclamped wallet holding. Needed/FullyCovered are derived here
+        /// so the c-table renderer stays a dumb read of computed fields.
         /// </summary>
         private static void BuildCurrencyTableRows(PlanSectionViewModel section, CraftingPlanResult result)
         {
@@ -440,20 +358,14 @@ namespace GW2CraftingHelper.Services
             {
                 string currencyName = CurrencyDisplayResolver.ResolveName(cc.CurrencyId, result.CurrencyMetadata);
                 string iconUrl = CurrencyDisplayResolver.ResolveIconUrl(cc.CurrencyId, result.CurrencyMetadata);
-                // Adversarial-review round-2 finding (merged-ceil-remainder
-                // quorum, 2026-08): a plain unchecked `(int)cc.Amount` cast
-                // silently wraps NEGATIVE once Amount exceeds int.MaxValue,
-                // which then made `fullyCovered = owned >= required` true
-                // for almost any owned amount below - the exact opposite of
-                // what a currency requirement this large should show.
-                // ClampToInt (same convention as VendorBatchSolver's own
-                // long-to-int clamp) keeps this a very large but still
-                // correctly-ordered positive number instead.
+                // A plain `(int)cc.Amount` cast wraps negative past
+                // int.MaxValue, making `owned >= required` true for almost
+                // any owned amount; ClampToInt keeps the ordering correct.
                 int required = ClampToInt(cc.Amount);
 
-                // W4A (user-mandated): UNCLAMPED - the real wallet holding,
-                // even when it exceeds what the plan needs. Null (not 0)
-                // when no wallet snapshot was available at all.
+                // Unclamped - the real wallet holding, even when it
+                // exceeds the need. Null (not 0) when no wallet snapshot
+                // was available.
                 int? owned = null;
                 if (result.OwnedCurrencyAmounts != null &&
                     result.OwnedCurrencyAmounts.TryGetValue(cc.CurrencyId, out int ownedRaw))
@@ -484,12 +396,8 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// currency-ux-package (Feature 2): converts the plan's currency
-        /// cost list into a currency-id-keyed dictionary for
-        /// PlanViewModel.CurrencyPlanTotals - the Recipe Tree's per-leaf
-        /// pill needs O(1) lookup by currency id, unlike
-        /// BuildCurrencyTableRows above, which only ever iterates the list
-        /// once in Summary-table order.
+        /// Converts the plan's currency cost list into a currency-id-keyed
+        /// dictionary - the Recipe Tree's per-leaf pill needs O(1) lookup.
         /// </summary>
         private static IReadOnlyDictionary<int, long> BuildCurrencyPlanTotals(List<CurrencyCost> currencyCosts)
         {
@@ -507,13 +415,8 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// currency-ux-package (Feature 3): re-indexes the plan's
-        /// informational timegated-cap notices by ItemId for
-        /// PlanViewModel.VendorCapsByItemId - pure passthrough/reindex of
-        /// an already-computed list (VendorBatchSolver.FinalizeVendorBatches
-        /// owns the actual cap computation, untouched here), one entry per
-        /// item id by construction (TimegatedItem is already a per-item
-        /// merged notice).
+        /// Re-indexes the plan's timegated-cap notices by ItemId - a pure
+        /// reindex; VendorBatchSolver owns the cap computation.
         /// </summary>
         private static IReadOnlyDictionary<int, TimegatedItem> BuildVendorCapsByItemId(
             List<TimegatedItem> timegatedItems)
@@ -587,10 +490,9 @@ namespace GW2CraftingHelper.Services
                     UnitCoinValue = step.UnitCost,
                     HintText = ResolveHintText(rowType, step.ItemId, result.AcquisitionHints),
                     BadgeText = ResolveBadgeText(rowType, step.ItemId, result.AcquisitionHints),
-                    // M34-B2b: owned/needed split, cosmetic only (mirrors
-                    // BuildSummarySection's CurrencyCost rows) - only the
-                    // Total column, never Each (a per-unit rate has no
-                    // ownership concept - see ResolveAmounts' doc comment).
+                    // Owned/needed split, cosmetic only - Total column
+                    // only, never Each (a per-unit rate has no ownership
+                    // concept).
                     CurrencyCosts = CurrencyDisplayResolver.ResolveAmounts(
                         step.VendorCurrencyCosts, result.CurrencyMetadata, result.OwnedCurrencyAmounts),
                     UnitCurrencyCosts = CurrencyDisplayResolver.ResolveUnitAmounts(
@@ -689,21 +591,18 @@ namespace GW2CraftingHelper.Services
                 });
             }
 
-            // Timegated (vendor purchase cap) notices (M34-B1 #3) - a plain
-            // informational line per item, gw2efficiency parity: caps are
-            // surfaced, never solved around. Appended after the real craft
-            // steps so a section made up ENTIRELY of notices (no craft
-            // steps at all) still renders correctly.
+            // Timegated (vendor purchase cap) notices - caps are surfaced,
+            // never solved around. Appended after the real craft steps so
+            // a notices-only section still renders correctly.
             if (result.Plan.TimegatedItems != null)
             {
                 foreach (var timegated in result.Plan.TimegatedItems)
                 {
                     string itemName = ResolveName(timegated.ItemId, result.ItemMetadata);
 
-                    // Astral Acclaim package (KNOWN-ISSUES #33): Seasonal
-                    // uses the noun "Season" (matching gw2e's own Wizard's
-                    // Vault wording), not the adjective "Seasonal" - keeps
-                    // the same "{CapLabel} limit: N" shape as Daily/Weekly.
+                    // Seasonal uses the noun "Season" (gw2e's Wizard's
+                    // Vault wording), keeping the "{CapLabel} limit: N"
+                    // shape of Daily/Weekly.
                     string capLabel;
                     if (timegated.CapType == TimegatedCapType.Daily)
                     {
@@ -726,35 +625,22 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // Daily craft-cooldown notices (audit row 56, gw2e parity in
-            // spirit with the vendor-cap notices above): additive,
-            // informational-only pass over the real craft steps just built,
-            // keyed on the wiki-verified seed (DailyCooldownItemService /
-            // ref/daily_cooldown_items.json). Never touches the solver or
-            // Plan.TimegatedItems - this reuses only the TimegatedNotice ROW
-            // SHAPE (plain Label text, see CraftStepsSectionRenderer.Render's
-            // generic TextRowRenderer branch), not the vendor-cap model
-            // type, so a recipe-level cooldown can never be confused with a
-            // vendor purchase cap in PlanStructuralValidator or anywhere
-            // else that reads Plan.TimegatedItems directly.
+            // Daily craft-cooldown notices: informational-only pass over
+            // the craft steps, keyed on the wiki-verified seed. Never
+            // touches the solver or Plan.TimegatedItems - reuses only the
+            // notice ROW SHAPE, not the vendor-cap model type, so a
+            // recipe-level cooldown can never be confused with a vendor
+            // purchase cap by anything reading Plan.TimegatedItems.
             AppendDailyCooldownNotices(section, steps, result);
 
             return section;
         }
 
         /// <summary>
-        /// Appends one TimegatedNotice row per Craft-source step whose
-        /// aggregate Quantity (already merged across the whole tree, same
-        /// aggregate PlanStep.Quantity every other row in this section
-        /// reads) exceeds the seed's PerDayCap for that item - "crafting N
-        /// takes about N/cap days (cap per day per account)" wording,
-        /// mirroring the vendor-cap notice's own plain-informational tone.
-        /// A step at or under the cap gets no notice (a single day's worth
-        /// needs no warning). result.DailyCooldownItems is null whenever
-        /// the module was not wired with the seed (Module.cs's own
-        /// try/catch degrades to null on a missing/bad file) - this method
-        /// is then a no-op, exactly like every other optional-seed lookup
-        /// in this class.
+        /// Appends one notice row per Craft-source step whose aggregate
+        /// Quantity exceeds the seed's PerDayCap. A step at or under the
+        /// cap gets no notice. Null DailyCooldownItems (seed not wired)
+        /// makes this a no-op.
         /// </summary>
         private static void AppendDailyCooldownNotices(
             PlanSectionViewModel section, List<PlanStep> craftSteps, CraftingPlanResult result)
@@ -764,13 +650,8 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            // Follow-up fix (recorded non-blocking): the "(runs in parallel
-            // with other daily-gated items)" clause only makes sense when
-            // there is another daily-gated notice for it to run in parallel
-            // WITH - a single-item notice has nothing to be parallel to.
-            // Collect the qualifying notices first so the clause can be
-            // gated on the real total count (2+) rather than rendered
-            // unconditionally on every row.
+            // The "runs in parallel" clause only makes sense with 2+
+            // notices; collect first so it can be gated on the real count.
             var pending = new List<(string ItemName, int PerDayCap, int Quantity, int Days)>();
 
             foreach (var step in craftSteps)
@@ -790,39 +671,16 @@ namespace GW2CraftingHelper.Services
 
             foreach (var notice in pending)
             {
-                // Review fix (audit row 56 PART C nice-to-have): the
-                // singular "day" branch was dead code - this loop already
-                // `continue`s above whenever step.Quantity <= cooldown.
-                // PerDayCap, so every notice reaching this point has
-                // Quantity > PerDayCap, making days = Ceiling(qty / cap)
-                // always >= 2. Always plural.
+                // Every notice reaching this point has Quantity >
+                // PerDayCap, so days is always >= 2 - always plural.
                 string label = $"{notice.ItemName} is timegated - {notice.PerDayCap} per day per account - " +
                     $"crafting {notice.Quantity} will take about {notice.Days} days";
 
-                // Review nice-to-have (post-PART-C follow-up): each
-                // notice row is individually accurate but says nothing
-                // about how multiple rows combine - the real floor
-                // across several gated items in one plan is max(days),
-                // not the sum, since the per-account daily caps run
-                // independently of each other (e.g. the flagship
-                // Gift of Aurene case, which needs several gated
-                // Dragon Hatchling Doll components at once). The clause
-                // is only appended when there are 2+ notices in the plan;
-                // a lone notice has nothing else to run in parallel with.
-                //
-                // Wording fix (recorded-followups-sweep verification
-                // finding): `pending` (and therefore showsParallelClause)
-                // counts ONLY daily craft-cooldown notices from this loop,
-                // never the separate Daily-cap vendor notices this same
-                // section also emits from Plan.TimegatedItems just above
-                // (see the CapType == TimegatedCapType.Daily branch). A
-                // plan can have exactly one craft-cooldown notice running
-                // alongside a Daily-cap vendor notice and genuinely be in
-                // parallel with it, so the clause names the population the
-                // gate actually measures - other daily-CRAFTED items -
-                // rather than the broader "daily-gated" (which would also
-                // read as covering the vendor-cap notices this count never
-                // looks at).
+                // The real floor across several gated items is max(days),
+                // not the sum - per-account daily caps run independently.
+                // The clause names only other daily-CRAFTED items, the
+                // population this count actually measures, never the
+                // separate Daily-cap vendor notices.
                 if (showsParallelClause)
                 {
                     label += " (runs in parallel with other daily-crafted items)";
@@ -860,14 +718,9 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W3C (per-character discipline display, gw2efficiency parity):
-        /// which characters have `disc`, and at what rating - see
-        /// PlanRowViewModel.CharacterAvailabilityText's own doc comment for
-        /// the exact output shapes. characterDisciplines is
-        /// CraftingPlanResult.CharacterDisciplines, a straight passthrough
-        /// of the account snapshot - null means the snapshot never
-        /// captured this data at all (old snapshot / degraded fetch), which
-        /// must never be conflated with "captured, and nobody has it".
+        /// Which characters have `disc`, and at what rating. Null
+        /// characterDisciplines means the snapshot never captured this
+        /// data - never to be conflated with "captured, and nobody has it".
         /// </summary>
         private static string BuildCharacterAvailabilityText(
             RequiredDiscipline disc, IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines)
@@ -891,17 +744,10 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// design-plan-notes.md (Notes section, competency notes): shared
-        /// filter/sort BuildCharacterAvailabilityText and BestCharacterRating
-        /// both build on, extracted so the two call sites can't drift on
-        /// which characters count as "having" a discipline or how ties
-        /// break. Same null contract as BuildCharacterAvailabilityText's own
-        /// doc comment: null (not an empty list) when characterDisciplines
-        /// itself is null (no snapshot captured this data at all) - a
-        /// caller must not conflate that with "captured, and nobody has
-        /// it" (empty list). Highest rating first, then character name
-        /// alphabetical for ties - matches this method's pre-extraction
-        /// ordering byte-for-byte.
+        /// Shared filter/sort for BuildCharacterAvailabilityText and
+        /// BestCharacterRating, extracted so the two cannot drift. Null
+        /// (not empty) when characterDisciplines is null - "no data",
+        /// never "nobody has it". Highest rating first, then name.
         /// </summary>
         private static List<SnapshotCharacterDiscipline> MatchingCharacterDisciplines(
             string discipline, IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines)
@@ -919,20 +765,10 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// design-plan-notes.md (Notes section, competency notes): the
-        /// account's best rating for `discipline`, plus which character
-        /// achieved it (ties broken alphabetically, same as
-        /// MatchingCharacterDisciplines) - used by BuildNotesSection to
-        /// decide whether a RequiredDiscipline is "blocked" (best == null,
-        /// or best.Rating &lt; the discipline's MinRating) and to word the
-        /// note. Null under the identical two conditions
-        /// BuildCharacterAvailabilityText already distinguishes: no
-        /// snapshot at all (characterDisciplines == null) and a snapshot
-        /// with zero characters on this discipline (matches.Count == 0) -
-        /// a caller cannot tell those apart from this return value alone,
-        /// by design; BuildNotesSection reads characterDisciplines == null
-        /// directly wherever that distinction matters (never renders a
-        /// competency line at all without a snapshot).
+        /// The account's best rating for `discipline`, plus which
+        /// character achieved it. Null both for "no snapshot" and "no
+        /// character has it" - callers needing the distinction read
+        /// characterDisciplines == null directly.
         /// </summary>
         private static (int Rating, string CharacterName)? BestCharacterRating(
             string discipline, IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines)
@@ -947,20 +783,11 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// design-plan-notes.md (Notes section, Option 1 - single flat
-        /// section, one shared NoteLine row shape). Assembles rows in a
-        /// fixed order - excess/reclaim lines, then a total (only when 2+
-        /// excess lines exist), then competency lines (disciplines a
-        /// COMMITTED Craft step already needs), then competency
-        /// OPPORTUNITY lines (disciplines that would make the plan cost
-        /// LESS, for a node craft was excluded from on competency
-        /// grounds), then (opportunity-notes) RECIPE-SHEET SAVINGS
-        /// opportunities, then SEASONAL VENDOR TIP opportunities, then
-        /// the gambling-forge scope line (0 or 1) - so re-solves and
-        /// screenshots stay diffable. Returns a section with zero rows
-        /// when every note kind is empty; the caller (Build()) only
-        /// appends it to vm.Sections when Rows.Count > 0, so an empty
-        /// Notes section never renders a header at all.
+        /// Assembles Notes rows in a fixed order - excess/reclaim, total
+        /// (2+ excess lines only), competency, competency opportunity,
+        /// recipe-sheet savings, seasonal vendor tips, forge-scope - so
+        /// re-solves and screenshots stay diffable. Returns zero rows when
+        /// every kind is empty; the caller skips the section then.
         /// </summary>
         private PlanSectionViewModel BuildNotesSection(CraftingPlanResult result)
         {
@@ -970,31 +797,19 @@ namespace GW2CraftingHelper.Services
                 IsDefaultExpanded = true
             };
 
-            // Review fix (nice-to-have): every other section's "(N)" counts
-            // real entries, not a rollup row - tracked separately from
-            // section.Rows.Count so the "Total reclaimable value" row (and,
-            // below, every physical row the forge-scope note now spans)
-            // never inflates the count.
+            // "(N)" counts real entries, not rollup or continuation rows.
             int noteEntryCount = 0;
 
-            // 1. Excess/reclaim lines, alphabetical by resolved item name -
-            // same StringComparer.Ordinal stable-sort precedent
-            // BuildCurrencyTableRows already uses for its own rows. Review
-            // fix (finding 3, MEASURED): sort on the resolved NAME itself,
-            // not the composed Label - every label starts with the shared
-            // "Excess: <qty>x " prefix, so sorting the whole Label put
-            // quantity digits ahead of the name ("12x Zircon Ore" sorted
-            // before "3x Apple"), contradicting this very comment.
+            // 1. Excess/reclaim lines, alphabetical by resolved item name
+            // (not the composed Label, whose "Excess: <qty>x " prefix
+            // would sort quantity digits ahead of the name).
             if (result.ExcessCraftOutputs != null && result.ExcessCraftOutputs.Count > 0)
             {
                 var excessRows = new List<(string Name, PlanRowViewModel Row)>(result.ExcessCraftOutputs.Count);
                 long totalReclaim = 0;
-                // Review fix (finding 5, MEASURED): an unpriced row
-                // (ReclaimValue == null because no live SellInstant, not
-                // because the item is account-bound) rendered identically
-                // to a genuinely worthless one and silently understated
-                // "Total reclaimable value" - flag it on the row and on the
-                // total whenever any contributor was unpriced.
+                // An unpriced row (no live SellInstant) must not render
+                // like a genuinely worthless one or silently understate
+                // the total - flag it on the row and on the total.
                 bool anyUnpriced = false;
                 foreach (var excess in result.ExcessCraftOutputs)
                 {
@@ -1043,14 +858,10 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // 2. Competency lines, alphabetical by discipline - matches
-            // RequiredDisciplines' own display order (disciplineMap.OrderBy
-            // in PlanResultBuilder.Build). A discipline is "blocked" only
-            // when a real snapshot exists AND the account's best rating for
-            // it is missing or below MinRating - CharacterDisciplines ==
-            // null (no snapshot) must never produce a false "blocked"
-            // claim, mirroring BuildCharacterAvailabilityText's own null
-            // contract.
+            // 2. Competency lines, alphabetical by discipline. "Blocked"
+            // requires a real snapshot AND a missing/insufficient best
+            // rating - no snapshot must never produce a false "blocked"
+            // claim.
             if (result.CharacterDisciplines != null && result.RequiredDisciplines != null)
             {
                 foreach (var disc in result.RequiredDisciplines)
@@ -1075,25 +886,12 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // 2b. Competency OPPORTUNITY lines (adversarial-review fix #7,
-            // design-law gap) - alphabetical by resolved item name, same
-            // ordering precedent as the excess/reclaim lines above.
-            // Distinct from the "2. Competency lines" block just above:
-            // that block explains disciplines the plan ALREADY needs (a
-            // committed Craft step); this one surfaces disciplines that
-            // would let the plan cost LESS than it currently does, for a
-            // node the automatic pick excluded craft from specifically on
-            // competency grounds (PlanSolver only suppresses
-            // Decision.CheapestCraftUntrained for a node the force-buy
-            // pre-pass excluded craft from REGARDLESS of training - see
-            // cheapestCraftUntrained's own doc comment in
-            // PlanSolver.Evaluate and OwnedMaterialsForceBuyPrePass.
-            // ForceBuyPrePassResult's own doc comment; a force-buy
-            // exclusion that is ITSELF competency-caused still reports here
-            // - and CompetencyOpportunityCalculator itself filters out
-            // manual-override-to-craft nodes and cost-neutral-or-worse
-            // cases; every entry here is a genuine, concrete "train this
-            // and save N" opportunity).
+            // 2b. Competency OPPORTUNITY lines, alphabetical by item name.
+            // Distinct from block 2: that explains disciplines the plan
+            // already needs; this surfaces disciplines that would make the
+            // plan cost LESS. Every entry is a genuine, concrete "train
+            // this and save N" opportunity (the calculator filters the
+            // rest).
             if (result.CompetencyOpportunities != null && result.CompetencyOpportunities.Count > 0)
             {
                 var opportunityRows = new List<(string Name, PlanRowViewModel Row)>(
@@ -1120,15 +918,9 @@ namespace GW2CraftingHelper.Services
                     .Select(r => r.Row));
             }
 
-            // 3. RECIPE-SHEET SAVINGS opportunities (opportunity-notes),
-            // alphabetical by resolved item name - same stable-sort
-            // precedent as the excess/reclaim rows above. Two physical rows
-            // per opportunity (the sheet's own cost, then the per-unit
-            // savings once learned) - NoteLine only has ONE CoinValue slot
-            // per row (NotesSectionRenderer), and this note carries two
-            // distinct concrete numbers, so it is split the same way the
-            // forge-scope note below is split for a different reason (line-
-            // wrap avoidance) - one logical note, two/three physical rows.
+            // 3. Recipe-sheet savings opportunities, alphabetical by item
+            // name. Two physical rows per opportunity - NoteLine has one
+            // CoinValue slot per row and this note carries two numbers.
             if (result.RecipeSheetSavingsOpportunities != null && result.RecipeSheetSavingsOpportunities.Count > 0)
             {
                 var sheetRows = new List<(string Name, List<PlanRowViewModel> Rows)>(
@@ -1165,27 +957,13 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // 4. SEASONAL VENDOR TIP opportunities (opportunity-notes),
-            // alphabetical by resolved item name. Two physical rows per
-            // tip (review fix, finding 4) - the trade description, then
-            // the "cheaper than this plan's price" comparison - same
-            // NotesSectionRenderer.LabelHelpers.EllipsizeToWidth exposure
-            // the RECIPE-SHEET SAVINGS note above was already split to
-            // avoid: a single ~150-char combined label ellipsizes at the
-            // panel edge, and the trailing clause (what the CoinValue on
-            // the SAME row actually means) is exactly what gets cut,
-            // leaving a bare coin number with no stated meaning. Splitting
-            // also resolves the "5x Glob of Ectoplasm" / "PlanUnitPrice"
-            // adjacency ambiguity (PlanUnitPrice is a PER-UNIT price, not
-            // the price of the 5x bundle just before it) by saying "per
-            // unit" explicitly on the row that actually carries the
-            // CoinValue. The tip's own "cost" description is built ONLY
-            // from Item-type cost lines (see BuildSeasonalCostDescription's
-            // own doc comment for why a coin-priced cost line is skipped
-            // entirely rather than rendered as raw text) - the only offers
-            // this module seeds today (Candy Corn Vendor (Weekly)) are
-            // pure single-Item-cost-line, so this never fires in practice
-            // yet.
+            // 4. Seasonal vendor tip opportunities, alphabetical by item
+            // name. Two physical rows per tip: a single combined label
+            // ellipsizes at the panel edge and cuts exactly the clause
+            // that explains the coin number; splitting also lets "per
+            // unit" sit on the row that carries the CoinValue. The cost
+            // description uses only Item-type cost lines (see
+            // BuildSeasonalCostDescription).
             if (result.SeasonalVendorTips != null && result.SeasonalVendorTips.Count > 0)
             {
                 var tipRows = new List<(string Name, List<PlanRowViewModel> Rows)>(result.SeasonalVendorTips.Count);
@@ -1198,18 +976,10 @@ namespace GW2CraftingHelper.Services
                     }
 
                     string itemName = ResolveName(tip.ItemId, result.ItemMetadata);
-                    // Review fix (finding 2): the cap number here is a
-                    // PURCHASE/trade limit, not an output-unit limit - see
-                    // ref/vendor_offers.json's own outputCount/weeklyCap
-                    // pairs (e.g. Dragon Bash Merchant, outputCount 50 /
-                    // weeklyCap 1) and VendorBatchSolver.FinalizeVendorBatches,
-                    // which compares this same cap against unitsNeeded
-                    // (a purchase count), never against an output-unit
-                    // count. The old "(capped N/week)" wording, placed
-                    // right after "Nx <item>", read as "N <item>s/week"
-                    // - off by a factor of OutputCount whenever OutputCount
-                    // != 1. Wording it as a purchase count instead removes
-                    // the ambiguity without needing the multiply-through.
+                    // The cap number is a PURCHASE limit, not an
+                    // output-unit limit ("capped N/week" right after
+                    // "Nx <item>" misread as N items/week, off by a factor
+                    // of OutputCount); word it as a purchase count.
                     string capClause = tip.WeeklyCap.HasValue
                         ? $" (limit {tip.WeeklyCap.Value} purchase{(tip.WeeklyCap.Value == 1 ? "" : "s")}/week)"
                         : tip.DailyCap.HasValue
@@ -1245,31 +1015,13 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // 5. Gambling-forge scope note (0 or 1 logical entry). Wording
-            // deliberately distinguishes the two mechanics design-plan-
-            // notes.md section 9 flags as easy to conflate: this plan's own
-            // Mystic-Clover-style fractional yield IS probability-adjusted
-            // (EV already priced in) - true multi-outcome gambles (e.g.
-            // precursor forging) are a DIFFERENT mechanic this module has
-            // no data for at all and are never represented in a plan,
-            // in either direction.
-            //
-            // Review fix (finding 4, INFERRED - no live desktop
-            // verification was performed, see docs/KNOWN-ISSUES.md): the
-            // single-row, ~243-char version of this note would have
-            // clipped horizontally at NotesSectionRenderer's panel edge
-            // (panelWidth ~884px at DefaultFont14, AutoSizeWidth label with
-            // no max-width cap) - a label cannot overflow a fixed-height
-            // row's HEIGHT, only its own horizontal extent, so the failure
-            // mode here is edge-clipping, not row overflow. The clipped
-            // portion would have been exactly the "true multi-outcome
-            // gambles... never models and never shows" caveat the note
-            // exists to deliver. Split at the existing sentence break plus
-            // one clause break, into 3 NoteLine rows, each now a complete
-            // sentence - this preserves the 28px-per-row contract exactly
-            // (section height is rows.Count * FallbackTextRowHeight) while
-            // keeping every word of the original text visible regardless
-            // of panel width.
+            // 5. Gambling-forge scope note (0 or 1 logical entry). The
+            // wording distinguishes fractional EV yield (already priced
+            // in) from true multi-outcome gambles, which this module never
+            // represents. Split into 3 complete-sentence rows: a single
+            // ~243-char row would edge-clip exactly the caveat the note
+            // exists to deliver, and the split preserves the fixed
+            // height-per-row contract.
             if (result.ProbabilisticForgeOutputItemIds != null &&
                 result.ProbabilisticForgeOutputItemIds.Count > 0)
             {
@@ -1293,16 +1045,9 @@ namespace GW2CraftingHelper.Services
                 noteEntryCount++;
             }
 
-            // Matches every other section's "Title (N)" convention (Used
-            // Materials/Shopping List/Crafting Steps/Required Disciplines/
-            // Required Recipes all count their own final row list this same
-            // way) - computed last so it reflects every note kind above.
-            // Review fix (nice-to-have): counts real note ENTRIES
-            // (noteEntryCount), not section.Rows.Count - the latter also
-            // includes the "Total reclaimable value" rollup row and, as of
-            // the finding-4 split above, 3 physical rows for what is still
-            // one logical forge-scope note, either of which would inflate
-            // "Notes (N)" past the number of things actually being said.
+            // Matches every other section's "Title (N)" convention, but
+            // counts logical note entries, not physical rows - rollup and
+            // continuation rows would inflate the count.
             section.Title = $"Notes ({noteEntryCount})";
 
             return section;
@@ -1320,29 +1065,14 @@ namespace GW2CraftingHelper.Services
 
             foreach (var recipe in result.RequiredRecipes)
             {
-                // Wave-3 quick win #2 (2026-08-06 field testing, maintainer
-                // direction): a sole-Mystic-Forge recipe has nothing to
-                // learn - the forge combination just exists, there is no
-                // unlock concept (PlanResultBuilder.InherentlyAvailableDisciplines
-                // already always marks it IsMissing = false for the same
-                // reason). Listing it here read as a recipe-unlock task that
-                // does not exist, so it is skipped entirely rather than
-                // shown as an always-"Learned"/"Auto-learned" row. A recipe
-                // that combines MysticForge with a genuine leveled
-                // discipline (not seen in real game data today - see
-                // FormatDisciplineSublabel's own doc comment - but not
-                // structurally impossible) still has a real discipline to
-                // learn, so only a recipe whose ENTIRE Disciplines list is
-                // MysticForge is filtered here.
-                //
-                // This only touches the Required Recipes SECTION's own row
-                // list, built fresh in this loop - the raw
-                // result.RequiredRecipes list itself, and
-                // BuildCraftingStepsSection's per-step sublabel lookup that
-                // reads it above, are both untouched. A Mystic Forge craft
-                // STEP therefore still shows its "Mystic Forge" location
-                // sublabel exactly as PR #102 left it - only this section
-                // drops the row.
+                // A sole-Mystic-Forge recipe has nothing to learn - there
+                // is no unlock concept - so it is skipped rather than
+                // shown as an always-"Learned" row. Only a recipe whose
+                // ENTIRE Disciplines list is MysticForge is filtered; one
+                // combining the forge with a real leveled discipline still
+                // has something to learn. Touches only this section's row
+                // list - a Mystic Forge craft STEP keeps its location
+                // sublabel.
                 if (IsMysticForgeOnly(recipe.Disciplines))
                 {
                     continue;
@@ -1373,23 +1103,14 @@ namespace GW2CraftingHelper.Services
                 string sublabel = FormatDisciplineSublabel(
                     recipe.Disciplines, recipe.MinRating, planDiscNames);
 
-                // UI-bundle milestone, Feature A (wiki links): scoped to
-                // "Required Recipes Missing!" rows only, per the spec's own
-                // wording (contrast Feature A's tree-row affordance, which
-                // the spec calls out for "each item row" with no such
-                // scoping) - a row the user has nothing left to unlock for
-                // (Learned/Auto-learned) gets no wiki affordance at all.
-                // Flag-based target: a LearnedFromItem recipe links to its
-                // own "Recipe: <name>" sheet page; every other recipe links
-                // to the output item's page + "#Acquisition" anchor.
-                // Review-fix: gated on the semantic flags (not the display
-                // string) so a tag rename cannot silently drop every wiki
-                // link. Verification-fix: IsAutoLearned excluded explicitly -
-                // an auto-learned recipe can be IsMissing (rating below
-                // threshold) yet has nothing to unlock via the wiki, so it
-                // must keep getting no affordance, exactly as the spec
-                // comment above states (the statusTag chain checks
-                // Auto-learned first for the same reason).
+                // Wiki links only on Missing rows - a Learned/Auto-learned
+                // row has nothing left to unlock. A LearnedFromItem recipe
+                // links to its "Recipe: <name>" sheet page; every other
+                // recipe to the item's "#Acquisition" anchor. Gated on the
+                // semantic flags (not the display string) so a tag rename
+                // cannot drop every link; IsAutoLearned is excluded
+                // explicitly - it can be IsMissing yet has nothing to
+                // unlock via the wiki.
                 string wikiUrl = !recipe.IsAutoLearned && recipe.IsMissing == true
                     ? WikiLinkBuilder.BuildRequiredRecipeUrl(name, recipe.IsLearnedFromItem)
                     : null;
@@ -1406,28 +1127,18 @@ namespace GW2CraftingHelper.Services
                 });
             }
 
-            // Title reflects the count AFTER the Mystic-Forge filter above,
-            // not result.RequiredRecipes.Count - keeps the header honest
-            // about what is actually listed below it. CraftingPlanView
-            // (wave-3 quick win #3's "Hide Unlocked Recipes" checkbox)
-            // recomputes its OWN header title at render time from this same
-            // section.Rows.Count plus its live filter state
-            // (RequiredRecipesVisibility.BuildHeaderTitle) rather than
-            // reading this Title verbatim - this value is still the correct
-            // "filter off" baseline for any other consumer (e.g. tests) and
-            // matches every other section's Title convention.
+            // Title reflects the count AFTER the Mystic-Forge filter, so
+            // the header is honest about what is listed. The view
+            // recomputes its own header title at render time from
+            // Rows.Count plus live filter state; this remains the correct
+            // filter-off baseline.
             section.Title = $"Required Recipes ({section.Rows.Count})";
             return section;
         }
 
-        // Wave-3 quick win #2: true only when EVERY entry in the recipe's
-        // Disciplines list is "MysticForge" (real production Mystic Forge
-        // recipes always carry exactly Disciplines = ["MysticForge"] -
-        // MysticForgeRecipeData.Load sets this unconditionally, mirrored by
-        // FormatDisciplineSublabel's own hasMysticForge comment above).
-        // Empty/null Disciplines is NOT Mystic-Forge-only (vacuous truth
-        // over an empty list would otherwise wrongly match a recipe with no
-        // discipline data at all).
+        // True only when EVERY entry in Disciplines is "MysticForge".
+        // Empty/null Disciplines is NOT Mystic-Forge-only - vacuous truth
+        // would wrongly match a recipe with no discipline data.
         private static bool IsMysticForgeOnly(List<string> disciplines)
         {
             if (disciplines == null || disciplines.Count == 0)
@@ -1445,18 +1156,11 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// opportunity-notes (SEASONAL VENDOR TIP): renders an offer's cost
-        /// lines as a plain "{Count}x {Name}[ + {Count}x {Name}...]" phrase
-        /// for the note's inline text. Returns null (never a partial/
-        /// misleading description) when costLines is null/empty or contains
-        /// ANY non-Item line - a coin (or other currency) cost line has no
-        /// safe way to render inline as raw text without violating the
-        /// repo's "coin icons MUST appear to the right of the number"
-        /// invariant, and NoteLine only has ONE CoinValue slot per row
-        /// (already spent on the plan's own price at the end of this same
-        /// row - see BuildNotesSection). The three offers this module seeds
-        /// today are pure single-Item-cost-line, so this restriction never
-        /// bites in practice yet.
+        /// Renders an offer's cost lines as a plain "{Count}x {Name}"
+        /// phrase. Returns null (never a partial description) when any
+        /// non-Item line exists: a coin cost line cannot render inline as
+        /// raw text without violating the coin-icon invariant, and the
+        /// row's one CoinValue slot is already spent.
         /// </summary>
         private static string BuildSeasonalCostDescription(
             List<CostLine> costLines, IReadOnlyDictionary<int, ItemMetadata> metadata)
@@ -1490,12 +1194,8 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        // source-selection-simplification: widened private -> internal (no
-        // logic change) so TreeSectionController can resolve a Subdued
-        // pill's StrictDomination item-kind delta to a display name too -
-        // see PlanViewModel.ItemMetadata's own doc comment. Still not
-        // public - stays same-assembly-only, matching every other
-        // resolver this pure builder class exposes.
+        // Internal so TreeSectionController can resolve a Subdued pill's
+        // item-kind delta to a display name too.
         internal static string ResolveName(
             int itemId, IReadOnlyDictionary<int, ItemMetadata> metadata)
         {
@@ -1549,33 +1249,13 @@ namespace GW2CraftingHelper.Services
                 return "";
             }
 
-            // Field-test finding E: a sole-MysticForge recipe (real
-            // production Mystic Forge recipes always carry
-            // Disciplines = ["MysticForge"] - MysticForgeRecipeData.Load
-            // sets this unconditionally) used to render "MysticForge 0" -
-            // the internal id string verbatim, plus a meaningless rating of
-            // 0 (the forge has no level requirement). The forge is a
-            // facility, not a discipline (PlanResultBuilder.
-            // NonCraftingDisciplines now excludes it from Required
-            // Disciplines entirely - see that field's doc comment), so its
-            // step/recipe sublabel shows the facility's real name with no
-            // level number instead.
-            //
-            // Follow-up fix: "MysticForge" is stripped out of planDiscNames
-            // upstream (it is never a member of RequiredDisciplines), so it
-            // can never survive the planDiscNames intersection below on its
-            // own merits. It used to be run through that intersection like
-            // any other discipline anyway, which meant a recipe combining
-            // MysticForge with a genuine leveled discipline (not seen in
-            // real game data today, but not structurally impossible) had
-            // MysticForge silently dropped whenever the real discipline was
-            // present - only the real discipline survived the intersection,
-            // so the facility name never made it back in. Splitting the
-            // MysticForge flag out before filtering, and always
-            // re-prepending it to the display text, means it can no longer
-            // be silently dropped no matter what planDiscNames does or does
-            // not contain - the OTHER discipline's rating remains
-            // meaningful information, so the level number stays too.
+            // The forge is a facility, not a discipline: a sole-
+            // MysticForge recipe shows the facility's real name with no
+            // level number (never "MysticForge 0"). The MysticForge flag
+            // is split out before the planDiscNames intersection and
+            // always re-prepended, so it can never be silently dropped
+            // when a real leveled discipline is also present - that
+            // discipline's rating stays.
             bool hasMysticForge = recipeDisciplines.Contains("MysticForge");
             List<string> otherDisciplines = hasMysticForge
                 ? recipeDisciplines.Where(d => d != "MysticForge").ToList()
@@ -1622,13 +1302,8 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Clamps a long to int.MaxValue rather than letting a plain
-        /// `(int)` cast overflow/wrap negative - same convention as
-        /// VendorBatchSolver's own private ClampToInt (a currency Amount
-        /// this large is already an extreme edge case; showing the largest
-        /// representable int is safer than a corrupted negative required
-        /// quantity, which downstream owned-vs-required comparisons - see
-        /// BuildCurrencyTableRows' fullyCovered check - would otherwise
-        /// misread as fully covered).
+        /// `(int)` cast wrap negative, which downstream owned-vs-required
+        /// comparisons would misread as fully covered.
         /// </summary>
         private static int ClampToInt(long value)
         {

@@ -22,7 +22,7 @@ namespace GW2CraftingHelper.Services
     /// AutoSize-replacement containers explicitly and to size the
     /// individual row Panels it creates, so the two paths cannot drift
     /// apart - mirrors ShoppingColumnMath's "one source of truth" shape.
-    /// <para>See docs/ARCHITECTURE.md section 4 (M38 WP-27).</para>
+    /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
     public static class PlanContentHeightMath
     {
@@ -85,7 +85,7 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M34-B1 #3: a Crafting Steps section can now mix numbered
+        /// A Crafting Steps section can now mix numbered
         /// CraftStep rows (CraftStepRowHeight, via
         /// Views/Rendering/CraftStepsSectionRenderer.CreateCraftStepRow) with
         /// plain TimegatedNotice info rows (FallbackTextRowHeight, via the

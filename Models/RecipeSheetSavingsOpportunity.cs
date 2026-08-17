@@ -1,7 +1,7 @@
 namespace GW2CraftingHelper.Models
 {
     /// <summary>
-    /// opportunity-notes (RECIPE-SHEET SAVINGS): one item whose plan-chosen
+    /// One item whose plan-chosen
     /// source is NOT craft, but crafting it instead would be cheaper once a
     /// purchasable recipe sheet is bought (and, possibly, a discipline
     /// trained) - see Services/RecipeSheetSavingsCalculator, the sole

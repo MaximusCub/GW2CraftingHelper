@@ -5,7 +5,7 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// opportunity-notes (SEASONAL VENDOR TIP): pure, Blish-free post-solve
+    /// Pure, Blish-free post-solve
     /// annotation pass, same architectural role/placement precedent as
     /// ExcessCraftOutputCalculator - walks the plan's own shopping/craft
     /// steps (NOT the recipe tree - a seasonal offer is unconditionally

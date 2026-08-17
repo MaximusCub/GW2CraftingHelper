@@ -5,7 +5,7 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// currency-ux-package (Feature 3): builds the "value-detail" hover
+    /// Builds the "value-detail" hover
     /// text for a Recipe Tree CRAFT/VENDOR pill whose committed decision's
     /// DECISION-ONLY comparison value (CraftingTreeNode.DecisionValue)
     /// diverges from its displayed real gold cost (SubtreeCost) - i.e. a

@@ -184,7 +184,7 @@ namespace GW2CraftingHelper.Services
         /// is the board's own one-time initial seed - called at most once
         /// per module session, before the strip has shown anything else.
         /// <para>
-        /// Review-fix (W3D adversarial review, critical): no-op if a real
+        /// Review-fix: no-op if a real
         /// generation has already Begin()'n this session (_sequence != 0)
         /// or is currently in flight - "called at most once... before the
         /// strip has shown anything else" above is a caller EXPECTATION,

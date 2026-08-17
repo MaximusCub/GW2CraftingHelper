@@ -44,7 +44,7 @@ namespace GW2CraftingHelper.Services
         public int MinRating { get; set; }
         public List<string> Flags { get; set; } = new List<string>();
 
-        // M37 (KNOWN-ISSUES #26): recipe-level achievement_id, mirroring
+        // Recipe-level achievement_id, mirroring
         // gw2efficiency's own custom-recipes field (marks the RECIPE itself
         // as achievement-gated - e.g. a collection reward). Informational
         // only: NOT read by AchievementBitDedupPrePass, which keys purely on

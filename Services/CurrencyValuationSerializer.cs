@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Services
     /// Blish_HUD.Settings and cannot be unit tested per repo invariant) so
     /// the actual conversion logic is covered by a real, Blish-free test.
     ///
-    /// currency-ux-package (Feature 1): the persisted shape gained a
+    /// The persisted shape gained a
     /// "Cleared" array alongside the pre-existing "Values" map (see
     /// PersistedModel below) - a currency the user explicitly cleared of
     /// CurrencyDecisionDefaults' curated default must stay unvalued forever,

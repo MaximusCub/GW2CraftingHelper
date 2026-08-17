@@ -4,7 +4,7 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Round 4 review-fix (W3D adversarial review, critical): a single,
+    /// Round 4 review-fix: a single,
     /// class-level structural walk of the ENTIRE object graph a
     /// deserialized <see cref="PersistedPlan"/> carries, run once at the
     /// deserialization boundary (<see cref="PlanStoreHelpers.DeserializePersistedPlan"/>)
@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Services
     /// check's own inline comment for the exact call site it protects.
     /// </para>
     /// <para>
-    /// Validation failure is the corrupt-file path (W3D spec item 4): the
+    /// Validation failure is the corrupt-file path: the
     /// caller throws, which propagates to <see cref="PlanStore.LoadLatest"/>'s
     /// own try/catch - one Warn log line, then a null return (fresh start).
     /// Never a partial accept: any single invalid field anywhere in the

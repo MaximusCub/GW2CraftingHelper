@@ -38,7 +38,7 @@ namespace GW2CraftingHelper.Services.Recipes
             // of StreamReader.ReadToEnd() + Deserialize<string>: it avoids
             // ReadToEnd's full UTF-16 string materialization (and the
             // internal UTF-8 re-encoding System.Text.Json performs to parse
-            // a string) on this seed file (M38 WP-08 / perf P2a).
+            // a string) on this seed file.
             // System.Text.Json 5.0.0 (net461) has no synchronous
             // Deserialize(Stream) overload. The File.ReadAllBytes() +
             // Deserialize<T>(ReadOnlySpan<byte>) sync overload was also

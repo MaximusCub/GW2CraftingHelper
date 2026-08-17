@@ -91,7 +91,7 @@ namespace GW2CraftingHelper.Services
         ///   node with owned stock of ITSELF plus owned stock of its own
         ///   ingredients, and a recipe/vendor batch whose output count is
         ///   greater than 1.
-        /// - Legacy heuristic (M34-B2a #2, gw2e parity / M1 Finding 5): used
+        /// - Legacy heuristic: used
         ///   whenever <paramref name="zeroOwnedDecisions"/> is null (every
         ///   pre-VOM caller/test) OR does not contain this node's NodeId
         ///   (defensive fallback) - true only along the single
@@ -458,7 +458,7 @@ namespace GW2CraftingHelper.Services
                 IngredientType = node.IngredientType,
                 Quantity = node.Quantity,
                 NodeId = node.NodeId,
-                // M37 (KNOWN-ISSUES #26): must be copied explicitly, same as
+                // Must be copied explicitly, same as
                 // every other field here - see the M33 Finding 2 comment on
                 // RecipeOption.ExpectedOutputCount below for why a field
                 // silently missing from this clone is a real, previously-hit
