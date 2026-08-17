@@ -46,6 +46,10 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("Lump of Mithrillium", notice.Label);
             Assert.Contains("30", notice.Label);
             Assert.Contains("30 days", notice.Label);
+            // Follow-up fix (recorded non-blocking): a single notice has no
+            // other daily-gated item to run in parallel with, so the
+            // clause must be dropped, not rendered unconditionally.
+            Assert.DoesNotContain("runs in parallel", notice.Label);
         }
 
         [Fact]
@@ -159,6 +163,36 @@ namespace GW2CraftingHelper.Tests.Services
             var notice = section.Rows[1];
             // Ceiling(5 / 2) = 3 days, not a truncated 2.
             Assert.Contains("3 days", notice.Label);
+        }
+
+        [Fact]
+        public void TwoCraftCooldownNotices_BothAppendParallelClause()
+        {
+            // Follow-up fix (recorded non-blocking): with 2+ daily-gated
+            // notices in the plan, each row DOES have another notice to run
+            // in parallel with, so the clause must be present on both.
+            var meta = MetaFor(
+                (46742, "Lump of Mithrillium", "lump.png"),
+                (43772, "Charged Quartz Crystal", "q.png"));
+            var result = MakeResult(
+                metadata: meta,
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.Craft, RecipeId = 7319 },
+                    new PlanStep { ItemId = 43772, Quantity = 5, Source = AcquisitionSource.Craft, RecipeId = 99 }
+                },
+                dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
+                {
+                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 },
+                    [43772] = new DailyCooldownItem { ItemId = 43772, PerDayCap = 2 }
+                });
+
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            var notices = section.Rows.Where(r => r.RowType == PlanRowType.TimegatedNotice).ToList();
+            Assert.Equal(2, notices.Count);
+            Assert.All(notices, n => Assert.Contains("runs in parallel with other daily-gated items", n.Label));
         }
 
         [Fact]
