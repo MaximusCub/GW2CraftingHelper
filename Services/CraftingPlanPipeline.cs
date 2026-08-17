@@ -1269,8 +1269,12 @@ namespace GW2CraftingHelper.Services
             // here - see that method's own doc comment for why this is
             // NOT a pure move: the operand checked against that constant
             // is now solveTree (possibly a fresh re-reduced clone), not
-            // context.Tree, and a null tree now dispatches to the
-            // single-item branch instead of throwing.
+            // context.Tree. The `tree != null &&` guard is defensive
+            // only - a null tree still NREs one frame deeper, inside
+            // ComputePerItemEconomics' itemRoot.NodeId dereference - and
+            // is unreachable here in production anyway (ResolveWithOverrides
+            // passes this same solveTree to _solver.Solve and
+            // BuildCraftingTreeResult before this call).
             SellSideEconomics.ApplyForPlanShape(
                 result, solveTree, solveResult, context.Prices,
                 context.TargetItemId, context.Quantity, context.RequestedItems,

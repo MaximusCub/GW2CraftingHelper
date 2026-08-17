@@ -6991,7 +6991,7 @@ fixes, and document the whole annotation-pass group in
 
 **What changed:**
 1. **Annotation-detection characterization tests
-   (`tests/.../CraftingPlanPipelineTests.cs`).** Five new tests, real
+   (`tests/.../CraftingPlanPipelineTests.cs`).** Six new tests, real
    pipeline paths throughout (no mocked calculators): three pin the exact
    mutation described above -
    `GenerateStructuredAsync_ListOverload_MultiItem_
@@ -7014,7 +7014,10 @@ fixes, and document the whole annotation-pass group in
    commented out the four `Apply` calls at both sites, rebuilt (0
    errors), ran the full suite - exactly the three targeted tests failed
    (`Assert.NotNull() Failure: Value is null`), the other 1770 stayed
-   green - then reverted and confirmed 1773/1773 green again.
+   green - then reverted and confirmed 1773/1773 green again. A sixth
+   test, `GenerateStructuredAsync_RecipeSheetSavings_EndToEnd_
+   PopulatesOpportunity`, was added later (gate finding 1, 2026-08-17
+   correction commit) - see item 3 below.
 2. **B8: `SellSideEconomics.ApplyForPlanShape` self-dispatch
    (`Services/SellSideEconomics.cs`).** `ResolveWithOverrides` used to
    branch on `context.Tree.Id != Gw2Constants.MultiItemWrapperItemId`
@@ -7031,9 +7034,13 @@ fixes, and document the whole annotation-pass group in
    _reducer != null`. Equivalent today only because
    `InventoryReducer.CloneNode` copies `Id` onto the clone and the
    wrapper root is never pruned - an invariant nothing asserts. The new
-   `tree != null &&` guard is also a second, previously-unstated behavior
-   change: a null tree used to throw NRE at `context.Tree.Id`; it now
-   silently routes to the single-item branch. See
+   `tree != null &&` guard does NOT change null-tree behavior: a null
+   tree used to throw NRE at `context.Tree.Id`; it still NREs, one frame
+   deeper, at `itemRoot.NodeId` inside `ComputePerItemEconomics` (MEASURED
+   via a temporary probe test, since reverted). The guard is defensive
+   only, and the state is unreachable in production anyway -
+   `ResolveWithOverrides` passes the same `solveTree` to `_solver.Solve`
+   and `BuildCraftingTreeResult` before this call. See
    `SellSideEconomics.ApplyForPlanShape`'s own doc comment for the
    corrected description.
 3. **B8: `RecipeSheetSavingsCalculator.Apply` narrowed to
@@ -7055,6 +7062,20 @@ fixes, and document the whole annotation-pass group in
    17 call sites' argument changed, from `vendorOfferStore: store` to
    `offersForItem: store.GetOffersForItem` (a plain delegate over the
    same real store).
+   **Correction (gate finding 1, 2026-08-17):** this narrowing moved the
+   offer source onto a previously-unpinned `CraftingPlanPipeline` field,
+   `_offersForRecipeSheetItem`, computed once in the constructor. Nothing
+   in the suite asserted on its content: replacing the whole assignment
+   with `_offersForRecipeSheetItem = null;` left all 1773 pre-existing
+   tests green (verified), silently disabling every recipe-sheet-savings
+   note in production with no crash. Closed with an end-to-end pipeline
+   test, `GenerateStructuredAsync_RecipeSheetSavings_EndToEnd_
+   PopulatesOpportunity` (real temp-directory `VendorOfferStore` plus a
+   non-empty `recipeSheetItemIdByRecipeId`, no fakes), asserting
+   `RecipeSheetSavingsOpportunities` is non-empty with correct content,
+   not merely `NotNull`. Verified against the mutation: reintroducing
+   `_offersForRecipeSheetItem = null;` fails this test; reverting
+   restores 1774/1774 green.
 4. **`docs/ARCHITECTURE.md` Section 10, "Post-solve annotation passes."**
    New section naming the four calculators and their one-collection-each
    contract, why `SellSideEconomics` is adjacent but not a member (it
@@ -7074,13 +7095,13 @@ fixes, and document the whole annotation-pass group in
   errors (1782 pre-existing StyleCop warnings, none new).
 - Tests: `"/mnt/c/Program Files/dotnet/dotnet.exe" test
   C:/Dev/Blish/wt-qannot/tests/GW2CraftingHelper.Tests/
-  GW2CraftingHelper.Tests.csproj` - 1773/1773 green (baseline 1768 + 5
+  GW2CraftingHelper.Tests.csproj` - 1774/1774 green (baseline 1768 + 6
   new tests listed above).
 - Mutation verification (see item 1 above): the exact judge's mutation
   (deleting all four `Apply` calls at the multi-item and
   override-resolve sites) reproduced by hand, rebuilt, and run - exactly
   the three targeted characterization tests failed, no others; reverted
-  and re-confirmed 1773/1773 green.
+  and re-confirmed 1774/1774 green.
 
 **Repo Invariants Checklist:**
 - [x] No Blish HUD references added to tests

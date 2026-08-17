@@ -101,10 +101,14 @@ namespace GW2CraftingHelper.Services
         /// consulted only by the single-item branch; requestedItems only by
         /// the multi-item branch - the unused pair of arguments is simply
         /// ignored by whichever branch does not run, exactly as each
-        /// branch's own existing parameter list already required. Also NOT
-        /// equivalent to the old if/else on a null tree: `context.Tree.Id`
-        /// threw NRE on a null Tree; the `tree != null &&` guard here
-        /// instead routes a null tree to the single-item branch.
+        /// branch's own existing parameter list already required. On a null
+        /// tree, the `tree != null &&` guard is defensive only, NOT a
+        /// behavior change from the old if/else: `context.Tree.Id` threw
+        /// NRE on a null Tree, and a null `tree` here still NREs, one frame
+        /// deeper, at itemRoot.NodeId inside ComputePerItemEconomics. Also
+        /// unreachable in production either way - ResolveWithOverrides
+        /// passes the same tree to _solver.Solve and BuildCraftingTreeResult
+        /// before dispatching here.
         /// </summary>
         internal static void ApplyForPlanShape(
             CraftingPlanResult result,
