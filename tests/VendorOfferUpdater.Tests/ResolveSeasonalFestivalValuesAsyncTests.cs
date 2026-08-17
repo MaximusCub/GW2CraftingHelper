@@ -246,6 +246,98 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
+        // Resilience fix (2026-08-17): a non-JSON/HTML 200 response (the
+        // shape a wiki maintenance page or a proxy error page would
+        // return) used to throw an uncaught JsonException out of
+        // FetchWitextAsync's JsonDocument.Parse, aborting the WHOLE method
+        // - the loop never reached its other pages, and (before this fix)
+        // the post-loop-only save call meant nothing fetched so far was
+        // persisted either. Must now behave exactly like an HTTP failure:
+        // warn, leave that one page uncached, continue with the rest.
+        [Fact]
+        public async Task NonJsonResponseOnOnePage_LeavesItUncached_OthersStillResolved()
+        {
+            var handler = new FakeHttpHandler();
+            using var httpClient = new HttpClient(handler);
+            var client = new WikiSmwClient(httpClient);
+
+            handler.MapUrl(
+                url => url.Contains("action=parse") && url.Contains("Good"),
+                BuildWikitextResponse("{{Temporary|release=Dragon Bash 2019|seasonal=Dragon Bash}}"));
+            handler.MapUrl(
+                url => url.Contains("action=parse") && url.Contains("Bad"),
+                "<html>not json</html>");
+
+            var results = new List<WikiVendorResult>
+            {
+                new WikiVendorResult { PageName = "Bad Vendor#vendor1", GameId = 1 },
+                new WikiVendorResult { PageName = "Good Vendor#vendor1", GameId = 2 },
+            };
+
+            string cachePath = TempCachePath();
+            try
+            {
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    results, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
+
+                Assert.Null(results[0].TemporarySeasonalValue);
+                Assert.Equal("Dragon Bash", results[1].TemporarySeasonalValue);
+            }
+            finally
+            {
+                File.Delete(cachePath);
+            }
+        }
+
+        // Resilience fix (2026-08-17): an exception the per-page catches
+        // don't handle (anything other than HttpRequestException/
+        // JsonException - e.g. Ctrl-C's OperationCanceledException, or
+        // any other unexpected failure) must still leave every page
+        // already fetched THIS run persisted, not just the pages fetched
+        // on a run that happens to complete normally. Deterministic
+        // repro: the second page's URL matches nothing the fake handler
+        // knows about, so it throws an arbitrary (uncaught-by-design)
+        // exception straight out of the loop.
+        [Fact]
+        public async Task UnhandledExceptionMidLoop_StillSavesPagesFetchedSoFar()
+        {
+            var handler = new FakeHttpHandler();
+            using var httpClient = new HttpClient(handler);
+            var client = new WikiSmwClient(httpClient);
+
+            handler.MapUrl(
+                url => url.Contains("action=parse") && url.Contains("page=VendorA"),
+                BuildWikitextResponse("{{Temporary|release=Dragon Bash 2019|seasonal=Dragon Bash}}"));
+            // Deliberately no mapping for "VendorB" and no queued
+            // fallback - FakeHttpHandler throws InvalidOperationException
+            // for it, simulating an unanticipated failure mode.
+
+            var results = new List<WikiVendorResult>
+            {
+                new WikiVendorResult { PageName = "VendorA#vendor1", GameId = 1 },
+                new WikiVendorResult { PageName = "VendorB#vendor1", GameId = 2 },
+            };
+
+            string cachePath = TempCachePath();
+            try
+            {
+                await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    Program.ResolveSeasonalFestivalValuesAsync(
+                        results, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None));
+
+                Assert.True(
+                    File.Exists(cachePath),
+                    "Cache file should be saved even when the loop exits via an unhandled exception.");
+                string json = File.ReadAllText(cachePath);
+                Assert.Contains("VendorA", json);
+                Assert.DoesNotContain("VendorB", json);
+            }
+            finally
+            {
+                File.Delete(cachePath);
+            }
+        }
+
         [Fact]
         public async Task EmptyWikiResults_NoOp()
         {
@@ -269,7 +361,7 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
-        // ── StripSubobjectSuffix ────────────────────────────────────
+        // -- StripSubobjectSuffix --------------------------------------
 
         [Theory]
         [InlineData("Candy Corn Vendor (Weekly)#vendor1", "Candy Corn Vendor (Weekly)")]

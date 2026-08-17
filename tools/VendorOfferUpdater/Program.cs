@@ -311,6 +311,23 @@ namespace VendorOfferUpdater
 
                     await ResolveSeasonalFestivalValuesAsync(
                         wikiResults, wikiClient, seasonalCachePath, maxSeasonalPages, delayMs, ct);
+
+                    // Round-trip fix (2026-08-17): WikiVendorResult.
+                    // TemporarySeasonalValue's own doc comment claims this
+                    // value "still round-trips through wiki_vendor_cache.
+                    // json for a later run without needing to re-fetch the
+                    // page" - false as written, because Step 2 above wrote
+                    // wikiCachePath BEFORE this pass populated the field,
+                    // so every row in that file had it as null. Re-save
+                    // now that wikiResults carries the resolved values, so
+                    // a later --resolve-item-currencies-only (or any other
+                    // run that loads wikiCachePath) actually gets them
+                    // without re-fetching every vendor page's wikitext.
+                    string cacheJsonWithSeasonalTags = JsonSerializer.Serialize(wikiResults);
+                    await File.WriteAllTextAsync(wikiCachePath, cacheJsonWithSeasonalTags);
+                    Console.WriteLine(
+                        $"Re-saved wiki vendor cache ({wikiResults.Count} results, now including " +
+                        $"resolved seasonal festival tags) to {wikiCachePath}");
                     Console.WriteLine();
                 }
 
@@ -320,11 +337,26 @@ namespace VendorOfferUpdater
                 int skippedNoId = 0;
                 int skippedUnresolved = 0;
 
+                // DATA LOSS fix (2026-08-17, festival-vendor auto-tagging
+                // live run post-mortem): a merchant with a GameId<=0 row
+                // in THIS pass means the pass's own wiki query failed to
+                // resolve a game id for at least one of that merchant's
+                // items (a query defect, not proof the wiki dropped the
+                // item - a scoped festival-vendor run measured the wiki
+                // still serving real ids for rows its own cache recorded
+                // as GameId 0). MergeIntoBaseline's per-merchant wholesale
+                // replacement must not be allowed to delete that
+                // merchant's baseline offers on the strength of an
+                // incomplete fresh result - see the set built below and
+                // its use at the --merge-into call site.
+                var skippedNoIdMerchants = new HashSet<string>(StringComparer.Ordinal);
+
                 foreach (var result in wikiResults)
                 {
                     if (result.GameId <= 0)
                     {
                         skippedNoId++;
+                        skippedNoIdMerchants.Add(result.MerchantName ?? string.Empty);
                         continue;
                     }
 
@@ -400,7 +432,7 @@ namespace VendorOfferUpdater
                         }
                     }
 
-                    var mergeResult = MergeIntoBaseline(baseline.Offers, uniqueOffers);
+                    var mergeResult = MergeIntoBaseline(baseline.Offers, uniqueOffers, skippedNoIdMerchants);
                     finalOffers = mergeResult.Merged;
                     Console.WriteLine(
                         $"Merged into baseline ({baseline.Offers.Count} offers): " +
@@ -408,6 +440,16 @@ namespace VendorOfferUpdater
                         $"{mergeResult.MerchantNamesReplaced.Count} merchant(s), " +
                         $"added {finalOffers.Count - (baseline.Offers.Count - mergeResult.RemovedFromBaseline)} " +
                         $"=> {finalOffers.Count} total");
+
+                    if (mergeResult.MerchantNamesProtected.Count > 0)
+                    {
+                        Console.WriteLine(
+                            $"  WARNING: {mergeResult.MerchantNamesProtected.Count} merchant(s) had " +
+                            "row(s) with no game id this pass, so their baseline offers were NOT " +
+                            "dropped (DATA LOSS guard) - re-run once every row resolves a game id " +
+                            "to clean up any now-stale baseline rows for: " +
+                            string.Join(", ", mergeResult.MerchantNamesProtected));
+                    }
                     Console.WriteLine();
                 }
 
@@ -570,6 +612,13 @@ namespace VendorOfferUpdater
             public List<VendorOffer> Merged { get; set; } = new();
             public int RemovedFromBaseline { get; set; }
             public List<string> MerchantNamesReplaced { get; set; } = new();
+
+            // DATA LOSS fix (2026-08-17): merchants that appeared in the
+            // fresh batch but were EXCLUDED from wholesale replacement
+            // because merchantsWithSkippedRows flagged them - their
+            // baseline offers were kept, not dropped. See
+            // MergeIntoBaseline's own doc comment.
+            public List<string> MerchantNamesProtected { get; set; } = new();
         }
 
         /// <summary>
@@ -587,19 +636,48 @@ namespace VendorOfferUpdater
         /// fresh offer for that merchant is added - never a partial,
         /// offer-by-offer union that could leave stale rows alongside new
         /// ones for the same merchant.
+        ///
+        /// DATA LOSS fix (2026-08-17): the wholesale-replace rule above is
+        /// exactly what silently deleted 6 shipped offers in a real run -
+        /// the fresh batch's own wiki query had 9 rows with GameId 0 for
+        /// two merchants (a query defect; the wiki still served real ids
+        /// for those rows, confirmed live after the fact), Program.cs's
+        /// GameId&lt;=0 filter dropped them before they ever reached this
+        /// method, and wholesale replacement then deleted the baseline's
+        /// only copies with no fresh row to replace them. <paramref
+        /// name="merchantsWithSkippedRows"/> (merchant names with at least
+        /// one such GameId&lt;=0 row this pass, built by the caller from
+        /// the same wikiResults list before the GameId filter runs) opts a
+        /// merchant OUT of wholesale replacement: its baseline offers are
+        /// kept alongside whatever fresh offers this pass did resolve for
+        /// it (union, deduplicated by OfferId), rather than dropped and
+        /// replaced by a known-incomplete fresh set. This trades "some
+        /// possibly-stale baseline rows survive an extra run or two" for
+        /// "never silently deletes shipped data" - the former is visible
+        /// and fixable by a follow-up run once every row resolves a game
+        /// id; the latter is not.
         /// </summary>
         // internal for testability (VendorOfferUpdater.Tests)
         internal static BaselineMergeResult MergeIntoBaseline(
             List<VendorOffer> baseline,
-            List<VendorOffer> fresh)
+            List<VendorOffer> fresh,
+            ISet<string>? merchantsWithSkippedRows = null)
         {
             baseline ??= new List<VendorOffer>();
             fresh ??= new List<VendorOffer>();
+            merchantsWithSkippedRows ??= new HashSet<string>(StringComparer.Ordinal);
 
-            var merchantsReplaced = fresh
+            var merchantsInFresh = fresh
                 .Select(o => o.MerchantName ?? string.Empty)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(m => m, StringComparer.Ordinal)
+                .ToList();
+
+            var merchantsProtected = merchantsInFresh
+                .Where(m => merchantsWithSkippedRows.Contains(m))
+                .ToList();
+            var merchantsReplaced = merchantsInFresh
+                .Where(m => !merchantsWithSkippedRows.Contains(m))
                 .ToList();
             var merchantsReplacedSet = new HashSet<string>(merchantsReplaced, StringComparer.Ordinal);
 
@@ -609,6 +687,8 @@ namespace VendorOfferUpdater
             int removed = baseline.Count - kept.Count;
 
             var merged = kept.Concat(fresh)
+                .GroupBy(o => o.OfferId, StringComparer.Ordinal)
+                .Select(g => g.First())
                 .OrderBy(o => o.OfferId, StringComparer.Ordinal)
                 .ToList();
 
@@ -616,7 +696,8 @@ namespace VendorOfferUpdater
             {
                 Merged = merged,
                 RemovedFromBaseline = removed,
-                MerchantNamesReplaced = merchantsReplaced
+                MerchantNamesReplaced = merchantsReplaced,
+                MerchantNamesProtected = merchantsProtected
             };
         }
 
@@ -840,33 +921,59 @@ namespace VendorOfferUpdater
 
                 int effectiveDelay = Math.Max(200, delayMs);
 
-                for (int i = 0; i < toFetch.Count; i++)
+                // Resilience fix (2026-08-17): the ONLY save call used to
+                // sit after this loop, and the per-page catch only caught
+                // HttpRequestException. A JsonException from a non-JSON/
+                // HTML response (JsonDocument.Parse in
+                // WikiSmwClient.FetchWikitextAsync), an
+                // OperationCanceledException from Ctrl-C
+                // (ct.ThrowIfCancellationRequested/Task.Delay), or any
+                // other exception then aborted the whole method and
+                // discarded every page already fetched THIS run - a
+                // re-run would re-fetch all of them, and the caller
+                // (RunAsync) never even reaches Step 4/5/6 to write any
+                // output. The try/finally below saves whatever this pass
+                // fetched no matter how the loop exits; a parse failure is
+                // now treated exactly like an HTTP failure (warn, leave
+                // this one page uncached, continue with the rest).
+                try
                 {
-                    ct.ThrowIfCancellationRequested();
-
-                    string pageName = toFetch[i];
-                    string? wikitext;
-                    try
+                    for (int i = 0; i < toFetch.Count; i++)
                     {
-                        wikitext = await wikiClient.FetchWikitextAsync(pageName, ct);
-                    }
-                    catch (HttpRequestException ex)
-                    {
-                        Console.WriteLine(
-                            $"  WARNING: Failed to fetch wikitext for \"{pageName}\": {ex.Message} - left uncached.");
-                        continue;
-                    }
+                        ct.ThrowIfCancellationRequested();
 
-                    string? raw = TemporaryTemplateParser.ExtractSeasonalOrEventParameter(wikitext);
-                    cache[pageName] = raw ?? string.Empty;
+                        string pageName = toFetch[i];
+                        string? wikitext;
+                        try
+                        {
+                            wikitext = await wikiClient.FetchWikitextAsync(pageName, ct);
+                        }
+                        catch (HttpRequestException ex)
+                        {
+                            Console.WriteLine(
+                                $"  WARNING: Failed to fetch wikitext for \"{pageName}\": {ex.Message} - left uncached.");
+                            continue;
+                        }
+                        catch (JsonException ex)
+                        {
+                            Console.WriteLine(
+                                $"  WARNING: Failed to parse wikitext response for \"{pageName}\": {ex.Message} - left uncached.");
+                            continue;
+                        }
 
-                    if (i + 1 < toFetch.Count)
-                    {
-                        await Task.Delay(effectiveDelay, ct);
+                        string? raw = TemporaryTemplateParser.ExtractSeasonalOrEventParameter(wikitext);
+                        cache[pageName] = raw ?? string.Empty;
+
+                        if (i + 1 < toFetch.Count)
+                        {
+                            await Task.Delay(effectiveDelay, ct);
+                        }
                     }
                 }
-
-                SaveSeasonalWikitextCache(cachePath, cache);
+                finally
+                {
+                    SaveSeasonalWikitextCache(cachePath, cache);
+                }
             }
             else if (distinctPageNames.Count > 0)
             {
@@ -940,7 +1047,28 @@ namespace VendorOfferUpdater
 
             var options = new JsonSerializerOptions { WriteIndented = true };
             string json = JsonSerializer.Serialize(sorted, options);
-            File.WriteAllText(path, json);
+
+            // Nice-to-have fix (2026-08-17 review): unlike
+            // Services/VendorOfferStore.SaveOverlay's temp-file +
+            // File.Replace pattern, this used to write path directly - a
+            // crash mid-write left a truncated cache. Bounded impact
+            // (LoadSeasonalWikitextCache swallows a parse failure and
+            // returns empty, so the only cost was a silent full re-fetch
+            // next run), but this pass's own resilience fix now calls
+            // this method from a `finally` block specifically to survive
+            // a mid-run crash/cancellation, so the write itself should be
+            // no less durable than that.
+            string tmpPath = path + ".tmp";
+            File.WriteAllText(tmpPath, json);
+            if (File.Exists(path))
+            {
+                File.Replace(tmpPath, path, null);
+            }
+            else
+            {
+                File.Move(tmpPath, path);
+            }
+
             Console.WriteLine($"  Saved seasonal wikitext cache ({cache.Count} entries) to {path}");
         }
 

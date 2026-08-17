@@ -172,5 +172,93 @@ namespace VendorOfferUpdater.Tests
             var result2 = Program.MergeIntoBaseline(new List<VendorOffer> { MakeOffer("a", "M") }, null);
             Assert.Single(result2.Merged);
         }
+
+        // DATA LOSS fix (2026-08-17): a merchant flagged as having had a
+        // GameId<=0 row this pass must NOT have its baseline offers
+        // dropped, even though it also appears in the fresh batch -
+        // exactly the mechanism that silently deleted 6 shipped offers in
+        // a real run (Program.cs's own GameId<=0 filter meant the fresh
+        // batch for that merchant was known-incomplete).
+        [Fact]
+        public void ProtectedMerchant_BaselineOffersSurviveAlongsideFreshOnes()
+        {
+            var baseline = new List<VendorOffer>
+            {
+                MakeOffer("stale-a", "Festival Rewards Vendor (Weekly)", 1),
+                MakeOffer("stale-b", "Festival Rewards Vendor (Weekly)", 2),
+                MakeOffer("c", "Miyani", 3)
+            };
+            var fresh = new List<VendorOffer>
+            {
+                MakeOffer("fresh-a", "Festival Rewards Vendor (Weekly)", 4)
+            };
+            var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
+
+            var result = Program.MergeIntoBaseline(baseline, fresh, skipped);
+
+            Assert.Equal(0, result.RemovedFromBaseline);
+            Assert.Equal(4, result.Merged.Count);
+            Assert.Contains(result.Merged, o => o.OfferId == "stale-a");
+            Assert.Contains(result.Merged, o => o.OfferId == "stale-b");
+            Assert.Contains(result.Merged, o => o.OfferId == "fresh-a");
+            Assert.Contains(result.Merged, o => o.OfferId == "c");
+            Assert.Equal(
+                new[] { "Festival Rewards Vendor (Weekly)" },
+                result.MerchantNamesProtected);
+            Assert.Empty(result.MerchantNamesReplaced);
+        }
+
+        // A run can have BOTH an unaffected merchant (wholesale-replaced
+        // as normal) and a protected one (skipped-row merchant) in the
+        // same fresh batch - each merchant's own outcome must be
+        // independent.
+        [Fact]
+        public void MixOfProtectedAndUnprotectedMerchants_EachHandledIndependently()
+        {
+            var baseline = new List<VendorOffer>
+            {
+                MakeOffer("stale-protected", "Wintersday Trader (Weekly)", 1),
+                MakeOffer("stale-replaced", "Homestead Refinement\u2014Farm", 2)
+            };
+            var fresh = new List<VendorOffer>
+            {
+                MakeOffer("fresh-protected", "Wintersday Trader (Weekly)", 3),
+                MakeOffer("fresh-replaced", "Homestead Refinement\u2014Farm", 4)
+            };
+            var skipped = new HashSet<string> { "Wintersday Trader (Weekly)" };
+
+            var result = Program.MergeIntoBaseline(baseline, fresh, skipped);
+
+            Assert.Equal(1, result.RemovedFromBaseline);
+            Assert.Contains(result.Merged, o => o.OfferId == "stale-protected");
+            Assert.DoesNotContain(result.Merged, o => o.OfferId == "stale-replaced");
+            Assert.Contains(result.Merged, o => o.OfferId == "fresh-protected");
+            Assert.Contains(result.Merged, o => o.OfferId == "fresh-replaced");
+            Assert.Equal(
+                new[] { "Wintersday Trader (Weekly)" }, result.MerchantNamesProtected);
+            Assert.Equal(
+                new[] { "Homestead Refinement\u2014Farm" }, result.MerchantNamesReplaced);
+        }
+
+        [Fact]
+        public void MergedResult_DedupesByOfferId_WhenProtectedBaselineAndFreshShareAnId()
+        {
+            // Same OfferId means content-identical (VendorOfferHasher is a
+            // content hash) - the union must not produce a visible
+            // duplicate row.
+            var baseline = new List<VendorOffer>
+            {
+                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1)
+            };
+            var fresh = new List<VendorOffer>
+            {
+                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1)
+            };
+            var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
+
+            var result = Program.MergeIntoBaseline(baseline, fresh, skipped);
+
+            Assert.Single(result.Merged);
+        }
     }
 }

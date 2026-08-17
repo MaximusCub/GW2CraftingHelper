@@ -161,6 +161,21 @@ namespace VendorOfferUpdater.Tests
             Assert.Null(TemporaryTemplateParser.ExtractSeasonalOrEventParameter(wikitext));
         }
 
+        // Nice-to-have fix (2026-08-17 review): a page with TWO
+        // {{Temporary}} templates, where only the SECOND one carries
+        // seasonal=, used to return null (only the first match was ever
+        // inspected) - now every match is checked.
+        [Fact]
+        public void SecondTemporaryTemplate_CarriesSeasonalParameter_StillExtracted()
+        {
+            const string wikitext =
+                "{{Temporary|release=Some Unrelated One-Off Release}}\n" +
+                "{{NPC infobox\n| name = Some Vendor\n}}\n" +
+                "{{Temporary|release=Dragon Bash 2019|seasonal=Dragon Bash}}";
+
+            Assert.Equal("Dragon Bash", TemporaryTemplateParser.ExtractSeasonalOrEventParameter(wikitext));
+        }
+
         [Fact]
         public void NullWikitext_ReturnsNull()
         {

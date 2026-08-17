@@ -34,12 +34,27 @@ namespace VendorOfferUpdater
     ///     vendor) - ExtractSeasonalOrEventParameter returns null for
     ///     that shape, same as for a page with no {{Temporary}} template
     ///     at all.
+    ///   - Known, untested shape (2026-08-17 review note - no live page
+    ///     has shown it yet): the extracted value is NOT normalized
+    ///     against wiki markup - "seasonal=[[Halloween]]" would extract
+    ///     the literal "[[Halloween]]", which is correctly left untagged
+    ///     with a warning by Gw2Constants.ResolveSeasonalFestivalKey
+    ///     rather than fuzzy-matched or guessed (per the never-guess
+    ///     repo invariant), but is worth knowing about if a future wiki
+    ///     edit ever introduces wikilink-wrapped parameter values.
     /// </summary>
     internal static class TemporaryTemplateParser
     {
-        // Non-greedy up to the first "}}" is safe here: every real
-        // {{Temporary|...}} usage observed is a single, non-nested
-        // template call - no "{{" appears inside its parameter list.
+        // Nice-to-have fix (2026-08-17 review): the comment here used to
+        // say "Non-greedy up to the first }}", but the pattern actually
+        // matches up to the first LITERAL '}' character via the negated
+        // class [^}]* - a single stray '}' anywhere inside a real
+        // template's parameter list (not observed in practice, but not
+        // impossible either) would make that template unmatchable rather
+        // than just truncate its captured body early. Kept as-is (not
+        // hardened further) since no real page has shown this shape -
+        // documented accurately instead of describing regex behavior
+        // that isn't what the pattern does.
         private static readonly Regex TemplateRegex = new Regex(
             @"\{\{\s*Temporary\s*\|([^}]*)\}\}",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -55,10 +70,19 @@ namespace VendorOfferUpdater
         /// <summary>
         /// Returns the trimmed "seasonal=" (preferred) or "event=" value
         /// from the page's {{Temporary|...}} template, or null if the page
-        /// has no such template, or has one with neither parameter set.
+        /// has no such template, or has none with either parameter set.
         /// Never returns an empty string (an explicit "seasonal=" with
         /// nothing after it is treated the same as the parameter being
         /// absent).
+        ///
+        /// Nice-to-have fix (2026-08-17 review): this used to look only
+        /// at the FIRST {{Temporary}} match on the page (Regex.Match) - a
+        /// page with two such templates, where only the first carries
+        /// release= and the second carries seasonal=/event=, would
+        /// return null despite genuinely being a festival vendor. Every
+        /// match is now checked in order (seasonal=/event= within each
+        /// match, same preference as before); the first non-empty value
+        /// found across the whole page wins.
         /// </summary>
         internal static string? ExtractSeasonalOrEventParameter(string? wikitext)
         {
@@ -67,31 +91,28 @@ namespace VendorOfferUpdater
                 return null;
             }
 
-            var templateMatch = TemplateRegex.Match(wikitext);
-            if (!templateMatch.Success)
+            foreach (Match templateMatch in TemplateRegex.Matches(wikitext))
             {
-                return null;
-            }
+                string body = templateMatch.Groups[1].Value;
 
-            string body = templateMatch.Groups[1].Value;
-
-            var seasonalMatch = SeasonalParamRegex.Match(body);
-            if (seasonalMatch.Success)
-            {
-                string value = seasonalMatch.Groups[1].Value.Trim();
-                if (value.Length > 0)
+                var seasonalMatch = SeasonalParamRegex.Match(body);
+                if (seasonalMatch.Success)
                 {
-                    return value;
+                    string value = seasonalMatch.Groups[1].Value.Trim();
+                    if (value.Length > 0)
+                    {
+                        return value;
+                    }
                 }
-            }
 
-            var eventMatch = EventParamRegex.Match(body);
-            if (eventMatch.Success)
-            {
-                string value = eventMatch.Groups[1].Value.Trim();
-                if (value.Length > 0)
+                var eventMatch = EventParamRegex.Match(body);
+                if (eventMatch.Success)
                 {
-                    return value;
+                    string value = eventMatch.Groups[1].Value.Trim();
+                    if (value.Length > 0)
+                    {
+                        return value;
+                    }
                 }
             }
 
