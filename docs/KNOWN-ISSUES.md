@@ -5332,27 +5332,43 @@ plumbing" the task explicitly ruled out. Rather than fabricate a
 recipe/sheet pairing I could not verify against a real wiki source (repo
 invariant: never invent data), `RecipeSheetSavingsCalculator.Apply`
 takes `recipeSheetItemIdByRecipeId` as an injectable, optional
-dictionary - `CraftingPlanPipeline`'s own constructor default is empty,
-and `Module.cs` passes nothing (also empty) - so **this note never fires
-in production today**. Every other piece of the feature (missing+
-LearnedFromItem detection, craft-vs-chosen-cost delta math, "not
-comparable" skip rules, discipline-training-blocked detection, sheet-
-price lookup via the ordinary `VendorOfferStore.GetOffersForItem`, and
-the two-row Notes rendering) is fully implemented and covered by real,
-injected fixture data in `RecipeSheetSavingsCalculatorTests`/
-`PlanViewModelBuilderNotesRecipeSheetSavingsTests` - wiring in a real,
-wiki-verified `recipeSheetItemIdByRecipeId` map (a small curated seed,
-same shape as `acquisition_hints_seed.json`/`daily_cooldown_items.json`)
-is a one-line follow-up, not a redesign. Flagging this for the
-maintainer's explicit sign-off rather than silently shipping a feature
-that can never activate.
+dictionary - `CraftingPlanPipeline`'s own constructor default is empty.
+**Since fixed (review-fix round):** `Module.cs`'s `Initialize()` now
+loads a small, wiki-verified `ref/recipe_sheet_items.json` seed via the
+new `Services/RecipeSheetItemSeedService.Load` (same try/catch,
+Blish-`ContentsManager`-stream loading shape as the neighboring
+`acquisition_hints_seed.json`/`daily_cooldown_items.json` reads
+immediately above it) and passes the result as
+`recipeSheetItemIdByRecipeId:` on the real `CraftingPlanPipeline`
+construction - **this note now fires in production** whenever a plan's
+reference branch matches a seeded recipe. Every other piece of the
+feature (missing+LearnedFromItem detection, craft-vs-chosen-cost delta
+math, "not comparable" skip rules, discipline-training-blocked
+detection, sheet-price lookup via the ordinary
+`VendorOfferStore.GetOffersForItem`, and the two-row Notes rendering) is
+fully implemented and covered by real, injected fixture data in
+`RecipeSheetSavingsCalculatorTests`/
+`PlanViewModelBuilderNotesRecipeSheetSavingsTests`, plus the now-real
+`ref/recipe_sheet_items.json` seed wiring exercised via
+`RecipeSheetItemSeedService`.
 
-**2. SEASONAL VENDOR TIP.** Blish's `FestivalContext` is read exactly
-once, in `Module.cs`'s `Initialize()`, and projected to plain
+**2. SEASONAL VENDOR TIP.** Blish's `FestivalContext` is read via
+`Module.cs`'s `ReadActiveFestivalNames()` and projected to plain
 `Festival.Name` strings (e.g. `"halloween"`) before crossing into the
-Blish-free `Services`/`Models` layers - every failure state (context not
-registered, `NotReady`/`Unavailable`/`Failed`, or any exception) collapses
-to an empty list. **MEASURED, not guessed:** `Festival.Name` and
+Blish-free `Services`/`Models` layers. **Since fixed (review-fix round
+#3):** the read is no longer a one-shot `Initialize()`-time call - it is
+now a `Func<IReadOnlyList<string>>` (`CraftingPlanPipeline`'s
+`activeFestivalNames` constructor parameter) that `Module.cs` passes as
+`ReadActiveFestivalNames`, invoked LAZILY at plan-generation time
+instead. A one-shot `Initialize()`-time read could observe `NotReady`
+(the context loads asynchronously) and silently disable the feature for
+the whole session; the lazy read re-checks on every plan instead. Every
+failure state (context not registered, `NotReady`/`Unavailable`/`Failed`,
+or any exception) still collapses to an empty list, now logged at Info
+(an expected, common, benign state) so "seasonal tips disabled by
+<availability>" is distinguishable in the module log from "no festival
+active" (Available with an empty list, which logs nothing). Only the
+exception path still logs at Warn. **MEASURED, not guessed:** `Festival.Name` and
 `Festival.DisplayName` were read via `System.Reflection` directly against
 the shipped `packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe` (no live
 game client needed - `Festival` instances are plain static fields) -
@@ -5403,8 +5419,16 @@ the DO-NOT-TOUCH files), `Services/SeasonalOfferFilter.cs` (new),
 `Services/CraftingPlanPipeline.cs` (two new optional constructor
 parameters, both default-empty; wired at all three result-building call
 sites), `Services/PlanViewModelBuilder.cs` (`BuildNotesSection` gains the
-two new note kinds), `Module.cs` (`FestivalContext` read),
-`ref/vendor_offers.json` (3 rows tagged).
+two new note kinds), `Module.cs` (`FestivalContext` read, now lazy;
+loads and wires the `ref/recipe_sheet_items.json` seed),
+`ref/vendor_offers.json` (3 rows tagged),
+`ref/recipe_sheet_items.json` (new, curated recipe-id ->
+unlocking-sheet-item-id seed), `Services/RecipeSheetItemSeedService.cs`
+(new, loads the seed file), `tools/VendorOfferUpdater/Models/VendorOffer.cs`
+(seasonal-festival tagging support for the updater side),
+`tests/VendorOfferUpdater.Tests/SeasonalFestivalRoundTripTests.cs` (new),
+`.github/workflows/tests.yml` (updated to run the updater/seeder test
+projects alongside the main suite).
 
 **Repo Invariants Checklist:**
 - [x] No Blish HUD references added to tests (both new calculators and
@@ -5428,15 +5452,29 @@ two new note kinds), `Module.cs` (`FestivalContext` read),
 **Validation performed:** `dotnet build GW2CraftingHelper.csproj
 -p:Platform=x64` - clean, 0 errors (only pre-existing StyleCop warnings,
 none in new/edited files). `dotnet test tests/GW2CraftingHelper.Tests/
-GW2CraftingHelper.Tests.csproj` (measured): 1554 (baseline) -> 1601
-(+47): `CostLineValuationTests` (7), `SeasonalOfferFilterTests` (5),
-`RecipeSheetSavingsCalculatorTests` (12), `SeasonalVendorTipCalculatorTests`
-(10 - includes a review-fix-round addition, see below),
-`PlanViewModelBuilderNotesRecipeSheetSavingsTests` (4),
-`PlanViewModelBuilderNotesSeasonalVendorTipTests` (5), plus 3 new cases
-appended to the existing `CraftingTreeBuilderTests`, plus one existing
-test file gained two new constructor parameters
-(`CraftingPlanResultBuilders`, not itself a test). All 1601 green.
+GW2CraftingHelper.Tests.csproj` (measured, at this pass's own commit):
+1554 (baseline) -> 1601 (+47): `CostLineValuationTests` (7),
+`SeasonalOfferFilterTests` (5), `RecipeSheetSavingsCalculatorTests` (12),
+`SeasonalVendorTipCalculatorTests` (10 - includes a review-fix-round
+addition, see below), `PlanViewModelBuilderNotesRecipeSheetSavingsTests`
+(4), `PlanViewModelBuilderNotesSeasonalVendorTipTests` (5), plus 3 new
+cases appended to the existing `CraftingTreeBuilderTests`, plus one
+existing test file gained two new constructor parameters
+(`CraftingPlanResultBuilders`, not itself a test). All 1601 green at
+that point.
+
+**Updated (later review-fix rounds, measured 2026-08-16):** further
+review-fix rounds (activating the recipe-sheet seed, seasonal tag
+round-trip/lazy festival read/tip wrap/craft-cost math fixes, the
+recursive vendor-currency guard, and the updater CI gap) added more
+tests and a new CI-wired test project. Current totals: `dotnet test
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` - 1616
+green. `dotnet test tests/VendorOfferUpdater.Tests/
+VendorOfferUpdater.Tests.csproj` - 136 green (includes the new
+`SeasonalFestivalRoundTripTests`). `dotnet test
+tests/GW2CraftingHelper.RecipeSeeder.Tests/
+GW2CraftingHelper.RecipeSeeder.Tests.csproj -p:Platform=x64` - 3 green.
+All three suites green as of this pass.
 
 **Review-fix round (self-review, before handoff):**
 `SeasonalVendorTipCalculator` was picking the FIRST qualifying seasonal
@@ -5449,9 +5487,11 @@ own identical "cheapest priceable offer wins" precedent - new test
 `MultipleQualifyingOffers_PicksCheapest`.
 
 **Risks / follow-ups:**
-- `recipeSheetItemIdByRecipeId` ships empty - see the RECIPE-SHEET
-  SAVINGS section above. Curating real entries (wiki-verified) is the
-  natural next step to actually activate the feature.
+- `recipeSheetItemIdByRecipeId` now ships from `ref/recipe_sheet_items.json`
+  (see the RECIPE-SHEET SAVINGS section above) - the seed is small and
+  curated by hand; growing its coverage (more wiki-verified recipe/sheet
+  pairs) is the natural next step to widen when the feature can fire,
+  not to activate it for the first time.
 - Seasonal-offer detection is a one-time hand tag of three known rows,
   not an automated wiki-scrape pass - see the SEASONAL VENDOR TIP section
   above.
@@ -5464,9 +5504,10 @@ own identical "cheapest priceable offer wins" precedent - new test
   `PlanRelayoutMath.cs`/scroll machinery at all - every new row is a
   plain `NoteLine`, already covered by that renderer's existing 28px
   contract). The two new note kinds' real on-screen wording/wrapping have
-  not been visually confirmed in a running Blish HUD client, and cannot
-  be exercised at all with `recipeSheetItemIdByRecipeId` empty (the
-  RECIPE-SHEET SAVINGS row shape has ONLY been verified via injected
-  test fixtures, never against a real generated plan).
+  not been visually confirmed in a running Blish HUD client - the
+  RECIPE-SHEET SAVINGS row shape has been verified via injected test
+  fixtures and is now wired to a real, non-empty
+  `recipeSheetItemIdByRecipeId` seed in production (see above), but has
+  not yet been confirmed against a real generated plan on-screen.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
