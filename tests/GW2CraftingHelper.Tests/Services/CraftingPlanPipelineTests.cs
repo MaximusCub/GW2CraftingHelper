@@ -4151,30 +4151,11 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(3, resolved.UsedMaterials[0].QuantityUsed);
         }
 
-        // --- Live-repro gate (2026-08-16): value-detail hover missing on a
-        // real GenerateStructuredAsync pipeline run ---
-        //
-        // PlanSolverCurrencyValuationTests.
-        // CraftRoot_VendorChildValuedInCuratedCurrency_ValueDetailTooltipFires
-        // already proves the raw seam (PlanSolver.Solve ->
-        // CraftingTreeBuilder.BuildTree -> ValueDetailTooltipBuilder.TryBuild)
-        // works when called directly with CurrencyValuation.WithDefaults. The
-        // live report reproduced the hover NOT firing on a real Deldrimor
-        // Steel Ingot-shaped plan, generated through the FULL pipeline: a
-        // craft root with a Philosopher's Stone-style BuyFromVendor child
-        // priced purely in spirit shards (currency 23, curated default 3600
-        // copper/unit), Value Own Materials ON, and a real account snapshot
-        // that owns some materials (a SIBLING ingredient, not the vendor
-        // child itself - InventoryReducer/the zero-owned guided pass/
-        // RecomputeComparisonValues all run over the whole tree regardless
-        // of which node the ownership sits on). This test reproduces that
-        // exact shape through GenerateStructuredAsync itself (fake HTTP
-        // fixtures, matching this file's established pattern) rather than
-        // calling PlanSolver.Solve directly, to determine whether the
-        // pipeline-level machinery the seam test does not model (effective-
-        // default valuation threading, VOM reduction, the post-selection
-        // ComparisonValue passes) loses the fold-up somewhere between the
-        // solver and the built CraftingTreeNode.
+        // A currency-valued vendor child's contribution must survive the whole
+        // GenerateStructuredAsync path - effective-default valuation threading,
+        // VOM reduction, and the post-selection ComparisonValue passes - and
+        // still reach the craft root as a DecisionValue/SubtreeCost divergence
+        // the value-detail hover can render.
         [Fact]
         public async Task GenerateStructuredAsync_CraftRootWithVendorChildValuedInCuratedCurrency_VomOn_ValueDetailTooltipFires()
         {
@@ -4237,17 +4218,14 @@ namespace GW2CraftingHelper.Tests.Services
                     store,
                     reducer: new InventoryReducer());
 
-                // Effective-default valuation (condition a): matches
-                // ModuleSettings.GetEffectiveCurrencyValuation() on a FRESH
-                // settings state exactly - user overrides is None, so only
+                // Same valuation ModuleSettings.GetEffectiveCurrencyValuation()
+                // returns on a fresh settings state: no user overrides, so only
                 // CurrencyDecisionDefaults' curated table applies.
                 var valuation = CurrencyValuation.WithDefaults(CurrencyValuation.None);
 
-                // Real account snapshot with owned materials (condition b):
-                // owns 3 of the 10 needed (2/craft x 5 root quantity) units
-                // of the ORDINARY sibling, not the vendor-only child - VOM's
-                // zero-owned guided pass/InventoryReducer/force-buy pre-pass
-                // all still run over the whole tree.
+                // Owns 3 of the 10 needed (2/craft x 5 root quantity) units of
+                // the ORDINARY sibling, not the vendor-only child, so ownership
+                // reduction never touches the node the divergence comes from.
                 var snapshot = new AccountSnapshot
                 {
                     Items = new List<SnapshotItemEntry>
@@ -4271,41 +4249,27 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Equal(CraftingDecision.Craft, root.Decision);
 
                 // Real gold cost: only the ordinary child's remaining (10-3=7)
-                // units at 10 copper each = 70; the vendor child's coin part
-                // is 0. Comparison value additionally folds in the vendor
-                // child's shard cost: 5 crafts x 20 shards/unit x 3600
-                // copper/shard = 360000, so DecisionValue must exceed
-                // SubtreeCost by exactly that amount.
-                Assert.True(root.SubtreeCost.HasValue, "SubtreeCost must be available for the tooltip guard.");
-                Assert.True(root.DecisionValue.HasValue, "DecisionValue must be available for the tooltip guard.");
-                Assert.True(
-                    root.DecisionValue.Value > root.SubtreeCost.Value,
-                    $"Expected DecisionValue ({root.DecisionValue}) > SubtreeCost ({root.SubtreeCost}) - " +
-                    "the currency divergence from the vendor child must survive VOM reduction and the " +
-                    "post-selection ComparisonValue passes.");
+                // units, bought at the InstantBuy basis' sell price of 20 = 140;
+                // the vendor child's coin part is 0. Comparison value
+                // additionally folds in the vendor child's shard cost: 5 crafts
+                // x 20 shards/unit x 3600 copper/shard = 360000, so
+                // DecisionValue exceeds SubtreeCost by exactly that amount.
+                Assert.Equal(140L, root.SubtreeCost);
+                Assert.Equal(360140L, root.DecisionValue);
 
                 bool fired = ValueDetailTooltipBuilder.TryBuild(root, null, out string tooltipText);
 
                 Assert.True(fired, "Value-detail hover must fire for the craft root live pipeline case.");
-                Assert.NotNull(tooltipText);
-                Assert.Contains("Crafting gold price:", tooltipText);
-                Assert.Contains("Currencies:", tooltipText);
-                Assert.Contains("Optimization price:", tooltipText);
+                Assert.Contains("Crafting gold price: 0g 1s 40c", tooltipText);
+                Assert.Contains("Currencies: 36g 0s 0c", tooltipText);
+                Assert.Contains("Optimization price: 36g 1s 40c", tooltipText);
             }
         }
 
-        // Live-repro gate (2026-08-17), variant B: the previous test's root
-        // has exactly one option (craft), so its committed pill is
-        // PillKind.Locked and its own base tooltip reads "Only available
-        // source" - not the "Current source: CRAFT" wording the live report
-        // actually quoted. That wording only comes from PillKind.Selected
-        // (TreeSectionController's spec.Kind == PillKind.Selected branch),
-        // which requires 2+ options with craft winning. This variant adds a
-        // (deliberately uncompetitive) TP price for the root so it becomes
-        // a genuine multi-option Selected pill, matching the quoted live
-        // wording exactly, and checks DecisionPillPlanner.BuildPillSpecs
-        // directly (Blish-free, so this is as deep as an automated test can
-        // go toward the actual render-time gate) alongside TryBuild.
+        // The test above leaves the root single-option, so its committed pill is
+        // PillKind.Locked. A deliberately uncompetitive TP price on the root
+        // makes it multi-option, exercising the PillKind.Selected branch that
+        // TreeSectionController's value-detail append gate also accepts.
         [Fact]
         public async Task GenerateStructuredAsync_CraftRootSelectedAmongMultipleOptions_ValueDetailTooltipFires()
         {
@@ -4331,9 +4295,8 @@ namespace GW2CraftingHelper.Tests.Services
             var priceApi = new InMemoryPriceApiClient();
             priceApi.AddPrice(OrdinaryChildItemId, buyUnitPrice: 10, sellUnitPrice: 20);
             // Root ALSO has a (much higher) TP price, so it becomes a
-            // multi-option node and the committed pill is genuinely
-            // PillKind.Selected (not Locked) - matching the live-reported
-            // "Current source: CRAFT" wording exactly.
+            // multi-option node and the committed pill is PillKind.Selected
+            // rather than Locked.
             priceApi.AddPrice(RootItemId, buyUnitPrice: 1000000, sellUnitPrice: 1000000);
 
             var itemApi = new InMemoryItemApiClient();
@@ -4394,18 +4357,23 @@ namespace GW2CraftingHelper.Tests.Services
 
                 Assert.Equal(CraftingDecision.Craft, root.Decision);
 
+                Assert.Equal(140L, root.SubtreeCost);
+                Assert.Equal(360140L, root.DecisionValue);
+
+                // Multi-option: the losing TP pill must be present too, or the
+                // root would have taken BuildPillSpecs' single-option path and
+                // the Selected assertion below would be checking a Locked pill.
                 var specs = DecisionPillPlanner.BuildPillSpecs(root, null, null);
-                Assert.True(specs.Exists(s => s.Text == "CRAFT"), "Expected a CRAFT pill among the built specs.");
-                var craftSpec = specs.Find(s => s.Text == "CRAFT");
+                Assert.Contains(specs, s => s.Text == "TP");
+                var craftSpec = Assert.Single(specs, s => s.Text == "CRAFT");
                 Assert.Equal(PillKind.Selected, craftSpec.Kind);
 
                 bool fired = ValueDetailTooltipBuilder.TryBuild(root, null, out string tooltipText);
 
                 Assert.True(fired, "Value-detail hover must fire when the committed pill is genuinely Selected (2+ options).");
-                Assert.NotNull(tooltipText);
-                Assert.Contains("Crafting gold price:", tooltipText);
-                Assert.Contains("Currencies:", tooltipText);
-                Assert.Contains("Optimization price:", tooltipText);
+                Assert.Contains("Crafting gold price: 0g 1s 40c", tooltipText);
+                Assert.Contains("Currencies: 36g 0s 0c", tooltipText);
+                Assert.Contains("Optimization price: 36g 1s 40c", tooltipText);
             }
         }
     }

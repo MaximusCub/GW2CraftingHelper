@@ -6989,8 +6989,11 @@ force-buy pre-pass, `InventoryReducer`, real vendor-offer-store lookups,
 `ModuleSettings.GetEffectiveCurrencyValuation()`'s actual return value on
 a fresh settings state).
 
-Reproduced the exact live shape end to end: a craft root (Deldrimor Steel
-Ingot-style, quantity 5) whose recipe has a vendor-only child priced
+Reproduced a simplified analogue of the live shape end to end (2 levels,
+single vendor occurrence - NOT the live tree's actual depth, which
+matters for the untested factors listed at the bottom of this entry): a
+craft root (Deldrimor Steel Ingot-style, quantity 5) whose recipe has a
+vendor-only child priced
 purely in spirit shards (currency 23, curated default 3600 copper/unit,
 `Models/CurrencyDecisionDefaults.cs` line 109) plus an ordinary TP-priced
 sibling, `OwnMaterialsMode.Valued` with a real `AccountSnapshot` owning
@@ -7002,10 +7005,10 @@ pattern). New test:
 `CraftingPlanPipelineTests.GenerateStructuredAsync_
 CraftRootWithVendorChildValuedInCuratedCurrency_VomOn_
 ValueDetailTooltipFires`. **Passes on the first run**: `root.SubtreeCost
-== 70` (real coin only, the sibling's un-owned remainder), `root.
-DecisionValue == 360070` (the same 70 plus the vendor child's 100 shards
-x 3600 copper/unit), and `TryBuild` returns true with all three expected
-lines.
+== 140` (real coin only, the sibling's un-owned 7 units at the InstantBuy
+basis' sell price of 20), `root.DecisionValue == 360140` (the same 140
+plus the vendor child's 100 shards x 3600 copper/unit), and `TryBuild`
+returns true with all three expected lines carrying those exact figures.
 
 Checked the four live factors the prior entry's seam test could not
 exercise, all confirmed not to be the gap:
@@ -7045,28 +7048,52 @@ passes.** Since the append gate at
 already established as Selected/Craft in that same loop iteration where
 the base "Current source: CRAFT" tooltip was just set two branches
 above, and `TryBuild` is a pure function of that node's own fields, a
-live miss on this exact wording cannot be explained by anything this
-class hierarchy computes - the node reaching line 1490 live would have
+live miss on this exact wording requires the node reaching line 1490 live
 to carry different `SubtreeCost`/`DecisionValue`/
-`VendorComponentCostsUnreliable` values than the ones `GenerateStructuredAsync`
-actually produces for this shape, which every test above rules out.
+`VendorComponentCostsUnreliable` values than the ones
+`GenerateStructuredAsync` produces for THIS shape - which the tests above
+rule out only for this shape, not for the live tree.
 
-**Conclusion: correct-by-design at every Blish-free seam; no code defect
-found.** This closes out every pipeline-level factor the 2026-08-16 entry
-left untested, with the same result as that entry's narrower seam-level
-pass: the data layer (solver through `CraftingTreeNode`) is provably
-correct for this shape at every depth an xunit test can reach. The
-residual explanation is unchanged from the prior entry and now
-significantly narrowed: not a solver/pipeline computation gap (ruled out
-twice, at two different depths), so if a third live repro occurs against
-a build confirmed to include both this branch and `value-detail-pipeline`
-was cut from, the next step is temporary Blish-side instrumentation - a
+**Conclusion: correct-by-design for the shape modelled here; no code
+defect found in it.** Both tests pass, so the data layer (solver through
+`CraftingTreeNode`) is correct for a shallow craft-over-valued-vendor-
+child tree at every depth an xunit test can reach.
+
+This does NOT clear the whole pipeline, and the live behaviour has NOT
+been verified either way - no live capture was taken during this pass.
+Two suppression paths inside `ValueDetailTooltipBuilder.TryBuild` itself
+remain untested for a Craft ROOT, and both would produce exactly the
+reported symptom:
+
+- **Fallback-tier propagation (the strongest untested candidate).**
+  `PlanSolver.RecomputeComparisonValues` (line 2443) sets
+  `ComparisonValue = TotalCost` whenever `decision.HasUnvaluedCurrency`,
+  and that flag propagates transitively up through every Craft ancestor
+  (line 1061). One unvalued currency or `GuildUpgrade` ingredient
+  ANYWHERE in the chosen subtree therefore forces `delta == 0` on the
+  root and suppresses this hover - the scope limit already documented in
+  `ValueDetailTooltipBuilder.cs` lines 26-36. A real Deldrimor Steel
+  Ingot tree is far deeper than the 2-level fixture used here and can
+  easily contain one. The only existing test on this path
+  (`PlanSolverCurrencyValuationTests.
+  MixedCoinValuedUnvaluedFallbackOffer_ComparisonValueMatchesTotalCost_
+  NoTooltip`) covers a FLAT vendor leaf, never the ancestor rollup.
+- **`VendorComponentCostsUnreliable`.** Set by
+  `FlagUnreliableVendorComponentCosts` on every occurrence of a vendor
+  step merged across 2+ tree occurrences. No test anywhere passes a node
+  with this flag true to `TryBuild`. It lands on vendor nodes rather than
+  Craft ancestors, so it is the weaker candidate for a root-pill miss,
+  but it is untested.
+
+Next step if a third live repro occurs: rule out fallback-tier
+propagation FIRST (a test with an unvalued-currency ingredient buried
+under the craft root, asserting whether the root hover survives), since
+that is a cheap Blish-free test and a genuine code-level explanation.
+Only if that comes back clean is Blish-side instrumentation warranted - a
 log line in `TreeSectionController.RenderDecisionPills` at line ~1490
 recording `node.ItemId`, `node.Decision`, `node.SubtreeCost`, `node.
 DecisionValue`, `node.VendorComponentCostsUnreliable`, and the `TryBuild`
-return value at the moment of the live render - rather than further
-static tracing or another layer of pipeline test, since two independent
-passes (seam-level and pipeline-level) have now both come back clean.
+return value at the moment of the live render.
 
 Tests: 1768 -> 1770 (2 new:
 `GenerateStructuredAsync_CraftRootWithVendorChildValuedInCuratedCurrency_
