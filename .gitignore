@@ -378,3 +378,4 @@ ref/mf_item_id_cache.json
 # repo tree to stay out of the shipped module (see docs/RELEASING.md).
 ref/wiki_vendor_cache.json
 ref/item_id_cache.json
+ref/seasonal_wikitext_cache.json

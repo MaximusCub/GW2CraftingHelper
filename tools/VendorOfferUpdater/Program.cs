@@ -62,6 +62,8 @@ namespace VendorOfferUpdater
             int maxRequests = 2000;
             int maxRuntimeMinutes = 30;
             int delayMs = 250;
+            bool tagSeasonalFestivals = false;
+            int maxSeasonalPages = 500;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -100,6 +102,14 @@ namespace VendorOfferUpdater
                 else if (args[i] == "--merge-into" && i + 1 < args.Length)
                 {
                     mergeIntoPath = args[++i];
+                }
+                else if (args[i] == "--tag-seasonal-festivals")
+                {
+                    tagSeasonalFestivals = true;
+                }
+                else if (args[i] == "--max-seasonal-pages" && i + 1 < args.Length)
+                {
+                    maxSeasonalPages = int.Parse(args[++i]);
                 }
                 else if (!args[i].StartsWith("--"))
                 {
@@ -286,6 +296,22 @@ namespace VendorOfferUpdater
                     {
                         itemIdMap[kv.Key] = kv.Value;
                     }
+                }
+
+                // Step 3.5: Resolve festival-vendor seasonal tags via wiki
+                // (opt-in, --tag-seasonal-festivals - see
+                // ResolveSeasonalFestivalValuesAsync's own doc comment for
+                // why this is a separate, explicitly-requested pass rather
+                // than part of every default run).
+                if (tagSeasonalFestivals)
+                {
+                    string seasonalCachePath = Path.Combine(
+                        Path.GetDirectoryName(outputPath) ?? ".",
+                        "seasonal_wikitext_cache.json");
+
+                    await ResolveSeasonalFestivalValuesAsync(
+                        wikiResults, wikiClient, seasonalCachePath, maxSeasonalPages, delayMs, ct);
+                    Console.WriteLine();
                 }
 
                 // Step 4: Convert to VendorOffers
@@ -684,6 +710,25 @@ namespace VendorOfferUpdater
                     $"has unrecognized requirement text \"{result.Requirement}\" - left untagged.");
             }
 
+            // Festival-vendor auto-tagging follow-up (2026-08-16): resolves
+            // the raw wiki "seasonal="/"event=" value (if any, from a
+            // separate ResolveSeasonalFestivalValuesAsync pass) to the
+            // internal festival key. A present-but-unrecognized value
+            // (e.g. a one-off non-festival event like "Fractal Rush") is
+            // deliberately left untagged with a warning rather than
+            // guessed - never hashed into OfferId either way, matching
+            // VendorOffer.SeasonalFestival's own doc comment (this field
+            // is deliberately not hashed by VendorOfferHasher, so tagging
+            // an already-shipped offer never changes its OfferId).
+            string? seasonalFestival = Gw2Constants.ResolveSeasonalFestivalKey(result.TemporarySeasonalValue);
+            if (seasonalFestival == null && !string.IsNullOrWhiteSpace(result.TemporarySeasonalValue))
+            {
+                Console.WriteLine(
+                    $"  WARNING: Vendor \"{merchant}\" has an unrecognized wiki " +
+                    $"seasonal/event value \"{result.TemporarySeasonalValue}\" in its " +
+                    "{{Temporary}} template - left untagged (no invented festival mapping).");
+            }
+
             string offerId = VendorOfferHasher.ComputeOfferId(
                 result.GameId,
                 outputCount,
@@ -706,8 +751,197 @@ namespace VendorOfferUpdater
                 DailyCap = result.DailyCap,
                 WeeklyCap = result.WeeklyCap,
                 HomesteadTier = homesteadTier,
-                SeasonalCap = result.SeasonalCap
+                SeasonalCap = result.SeasonalCap,
+                SeasonalFestival = seasonalFestival
             };
+        }
+
+        /// <summary>
+        /// Festival-vendor auto-tagging follow-up (2026-08-16): fetches
+        /// each distinct wiki vendor PAGE's raw wikitext (via
+        /// WikiSmwClient.FetchWikitextAsync) and extracts its
+        /// {{Temporary|...}} template's seasonal/event value
+        /// (TemporaryTemplateParser), so ConvertToOffer can resolve every
+        /// vendor's offers to a festival tag - not just the three
+        /// Candy Corn Vendor (Weekly) rows this module previously
+        /// hand-tagged.
+        ///
+        /// Deliberately opt-in (--tag-seasonal-festivals), not part of
+        /// every default run: unlike every other field on WikiVendorResult
+        /// (which come from the SMW "ask" printouts already fetched by
+        /// QueryVendorItemsAsync/ResolveItemGameIdsAsync), there is no
+        /// Semantic MediaWiki property for a page's {{Temporary}} template
+        /// - unioning a distinct-PageName wikitext-parse request into
+        /// every full refresh would add one HTTP request per distinct
+        /// vendor page (thousands, for a from-scratch scrape) on top of
+        /// the existing two-pass budget, silently changing the cost/time
+        /// profile of the default `./tools/refresh-vendor-data.sh` workflow.
+        /// A developer who wants full coverage passes the flag explicitly.
+        ///
+        /// Results are cached by real wiki page title (raw wiki value, or
+        /// "" for "checked - no seasonal/event tag") in a small JSON file
+        /// next to the other dev-local caches (gitignored, like
+        /// wiki_vendor_cache.json/item_id_cache.json) so a repeat run
+        /// never re-fetches a page it has already checked.
+        /// <paramref name="maxSeasonalPages"/> is a safety limit
+        /// (SafetyLimitException, same pattern WikiSmwClient's own query
+        /// safety limits use) on how many NEW pages a single run will
+        /// fetch, so an accidental full-dataset run with the flag set does
+        /// not silently attempt thousands of live requests.
+        ///
+        /// WikiVendorResult.PageName is the SMW subject key of the vendor's
+        /// "Sells item" SUBOBJECT, not the vendor's own wiki page title -
+        /// confirmed live (api.php?action=ask against
+        /// "[[Has vendor::Candy Corn Vendor (Weekly)]]"): every row's
+        /// subject is "Candy Corn Vendor (Weekly)#vendor1",
+        /// "...#vendor2", etc. (one subobject per sold item). The real,
+        /// fetchable page title is everything before the first '#' - see
+        /// StripSubobjectSuffix. Caching (and fetching) by the STRIPPED
+        /// title, not the raw subobject key, is also what keeps this pass
+        /// cheap: one wikitext fetch per distinct VENDOR, not per sold item.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static async Task ResolveSeasonalFestivalValuesAsync(
+            List<WikiVendorResult> wikiResults,
+            WikiSmwClient wikiClient,
+            string cachePath,
+            int maxSeasonalPages,
+            int delayMs,
+            CancellationToken ct)
+        {
+            var cache = LoadSeasonalWikitextCache(cachePath);
+
+            var distinctPageNames = wikiResults
+                .Select(r => r.PageName)
+                .Where(p => !string.IsNullOrEmpty(p))
+                .Select(p => StripSubobjectSuffix(p!))
+                .Where(p => p.Length > 0)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            var toFetch = distinctPageNames
+                .Where(p => !cache.ContainsKey(p))
+                .ToList();
+
+            if (toFetch.Count > 0)
+            {
+                Console.WriteLine(
+                    $"Resolving seasonal festival tags for {toFetch.Count} " +
+                    $"uncached vendor page(s) ({distinctPageNames.Count - toFetch.Count} already cached)...");
+
+                if (toFetch.Count > maxSeasonalPages)
+                {
+                    throw new SafetyLimitException(
+                        $"Seasonal festival tagging would fetch {toFetch.Count} new wiki " +
+                        $"page(s), exceeding --max-seasonal-pages ({maxSeasonalPages}). " +
+                        "Increase --max-seasonal-pages or narrow --query to a smaller " +
+                        "set of vendors.");
+                }
+
+                int effectiveDelay = Math.Max(200, delayMs);
+
+                for (int i = 0; i < toFetch.Count; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    string pageName = toFetch[i];
+                    string? wikitext;
+                    try
+                    {
+                        wikitext = await wikiClient.FetchWikitextAsync(pageName, ct);
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        Console.WriteLine(
+                            $"  WARNING: Failed to fetch wikitext for \"{pageName}\": {ex.Message} - left uncached.");
+                        continue;
+                    }
+
+                    string? raw = TemporaryTemplateParser.ExtractSeasonalOrEventParameter(wikitext);
+                    cache[pageName] = raw ?? string.Empty;
+
+                    if (i + 1 < toFetch.Count)
+                    {
+                        await Task.Delay(effectiveDelay, ct);
+                    }
+                }
+
+                SaveSeasonalWikitextCache(cachePath, cache);
+            }
+            else if (distinctPageNames.Count > 0)
+            {
+                Console.WriteLine(
+                    $"All {distinctPageNames.Count} vendor page(s) already checked for seasonal festival tags.");
+            }
+
+            foreach (var result in wikiResults)
+            {
+                if (string.IsNullOrEmpty(result.PageName))
+                {
+                    continue;
+                }
+
+                string pageTitle = StripSubobjectSuffix(result.PageName);
+                if (pageTitle.Length > 0 &&
+                    cache.TryGetValue(pageTitle, out var value) &&
+                    !string.IsNullOrEmpty(value))
+                {
+                    result.TemporarySeasonalValue = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Strips a Semantic MediaWiki subobject suffix ("#vendor1", etc.)
+        /// off a "Sells item" subject key, returning the vendor's real,
+        /// fetchable wiki page title. A subject with no '#' (already a
+        /// plain page title) is returned unchanged. See
+        /// ResolveSeasonalFestivalValuesAsync's own doc comment for the
+        /// live-confirmed subject-key shape this un-does.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string StripSubobjectSuffix(string subjectKey)
+        {
+            int hashIndex = subjectKey.IndexOf('#');
+            return hashIndex >= 0 ? subjectKey.Substring(0, hashIndex) : subjectKey;
+        }
+
+        private static Dictionary<string, string> LoadSeasonalWikitextCache(string path)
+        {
+            var cache = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (!File.Exists(path))
+            {
+                return cache;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(path);
+                using var doc = JsonDocument.Parse(json);
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    cache[prop.Name] = prop.Value.GetString() ?? string.Empty;
+                }
+                Console.WriteLine($"Loaded seasonal wikitext cache ({cache.Count} entries) from {path}");
+            }
+            catch
+            {
+                // Ignore corrupt cache
+            }
+
+            return cache;
+        }
+
+        private static void SaveSeasonalWikitextCache(string path, Dictionary<string, string> cache)
+        {
+            var sorted = cache
+                .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(sorted, options);
+            File.WriteAllText(path, json);
+            Console.WriteLine($"  Saved seasonal wikitext cache ({cache.Count} entries) to {path}");
         }
 
         private static Dictionary<string, int> LoadItemIdCache(string path)
