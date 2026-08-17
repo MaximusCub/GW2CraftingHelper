@@ -117,6 +117,8 @@
     <Compile Include="Models\CurrencyMetadata.cs" />
     <Compile Include="Models\CraftingPlanResult.cs" />
     <Compile Include="Models\ExcessCraftOutput.cs" />
+    <Compile Include="Models\CompetencyOpportunity.cs" />
+    <Compile Include="Services\CompetencyOpportunityCalculator.cs" />
     <Compile Include="Models\RecipeSheetSavingsOpportunity.cs" />
     <Compile Include="Models\SeasonalVendorTip.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
@@ -129,6 +131,7 @@
     <Compile Include="Services\SeasonalVendorTipCalculator.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
+    <Compile Include="Services\ShoppingRowTooltipFormatter.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />
     <Compile Include="Services\AcquisitionHintService.cs" />
     <Compile Include="Models\DailyCooldownItem.cs" />
@@ -179,6 +182,7 @@
     <Compile Include="Services\LogViewFloor.cs" />
     <Compile Include="Models\Gw2Constants.cs" />
     <Compile Include="Models\CostLine.cs" />
+    <Compile Include="Models\PillSourceCostBreakdown.cs" />
     <Compile Include="Models\VendorOffer.cs" />
     <Compile Include="Models\VendorOfferDataset.cs" />
     <Compile Include="Models\PlanStatus.cs" />
@@ -193,6 +197,9 @@
     <Compile Include="Services\AccountCurrencyIndex.cs" />
     <Compile Include="Services\InventoryReducer.cs" />
     <Compile Include="Services\OwnedMaterialsForceBuyPrePass.cs" />
+    <Compile Include="Services\CraftCompetencyEvaluator.cs" />
+    <Compile Include="Services\PillSubduingEvaluator.cs" />
+    <Compile Include="Services\PillSubduingTooltipBuilder.cs" />
     <Compile Include="Services\AchievementBitDedupPrePass.cs" />
     <Compile Include="Services\RecipeNodeIds.cs" />
     <Compile Include="Models\RequiredDiscipline.cs" />

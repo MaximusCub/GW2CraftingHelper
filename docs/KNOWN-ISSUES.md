@@ -5664,6 +5664,740 @@ own identical "cheapest priceable offer wins" precedent - new test
   not yet been confirmed against a real generated plan on-screen.
 
 Gate: PASS (negative checks) 2026-08-16 (orchestrator live desktop session). Seasonal exclusion verified as the headline: the ARE craft path now prices ectos at the real TP rate (~26s vs the old ~4s26 phantom Halloween vendor), the ecto row's vendor source is gone entirely, and the Candy Corn tip correctly does NOT render out of season; sheet-savings positive render suite-covered.
+Gate: not yet run live - queued for the next batched desktop session (maintainer is currently holding the desktop). Merged after the full review pipeline resolved every finding (2 adversarial rounds, verification zero-blocking, 1536/1536 pre-merge), under the maintainer's standing merge directive (2026-08-16).
+
+## Source selection simplification: competency-aware default + subdued losing pills (2026-08-16)
+
+Maintainer-approved redesign (docs/gw2e-considerations.md context, the
+merged Plan Notes/competency machinery). Two independent rules on branch
+`source-selection-simplification`:
+
+**Rule 1 - competency-aware default.** A Craft source now only wins the
+AUTOMATIC buy-vs-craft-vs-vendor comparison when some character actually
+has one of the winning recipe's Disciplines at its MinRating
+(`CraftCompetencyEvaluator`, a pure/testable Services class). Snapshot
+data absent (`characterDisciplines == null`) is competency UNKNOWN and
+never penalizes craft - byte-identical to pre-existing behavior for every
+caller that doesn't pass the new parameter.
+
+*Seam decision:* studied how `PickCheapest` (pure economics) and
+`DecisionPillPlanner` (a pure mirror of `node.Decision`, no independent
+logic of its own) divide responsibility, then implemented the check
+INSIDE `PlanSolver.Evaluate`, folded into the SAME
+`craftExcludedFromAutoPick` flag the M34-B2a #3 force-buy pre-pass
+already uses (excludes Craft from the automatic `PickCheapest`/terminal-
+fallback race; `canCraft` and the manual-override branch both read the
+UNMODIFIED `bestComparable`/`bestFallback` values, so `CanCraft`/the
+CRAFT pill and a manual override are both unaffected). This is cheaper
+and more surgical than a separate throwaway-solve prepass (mirroring
+`OwnedMaterialsForceBuyPrePass`'s own mechanism) would have been: the
+winning recipe's Disciplines/MinRating are already in scope at the exact
+point `craftExcludedFromAutoPick` is read, with zero extra solves.
+Additionally gated on `(canBuyTp || canBuyVendor)` - a node whose ONLY
+feasible source is Craft still auto-crafts regardless of competency,
+since excluding it there would drop real, priced cost data out of the
+plan entirely (UnknownSource) rather than merely changing a default.
+`CraftingPlanPipeline` threads `characterDisciplines` into every
+`Solve()` call for a generation, including the zero-owned guide solve
+(so `InventoryReducer` never discounts ingredients for a Craft path
+competency will end up overriding) and into `ResolveWithOverrides`' local
+re-solves via the already-existing `PlanSolveContext.CharacterDisciplines`
+field.
+
+**Rule 2 - subdued losing pills.** A non-selected, multi-option pill that
+decisively loses to the selected pill renders subdued (reuses
+`PillKind.Locked`'s exact muted-gray color via a new `PillKind.Subdued`
+case - "no new colors", per the maintainer's own wording) with a tooltip
+explaining why, under two independently-checked rules:
+- **StrictDomination** (checked first - a stronger, valuation-free
+  claim): the losing option's raw coin and every currency/item cost-line
+  kind are each >= the selected option's (missing kind on either side
+  reads as 0), with at least one strictly greater. Needs NO valuation at
+  all - covers the maintainer's own canonical Amalgamated Rift Essence
+  shape (vendor needs the same coin, 10 more raw Globs of Ectoplasm than
+  crafting does) with a real end-to-end test through the actual solver.
+- **Weighted**: both options' fully-valued decision-value figures are
+  non-null and the losing one is strictly greater ("more expensive at
+  your current currency values"). Any strictly-positive margin counts -
+  a pill only reaches this comparison at all when it is one of 2-3 real
+  offered choices, so an objectively (if narrowly) worse valued option is
+  still worth flagging rather than under-reporting it behind an invented
+  percentage threshold (no such threshold was specified).
+- Unvalued AND non-dominated (a genuine tradeoff, e.g. less of one kind,
+  more of another) leaves both pills normal, per spec.
+- The selected pill is never evaluated as a "losing" candidate at all -
+  structurally impossible for it to be subdued.
+
+*Seam decision:* `PlanSolver.Evaluate` now computes a raw
+`PillSourceCostBreakdown` (RawCoin + non-coin currency/item cost lines,
+raw quantities, never gold-valued for the raw-comparison fields) for
+EVERY feasible source at a node - not just the winner - mirroring
+`costDiagnostics`' own "always computed, never filtered by decision"
+precedent, attached to `PlanSolver.Decision`/`SolverDecision`/
+`CraftingTreeNode` via the SAME winner-agnostic passthrough chain
+`CanCraft`/`CanBuyTp`/`CanBuyVendor` already use. Vendor's breakdown
+reuses `VendorBatchSolver`'s own already-evaluated
+`VendorCurrencyCosts`/`VendorItemCosts`/coin-cost output verbatim
+(`VendorBatchSolver.cs` itself - the merged-ceil math - was never
+touched, per the DO-NOT-TOUCH list); Craft's breakdown decomposes the
+candidate recipe's DIRECT (non-recursive) ingredient list, which needs
+no pricing/recursion since domination compares raw ingredient quantities
+by id, the same granularity `VendorItemCostLine.Quantity` already uses.
+Detection itself (`PillSubduingEvaluator`) is a pure, Blish-free,
+directly-testable Services class operating only on two
+`PillSourceCostBreakdown` values - never reads a `CraftingTreeNode`,
+never resolves a name, never decides which pill is selected
+(`DecisionPillPlanner`'s own job). Tooltip TEXT is built by a second
+pure class (`PillSubduingTooltipBuilder`, mirroring the pre-existing
+`ValueDetailTooltipBuilder` "Blish-free builder, the View only assigns
+the string" split) so raw currency/item ids never cross into
+`DecisionPillPlanner`/`PillSubduingEvaluator` at all (repo invariant:
+IDs internal-only) - name resolution happens only at the View layer,
+which already had `CurrencyMetadata` for this purpose and gained a new
+`PlanViewModel.ItemMetadata` passthrough (mirroring `CurrencyMetadata`'s
+own precedent exactly) for the item-kind case.
+
+*Adversarial-review fix (self-caught, not maintainer-flagged):* a merged
+multi-occurrence vendor step's per-occurrence `VendorCurrencyCosts`/
+`VendorItemCosts` (and therefore this node's own
+`BuyFromVendorCostBreakdown`, built from those same local numbers) can
+disagree with the corrected `TotalCost` once `AllocateVendorNodeCosts`
+reallocates it - the exact signal `CraftingTreeNode.
+VendorComponentCostsUnreliable` already exists for, and
+`ValueDetailTooltipBuilder`/`CraftingTreeBuilder.
+BuildVendorCostComponentLeaves` already gate on. `DecisionPillPlanner`
+now takes the same conservative posture: subduing detection is
+suppressed entirely (every pill stays plain `Available`) whenever that
+flag is set on the node, rather than risk a wrong verdict off stale
+numbers when a merged Vendor decision is the SELECTED baseline every
+other pill gets compared against.
+
+**Repo invariants checklist:**
+- ASCII-only / no em-dashes in every new/edited `.cs` file (verified via
+  a non-ASCII grep sweep across the full changed-file list - zero hits).
+- Allman brace style throughout.
+- Tests exercise real production code paths - `PlanSolver.Solve`,
+  `CraftingTreeBuilder.BuildTree`, and `DecisionPillPlanner.
+  BuildPillSpecs` are called directly and unmocked in every new test
+  file; no Blish HUD reference anywhere in tests.
+- IDs remain internal-only - `PillCostDelta.Id` is a raw currency/item
+  id but is a Services-layer, id-only DTO never displayed directly;
+  `PillSubduingTooltipBuilder` is the sole place it gets resolved to a
+  name before ever reaching a tooltip string.
+- Coin amounts in the new tooltip text use the same "Xg Ys Zc" plain-text
+  convention `ValueDetailTooltipBuilder` already established for its own
+  hover (not a coin-icon rendering context, so the icon-right-of-number
+  rule for the coin PANEL/shopping rows does not apply here).
+- `Services/VendorBatchSolver.cs` (merged-ceil math), `Services/
+  ModuleLog.cs`, `PlanContentHeightMath`, `PlanRelayoutMath`, and scroll
+  machinery were never touched.
+
+**New files:** `Services/CraftCompetencyEvaluator.cs`,
+`Services/PillSubduingEvaluator.cs`, `Services/
+PillSubduingTooltipBuilder.cs`, `Models/PillSourceCostBreakdown.cs`.
+
+**Test plan (real path per rule, as specified):** competency flips the
+default (`PlanSolverCraftCompetencyTests.
+NonCompetentAccount_CraftCheapestButNotCraftable_DefaultsToNextBestSource`);
+unknown competency preserves prior behavior
+(`NoCharacterDisciplines_CompetencyUnknown_CraftStillAutoWins`); domination
+detected on the real Amalgamated Rift Essence shape through the actual
+solver (`PlanSolverPillSubduingTests.
+AmalgamatedRiftEssenceShape_VendorNeedsMoreRawEcto_StrictlyDominated`);
+weighted subduing through a real `CurrencyValuation`
+(`WeightedValuation_VendorCheaperInRawCoinButPricierWhenValued_Subdued`);
+unvalued+non-dominated left untouched, both at the pure-evaluator level
+(`PillSubduingEvaluatorTests.UnvaluedAndNonDominated_BothPillsStayNormal`)
+and through the real solver
+(`PlanSolverPillSubduingTests.UnvaluedNonDominatedAlternative_
+StaysAvailable_NotSubdued`) - plus the self-caught
+`VendorComponentCostsUnreliable` suppression fix, and the "no alternative
+source exists" guard for Rule 1 that stops competency from silently
+dropping a node's cost out of the plan.
+
+Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
+GW2CraftingHelper.csproj -p:Platform=x64` - clean, 0 errors (only
+pre-existing StyleCop warnings scattered across the file set, none of
+them new patterns this package introduced beyond one cosmetic SA1204
+"static members before non-static" in the brand-new
+`PillSubduingEvaluator.cs`, left as-is - matches this repo's own
+already-extensive, pre-existing, unaddressed StyleCop backlog rather
+than a regression).
+
+Tests (measured, `dotnet test tests/GW2CraftingHelper.Tests/
+GW2CraftingHelper.Tests.csproj`): 1554 (baseline) -> 1575 after Rule 1
+(+21) -> 1605 after Rule 2 (+30, including the VendorComponentCostsUnreliable
+suppression fix's own test). All green at every commit checkpoint.
+
+**Nice-to-have (not fixed, noted for a future pass):**
+- `PlanResultBuilder` already carries two independent, byte-identical
+  copies of the "MysticForge/Achievement/Merchant are inherently
+  available" tag set (`InherentlyAvailableDisciplines`/
+  `NonCraftingDisciplines`); `CraftCompetencyEvaluator` now adds a THIRD
+  independent copy (`NonLevelableDisciplineTags`) rather than couple a
+  solver-path pure class to `PlanResultBuilder`'s display-adjacent
+  internals - a future pass could extract one shared canonical set.
+- The cosmetic SA1204 StyleCop warning noted above.
+- StrictDomination's ITEM-kind comparison only decomposes a candidate
+  craft recipe's DIRECT ingredients, not a full recursive expansion - a
+  domination that only becomes visible several craft levels deep (rather
+  than at the immediate ingredient list) is not detected. Not believed to
+  affect the maintainer's own Amalgamated-Rift-Essence-shaped cases
+  (which are direct-ingredient-level by construction), and no case
+  requiring deeper recursion was specified.
+
+No live desktop verification was performed - `Views/Rendering/
+TreeSectionController.cs` and `Views/Rendering/PillColors.cs` are
+Blish-bound and outside this repo's test-runnable surface, same
+constraint every UI-adjacent entry in this file notes. The Subdued
+pill's actual on-screen color/tooltip rendering has not been visually
+confirmed in a running Blish HUD client.
+
+Gate: not yet run live - queued for the next desktop session (subdued-pill + competency-default visuals). Merged after the deepest pipeline of the wave: implementation, two adversarial rounds, three verification passes (the second MEASURED an overcorrection suppressing a real 70c opportunity; the third revert-tested both direction pins on the final design), under the maintainer's standing merge directive (2026-08-16).
+
+## Source selection simplification: adversarial-review fix round (8 findings) (2026-08-16)
+
+A follow-up adversarial code review of the `source-selection-simplification`
+work above (competency-aware default + subdued losing pills) found 8
+Critical/Must-Fix defects plus several nice-to-haves. All 8 fixed on
+branch `source-selection-simplification`, plus the cheap same-file
+nice-to-haves.
+
+**1 - competency gate inspected only the single cheapest recipe option.**
+`PlanSolver.Evaluate` now tracks the best COMPETENT option per tier
+(`bestCompetentComparableOption`/`bestCompetentFallbackOption`) alongside
+the existing unfiltered `bestComparable`/`bestFallback` pair -
+`craftExcludedFromAutoPick` (competency branch) fires only when NO option
+in EITHER tier is competent. `canCraft` and the manual-override branch
+still read the unfiltered pair, unchanged. `autoPickCraftOption`/
+`craftBreakdownDecisionValue`/`autoPickCraftRealCost`/`autoPickRecipeId`
+resolve to whichever of the four (comparable/fallback x competent/raw)
+buckets actually applies, so PickCheapest, both Craft `Commit` sites, and
+`BuildCraftCostBreakdown` all operate on the SAME recipe. Test:
+`PlanSolverCraftCompetencyTests.
+MultiRecipeNode_OneCompetentOneNot_CompetentSiblingAutoWinsOverExcludedCheaperOne`.
+
+**2 - Weighted subduing wording blamed "currency values" for pure-gold
+gaps.** Added `PillSubduingResult.HasNonCoinCost` (true when either
+side's `CostLines` is non-empty), computed in `PillSubduingEvaluator`.
+`PillSubduingTooltipBuilder` now says plain "More expensive (N more)"
+when no currency was ever involved. Nice-to-have folded in (same file):
+StrictDomination's "same currencies" claim was also wrong whenever the
+union treated a missing kind as 0 on the selected side - reworded to
+"needs everything the selected option needs, plus ...". Tests:
+`PillSubduingEvaluatorTests.Weighted_PureCoinBothSides_HasNonCoinCostFalse`,
+`PillSubduingTooltipBuilderTests.Weighted_PureCoinDifference_NoCurrencyMentioned`.
+
+**3 - force-buy pre-pass's throwaway solve was competency-UNAWARE.**
+`OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds` gained a
+`characterDisciplines` parameter, threaded from `effectiveCharacterDisciplines`
+at both real call sites in `CraftingPlanPipeline` (single-item and
+batch). Test:
+`OwnedMaterialsForceBuyPrePassTests.
+ChildIngredientNotCraftable_CharacterDisciplinesThreaded_ChangesForceBuyResult`
+(the same tree/prices produce a DIFFERENT force-buy result depending
+solely on whether this parameter is passed).
+Correction (round-2 adversarial review, 2026-08-16): the sentence above
+originally claimed "all 3 real call sites ... and the pre-pass's own
+re-run inside `ResolveWithOverrides`" - there is no such re-run. A grep
+for `ComputeForceBuyOnlyNodeIds(` shows exactly 2 real call sites
+(`CraftingPlanPipeline.cs:270` and `:770`); the override path reuses the
+already-frozen `context.ForceBuyOnlyNodeIds` instead of recomputing it.
+Stale guidance, now corrected in place.
+
+**4 - StrictDomination compared post-reduction craft quantities against
+un-reduced vendor quantities.** Added `PillSourceCostBreakdown.
+RawQuantitiesReducedByOwnedStock`, set by `PlanSolver.
+AnyIngredientReducedByOwnedStock` (reference-keyed lookup against
+InventoryReducer's own `OwnedQuantityUsedByNode`, threaded through a new
+`PlanSolver.Solve`/`Evaluate` parameter). `PillSubduingEvaluator` skips
+StrictDomination (only - Weighted is unaffected, its DecisionValue
+already reflects real discounted economics) whenever either side is
+flagged. Threaded at the 3 real solve call sites; NOT threaded for
+`ResolveWithOverrides`' frozen-tree branch (no fresh reduction there to
+source a reference-keyed dictionary from) - documented gap, not a
+regression (this check did not exist there before either).
+
+**5 - craft breakdown silently dropped GuildUpgrade/unrecognized
+ingredients.** Added `PillSourceCostBreakdown.IsIncomplete`, set by
+`BuildCraftCostBreakdown` whenever an ingredient has no representable
+line. `PillSubduingEvaluator` refuses BOTH rules when either side is
+incomplete (same conservative posture as
+`VendorComponentCostsUnreliable`). Nice-to-have folded in (same file):
+corrected the "Count is always >= 1" doc claim on
+`PillSourceCostBreakdown` (false for an owned-stock-reduced-to-0
+ingredient line).
+
+**6 - the "genuine alternative" guard counted a fallback-tier vendor
+offer.** The competency-exclusion guard now requires
+`buyTotalCost.HasValue || comparableVendorValue.HasValue` (a real
+COMPARABLE alternative), not `canBuyTp || canBuyVendor` (which is also
+true for an unvalued-currency-only offer). Without this, a node with a
+fully-priced but untrained craft and only a karma-only vendor offer
+would silently default onto the unvalued vendor purchase, dropping the
+real priced cost from the plan. Test: `PlanSolverCraftCompetencyTests.
+NonCompetentAccount_OnlyAlternativeIsFallbackTierVendor_
+StillAutoCraftsRatherThanDroppingCost`.
+
+**7 - the competency flip had no user-visible explanation (design-law
+gap).** Added `SolverDecision.CraftExcludedByCompetency`/
+`CraftExcludedRealCost`/`CraftExcludedDisciplines`/`CraftExcludedMinRating`
+(passthrough from a new `PlanSolver.Decision` set of fields, straight
+through `CraftingTreeNode`), and a new `CompetencyOpportunityCalculator`
+(same shape/placement precedent as `ExcessCraftOutputCalculator`) that
+walks the built display tree for a node where craft was excluded on
+competency grounds, did NOT end up crafted anyway (a manual override to
+Craft is excluded - nothing to report, the user already chose), and
+would genuinely have been cheaper. Writes
+`CraftingPlanResult.CompetencyOpportunities`, rendered by
+`PlanViewModelBuilder.BuildNotesSection` as a new Plan Notes bucket
+("{item}: could be crafted for less - no character has {discipline}
+{rating}"), per the maintainer's own design law (opportunities go to
+Plan Notes with concrete numbers). Tests:
+`CompetencyOpportunityCalculatorTests` (8 cases: basic delta, manual-
+override suppression, not-excluded, cost-neutral, reference-branch
+exclusion, cross-occurrence dedup, null/empty), plus a real pipeline
+round-trip in `CraftingPlanPipelineTests.
+GenerateStructuredAsync_CraftExcludedByCompetency_PopulatesCompetencyOpportunities`.
+
+**8 - a partial character-fetch failure could leave `CharacterDisciplines`
+non-null.** `Gw2AccountSnapshotService`'s outer
+`catch (Exception ex) when (!(ex is OperationCanceledException))` around
+the per-character loop now nulls `snapshot.CharacterDisciplines`
+explicitly - before this fix, anything escaping the loop (WhenAll
+faulting, a `.Result` rethrow) left whatever partial list had already
+been gathered, which read as an affirmative "not trained on any
+character" for every character the loop never reached. No test added:
+this class directly references `Blish_HUD`/`Gw2Sharp` types
+(`Gw2ApiManager`), which the repo's test invariants forbid importing
+into any test file - the fix is a one-line, low-risk null-out with no
+production code path this repo's test suite is permitted to exercise.
+
+**Files touched:** `Services/PlanSolver.cs`, `Services/SolverDecision.cs`,
+`Services/PillSubduingEvaluator.cs`, `Services/PillSubduingTooltipBuilder.cs`,
+`Services/OwnedMaterialsForceBuyPrePass.cs`, `Services/CraftingPlanPipeline.cs`,
+`Services/CraftingTreeBuilder.cs`, `Services/Gw2AccountSnapshotService.cs`,
+`Services/CompetencyOpportunityCalculator.cs` (new),
+`Models/PillSourceCostBreakdown.cs`, `Models/CraftingTreeNode.cs`,
+`Models/CraftingPlanResult.cs`, `Models/CompetencyOpportunity.cs` (new).
+
+**Deliberately NOT applied** (each explicitly flagged by the review as
+needing maintainer sign-off, not a unilateral call): Weighted subduing's
+"any strictly-positive margin" threshold (the brief said "decisive",
+none was specified - **superseded, see the round-2 entry below**: a
+round-2 finding directed gating this rather than continuing to defer it,
+so it is no longer un-signed-off/live-by-default as of that entry);
+extracting the now-three-times-duplicated
+`NonLevelableDisciplineTags`/`NonCraftingDisciplines`/
+`InherentlyAvailableDisciplines` set (flagged for a future pass, not
+this one, and STILL not applied in round 2 either); the persisted-plan
+JSON size of the 3 new `PillSourceCostBreakdown`s per node (no
+measurement taken, no `[JsonIgnore]` added; also still not applied in
+round 2).
+
+Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
+GW2CraftingHelper.csproj -p:Platform=x64` - clean, 0 errors (StyleCop
+warnings only, all pre-existing patterns, none new).
+
+Tests (measured, `dotnet test tests/GW2CraftingHelper.Tests/
+GW2CraftingHelper.Tests.csproj`): 1619 total, 0 failures, at the final
+checkpoint (one pre-existing test's own expected string needed updating
+for finding 2's wording change - `PillSubduingTooltipBuilderTests.
+Weighted_PureCoinDifference_NoCurrencyMentioned`'s own initial FormatCoin
+expectation, fixed within the same pass before commit).
+
+Gate: not yet run live - Blish-bound rendering (the new Plan Notes rows,
+the reworded subduing tooltips) has not been visually confirmed in a
+running Blish HUD client, same constraint every UI-adjacent entry in
+this file notes.
+
+## Source selection simplification: adversarial-review fix round 2 (5 findings) (2026-08-16)
+
+A further adversarial code review of the round-1 fix round above found 5
+Critical/Must-Fix defects (two of them only-half-fixed round-1 items) plus
+several nice-to-haves. All 5 fixed on branch `source-selection-
+simplification`, plus one cheap same-file nice-to-have.
+
+**1 - Weighted tooltip wording still blamed "currency values" for
+pure-gold gaps (round-1 finding #2 only half-fixed).** Round-1's
+`HasNonCoinCost` fired whenever either side's `CostLines` was non-empty -
+but `PlanSolver.BuildCraftCostBreakdown` emits a Type == "Item" line for
+EVERY craft ingredient regardless of valuation (TP-priced, never
+user-valued), so any craft-vs-TP comparison had non-empty `CostLines`
+purely from its ingredient list. `HasNonCoinCost` now checks for a Type
+== "Currency" line specifically (`PillSubduingEvaluator.HasCurrencyLine`)
+- the only `CostLine` kind a `CurrencyValuation` can ever price. Tests:
+`PillSubduingEvaluatorTests.Weighted_ItemLinesOnlyNoCurrencyLine_HasNonCoinCostFalse`
+/ `Weighted_CurrencyLinePresent_HasNonCoinCostTrue`,
+`PlanSolverPillSubduingTests.WeightedCraftLosing_PureGoldNoValuation_HasNonCoinCostFalse`
+(real Solve()-path, the exact reported TP-400c-vs-craft-500c shape).
+
+**2 - costDiagnostics still recorded the competency-unfiltered craft cost
+(round-1 finding #3 fixed only the recursion half of the same
+divergence).** `PlanSolver.Evaluate` still wrote `costDiagnostics[node.NodeId]
+= (buyTotalCost, bestComparableCraftCost ?? bestFallbackCraftCost)` -
+ignoring competency entirely, always the numerically cheapest recipe in
+each tier - while the real decision path commits
+`craftBreakdownDecisionValue`/`autoPickCraftRealCost` (competency-
+resolved). `OwnedMaterialsForceBuyPrePass`'s 85% rule was therefore
+derived from a craft cost the real solve could never actually commit to
+whenever competency demoted the pick to a costlier competent sibling
+recipe (or excluded craft entirely). Fixed by moving the write to AFTER
+competency resolution and changing the recorded figure to
+`craftBreakdownDecisionValue ?? autoPickCraftRealCost` - the exact
+tier/competency-resolved pair the Craft commit sites use. Test:
+`PlanSolverForceBuyOnlyTests.
+CostDiagnostics_CompetencyResolved_UsesCompetentRecipeNotCheapestOverall`.
+
+**3 - Weighted subdued on a 1-copper margin; brief says "decisive".**
+Round-1 deferred this to maintainer sign-off and shipped the bare
+strictly-positive-margin behavior live (not merely "documented as
+deferred"), so a genuinely near-equal alternative rendered in Locked's
+muted gray and was told it was "more expensive". Gated with an
+absolute-AND-relative floor (`PillSubduingEvaluator.IsDecisiveMargin`):
+the margin must clear BOTH a 100-copper (1 silver) absolute floor AND a
+1% relative floor of the selected option's own value - requiring both
+(not either) is the more conservative reading, since a margin that only
+clears one measure (e.g. 101c on a 10g/100000c purchase - past the
+absolute floor but only 0.1%) still is not "decisive" by the other. No
+maintainer-specified numbers exist for either constant - these are a
+deliberately modest, easily-tunable starting point, not a precisely-
+derived figure. Tests: `PillSubduingEvaluatorTests.
+Weighted_OneCopperMarginOnMultiGoldPurchase_NotDecisive_NotSubdued`,
+`Weighted_MarginClearsAbsoluteButNotRelativeFloor_NotSubdued`,
+`Weighted_MarginClearsRelativeButNotAbsoluteFloor_NotSubdued`,
+`Weighted_MarginClearsBothFloors_Subdued`,
+`Weighted_SelectedValueZero_AnyPositiveMarginClearingAbsoluteFloorIsDecisive`.
+
+**4 - three parallel reference-equality ternary chains had to stay in
+sync by hand (future merge hazard).** `PlanSolver.Evaluate` resolved
+`autoPickCraftOption` via a 4-term `??` chain, then re-derived "which
+bucket did it come from" three more times (for `craftBreakdownDecisionValue`,
+`autoPickCraftRealCost`, `autoPickRecipeId`) via independent reference-
+equality ternary chains against the same four `best*Option` variables -
+correct today, but a future edit to the `??` precedence (or a fifth
+bucket) could silently desynchronise them, producing a Commit with one
+recipe's cost and another recipe's RecipeId with no test catching it.
+Collapsed into a single `PlanSolver.CraftAutoPickCandidate` (a small
+readonly struct holding Option/RealCost/ComparisonValue/RecipeId),
+resolved once via an if/else-if chain, with the other three values read
+straight off the one resolved candidate. Pure refactor - existing
+behavior (and the full pre-existing test suite) unchanged; no new test
+needed beyond the suite continuing to pass.
+
+**5 - competency demotion inside the craft arm had no user-visible
+explanation for two shapes (round-1 finding #7 accepted this exact gap,
+closed only for the all-untrained case).** `CraftExcludedByCompetency` is
+only true when NO option in EITHER tier is competent, so two real shapes
+raised the plan's cost silently: (a) the cheapest COMPARABLE recipe is
+untrained but a competent recipe exists only in the FALLBACK tier -
+`craftBreakdownDecisionValue` becomes null and craft never enters the
+comparable-tier PickCheapest race at all, TP/vendor commits, nothing
+explains why; (b) a costlier competent SIBLING recipe wins Craft over a
+cheaper untrained one - `CraftExcludedByCompetency`'s own "Decision ==
+Craft -> nothing to report" precedent incorrectly suppressed this, even
+though the user never got the cheap recipe. Added a second, independent
+field set - `Decision`/`SolverDecision`/`CraftingTreeNode.
+CheapestCraftUntrained`/`CheapestCraftRealCost`/`CheapestCraftDisciplines`/
+`CheapestCraftMinRating` - true whenever the numerically cheapest raw
+craft candidate overall (`bestComparableOption ?? bestFallbackOption`,
+same tier priority as `autoPickCraftOption` but WITHOUT the competent-
+first override) is untrained, independent of whether the AUTOMATIC pick
+itself got excluded. Deliberately does NOT drive
+`craftExcludedFromAutoPick` or any other decision-affecting behavior -
+purely additive display data, same as `CraftExcludedRealCost` before it.
+`CompetencyOpportunityCalculator` now reads these new fields instead of
+the narrower `CraftExcludedByCompetency` pair; the existing `Decision !=
+Craft` guard was DROPPED (the delta-based check - SubtreeCost strictly
+greater than the cheap recipe's real cost - subsumes it: a manual
+override or an automatic pick landing on that SAME cheap recipe always
+makes the delta exactly 0). `CraftExcludedByCompetency` and its own
+fields are UNCHANGED and still drive the real `craftExcludedFromAutoPick`
+behavioral gate - only the notification/Plan-Notes path was
+re-pointed. Tests: `CompetencyOpportunityCalculatorTests.
+CraftUsingACostlierCompetentSiblingRecipe_StillReported`,
+`PlanSolverCraftCompetencyTests.
+FallbackTierCompetentRecipe_CheaperComparableUntrained_ReportsOpportunity`
+(shape a, full Solve+CraftingTreeBuilder+CompetencyOpportunityCalculator
+round trip), `CostlierCompetentSiblingWinsCraft_CheaperUntrainedSibling_ReportsOpportunity`
+(shape b, same round trip) plus updated assertions on the existing
+`MultiRecipeNode_OneCompetentOneNot_CompetentSiblingAutoWinsOverExcludedCheaperOne`.
+
+**Nice-to-have folded in (same file):** `docs/KNOWN-ISSUES.md` finding #3's
+own entry above claimed `characterDisciplines` was threaded "at all 3
+real call sites in `CraftingPlanPipeline` ... and the pre-pass's own
+re-run inside `ResolveWithOverrides`" - there is no such re-run; a grep
+for `ComputeForceBuyOnlyNodeIds(` shows exactly 2 real call sites
+(`CraftingPlanPipeline.cs:270` and `:770`), the override path reuses the
+frozen `context.ForceBuyOnlyNodeIds`. Corrected in place above.
+
+**Deliberately NOT applied** (each explicitly still needing a decision
+this round did not make): the Subdued pill's missing "why" tooltip on
+the non-interactive path (`TreeSectionController.cs:1157` - a Views file,
+outside this round's Services/Models scope); a manual override to Craft
+still commits `bestComparableRecipeId`/`bestComparableCraftRealCost`
+(possibly the untrained recipe) while the CRAFT pill's own displayed
+breakdown uses `autoPickCraftOption` (the competent one) - a real
+display/commit mismatch, but changing WHICH recipe a manual override
+commits is a behavioral decision, not a display-only fix, and needs
+explicit maintainer sign-off before changing; Plan Notes wording for
+MinRating 0 / 3+ disciplines joined by "or" (`PlanViewModelBuilder.cs` -
+untouched this round); persisted-plan JSON size (`PlanStoreHelpers.cs` -
+untouched this round, still unmeasured); per-render
+`PillSubduingEvaluator` allocation (`TreeSectionController.cs`'s
+`RenderDecisionPills` - untouched this round); `NonLevelableDisciplineTags`
+triplication (still deferred, per round-1).
+
+**Files touched:** `Services/PlanSolver.cs`, `Services/SolverDecision.cs`,
+`Services/PillSubduingEvaluator.cs`, `Services/CraftingTreeBuilder.cs`,
+`Services/CompetencyOpportunityCalculator.cs`,
+`Models/CraftingTreeNode.cs`, `docs/KNOWN-ISSUES.md` (this file).
+
+Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
+GW2CraftingHelper.csproj -p:Platform=x64` - clean, 0 errors (StyleCop
+warnings only, all pre-existing patterns, none new - verified by diffing
+warning output for the touched files specifically).
+
+Tests (measured, `"/mnt/c/Program Files/dotnet/dotnet.exe" test
+tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`): 1631
+total, 0 failures (up from round-1's 1619 - 12 new tests added this
+round, no existing test deleted).
+
+Gate: not yet run live - Blish-bound rendering (Plan Notes rows for the
+two newly-reported competency shapes, the now-gated Weighted subduing
+tooltip) has not been visually confirmed in a running Blish HUD client,
+same constraint every UI-adjacent entry in this file notes.
+Gate: not yet run live - scheduled for tonight's 7:15 PM batched desktop session (recipe-sheet savings row and seasonal-tip negative check are explicit scenarios). Merged after the full review pipeline resolved every finding (verification's docs-staleness hold corrected in 30d66de), under the maintainer's standing merge directive (2026-08-16).
+
+## Gate investigation: receipt/what-if captions + value-detail hover (2026-08-16)
+
+Two live gate findings from tonight's batched desktop session against the
+`ui-bundle`/`currency-ux-package` features (both entries earlier in this
+file). Both were investigated to the deepest reachable, Blish-free seam via
+new real-production-path tests; neither investigation found a code defect.
+
+**Item 1 (GATE FAIL as reported): receipt/what-if captions not rendering on
+an override-re-solve.** Live repro: Amalgamated Rift Essence plan, root
+manually overridden to VENDOR (the "Decisions updated (1 override(s))"
+re-solve via `CraftingPlanPipeline.ResolveWithOverrides`), root expanded
+shows 4 synthesized cost-component leaves then 4 dimmed reference-branch
+children, with no "Vendor price:"/"If crafted instead:" caption or caption
+tooltip on either group's first row.
+
+Traced the full chain the live path exercises: `PlanSolver.Solve` ->
+`CraftingPlanPipeline.ResolveWithOverrides` ->
+`CraftingPlanPipeline.BuildCraftingTreeResult` ->
+`CraftingTreeBuilder.BuildTree` (sets `IsReferenceBranch`/`IsCostComponent`
+per node) -> `Services/ReceiptCaptionHelper.cs`'s
+`ComputeCaptionSplitIndex`/`CaptionForChildIndex` ->
+`Views/Rendering/TreeSectionController.cs`'s three render call sites
+(the initial default-expanded build inside `RenderTreeNode`, the lazy
+expand/collapse toggle handler, and the Expand All button's lazy-build
+loop - the report's own "TWO call sites" undercounts; there are three, and
+all three correctly compute `captionSplitIndex` from the parent node once
+and thread the right child's caption into `RenderTreeNode`'s `captionText`
+parameter) -> `UpdateTreeRowTooltip` -> `rowPanel.BasicTooltipText`. Every
+step reads correctly on inspection: `CraftingPlanPipeline.
+BuildCraftingTreeResult` passes `currencyMetadata`/owned-amount dictionaries
+through to `CraftingTreeBuilder.BuildTree` unchanged on the override path
+exactly as the initial generation does; `PlanViewModelBuilder.Build` assigns
+`vm.TreeRoot = result.CraftingTree` verbatim (no reordering/cloning of
+`Children`); `TreeSectionController.CreateTreeSection` receives that same
+list unmodified; `ResetContentPanelToEmpty` fully disposes the previous
+render's controls before every rebuild (no stale-panel reuse).
+
+Wrote a new real-path test,
+`CraftingPlanPipelineTests.MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_ProducesReferenceBranchWithValidCaptionSplit`
+(`tests/GW2CraftingHelper.Tests/Services/CraftingPlanPipelineTests.cs`),
+reproducing the exact live shape: a Craft-baseline item whose recipe is
+non-empty, manually overridden to `BuyFromVendor` via
+`ResolveWithOverrides` against a 2-kind vendor offer (item + currency).
+It asserts `resolved.CraftingTree.IsReferenceBranch`, the 2-leaves-then-
+1-reference-child `Children` shape (the same stacking
+`CraftingTreeBuilder`'s own
+`MixedOfferNode_AlsoHasRecipe_StacksComponentLeavesThenReferenceBranch`
+test already locks down for the non-override case), and that
+`ReceiptCaptionHelper.ComputeCaptionSplitIndex`/`CaptionForChildIndex`
+return the expected non-null split and both caption strings on the
+resulting node. **This test passes** - the data and helper layer that
+ultimately feeds the tooltip is correct for this exact live scenario.
+
+**Item 2 (investigate, fix if real): value-detail hover not firing on a
+CRAFT pill above a currency-valued vendor child.** Live repro: Deldrimor
+Steel Ingot x5 root CRAFT pill, subtree contains a Philosopher's Stone
+`BuyFromVendor` child priced in spirit shards (curated default 3600
+copper/unit, `Models/CurrencyDecisionDefaults.cs`) - so the root's
+`DecisionValue` was expected to exceed its `SubtreeCost` and
+`ValueDetailTooltipBuilder.TryBuild` was expected to fire, but did not.
+
+The sibling test
+`PlanSolverCurrencyValuationTests.ComparisonValue_RollsUpThroughAncestorCraft_MatchesDecisionOnlyExpectation`
+already proved the raw `SolverDecision.ComparisonValue` rolls up correctly
+through `PlanSolver` for this exact shape (a Craft ancestor over a
+currency-valued `BuyFromVendor` child). Added a new test one layer
+further down the real chain,
+`PlanSolverCurrencyValuationTests.CraftRoot_VendorChildValuedInCuratedCurrency_ValueDetailTooltipFires`,
+that walks `PlanSolver.Solve` -> `CraftingTreeBuilder.BuildTree` ->
+`ValueDetailTooltipBuilder.TryBuild` for a Deldrimor-shaped tree (craft
+root, vendor-only child priced purely in spirit shards, valuation supplied
+via `CurrencyValuation.WithDefaults(CurrencyValuation.None)` so the
+curated default - not a hand-picked test value - is what is exercised,
+matching the live report's own wording). **This test passes on the first
+attempt**: `root.SubtreeCost == 0`, `root.DecisionValue == 360000` (100
+shards at 3600 copper/unit), and `TryBuild` returns true with all three
+expected lines ("Crafting gold price:", "Currencies:", "Optimization
+price:"). `CraftingTreeBuilder.BuildNode` does copy
+`decision.ComparisonValue`/`decision.TotalCost` onto
+`CraftingTreeNode.DecisionValue`/`SubtreeCost` unconditionally for every
+decision (`Services/CraftingTreeBuilder.cs` lines 185/188), so the
+DecisionValue genuinely folds up vendor-child currency valuations all the
+way to a Craft root - this is not the gap.
+
+Also read `TreeSectionController.RenderDecisionPills`' own value-detail
+wiring (`Views/Rendering/TreeSectionController.cs` ~1462-1483): it gates
+on `spec.Kind == Selected || Locked` and
+`node.Decision == Craft || BuyFromVendor`, calls
+`ValueDetailTooltipBuilder.TryBuild(node, plan?.VendorCapsByItemId, out
+valueDetailText)`, and appends the result onto the pill's own
+`BasicTooltipText` - structurally correct on inspection, no defect found.
+
+**Conclusion for both items**: no code defect was found in the reachable
+chain (solver -> pipeline -> tree builder -> caption/tooltip helper). Both
+new tests are real production-path regression coverage for the exact
+reported live shapes and pass cleanly. The residual, un-fixed possibility
+for both is either (a) tonight's live session ran against a Blish HUD
+build that predated the commits under test in this same session (this
+file's own `ui-bundle`/`currency-ux-package` entries both note their gate
+was "not yet run live" as of the point they were merged, and several
+`fill gate line` merge commits landed the same day), or (b) a genuine
+Blish-only rendering/tooltip-binding gap in
+`Views/Rendering/TreeSectionController.cs` that is outside this repo's
+test-runnable boundary (`Blish_HUD.Controls.Panel.BasicTooltipText` and
+the mouse-hover binding that reads it cannot be exercised from an xunit
+test per this repo's Blish-free test invariant) - the same constraint
+every other UI-adjacent entry in this file already notes. If a future live
+session reproduces either miss against a confirmed-current build, the next
+step is temporary Blish-side instrumentation (a log line in
+`TreeSectionController.RenderTreeNode`/`RenderDecisionPills` recording the
+computed `captionText`/`valueDetailText` at build time) rather than further
+static tracing, since every reachable real-path test now confirms the data
+layer is correct.
+
+Tests: 1673 -> 1675 (2 new: `MixedVendorOffer_NotBaselineWinner_
+ResolveWithOverrides_ProducesReferenceBranchWithValidCaptionSplit`,
+`CraftRoot_VendorChildValuedInCuratedCurrency_ValueDetailTooltipFires`),
+via `dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`.
+Both new tests exercise real production entry points (`PlanSolver`,
+`CraftingPlanPipeline.ResolveWithOverrides`, `CraftingTreeBuilder`,
+`ReceiptCaptionHelper`, `ValueDetailTooltipBuilder`) with real
+`VendorOfferStore`/`InventoryReducer` where applicable - no Blish HUD
+reference, no fake logic, no fake file I/O. Build:
+`dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - clean, 0 errors.
+No files on the DO-NOT-TOUCH list (`ModuleLog`, `PlanContentHeightMath`,
+`PlanRelayoutMath`, scroll machinery, `VendorBatchSolver` merged-ceil
+batching) were edited.
+
+Gate: investigation outcome recorded 2026-08-16 - no code defect found; both live-gate anomalies (captions on override-re-solve, value-detail on a valued-vendor-child craft root) reproduce as PASSING real-path tests at every Blish-free seam (2 new tests); residual is Blish-side render binding or an observation artifact - both visuals re-verify at the next desktop session. Merged under the maintainer's standing merge directive (2026-08-16).
+
+## Shopping-list row tooltip: scope collision + swallowed hover (shoplist-have-format, 2026-08-16)
+
+Follow-up review of the shoplist-have-format branch (three own commits:
+`7d4cb2a` add raw unclamped currency holding, `fa36cb7` reword the
+shopping-row tooltip off the banned "N owned, M needed" phrasing,
+`fa1829c` fix the tooltip-currency-lines-dropped-on-resize divergence)
+found two Critical/Must-Fix issues in the new wording and its wiring,
+fixed in this pass.
+
+**SCOPE COLLISION (Critical).** The reworded wording rendered bare
+`HAVE {cc.Amount}/{cc.Amount}` - a per-row (PlanStep) total, never the
+whole plan's need for that currency id - with no scope marker, in the
+exact vocabulary `DecisionPillPlanner.AppendCurrencyOwnershipPill`
+reserves for PLAN-scope facts (`HAVE {have}/{planTotal} TOTAL`). Two
+shopping rows drawing on the same wallet currency (e.g. a 700-Karma need
+split into 300 + 400 across two vendor rows, wallet holds 500) could
+each independently render as fully covered - "HAVE 300/300" and
+"HAVE 400/400" - double-counting the one wallet balance, with the new
+"(you hold 500)" aside actively reinforcing the false reading by
+splicing a wallet-wide figure into a row-scope coverage fraction.
+`Services/ShoppingRowTooltipFormatter.cs` now appends a `THIS ROW`
+scope marker to both the shortfall and covered lines (mirroring
+`AppendCurrencyOwnershipPill`'s own `TOTAL` marker on the plan-scope
+pill), and the surplus aside now reads `(wallet N)` instead of "(you
+hold N)" - the same "wallet" term the Summary c-table's Have column and
+the tree's `HAVE x/y TOTAL` pill already use, so no third phrasing for
+the same concept survives. New/updated wording:
+`Karma: HAVE 200/500 THIS ROW, NEED 300` (shortfall),
+`Spirit Shards: HAVE 500/500 THIS ROW` (covered, no surplus),
+`Spirit Shards: HAVE 500/500 THIS ROW (wallet 999999)` (covered,
+surplus). A plan-scope fix (threading `PlanViewModel.CurrencyPlanTotals`/
+`OwnedCurrencyAmounts` into `ShoppingListSectionRenderer.Render` and
+building the line exactly like `AppendCurrencyOwnershipPill` does) was
+considered and rejected for this pass: `CurrencyAmountViewModel`
+deliberately carries no currency id field at all (`CurrencyDisplayResolver`'s
+own doc comment: "the no-displayed-IDs invariant is enforced by
+construction here... so a caller cannot accidentally surface a raw
+currency id"), so a plan-scope lookup would require adding one - a
+larger, cross-file change out of scope for this pass. The row-scope
+`THIS ROW` marker fully resolves the misreading (both halves now
+honestly say "this row", never implying plan-wide coverage) without
+touching that invariant.
+
+**TOOLTIP SWALLOWED BY CHILD CONTROLS (Must Fix).** `BuildTooltip()`
+stamped the new HAVE/NEED text on `rowPanel` only; `nameLabel` and the
+Total cell's segment controls (`CoinCurrencyRenderer.RenderValueCellRightAligned`'s
+labels/icons) have no `BasicTooltipText` of their own and silently
+captured the mouse first over most of the row - including over the
+Total cell's own currency amount, the one place a user hovering "do I
+have enough?" would look. This repo has already root-caused and fixed
+this exact class twice (the "Field-test UX wave" finding D and the
+ellipsized-currency-name tooltip fix in `SummarySectionRenderer.cs`).
+Fixed in `Views/Rendering/ShoppingListSectionRenderer.cs`:
+`BuildTooltip()` now also assigns the same string to
+`nameLabel.BasicTooltipText` and, via a new `SetValueCellTooltip`
+helper, to every control in the Total cell's `ValueCellHandle` (coin
+segments, currency segments, or the dash label for an unpriceable row).
+`BuildTooltip()`'s definition and initial call were moved to after
+`nameLabel`/`totalCell` are constructed so both are in scope for every
+rebuild, including the existing `AddReellipsis` resize/settle path -
+that rebuild already ran through the same `BuildTooltip()` closure, so
+no new divergence risk is introduced.
+
+**Verification split.** The wording change (`ShoppingRowTooltipFormatter.
+BuildCurrencyLines`) is Blish-free and fully suite-covered - see
+`ShoppingRowTooltipFormatterTests.cs`. The wiring fix
+(`ShoppingListSectionRenderer.BuildTooltip`/`SetValueCellTooltip`,
+`AddReellipsis` reassigning `BasicTooltipText` on resize/settle, and the
+on-screen hover behavior itself - does hovering the name or the Total
+cell now actually show the tooltip) is Blish-bound and outside this
+repo's test-runnable surface, same constraint every UI-adjacent entry in
+this file notes. Not yet confirmed live.
+
+**Sweep note.** Re-ran the required sweep for other `"(N owned, M
+needed)"`-style sites (repo rule: fix the class, not the instance):
+zero remaining production `.cs` sites - the only `OwnedQuantity`
+consumers are `CurrencyDisplayResolver`, `ShoppingRowTooltipFormatter`,
+and the model itself; `SummarySectionRenderer` uses a Have/Needed column
+table and `DecisionPillPlanner` already uses `HAVE`/`NEEDED`. The four
+hits in `docs/dev-notes/HISTORY.md` (lines 745, 1496, 1765, 2615) are
+historical field-test transcripts and are deliberately left verbatim,
+not updated - recorded here so a future reviewer does not need to
+re-derive that exclusion.
+
+**Tests:** `dotnet test tests/GW2CraftingHelper.Tests/
+GW2CraftingHelper.Tests.csproj` - 1682 green (measured, this pass's own
+commit), 0 failed. `ShoppingRowTooltipFormatterTests.cs` updated for the
+new `THIS ROW`/`wallet` wording; its tautological
+`BuildCurrencyLines_NeverMentionsPlanRequires` case (asserted a string
+that appears nowhere in the formatter, so it could never fail) was
+removed - `BuildCurrencyLines_MultipleCurrencies_OneLinePerCurrencyInOrder`
+already pins the full multi-currency line set with exact-string
+assertions.
+
+**Build:** `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` -
+PASS, 0 errors (pre-existing StyleCop warnings only, none in
+edited files).
+
+Gate: not yet run live - queued for the next desktop session. Merged after the full review pipeline resolved every finding, under the maintainer's standing merge directive (2026-08-16).
 
 ## Festival-vendor auto-tagging follow-up (2026-08-16)
 

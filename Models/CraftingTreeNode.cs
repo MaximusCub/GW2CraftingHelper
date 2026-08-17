@@ -254,6 +254,61 @@ namespace GW2CraftingHelper.Models
         // (or no hint at all) - the view falls back to "UNKNOWN".
         public string AcquisitionBadge { get; set; }
 
+        // source-selection-simplification (maintainer-approved redesign,
+        // docs/gw2e-considerations.md): raw cost breakdowns for EVERY
+        // feasible source at this node, straight passthrough of
+        // SolverDecision's own matching fields (see PillSourceCostBreakdown's
+        // own doc comment) - null until CraftingTreeBuilder populates them
+        // for a real "Item" node with a solved decision (the same early-
+        // return nodes that never set CanCraft/CanBuyTp/CanBuyVendor either -
+        // Have/GuildUpgrade/Currency/UnrecognizedIngredient/cost-component
+        // leaves - leave these null too, since DecisionPillPlanner never
+        // needs a breakdown comparison for a node with no real source
+        // choice). Consumed by PillSubduingEvaluator via DecisionPillPlanner
+        // - never fed back into any displayed cost.
+        public PillSourceCostBreakdown CraftCostBreakdown { get; set; }
+        public PillSourceCostBreakdown BuyFromTpCostBreakdown { get; set; }
+        public PillSourceCostBreakdown BuyFromVendorCostBreakdown { get; set; }
+
+        // Adversarial-review fix (#7, source-selection-simplification
+        // design-law gap): straight passthrough of SolverDecision's own
+        // matching fields - true when craft was excluded from the
+        // AUTOMATIC pick specifically because no character meets the
+        // winning recipe's discipline requirement (never for the force-buy
+        // pre-pass's own, separately-explained exclusion). Consumed by
+        // CompetencyOpportunityCalculator to build a concrete "crafting
+        // would save N" Plan Notes line - never fed back into any
+        // displayed cost. CraftExcludedRealCost/Disciplines/MinRating
+        // describe the recipe that would have won; only meaningful when
+        // CraftExcludedByCompetency is true.
+        public bool CraftExcludedByCompetency { get; set; }
+        public long? CraftExcludedRealCost { get; set; }
+        public IReadOnlyList<string> CraftExcludedDisciplines { get; set; }
+        public int CraftExcludedMinRating { get; set; }
+
+        // Adversarial-review round-2 fix (finding #5): straight
+        // passthrough of SolverDecision's own matching fields - true
+        // whenever the numerically cheapest raw craft recipe overall is
+        // untrained, independent of whether the AUTOMATIC pick itself got
+        // excluded. Closes two gaps CraftExcludedByCompetency alone left
+        // unreported: (a) the cheapest COMPARABLE recipe is untrained but
+        // a competent recipe exists only in the FALLBACK tier (craft never
+        // even enters the comparable-tier PickCheapest race); (b) a
+        // costlier competent SIBLING recipe wins Craft over the cheaper
+        // untrained one (the plan still crafts, so CraftExcludedByCompetency's
+        // own "Decision == Craft -> nothing to report" precedent does not
+        // apply - the user still never got the cheap recipe). Consumed by
+        // CompetencyOpportunityCalculator; never fed back into any
+        // displayed cost. CheapestCraftRealCost/Disciplines/MinRating
+        // describe that cheap recipe - only meaningful when
+        // CheapestCraftUntrained is true. Verification-review fix: never
+        // true for a node the force-buy pre-pass excluded craft from - see
+        // SolverDecision.CheapestCraftUntrained's own doc comment.
+        public bool CheapestCraftUntrained { get; set; }
+        public long? CheapestCraftRealCost { get; set; }
+        public IReadOnlyList<string> CheapestCraftDisciplines { get; set; }
+        public int CheapestCraftMinRating { get; set; }
+
         public IReadOnlyList<CraftingTreeNode> Children
         {
             get => _children;

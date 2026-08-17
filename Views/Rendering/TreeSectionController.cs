@@ -1256,6 +1256,20 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (interactive)
                 {
                     tooltipText = $"Switch to {spec.Text}";
+                    // source-selection-simplification: a decisively-losing
+                    // pill (Kind == Subdued) stays clickable - only its
+                    // tooltip gains the "why" explanation, appended after
+                    // the ordinary "Switch to X" line rather than replacing
+                    // it, since clicking still does exactly that.
+                    if (spec.Kind == PillKind.Subdued)
+                    {
+                        string subduingText = PillSubduingTooltipBuilder.Build(
+                            spec.SubduingResult, plan?.ItemMetadata, plan?.CurrencyMetadata);
+                        if (subduingText != null)
+                        {
+                            tooltipText += "\n\n" + subduingText;
+                        }
+                    }
                     var source = spec.Source.Value;
                     outer.Click += (_, __) =>
                     {

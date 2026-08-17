@@ -120,6 +120,22 @@ namespace GW2CraftingHelper.Models
         public ISet<int> ForceBuyOnlyNodeIds { get; set; }
 
         /// <summary>
+        /// Verification-review fix: the narrower, competency-independent
+        /// subset of ForceBuyOnlyNodeIds above, snapshotted at GENERATION
+        /// time alongside it - see OwnedMaterialsForceBuyPrePass.
+        /// ForceBuyPrePassResult's own doc comment for what distinguishes
+        /// the two sets. ResolveWithOverrides' local re-solve reapplies
+        /// this to PlanSolver.Solve's competencyIndependentForceBuyNodeIds
+        /// parameter on every re-solve, the same way it already reapplies
+        /// ForceBuyOnlyNodeIds - without it, a local override re-solve
+        /// would silently fall back to "never suppress
+        /// CheapestCraftUntrained" (null default), diverging from the
+        /// original generation's own Plan Notes. Null under the exact same
+        /// conditions as ForceBuyOnlyNodeIds (the pre-pass never ran).
+        /// </summary>
+        public ISet<int> CompetencyIndependentForceBuyNodeIds { get; set; }
+
+        /// <summary>
         /// M35 (gw2efficiency parity - multi-item plans): the original
         /// per-item request snapshotted at GENERATION time, for the same
         /// reason as CurrencyValuation/OwnMaterialsMode above - so a local

@@ -149,6 +149,17 @@ namespace GW2CraftingHelper.Models
         // resolver's own null-safe fallbacks handle that case.
         public IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadata { get; set; }
 
+        // source-selection-simplification (maintainer-approved redesign,
+        // docs/gw2e-considerations.md): passthrough of CraftingPlanResult.
+        // ItemMetadata, mirroring CurrencyMetadata's own precedent exactly
+        // - lets the recipe-tree renderer resolve a Subdued pill's
+        // StrictDomination item-kind deltas (raw item ids, e.g. Globs of
+        // Ectoplasm) to a display-ready name via PlanViewModelBuilder.
+        // ResolveName at render time, the same "id-only in the pure
+        // layers, resolved only at render" split CurrencyMetadata already
+        // establishes. Null under the same conditions as the source field.
+        public IReadOnlyDictionary<int, ItemMetadata> ItemMetadata { get; set; }
+
         // AUDIT ROW 20/38 (gw2e price-side fallback parity): passthrough of
         // CraftingPlanResult.PriceBasis so the recipe-tree renderer can word
         // a fallen-back node's unit-price tooltip caveat with the correct
@@ -214,8 +225,22 @@ namespace GW2CraftingHelper.Models
         // of this currency the account already holds. Null (not 0) when no
         // wallet snapshot was available, or this amount is a per-unit
         // "Each" figure (ownership is a total-quantity concept - see
-        // CurrencyDisplayResolver.ResolveAmounts/ResolveUnitAmounts).
+        // CurrencyDisplayResolver.ResolveAmounts/ResolveUnitAmounts). This
+        // value is DELIBERATELY clamped so the HAVE/Amount pair the row
+        // tooltip renders always reads as a coverage fraction (e.g.
+        // "HAVE 500/500") rather than overshooting the total - see
+        // RawOwnedQuantity below for the real, unclamped holding.
         public int? OwnedQuantity { get; set; }
+
+        // Raw, UNCLAMPED wallet holding backing OwnedQuantity above
+        // (shoplist-have-format): unlike OwnedQuantity, this is never
+        // capped at Amount, so it can exceed the row's Total when the
+        // account holds more of this currency than this row needs. Null
+        // under the exact same conditions as OwnedQuantity (no wallet
+        // snapshot / per-unit "Each" figure). Tooltip-only - lets the
+        // shopping row's tooltip spell out the real holding even when the
+        // clamped OwnedQuantity/Amount pair alone would hide it.
+        public int? RawOwnedQuantity { get; set; }
     }
 
     public class PlanSectionViewModel
