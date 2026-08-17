@@ -596,28 +596,43 @@ namespace VendorOfferUpdater
             fresh ??= new List<WikiVendorResult>();
 
             var merged = new Dictionary<string, WikiVendorResult>(StringComparer.Ordinal);
+            var existingKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var r in existing)
             {
-                merged[r.PageName ?? string.Empty] = r;
+                string key = r.PageName ?? string.Empty;
+                merged[key] = r;
+                existingKeys.Add(key);
             }
 
-            int added = 0;
-            int refreshed = 0;
+            // Quality-audit fix (B4): counted against existingKeys (a set)
+            // rather than testing merged.ContainsKey - merged is the
+            // dictionary this same loop writes to on every iteration, so a
+            // duplicate PageName within the FRESH batch itself used to be
+            // seen as "already present" (from its own earlier iteration,
+            // not from the original existing cache) and double-counted as
+            // Refreshed, which could make Unchanged (existing.Count -
+            // refreshed) under-report or go negative. addedKeys/
+            // refreshedKeys are sets for the same reason: two fresh
+            // entries sharing a PageName are one net page each, not two.
+            var addedKeys = new HashSet<string>(StringComparer.Ordinal);
+            var refreshedKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var r in fresh)
             {
                 string key = r.PageName ?? string.Empty;
-                if (merged.ContainsKey(key))
+                if (existingKeys.Contains(key))
                 {
-                    refreshed++;
+                    refreshedKeys.Add(key);
                 }
                 else
                 {
-                    added++;
+                    addedKeys.Add(key);
                 }
                 merged[key] = r;
             }
 
-            int unchanged = existing.Count - refreshed;
+            int added = addedKeys.Count;
+            int refreshed = refreshedKeys.Count;
+            int unchanged = existingKeys.Count - refreshed;
 
             return new WikiCacheMergeResult
             {
