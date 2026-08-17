@@ -5904,23 +5904,145 @@ fully green.
     wintersday/festivalofthefourwinds/lunarnewyear/superadventurefestival
     vendor tip would have rendered the raw internal key in the Notes
     section.
-  - (b) six items now have their ONLY vendor offer tagged seasonal and
-    are therefore unconditionally removed from the solver by
-    `Services/SeasonalOfferFilter`: Blood Ruby (79280), Petrified Wood
-    (79469), Fresh Winterberry (79899), Jade Shard (80332), Fire Orchid
-    Blossom (81127), Orrian Pearl (81706) each go from 1 vendor offer to
-    0 usable ones, with no compensating Plan Notes tip (their Festival
-    Token cost has no coin price, so `SeasonalVendorTipCalculator`'s
-    `TryGetCoinCost` fails for them). This is arguably the correct
-    policy (an out-of-season festival offer should not silently count as
-    always-available), but it is an undisclosed PLANNING-BEHAVIOR
-    change for those six items, not a purely internal data update, and
-    was not stated or gated before now. `SeasonalOfferFilter`/
-    `SeasonalVendorTipCalculator` are pre-existing, prior-gated code
-    paths, but this pass changed what data flows through them.
+  - (b) **Correction (2026-08-18 review fix): the "six items" count below
+    was itself measured against the wrong baseline (the post-tagging
+    file, not the merge-base one) and undercounted.** Measured against
+    merge-base commit `4735064`, **13 items** go from >=1 untagged
+    (solver-usable) vendor offer to 0 usable offers, not six: Blood Ruby
+    (79280), Petrified Wood (79469), Fresh Winterberry (79899), Jade
+    Shard (80332), Fire Orchid Blossom (81127), Orrian Pearl (81706),
+    Eitrite Ingot (92317, a real crafting material, not a
+    cosmetic/currency item), and 102002, 102175, 104132, 104836, 105086,
+    106848. Each is unconditionally removed from the solver by
+    `Services/SeasonalOfferFilter`, with no compensating Plan Notes tip
+    (their Festival Token cost has no coin price, so
+    `SeasonalVendorTipCalculator`'s `TryGetCoinCost` fails for them). A
+    further 33 items lose one usable vendor offer but keep at least one
+    other. This is arguably the correct policy (an out-of-season festival
+    offer should not silently count as always-available), but it is an
+    undisclosed PLANNING-BEHAVIOR change for these items, not a purely
+    internal data update, and was not stated or gated before now.
+    `SeasonalOfferFilter`/`SeasonalVendorTipCalculator` are pre-existing,
+    prior-gated code paths, but this pass changed what data flows through
+    them.
   - Live desktop verification for (a)/(b) above has not yet been
     performed as part of this review-fix pass either - flagging it here
     so the orchestrator's gate step (below) covers it rather than
     treating this as settled.
+- **Per-vendor tag coverage is internally inconsistent for three of the
+  seven vendors this pass touched (2026-08-18 review finding).** A
+  vendor's own wiki page is checked once for `{{Temporary}}` and its raw
+  value applies to every offer that page sells, but tagging is currently
+  keyed per-offer, not per-vendor, so a vendor can ship with some rows
+  tagged and others not: Candy Corn Vendor (Weekly) 3/9 offers tagged
+  (untagged `outputItemId` 103702, 105376, 73430, 64736, 79431, 86804),
+  Wintersday Trader (Weekly) 4/7 (untagged 64736, 79431, 86804), Festival
+  Rewards Vendor (Weekly) 9/12 (untagged 64736, 79431, 86804) - all
+  measured directly against the shipped `ref/vendor_offers.json`. The
+  untagged siblings remain solver-visible year-round via
+  `SeasonalOfferFilter` despite selling on a festival-only vendor page -
+  the same phantom-year-round-vendor failure mode this whole pass exists
+  to close, just left open for these 12 rows. Not fixed in this pass
+  (would require either a live re-tag run or deriving the tag from a
+  per-page rather than per-offer signal - see the `Requirement`-field
+  follow-up idea below); recorded here so the partial-coverage caveat
+  above is understood to include per-vendor gaps, not just
+  dataset-wide ones.
+- **Correction (2026-08-18 review fix, Critical): `MergeIntoBaseline`'s
+  protected-merchant union path silently discarded the fresh
+  `SeasonalFestival` tag it exists to add.** `kept.Concat(fresh)` put the
+  baseline row first, so `GroupBy(OfferId).Select(g => g.First())` kept
+  the untagged BASELINE row on any OfferId collision - and since
+  `SeasonalFestival` is deliberately not hashed into `OfferId` (by
+  design, so tagging a shipped offer never changes its identity), a
+  protected merchant whose row content was otherwise unchanged collided
+  every time, so the feature's whole output was dropped for exactly the
+  merchants the protected-merchant guard exists to preserve data for.
+  Separately, a protected merchant's baseline row that predates a
+  `VendorOfferHasher` hash-format change gets a DIFFERENT `OfferId` for
+  content-identical data, so the OfferId-based dedupe alone would ship a
+  duplicate tagged+untagged pair. Fixed by concatenating `fresh` first
+  (so it wins any OfferId collision) and adding a second, protected-
+  merchant-scoped dedupe pass keyed by offer content
+  (`Program.ComputeContentKey` - item/count/costs/locations/caps,
+  deliberately excluding `SeasonalFestival` itself) that also prefers the
+  fresh-tagged row. The prior test asserting this path (`
+  MergeIntoBaselineTests.MergedResult_DedupesByOfferId_...`) carried the
+  wrong premise in its own comment ("Same OfferId means content-
+  identical") and never asserted which copy survived a collision; it now
+  asserts the surviving row carries the fresh tag, and a second test
+  covers the content-key (different-OfferId) case.
+- **Correction (2026-08-18 review fix, Must Fix): a scoped `--query` run
+  could hard-abort AFTER doing live scrape work, discarding it.**
+  `ResolveSeasonalFestivalValuesAsync`'s fetch budget (and
+  `--max-seasonal-pages` safety check) was scoped to the FULL merged
+  `wiki_vendor_cache.json` (Step 2's `MergeWikiCache` union), not to the
+  pages this run's own `--query` returned - on a real dev-machine cache
+  (thousands of distinct vendor pages), a narrow `--query` computed
+  thousands of "uncached" pages and threw `SafetyLimitException` before
+  Steps 4-6 ever wrote output, even though the run's own live scrape had
+  already completed. Fixed by threading the query-scoped result list
+  through as a new optional parameter that the fetch budget now checks
+  instead (the existing `--resolve-item-currencies-only` path, which has
+  no `--query` and intentionally processes the whole cache, is
+  unaffected - it passes no scoped list and keeps its old behavior).
+- **Correction (2026-08-18 review fix, Must Fix):
+  `WikiSmwClient.FetchWikitextAsync` could permanently miscache a page as
+  "checked, not tagged."** `action=parse` does not resolve redirects by
+  default (unlike `action=ask`'s SMW queries) - a vendor page whose SMW
+  subject title is a redirect returned `#REDIRECT [[Target]]` as its
+  wikitext, in which the `{{Temporary}}` parser correctly finds no
+  template, silently caching a false negative. The same silent-permanent-
+  miss happened when the API returned an `error` object (missing/renamed
+  page): the method returned null, and the caller cached that identically
+  to a real "no template" result. Fixed by adding `&redirects=1` to the
+  request, and by having the caller warn and leave a null-wikitext page
+  UNCACHED (retried next run) instead of caching it as `""`.
+- Nice-to-have fixes in the same review pass: the `README.md` table row
+  for `ref/seasonal_wikitext_cache.json` used an em-dash (repo rule bans
+  them outside correctly-encoded UI text), corrected to `-`.
+  `ResolveSeasonalFestivalValuesAsync`'s cache-apply loop only ever
+  ASSIGNED a non-empty cached value and never CLEARED one - combined with
+  the Step 3.5 cache re-save, a value that round-tripped in could never
+  be un-set even if the wiki later drops the `{{Temporary}}` template;
+  now assigned unconditionally (including `"" -> null`).
+  `--max-seasonal-pages` is now rejected at parse time if `<= 0` (used to
+  make every tagging run throw `SafetyLimitException` with a message that
+  read like a data problem). Recorded but not acted on: `WikiVendorResult.
+  Requirement` is already populated on every SMW row at zero extra HTTP
+  cost and carries the same "the festival [[X]]" signal `{{Temporary}}`
+  does (confirmed in `ref/wiki_vendor_cache.json`); deriving the tag from
+  it (with `{{Temporary}}` kept as the authority where the two disagree)
+  would give dataset-wide coverage with no separate opt-in fetch pass and
+  no `--max-seasonal-pages` trap - worth a future pass, out of scope here
+  since this pass was explicitly asked for `{{Temporary}}` parsing.
+
+**Review-fix pass re-validation (2026-08-18, measured, after the
+`MergeIntoBaseline`/`ResolveSeasonalFestivalValuesAsync`/
+`FetchWikitextAsync` corrections above):**
+`"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-festivalscrape/tools/VendorOfferUpdater/
+VendorOfferUpdater.csproj` - 0 errors, 0 warnings.
+`"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-festivalscrape/GW2CraftingHelper.csproj -p:Platform=x64` -
+0 errors, 0 warnings. `"/mnt/c/Program Files/dotnet/dotnet.exe" test
+C:/Dev/Blish/wt-festivalscrape/tests/VendorOfferUpdater.Tests/
+VendorOfferUpdater.Tests.csproj` - 196 green (5 new: 1
+`MergeIntoBaselineTests` content-key case
+(`ProtectedMerchant_DedupesByContent_...`), 3
+`ResolveSeasonalFestivalValuesAsyncTests` cases (null-wikitext-left-
+uncached, query-scoped fetch budget, stale-value-cleared), 1
+`WikiSmwClientTests` redirects=1 case; the existing
+`MergedResult_DedupesByOfferId_...` test was corrected in place to assert
+which row survives a collision rather than only the count, not counted
+as new). `"/mnt/c/Program
+Files/dotnet/dotnet.exe" test C:/Dev/Blish/wt-festivalscrape/tests/
+GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj` - 1675 green (0
+new; this pass touched no code the module-side suite exercises). Both
+suites fully green. `ref/vendor_offers.json` was NOT regenerated by this
+review-fix pass (no live wiki run performed) - the `MergeIntoBaseline`/
+`ResolveSeasonalFestivalValuesAsync`/`FetchWikitextAsync` fixes above are
+verified by unit test only; the per-vendor tag-coverage gap noted above
+is documentation-only for the same reason.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

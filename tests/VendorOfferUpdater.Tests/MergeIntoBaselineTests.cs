@@ -13,7 +13,8 @@ namespace VendorOfferUpdater.Tests
     public class MergeIntoBaselineTests
     {
         private static VendorOffer MakeOffer(
-            string offerId, string merchantName, int outputItemId = 1)
+            string offerId, string merchantName, int outputItemId = 1,
+            string seasonalFestival = null)
         {
             return new VendorOffer
             {
@@ -22,7 +23,8 @@ namespace VendorOfferUpdater.Tests
                 OutputCount = 1,
                 CostLines = new List<CostLine>(),
                 MerchantName = merchantName,
-                Locations = new List<string>()
+                Locations = new List<string>(),
+                SeasonalFestival = seasonalFestival
             };
         }
 
@@ -240,25 +242,61 @@ namespace VendorOfferUpdater.Tests
                 new[] { "Homestead Refinement\u2014Farm" }, result.MerchantNamesReplaced);
         }
 
+        // Review fix (2026-08-18, Critical): the comment this test used to
+        // carry ("Same OfferId means content-identical") is WRONG -
+        // VendorOffer.SeasonalFestival is deliberately NOT hashed into
+        // OfferId (see VendorOffer.SeasonalFestival's own doc comment), so
+        // a baseline row and a freshly-tagged row for the identical
+        // offer share an OfferId while differing in exactly the field this
+        // whole pass exists to add. The union must not just dedupe to one
+        // row - it must keep the FRESH row, so the surviving copy actually
+        // carries the new tag rather than silently reverting to the
+        // baseline's untagged copy (the old kept.Concat(fresh) ordering
+        // let the baseline win every collision).
         [Fact]
-        public void MergedResult_DedupesByOfferId_WhenProtectedBaselineAndFreshShareAnId()
+        public void MergedResult_DedupesByOfferId_PreferringFreshRow_WhenProtectedBaselineAndFreshShareAnId()
         {
-            // Same OfferId means content-identical (VendorOfferHasher is a
-            // content hash) - the union must not produce a visible
-            // duplicate row.
             var baseline = new List<VendorOffer>
             {
                 MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1)
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1)
+                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash")
             };
             var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
 
             var result = Program.MergeIntoBaseline(baseline, fresh, skipped);
 
             Assert.Single(result.Merged);
+            Assert.Equal("dragonbash", result.Merged[0].SeasonalFestival);
+        }
+
+        // Companion to the fix above: a protected merchant's baseline row
+        // can predate a VendorOfferHasher hash-format change (see that
+        // file's own doc comment) and so carry a DIFFERENT OfferId than a
+        // content-identical fresh row - the OfferId-based GroupBy above
+        // does not catch that case, so MergeIntoBaseline also dedupes
+        // protected-merchant rows by content (ComputeContentKey, which
+        // deliberately excludes SeasonalFestival), keeping the copy that
+        // carries the fresh tag.
+        [Fact]
+        public void ProtectedMerchant_DedupesByContent_WhenOfferIdDiffersButContentMatches()
+        {
+            var baseline = new List<VendorOffer>
+            {
+                MakeOffer("old-hash-format", "Festival Rewards Vendor (Weekly)", 1)
+            };
+            var fresh = new List<VendorOffer>
+            {
+                MakeOffer("new-hash-format", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash")
+            };
+            var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
+
+            var result = Program.MergeIntoBaseline(baseline, fresh, skipped);
+
+            Assert.Single(result.Merged);
+            Assert.Equal("dragonbash", result.Merged[0].SeasonalFestival);
         }
     }
 }

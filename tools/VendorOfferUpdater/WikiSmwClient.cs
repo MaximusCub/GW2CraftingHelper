@@ -696,11 +696,26 @@ namespace VendorOfferUpdater
         /// response otherwise has no wikitext (reused FetchWithRetryAsync
         /// already retries transient failures; a null here means the page
         /// itself does not have a "wikitext" result, not a network error).
+        ///
+        /// Review fix (2026-08-18): action=parse does NOT resolve
+        /// redirects by default (unlike action=ask's SMW queries) -
+        /// without &amp;redirects=1, a vendor page whose SMW subject title
+        /// is a redirect returned "#REDIRECT [[Target]]" as its wikitext,
+        /// which TemplateRegex then correctly finds no {{Temporary}}
+        /// template in, so the caller's cache[pageName] = "" ("checked -
+        /// no tag") looked identical to a real, deliberate absence and
+        /// never got retried. See ResolveSeasonalFestivalValuesAsync's own
+        /// caller-side fix for the companion "wikitext came back null at
+        /// all" (missing/renamed page, API error object) case - that one
+        /// is now warned about and left uncached rather than baked into
+        /// the cache as "", precisely because a null return here does NOT
+        /// mean "checked, no template" the way an empty wikitext body
+        /// legitimately can.
         /// </summary>
         public async Task<string?> FetchWikitextAsync(string pageName, CancellationToken ct = default)
         {
             var url = $"{WikiApiUrl}?action=parse&page={Uri.EscapeDataString(pageName)}" +
-                       "&prop=wikitext&format=json";
+                       "&prop=wikitext&redirects=1&format=json";
 
             string response = await FetchWithRetryAsync(url, ct);
 

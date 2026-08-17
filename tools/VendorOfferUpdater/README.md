@@ -81,7 +81,7 @@ DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
 | `ref/vendor_offers.json` | ~13 MB | **Baseline vendor offers** — loaded by the Blish HUD module at runtime. Contains deduplicated, ID-resolved vendor offers. Committed to repo and embedded in the `.bhm` package. |
 | `ref/wiki_vendor_cache.json` | ~16 MB | **Wiki query cache** — raw SMW results from Pass 1. Used by Pass 2 for currency resolution. Supports incremental merging across multiple scrape runs. Committed to repo for developer convenience. |
 | `ref/item_id_cache.json` | ~40 KB | **Item ID cache** — maps item currency names to GW2 game IDs. Avoids re-resolving known items on subsequent runs. Committed to repo. |
-| `ref/seasonal_wikitext_cache.json` | small | **Seasonal festival tag cache** — maps vendor page name to its raw wiki `{{Temporary\|...}}` seasonal/event value (or `""` for "checked, not tagged"). Only populated by `--tag-seasonal-festivals`. Gitignored (dev-local, like `wiki_vendor_cache.json`/`item_id_cache.json`). |
+| `ref/seasonal_wikitext_cache.json` | small | **Seasonal festival tag cache** - maps vendor page name to its raw wiki `{{Temporary\|...}}` seasonal/event value (or `""` for "checked, not tagged"). Only populated by `--tag-seasonal-festivals`. Gitignored (dev-local, like `wiki_vendor_cache.json`/`item_id_cache.json`). |
 
 ## What It Queries
 

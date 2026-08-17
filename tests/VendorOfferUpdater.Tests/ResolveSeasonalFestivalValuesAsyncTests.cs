@@ -338,6 +338,152 @@ namespace VendorOfferUpdater.Tests
             }
         }
 
+        // Review fix (2026-08-18): a null FetchWikitextAsync result
+        // (missing/renamed page, or an "error" object in the API response
+        // - valid JSON with no "parse" property) must NOT be cached as ""
+        // ("checked - no {{Temporary}} template") the way a real, fetched-
+        // fine page with no template legitimately is - see
+        // NoTemporaryTemplate_CachedAsUntagged_StaysNull above for that
+        // contrasting case. Left uncached, this page is retried on the
+        // very next run instead of silently baking a false negative in
+        // forever.
+        [Fact]
+        public async Task NullWikitext_LeftUncached_RetriedNextRun()
+        {
+            var handler = new FakeHttpHandler();
+            using var httpClient = new HttpClient(handler);
+            var client = new WikiSmwClient(httpClient);
+
+            handler.MapUrl(
+                url => url.Contains("action=parse"),
+                "{\"error\":{\"code\":\"missingtitle\"}}");
+
+            string cachePath = TempCachePath();
+            try
+            {
+                var firstRun = new List<WikiVendorResult>
+                {
+                    new WikiVendorResult { PageName = "Renamed Vendor#vendor1", GameId = 1 }
+                };
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    firstRun, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
+
+                Assert.Null(firstRun[0].TemporarySeasonalValue);
+                Assert.Single(handler.RequestedUrls);
+
+                var secondRun = new List<WikiVendorResult>
+                {
+                    new WikiVendorResult { PageName = "Renamed Vendor#vendor1", GameId = 1 }
+                };
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    secondRun, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
+
+                // Re-fetched, not served from a stale "" cache entry.
+                Assert.Equal(2, handler.RequestedUrls.Count);
+            }
+            finally
+            {
+                File.Delete(cachePath);
+            }
+        }
+
+        // Review fix (2026-08-18): a scoped --merge-into --query run's
+        // fetch budget (and --max-seasonal-pages check) must count only
+        // the pages THIS run's --query returned (queryScopedResults), not
+        // every distinct page in the full merged wiki_vendor_cache.json
+        // (wikiResults) - otherwise a narrow --query on a large existing
+        // cache spuriously exceeds the limit and SafetyLimitException-
+        // aborts a run that would otherwise complete fine.
+        [Fact]
+        public async Task QueryScopedResults_LimitsFetchBudget_NotFullMergedCache()
+        {
+            var handler = new FakeHttpHandler();
+            using var httpClient = new HttpClient(handler);
+            var client = new WikiSmwClient(httpClient);
+
+            handler.MapUrl(
+                url => url.Contains("action=parse"),
+                BuildWikitextResponse("{{Temporary|release=Dragon Bash 2019|seasonal=Dragon Bash}}"));
+
+            // The full merged cache (as Program.cs's Step 2 MergeWikiCache
+            // union would produce) has 5 distinct pages, but this run's own
+            // --query only touched 1 of them.
+            var wikiResults = new List<WikiVendorResult>
+            {
+                new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor1", GameId = 1 },
+                new WikiVendorResult { PageName = "Vendor B#vendor1", GameId = 2 },
+                new WikiVendorResult { PageName = "Vendor C#vendor1", GameId = 3 },
+                new WikiVendorResult { PageName = "Vendor D#vendor1", GameId = 4 },
+                new WikiVendorResult { PageName = "Vendor E#vendor1", GameId = 5 },
+            };
+            var queryScopedResults = new List<WikiVendorResult>
+            {
+                wikiResults[0]
+            };
+
+            string cachePath = TempCachePath();
+            try
+            {
+                // maxSeasonalPages=1 would throw SafetyLimitException
+                // against the full 5-page wikiResults, but must NOT throw
+                // when scoped to the 1-page query result.
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    wikiResults, client, cachePath, maxSeasonalPages: 1, delayMs: 0,
+                    CancellationToken.None, queryScopedResults);
+
+                Assert.Single(handler.RequestedUrls);
+                Assert.Equal("Dragon Bash", wikiResults[0].TemporarySeasonalValue);
+            }
+            finally
+            {
+                File.Delete(cachePath);
+            }
+        }
+
+        // Nice-to-have fix (2026-08-18 review): the cache-apply loop used
+        // to only ever ASSIGN a non-empty cached value onto
+        // TemporarySeasonalValue and never CLEAR it - a value that had
+        // already round-tripped in from a prior run (e.g. via
+        // wiki_vendor_cache.json) stayed set forever, even after this
+        // pass re-checks the page and finds the {{Temporary}} template is
+        // now gone.
+        [Fact]
+        public async Task PreviouslySetValue_ClearedWhenPageNoLongerHasTemplate()
+        {
+            var handler = new FakeHttpHandler();
+            using var httpClient = new HttpClient(handler);
+            var client = new WikiSmwClient(httpClient);
+
+            handler.MapUrl(
+                url => url.Contains("action=parse"),
+                BuildWikitextResponse("{{NPC infobox\n| name = Miyani\n}}"));
+
+            var results = new List<WikiVendorResult>
+            {
+                new WikiVendorResult
+                {
+                    PageName = "Miyani#vendor1",
+                    GameId = 1,
+                    // Simulates a value that round-tripped in from a prior
+                    // run's wiki_vendor_cache.json save.
+                    TemporarySeasonalValue = "Halloween"
+                }
+            };
+
+            string cachePath = TempCachePath();
+            try
+            {
+                await Program.ResolveSeasonalFestivalValuesAsync(
+                    results, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
+
+                Assert.Null(results[0].TemporarySeasonalValue);
+            }
+            finally
+            {
+                File.Delete(cachePath);
+            }
+        }
+
         [Fact]
         public async Task EmptyWikiResults_NoOp()
         {
