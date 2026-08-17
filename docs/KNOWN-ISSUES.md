@@ -6862,6 +6862,17 @@ alongside them.
    craft-cooldown notice, even a lone one with no sibling notice to run
    in parallel with. The method now collects qualifying notices first
    and appends the clause only when the plan has 2+ of them.
+   Wording corrected on a later follow-up sweep (recorded-followups-
+   sweep verification finding): the 2+ count (`pending`) only ever
+   counts daily craft-cooldown notices from this loop, never the
+   separate Daily-cap vendor notices this same section also emits from
+   `Plan.TimegatedItems` - so a plan with exactly one craft-cooldown
+   notice running alongside a Daily-cap vendor notice IS genuinely
+   running in parallel with another daily-gated item, yet the old
+   "daily-gated" wording implied that broader population was what the
+   gate measured. The clause text is now "(runs in parallel with other
+   daily-crafted items)", naming only the population the count actually
+   covers.
    `PlanViewModelBuilderDailyCooldownTests` updated: the existing single-
    notice test now asserts the clause is absent, and a new
    `TwoCraftCooldownNotices_BothAppendParallelClause` test pins it
@@ -6887,21 +6898,30 @@ alongside them.
    its comment were corrected to assert that instead before this was
    committed.)
 4. **`ForceBuyPrePassResult` doc nuance
-   (`Services/OwnedMaterialsForceBuyPrePass.cs`).** The doc comment read
-   as if the "competency-blind" raw evaluation was training-independent
-   top to bottom. In reality it is competency-blind only at the node's
-   OWN recipe choice (picks the cheapest recipe among `node.Recipes`
-   regardless of training); each child ingredient's contribution to that
-   raw figure still comes from `PlanSolver.Evaluate`'s normal
-   competency-RESOLVED recursive call (`bestRatingByDiscipline` threaded
-   through). Documented the nuance and its safe error direction: this
-   can only make the raw craft cost look pricier than a truly
-   training-blind figure would, so it can only make
-   `CompetencyIndependentForceBuyNodeIds` UNDER-report (miss a
-   genuinely-training-independent node), never falsely exclude a real
-   training opportunity - and a child's own untrained-recipe opportunity
-   is not lost by this, since it is evaluated and reported independently
-   at that child's own node.
+   (`Services/OwnedMaterialsForceBuyPrePass.cs`) - direction corrected
+   (recorded-followups-sweep verification finding).** The doc comment
+   read as if the "competency-blind" raw evaluation was training-
+   independent top to bottom. In reality it is competency-blind only at
+   the node's OWN recipe choice (picks the cheapest recipe among
+   `node.Recipes` regardless of training); each child ingredient's
+   contribution to that raw figure still comes from
+   `PlanSolver.Evaluate`'s normal competency-RESOLVED recursive call
+   (`bestRatingByDiscipline` threaded through), which makes the raw
+   craft cost look pricier than a truly training-blind figure would.
+   An earlier version of this entry (and the doc comment it described)
+   drew the wrong conclusion from that correct premise: membership is
+   `buyCost < rawCraftCost * 0.85`, so an INFLATED rawCraftCost only
+   makes that test EASIER to satisfy - it can only ADD nodes to
+   `CompetencyIndependentForceBuyNodeIds`, never cause a miss. The real
+   risk is the opposite of what was originally written: a parent node
+   whose own untrained recipe would genuinely survive a true blind
+   evaluation can still be pulled into the set by a resolved child's
+   inflated cost, suppressing that PARENT's own
+   `Decision.CheapestCraftUntrained` - i.e. this can falsely EXCLUDE a
+   real training opportunity, not miss an independent one. Corrected the
+   doc comment and this entry to state that direction plainly. No
+   runtime behavior changed; the code on this branch is unchanged from
+   master.
 
 **Sweep of docs/KNOWN-ISSUES.md's last two days of sections (2026-08-15/
 16, plus the Festival-vendor entry's own later-dated review-fix notes)

@@ -145,16 +145,26 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CraftStep_ExceedsCap_NotDivisibleByCap_RoundsUpDays()
         {
-            var meta = MetaFor((43772, "Charged Quartz Crystal", "q.png"));
+            // Item choice (fix-the-class sweep alongside the recorded-
+            // followups-sweep verification finding on the sibling
+            // TwoCraftCooldownNotices test below): Charged Quartz Crystal
+            // (43772) is pinned by DailyCooldownItemServiceTests as NOT a
+            // Craft-step recipe output in this module and absent from the
+            // shipped seed for that reason - using it as a Craft-source
+            // step fixture teaches the reverse of that pinned invariant.
+            // Spool of Silk Weaving Thread (46740) is a real seeded entry
+            // (perDayCap 1, ref/daily_cooldown_items.json) and is used
+            // instead.
+            var meta = MetaFor((46740, "Spool of Silk Weaving Thread", "silk.png"));
             var result = MakeResult(
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 43772, Quantity = 5, Source = AcquisitionSource.Craft, RecipeId = 99 }
+                    new PlanStep { ItemId = 46740, Quantity = 5, Source = AcquisitionSource.Craft, RecipeId = 99 }
                 },
                 dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
                 {
-                    [43772] = new DailyCooldownItem { ItemId = 43772, PerDayCap = 2 }
+                    [46740] = new DailyCooldownItem { ItemId = 46740, PerDayCap = 2 }
                 });
 
             var vm = _builder.Build(result);
@@ -171,20 +181,33 @@ namespace GW2CraftingHelper.Tests.Services
             // Follow-up fix (recorded non-blocking): with 2+ daily-gated
             // notices in the plan, each row DOES have another notice to run
             // in parallel with, so the clause must be present on both.
+            //
+            // Item choice (recorded-followups-sweep verification finding):
+            // the second item must be a real shipped-seed Craft-step output
+            // with perDayCap 1 - DailyCooldownItemServiceTests pins Charged
+            // Quartz Crystal (43772) as NOT a Craft-step recipe output in
+            // this module (made at a Place of Power, never a recipe output
+            // anywhere in ref/recipes_seed.json or
+            // ref/mystic_forge_recipes.json) and asserts it is absent from
+            // the shipped seed for exactly that reason. Using it here as a
+            // Craft-source step fixture would teach a future reader the
+            // reverse of that pinned invariant. Glob of Elder Spirit
+            // Residue (46744) is a real seeded entry (perDayCap 1,
+            // ref/daily_cooldown_items.json) and is used instead.
             var meta = MetaFor(
                 (46742, "Lump of Mithrillium", "lump.png"),
-                (43772, "Charged Quartz Crystal", "q.png"));
+                (46744, "Glob of Elder Spirit Residue", "residue.png"));
             var result = MakeResult(
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
                     new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.Craft, RecipeId = 7319 },
-                    new PlanStep { ItemId = 43772, Quantity = 5, Source = AcquisitionSource.Craft, RecipeId = 99 }
+                    new PlanStep { ItemId = 46744, Quantity = 5, Source = AcquisitionSource.Craft, RecipeId = 99 }
                 },
                 dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
                 {
                     [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 },
-                    [43772] = new DailyCooldownItem { ItemId = 43772, PerDayCap = 2 }
+                    [46744] = new DailyCooldownItem { ItemId = 46744, PerDayCap = 2 }
                 });
 
             var vm = _builder.Build(result);
@@ -192,7 +215,7 @@ namespace GW2CraftingHelper.Tests.Services
             var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
             var notices = section.Rows.Where(r => r.RowType == PlanRowType.TimegatedNotice).ToList();
             Assert.Equal(2, notices.Count);
-            Assert.All(notices, n => Assert.Contains("runs in parallel with other daily-gated items", n.Label));
+            Assert.All(notices, n => Assert.Contains("runs in parallel with other daily-crafted items", n.Label));
         }
 
         [Fact]

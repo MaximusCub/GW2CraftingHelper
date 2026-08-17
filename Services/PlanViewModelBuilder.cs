@@ -800,9 +800,23 @@ namespace GW2CraftingHelper.Services
                 // Dragon Hatchling Doll components at once). The clause
                 // is only appended when there are 2+ notices in the plan;
                 // a lone notice has nothing else to run in parallel with.
+                //
+                // Wording fix (recorded-followups-sweep verification
+                // finding): `pending` (and therefore showsParallelClause)
+                // counts ONLY daily craft-cooldown notices from this loop,
+                // never the separate Daily-cap vendor notices this same
+                // section also emits from Plan.TimegatedItems just above
+                // (see the CapType == TimegatedCapType.Daily branch). A
+                // plan can have exactly one craft-cooldown notice running
+                // alongside a Daily-cap vendor notice and genuinely be in
+                // parallel with it, so the clause names the population the
+                // gate actually measures - other daily-CRAFTED items -
+                // rather than the broader "daily-gated" (which would also
+                // read as covering the vendor-cap notices this count never
+                // looks at).
                 if (showsParallelClause)
                 {
-                    label += " (runs in parallel with other daily-gated items)";
+                    label += " (runs in parallel with other daily-crafted items)";
                 }
 
                 section.Rows.Add(new PlanRowViewModel
