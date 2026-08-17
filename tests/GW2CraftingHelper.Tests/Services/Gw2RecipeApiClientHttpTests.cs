@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Tests.Services
                 _body = body;
             }
 
-            // Review-fix (recipe-ingestion-fix): captures the actual
+            // Captures the actual
             // request URI so tests can assert the schema-version query
             // parameter is present, mirroring StubHandler's own pattern
             // but adding observability rather than changing behavior.
@@ -65,7 +65,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task SearchByOutputAsync_RequestUri_CarriesSchemaVersion()
         {
-            // Review-fix (recipe-ingestion-fix): the actual regression this
+            // The actual regression this
             // branch exists to fix - Gw2RecipeApiClient.SchemaVersion's "v="
             // query parameter - had zero coverage before this test.
             // ParseRecipe-only tests pass identically whether or not the
@@ -143,7 +143,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GetRecipeAsync_RequestUri_CarriesSchemaVersion()
         {
-            // Review-fix (recipe-ingestion-fix): same coverage gap as
+            // Same coverage gap as
             // SearchByOutputAsync_RequestUri_CarriesSchemaVersion, for the
             // /v2/recipes/{id} detail call - see that test's doc comment.
             var json = @"{

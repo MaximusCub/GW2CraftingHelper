@@ -230,7 +230,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.Plan.CurrencyCosts);
         }
 
-        // ---- Class-level follow-up (adversarial review, guildupgrade-
+        // ---- Class-level follow-up (guildupgrade-
         // ingredients): the fix above must not be scoped to the literal
         // string "GuildUpgrade" - PlanSolver.Evaluate's top guard and
         // ingredient loop, Collect's top guard, and RecomputeCraftCosts'

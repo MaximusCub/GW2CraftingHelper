@@ -198,7 +198,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GetRecipe_NegativeIdNotInMf_FallsThroughToPrimary()
         {
-            // Adversarial-review fix-pass: a negative recipeId is Mystic
+            // Regression: a negative recipeId is Mystic
             // Forge only if MysticForgeRecipeData actually recognizes it -
             // otherwise it must fall through to primary rather than being
             // silently swallowed as "not found" purely because it is

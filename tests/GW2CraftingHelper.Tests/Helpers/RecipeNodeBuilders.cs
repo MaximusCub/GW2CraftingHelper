@@ -66,7 +66,7 @@ namespace GW2CraftingHelper.Tests.Helpers
             return opt;
         }
 
-        // source-selection-simplification: same additive-optional-parameter
+        // Same additive-optional-parameter
         // pattern Leaf's achievementId/achievementBit already established -
         // every existing Option(...) call keeps building a Disciplines-free/
         // MinRating-0 RecipeOption (RecipeOption's own field defaults)

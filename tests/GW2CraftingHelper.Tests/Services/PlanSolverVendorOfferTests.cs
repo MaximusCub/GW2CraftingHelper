@@ -59,7 +59,7 @@ namespace GW2CraftingHelper.Tests.Services
             // not just the last-seen occurrence's amount. Item 3 (which
             // consumes item 2, the vendor-fallback-tier item under test)
             // intentionally has NO TP price: craft/vendor comparability-
-            // parity fix's transitive-taint propagation (adversarial-review
+            // parity fix's transitive-taint propagation (regression
             // follow-up - Decision.HasUnvaluedCurrency) now correctly
             // demotes item 3's own craft-via-item-2 recipe to fallback-tier
             // too, since it consumes item 2's own fallback (unvalued
@@ -350,7 +350,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void VendorOfferWithUnrecognizedCostLineType_TreatedAsUnpriceable_NeverWinsOverTp()
         {
-            // Adversarial-review finding (2026-08-16, class-level sibling of
+            // Regression (class-level sibling of
             // the recipe-ingredient Item-positive sweep): before the fix,
             // VendorBatchSolver's cost-line fold had no `else` branch, so an
             // unrecognized CostLine.Type (VendorOfferLoader performs no type
@@ -544,7 +544,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// W4B review-fix (Must Fix): a malformed offer with a Count-0 Item
+        /// A malformed offer with a Count-0 Item
         /// cost line (e.g. bad wiki-scraped seed data) must not invent a
         /// phantom "item" cost KIND - matches the raw-coin branch's own
         /// `if (cost.Count > 0)` guard a few lines above it. Mixed with a
@@ -578,7 +578,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// W4B review-fix (Must Fix): the sibling defect to
+        /// The sibling defect to
         /// <see cref="ZeroCountItemCostLine_DoesNotPopulateVendorItemCosts"/>
         /// one field over - a malformed offer with a Count-0 non-coin
         /// Currency cost line must not invent a phantom "currency" cost

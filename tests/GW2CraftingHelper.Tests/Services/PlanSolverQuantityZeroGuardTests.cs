@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class PlanSolverQuantityZeroGuardTests
     {
-        // --- M37 (KNOWN-ISSUES #26 fix-pass finding): a Quantity == 0 node
+        // --- M37: a Quantity == 0 node
         // must never leave a standalone "ghost" step, even when its own
         // resolved Source/stepKey does not match any other occurrence's ---
 

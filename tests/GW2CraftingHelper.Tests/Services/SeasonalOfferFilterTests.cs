@@ -6,7 +6,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// opportunity-notes (SEASONAL VENDOR TIP, maintainer decision): direct
+    /// Direct
     /// unit tests on SeasonalOfferFilter.ExcludeSeasonal - the solver's
     /// offer set must unconditionally drop any offer with a non-null
     /// SeasonalFestival, regardless of festival-active state (this filter

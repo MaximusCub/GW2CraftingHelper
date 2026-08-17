@@ -5,7 +5,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// W3B review-fix: pure requestLabel capping - Blish-free, exercises
+    /// Pure requestLabel capping - Blish-free, exercises
     /// the real RequestLabelFormatter production code
     /// CraftingPlanView.TriggerGenerate calls before handing requestLabel
     /// to CraftingPlanPipeline.GenerateStructuredAsync.

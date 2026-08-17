@@ -86,7 +86,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ComputePerItemEconomics_FractionalEvRoot_UsesExpectedOutputCountNotNominalOutputCount()
         {
-            // Review fix (finding 8, MEASURED): a Mystic-Clover-style root
+            // A Mystic-Clover-style root
             // recipe (nominal OutputCount 1, but ExpectedOutputCount 0.31 -
             // fractional EV) crafted 249 times to satisfy a 77-unit
             // request. The pre-fix nominal basis (CraftsNeeded *

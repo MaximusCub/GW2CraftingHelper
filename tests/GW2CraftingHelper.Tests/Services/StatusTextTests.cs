@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("", StatusText.Normalize(""));
         }
 
-        // M37 (KNOWN-ISSUES #22/#27): the ignore toggle (and every other
+        // The ignore toggle (and every other
         // non-Best-Path re-solve trigger) must never produce the Best
         // Path preset's own label, regardless of the current override
         // count - this is exactly the "Best path restored" mislabel bug.
@@ -48,7 +48,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Best path restored", StatusText.ForOverrideResolve(isBestPathPreset: true, overrideCount: 0));
         }
 
-        // ---- ForSnapshotAge (M39 snapshot search) ----
+        // ---- ForSnapshotAge ----
 
         [Fact]
         public void ForSnapshotAge_LessThanOneMinute_ReturnsJustNow()
@@ -106,7 +106,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("1d ago", StatusText.ForSnapshotAge(TimeSpan.FromDays(1)));
         }
 
-        // ---- ForRefreshFailure (field-tested pain, 2026-08-06: the
+        // ---- ForRefreshFailure (field-tested pain: the
         // Snapshot tab's Refresh Now used to show only bare
         // "Refresh Failed - {time}" regardless of cause) ----
 

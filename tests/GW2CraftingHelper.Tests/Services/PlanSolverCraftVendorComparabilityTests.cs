@@ -380,7 +380,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains(plan.Steps, s => s.Source == AcquisitionSource.Craft && s.ItemId == 1);
         }
 
-        // --- Adversarial-review follow-up (2026-08-15): findings on the
+        // --- Regression: findings on the
         // fix above. See docs/KNOWN-ISSUES.md's "Craft/vendor
         // comparability parity fix" section for the full writeup. ---
 

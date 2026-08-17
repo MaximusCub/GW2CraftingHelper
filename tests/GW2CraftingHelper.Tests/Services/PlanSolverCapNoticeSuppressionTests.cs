@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Tests.Services
         // #24/#25 Section 3.3) - a fix was attempted here (summing each
         // occurrence's own true purchase count when occurrences disagreed
         // on the winning offer but agreed on the raw (DailyCap, WeeklyCap)
-        // tuple) but reverted after adversarial review: the wiki's per-row
+        // tuple) but reverted after review: the wiki's per-row
         // WeeklyCap the Homestead seed data carries is a template
         // parameter, not a confirmed per-station aggregate (see
         // KNOWN-ISSUES #24's "Cap data" note), so two occurrences agreeing
@@ -110,7 +110,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(plan.TimegatedItems);
         }
 
-        // --- Adversarial review of the M37 mixed-offer Weekly pair above
+        // --- Regressions for the M37 mixed-offer Weekly pair above
         // found the Conflict-suppression parity claim for the KNOWN-ISSUES
         // #33 SeasonalCap package unverified: FinalizeVendorBatches checks
         // Seasonal inside the exact same "!state.Conflict" guard as Daily/

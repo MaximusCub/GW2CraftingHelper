@@ -8,7 +8,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // M39 (log system, d2-log-system.md Section 9): ModuleLog is an
+    // ModuleLog is an
     // ordinary instantiable class specifically so tests can construct
     // isolated instances (new ModuleLog()) instead of touching the shared
     // ModuleLog.Shared singleton - see ModuleLog's own class doc comment on

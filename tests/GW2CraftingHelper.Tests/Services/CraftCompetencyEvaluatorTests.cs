@@ -6,7 +6,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// source-selection-simplification (maintainer-approved redesign,
+    /// (redesign,
     /// docs/gw2e-considerations.md): pure unit coverage of
     /// CraftCompetencyEvaluator, independent of PlanSolver - see
     /// PlanSolverCraftCompetencyTests for the real Solve()-path coverage of

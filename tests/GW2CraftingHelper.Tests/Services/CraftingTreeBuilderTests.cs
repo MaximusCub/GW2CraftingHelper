@@ -108,7 +108,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(node.IsReferenceBranch); // real craft, not a reference branch
             Assert.Single(node.Children);
 
-            // Review fix (finding 7): the Notes excess feature is entirely
+            // The Notes excess feature is entirely
             // downstream of these three fields (CraftingTreeBuilder.BuildNode
             // copying them from the chosen RecipeOption) - nothing asserted
             // they actually land on the tree node before this.
@@ -125,7 +125,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, child.SubtreeCost);
             Assert.False(child.IsReferenceBranch); // no recipe to build a reference branch from
 
-            // Review fix (finding 7): a non-Craft node must carry none of
+            // A non-Craft node must carry none of
             // the three Craft-only fields (CraftingTreeNode.CraftsNeeded's
             // own doc comment: "null for every other decision").
             Assert.Null(child.CraftsNeeded);
@@ -187,7 +187,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// opportunity-notes (RECIPE-SHEET SAVINGS): a bought node's
+        /// A bought node's
         /// reference branch also surfaces node.Recipes[0]'s own RecipeId/
         /// Disciplines/MinRating/LearnedFromItem flag onto the tree node -
         /// see CraftingTreeNode.ReferenceRecipeId's own doc comment.
@@ -347,7 +347,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(treeNode.IsAchievementBitDeduped); // genuine ownership, not the M37 dedup flag
         }
 
-        // ---- M37 (KNOWN-ISSUES #26): achievement-bit dedup collapses to Have + IsAchievementBitDeduped ----
+        // ---- M37: achievement-bit dedup collapses to Have + IsAchievementBitDeduped ----
 
         [Fact]
         public void AchievementBitDedupedNode_CollapsesToHave_SetsFlag()
@@ -502,8 +502,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CurrencyNode_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides()
         {
-            // Adversarial-review finding (guildupgrade-ingredients, Must
-            // Fix): mirrors
+            // Regression (guildupgrade-ingredients, Must            // Fix): mirrors
             // GuildUpgradeNode_NeverResolvesIconOrRarityViaItemMetadata_
             // EvenWhenIdCollides below - `metadata` (the ItemMetadata dict
             // every Item node's IconUrl/Rarity is looked up from, keyed by
@@ -629,7 +628,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void GuildUpgradeNode_NeverResolvesIconOrRarityViaItemMetadata_EvenWhenIdCollides()
         {
-            // Adversarial-review finding: `metadata` (the ItemMetadata
+            // `metadata` (the ItemMetadata
             // dict every OTHER node's IconUrl/Rarity is looked up from,
             // keyed by raw ingredient id) happens to carry a genuine entry
             // for the SAME numeric id as this GuildUpgrade ingredient. The
@@ -679,7 +678,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(treeNode.IsIgnored);
         }
 
-        // ---- Class-level follow-up (adversarial review, guildupgrade-
+        // ---- Class-level follow-up (guildupgrade-
         // ingredients): line 177's non-Item branch used to read
         // `!= "Item"`, silently labeling ANY unrecognized ingredient type
         // as CraftingDecision.Currency via CurrencyDisplayResolver - the
@@ -691,7 +690,7 @@ namespace GW2CraftingHelper.Tests.Services
         // prove the general fallthrough, not just the "GuildUpgrade"
         // instance covered above.
         //
-        // Second adversarial-review pass: this leaf used to share
+        // This leaf must not share
         // CraftingDecision.Unknown with a genuine no-source "Item" node,
         // which meant it also picked up DecisionPillPlanner's interactive
         // IGNORE pill - keyed by TreeSectionController on this node's raw
@@ -790,8 +789,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void UnrecognizedIngredientType_IgnoresStaleMemoEntry_EvenWhenOneExistsForThisNodeId()
         {
-            // Class-level follow-up (guildupgrade-ingredients, adversarial
-            // review): the non-"Item" catch-all above sits BEFORE the
+            // Class-level follow-up (guildupgrade-ingredients): the
+            // non-"Item" catch-all above sits BEFORE the
             // decisions lookup now, matching where the GuildUpgrade and
             // Currency branches sit, rather than only inside the "no
             // decision found" branch. PlanSolver's Evaluate never actually
@@ -1129,14 +1128,14 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CurrencyNode_WithCurrencyMetadata_PrefersLiveNameOverStaticMap()
         {
-            // Review-fix (recipe-ingestion-fix, Must Fix): CraftingTreeBuilder
+            // CraftingTreeBuilder
             // now resolves Currency leaf names through CurrencyDisplayResolver
             // (live CurrencyMetadataService data preferred, Gw2Constants
             // static map as fallback) instead of calling
             // Gw2Constants.ResolveCurrencyName directly - the same chain
             // PlanViewModelBuilder's Summary/shopping rows already use. Id 61
             // ("Research Note" live) is deliberately used here: it is one of
-            // the ids the 2026-08-15 audit found the static map had
+            // the ids the audit found the static map had
             // literally never carried an entry for.
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
@@ -1227,7 +1226,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(node.Children);
         }
 
-        // --- Acquisition hints (M32) ---
+        // --- Acquisition hints ---
 
         [Fact]
         public void UnknownDecision_WithHint_SetsAcquisitionHint()
@@ -1561,7 +1560,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(decision.TotalCost, node.SubtreeCost);
         }
 
-        // ---- AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap): item cost-component leaf PriceSideFellBack ----
+        // ---- Price-side fallback (DISPLAY CAVEAT gap): item cost-component leaf PriceSideFellBack ----
 
         [Fact]
         public void MixedOffer_ItemCostPreferredSideEmpty_LeafFlagsPriceSideFellBack()
@@ -1667,7 +1666,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap, round 3): the
+        /// The
         /// sibling of the test above, but the barter item's preferred TP
         /// side (BuyInstant, under the default InstantBuy basis) is empty -
         /// its price only exists via this same item's other-side fallback
@@ -1891,10 +1890,10 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // ---- W4B review-fix round (2026-08-15): Critical/Must Fix findings ----
+        // ---- Vendor cost-component regressions ----
 
         /// <summary>
-        /// W4B review-fix (Critical): item 500 is needed via TWO separate
+        /// Item 500 is needed via TWO separate
         /// tree occurrences (under items 2 and 3), each demanding 6 units,
         /// from a single mixed item+currency vendor offer (OutputCount 15,
         /// no raw coin). PlanSolver.Collect merges both occurrences into
@@ -1970,7 +1969,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// AUDIT ROW 20/38 review-fix (DISPLAY CAVEAT gap, round 3): same
+        /// Same
         /// merged-occurrence fixture as
         /// MultiOccurrence_MergedMixedVendorOffer_SuppressesComponentLeaves_ParentStaysConsistent
         /// above (VendorComponentCostsUnreliable suppresses leaf synthesis
@@ -2029,7 +2028,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// W4B review-fix (Must Fix): kindCount in
+        /// KindCount in
         /// BuildVendorCostComponentLeaves counts by
         /// decision.VendorCurrencyCosts.Count &gt; 0 (a boolean per KIND),
         /// not per distinct currency id - so an offer spanning 3 different
@@ -2060,7 +2059,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// W4B review-fix (Must Fix): a BuyFromVendor node whose winning
+        /// A BuyFromVendor node whose winning
         /// offer ALSO has 2+ cost kinds AND a known recipe must not
         /// silently lose gw2e's "what it would cost to craft instead"
         /// comparison just because it also got component leaves - the two
@@ -2117,7 +2116,7 @@ namespace GW2CraftingHelper.Tests.Services
         // ---- AUDIT ROW 20/38: SolverDecision.PriceSideFellBack reaching CraftingTreeNode ----
 
         /// <summary>
-        /// AUDIT ROW 20/38: item 1's preferred side under the default
+        /// Item 1's preferred side under the default
         /// InstantBuy basis (BuyInstant) is empty - the buy total only
         /// exists via this same item's other-side fallback to SellInstant.
         /// BuyFromTp wins outright (no craft/vendor option at all), so the
@@ -2140,7 +2139,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// AUDIT ROW 20/38: the repeated BuyFromTp-only guard in
+        /// The repeated BuyFromTp-only guard in
         /// CraftingTreeBuilder.BuildNode (mirroring PlanSolver's own Commit
         /// gate) must stop SolverDecision.PriceSideFellBack from leaking
         /// onto a winning Craft node's CraftingTreeNode even though item 1's
@@ -2170,7 +2169,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// AUDIT ROW 20/38 review-fix (test gap): sibling of
+        /// Sibling of
         /// CraftNode_WinsOverFallbackPricedBuy_PriceSideFellBackStaysFalseOnNode
         /// above, but for a BuyFromVendor win instead of Craft - the other
         /// source the repeated BuyFromTp-only guard in

@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Tests.Services
             string acquisitionBadge = null, int ownedQuantityUsed = 0, bool isIgnored = false,
             bool isAchievementBitDeduped = false, int quantity = 1,
             bool isCostComponent = false, int componentOwnedQuantity = 0,
-            // W4B (2026-08-15): lets cost-component tests pick between the
+            // Lets cost-component tests pick between the
             // item-type leaf shape (non-null SubtreeCost, a real gold
             // value - see CraftingTreeBuilder.BuildVendorCostComponentLeaves'
             // item-line branch) and the currency-type shape (SubtreeCost
@@ -120,7 +120,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
         }
 
-        // ---- M37 (KNOWN-ISSUES #26): achievement-bit dedup pill ----
+        // ---- M37: achievement-bit dedup pill ----
 
         [Fact]
         public void Have_AchievementBitDeduped_SingleCountedElsewherePill_NoPlainHave()
@@ -205,7 +205,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
         }
 
-        // ---- guildupgrade-ingredients fix, second adversarial-review
+        // ---- guildupgrade-ingredients fix, second
         // pass: "UnrecognizedIngredient" is its own Decision value now,
         // distinct from Unknown, specifically so it takes this same locked
         // single-pill short-circuit instead of falling into the
@@ -358,7 +358,7 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- All three feasible: the highlighted pill MUST match the
         // solver's actual committed Source, whichever of the three it is
-        // (KNOWN-ISSUES #18b) ---
+        // ---
 
         [Theory]
         [InlineData(CraftingDecision.Craft, "CRAFT")]
@@ -403,7 +403,7 @@ namespace GW2CraftingHelper.Tests.Services
         // --- M34-B2b: "HAVE N/M NEEDED" annotation (field-test finding A:
         // widened to show the original total demand, not just the covered
         // count, alongside the tree row's own remaining-need "Nx" prefix;
-        // maintainer's final wording pass (2026-08-06) moved OWNED away
+        // the final wording pass moved OWNED away
         // from sitting next to the total - see AppendOwnershipPills' doc
         // comment) ---
 
@@ -616,7 +616,7 @@ namespace GW2CraftingHelper.Tests.Services
         // ---- W4B: cost-component leaves - informational-only pill
         // vocabulary ----
         //
-        // Maintainer's field-test finding (2026-08-15): the earlier HAVE/
+        // Maintainer's field-test finding: the earlier HAVE/
         // "HAVE x/y NEEDED" vocabulary was replaced by a subdued "OWN n"
         // badge (PillKind.OwnedInfo, the same muted-gold kind the ordinary
         // partial-ownership annotation uses) showing the raw
@@ -712,7 +712,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(specs, s => s.Kind == PillKind.Locked);
         }
 
-        // ---- W4B (2026-08-15): "CURRENCY" badge on the blank-cost-cell
+        // ---- W4B: "CURRENCY" badge on the blank-cost-cell
         // (currency-type) component shape - explains at a glance why no
         // gold value is shown, gw2efficiency's own grey Currency-badge
         // pattern. ----
@@ -855,7 +855,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CurrencyDecision_ZeroOwnedNoPlanTotal_OmitsHaveTotalPillEntirely()
         {
-            // currency-ux-package review fix (finding 3, MEASURED): the old
+            // The old
             // `long planTotal = 0; currencyPlanTotals?.TryGetValue(...)`
             // default made "this id has no plan total at all" (reachable
             // whenever ownedCurrencyAmounts is widened - via

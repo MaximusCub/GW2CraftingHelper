@@ -203,7 +203,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task NullTypedIngredient_BecomesLeaf_RecipeNeverExpanded()
         {
-            // Adversarial-review finding (2026-08-16): RawIngredient.Type
+            // RawIngredient.Type
             // deserializes to null when a seed/overlay JSON row omits
             // "type" (System.Text.Json applies no default), so this shape
             // is reachable from real cache data even though today's seed
@@ -612,7 +612,7 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     new RawIngredient { Type = "Item", Id = 2, Count = 1 }
                 }
-                // No Disciplines, MinRating, or Flags set — use defaults
+                // No Disciplines, MinRating, or Flags set - use defaults
             });
 
             var svc = new RecipeService(api);
@@ -648,7 +648,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain("AutoLearned", option.Flags);
         }
 
-        // --- M37 (KNOWN-ISSUES #26): achievement-bit ingredient propagation ---
+        // --- M37: achievement-bit ingredient propagation ---
 
         [Fact]
         public async Task AchievementFields_PropagateFromRawIngredientOntoChildNode()
@@ -784,7 +784,7 @@ namespace GW2CraftingHelper.Tests.Services
                 () => svc.BuildMultiItemTreeAsync(new List<PlanRequestItem>(), CancellationToken.None));
         }
 
-        // KNOWN-ISSUES api-degradation F5 (adversarial-review follow-up):
+        // KNOWN-ISSUES api-degradation F5 :
         // Gw2RecipeApiClient.GetRecipeAsync can now return null on a 404
         // instead of throwing. A recipe id a search result points to that
         // then 404s on its own detail lookup must not crash the tree build

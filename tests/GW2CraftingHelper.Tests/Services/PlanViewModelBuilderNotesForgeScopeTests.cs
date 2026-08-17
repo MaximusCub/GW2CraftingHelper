@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
-            // Review fix (finding 4, INFERRED - no live desktop
+            // INFERRED (no live desktop
             // verification was performed): the single ~243-char row would
             // have clipped horizontally at NotesSectionRenderer's panel
             // edge, cutting off the "never models or shows them" caveat -

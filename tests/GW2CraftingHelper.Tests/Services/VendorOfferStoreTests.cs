@@ -271,7 +271,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(store.HasAnyOffer(200));
         }
 
-        // --- M37 (KNOWN-ISSUES #24): shipped Homestead Refinement tier
+        // --- M37: shipped Homestead Refinement tier
         // data invariant. VendorBatchSolver.EvaluateVendorOffers admits any offer
         // whose HomesteadTier is null at every configured tier setting -
         // correct for the 21 one-time "Upgrade" purchase rows the same
@@ -359,13 +359,13 @@ namespace GW2CraftingHelper.Tests.Services
                 var dataset = _loader.Load(stream);
 
                 Assert.Equal(1, dataset.SchemaVersion);
-                // Astral Acclaim package (KNOWN-ISSUES #28): a scoped
+                // Astral Acclaim package: a scoped
                 // Wizard's Vault re-scrape (--query + --merge-into) net
                 // added 7 offers (100 removed/replaced, 107 added) while
                 // seeding SeasonalCap - see the package's commit for the
                 // full accounting.
                 //
-                // Festival-vendor auto-tagging follow-up (2026-08-16): a
+                // Festival-vendor auto-tagging follow-up: a
                 // second scoped re-scrape (--query + --tag-seasonal-festivals
                 // + --merge-into) targeting the six known festival vendors
                 // OTHER than Candy Corn Vendor (Weekly) - Dragon Bash
@@ -411,7 +411,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // Review fix (finding 6, 2026-08-17): neither suite previously
+        // Neither suite previously
         // tied the shipped data's festival keys to the module's own
         // known-key/display-name table - VendorOfferUpdater.Tests.
         // SeasonalFestivalRoundTripTests only checks a hard-coded string
@@ -422,7 +422,7 @@ namespace GW2CraftingHelper.Tests.Services
         // dragonbash/wintersday/festivalofthefourwinds/lunarnewyear/
         // superadventurefestival all fell through
         // ResolveFestivalDisplayName's raw-key fallback before that fix).
-        // The six-key list below is independently MEASURED the same way
+        // The six-key list below is independently measured the same way
         // as FestivalDisplayNames itself (see that field's own doc
         // comment) - kept as its own literal, not copied from
         // FestivalDisplayNames.Keys, so a future accidental deletion from
@@ -503,7 +503,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // Astral Acclaim package (KNOWN-ISSUES #33): pins SeasonalCap for
+        // Astral Acclaim package: pins SeasonalCap for
         // the two task-named Wizard's Vault rows, mirroring the guard
         // docs/research/m37-r4-vendor-caps.md section 4f recommended for
         // the analogous daily/weekly case (item 28's Candy-Corn-Ecto

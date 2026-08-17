@@ -53,14 +53,14 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ParseRecipe_RealVersionedCurrencyRecipe_UsesIdKeyForEveryIngredientType()
         {
-            // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): replaces
+            // KNOWN-ISSUES recipe-ingestion bug class: replaces
             // a contract-mirror test that fabricated a "hypothetical"
             // explicit-type shape keyed on "item_id" - which is NOT what
             // the real API sends for a typed ingredient and is exactly the
             // wrong shape that let the original bug (unconditional
             // ing.Value<int>("item_id")) go undetected. This is the REAL,
             // byte-for-byte captured response body from
-            // `curl "https://api.guildwars2.com/v2/recipes/14025?v=2026-08-15"`
+            // `curl "https://api.guildwars2.com/v2/recipes/14025?v="`
             // (recipe 14025, Amalgamated Rift Essence -> item 100930; this
             // exact recipe was the one invisible to unversioned
             // /v2/recipes/14025, which 404s outright, and to unversioned
@@ -151,7 +151,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ParseRecipe_IngredientMissingBothIdKeys_SkipsIngredientRatherThanEmittingIdZero()
         {
-            // Review-fix (recipe-ingestion-fix): a row with NEITHER "id" nor
+            // A row with NEITHER "id" nor
             // "item_id" previously silently ingested Id = 0 (Newtonsoft's
             // Value<int>(key) defaults to 0 for a missing key) - a real
             // item id 0 flows into CraftingPlanPipeline.CollectItemIds as a

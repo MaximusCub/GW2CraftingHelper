@@ -201,7 +201,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
 
-        // B8 shape fix: offersForItem narrowed from VendorOfferStore to
+        // OffersForItem narrowed from VendorOfferStore to
         // Func<int, IReadOnlyList<VendorOffer>> - pins the null-delegate
         // guard (the direct replacement for the old `vendorOfferStore !=
         // null` check) with every OTHER input otherwise satisfied, so this
@@ -224,7 +224,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
 
-        // Nice-to-have: a sheet offer that is ONLY available during a
+        // A sheet offer that is ONLY available during a
         // festival must not be priced as if it were a year-round offer
         // (SeasonalOfferFilter's "the plan always assumes the regular
         // market" law - see VendorOffer.SeasonalFestival's own doc
@@ -248,7 +248,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
 
-        // Nice-to-have: a reference branch whose only children are
+        // A reference branch whose only children are
         // cost-component leaves (IsCostComponent) has zero children
         // actually counted into craftTotal - without the countedChildren
         // guard this would leave craftUnitCost at 0 and report the full
@@ -308,7 +308,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
 
-        // Review fix (finding 6): a reference-branch child reported as
+        // A reference-branch child reported as
         // owned (Have) must NOT contribute 0 to the hypothetical craft
         // cost - this whole node is a hypothetical "what if I crafted
         // instead" branch, and those owned units may already be allocated
@@ -340,7 +340,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
 
-        // Review fix (finding 6): the pre-existing "unprovable child bails
+        // The pre-existing "unprovable child bails
         // the whole craft cost" path (Currency/Unknown/GuildUpgrade/
         // UnrecognizedIngredient children) had no direct test - only the
         // Have-child path was silently exempted from it. Currency here
@@ -387,7 +387,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
 
-        // Review fix (finding 1): VendorCurrencyCostsPresent_NotComparable_
+        // VendorCurrencyCostsPresent_NotComparable_
         // NoOpportunity above only sets VendorCurrencyCosts on the PARENT
         // fixture's direct BuyFromTp child - it never proves the guard
         // walks deeper. This fixture puts the karma-priced vendor node two
@@ -471,7 +471,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(opp.DisciplineBlocked);
         }
 
-        // Nice-to-have: multi-discipline recipe must steer toward the
+        // Multi-discipline recipe must steer toward the
         // discipline the account is closest to training, not whichever
         // name sorts first - "Armorsmith" sorts before "Weaponsmith", but
         // the account here is far closer to the Weaponsmith requirement.
@@ -564,8 +564,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, result.RecipeSheetSavingsOpportunities[0].SheetCost);
         }
 
-        // --- Review finding 7 correction (merged-ceil-remainder stream,
-        // MEASURED): despite the name, this is NOT a real downstream
+        // --- Correction (merged-ceil-remainder,
+        // measured): despite the name, this is NOT a real downstream
         // consumer of AllocateVendorNodeCosts - it hand-constructs a
         // CraftingTreeNode tree directly via BoughtNodeWithReferenceBranch
         // and feeds `ingredientSubtreeCost` in as a plain constructor

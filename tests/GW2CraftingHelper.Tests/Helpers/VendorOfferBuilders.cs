@@ -4,7 +4,7 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Tests.Helpers
 {
     /// <summary>
-    /// Shared VendorOffer builder helpers (M38 WP-20). CoinVendorOffer and
+    /// Shared VendorOffer builder helpers. CoinVendorOffer and
     /// MixedVendorOffer were private static methods on PlanSolverTests
     /// before that 2705-line file was split into focused test files - both
     /// helpers are called from several of the split files, so they moved
@@ -64,7 +64,7 @@ namespace GW2CraftingHelper.Tests.Helpers
         }
 
         /// <summary>
-        /// W4B (vendor cost-component leaves): an offer mixing TP-valued
+        /// An offer mixing TP-valued
         /// Item cost line(s) with non-coin currency cost line(s) - the real
         /// field case that motivated the feature ("Amalgamated Rift
         /// Essence": currencies + Globs of Ectoplasm). itemCostLines/

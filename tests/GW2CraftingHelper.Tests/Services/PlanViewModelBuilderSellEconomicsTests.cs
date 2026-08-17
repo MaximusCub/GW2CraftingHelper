@@ -7,7 +7,7 @@ using static GW2CraftingHelper.Tests.Helpers.CraftingPlanResultBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // W4A (Total Cost section redesign): rewritten for the two-formula-band
+    // Rewritten for the two-formula-band
     // shape (CostFormulaTile/ProfitFormulaTile) - see
     // PlanViewModelBuilderSummaryTests for the primary band/collapse-rule/
     // currency-table coverage. This file keeps its original name/focus

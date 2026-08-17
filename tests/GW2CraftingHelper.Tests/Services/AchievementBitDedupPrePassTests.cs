@@ -217,7 +217,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultipleRecipeOptions_OnlyPrimaryOptionWalked_OtherOptionUntouched()
         {
-            // Adversarial-review fix-pass: unlike gw2e's single-recipe-per-
+            // Regression: unlike gw2e's single-recipe-per-
             // node nested tree, this module's RecipeNode can carry multiple
             // MUTUALLY EXCLUSIVE alternate RecipeOptions for the same node
             // (PlanSolver.Evaluate compares them for cost; only one is ever
@@ -250,7 +250,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultipleRecipeOptions_PrePassNeverUndercutsTheHonestOption()
         {
-            // End-to-end regression for the adversarial-review finding's
+            // End-to-end regression for the finding's
             // direct repro: node 999 has two alternate RecipeOptions, both
             // needing achievement-bit item 55 (true cost 100 via TP).
             // Option A (recipe 10) needs only item 55. Option B (recipe 11)

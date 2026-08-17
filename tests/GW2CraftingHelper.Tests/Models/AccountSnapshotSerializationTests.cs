@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Tests.Models
                 {
                     new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 9999 }
                 },
-                // W3C polish (review nice-to-have): this test's name is a
+                // This test's name is a
                 // promise ("preserves ALL fields") that CharacterDisciplines
                 // broke when it was added without updating this fixture -
                 // two entries here exercise every field on

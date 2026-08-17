@@ -156,7 +156,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(500, result.RequiredDisciplines[0].MinRating);
         }
 
-        // W3C review-fix (mustFix): the greedy set-cover tiebreak used to
+        // The greedy set-cover tiebreak used to
         // fall straight to alphabetical order whenever no Pass 1/pre-cover
         // discipline had already been selected - see PlanResultBuilder.
         // Build's accountDisciplineNames doc comment. A recipe craftable by
@@ -629,7 +629,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void RequiredDisciplines_AchievementOrMerchantDiscipline_ExcludedFromList()
         {
-            // M37 fix-pass (adversarial review finding): "Achievement"/
+            // "Achievement"/
             // "Merchant" are gw2e-borrowed informational source tags on the
             // new achievement-bit seed recipes, not real, player-levelable
             // GW2 crafting disciplines - they must never appear in Required
@@ -738,7 +738,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(result.RequiredRecipes[0].IsAutoLearned);
         }
 
-        // UI-bundle milestone, Feature A (wiki links): same Flags-membership
+        // Same Flags-membership
         // pattern as RequiredRecipes_AutoLearnedFlag above.
         [Fact]
         public void RequiredRecipes_LearnedFromItemFlag()

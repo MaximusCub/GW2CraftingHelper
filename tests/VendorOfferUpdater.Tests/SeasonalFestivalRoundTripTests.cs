@@ -11,8 +11,8 @@ using static VendorOfferUpdater.Tests.Helpers.RepoFileLocator;
 namespace VendorOfferUpdater.Tests
 {
     /// <summary>
-    /// opportunity-notes (SEASONAL VENDOR TIP, review-fix): guards the
-    /// exact regression the review found - VendorOfferUpdater.Models.
+    /// Guards the
+    /// exact regression - VendorOfferUpdater.Models.
     /// VendorOffer used to have no SeasonalFestival property, so a
     /// --merge-into run (Program.MergeIntoBaseline, reached via
     /// Program.cs's deserialize-the-whole-baseline-through-this-model then
@@ -25,7 +25,7 @@ namespace VendorOfferUpdater.Tests
     /// merges in an unrelated fresh merchant's offer, and asserts every
     /// known tagged offer still carries seasonalFestival afterward.
     ///
-    /// Festival-vendor auto-tagging follow-up (2026-08-16): the shipped
+    /// Festival-vendor auto-tagging follow-up: the shipped
     /// baseline now carries seasonalFestival on 57 offers across all six
     /// known festivals, not just the original three hand-tagged Candy Corn
     /// Vendor (Weekly) ecto offers - Dragon Bash Merchant (Weekly),

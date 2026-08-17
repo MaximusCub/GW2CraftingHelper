@@ -7,10 +7,10 @@ namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
     /// Pins the exact HAVE/NEED wording ShoppingListSectionRenderer's
-    /// tooltip depends on (shoplist-have-format review finding #3 -
+    /// tooltip depends on (finding -
     /// previously nothing observed these strings, so a regression straight
     /// back to the banned "N owned, M needed" phrasing passed the full
-    /// suite). Also covers review finding #2: the output must never claim
+    /// suite). Also: the output must never claim
     /// "plan requires" - cc.Amount is this row's own total, not the whole
     /// plan's requirement for that currency id.
     /// </summary>

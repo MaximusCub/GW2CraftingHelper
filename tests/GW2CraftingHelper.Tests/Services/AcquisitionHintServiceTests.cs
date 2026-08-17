@@ -164,7 +164,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Assert.False(string.IsNullOrEmpty(hint.Badge));
                 }
 
-                // Review fix (finding 1, post-PART-C follow-up): Charged
+                // Charged
                 // Quartz Crystal (43772) is made at a Place of Power, not
                 // via any recipe this module resolves, so it can never be a
                 // DailyCooldownItemService.Load Craft-step entry (see

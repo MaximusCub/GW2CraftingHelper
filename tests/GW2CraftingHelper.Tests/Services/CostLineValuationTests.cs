@@ -6,7 +6,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// opportunity-notes: direct unit tests on CostLineValuation's pure
+    /// Direct unit tests on CostLineValuation's pure
     /// coin-valuation helper, shared by RecipeSheetSavingsCalculator and
     /// SeasonalVendorTipCalculator.
     /// </summary>
@@ -97,7 +97,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(ok);
         }
 
-        // Review fix (nice-to-have): a failure on a LATER line (not just
+        // A failure on a LATER line (not just
         // the first) must still leave the out param at 0, not the partial
         // sum accumulated from the earlier, valid line(s) - the pre-fix
         // code only zeroed coinCost on a first-line failure (its initial

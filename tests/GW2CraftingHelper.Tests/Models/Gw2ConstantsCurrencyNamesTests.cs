@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Tests.Models
     /// <summary>
     /// Audit row 56 PART B #2: pins Gw2Constants.KnownCurrencyNames' id-to-
     /// name pairs against a real snapshot of GET /v2/currencies?ids=all
-    /// (captured 2026-08-16, v=2022-03-23 - see this file's own
+    /// (captured v=- see this file's own
     /// LiveApiNameById, which is the exact "name" field the live API
     /// returned for each id, not invented). KnownCurrencyNames itself
     /// consistently pluralizes the API's singular per-unit name for every
@@ -24,8 +24,8 @@ namespace GW2CraftingHelper.Tests.Models
     public class Gw2ConstantsCurrencyNamesTests
     {
         // Real "name" field per id, captured verbatim from
-        // https://api.guildwars2.com/v2/currencies?ids=all&v=2022-03-23 on
-        // 2026-08-16 - a representative subset covering every id this
+        // https://api.guildwars2.com/v2/currencies?ids=all&v=on
+        // - a representative subset covering every id this
         // audit specifically checked (the six previously-mispaired ids,
         // the newly-added id 68, plus a spread of long-standing entries as
         // a general regression net).
@@ -88,7 +88,7 @@ namespace GW2CraftingHelper.Tests.Models
                 int id = kvp.Key;
                 string expectedName = kvp.Value;
 
-                // Review nice-to-have: a bare LiveApiNameById[id] indexer
+                // a bare LiveApiNameById[id] indexer
                 // here would throw an undiagnostic KeyNotFoundException if
                 // a future id were added to ExpectedDictName without a
                 // matching LiveApiNameById entry, instead of one of this
@@ -103,7 +103,7 @@ namespace GW2CraftingHelper.Tests.Models
                     $"KnownCurrencyNames is missing id {id} ({liveName} per the live API).");
                 Assert.Equal(expectedName, Gw2Constants.KnownCurrencyNames[id]);
 
-                // Review fix (audit row 56 PART C): the assertion above only
+                // The assertion above only
                 // ever compared KnownCurrencyNames to ExpectedDictName - a
                 // hand-copied duplicate of the very dictionary under test -
                 // so it never actually pinned anything to LiveApiNameById;

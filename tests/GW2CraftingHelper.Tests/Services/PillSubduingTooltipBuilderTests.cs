@@ -6,7 +6,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// source-selection-simplification: pure text-building coverage. Names
+    /// Pure text-building coverage. Names
     /// are resolved via the SAME resolvers the rest of the tree renderer
     /// uses - never a raw id (repo invariant: IDs are internal-only).
     /// </summary>
@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Weighted_PureCoinDifference_NoCurrencyMentioned()
         {
-            // Adversarial-review finding: TP selected at 500c, CRAFT
+            // TP selected at 500c, CRAFT
             // losing with DecisionValue 800c and no Currency ingredient
             // anywhere - StrictDomination cannot fire (craft's RawCoin is
             // LOWER than TP's, so coinDelta is negative), so Weighted

@@ -5,7 +5,7 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class WheelDeltaSanitizerTests
     {
-        // Exact histogram measured in the live 2026-07-21 instrumented
+        // Exact histogram measured in the live instrumented
         // user trace (M36, KNOWN-ISSUES #12 reopened): fast multi-notch
         // wheel-UP flicks arrive as (N*120) - 65536 for N=2..8.
         [Theory]

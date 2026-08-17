@@ -63,7 +63,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void TimegatedItems_AppendedAsNoticeRowsInCraftingSteps()
         {
-            // M34-B1 #3: a timegated (vendor purchase cap) notice renders as
+            // A timegated (vendor purchase cap) notice renders as
             // a plain informational row alongside real craft steps, never
             // altering the numbered CraftStep rows themselves.
             var meta = MetaFor((2, "Blade", "blade.png"), (9, "Obsidian Shard", "shard.png"));
@@ -114,7 +114,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void TimegatedItems_SeasonalCapType_RendersSeasonWording()
         {
-            // Astral Acclaim package (KNOWN-ISSUES #33): Seasonal renders
+            // Astral Acclaim package: Seasonal renders
             // with the noun "Season" (matching gw2e's own Wizard's Vault
             // wording), keeping the same "{CapLabel} limit: N (plan needs
             // M)" shape Daily/Weekly already use.

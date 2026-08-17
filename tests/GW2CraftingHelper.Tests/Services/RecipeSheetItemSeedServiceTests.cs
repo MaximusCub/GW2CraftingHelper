@@ -8,7 +8,7 @@ using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// opportunity-notes (RECIPE-SHEET SAVINGS, review-fix) -
+    /// RECIPE-SHEET SAVINGS -
     /// RecipeSheetItemSeedService.Load, same test shape as
     /// DailyCooldownItemServiceTests (see that file's own doc comment).
     /// </summary>
@@ -131,7 +131,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 var map = RecipeSheetItemSeedService.Load(stream);
 
-                // Review-fix (KNOWN-ISSUES RECIPE-SHEET SAVINGS entry): at
+                // At
                 // least one real, API-verified entry must ship so the
                 // calculator's own "empty map -> nothing" gate is no
                 // longer permanently closed - see this seed's own "note"

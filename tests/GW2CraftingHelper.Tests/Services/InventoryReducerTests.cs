@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// recipeId/outputCount pair instead of pre-built RecipeOptions,
         /// auto-computes CraftsNeeded from qty/outputCount, and bakes in
         /// Disciplines/MinRating/Flags that the shared builder leaves
-        /// empty (M38 WP-01, tests T2).
+        /// empty.
         /// </summary>
         private static RecipeNode Craftable(
             int id, int qty, int recipeId, int outputCount,
@@ -84,7 +84,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(5, tree.Recipes[0].Ingredients[0].Quantity);
         }
 
-        // --- M37 (KNOWN-ISSUES #26): CloneNode must preserve the new fields ---
+        // --- M37: CloneNode must preserve the new fields ---
 
         [Fact]
         public void CloneNode_PreservesAchievementFieldsAndDedupFlag()
@@ -1280,7 +1280,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void StaleRecipeIdInGuide_NoOptionMatches_SuppressesAllConsumptionForThatNode()
         {
-            // Post-review coverage gap fix: a guide entry present FOR this
+            // Coverage: a guide entry present FOR this
             // node's NodeId, with Source == Craft, but whose RecipeId
             // matches NEITHER option (a stale/UnknownSource guide entry -
             // e.g. the tree's recipe options changed between the guide
@@ -1424,7 +1424,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Sourced_MissingNodeInGuide_FallsBackToPrimaryHeuristic()
         {
-            // Post-review coverage gap fix: MissingNodeInGuide_
+            // Coverage: MissingNodeInGuide_
             // FallsBackToPrimaryHeuristic above pins this defensive
             // fallback only on the flat-Dictionary overload - production
             // exclusively calls the AccountItemIndex-sourced overload this

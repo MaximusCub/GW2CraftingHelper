@@ -316,7 +316,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// Gate finding 2026-08-16 (value-detail hover, live repro): the
+        /// Gate finding (value-detail hover, live repro): the
         /// live case reported a CRAFT root's value-detail hover
         /// (ValueDetailTooltipBuilder) not firing for a Deldrimor Steel
         /// Ingot-shaped plan whose subtree contains a Philosopher's Stone-
@@ -401,7 +401,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MixedCoinValuedUnvaluedFallbackOffer_ComparisonValueMatchesTotalCost_NoTooltip()
         {
-            // Regression test (MEASURED): a fallback-tier vendor offer
+            // Regression test a fallback-tier vendor offer
             // (coin 100 + valued currency 2 x50 @1 copper/unit + unvalued
             // currency 3 x1000) used to have its ComparisonValue overwritten
             // by the vendorOccurrences post-selection pass in PlanSolver

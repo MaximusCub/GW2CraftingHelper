@@ -129,7 +129,7 @@ namespace GW2CraftingHelper.Tests.Models
             Assert.Equal(0, copperPerUnit);
         }
 
-        // --- currency-ux-package review fix (finding 5, MEASURED):
+        // --- CurrencyValuation.WithDefaults:
         // WithDefaults, the merge previously only exercised indirectly via
         // the Blish-coupled (and therefore untestable) ModuleSettings.
         // GetEffectiveCurrencyValuation. ---
@@ -166,7 +166,7 @@ namespace GW2CraftingHelper.Tests.Models
             // is cleared must never also land in the merged value set
             // (CurrencyValuation's own constructor throws if both are
             // true) - covered here as the concrete regression this
-            // review-fix test exists to guard, not merely re-asserting the
+            // this test exists to guard, not merely re-asserting the
             // constructor's own already-tested behavior.
             Assert.False(merged.TryGetCopperValue(2, out _));
             Assert.True(merged.IsCleared(2));

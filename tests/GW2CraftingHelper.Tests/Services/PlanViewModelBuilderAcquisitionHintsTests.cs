@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Tests.Services
     {
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
-        // --- Acquisition hints (M32) ---
+        // --- Acquisition hints ---
 
         [Fact]
         public void ShoppingList_UnknownSource_WithHint_PopulatesHintText()

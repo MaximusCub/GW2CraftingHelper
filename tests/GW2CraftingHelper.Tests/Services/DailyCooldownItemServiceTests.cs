@@ -122,7 +122,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Load_ZeroOrNegativeItemId_EntrySkipped_NoThrow()
         {
-            // Review nice-to-have: same malformed-data guard shape as the
+            // same malformed-data guard shape as the
             // existing PerDayCap check above - no PlanStep ever carries an
             // ItemId <= 0, so an entry claiming one is bad seed data, not a
             // real recipe.
@@ -176,7 +176,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.True(items.ContainsKey(46742));
                 Assert.Equal(1, items[46742].PerDayCap);
 
-                // Review fix (audit row 56 PART C, finding 1): the four
+                // The four
                 // Dragon Hatchling Doll parts carry the identical evidence
                 // pattern as Gossamer Stuffing (already-seeded, id 79763) -
                 // timegate = y + Category:Time gated recipes, no separate
@@ -191,7 +191,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Assert.Equal(1, items[dragonDollPartId].PerDayCap);
                 }
 
-                // Review fix (audit row 56 PART C, finding 2): Charged
+                // Charged
                 // Quartz Crystal (43772) is made at a Place of Power, not
                 // via any recipe this module resolves - it is not a recipe
                 // OUTPUT anywhere in ref/recipes_seed.json or

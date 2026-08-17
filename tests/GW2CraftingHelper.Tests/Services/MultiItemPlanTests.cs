@@ -10,7 +10,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// M35-B1 (gw2efficiency parity - multi-item plans): the synthetic
+    /// The synthetic
     /// wrapper pipeline (RecipeService.BuildMultiItemTreeAsync ->
     /// CraftingPlanPipeline.GenerateStructuredAsync(IReadOnlyList
     /// &lt;PlanRequestItem&gt;, ...) -> PlanSolver -> CraftingTreeBuilder),
@@ -79,7 +79,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(legacy.RequiredDisciplines.Count, viaList.RequiredDisciplines.Count);
             Assert.Equal(legacy.RequiredRecipes.Count, viaList.RequiredRecipes.Count);
 
-            // M37 (KNOWN-ISSUES #25): the ComputePerItemEconomics/
+            // The ComputePerItemEconomics/
             // ComputeMaterialOpportunityCost extraction must not change the
             // single-item sell-side economics fields either - both entry
             // points call the SAME (refactored) ApplySellSideEconomics.
@@ -475,7 +475,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// Fix pass (M35 review): every prior multi-item test passed
+        /// Fix pass: every prior multi-item test passed
         /// snapshot=null, so InventoryReducer.Reduce's shared consumption
         /// pool (created once per GenerateStructuredMultiAsync call and
         /// walked depth-first through the wrapper's N item-root
@@ -581,7 +581,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// Fix pass (M35 review): no multi-item test exercised the M34-B2a
+        /// Fix pass: no multi-item test exercised the M34-B2a
         /// #3 "Value Own Materials" force-buy pre-pass
         /// (OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds),
         /// which only runs when OwnMaterialsMode.Valued AND a non-null
@@ -763,7 +763,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// Fix pass (M37 review): before ApplyBatchSellSideEconomics
+        /// Fix pass: before ApplyBatchSellSideEconomics
         /// existed, NOTHING ever set CraftingPlanResult.PriceBasis for a
         /// multi-item batch (PlanResultBuilder.Build never touches it, and
         /// GenerateStructuredMultiAsync never called ApplySellSideEconomics,
@@ -776,7 +776,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// own single-item behavior) even when zero roots qualify for the
         /// sell/profit rollup below.
         ///
-        /// Fix pass 2 (later M37 review): the original version of this
+        /// The original version of this
         /// test reused BuildTwoIndependentItemsPipeline, whose items 300/400
         /// BOTH have a live sell price of their own - every requested root
         /// actually qualified for the rollup there, so the `!anySellable`
@@ -942,7 +942,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// GenerateStructuredAsync_MultiItem_PerRootDecision_MatchesStandaloneSingleItemSolve
         /// above), so the solver buys it rather than crafting - but it DOES
         /// have a live TP sell price. Item 1200 is crafted and also has a
-        /// live sell price. M37 review fix (KNOWN-ISSUES #25): the batch
+        /// live sell price. Regression: the batch
         /// rollup has NO craft-vs-buy filter at all (docs/research/
         /// m37-r2-batch-economics.md Section 4.1.1 explicitly recommends
         /// against replicating gw2e's own craft===true filter) - a
@@ -1043,7 +1043,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// own craft-cost contribution (ItemCraftCost), but does NOT drop it
         /// from the rollup: ComputePerItemEconomics' NetSaleValue is driven
         /// purely by the item's own live TP price, never by its acquisition
-        /// decision (M37 review fix - no craft-vs-buy filter, see
+        /// decision (no craft-vs-buy filter, see
         /// GenerateStructuredAsync_MultiItem_OneRootBoughtButTradable_IncludedInSum
         /// above), matching the single-item path's own pre-existing
         /// "ignoring the target still shows a sell number" convention.
@@ -1138,7 +1138,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// VOM design (Candidate A) re-baseline of an M37 review finding.
+        /// Re-baselined under the decision-guided reduction design.
         /// Originally (pre-VOM): InventoryReducer.Reduce walked the WHOLE
         /// unreduced wrapper tree price-blind, before PlanSolver.Solve ever
         /// decided per-root Buy vs. Craft, so it phantom-consumed root
@@ -1227,7 +1227,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// Post-review coverage gap fix: every Valued-mode multi-item
+        /// Coverage: every Valued-mode multi-item
         /// assertion above (this class) exercised a wrapper root whose
         /// guide decision was Buy - so `UsedMaterials`/
         /// `MaterialOpportunityCost` were always asserted NULL/empty, and
@@ -1312,7 +1312,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// M37 review finding: no committed test exercised
+        /// Regression: no committed test exercised
         /// ApplyBatchSellSideEconomics' per-root ItemCraftCost summation
         /// when two qualifying (crafted + tradable) roots share a cost
         /// that FinalizeVendorBatches/AllocateVendorNodeCosts merges
@@ -1434,7 +1434,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- M37 (KNOWN-ISSUES #26): achievement-bit ingredient dedup -
+        // --- M37: achievement-bit ingredient dedup -
         // the report's exact multi-item-request double-count scenario
         // (docs/research/m37-r3-achievement-dedup.md Section 4.6), using
         // the real, wiki/API-verified Infinite Trebuchet Blueprint ids. ---

@@ -75,7 +75,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new ItemMetadataService(itemApi));
         }
 
-        // Round 4 review-fix (critical): a THREE-level real tree (item 1 <-
+        // A THREE-level real tree (item 1 <-
         // recipe 10 <- item 2 <- recipe 20 <- item 3), so
         // result.CraftingTree.Children[0].Children[0] is a real depth-2
         // node - the PlanStructuralValidator tests below corrupt exactly
@@ -176,7 +176,7 @@ namespace GW2CraftingHelper.Tests.Services
         // < craft(5x30=150)*0.85=127.5, so item 1's node is force-buy-
         // flagged under OwnMaterialsMode.Valued - the scenario that
         // populates PlanSolveContext.ForceBuyOnlyNodeIds (an ISet<int>) with
-        // real content, one of the exact shapes this review-fix pass
+        // real content, one of the exact shapes this sweep
         // targets.
         private static CraftingPlanPipeline BuildForceBuyPipeline(out InMemoryPriceApiClient priceApi)
         {
@@ -207,14 +207,14 @@ namespace GW2CraftingHelper.Tests.Services
             PriceBasis priceBasis = PriceBasis.InstantBuy,
             IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides = null,
             IReadOnlyList<int> ignoredItemIds = null,
-            // VOM design: mirrors useOwn/priceBasis above - default true
+            // Mirrors useOwn/priceBasis above - default true
             // matches ValueOwnMaterials' own real-world default (see
             // Views/CraftingPlanView.cs's _valueOwnMaterials field).
             bool valueOwn = true)
         {
             return new PersistedPlan
             {
-                // Round 2 review-fix (mustFix): SchemaVersion has no
+                // SchemaVersion has no
                 // property initializer any more (see PersistedPlan's own
                 // doc comment) - every real construction site sets it
                 // explicitly, so this fixture-building helper must too or
@@ -228,7 +228,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PriceBasis = priceBasis,
                 ValueOwnMaterials = valueOwn,
                 Result = result,
-                // W3D review-fix: PersistedPlan.NodeOverrides/IgnoredItemIds
+                // PersistedPlan.NodeOverrides/IgnoredItemIds
                 // are empty (never null) on every real persist path (see
                 // Module.PersistAfterGenerateAsync/
                 // PersistResolvedPlanInBackground) - defaulting the same
@@ -321,7 +321,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(timestamp, loaded.GeneratedAt);
             Assert.True(loaded.UseOwnMaterials);
             Assert.Equal(PriceBasis.BuyOrder, loaded.PriceBasis);
-            // VOM design: ValueOwnMaterials round-trips independently of
+            // ValueOwnMaterials round-trips independently of
             // UseOwnMaterials - false here specifically to prove it is not
             // just silently mirroring useOwn's own true value above.
             Assert.False(loaded.ValueOwnMaterials);
@@ -365,7 +365,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(ToJson(vmBuilder.Build(overridden)), ToJson(vmBuilder.Build(loaded.Result)));
         }
 
-        // --- W3D review-fix (critical): the user's decision-pill overrides
+        // --- Regression: the user's decision-pill overrides
         // themselves must round-trip, not just the Result they produced -
         // see Models/PersistedPlan.cs's NodeOverrides/IgnoredItemIds doc
         // comments and TreeSectionController.RestoreOverrides. ---
@@ -493,7 +493,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(capturedMessage);
         }
 
-        // --- W3D review-fix (mustFix): SchemaVersion is what makes the
+        // --- Regression: SchemaVersion is what makes the
         // "old-schema file = fresh start with one Warn log line" tolerance
         // contract enforceable against a FUTURE member rename/removal, not
         // just a Result/Plan structurally missing entirely - see
@@ -504,7 +504,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             string filePath = Path.Combine(_tempDir, "plan.json");
             // Structurally valid (Result/Plan present, would have passed
-            // the pre-review-fix check) but stamped with an old/
+            // the old structural check) but stamped with an old/
             // incompatible SchemaVersion.
             File.WriteAllText(filePath,
                 "{ \"SchemaVersion\": 0, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
@@ -521,7 +521,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void LoadLatest_VomSchemaVersion1File_ReturnsNullAndLogsWarn()
         {
-            // VOM design (Section 5.4): CurrentSchemaVersion bumped 1 -> 2
+            // CurrentSchemaVersion bumped 1 -> 2
             // for the new PersistedPlan.ValueOwnMaterials field. A
             // genuinely realistic old file - SchemaVersion 1 (the actual
             // previous CurrentSchemaVersion, not the synthetic "0" the
@@ -572,7 +572,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Save_Load_ExplicitCurrentSchemaVersion_RoundTrips()
         {
-            // Round 2 review-fix (mustFix): PersistedPlan.SchemaVersion has
+            // PersistedPlan.SchemaVersion has
             // NO property initializer any more - a caller (every real
             // construction site in Module.cs) must set it explicitly. This
             // proves the field itself round-trips correctly when set that
@@ -600,7 +600,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void LoadLatest_MissingSchemaVersionField_ReturnsNullAndLogsWarn()
         {
-            // Round 2 review-fix (mustFix): the ONE class of old file that
+            // The ONE class of old file that
             // can actually exist (written before the SchemaVersion field
             // existed, or by any code that forgets to set it) omits the
             // member entirely, rather than writing an explicit 0 the way
@@ -697,7 +697,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(capturedException);
         }
 
-        // --- W3D review-fix (mustFix): the investigation's own flagged
+        // --- Regression: the investigation's own flagged
         // "exact shapes" (ISet<int>, IReadOnlyDictionary<int,
         // IReadOnlyList<VendorOffer>>, a NON-empty CurrencyValuation/
         // HomesteadEfficiencyTiers) were never actually exercised by any
@@ -1095,7 +1095,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(ToJson(vmBuilder.Build(resolvedOriginal)), ToJson(vmBuilder.Build(resolvedReloaded)));
         }
 
-        // --- Round 4 review-fix (critical): PlanStructuralValidator - a
+        // --- Regression: PlanStructuralValidator - a
         // structurally-valid-but-degraded plan.json (e.g. a null entry deep
         // inside CraftingTreeNode.Children, invisible to
         // PlanViewModelBuilder's reference-copying vm build) used to sail
@@ -1310,7 +1310,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task LoadLatest_NullEntryInSolveContextUsedMaterials_ReturnsNullAndLogsWarnExactlyOnce()
         {
-            // Round 5 review-fix: SolveContext.UsedMaterials is a
+            // SolveContext.UsedMaterials is a
             // SEPARATELY serialized copy of the same list as
             // CraftingPlanResult.UsedMaterials (Newtonsoft writes no $ref) -
             // this corrupts ONLY the SolveContext copy, leaving
@@ -1350,7 +1350,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task LoadLatest_NullRecipesListOnSolveContextUnreducedTree_ReturnsNullAndLogsWarnExactlyOnce()
         {
-            // VOM finding #1 fix: UnreducedTree is walked by
+            // UnreducedTree is walked by
             // ResolveWithOverrides' guideSolve (_solver.Solve) and
             // re-reduction (_reducer.Reduce) on EVERY override re-solve
             // once the force-buy pre-pass ran at generation time (Valued
@@ -1388,7 +1388,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task LoadLatest_NullEntryInSolveContextAccountItems_ReturnsNullAndLogsWarnExactlyOnce()
         {
-            // VOM finding #1 fix: AccountItemIndex's constructor (Services/
+            // AccountItemIndex's constructor (Services/
             // AccountItemIndex.cs) null-checks the LIST but not each entry
             // ("entry.Count"/"entry.Source" with no per-entry guard) - a
             // null ENTRY NREs identically to the UnreducedTree gap above,
