@@ -306,12 +306,15 @@ that lifetime management across both halves or reintroduce a second
 implicit owner - the exact class of bug section 1's "one owner" primitives
 above exist to prevent, just at the object-graph level instead of the
 thread level. It is also already the most-coupled class in
-`Views/Rendering/` outside its own file - named by type in 14 production
-code refs, measured (`Module.cs` plus 9 `Services/` files and 4 `Views/`
-files, not counting `Models/` shape-mirroring comments or test files) and
-3 existing doc mentions (this section's own bullet and "Where:" line, plus
-`docs/ROADMAP.md`) - not 18, an earlier over-count that conflated this
-figure with something wider. A state/render split would not shrink that
+`Views/Rendering/` outside its own file - mentioned by name in 14
+production `.cs` files (`Module.cs` plus 9 `Services/` files and 4
+`Views/` files, not counting `Models/` shape-mirroring comments or test
+files), of which 13 are comment-only; the actual compile-time coupling is
+2 references, both in `Views/CraftingPlanView.cs` (the field declaration
+and the constructor call site) - plus 3 doc mentions (this section's own
+bullet and "Where:" line, plus `docs/ROADMAP.md`; `docs/KNOWN-ISSUES.md`
+carries 42 more as historical narrative) - not 18, an earlier over-count
+that conflated this figure with something wider. A state/render split would not shrink that
 coupling, only relocate half of it across a new seam. The accepted
 alternative for future tree-row/pill features is not a class bisection: per
 the STANDING RULE (`CONTRIBUTING.md`), extract the pure text/decision

@@ -188,6 +188,69 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void PriceSideFellBack_BuyFromVendorParent_InstantBuyBasis_UsesVendorBuyOrderSentence()
+        {
+            // The BuyFromTp/IsCostComponent branch above already pins all
+            // three PriceBasis arms of its own ternary; this is the
+            // BuyFromVendor-parent aggregate branch's InstantBuy arm, the
+            // one remaining untested arm of that second ternary.
+            var node = Node(CraftingDecision.BuyFromVendor, priceSideFellBack: true);
+            var plan = new PlanViewModel { PriceBasis = PriceBasis.InstantBuy };
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+
+            Assert.Contains(
+                "A vendor cost item's instant-buy price is unavailable - its buy-order price is used", lines);
+        }
+
+        [Fact]
+        public void MixedCoinAndCurrencyVendorOffer_ShowsBothUnitPriceLinesInOrder()
+        {
+            // The composer's own comment claims "a mixed coin+currency
+            // offer still shows both lines below" - pin that a non-zero
+            // UnitCost together with a non-empty VendorCurrencyCosts
+            // renders both the coin line and the currency line, coin
+            // first, rather than the zero-coin suppression path.
+            var currencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 25 } };
+            var node = Node(
+                CraftingDecision.BuyFromVendor, quantity: 5, unitCost: 500,
+                vendorCurrencyCosts: currencyCosts);
+            var metadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+            };
+            var plan = new PlanViewModel { CurrencyMetadata = metadata };
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+
+            Assert.Equal(
+                new[] { "Unit price: 0g 5s 0c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
+                lines);
+        }
+
+        [Fact]
+        public void CurrencyUnitAmount_NonEvenDivision_UsesBundleLabel()
+        {
+            // ResolveTreeNodeUnitAmounts falls back to a "N for M" bundle
+            // label (Amount left at 0) whenever the total does not divide
+            // evenly by quantity - pin that BuildExtraTooltipLines renders
+            // that label rather than the numeric Amount.ToString() fork.
+            var currencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 10 } };
+            var node = Node(
+                CraftingDecision.BuyFromVendor, quantity: 3, unitCost: 0,
+                vendorCurrencyCosts: currencyCosts);
+            var metadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+            };
+            var plan = new PlanViewModel { CurrencyMetadata = metadata };
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+
+            Assert.Contains("Unit price: 10 for 3 Karma", lines);
+        }
+
+        [Fact]
         public void NoPriceSideFellBack_NoCaveatLine()
         {
             var node = Node(CraftingDecision.BuyFromTp, priceSideFellBack: false);

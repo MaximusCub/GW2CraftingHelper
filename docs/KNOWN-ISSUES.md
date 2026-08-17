@@ -6999,11 +6999,16 @@ this verdict, not merely out of scope.
    invariant, the constructed-once-in-`CraftingPlanView`'s-constructor
    fact (`Views/CraftingPlanView.cs` ~614), the preferred future shape
    (Blish-free pure composers under `Services/`, never a class bisection),
-   and the measured coupling figure - 14 production code refs to
-   `TreeSectionController` by name (`Module.cs` plus 9 `Services/` files
-   and 4 `Views/` files, not counting `Models/` shape-mirroring comments
-   or test files) and 3 existing doc mentions, not 18. (The file count
-   moved from a pre-change 13 to 14 because this same milestone's own new
+   and the measured coupling figure - `TreeSectionController` is
+   mentioned by name in 14 production `.cs` files (`Module.cs` plus 9
+   `Services/` files and 4 `Views/` files, not counting `Models/`
+   shape-mirroring comments or test files), of which 13 are comment-only;
+   the actual compile-time coupling is 2 references, both in
+   `Views/CraftingPlanView.cs` (the field declaration and the constructor
+   call site) - plus 3 mentions in `docs/ARCHITECTURE.md` and
+   `docs/ROADMAP.md` (`docs/KNOWN-ISSUES.md` carries 42 more as
+   historical narrative) - not 18. (The file count moved from a
+   pre-change 13 to 14 because this same milestone's own new
    `TreeRowTooltipComposer.cs` documents its provenance with a
    "TreeSectionController.RenderTreeNode" reference in its own doc
    comment - a real, verified `grep` count taken after the change, not
