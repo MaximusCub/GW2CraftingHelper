@@ -464,3 +464,45 @@ scraper - `tools/VendorOfferUpdater/WikiSmwClient.cs`.
 
 **Full history:** KNOWN-ISSUES items 24, 28, 33; `CONTRIBUTING.md`'s
 "Where seed/reference data comes from" section for the day-to-day workflow.
+
+---
+
+## 10. Post-solve annotation passes
+
+**What:** four pure, Blish-free calculators run after the display tree
+(`CraftingTree`/`MultiItemRoots`) is built: `CompetencyOpportunityCalculator`,
+`ExcessCraftOutputCalculator`, `RecipeSheetSavingsCalculator`, and
+`SeasonalVendorTipCalculator`. Each writes exactly one `CraftingPlanResult`
+list (`CompetencyOpportunities`/`ExcessCraftOutputs`/
+`RecipeSheetSavingsOpportunities`/`SeasonalVendorTips`) - one collection
+each, never another pass's, never `Plan` or a total. `SellSideEconomics`
+sits adjacent (same "pure, post-tree" shape) but is **not** a member: it
+writes displayed totals the Total Cost section renders directly
+(`NetSaleValue`/`CraftingProfit`), not an advisory Notes list.
+
+All four are wired at three producer call sites, by name -
+`CraftingPlanPipeline.GenerateStructuredAsync` (single-item),
+`GenerateStructuredMultiAsync`, `ResolveWithOverrides` - plus one consumer
+edit site, `PlanViewModelBuilder.BuildNotesSection`, which reads all four
+lists to render their Notes rows. A fifth pass means touching all four
+sites; there is deliberately no `ApplyAll` seam collapsing the three
+producer calls into one - rejected on review as premature (quorum verdict
+D-3): the four calculators do not share a signature (differing inputs -
+`learnedRecipeIds`, `vendorOffers`, `characterDisciplines`), so a shared
+seam would need its own parameter object with no caller needing it today.
+
+The call order at each producer site - `SellSideEconomics` first,
+`CompetencyOpportunityCalculator` last - is convention (kept identical
+across all three sites for readability), not a data dependency: every
+pass here reads only the already-built display tree, never another
+pass's output, so any order between them is byte-identical.
+
+**Where:** `Services/CompetencyOpportunityCalculator.cs`,
+`Services/ExcessCraftOutputCalculator.cs`,
+`Services/RecipeSheetSavingsCalculator.cs`,
+`Services/SeasonalVendorTipCalculator.cs`; wiring in
+`Services/CraftingPlanPipeline.cs`; consumer in
+`Services/PlanViewModelBuilder.cs` (`BuildNotesSection`).
+
+**Full history:** quorum verdict D-3 (annotation-detection mutation-testing
+gap); each calculator's own class doc comment for its individual rationale.
