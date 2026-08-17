@@ -133,19 +133,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void Summary_CoinRowPlusCurrencyRows()
-        {
-            var rows = new List<PlanRowViewModel>
-            {
-                Row(PlanRowType.CoinTotal),
-                Row(PlanRowType.CurrencyCost),
-                Row(PlanRowType.CurrencyCost),
-            };
-            int expected = PlanContentHeightMath.CostTileRowHeight + 2 * PlanContentHeightMath.CurrencyRowHeight;
-            Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.Summary, rows));
-        }
-
-        [Fact]
         public void Summary_NoCoinRow_OmitsTileRow()
         {
             var rows = new List<PlanRowViewModel> { Row(PlanRowType.CurrencyCost) };
@@ -338,56 +325,20 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(expected, PlanContentHeightMath.MultiRootTreeFlowHeight(roots, overrides));
         }
 
-        // --- SummaryBodyHeight + MultiItemNote (M35) ---
-
-        [Fact]
-        public void Summary_MultiItemNoteRow_AddsFallbackTextRowHeight()
-        {
-            var rows = new List<PlanRowViewModel>
-            {
-                Row(PlanRowType.CoinTotal),
-                Row(PlanRowType.MultiItemNote)
-            };
-            int expected = PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
-            Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.Summary, rows));
-        }
-
-        [Fact]
-        public void Summary_NoMultiItemNoteRow_UnaffectedByNewBranch()
-        {
-            var rows = new List<PlanRowViewModel>
-            {
-                Row(PlanRowType.CoinTotal),
-                Row(PlanRowType.CurrencyCost)
-            };
-            int expected = PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.CurrencyRowHeight;
-            Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.Summary, rows));
-        }
-
-        // --- Multi-item batch sell-side economics (M37, KNOWN-ISSUES #25) ---
-
-        /// <summary>
-        /// M37 populates real batch Sell value/Profit rows, so a multi-item
-        /// plan can now reach the same 4-simultaneous-CoinTotal-row maximum
-        /// single-item mode already exercised (Total, Own materials, Sell
-        /// value, Profit) - the FIRST time 4 tiles occur in MULTI-item mode.
-        /// The boolean "hasCoinRow ? CostTileRowHeight : 0" logic (not a
-        /// per-tile count) means this must still collapse to exactly one
-        /// CostTileRowHeight, same as any other coin-row count.
-        /// </summary>
-        [Fact]
-        public void Summary_MultiItemFourCoinRowsPlusNoteRow_StillOneCostTileRowHeight()
-        {
-            var rows = new List<PlanRowViewModel>
-            {
-                Row(PlanRowType.CoinTotal), // Total
-                Row(PlanRowType.CoinTotal), // Own materials
-                Row(PlanRowType.CoinTotal), // Sell value (batch total)
-                Row(PlanRowType.CoinTotal), // Profit if sold (batch total)
-                Row(PlanRowType.MultiItemNote)
-            };
-            int expected = PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
-            Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.Summary, rows));
-        }
+        // Three tests formerly here (under a "SummaryBodyHeight +
+        // MultiItemNote (M35)" / "Multi-item batch sell-side economics
+        // (M37, KNOWN-ISSUES #25)" heading: Summary_MultiItemNoteRow_
+        // AddsFallbackTextRowHeight, Summary_NoMultiItemNoteRow_
+        // UnaffectedByNewBranch, Summary_MultiItemFourCoinRowsPlusNoteRow_
+        // StillOneCostTileRowHeight) asserted
+        // PlanContentHeightMath.SummaryBodyHeight's shape via
+        // PlanRowType.CoinTotal. Deleted as dead code (KNOWN-ISSUES W4A
+        // follow-up, closed under the high-evidence-zone policy - see
+        // docs/KNOWN-ISSUES.md's policy note): CoinTotal was never emitted
+        // by PlanViewModelBuilder, and SummaryBodyHeight was unreachable
+        // for a real Summary section since W4A routed
+        // PlanSectionType.Summary to SummarySectionLayoutMath.BodyHeight
+        // instead. Deleted together with the enum member and the method
+        // (see Models/PlanViewModel.cs, Services/PlanContentHeightMath.cs).
     }
 }
