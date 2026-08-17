@@ -1275,6 +1275,27 @@ namespace GW2CraftingHelper.Services
                 string sublabel = FormatDisciplineSublabel(
                     recipe.Disciplines, recipe.MinRating, planDiscNames);
 
+                // UI-bundle milestone, Feature A (wiki links): scoped to
+                // "Required Recipes Missing!" rows only, per the spec's own
+                // wording (contrast Feature A's tree-row affordance, which
+                // the spec calls out for "each item row" with no such
+                // scoping) - a row the user has nothing left to unlock for
+                // (Learned/Auto-learned) gets no wiki affordance at all.
+                // Flag-based target: a LearnedFromItem recipe links to its
+                // own "Recipe: <name>" sheet page; every other recipe links
+                // to the output item's page + "#Acquisition" anchor.
+                // Review-fix: gated on the semantic flags (not the display
+                // string) so a tag rename cannot silently drop every wiki
+                // link. Verification-fix: IsAutoLearned excluded explicitly -
+                // an auto-learned recipe can be IsMissing (rating below
+                // threshold) yet has nothing to unlock via the wiki, so it
+                // must keep getting no affordance, exactly as the spec
+                // comment above states (the statusTag chain checks
+                // Auto-learned first for the same reason).
+                string wikiUrl = !recipe.IsAutoLearned && recipe.IsMissing == true
+                    ? WikiLinkBuilder.BuildRequiredRecipeUrl(name, recipe.IsLearnedFromItem)
+                    : null;
+
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.RecipeRow,
@@ -1282,7 +1303,8 @@ namespace GW2CraftingHelper.Services
                     Sublabel = sublabel,
                     IconUrl = iconUrl,
                     Rarity = rarity,
-                    StatusTag = statusTag
+                    StatusTag = statusTag,
+                    WikiUrl = wikiUrl
                 });
             }
 
