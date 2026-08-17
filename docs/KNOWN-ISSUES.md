@@ -6919,12 +6919,12 @@ rebuild) - 0 errors, 1788 warnings, all pre-existing StyleCop findings
 unrelated to this change (confirmed no new warnings in any of the four
 touched files individually). `"/mnt/c/Program Files/dotnet/dotnet.exe"
 test C:/Dev/Blish/wt-qp1/tests/GW2CraftingHelper.Tests/
-GW2CraftingHelper.Tests.csproj` - 1778/1778 green (13 new: B1 adds 5 -
-4 `PersistedPlanSchemaMemberSetTests` cases + 1
+GW2CraftingHelper.Tests.csproj` - 1776/1776 green (11 new: B1 adds 3 -
+2 `PersistedPlanSchemaMemberSetTests` cases + 1
 `LoadLatest_QualityAuditSchemaVersion2File_...` in `PlanStoreTests`;
 B2 adds 4 null-entry corruption tests in `PlanStoreTests`; B3 adds 4
 `RecipeClientFactoryTests` cases; B4 touches only the updater suite.
-Measured after each commit: 1770 after B1, 1774 after B2, 1778 after
+Measured after each commit: 1768 after B1, 1772 after B2, 1776 after
 B3, consistent with a pre-B1 count of 1765). `"/mnt/c/Program Files/
 dotnet/dotnet.exe" build C:/Dev/Blish/wt-qp1/tools/VendorOfferUpdater/
 VendorOfferUpdater.csproj` - 0 errors, 0 warnings. `"/mnt/c/Program
@@ -6933,4 +6933,13 @@ VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj` - 207/207
 green (2 new `MergeWikiCacheTests` cases for B4). Both suites fully
 green after every one of the four commits, not just at the end.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (quality-phase1-bugs follow-up, 2026-08-17, measured). No
+live desktop check required - B1-B4 touch no rendered UI surface
+beyond B3's Log-tab warning line, which is exercised by
+`RecipeClientFactoryTests` against a real `ModuleLog` instance, not a
+live Blish session. Module build 0 errors/1788 warnings (clean
+rebuild, unchanged), module suite 1776/1776 green, updater build 0
+errors/0 warnings, updater suite 207/207 green - re-measured after
+fixing this block's own wrong counts above and the retype blind spot
+in `PersistedPlanSchemaMemberSetTests` (see that file and
+`PersistedPlan.cs` for the fix).

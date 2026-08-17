@@ -46,7 +46,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void Create_LoadWarningsPresent_WritesOneWarnLineWithCountAndText()
+        public void Create_LoadWarningsPresent_WritesOneWarnLineWithCountOnly()
         {
             // Same "id must be negative" shape as MysticForgeRecipeDataTests'
             // own Load_PositiveId_SkipsWithWarning - one skipped recipe, one
