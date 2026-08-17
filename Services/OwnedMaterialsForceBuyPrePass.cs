@@ -69,6 +69,27 @@ namespace GW2CraftingHelper.Services
         /// PillSourceCostBreakdown/the solver's own forceBuyOnlyNodeIds
         /// parameter (solve behavior itself) still use ForceBuyOnlyNodeIds
         /// exactly as before this fix.
+        /// <para>
+        /// Doc nuance (recorded follow-up, srcsel verification): "competency-
+        /// BLIND" above describes the raw evaluation only AT THE NODE'S OWN
+        /// recipe choice - picking the numerically cheapest recipe among
+        /// node.Recipes regardless of whether the account is trained for it.
+        /// The ingredient costs THAT recipe sums are NOT similarly blind:
+        /// PlanSolver.Evaluate's recursive call for each child ingredient
+        /// (see the rawCraftCostDiagnostics-writing loop) still threads
+        /// bestRatingByDiscipline through, so a child's contribution to this
+        /// raw figure is its normal competency-RESOLVED cost, not a second
+        /// training-blind recursion all the way down. This is the safe
+        /// error direction: it can only make the raw craft cost look more
+        /// expensive than a truly training-blind figure would (a costlier
+        /// resolved child, never a cheaper untrained one it isn't allowed to
+        /// use), so it can only make CompetencyIndependentForceBuyNodeIds
+        /// UNDER-report (miss a genuinely-training-independent node), never
+        /// over-report (falsely exclude a real training opportunity). A
+        /// child's own untrained-recipe opportunity is not lost by this -
+        /// it is evaluated and reported independently at that child's own
+        /// node, via that child's own diagnostics entry.
+        /// </para>
         /// </summary>
         public readonly struct ForceBuyPrePassResult
         {
