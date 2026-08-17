@@ -12,21 +12,23 @@ namespace GW2CraftingHelper.Services
     /// Deliberately kept OUT of Services/PlanContentHeightMath.cs and
     /// Services/PlanRelayoutMath.cs, even though this class's role is
     /// otherwise the same kind of thing both already do for every other
-    /// section: the W4A task brief lists both of those files DO-NOT-TOUCH
-    /// (they are shared infrastructure several other sections' row builders
-    /// depend on, and other in-flight work touches them too). Both files
-    /// are left byte-for-byte unmodified by this package - in particular
-    /// PlanContentHeightMath's own private SummaryBodyHeight method (and
-    /// its existing PlanContentHeightMathTests.cs coverage) still compiles
-    /// and still passes exactly as before, it is simply no longer wired to
-    /// any REAL Summary section: Views/CraftingPlanView.cs's one call site
-    /// (CreateCollapsibleSection) now special-cases
-    /// PlanSectionType.Summary to call BodyHeight below instead of
+    /// section: at W4A time both of those files were DO-NOT-TOUCH (they
+    /// are shared infrastructure several other sections' row builders
+    /// depend on, and other in-flight work touched them too); they are now
+    /// high-evidence zones (formerly DO-NOT-TOUCH; see
+    /// docs/KNOWN-ISSUES.md's policy note) - still off-limits for the
+    /// broader fold-back this class's own existence sidesteps, but changes
+    /// are possible with proof. W4A left both files byte-for-byte
+    /// unmodified: Views/CraftingPlanView.cs's one call site
+    /// (CreateCollapsibleSection) special-cases PlanSectionType.Summary to
+    /// call BodyHeight below instead of
     /// PlanContentHeightMath.SectionBodyHeight, the same way every other
-    /// section type still routes through that method unchanged. See
-    /// docs/KNOWN-ISSUES.md's W4A entry for the full rationale and the
-    /// PlanRowType.CoinTotal enum member's own doc comment for the
-    /// matching note on the model side.
+    /// section type still routes through that method unchanged. A later
+    /// pass (high-evidence-zones, 2026-08-17) proved
+    /// PlanContentHeightMath's own private SummaryBodyHeight method (and
+    /// the PlanRowType.CoinTotal enum member it existed to read) were
+    /// unreachable for a real Summary section and deleted both outright -
+    /// see docs/KNOWN-ISSUES.md's W4A entry for the original rationale.
     ///
     /// The row-height CONSTANTS themselves are not redefined here - every
     /// formula below reads PlanContentHeightMath's existing public

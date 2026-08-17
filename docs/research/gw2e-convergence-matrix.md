@@ -2,6 +2,12 @@
 
 Date: 2026-08-15
 
+> DO-NOT-TOUCH references below predate the 2026-08-17 high-evidence-zone
+> policy - see docs/KNOWN-ISSUES.md's policy note. A DO-NOT-TOUCH citation
+> is no longer a blocking verdict; it is a proof requirement (see that
+> note for what proof looks like). Individual ADOPT/PRESERVE calls below
+> have not been re-litigated under the new rule.
+
 ## Method
 
 Five area readers independently compared GW2CraftingHelper's crafting-planner
