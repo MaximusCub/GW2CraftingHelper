@@ -4150,5 +4150,263 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(resolved.UsedMaterials);
             Assert.Equal(3, resolved.UsedMaterials[0].QuantityUsed);
         }
+
+        // --- Live-repro gate (2026-08-16): value-detail hover missing on a
+        // real GenerateStructuredAsync pipeline run ---
+        //
+        // PlanSolverCurrencyValuationTests.
+        // CraftRoot_VendorChildValuedInCuratedCurrency_ValueDetailTooltipFires
+        // already proves the raw seam (PlanSolver.Solve ->
+        // CraftingTreeBuilder.BuildTree -> ValueDetailTooltipBuilder.TryBuild)
+        // works when called directly with CurrencyValuation.WithDefaults. The
+        // live report reproduced the hover NOT firing on a real Deldrimor
+        // Steel Ingot-shaped plan, generated through the FULL pipeline: a
+        // craft root with a Philosopher's Stone-style BuyFromVendor child
+        // priced purely in spirit shards (currency 23, curated default 3600
+        // copper/unit), Value Own Materials ON, and a real account snapshot
+        // that owns some materials (a SIBLING ingredient, not the vendor
+        // child itself - InventoryReducer/the zero-owned guided pass/
+        // RecomputeComparisonValues all run over the whole tree regardless
+        // of which node the ownership sits on). This test reproduces that
+        // exact shape through GenerateStructuredAsync itself (fake HTTP
+        // fixtures, matching this file's established pattern) rather than
+        // calling PlanSolver.Solve directly, to determine whether the
+        // pipeline-level machinery the seam test does not model (effective-
+        // default valuation threading, VOM reduction, the post-selection
+        // ComparisonValue passes) loses the fold-up somewhere between the
+        // solver and the built CraftingTreeNode.
+        [Fact]
+        public async Task GenerateStructuredAsync_CraftRootWithVendorChildValuedInCuratedCurrency_VomOn_ValueDetailTooltipFires()
+        {
+            const int SpiritShardCurrencyId = 23;
+            const int RootItemId = 1;
+            const int VendorOnlyChildItemId = 2; // Philosopher's Stone-style
+            const int OrdinaryChildItemId = 3;
+
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(RootItemId, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = RootItemId,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = VendorOnlyChildItemId, Count = 1 },
+                    new RawIngredient { Type = "Item", Id = OrdinaryChildItemId, Count = 2 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            // No TP price for the root or the vendor-only child - craft and
+            // BuyFromVendor are each the only source for their own item.
+            // Ordinary child has a real TP price (craft-cost basis 10/unit).
+            priceApi.AddPrice(OrdinaryChildItemId, buyUnitPrice: 10, sellUnitPrice: 20);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(RootItemId, "Deldrimor Steel Ingot", "root.png");
+            itemApi.AddItem(VendorOnlyChildItemId, "Philosopher's Stone", "stone.png");
+            itemApi.AddItem(OrdinaryChildItemId, "Ordinary Ingredient", "ingredient.png");
+
+            using (var tmp = new TempDirectory())
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tmp.Path, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-spirit-shard-stone",
+                        OutputItemId = VendorOnlyChildItemId,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Currency", Id = SpiritShardCurrencyId, Count = 20 }
+                        },
+                        MerchantName = "Mystic Forge Attendant",
+                        Locations = new List<string>()
+                    }
+                });
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store,
+                    reducer: new InventoryReducer());
+
+                // Effective-default valuation (condition a): matches
+                // ModuleSettings.GetEffectiveCurrencyValuation() on a FRESH
+                // settings state exactly - user overrides is None, so only
+                // CurrencyDecisionDefaults' curated table applies.
+                var valuation = CurrencyValuation.WithDefaults(CurrencyValuation.None);
+
+                // Real account snapshot with owned materials (condition b):
+                // owns 3 of the 10 needed (2/craft x 5 root quantity) units
+                // of the ORDINARY sibling, not the vendor-only child - VOM's
+                // zero-owned guided pass/InventoryReducer/force-buy pre-pass
+                // all still run over the whole tree.
+                var snapshot = new AccountSnapshot
+                {
+                    Items = new List<SnapshotItemEntry>
+                    {
+                        new SnapshotItemEntry
+                        {
+                            ItemId = OrdinaryChildItemId,
+                            Count = 3,
+                            Source = AccountItemIndex.SourceMaterialStorage
+                        }
+                    }
+                };
+
+                var result = await pipeline.GenerateStructuredAsync(
+                    RootItemId, 5, snapshot, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy,
+                    currencyValuation: valuation,
+                    ownMaterialsMode: OwnMaterialsMode.Valued);
+
+                var root = result.CraftingTree;
+                Assert.Equal(CraftingDecision.Craft, root.Decision);
+
+                // Real gold cost: only the ordinary child's remaining (10-3=7)
+                // units at 10 copper each = 70; the vendor child's coin part
+                // is 0. Comparison value additionally folds in the vendor
+                // child's shard cost: 5 crafts x 20 shards/unit x 3600
+                // copper/shard = 360000, so DecisionValue must exceed
+                // SubtreeCost by exactly that amount.
+                Assert.True(root.SubtreeCost.HasValue, "SubtreeCost must be available for the tooltip guard.");
+                Assert.True(root.DecisionValue.HasValue, "DecisionValue must be available for the tooltip guard.");
+                Assert.True(
+                    root.DecisionValue.Value > root.SubtreeCost.Value,
+                    $"Expected DecisionValue ({root.DecisionValue}) > SubtreeCost ({root.SubtreeCost}) - " +
+                    "the currency divergence from the vendor child must survive VOM reduction and the " +
+                    "post-selection ComparisonValue passes.");
+
+                bool fired = ValueDetailTooltipBuilder.TryBuild(root, null, out string tooltipText);
+
+                Assert.True(fired, "Value-detail hover must fire for the craft root live pipeline case.");
+                Assert.NotNull(tooltipText);
+                Assert.Contains("Crafting gold price:", tooltipText);
+                Assert.Contains("Currencies:", tooltipText);
+                Assert.Contains("Optimization price:", tooltipText);
+            }
+        }
+
+        // Live-repro gate (2026-08-17), variant B: the previous test's root
+        // has exactly one option (craft), so its committed pill is
+        // PillKind.Locked and its own base tooltip reads "Only available
+        // source" - not the "Current source: CRAFT" wording the live report
+        // actually quoted. That wording only comes from PillKind.Selected
+        // (TreeSectionController's spec.Kind == PillKind.Selected branch),
+        // which requires 2+ options with craft winning. This variant adds a
+        // (deliberately uncompetitive) TP price for the root so it becomes
+        // a genuine multi-option Selected pill, matching the quoted live
+        // wording exactly, and checks DecisionPillPlanner.BuildPillSpecs
+        // directly (Blish-free, so this is as deep as an automated test can
+        // go toward the actual render-time gate) alongside TryBuild.
+        [Fact]
+        public async Task GenerateStructuredAsync_CraftRootSelectedAmongMultipleOptions_ValueDetailTooltipFires()
+        {
+            const int SpiritShardCurrencyId = 23;
+            const int RootItemId = 1;
+            const int VendorOnlyChildItemId = 2;
+            const int OrdinaryChildItemId = 3;
+
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(RootItemId, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = RootItemId,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = VendorOnlyChildItemId, Count = 1 },
+                    new RawIngredient { Type = "Item", Id = OrdinaryChildItemId, Count = 2 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(OrdinaryChildItemId, buyUnitPrice: 10, sellUnitPrice: 20);
+            // Root ALSO has a (much higher) TP price, so it becomes a
+            // multi-option node and the committed pill is genuinely
+            // PillKind.Selected (not Locked) - matching the live-reported
+            // "Current source: CRAFT" wording exactly.
+            priceApi.AddPrice(RootItemId, buyUnitPrice: 1000000, sellUnitPrice: 1000000);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(RootItemId, "Deldrimor Steel Ingot", "root.png");
+            itemApi.AddItem(VendorOnlyChildItemId, "Philosopher's Stone", "stone.png");
+            itemApi.AddItem(OrdinaryChildItemId, "Ordinary Ingredient", "ingredient.png");
+
+            using (var tmp = new TempDirectory())
+            {
+                var loader = new VendorOfferLoader();
+                var store = new VendorOfferStore(tmp.Path, loader);
+                store.LoadBaseline(null);
+                store.AddOffersToOverlay(new[]
+                {
+                    new VendorOffer
+                    {
+                        OfferId = "test-spirit-shard-stone",
+                        OutputItemId = VendorOnlyChildItemId,
+                        OutputCount = 1,
+                        CostLines = new List<CostLine>
+                        {
+                            new CostLine { Type = "Currency", Id = SpiritShardCurrencyId, Count = 20 }
+                        },
+                        MerchantName = "Mystic Forge Attendant",
+                        Locations = new List<string>()
+                    }
+                });
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(recipeApi),
+                    new TradingPostService(priceApi),
+                    new PlanSolver(),
+                    new ItemMetadataService(itemApi),
+                    store,
+                    reducer: new InventoryReducer());
+
+                var valuation = CurrencyValuation.WithDefaults(CurrencyValuation.None);
+                var snapshot = new AccountSnapshot
+                {
+                    Items = new List<SnapshotItemEntry>
+                    {
+                        new SnapshotItemEntry
+                        {
+                            ItemId = OrdinaryChildItemId,
+                            Count = 3,
+                            Source = AccountItemIndex.SourceMaterialStorage
+                        }
+                    }
+                };
+
+                var result = await pipeline.GenerateStructuredAsync(
+                    RootItemId, 5, snapshot, CancellationToken.None,
+                    priceBasis: PriceBasis.InstantBuy,
+                    currencyValuation: valuation,
+                    ownMaterialsMode: OwnMaterialsMode.Valued);
+
+                var root = result.CraftingTree;
+
+                Assert.Equal(CraftingDecision.Craft, root.Decision);
+
+                var specs = DecisionPillPlanner.BuildPillSpecs(root, null, null);
+                Assert.True(specs.Exists(s => s.Text == "CRAFT"), "Expected a CRAFT pill among the built specs.");
+                var craftSpec = specs.Find(s => s.Text == "CRAFT");
+                Assert.Equal(PillKind.Selected, craftSpec.Kind);
+
+                bool fired = ValueDetailTooltipBuilder.TryBuild(root, null, out string tooltipText);
+
+                Assert.True(fired, "Value-detail hover must fire when the committed pill is genuinely Selected (2+ options).");
+                Assert.NotNull(tooltipText);
+                Assert.Contains("Crafting gold price:", tooltipText);
+                Assert.Contains("Currencies:", tooltipText);
+                Assert.Contains("Optimization price:", tooltipText);
+            }
+        }
     }
 }
