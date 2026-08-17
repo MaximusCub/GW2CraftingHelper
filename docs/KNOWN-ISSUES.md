@@ -8177,4 +8177,9 @@ cited behavior now lives. Historical records (HISTORY.md, the gw2e
 convergence matrix, and this section's own deletion narrative) keep
 the old name deliberately.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (structural dedup with measured move-purity - the review
+diffed the shared body against both original paths and found only the
+four parameterization hunks, and three targeted reducer mutations were
+killed by the ported tests; no rendered surface changed, so no desktop
+gate applies; suite 1827/1827 and build clean at the verification
+pass).
