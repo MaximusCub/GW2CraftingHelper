@@ -1324,7 +1324,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             // The ingredient's own Quantity still rescales to match the
             // node's new (already-reduced) demand - unconditional, per
-            // ReduceNode's doc comment - so 2, not the
+            // ReduceNodeSourced's doc comment - so 2, not the
             // original 5. What the guide actually gates is pool
             // CONSUMPTION: the ingredient's own 5 owned units in the pool
             // are never touched, since the node was decided Buy.
@@ -1395,7 +1395,7 @@ namespace GW2CraftingHelper.Tests.Services
             // present), so optionConsumes is false for EVERY option (none
             // has option.RecipeId == 999) - no fallback, no consumption at
             // all for this node's descendants. Pinning this as documented,
-            // intentional behavior (see ReduceNode's own doc comment),
+            // intentional behavior (see ReduceNodeSourced's own doc comment),
             // NOT a bug.
             var optionA = new RecipeOption { RecipeId = 10, OutputCount = 1, CraftsNeeded = 1 };
             optionA.Ingredients.Add(Leaf(2, 5));

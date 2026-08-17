@@ -5109,7 +5109,8 @@ phantom-`UsedMaterials` bug re-entering through a second door. Requires
 a node with owned stock of ITSELF plus owned stock of its own
 ingredients, and a recipe/vendor batch whose output count is greater
 than 1 - not exercised by any existing fixture. See
-`InventoryReducer.ReduceNode`'s doc comment for the precise mechanism.
+`InventoryReducer.ReduceNodeSourced`'s doc comment for the precise
+mechanism.
 Left undone (not treated as blocking this milestone) rather than
 attempting a fix: closing it properly needs the same
 "solve-then-detect-a-flip-then-re-reduce" shape as the `ResolveWithOverrides`
@@ -8167,5 +8168,13 @@ allocation listing; same-source-across-branches allocation merging);
 the flat-vs-sourced equivalence test became
 Sourced_SourceSplitInvariance_SameQuantityResults with an absolute
 quantity anchor. [Fact] count 51 -> 51; suite total 1827 unchanged.
+Follow-up (review finding): the deletion sweep covered call sites
+only; 6 comment references to the deleted ReduceNode symbol (in
+AchievementBitDedupPrePass.cs, AchievementBitDedupPrePassTests.cs,
+InventoryReducerTests.cs, MultiItemPlanTests.cs) plus one live
+KNOWN-ISSUES pointer were retargeted to ReduceNodeSourced, where the
+cited behavior now lives. Historical records (HISTORY.md, the gw2e
+convergence matrix, and this section's own deletion narrative) keep
+the old name deliberately.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

@@ -479,8 +479,9 @@ namespace GW2CraftingHelper.Tests.Services
         /// snapshot=null, so InventoryReducer.Reduce's shared consumption
         /// pool (created once per GenerateStructuredMultiAsync call and
         /// walked depth-first through the wrapper's N item-root
-        /// ingredients in request order - see InventoryReducer.ReduceNode's
-        /// own doc comment) was never exercised across two roots.
+        /// ingredients in request order - see
+        /// InventoryReducer.ReduceNodeSourced's own doc comment) was never
+        /// exercised across two roots.
         ///
         /// Two items (800, 801) each need 3 of the SAME owned raw material
         /// (900); the account owns 4. Root 800 is walked first (request
