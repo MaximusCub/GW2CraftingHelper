@@ -604,16 +604,12 @@ namespace VendorOfferUpdater
                 existingKeys.Add(key);
             }
 
-            // Quality-audit fix (B4): counted against existingKeys (a set)
-            // rather than testing merged.ContainsKey - merged is the
-            // dictionary this same loop writes to on every iteration, so a
-            // duplicate PageName within the FRESH batch itself used to be
-            // seen as "already present" (from its own earlier iteration,
-            // not from the original existing cache) and double-counted as
-            // Refreshed, which could make Unchanged (existing.Count -
-            // refreshed) under-report or go negative. addedKeys/
+            // Quality-audit B4 (docs/KNOWN-ISSUES.md): counted against
+            // existingKeys, not merged.ContainsKey - merged mutates during
+            // this same loop, so a duplicate PageName within one fresh
+            // batch was double-counted as Refreshed. addedKeys/
             // refreshedKeys are sets for the same reason: two fresh
-            // entries sharing a PageName are one net page each, not two.
+            // entries sharing a PageName are one net page, not two.
             var addedKeys = new HashSet<string>(StringComparer.Ordinal);
             var refreshedKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var r in fresh)

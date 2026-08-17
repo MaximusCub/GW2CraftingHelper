@@ -150,14 +150,16 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void DuplicatePageNameWithinFreshBatch_RefreshedAndUnchangedNotDoubleCounted()
         {
-            // Quality-audit fix (B4): the bug this pins down - refreshed
-            // used to be incremented once per FRESH entry whose key was
-            // already in `merged`, and `merged` is the same dictionary the
-            // loop writes to on every iteration. Two fresh entries sharing
-            // one PageName ("Refreshed Page" here) used to count as TWO
-            // refreshes against a cache that only ever had ONE matching
-            // page, driving Unchanged (existing.Count - refreshed)
-            // negative for this exact 2-existing/1-refreshed-twice shape.
+            // Quality-audit B4 (docs/KNOWN-ISSUES.md): the bug this pins
+            // down - refreshed used to be incremented once per FRESH entry
+            // whose key was already in `merged`, and `merged` is the same
+            // dictionary the loop writes to on every iteration. Two fresh
+            // entries sharing one PageName ("Refreshed Page" here) used to
+            // count as TWO refreshes against a cache that only ever had
+            // ONE matching page - existing.Count(2) - refreshed(2) yields
+            // Unchanged 0 instead of the correct 1 for this exact shape
+            // (measured; a smaller existing count than duplicate refreshes
+            // would go negative, but this fixture does not).
             var existing = new List<WikiVendorResult>
             {
                 MakeResult("Untouched Page", dailyCap: 3),

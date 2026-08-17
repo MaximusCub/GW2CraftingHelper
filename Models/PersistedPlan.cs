@@ -54,24 +54,13 @@ namespace GW2CraftingHelper.Models
         /// a known, already-exercised, safe fresh-start, not a crash.
         /// </para>
         /// <para>
-        /// Quality-audit fix (B1): bumped 2 -&gt; 3 because the graph this
-        /// version number is supposed to cover grew ~275 lines of new
-        /// members (CraftingTreeNode's CraftCostBreakdown/
-        /// BuyFromTpCostBreakdown/BuyFromVendorCostBreakdown among others,
-        /// PlanSolveContext's CompetencyIndependentForceBuyNodeIds/
-        /// UnreducedTree/AccountItems/ActiveCharacterName,
-        /// CraftingPlanResult's ExcessCraftOutputs/
-        /// RecipeSheetSavingsOpportunities/SeasonalVendorTips among
-        /// others) after the 1 -&gt; 2 bump without a matching version bump -
-        /// exactly the silent-default failure this constant's doc comment
-        /// says it exists to reject: a SchemaVersion-2 file written by an
-        /// older build would have restored with all of those fields
-        /// silently null instead of being rejected. See
-        /// tests/Models/PersistedPlanSchemaMemberSetTests.cs for the guard
-        /// that now catches a repeat of this - it fails, independent of
-        /// SchemaVersion, whenever the public member set of PersistedPlan,
-        /// CraftingPlanResult, PlanSolveContext, or CraftingTreeNode
-        /// changes, which is the prompt to bump this constant again.
+        /// Bumped 2 -&gt; 3 (quality-audit B1: the persisted graph grew
+        /// members with no matching version bump). See
+        /// docs/KNOWN-ISSUES.md ("Quality-audit cleanup, phase 1") for
+        /// the rationale and tests/Models/PersistedPlanSchemaMemberSetTests.cs
+        /// for the reflective guard - it now walks the whole graph
+        /// reachable from PersistedPlan, not just the four types named
+        /// above, and fails on any rename/add/remove/retype.
         /// </para>
         /// </summary>
         public const int CurrentSchemaVersion = 3;

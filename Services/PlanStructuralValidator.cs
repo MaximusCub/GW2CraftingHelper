@@ -147,13 +147,10 @@ namespace GW2CraftingHelper.Services
             if (!NoNullEntries(result.RequiredDisciplines, "RequiredDisciplines", out reason)) return false;
             if (!NoNullEntries(result.RequiredRecipes, "RequiredRecipes", out reason)) return false;
 
-            // Quality-audit fix (B2): unlike Metadata/Tree, these four lists
-            // are NOT recomputed on the restore path, and each has the same
-            // "list null-checked, entry not" gap as the checks immediately
-            // above - PlanViewModelBuilder.BuildNotesSection dereferences
-            // opportunity.ItemId/excess.ItemId/opp.ItemId/tip.CostLines with
-            // no per-entry null check once the surrounding list-level Count
-            // > 0 guard passes.
+            // Quality-audit B2 (docs/KNOWN-ISSUES.md): these four lists are
+            // not recomputed on the restore path and had the same per-entry
+            // gap as the checks above - BuildNotesSection dereferences each
+            // entry unguarded.
             if (!NoNullEntries(result.CompetencyOpportunities, "CompetencyOpportunities", out reason)) return false;
             if (!NoNullEntries(result.ExcessCraftOutputs, "ExcessCraftOutputs", out reason)) return false;
             if (!NoNullEntries(result.RecipeSheetSavingsOpportunities, "RecipeSheetSavingsOpportunities", out reason)) return false;

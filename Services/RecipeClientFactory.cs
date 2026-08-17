@@ -4,28 +4,16 @@ namespace GW2CraftingHelper.Services
 {
     public static class RecipeClientFactory
     {
-        // Quality-audit fix (B3): mfData.LoadWarnings used to be collected
-        // and silently discarded (a corrupt mystic_forge_recipes.json was
-        // invisible despite the module having a log sink), and this catch
-        // used to swallow the load exception itself just as silently.
-        // Optional ModuleLog injection (defaults to the app-wide
-        // ModuleLog.Shared singleton - see Module.cs's own construction
-        // sites for the same idiom, none of which pass this) so tests can
-        // inject an isolated `new ModuleLog()` instance instead of
-        // touching Shared - see ModuleLog's own class doc comment on why
-        // Shared is unsuitable for exact-count/content test assertions.
-        //
-        // Review fix: the individual LoadWarnings strings are NOT joined
-        // into the logged message, even though a Warn line here (unlike a
-        // thrown exception) would be worth the detail. One of them
-        // (MysticForgeRecipeData's "invalid ingredient" warning) embeds
-        // the ingredient's raw item id - and PlanStructuralValidator.
-        // NoNullValues' own doc comment already establishes, for this
-        // exact "Warn-level ModuleLog line the Log tab shows the user"
-        // surface, that the item/currency/vendor-id-internal-only
-        // invariant applies there exactly as much as to any other UI
-        // surface. Only the count is logged; a maintainer chasing down a
-        // corrupt seed file reads ref/mystic_forge_recipes.json directly.
+        // Quality-audit B3 (docs/KNOWN-ISSUES.md): mfData.LoadWarnings was
+        // collected and never logged, and this catch swallowed the load
+        // exception silently. Wired both to ModuleLog (optional injection,
+        // defaults to ModuleLog.Shared - see Module.cs's other
+        // construction sites; tests inject an isolated instance instead).
+        // Only a warning COUNT is logged, not the raw strings - one
+        // LoadWarnings category embeds a raw item id, and this Warn line
+        // is a Log-tab-visible surface the item/currency/vendor-id-
+        // internal-only invariant covers (see PlanStructuralValidator.
+        // NoNullValues for the same precedent).
         public static IRecipeApiClient Create(
             IRecipeApiClient primary,
             IMysticForgeRecipeSource mfSource,
