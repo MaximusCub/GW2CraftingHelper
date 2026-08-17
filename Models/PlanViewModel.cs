@@ -32,20 +32,6 @@ namespace GW2CraftingHelper.Models
 
     public enum PlanRowType
     {
-        // W4A (Total Cost section redesign): CoinTotal itself is no longer
-        // emitted by PlanViewModelBuilder.BuildSummarySection (superseded
-        // by CostFormulaTile/ProfitFormulaTile below) - kept as an enum
-        // member ONLY because Services/PlanContentHeightMath.cs (DO-NOT-
-        // TOUCH for this package) still references it by name in its own
-        // private SummaryBodyHeight method. That method is itself now
-        // unreachable for a real Summary section (Views/CraftingPlanView.cs
-        // routes PlanSectionType.Summary through
-        // Services/SummarySectionLayoutMath.BodyHeight instead - see that
-        // class's doc comment) but is left byte-for-byte unmodified per the
-        // W4A task brief, so removing this member would break its
-        // compilation. Do not resurrect this as a real row type without
-        // first re-reading that class's doc comment.
-        CoinTotal,
         CurrencyCost,
         UsedMaterial,
         ShoppingBuy,
