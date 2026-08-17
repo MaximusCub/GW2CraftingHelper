@@ -162,6 +162,7 @@ namespace GW2CraftingHelper.Tests.Services
             var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, null);
 
             Assert.Null(result[0].OwnedQuantity);
+            Assert.Null(result[0].RawOwnedQuantity);
         }
 
         [Fact]
@@ -173,19 +174,26 @@ namespace GW2CraftingHelper.Tests.Services
             var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
 
             Assert.Equal(200, result[0].OwnedQuantity);
+            Assert.Equal(200, result[0].RawOwnedQuantity);
         }
 
         [Fact]
         public void ResolveAmounts_OwnedExceedsNeeded_OwnedQuantityClampedToAmount()
         {
             // Owning MORE than this cost line needs must never surface an
-            // "owned" figure bigger than the line's own Amount.
+            // "owned" figure bigger than the line's own Amount - the
+            // clamped OwnedQuantity is deliberate (shoplist-have-format)
+            // so the tooltip's HAVE/Amount pair always reads as a
+            // coverage fraction. RawOwnedQuantity is the escape hatch that
+            // still carries the real, unclamped holding for that same
+            // tooltip to state alongside it.
             var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
             var owned = new Dictionary<int, int> { { 23, 999999 } };
 
             var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
 
             Assert.Equal(500, result[0].OwnedQuantity);
+            Assert.Equal(999999, result[0].RawOwnedQuantity);
         }
 
         [Fact]
@@ -197,6 +205,7 @@ namespace GW2CraftingHelper.Tests.Services
             var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
 
             Assert.Null(result[0].OwnedQuantity);
+            Assert.Null(result[0].RawOwnedQuantity);
         }
 
         [Fact]
@@ -212,7 +221,9 @@ namespace GW2CraftingHelper.Tests.Services
             var result = CurrencyDisplayResolver.ResolveAmounts(costLines, null, owned);
 
             Assert.Equal(100, result[0].OwnedQuantity);
+            Assert.Equal(100, result[0].RawOwnedQuantity);
             Assert.Null(result[1].OwnedQuantity);
+            Assert.Null(result[1].RawOwnedQuantity);
         }
 
         [Fact]

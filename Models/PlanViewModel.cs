@@ -225,8 +225,22 @@ namespace GW2CraftingHelper.Models
         // of this currency the account already holds. Null (not 0) when no
         // wallet snapshot was available, or this amount is a per-unit
         // "Each" figure (ownership is a total-quantity concept - see
-        // CurrencyDisplayResolver.ResolveAmounts/ResolveUnitAmounts).
+        // CurrencyDisplayResolver.ResolveAmounts/ResolveUnitAmounts). This
+        // value is DELIBERATELY clamped so the HAVE/Amount pair the row
+        // tooltip renders always reads as a coverage fraction (e.g.
+        // "HAVE 500/500") rather than overshooting the total - see
+        // RawOwnedQuantity below for the real, unclamped holding.
         public int? OwnedQuantity { get; set; }
+
+        // Raw, UNCLAMPED wallet holding backing OwnedQuantity above
+        // (shoplist-have-format): unlike OwnedQuantity, this is never
+        // capped at Amount, so it can exceed the row's Total when the
+        // account holds more of this currency than this row needs. Null
+        // under the exact same conditions as OwnedQuantity (no wallet
+        // snapshot / per-unit "Each" figure). Tooltip-only - lets the
+        // shopping row's tooltip spell out the real holding even when the
+        // clamped OwnedQuantity/Amount pair alone would hide it.
+        public int? RawOwnedQuantity { get; set; }
     }
 
     public class PlanSectionViewModel

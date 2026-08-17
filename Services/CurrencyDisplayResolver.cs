@@ -66,6 +66,12 @@ namespace GW2CraftingHelper.Services
         /// min(line.Count, wallet amount) when the wallet holds any of that
         /// currency; null (not 0) when the caller has no wallet data at all
         /// or omits it, or the currency simply isn't in the wallet snapshot.
+        /// The same pass also sets RawOwnedQuantity to the real, UNCLAMPED
+        /// wallet amount under the identical null-vs-set conditions
+        /// (shoplist-have-format) - see CurrencyAmountViewModel.
+        /// RawOwnedQuantity's own doc comment for why the clamped and raw
+        /// figures both need to survive to callers.
+        ///
         /// Callers resolving a per-unit "Each" amount should not pass this
         /// (ownership is a total-quantity concept - see ResolveUnitAmounts,
         /// which never accepts it).
@@ -84,10 +90,12 @@ namespace GW2CraftingHelper.Services
             foreach (var line in costLines)
             {
                 int? owned = null;
+                int? rawOwned = null;
                 if (ownedCurrencyAmounts != null &&
                     ownedCurrencyAmounts.TryGetValue(line.Id, out int ownedRaw))
                 {
                     owned = Math.Min(ownedRaw, line.Count);
+                    rawOwned = ownedRaw;
                 }
 
                 result.Add(new CurrencyAmountViewModel
@@ -95,7 +103,8 @@ namespace GW2CraftingHelper.Services
                     Amount = line.Count,
                     Name = ResolveName(line.Id, currencyMetadata),
                     IconUrl = ResolveIconUrl(line.Id, currencyMetadata),
-                    OwnedQuantity = owned
+                    OwnedQuantity = owned,
+                    RawOwnedQuantity = rawOwned
                 });
             }
             return result;
