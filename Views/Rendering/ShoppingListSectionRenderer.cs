@@ -199,55 +199,37 @@ namespace GW2CraftingHelper.Views.Rendering
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, edges.QtyRightEdge, qtyWidth, 12, nameX, 9);
             var nameLabel = nameHandle.NameLabel;
-            var tooltipParts = new List<string>();
-            if (nameLabel.Text != fullName)
-            {
-                tooltipParts.Add(fullName);
-            }
-            if (!string.IsNullOrEmpty(hintText))
-            {
-                tooltipParts.Add(hintText);
-            }
+
             // M34-B2b: owned/needed split for this row's currency cost(s),
             // cosmetic-only tooltip (avoids new inline layout math for a
             // fixed-height shopping row - see PlanContentHeightMath).
-            // shoplist-have-format: reworded off "N owned, M needed" (a
-            // total sitting next to the word OWNED caused a real
-            // misreading incident) to the HAVE/NEED vocabulary the
-            // decision pills already use elsewhere in the tree
-            // (DecisionPillPlanner's "HAVE N/M NEEDED"). cc.OwnedQuantity
-            // is deliberately clamped to cc.Amount so the HAVE/Amount pair
-            // always reads as a coverage fraction ("HAVE 500/500"); the
-            // parenthetical spells out the three numbers in full (what the
-            // plan requires, what you actually hold unclamped, and the
-            // shortfall) so a covered row whose real holding exceeds the
-            // requirement is never silently hidden by the clamp.
-            if (row.CurrencyCosts != null)
+            // shoplist-have-format: line text now built by the Blish-free
+            // ShoppingRowTooltipFormatter (its own doc comment covers the
+            // HAVE/NEED wording and why "plan requires" was dropped -
+            // cc.Amount is this row's own total, never the whole plan's
+            // requirement for that currency id, which this renderer is
+            // never handed - review finding #2). currencyLines is captured
+            // once and reused by both BuildTooltip below and the
+            // AddReellipsis rebuild further down - the two used to diverge,
+            // silently dropping these lines on every resize (review
+            // finding #1).
+            var currencyLines = ShoppingRowTooltipFormatter.BuildCurrencyLines(row.CurrencyCosts);
+
+            void BuildTooltip()
             {
-                foreach (var cc in row.CurrencyCosts)
+                var tooltipParts = new List<string>();
+                if (nameLabel.Text != fullName)
                 {
-                    if (cc.OwnedQuantity.HasValue)
-                    {
-                        long needed = cc.Amount - cc.OwnedQuantity.Value;
-                        string haveNeed = needed > 0
-                            ? $"HAVE {cc.OwnedQuantity.Value}/{cc.Amount}, NEED {needed}"
-                            : $"HAVE {cc.Amount}/{cc.Amount}";
-                        // RawOwnedQuantity is always set alongside
-                        // OwnedQuantity by CurrencyDisplayResolver.
-                        // ResolveAmounts; the ?? fallback only guards
-                        // against a future caller constructing this view
-                        // model directly with just OwnedQuantity set.
-                        long rawHeld = cc.RawOwnedQuantity ?? cc.OwnedQuantity.Value;
-                        tooltipParts.Add(
-                            $"{cc.Name}: {haveNeed} " +
-                            $"(plan requires {cc.Amount}, you hold {rawHeld}, shortfall {needed})");
-                    }
+                    tooltipParts.Add(fullName);
                 }
+                if (!string.IsNullOrEmpty(hintText))
+                {
+                    tooltipParts.Add(hintText);
+                }
+                tooltipParts.AddRange(currencyLines);
+                rowPanel.BasicTooltipText = tooltipParts.Count > 0 ? string.Join("\n", tooltipParts) : null;
             }
-            if (tooltipParts.Count > 0)
-            {
-                rowPanel.BasicTooltipText = string.Join("\n", tooltipParts);
-            }
+            BuildTooltip();
 
             string sourceTag = ShoppingSourceTag(row);
             Panel tagPanel = null;
@@ -300,10 +282,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
                 if (IconNameRowHelpers.ReellipsizeName(nameHandle, font, e.QtyRightEdge, qtyWidth, 12))
                 {
-                    var parts = new List<string>();
-                    if (nameLabel.Text != fullName) parts.Add(fullName);
-                    if (!string.IsNullOrEmpty(hintText)) parts.Add(hintText);
-                    rowPanel.BasicTooltipText = parts.Count > 0 ? string.Join("\n", parts) : null;
+                    BuildTooltip();
                 }
                 if (tagPanel != null)
                 {
