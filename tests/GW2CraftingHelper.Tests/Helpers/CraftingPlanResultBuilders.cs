@@ -62,7 +62,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                 // CharacterDisciplines' own "no data captured" null
                 // convention, so a test that doesn't pass this explicitly
                 // exercises the same "no data" path production code hits
-                // for every pre-W3C/degraded snapshot.
+                // for every legacy/degraded snapshot.
                 CharacterDisciplines = characterDisciplines,
                 // design-plan-notes.md (Notes section): matches
                 // RequiredDisciplines/RequiredRecipes' own "empty list, not

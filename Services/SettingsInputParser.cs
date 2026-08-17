@@ -124,8 +124,7 @@ namespace GW2CraftingHelper.Services
             return true;
         }
 
-        // M39 (log system, d2-log-system.md Section 5, tab-roadmap-proposal
-        // Section 2.1): "clamp 1-365" for LogRetentionDays.
+        // "Clamp 1-365" for LogRetentionDays (d2-log-system.md Section 5).
         private const int MinRetentionDays = 1;
         private const int MaxRetentionDays = 365;
 

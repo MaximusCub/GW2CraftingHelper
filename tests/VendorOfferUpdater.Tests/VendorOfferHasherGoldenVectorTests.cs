@@ -8,8 +8,8 @@ using Xunit;
 namespace VendorOfferUpdater.Tests
 {
     /// <summary>
-    /// Cross-project parity net for VendorOfferHasher (M38 WP-19, tests
-    /// T13). tools/VendorOfferUpdater/VendorOfferHasher.cs (this project,
+    /// Cross-project parity net for VendorOfferHasher.
+    /// tools/VendorOfferUpdater/VendorOfferHasher.cs (this project,
     /// net8.0) and Services/VendorOfferHasher.cs (net48) are two
     /// independently-maintained copies with byte-for-byte identical
     /// string-composition logic; only the digest-to-hex step differs

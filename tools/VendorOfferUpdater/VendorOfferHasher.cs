@@ -20,7 +20,7 @@ namespace VendorOfferUpdater
             int? weeklyCap,
             // Optional so a caller need not pass
             // it, but this does NOT keep the hash byte-for-byte identical
-            // to the pre-M37 value: the ";homesteadTier=" segment below is
+            // to the pre-tier value: the ";homesteadTier=" segment below is
             // appended unconditionally (as "null" when omitted), so any
             // offer's OfferId changes the first time it is recomputed with
             // this code, whether or not its own tier is null. Existing

@@ -5,8 +5,8 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Deterministic pre-order DFS NodeId assignment (root, then each
     /// node's recipes' ingredients, in list order) - the same algorithm
-    /// PlanSolver.Solve has always used internally, extracted here (M34-B2a
-    /// #3) so it can also be called BEFORE InventoryReducer.Reduce runs.
+    /// PlanSolver.Solve has always used internally, extracted here
+    /// so it can also be called BEFORE InventoryReducer.Reduce runs.
     ///
     /// Why this matters: InventoryReducer.CloneNode preserves whatever
     /// NodeId a node already has when it clones/prunes a tree. Pre-assigning

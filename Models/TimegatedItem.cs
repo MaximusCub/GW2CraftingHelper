@@ -16,8 +16,8 @@ namespace GW2CraftingHelper.Models
     /// <summary>
     /// Informational-only record of an item whose winning vendor offer
     /// carries a positive purchase cap that the plan's total (merged)
-    /// demand exceeds. Matches gw2efficiency's own treatment (M34 R3
-    /// research, dailyCooldowns.ts): a cap NEVER gates offer eligibility or
+    /// demand exceeds. Matches gw2efficiency's own treatment
+    /// (dailyCooldowns.ts): a cap NEVER gates offer eligibility or
     /// re-routes the solver to a different acquisition source - it is
     /// surfaced purely as a "this will take you more than one day/week"
     /// notice, computed once per merged shopping-list row after the plan is

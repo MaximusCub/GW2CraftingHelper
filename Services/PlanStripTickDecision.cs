@@ -59,27 +59,17 @@ namespace GW2CraftingHelper.Services
         /// "Fetching prices (418 items)..." - no spinner prefix (added by
         /// CraftingPlanView.RenderFromBoard). Falls back to "Generating..."
         /// for a null event or one with no display name, matching the
-        /// pre-first-event text TriggerGenerate already shows. W3B
+        /// pre-first-event text TriggerGenerate already shows.
         /// When a phase carries no item count but does carry
         /// Detail (currently only the very first "Building recipe tree"
         /// event, shown unconditionally regardless of whether the cache
         /// actually turns out warm or cold - see
         /// CraftingPlanPipeline.FirstRunTreeHint's call sites), that detail
-        /// is appended instead - this is the pre-W3B "(may take several
+        /// is appended instead - this preserves the "(may take several
         /// seconds on first run)" hint, otherwise silently lost now that
         /// CraftingPlanView passes progress: null to the old, finer-grained
         /// IProgress&lt;PlanStatus&gt; channel (see that argument's own
         /// comment at its call site).
-        ///
-        /// tree-tooltip-composer milestone: moved verbatim out of
-        /// CraftingPlanView.FormatPhaseText (a private static method with
-        /// no Blish/instance-state dependency of its own) into this
-        /// existing pure, Blish-free, unit-tested file alongside
-        /// PlanStripTickDecision.Decide, its sibling "what should this
-        /// status-strip tick render" decision - see
-        /// docs/ARCHITECTURE.md section 5's STANDING RULE. No behavior
-        /// change; CraftingPlanView's sole call site now reads
-        /// PlanStripTickDecision.FormatPhaseText(pe).
         /// </summary>
         public static string FormatPhaseText(PlanPhaseEvent pe)
         {

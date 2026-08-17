@@ -18,22 +18,16 @@ namespace GW2CraftingHelper.Views.Rendering
     // (a semantics-preserving pass-through - see ISectionRelayoutSink's doc
     // comment).
     //
-    // CreateCTableHeaderRow (the shared "Recipe"/"Status" column header,
-    // also used by Required Disciplines' "Discipline"/"Level" header) moves
-    // with this package too, into its own Views/Rendering/CTableHeaderRenderer -
-    // see that class's doc comment for why: the WP-23 pilot deliberately
-    // left it in CraftingPlanView because Required Recipes (this section)
-    // was not yet extracted; now that both callers are extracted section
-    // renderers, this renderer's Render() calls CTableHeaderRenderer
-    // directly, exactly as DisciplinesSectionRenderer now does, rather than
-    // relying on CraftingPlanView to call it first.
+    // Render() calls CTableHeaderRenderer (the shared "Recipe"/"Status"
+    // column header, also used by Required Disciplines) directly, exactly
+    // as DisciplinesSectionRenderer does - see that class's doc comment.
     //
     // CreateRecipeRow's
-    // divider+relayout tail now goes through RowRelayoutHelpers.FinishRow -
+    // divider+relayout tail goes through RowRelayoutHelpers.FinishRow -
     // the shared "row panel resize + extra reposition + divider resize"
-    // shape confirmed identical across all five extracted renderers' row
+    // shape identical across all five extracted renderers' row
     // builders (see that class's doc comment). This row's name label is
-    // NOT run through IconNameRowHelpers (the other WP-24 helper): it has
+    // NOT run through IconNameRowHelpers: it has
     // no width cap or ellipsis at all (row.Label renders in full,
     // regardless of length), an optional sublabel line BELOW the name
     // rather than a same-line secondary label, and an icon y that varies
@@ -42,8 +36,6 @@ namespace GW2CraftingHelper.Views.Rendering
     // through that helper would mean either inventing ellipsis this row
     // never had or dropping its sublabel line, both real behavior changes,
     // so it stays hand-rolled - see IconNameRowHelpers' own doc comment.
-    // Geometry unchanged - see the WP-24 constant-by-constant table in the
-    // PR/commit body.
     internal sealed class RecipesSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -77,7 +69,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
         // The no-sublabel branch's rowHeight (32)
         // left the 34px CreateRarityFramedIcon default frame at y=1
-        // overflowing rowHeight by 3px even BEFORE the M36 divider-width
+        // overflowing rowHeight by 3px even BEFORE the divider-width
         // change (icon bottom = 1 + 34 = 35, rowHeight = 32) - pre-existing
         // negative headroom, not "several pixels of headroom" as
         // KNOWN-ISSUES #23 previously (incorrectly) claimed for this row,

@@ -8,8 +8,8 @@ using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// M37 (KNOWN-ISSUES #26, gw2e parity - achievement-bit ingredient
-    /// dedup). The BitDuplicate_/BitOnlyDuplicate_/OrdinaryDuplicate_ tests
+    /// Achievement-bit ingredient dedup (KNOWN-ISSUES #26, gw2e
+    /// parity). The BitDuplicate_/BitOnlyDuplicate_/OrdinaryDuplicate_ tests
     /// below port the exact scenario and asserted values from gw2e's own
     /// ground-truth unit test
     /// (recipe-calculation@master, tests/calculateTreeQuantity.spec.ts,
@@ -31,8 +31,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// Narrower Option shape (recipeId + ingredients only, OutputCount
         /// and CraftsNeeded hardcoded to 1) used throughout this file.
         /// Kept local rather than folded into RecipeNodeBuilders.Option,
-        /// which requires outputCount/craftsNeeded explicitly (M38 WP-01,
-        /// tests T2).
+        /// which requires outputCount/craftsNeeded explicitly.
         /// </summary>
         private static RecipeOption Option(int recipeId, params RecipeNode[] ingredients)
         {
@@ -50,7 +49,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Apply_TreeWithNoAchievementFields_IsCompletelyUnchanged()
         {
-            // M37 regression requirement: every one of the 14,732 existing
+            // Regression requirement: every one of the 14,732 existing
             // seed rows has no achievement fields at all - this pass must
             // be a byte-identical no-op for them.
             var root = Leaf(1, 5);

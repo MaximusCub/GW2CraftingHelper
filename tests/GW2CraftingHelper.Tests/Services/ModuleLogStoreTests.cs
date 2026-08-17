@@ -231,7 +231,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- onError callback (WP-16 shape): real IO failures, not mocked. ---
+        // --- onError callback: real IO failures, not mocked. ---
 
         [Fact]
         public void AppendLine_DirectoryCreationFails_InvokesOnErrorInsteadOfThrowing()

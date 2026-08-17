@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Models
         public int NodeId { get; set; }
         public List<RecipeOption> Recipes { get; set; } = new List<RecipeOption>();
 
-        // W3D (plan persistence): computed, not stored - Newtonsoft would
+        // Computed, not stored - Newtonsoft would
         // otherwise write this into every persisted plan.json even though
         // it can never be assigned back on load (no setter). [JsonIgnore]
         // keeps the on-disk schema to genuine state only; behavior is
@@ -21,8 +21,8 @@ namespace GW2CraftingHelper.Models
         [JsonIgnore]
         public bool IsLeaf => Recipes.Count == 0;
 
-        // M37 (KNOWN-ISSUES #26, gw2e parity - achievement-bit ingredient
-        // dedup): set once, at tree-build time (RecipeService.BuildNodeAsync),
+        // Achievement-bit ingredient dedup (KNOWN-ISSUES #26, gw2e
+        // parity): set once, at tree-build time (RecipeService.BuildNodeAsync),
         // from the matching RawIngredient - see that field's own doc comment.
         // Null for every ordinary ingredient (the vast majority). Preserved
         // across InventoryReducer.CloneNode.

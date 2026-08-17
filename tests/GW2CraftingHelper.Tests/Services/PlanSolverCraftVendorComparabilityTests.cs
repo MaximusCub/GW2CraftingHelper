@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Tests.Services
     /// line - it never competes on coin cost against a comparable option
     /// (TP buy, comparable vendor offer, or another comparable recipe) in
     /// PickCheapest, but is still offered (CanCraft/the CRAFT pill stay
-    /// true - the M33 guarantee) and used as a last resort when nothing
+    /// true - a standing guarantee) and used as a last resort when nothing
     /// coin-comparable exists at all. See PlanSolver.Evaluate's recipe loop
     /// and its terminal fallback branch for the implementation; see
     /// PlanSolverCurrencyValuationTests for the pre-existing VALUED-currency
@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void FallbackCraft_StillOffered_CanCraftTrueEvenWhenAutoDecisionPicksBuy()
         {
-            // M33 guarantee, explicitly isolated: a fallback-tier recipe
+            // The CanCraft guarantee, explicitly isolated: a fallback-tier recipe
             // (unvalued currency) never wins the automatic decision against
             // a comparable buy price, but CanCraft/the CRAFT pill must
             // still report true - the option is offered, just not
@@ -287,8 +287,8 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // A per-node override forcing Craft must still work when the
             // only recipe is fallback-tier (unvalued currency) - manual
-            // overrides always win over the automatic comparison (M33
-            // guarantee), mirroring VendorBatchSolver's own
+            // overrides always win over the automatic comparison,
+            // mirroring VendorBatchSolver's own
             // comparable-first-else-fallback override precedence for
             // BuyFromVendor.
             var tree = Craftable(1, 1,
@@ -487,7 +487,7 @@ namespace GW2CraftingHelper.Tests.Services
             // asymmetry this whole fix exists to close. With propagation,
             // item 1's own recipe is fallback-tier too, so it correctly
             // loses to its real, fully-known 500 TP buy - while still
-            // being offered (CanCraft stays true, the M33 guarantee).
+            // being offered (CanCraft stays true).
             var tree = Craftable(1, 1,
                 Option(10, 1, 1,
                     Craftable(2, 1,

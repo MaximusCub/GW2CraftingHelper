@@ -2,7 +2,7 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Pure decision for whether a queued generation-status update should
-    /// still be applied (M34-B1 #4 - CraftingPlanView's stale "Building
+    /// still be applied (CraftingPlanView's stale "Building
     /// final result..." status race).
     ///
     /// A generation's trailing progress tick and that same generation's own

@@ -70,7 +70,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Exotic", vm.TargetRarity);
         }
 
-        // --- W4A: cost formula band (collapse rule + arithmetic) ---
+        // --- Cost formula band (collapse rule + arithmetic) ---
 
         [Fact]
         public void CostBand_NoMaterialsUsed_CollapsesToSingleActualCostTile()
@@ -121,7 +121,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Actual Cost to Craft", costTiles[2].Label);
             Assert.Equal(200L, costTiles[2].CoinValue);
 
-            // M32 lesson (user-mandated tooltips): every tile header has
+            // User-mandated tooltips: every tile header has
             // its own non-empty tooltip.
             Assert.All(costTiles, t => Assert.False(string.IsNullOrEmpty(t.TooltipText)));
 
@@ -148,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("buy-order prices", costTile.TooltipText);
         }
 
-        // --- W4A: profit formula band (presence/absence, arithmetic, sign) ---
+        // --- Profit formula band (presence/absence, arithmetic, sign) ---
 
         [Fact]
         public void ProfitBand_NoSellPrice_Absent()
@@ -283,7 +283,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("overproduction", sellTile.TooltipText);
         }
 
-        // --- W4A: currency table rows (alphabetical, Required/Have/Needed) ---
+        // --- Currency table rows (alphabetical, Required/Have/Needed) ---
 
         [Fact]
         public void CurrencyTable_RowsSortedAlphabeticallyByName()
@@ -374,8 +374,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(vm.OwnedCurrencyAmounts);
         }
 
-        // Regression (merged-ceil-remainder,
-        // 2026-08): BuildCurrencyTableRows used to narrow
+        // Regression: BuildCurrencyTableRows used to narrow
         // CurrencyCost.Amount (long) to int with a plain unchecked
         // `(int)` cast. An Amount past int.MaxValue silently wraps to a
         // NEGATIVE required quantity, which then made
@@ -432,7 +431,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CurrencyTable_HaveIsUnclamped_ExceedsRequired()
         {
-            // The pre-W4A behavior clamped this to
+            // The old behavior clamped this to
             // 500 (the Required amount) - the redesigned "Have" column
             // must show the REAL holding instead.
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
@@ -673,7 +672,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(ccRow.IconUrl);
         }
 
-        // --- W4A: footnote row ---
+        // --- Footnote row ---
 
         [Fact]
         public void Footnote_AlwaysPresentAsLastRow()

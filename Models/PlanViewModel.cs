@@ -42,40 +42,39 @@ namespace GW2CraftingHelper.Models
         DisciplineRow,
         RecipeRow,
 
-        // Plain informational line in the Crafting Steps section (M34-B1
-        // #3) - a vendor-capped item whose merged demand exceeds its
+        // Plain informational line in the Crafting Steps section
+        // - a vendor-capped item whose merged demand exceeds its
         // offer's daily/weekly purchase cap. Never numbered/badged like a
         // CraftStep row; rendered via the same plain-text row pattern as
         // any other fallback text row.
         TimegatedNotice,
 
-        // M35 (gw2efficiency parity - multi-item plans): a single plain
-        // informational line appended to the Summary/Total Cost section
-        // ONLY for a genuine multi-item batch (2+ requested items). M37
-        // added a real batch-level Sell value/Profit
+        // A single plain informational line appended to the
+        // Summary/Total Cost section
+        // ONLY for a genuine multi-item batch (2+ requested items),
+        // describing the batch-level Sell value/Profit
         // rollup - see SellSideEconomics.ApplyBatchSellSideEconomics
-        // and PlanViewModelBuilder.BuildSummarySection - and reworded
-        // this note's Label text to describe it. The rollup has NO
-        // craft-vs-buy filter at all
+        // and PlanViewModelBuilder.BuildSummarySection.
+        // The rollup has NO craft-vs-buy filter at all
         // (SellSideEconomics.ApplyBatchSellSideEconomics' own doc comment,
         // divergence item 1): a bought-but-tradable root
         // with a live sell price still contributes to the sum. The
         // Label text is therefore deliberately NOT gw2e's own verbatim
         // Cost Breakdown banner ("Profit numbers are the sum of all
-        // crafted recipes." - docs/gw2e-parity-spec.md, the M34 r1
-        // multi-item research report) - "crafted recipes" would be
+        // crafted recipes." - docs/gw2e-parity-spec.md)
+        // - "crafted recipes" would be
         // inaccurate for a craft-agnostic, tradable-only rollup; see
         // docs/KNOWN-ISSUES.md #25's divergence record. Rendered via
         // the same plain-text row pattern as TimegatedNotice.
         MultiItemNote,
 
-        // W4A (Total Cost section redesign): one tile of the Total Cost
-        // section's first formula band - "Total Materials Value - Your
+        // One tile of the Total Cost section's first formula band -
+        // "Total Materials Value - Your
         // Materials Used = Actual Cost to Craft" - collapsing to a single
         // "Actual Cost to Craft" tile (one row of this type) when there is
         // no materials-used middle term to subtract (PlanViewModelBuilder.
         // BuildSummarySection's collapse rule). Rendered as an equal-width
-        // stat tile, same shape the pre-W4A CoinTotal band used - see
+        // stat tile, same shape the old CoinTotal band used - see
         // SummarySectionRenderer.
         CostFormulaTile,
 
@@ -116,8 +115,8 @@ namespace GW2CraftingHelper.Models
         public List<PlanSectionViewModel> Sections { get; set; } = new List<PlanSectionViewModel>();
         public CraftingTreeNode TreeRoot { get; set; }
 
-        // M35 (gw2efficiency parity - multi-item plans): populated INSTEAD
-        // of TreeRoot for a genuine multi-item batch (2+ requested items) -
+        // Populated INSTEAD of TreeRoot for a genuine multi-item batch
+        // (2+ requested items) -
         // one full CraftingTreeNode per requested item, in request order,
         // mirrors CraftingPlanResult.MultiItemRoots' own doc comment
         // exactly (the synthetic wrapper root never surfaces here either).
@@ -197,8 +196,8 @@ namespace GW2CraftingHelper.Models
         public string Name { get; set; }
         public string IconUrl { get; set; }
 
-        // Non-null only for a fractional-per-unit "Each" amount (M34-B1
-        // #2): when a vendor offer's true per-unit rate does not divide
+        // Non-null only for a fractional-per-unit "Each" amount:
+        // when a vendor offer's true per-unit rate does not divide
         // evenly (e.g. "2 for 3"), the renderer displays this literal
         // bundle text instead of Amount, rather than inventing a rounded
         // number. Null for every whole-number amount and for every Total
@@ -206,7 +205,7 @@ namespace GW2CraftingHelper.Models
         public string BundleLabel { get; set; }
 
         // Owned/needed split for a shopping-row currency Total amount
-        // (M34-B2b, gw2e parity - mirrors PlanRowViewModel.
+        // (gw2e parity - mirrors PlanRowViewModel.
         // CurrencyOwnedQuantity's doc comment): min(Amount, wallet amount)
         // of this currency the account already holds. Null (not 0) when no
         // wallet snapshot was available, or this amount is a per-unit
@@ -286,13 +285,13 @@ namespace GW2CraftingHelper.Models
         // Null/empty under the same condition as CurrencyCosts.
         public List<CurrencyAmountViewModel> UnitCurrencyCosts { get; set; }
 
-        // Owned split for a CurrencyCost row (M34-B2a #4, gw2e parity - see
+        // Owned split for a CurrencyCost row (gw2e parity - see
         // AccountCurrencyIndex): the account's wallet holding of this
         // currency. Null (not 0) when no wallet snapshot was available at
         // all, distinct from "0 owned" - only ever set on CurrencyCost
-        // rows. W4A (Total Cost section redesign, user-mandated): this is
-        // now the RAW, UNCLAMPED wallet amount (was min(Quantity, wallet
-        // amount) pre-W4A) - the redesigned currency table's "Have" column
+        // rows. User-mandated: this is
+        // the RAW, UNCLAMPED wallet amount (not min(Quantity, wallet
+        // amount)) - the redesigned currency table's "Have" column
         // shows the real holding even when it exceeds what the plan needs,
         // rather than silently capping it at Quantity. CurrencyNeededQuantity
         // below is the (still-clamped-to-zero) gap derived from this value.
@@ -314,11 +313,11 @@ namespace GW2CraftingHelper.Models
         // CurrencyCost rows.
         public bool CurrencyFullyCovered { get; set; }
 
-        // W4A (Total Cost section redesign, user-mandated mouseover
-        // tooltips): the exact-meaning tooltip text for a CostFormulaTile/
+        // User-mandated mouseover
+        // tooltips: the exact-meaning tooltip text for a CostFormulaTile/
         // ProfitFormulaTile row's header caption. Set directly on the
         // caption Label control itself, never on the tile's containing
-        // Panel (M32 lesson: a label captures the mouse before a container
+        // Panel (a label captures the mouse before a container
         // tooltip underneath it would ever be reached - see
         // SummarySectionRenderer.CreateFormulaBand). Null/unused for every
         // other row type.
@@ -342,7 +341,7 @@ namespace GW2CraftingHelper.Models
         // one boundary instead of "=".
         public bool FormulaResultIsExact { get; set; } = true;
 
-        // W3C (per-character discipline display, gw2efficiency parity):
+        // Per-character discipline display (gw2efficiency parity):
         // which of the account's characters have this DisciplineRow's
         // discipline, and at what rating - e.g. "Anna (500), Bob
         // (400/450)" (the "/450" suffix marks a character below the row's

@@ -3,25 +3,16 @@ using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-23b (m38-a1-architecture.md S3b-T2, continuing the WP-23 pilot):
-    // moved verbatim out of CraftingPlanView's "9. Recipe tree rendering"
+    // Moved verbatim out of CraftingPlanView's "9. Recipe tree rendering"
     // region - private static -> internal static, no logic changes.
     //
-    // GetPillColors could not move alongside either of its two call sites:
-    // it is used both by the Shopping List section's source-tag panel (see
-    // ShoppingListSectionRenderer, extracted alongside this file in the same
-    // package) and by CraftingPlanView.RenderDecisionPills (the recipe
-    // tree's decision pills, not yet extracted). The WP-23 pilot's FORWARD
-    // NOTE (docs/KNOWN-ISSUES.md) flagged exactly this fork and named the
-    // resolution: extract the shared piece to Views/Rendering and have
-    // CraftingPlanView forward to it, rather than bump GetPillColors
-    // private -> internal on CraftingPlanView again (which would reintroduce
-    // the reverse Views/Rendering -> CraftingPlanView dependency edge the
-    // WP-21 findings fix, commit 5c56b2a, already reverted once for exactly
-    // this reason). CraftingPlanView.RenderDecisionPills now calls
-    // PillColors.GetPillColors exactly as it already calls
-    // RarityColors.GetRarityBorderColor - a forward call into
-    // Views/Rendering, never the other way around.
+    // GetPillColors lives here (not in either caller) because it is shared
+    // by the Shopping List section's source-tag panel and by
+    // RenderDecisionPills. Do NOT bump GetPillColors private -> internal
+    // on CraftingPlanView instead - that would reintroduce the reverse
+    // Views/Rendering -> CraftingPlanView dependency edge already reverted
+    // once (commit 5c56b2a) for exactly this reason; callers make a
+    // forward call into Views/Rendering, never the other way around.
     internal static class PillColors
     {
         /// <summary>
@@ -38,7 +29,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     // measured 2.31:1 against white, below the 3:1 WCAG
                     // non-text contrast minimum. Darkened toward #1F8F0C
                     // (4.21:1) - same hue, same fill*0.15 fill, same white
-                    // label text (M30 #11 decision stands) - only the ring
+                    // label text - only the ring
                     // itself changed.
                     border = new Color(31, 143, 12); // #1F8F0C
                     fill = border * 0.15f;

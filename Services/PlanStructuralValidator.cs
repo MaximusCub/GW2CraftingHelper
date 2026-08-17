@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Services
         // PlanStoreHelpers' own doc comment on why no custom
         // JsonSerializerSettings are used) already rejects JSON nested
         // deeper than this before either recursive walk below ever runs,
-        // but per the W3D spec's round 4 mandate, the walk itself must not
+        // but the walk itself must not
         // be the weak point - so it enforces its own generous, explicit
         // bound rather than relying on that upstream protection alone. A
         // depth this shallow is also nowhere near a real stack-overflow
@@ -187,7 +187,7 @@ namespace GW2CraftingHelper.Services
                 return false;
             }
 
-            // M35 (multi-item plans): the same tree, N times over - never
+            // Multi-item plans: the same tree, N times over - never
             // touched by PlanViewModelBuilder except by reference either.
             if (!NoNullEntries(result.MultiItemRoots, "MultiItemRoots", out reason)) return false;
             if (result.MultiItemRoots != null)

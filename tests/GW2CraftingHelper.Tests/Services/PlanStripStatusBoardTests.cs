@@ -87,7 +87,7 @@ namespace GW2CraftingHelper.Tests.Services
             // A trailing phase-event tick draining after this SAME
             // generation's own Finish() already ran must not resurrect a
             // stale phase text over the already-written final status - the
-            // M34-B1 #4 "already closed" case, folded into the board.
+            // "already closed" case, folded into the board.
             var board = new PlanStripStatusBoard();
             board.Begin(1);
             board.Finish(1, "Plan generated - Aug 8, 2026 3:00 PM");
@@ -259,7 +259,7 @@ namespace GW2CraftingHelper.Tests.Services
             // _sequence back to 0 in that window would silently reject
             // every subsequent UpdatePhase(1,...)/Finish(1,...) for the
             // in-flight generation (StatusUpdateGuard sees sequence 0, not
-            // 1) and freeze its spinner - the exact W3B "lost completion
+            // 1) and freeze its spinner - the exact "lost completion
             // status" bug this board exists to prevent.
             var board = new PlanStripStatusBoard();
             board.Begin(1);

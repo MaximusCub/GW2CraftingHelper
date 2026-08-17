@@ -52,7 +52,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Second", _store.Load());
         }
 
-        // --- M39 (WP-16 shape): onError callback, real IO failure. ---
+        // --- onError callback: real IO failure. ---
 
         [Fact]
         public void Save_DirectoryCreationFails_InvokesOnErrorInsteadOfThrowing()

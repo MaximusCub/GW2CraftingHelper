@@ -5,11 +5,12 @@ using Newtonsoft.Json;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Serialization for W3D plan persistence - mirrors SnapshotHelpers'
+    /// Serialization for plan persistence - mirrors SnapshotHelpers'
     /// shape, with two deliberate differences: (1) DeserializePersistedPlan
     /// does NOT swallow a parse/schema failure into a silent null itself.
-    /// The W3D spec requires a Warn log line for a corrupt or old-schema
-    /// file (unlike snapshot.json's own silent-null precedent) - so this
+    /// A corrupt or old-schema
+    /// file requires a Warn log line (unlike snapshot.json's own
+    /// silent-null precedent) - so this
     /// lets the exception propagate to PlanStore.LoadLatest's single
     /// try/catch, which already logs via the same onError callback every
     /// other store uses (see PlanStore.cs). (2) Compact (not Indented)

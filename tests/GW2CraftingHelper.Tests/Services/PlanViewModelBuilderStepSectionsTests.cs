@@ -167,7 +167,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(vm.Sections, s => s.SectionType == PlanSectionType.RequiredDisciplines);
         }
 
-        // --- W3C (per-character discipline display, gw2efficiency
+        // --- Per-character discipline display (gw2efficiency
         // parity): character availability text on DisciplineRow rows. ---
 
         [Fact]

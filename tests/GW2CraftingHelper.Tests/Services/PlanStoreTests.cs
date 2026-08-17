@@ -15,7 +15,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // W3D (plan persistence across module restarts). Mirrors
+    // Plan persistence across module restarts. Mirrors
     // SnapshotStoreTests' shape (a real store against a real temp
     // directory - no fake file I/O). The round-trip fidelity tests build a
     // real CraftingPlanResult via CraftingPlanPipeline + the fake API
@@ -284,8 +284,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(loaded?.Result?.SolveContext);
 
             // Same override, applied to both the original in-memory context
-            // and the reloaded-from-disk one - the W3D correctness bar
-            // (spec item 3): both must produce identical decisions.
+            // and the reloaded-from-disk one - the correctness bar:
+            // both must produce identical decisions.
             var overrides = new Dictionary<int, AcquisitionSource>
             {
                 { result.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
@@ -405,7 +405,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(loaded.IgnoredItemIds);
             Assert.Equal(new[] { 2 }, loaded.IgnoredItemIds);
 
-            // W3D spec item 3's correctness bar: re-applying the RELOADED
+            // The persistence correctness bar: re-applying the RELOADED
             // overrides/ignoredItemIds to the RELOADED context (exactly what
             // a FURTHER pill click after a restart would do) must produce
             // identical decisions/economics to the same overrides applied to
@@ -965,7 +965,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Equal(2, loaded.Result.SolveContext.HomesteadTiers.GetTier(Gw2Constants.RefinedHomesteadMetalItemId));
 
                 // And the whole graph still re-solves identically after the
-                // round trip - the W3D spec item 3 correctness bar, now
+                // round trip - the same correctness bar, now
                 // proven against a fixture carrying every flagged shape at
                 // once rather than a minimal two-item tree.
                 var overrides = new Dictionary<int, AcquisitionSource>
@@ -1604,8 +1604,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("SeasonalVendorTips[0] is null", lastMessage());
         }
 
-        // --- Post-W3D quick fix (user-sanctioned, compression only): the
-        // on-disk container is now gzip, sniffed by its first two magic
+        // --- Compression: the
+        // on-disk container is gzip, sniffed by its first two magic
         // bytes (0x1F 0x8B) so plan.json files written by the pre-gzip
         // PR #107 code (plain compact JSON) still load. Payload schema/
         // PlanStructuralValidator gate are unchanged - only these four
@@ -1739,7 +1739,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(lastMessage());
         }
 
-        // ---- W4B (vendor cost-component leaves): persistence round-trip
+        // ---- Vendor cost-component leaves: persistence round-trip
         // + PlanStructuralValidator acceptance ----
 
         /// <summary>
@@ -1811,7 +1811,7 @@ namespace GW2CraftingHelper.Tests.Services
             // PlanStoreHelpers.DeserializePersistedPlan/
             // PlanStructuralValidator's own doc comment): IsValidCraftingTreeNode's
             // recursive Children walk covers these leaves the same as any
-            // other node, with no W4B-specific change needed there.
+            // other node, with no leaf-specific change needed there.
             var loaded = _store.LoadLatest();
             Assert.NotNull(loaded);
             Assert.NotNull(loaded.Result.CraftingTree);

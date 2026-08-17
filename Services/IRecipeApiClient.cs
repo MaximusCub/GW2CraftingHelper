@@ -10,8 +10,8 @@ namespace GW2CraftingHelper.Services
         public int Id { get; set; }
         public int Count { get; set; }
 
-        // M37 (KNOWN-ISSUES #26, gw2e parity - achievement-bit ingredient
-        // dedup): mirrors gw2efficiency's own achievement_id/achievement_bit
+        // Achievement-bit ingredient dedup (KNOWN-ISSUES #26, gw2e
+        // parity): mirrors gw2efficiency's own achievement_id/achievement_bit
         // ingredient fields exactly (docs/research/m37-r3-achievement-dedup.md
         // Section 1.0/4.1). Null for every existing seed row (JSON-absent =
         // ordinary ingredient, fully backward compatible). Only
@@ -48,8 +48,8 @@ namespace GW2CraftingHelper.Services
         // gw2efficiency's own custom-recipes field (marks the RECIPE itself
         // as achievement-gated - e.g. a collection reward). Informational
         // only: NOT read by AchievementBitDedupPrePass, which keys purely on
-        // ingredient-level RawIngredient.AchievementBit. Added now, populated
-        // for the M37 achievement-recipe seed additions, so a future task
+        // ingredient-level RawIngredient.AchievementBit. Populated
+        // for the achievement-recipe seed additions, so a future task
         // surfacing "this recipe is achievement-gated" does not need a
         // second schema migration (m37-r3-achievement-dedup.md Section 6,
         // open question 5).

@@ -344,10 +344,10 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(treeNode.IsReferenceBranch);
             Assert.Empty(treeNode.Children);
             Assert.False(treeNode.IsIgnored); // genuine ownership, not the M34-B2b Ignore toggle
-            Assert.False(treeNode.IsAchievementBitDeduped); // genuine ownership, not the M37 dedup flag
+            Assert.False(treeNode.IsAchievementBitDeduped); // genuine ownership, not the dedup flag
         }
 
-        // ---- M37: achievement-bit dedup collapses to Have + IsAchievementBitDeduped ----
+        // ---- Achievement-bit dedup collapses to Have + IsAchievementBitDeduped ----
 
         [Fact]
         public void AchievementBitDedupedNode_CollapsesToHave_SetsFlag()
@@ -375,7 +375,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(treeNode.Children);
         }
 
-        // ---- M34-B2b: manually "Ignore"-d items collapse to Have + IsIgnored ----
+        // ---- Manually "Ignore"-d items collapse to Have + IsIgnored ----
 
         [Fact]
         public void IgnoredItem_CollapsesToHave_SetsIsIgnored()
@@ -438,7 +438,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void IgnoredItemIds_CurrencyNode_NeverCollapsedByIgnore()
         {
-            // Ignore is scoped to Item nodes only (M34-B2b) - a Currency
+            // Ignore is scoped to Item nodes only - a Currency
             // node sharing the same numeric id must keep its normal
             // Currency treatment, never collapse to Have.
             var node = Leaf(23, 100, "Currency");
@@ -662,7 +662,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void IgnoredItemIds_GuildUpgradeNode_NeverCollapsedByIgnore()
         {
             // Mirrors IgnoredItemIds_CurrencyNode_NeverCollapsedByIgnore
-            // above: Ignore is scoped to Item nodes only (M34-B2b) - a
+            // above: Ignore is scoped to Item nodes only - a
             // GuildUpgrade node sharing the same numeric id must keep its
             // normal GuildUpgrade treatment, never collapse to Have.
             var node = Leaf(829, 5, "GuildUpgrade");
@@ -935,7 +935,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void VendorCurrencyCosts_ThreadedOntoBuyFromVendorNode()
         {
-            // M33 item 5 (Finding 3): a vendor offer paid partly/wholly in
+            // A vendor offer paid partly/wholly in
             // non-coin currency (spirit shards here) must surface its
             // currency lines on the tree node, not just in the plan-wide
             // currency total - see SolverDecision.VendorCurrencyCosts.
@@ -1351,7 +1351,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(treeNode.AcquisitionBadge);
         }
 
-        // ---- M34-B2a #1: per-node owned-quantity attribution ----
+        // ---- Per-node owned-quantity attribution ----
 
         [Fact]
         public void OwnedQuantityUsedByNodeId_PopulatesMatchingNode()
@@ -1452,7 +1452,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(2, treeNode.Children[0].OwnedQuantityUsed);
         }
 
-        // ---- M38 WP-05: MapSource fails loudly on an unmapped AcquisitionSource ----
+        // ---- MapSource fails loudly on an unmapped AcquisitionSource ----
 
         [Fact]
         public void MapSource_UnmappedAcquisitionSource_ThrowsArgumentOutOfRangeException()
@@ -1462,8 +1462,8 @@ namespace GW2CraftingHelper.Tests.Services
             // it can never reach MapSource through the real BuildNode flow (a
             // non-"Item" node is intercepted and set to CraftingDecision.Currency
             // directly, before any decision lookup). A manually-constructed decision
-            // is the only way to drive the default arm, which pins the one
-            // intentional M38 WP-05 behavior change: throw instead of silently
+            // is the only way to drive the default arm, which pins the
+            // intentional behavior change: throw instead of silently
             // returning CraftingDecision.Unknown.
             var node = Leaf(1, 1);
             node.NodeId = 0;
@@ -1487,12 +1487,12 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // ---- W4B: vendor cost-component leaves ----
+        // ---- Vendor cost-component leaves ----
 
         /// <summary>
         /// Mixed offer: 5x item 42 (TP 10 each) + 3x currency 23 (no raw
         /// coin) - 2 kinds, so leaves ARE synthesized. Real solve, real
-        /// builder, exactly like BuildViaRealSolver but threading the W4B
+        /// builder, exactly like BuildViaRealSolver but threading the
         /// currencyMetadata/owned* params.
         /// </summary>
         private static (CraftingTreeNode Node, SolverDecision Decision) BuildMixedVendorNode(

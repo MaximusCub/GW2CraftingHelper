@@ -186,7 +186,7 @@ namespace GW2CraftingHelper.Services
 
         // Fetches every batch of `ids` this call itself owns, strictly one
         // batch at a time in order - identical sequencing to this method's
-        // pre-M37 inline for-loop, so a single caller's own batch
+        // old inline for-loop, so a single caller's own batch
         // count/order/timing is unaffected by the KNOWN-ISSUES 31c-1
         // coalescing added around it.
         //

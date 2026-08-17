@@ -115,8 +115,8 @@ namespace GW2CraftingHelper.Models
         public ISet<int> CompetencyIndependentForceBuyNodeIds { get; set; }
 
         /// <summary>
-        /// M35 (gw2efficiency parity - multi-item plans): the original
-        /// per-item request snapshotted at GENERATION time, for the same
+        /// The original per-item request snapshotted at GENERATION time,
+        /// for the same
         /// reason as CurrencyValuation/OwnMaterialsMode above - so a local
         /// override re-solve (ResolveWithOverrides) can keep populating
         /// CraftingPlanResult.RequestedItems/MultiItemRoots consistently on

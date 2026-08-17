@@ -58,7 +58,7 @@ namespace GW2CraftingHelper.Services
             // Membership check, not a bare sign check: a negative recipeId
             // is Mystic Forge ONLY if MysticForgeRecipeData actually
             // recognizes it. Other negative-id synthetic recipes (e.g. the
-            // M37 achievement/merchant seed recipes, ref/recipes_seed.json
+            // achievement/merchant seed recipes, ref/recipes_seed.json
             // ids -1592..-1595, adjacent to but not part of the Mystic
             // Forge id range) are NOT Mystic Forge recipes and must fall
             // through to primary instead of being silently swallowed as a

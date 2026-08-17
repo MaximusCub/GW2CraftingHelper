@@ -5,8 +5,8 @@ namespace GW2CraftingHelper.Tests.Helpers
 {
     /// <summary>
     /// Locates real repo files (e.g. ref/*.json seed files) from the
-    /// running test assembly's output directory (M38 WP-01, tests T3 /
-    /// simplify #6). Consolidated from an identical private FindRepoFile
+    /// running test assembly's output directory.
+    /// Consolidated from an identical private FindRepoFile
     /// helper duplicated verbatim in AcquisitionHintServiceTests and
     /// RecipeCacheSerializerTests - the latter's own doc comment noted it
     /// was written "mirroring AcquisitionHintServiceTests' FindRepoFile

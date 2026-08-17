@@ -250,10 +250,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void UnpriceableCraftIngredient_ZeroFilled_CraftWinsWithPartialCost()
         {
-            // M33 partial-pricing parity (superseded
-            // "UnpriceableCraftIngredients_BuyAvailable_FallsBackToBuy"):
-            // an unpriceable-and-unrecipeable ingredient no longer
-            // disqualifies the recipe - it contributes ZERO to the craft
+            // Partial-pricing parity:
+            // an unpriceable-and-unrecipeable ingredient does not
+            // disqualify the recipe - it contributes ZERO to the craft
             // cost instead (echoing gw2e's craftPrice = sum(component
             // .craftResultPrice || 0)). Item 1: buy = 500. Craft needs item
             // 2, which has no TP price and no recipe, so craft "costs" 0
@@ -290,7 +289,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void SiblingIngredients_AfterUnpriceableFirstIngredient_AreStillEvaluated()
         {
-            // M33 Finding 1 (m5 report): the ingredient loop used to `break`
+            // The ingredient loop used to `break`
             // on the first unpriceable ingredient, so every LATER sibling in
             // that same recipe never got evaluated at all - no memo entry,
             // indistinguishable from a genuine no-data gap. Recipe 10's
@@ -330,7 +329,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void RecipeWithNoBuyPriceAtAll_AlwaysForceCrafts_NeverUnknown()
         {
-            // M33 spec item 2a (gw2e: isCheaperToCraft = craftPrice-defined
+            // gw2e parity (isCheaperToCraft = craftPrice-defined
             // && (!buyPrice || decisionPrice < buyPrice)): a node with a
             // recipe but NO buy price (no TP price, no comparable vendor
             // offer) is force-crafted - Craft, never Unknown - regardless
@@ -354,7 +353,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void NoRecipeAndNoPrice_IsUnknownSource_WithAllFlagsFalse()
         {
-            // M33 spec item 2c (gw2e's "Not sold or crafted"): a node with
+            // gw2e parity ("Not sold or crafted"): a node with
             // NO recipe and NO price gets UnknownSource with every
             // feasibility flag false - never silently defaults to Craft.
             var tree = Leaf(1, 1);
@@ -369,7 +368,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(result.Decisions[0].CanBuyVendor);
         }
 
-        // --- Tie-break parity tests (M33 spec item 3) ---
+        // --- Tie-break parity tests ---
         // gw2e: craft/vendor must be STRICTLY cheaper than buy to win; an
         // exact tie resolves to buy at every level ("Vendor beats TP beats
         // Craft" is superseded).
@@ -439,10 +438,9 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, plan.TotalCoinCost);
         }
 
-        // --- Mystic Clover-style EV pricing tests (M33 spec item 7,
-        // CORRECTED per the M33 fix-pass Critical finding: quantity
+        // --- Mystic Clover-style EV pricing tests (quantity
         // propagation - not a second cost adjustment inside PlanSolver -
-        // is where ExpectedOutputCount now takes effect. RecipeService (and
+        // is where ExpectedOutputCount takes effect. RecipeService (and
         // InventoryReducer, when a snapshot is present) compute
         // CraftsNeeded = ceil(quantity / ExpectedOutputCount) and scale
         // every ingredient's Quantity by that many attempts BEFORE the tree
@@ -482,8 +480,8 @@ namespace GW2CraftingHelper.Tests.Services
             // 2 units of item 2 @ 100 = 200 - PlanSolver must NOT divide
             // this by the EV ratio again (that would double-amortize to
             // 400). The Craft step's own TotalCost must reconcile EXACTLY
-            // with the Buy step(s) it recursively spawns - the M33 Critical
-            // finding's "two different coin figures for the same subtree"
+            // with the Buy step(s) it recursively spawns - the
+            // "two different coin figures for the same subtree"
             // bug is fixed when this holds.
             Assert.Equal(200, buyStep.TotalCost);
             Assert.Equal(200, craftStep.TotalCost);
@@ -538,10 +536,10 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, craftStep.TotalCost);
         }
 
-        // --- Currency-ingredient decision valuation (M33 fix-pass MustFix:
+        // --- Currency-ingredient decision valuation:
         // a recipe's Currency-type ingredient must feed the craft-vs-buy
         // DECISION value via a caller-supplied valuation, while always
-        // contributing zero to the displayed real coin cost - r1 4.2/4.3) ---
+        // contributing zero to the displayed real coin cost ---
 
         [Fact]
         public void CurrencyIngredient_ValuedAndExpensive_TipsDecisionToBuy()
@@ -650,7 +648,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(AcquisitionSource.BuyFromTp, plan.Steps[0].Source);
             Assert.Equal(1000, plan.TotalCoinCost);
-            // M33 guarantee preserved: the CRAFT pill still shows even
+            // The CRAFT pill still shows even
             // though the automatic decision picked buy instead.
             Assert.True(result.Decisions[0].CanCraft);
         }

@@ -5,30 +5,23 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// W4A (Total Cost section redesign): the redesigned Summary section's
-    /// own pure layout arithmetic (Blish-free, unit-testable) - total
-    /// content height and the currency table's column edges.
+    /// The redesigned Summary (Total Cost) section's own pure layout
+    /// arithmetic (Blish-free, unit-testable) - total content height and
+    /// the currency table's column edges.
     ///
     /// Deliberately kept OUT of Services/PlanContentHeightMath.cs and
     /// Services/PlanRelayoutMath.cs, even though this class's role is
     /// otherwise the same kind of thing both already do for every other
-    /// section: at W4A time both of those files were DO-NOT-TOUCH (they
-    /// are shared infrastructure several other sections' row builders
-    /// depend on, and other in-flight work touched them too); they are now
-    /// high-evidence zones (formerly DO-NOT-TOUCH; see
-    /// docs/KNOWN-ISSUES.md's policy note) - still off-limits for the
-    /// broader fold-back this class's own existence sidesteps, but changes
-    /// are possible with proof. W4A left both files byte-for-byte
-    /// unmodified: Views/CraftingPlanView.cs's one call site
+    /// section: both are shared infrastructure several other sections'
+    /// row builders depend on and are high-evidence zones (see
+    /// docs/KNOWN-ISSUES.md's policy note) - off-limits for the broader
+    /// fold-back this class's own existence sidesteps.
+    /// Views/CraftingPlanView.cs's one call site
     /// (CreateCollapsibleSection) special-cases PlanSectionType.Summary to
     /// call BodyHeight below instead of
     /// PlanContentHeightMath.SectionBodyHeight, the same way every other
-    /// section type still routes through that method unchanged. A later
-    /// pass (high-evidence-zones, 2026-08-17) proved
-    /// PlanContentHeightMath's own private SummaryBodyHeight method (and
-    /// the PlanRowType.CoinTotal enum member it existed to read) were
-    /// unreachable for a real Summary section and deleted both outright -
-    /// see docs/KNOWN-ISSUES.md's W4A entry for the original rationale.
+    /// section type still routes through that method unchanged - see
+    /// docs/KNOWN-ISSUES.md's W4A entry for the original rationale.
     ///
     /// The row-height CONSTANTS themselves are not redefined here - every
     /// formula below reads PlanContentHeightMath's existing public
@@ -45,8 +38,8 @@ namespace GW2CraftingHelper.Services
         /// Total height of the redesigned Total Cost section's content
         /// FlowPanel - CraftingPlanView.CreateCollapsibleSection assigns
         /// this to contentFlow.Height synchronously right after
-        /// SummarySectionRenderer.Render populates it (M33 C2a directive A -
-        /// see PlanContentHeightMath's own class doc comment for why this
+        /// SummarySectionRenderer.Render populates it (see
+        /// PlanContentHeightMath's own class doc comment for why this
         /// matters), so it must stay in exact agreement with what that
         /// renderer actually builds:
         ///   - at most one CostTileRowHeight-tall row for the cost formula
@@ -117,12 +110,9 @@ namespace GW2CraftingHelper.Services
         // ComputeEdges' "clamp to a fixed minimum, widen from an actual
         // per-render widest-value measurement" shape.
         //
-        // The fixed-60px-only version of
-        // this comment claimed Required/Have/Needed have "no realistic risk
-        // of a value needing more than a handful of digits" - untrue once
-        // the W4A spec UNCLAMPED the Have column to the real wallet
-        // holding (PlanViewModelBuilder.BuildCurrencyTableRows): Karma
-        // (Gw2Constants id 2) routinely reaches 6-7 digits in a real
+        // The widening matters: the Have column is unclamped to the real
+        // wallet holding (PlanViewModelBuilder.BuildCurrencyTableRows), and
+        // Karma (Gw2Constants id 2) routinely reaches 6-7 digits in a real
         // player's wallet, which can plausibly exceed the 60px floor. Since
         // CreateRightAlignedLabel grows a label LEFTWARD from the column's
         // own right edge, an unreserved overlong value would visually

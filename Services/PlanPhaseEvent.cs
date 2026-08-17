@@ -1,8 +1,8 @@
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// W3B (generation progress + rich logging): the five coarse,
-    /// user-facing phases of one CraftingPlanPipeline.GenerateStructuredAsync
+    /// The five coarse, user-facing phases of one
+    /// CraftingPlanPipeline.GenerateStructuredAsync
     /// run. Deliberately coarser than the pipeline's own internal timingLog
     /// (~10 detailed steps - see CraftingPlanPipeline.FinishTimingLog),
     /// which keeps reporting unchanged; this enum exists purely to drive a

@@ -126,7 +126,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// price). Solved independently, each item's own ceil(2/5)=1
         /// purchase costs 20 coin, 40 total. Merged under the wrapper, the
         /// combined demand is 4 (2+2), ceil(4/5)=1 purchase - 20 coin total,
-        /// not 40 - proving the M34 merge-then-ceil path
+        /// not 40 - proving the merge-then-ceil path
         /// (FinalizeVendorBatches) applies across item roots, not just
         /// within one item's own tree.
         /// </summary>
@@ -404,8 +404,8 @@ namespace GW2CraftingHelper.Tests.Services
         /// standalone single-item solve buys it instead of crafting -
         /// verifies the multi-item wrapper does not silently force-craft
         /// every selected root: each item root gets EXACTLY the same
-        /// craft-vs-buy treatment it would get as a standalone tree (M35-B1
-        /// item 5 - PlanSolver.Evaluate has no root-only special case at
+        /// craft-vs-buy treatment it would get as a standalone tree
+        /// (PlanSolver.Evaluate has no root-only special case at
         /// all, so this holds structurally, not via any new force-craft
         /// code).
         /// </summary>
@@ -581,8 +581,8 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// Fix pass: no multi-item test exercised the M34-B2a
-        /// #3 "Value Own Materials" force-buy pre-pass
+        /// No other multi-item test exercised the
+        /// "Value Own Materials" force-buy pre-pass
         /// (OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds),
         /// which only runs when OwnMaterialsMode.Valued AND a non-null
         /// snapshot are both supplied - the gate every prior multi-item
@@ -702,7 +702,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(batch.Plan.Steps, s => s.ItemId == 903);
         }
 
-        // --- M37 (gw2efficiency parity - multi-item sell-side economics,
+        // --- Multi-item sell-side economics (gw2efficiency parity,
         // closes KNOWN-ISSUES #25) ---
 
         /// <summary>
@@ -855,7 +855,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// it has a recipe but no TP price of its own at all, like an
         /// account-bound material) but has no sell price. Plan.TotalCoinCost
         /// includes BOTH items' craft cost, but the sell/profit rollup must
-        /// include ONLY item 500's contribution - proving the M37
+        /// include ONLY item 500's contribution - proving the deliberate
         /// divergence from gw2e's own rollup (which would instead drag the
         /// total down by item 600's full craft cost as a hidden negative -
         /// see ApplyBatchSellSideEconomics's own doc comment, divergence
@@ -963,9 +963,9 @@ namespace GW2CraftingHelper.Tests.Services
             var standalone1100 = await pipeline.GenerateStructuredAsync(
                 1100, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
             Assert.Equal(CraftingDecision.BuyFromTp, standalone1100.CraftingTree.Decision);
-            // The single-item path never filters by craft-vs-buy (M20) - a
+            // The single-item path never filters by craft-vs-buy - a
             // bought target still shows economics (a flip/arbitrage
-            // number), and the M37 batch rollup below must match it.
+            // number), and the batch rollup below must match it.
             Assert.NotNull(standalone1100.NetSaleValue);
 
             var items = new List<PlanRequestItem>
@@ -1213,7 +1213,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(batch.MaterialOpportunityCost);
 
             // Both roots are tradable, so both still contribute their own
-            // NetSaleValue to the M37 batch rollup (no craft-vs-buy filter
+            // NetSaleValue to the batch rollup (no craft-vs-buy filter
             // - see GenerateStructuredAsync_MultiItem_OneRootBoughtButTradable_IncludedInSum
             // above) - unaffected by the MaterialOpportunityCost fix, since
             // that only ever subtracted from CraftingProfit, never from
@@ -1434,7 +1434,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- M37: achievement-bit ingredient dedup -
+        // --- Achievement-bit ingredient dedup -
         // the report's exact multi-item-request double-count scenario
         // (docs/research/m37-r3-achievement-dedup.md Section 4.6), using
         // the real, wiki/API-verified Infinite Trebuchet Blueprint ids. ---

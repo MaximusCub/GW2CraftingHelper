@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Tests.Services
     /// Full CanCraft/CanBuyTp/CanBuyVendor combination matrix (m3-display-
     /// decision-map.md's decision -> pill table) plus the HAVE/CURRENCY
     /// short-circuits, exercising the real DecisionPillPlanner.BuildPillSpecs
-    /// production code - KNOWN-ISSUES #18. Also covers the M34-B2b additions:
+    /// production code - KNOWN-ISSUES #18. Also covers:
     /// the non-interactive "HAVE N/M NEEDED" annotation and the interactive
     /// "IGNORE"/"IGNORED" toggle, appended to every non-Have/non-Currency
     /// pill set (and, when active, alongside HAVE too).
@@ -94,7 +94,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(ignorePill.Source); // toggled via node identity, not an AcquisitionSource
         }
 
-        // M38 WP-18 (tests T6, KNOWN-ISSUES 20.4): a node can be BOTH
+        // KNOWN-ISSUES 20.4: a node can be BOTH
         // manually ignored AND carry a nonzero OwnedQuantityUsed from an
         // earlier real reduction - CraftingTreeBuilder.BuildNode sets
         // OwnedQuantityUsed unconditionally BEFORE its IsIgnored early
@@ -120,7 +120,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(specs, s => s.Kind == PillKind.OwnedInfo);
         }
 
-        // ---- M37: achievement-bit dedup pill ----
+        // ---- Achievement-bit dedup pill ----
 
         [Fact]
         public void Have_AchievementBitDeduped_SingleCountedElsewherePill_NoPlainHave()
@@ -167,8 +167,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Currency_NeverGetsIgnorePill_EvenWithOwnedQuantityUsed()
         {
-            // Currency ownership is out of scope for the Ignore toggle (M34-B2b
-            // deliberately scopes Ignore to Item nodes - see behavioral_changes).
+            // Currency ownership is out of scope for the Ignore toggle
+            // (Ignore is deliberately scoped to Item nodes).
             var node = Node(CraftingDecision.Currency, ownedQuantityUsed: 5);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
@@ -379,7 +379,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             // Every other SOURCE pill (excluding the trailing IGNORE
             // annotation, which has its own Kind) is Available and
-            // independently clickable - the M21 per-pill override model,
+            // independently clickable - the per-pill override model,
             // not a single cycle button.
             foreach (var other in specs.Where(s => s.Kind != PillKind.Selected && s.Kind != PillKind.Ignore))
             {
@@ -400,7 +400,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromVendor, vendorPill.Source);
         }
 
-        // --- M34-B2b: "HAVE N/M NEEDED" annotation (field-test finding A:
+        // --- "HAVE N/M NEEDED" annotation (field-tested:
         // widened to show the original total demand, not just the covered
         // count, alongside the tree row's own remaining-need "Nx" prefix;
         // the final wording pass moved OWNED away
@@ -591,7 +591,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void RealSolver_UnknownSource_NeverHasChildren_NoLiveCraftSubtreeUnderUnknownPill()
         {
             // KNOWN-ISSUES #18c: the UNKNOWN pill must never coexist with a
-            // live craft subtree. Post-M33-B1, this is structurally
+            // live craft subtree. This is structurally
             // guaranteed (CanCraft is now always true whenever a recipe
             // exists, so Decision == Unknown implies no recipe at all,
             // hence no children could ever be built) - this test locks
@@ -613,7 +613,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("UNKNOWN", specs[0].Text);
         }
 
-        // ---- W4B: cost-component leaves - informational-only pill
+        // ---- Cost-component leaves - informational-only pill
         // vocabulary ----
         //
         // Maintainer's field-test finding: the earlier HAVE/
@@ -712,7 +712,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(specs, s => s.Kind == PillKind.Locked);
         }
 
-        // ---- W4B: "CURRENCY" badge on the blank-cost-cell
+        // ---- "CURRENCY" badge on the blank-cost-cell
         // (currency-type) component shape - explains at a glance why no
         // gold value is shown, gw2efficiency's own grey Currency-badge
         // pattern. ----

@@ -126,9 +126,9 @@ namespace GW2CraftingHelper.Views
         private Label _statusLabel;
         private Label _homesteadStatusLabel;
 
-        // M39 (log system, d2-log-system.md Section 5 / tab-roadmap-proposal
-        // Section 2.1): the ONE "Diagnostics" checkbox + the two log-file
-        // policy rows (max size / retention). No separate
+        // The ONE "Diagnostics" checkbox + the two log-file
+        // policy rows (max size / retention) - d2-log-system.md Section 5.
+        // No separate
         // ScrollDiagnosticsEnabled checkbox is surfaced here - see
         // ModuleSettings' own doc comment on that setting's backward-compat
         // read.
@@ -227,7 +227,7 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// The "Value own materials" checkbox
-        /// that used to live here (AddValueOwnMaterialsRow, M34-B2a #3) has
+        /// that used to live here (AddValueOwnMaterialsRow) has
         /// been relocated inline into Views/CraftingPlanView.cs's controls
         /// panel, next to Use Own Materials/price basis - it is now a
         /// per-plan session choice (like those two neighbors), not a

@@ -9,8 +9,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-25 (m38-a1-architecture.md S3b-T2, hardest of the Wave G
-    // extractions): moved verbatim out of CraftingPlanView's "8. Tree
+    // Moved verbatim out of CraftingPlanView's "8. Tree
     // rendering (state)"/"8. Tree rendering (continued)"/"9. Decision
     // pills" regions - the Recipe Tree section renderer AND the interactive
     // override loop it drives (Best Path/Craft All/Buy All presets, the
@@ -18,18 +17,18 @@ namespace GW2CraftingHelper.Views.Rendering
     // every field that loop owns: TreeNodeState, _treeNodeStates,
     // _treeRoots/_treeFlow (the current render pass's tree bookkeeping),
     // _nodeOverrides/_ignoredItemIds/_nodeExpansion (session-persistent
-    // decision/ignore/expansion state - M34-B2b, M21), and _lastResult (the
+    // decision/ignore/expansion state), and _lastResult (the
     // solve context the override loop re-resolves against).
     //
-    // Unlike the six section renderers WP-23/WP-23b/WP-23c/WP-23d/WP-24
+    // Unlike the six section renderers
     // extracted before it, this component owns a slice of application
     // state, not just presentation - the field group above survives across
     // every local re-solve (a pill click never rebuilds it) and is reset
     // only once per genuinely new Generate. It also cannot reach several
     // things it still needs purely through ISectionRelayoutSink, because
     // those things are NOT relayout registrations: PreserveScrollAcross
-    // (DO-NOT-TOUCH #3 - scroll preserve/restore/verify machinery, stays on
-    // CraftingPlanView per the WP-26 cut-scope decision - see
+    // (scroll preserve/restore/verify machinery, stays on
+    // CraftingPlanView - see
     // docs/KNOWN-ISSUES.md), SetStatus, the top-level RenderPlan rebuild
     // entry point, GetCurrentPanelWidth, the view's own _currentPlan/
     // _lastDebugLog fields, and CreateSectionHeader (shared chrome every
@@ -48,8 +47,8 @@ namespace GW2CraftingHelper.Views.Rendering
     // substitution every extracted renderer makes: (1) the DEBUG
     // must-register assert inside CreateTreeSection used to read
     // _relayoutActions.Count directly (a private CraftingPlanView field);
-    // it now reads the new ISectionRelayoutSink.RelayoutCount member added
-    // by this package specifically for that (see the interface's own doc
+    // it now reads ISectionRelayoutSink.RelayoutCount, added
+    // specifically for that (see the interface's own doc
     // comment - every other extracted renderer's equivalent assert stays
     // in CraftingPlanView.CreateCollapsibleSection, which still has direct
     // field access, so this is the first caller that needed it exposed
@@ -69,7 +68,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // own doc comment) so they stay two methods, not one.
     //
     // See docs/ARCHITECTURE.md section 5 for the state-ownership
-    // rationale and the WP-26 scroll/resize/wheel controller cut decision.
+    // rationale and the scroll/resize/wheel controller cut decision.
     internal sealed class TreeSectionController
     {
         private readonly ISectionRelayoutSink _sink;
@@ -125,7 +124,7 @@ namespace GW2CraftingHelper.Views.Rendering
         private readonly Dictionary<int, AcquisitionSource> _nodeOverrides =
             new Dictionary<int, AcquisitionSource>();
 
-        // Item ids manually marked "Ignore" this session (M34-B2b, gw2e
+        // Item ids manually marked "Ignore" this session (gw2e
         // parity) - keyed by ItemId (not NodeId), matching gw2e's own
         // "Ignore marks every occurrence of that item id, tree-wide"
         // semantics (see PlanSolver.Solve's ignoredItemIds parameter).
@@ -171,9 +170,9 @@ namespace GW2CraftingHelper.Views.Rendering
         // RefreshTreeContainerHeights - called from the tree row toggle
         // handler deep inside RenderTreeNode's recursion, as well as from
         // CreateTreeSection itself - can recompute treeFlow's own explicit
-        // Height without threading both through every recursive call. M35
-        // (gw2efficiency parity - multi-item plans): a single-item plan
-        // still populates this with exactly one root, so every consumer
+        // Height without threading both through every recursive call.
+        // A single-item plan still populates this with exactly one root,
+        // so every consumer
         // below is unchanged in that case (see MultiRootTreeFlowHeight's
         // own doc comment for the "N==1 is byte-identical" guarantee).
         private List<CraftingTreeNode> _treeRoots;
@@ -368,8 +367,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // between consecutive roots so N stacked full item trees read
             // as N distinct blocks (PlanContentHeightMath.
             // MultiRootDividerHeight) - never inserted for a single root,
-            // which keeps that case's rendered rows byte-identical to
-            // pre-M35.
+            // which keeps that case's rendered rows byte-identical to the
+            // single-item render.
             for (int i = 0; i < _treeRoots.Count; i++)
             {
                 if (i > 0)
@@ -934,8 +933,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // MeasureString - pill widths are already-known control Width,
             // CoinCurrencyRenderer.RepositionValueCellRightAligned uses only cached segment text
             // widths); childFlow's width tracks panelWidth with its Height
-            // preserved exactly (never perturbs scroll - M33 C2a already
-            // made every row/container height explicit). The name label is
+            // preserved exactly (never perturbs scroll - every
+            // row/container height is explicit). The name label is
             // untouched here; it only re-ellipsizes at settle below.
             _sink.AddRelayout(w =>
             {
@@ -1273,7 +1272,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else if (spec.Kind == PillKind.AchievementBitDeduped)
                 {
-                    // M37, KNOWN-ISSUES #26: explains the "COUNTED
+                    // KNOWN-ISSUES #26: explains the "COUNTED
                     // ELSEWHERE" semantics - nothing here is actually
                     // owned, this exact occurrence is just already required
                     // elsewhere in the tree.

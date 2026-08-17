@@ -115,8 +115,8 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
 
         /// <summary>
-        /// M35 (gw2efficiency parity - multi-item plans): the original
-        /// per-item request (item id + quantity) this result was generated
+        /// The original per-item request (item id + quantity) this
+        /// result was generated
         /// for, in request order. Populated ONLY for a genuine multi-item
         /// batch (2+ requested items, solved via the synthetic wrapper -
         /// see Gw2Constants.MultiItemWrapperItemId); null for a single-item

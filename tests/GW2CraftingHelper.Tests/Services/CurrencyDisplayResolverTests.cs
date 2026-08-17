@@ -152,7 +152,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(result[1].IconUrl);
         }
 
-        // --- ResolveAmounts ownedCurrencyAmounts (M34-B2b) ---
+        // --- ResolveAmounts ownedCurrencyAmounts ---
 
         [Fact]
         public void ResolveAmounts_OwnedAmountsNull_OwnedQuantityStaysNull()
@@ -235,7 +235,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(props, p => p.Name.IndexOf("Id", System.StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
-        // --- ResolveUnitAmounts (M34-B1 #2: winning-offer true per-unit
+        // --- ResolveUnitAmounts (winning-offer true per-unit
         // rate, not a truncated total/quantity average) ---
 
         [Fact]
@@ -303,8 +303,8 @@ namespace GW2CraftingHelper.Tests.Services
         public void ResolveUnitAmounts_NullCostLines_ReturnsNull()
         {
             // Covers both a non-vendor row and a vendor row whose tree
-            // occurrences resolved to more than one distinct offer (M34-B1
-            // #1's Conflict case) - PlanStep leaves this null in both cases.
+            // occurrences resolved to more than one distinct offer (the
+            // Conflict case) - PlanStep leaves this null in both cases.
             Assert.Null(CurrencyDisplayResolver.ResolveUnitAmounts(3, null, null));
         }
 

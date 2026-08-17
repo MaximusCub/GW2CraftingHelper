@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Services
             // Optional so a pre-existing call site
             // (none of which know about Homestead tiers) need not pass it,
             // but this does NOT keep the hash byte-for-byte identical to
-            // the pre-M37 value: the ";homesteadTier=" segment below is
+            // the pre-tier value: the ";homesteadTier=" segment below is
             // appended unconditionally (as "null" when omitted), so any
             // offer's OfferId changes the first time it is recomputed with
             // this code, whether or not its own tier is null.

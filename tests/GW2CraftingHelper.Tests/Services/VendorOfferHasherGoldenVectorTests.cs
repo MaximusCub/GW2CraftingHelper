@@ -8,8 +8,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// Cross-project parity net for VendorOfferHasher (M38 WP-19, tests
-    /// T13). Services/VendorOfferHasher.cs (this project, net48) and
+    /// Cross-project parity net for VendorOfferHasher. Services/VendorOfferHasher.cs (this project, net48) and
     /// tools/VendorOfferUpdater/VendorOfferHasher.cs (net8.0) are two
     /// independently-maintained copies with byte-for-byte identical
     /// string-composition logic; only the digest-to-hex step differs

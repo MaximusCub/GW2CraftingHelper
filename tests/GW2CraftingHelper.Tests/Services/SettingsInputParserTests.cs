@@ -145,7 +145,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, tier);
         }
 
-        // --- M39 (log system): TryParseLogMaxSizeMb ---
+        // --- TryParseLogMaxSizeMb (log system) ---
 
         [Theory]
         [InlineData("1", 1)]
@@ -198,7 +198,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, maxSizeBytes);
         }
 
-        // --- M39 (log system): TryParseRetentionDays ---
+        // --- TryParseRetentionDays (log system) ---
 
         [Theory]
         [InlineData("1", 1)]
@@ -250,7 +250,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, days);
         }
 
-        // --- M39 (d1-snapshot-about-settings.md Feature 3): TryParseRefreshIntervalMinutes ---
+        // --- TryParseRefreshIntervalMinutes (d1-snapshot-about-settings.md Feature 3) ---
 
         [Theory]
         [InlineData("1", 1)]

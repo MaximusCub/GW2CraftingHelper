@@ -57,8 +57,8 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// Pure top-strip Y-offset arithmetic (Blish-free math, kept as a
         /// plain struct/method rather than a control mutation so Build()
-        /// and every row Add/Remove reflow call the exact same formula -
-        /// M35, gw2efficiency parity multi-item plans). See the constants'
+        /// and every row Add/Remove reflow call the exact same formula).
+        /// See the constants'
         /// own doc comment for the rowCount==1 byte-identical guarantee.
         /// </summary>
         private struct TopRegionLayout
@@ -120,10 +120,10 @@ namespace GW2CraftingHelper.Views
 
         #endregion // General: shared layout constants, colors, top-region geometry & dependencies
 
-        #region 1. Input rows (state) - M35 gw2efficiency parity, multi-item plans
+        #region 1. Input rows (state) - multi-item plans (gw2efficiency parity)
 
         /// <summary>
-        /// One row of the multi-item input strip (M35, gw2efficiency
+        /// One row of the multi-item input strip (gw2efficiency
         /// parity): the plain session-persistent selection fields survive
         /// across Build() calls (tab switches) exactly like _nodeOverrides/
         /// _ignoredItemIds below - the live Blish controls do not (they are
@@ -147,7 +147,7 @@ namespace GW2CraftingHelper.Views
         // survives every later Build() (tab switch). No file persistence.
         private readonly List<ItemRowState> _itemRows = new List<ItemRowState>();
 
-        #endregion // 1. Input rows (state) - M35 gw2efficiency parity, multi-item plans
+        #endregion // 1. Input rows (state) - multi-item plans (gw2efficiency parity)
 
         #region 2. Generate orchestration (state)
 
@@ -784,7 +784,7 @@ namespace GW2CraftingHelper.Views
 
         #endregion // 6. The FrameTicker control (nested Control subclass) - KNOWN-ISSUES #12/#13
 
-        #region 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13, M39/WP-17
+        #region 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13
 
         /// <summary>
         /// Cancels every live FrameTicker (scroll-verify, resize-debounce,
@@ -812,7 +812,7 @@ namespace GW2CraftingHelper.Views
             _lastWheelEventUtc = null;
         }
 
-        #endregion // 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13, M39/WP-17
+        #endregion // 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13
 
         #region 3. Scroll preserve/restore/verify (continued) - KNOWN-ISSUES #12/#14/#19
 
@@ -1252,8 +1252,8 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Disposes every current item row's live controls and rebuilds
-        /// them from _itemRows (M35, gw2efficiency parity multi-item
-        /// plans). Called by Build() (initial construction) and by
+        /// them from _itemRows.
+        /// Called by Build() (initial construction) and by
         /// AddItemRow/RemoveItemRow via ReflowInputRegion (row-count
         /// changes) - a full rebuild rather than a patch, matching this
         /// file's existing dispose+recreate pattern (e.g. RenderPlan
@@ -1407,7 +1407,7 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// Rebuilds the item-row controls and repositions every fixed
         /// element below them (controls/status/separator/content) after
-        /// the row count changes - M35's Add/Remove counterpart to
+        /// the row count changes - the Add/Remove counterpart to
         /// OnPanelResized's own width-driven repositioning. Row add/remove
         /// never changes width, only the top strip's total height, so this
         /// mirrors OnPanelResized's heightChanged branch (scroll-preserve)
@@ -1463,9 +1463,8 @@ namespace GW2CraftingHelper.Views
         // one of the 11 - see m38-a1-architecture.md S3.
         public void Build(Container buildPanel)
         {
-            // Screen-parented popups from the previous build cycle (one per
-            // item row - M35 replaces the single _suggestionPanel this used
-            // to be) are cleaned up by RebuildItemRowControls below, which
+            // Screen-parented popups from the previous build cycle (one
+            // per item row) are cleaned up by RebuildItemRowControls below, which
             // every row already routes through - no separate loop needed
             // here.
 
@@ -1693,9 +1692,9 @@ namespace GW2CraftingHelper.Views
             int previousContentHeight = _contentPanel?.Height ?? 0;
 
             // Update widths of layout panels. Top-strip controls keep their
-            // pre-existing direct updates (M33 C2b directive 1) - these were
+            // pre-existing direct updates - these were
             // never part of the dispose+rebuild problem the relayout
-            // registry below replaces. M35: the input strip is now N rows
+            // registry below replaces. The input strip is N rows
             // (_itemRows.Count) rather than a fixed one, so its own and
             // every row panel's width need updating too, and the Y offsets
             // below it come from the same ComputeTopRegionLayout formula
@@ -1924,7 +1923,7 @@ namespace GW2CraftingHelper.Views
         /// UpdateLayout call resolves any still-Invalidated FlowPanel
         /// automatically on the very next real frame, so nothing is lost,
         /// only coalesced. Since these writes only ever touch Width/X (row
-        /// heights stay fixed per M33 C2a), the coalesced reflow is a no-op
+        /// heights stay fixed), the coalesced reflow is a no-op
         /// for vertical position anyway - SingleTopToBottom flow positions
         /// children from cumulative Height, not Width.
         ///
@@ -1942,7 +1941,7 @@ namespace GW2CraftingHelper.Views
             if (_contentPanel == null || _relayoutActions.Count == 0) return;
 
 #if DEBUG
-            // M33 C2b invariant (task directive 6): a pure width/text
+            // Invariant (KNOWN-ISSUES #13): a pure width/text
             // relayout must never touch scroll position. DEBUG-only (reuses
             // the same cached PanelScrollbarField reflection handle the
             // scroll-restore machinery already resolved once) so this costs
@@ -1997,12 +1996,12 @@ namespace GW2CraftingHelper.Views
         /// names), since MeasureString is comparatively expensive to run on
         /// every tick across a long list/deep tree and the visible cost of
         /// deferring it (truncated text unchanged mid-drag, corrected once
-        /// the drag settles) is small - per M33 C2b directive 2. Neither
+        /// the drag settles) is small. Neither
         /// this pass nor the defensive ReplayRelayout repeat below ever
-        /// changes a row's Height, so - unlike the pre-C2a settle rebuild
+        /// changes a row's Height, so - unlike the settle rebuild
         /// this replaces - nothing in RunReellipsis/ReplayRelayout can
         /// perturb scroll position; no PreserveScrollAcross wrapper is
-        /// needed around them. M33 C2c: this method also arms the resize
+        /// needed around them. This method also arms the resize
         /// drag's single settle-time scroll-verify window, if a
         /// height-changing tick during the drag needs one - see
         /// StartResizeScrollVerify and _resizeScrollRestorePending.
@@ -2121,7 +2120,7 @@ namespace GW2CraftingHelper.Views
             // Gather every
             // row's selection + quantity into the request list the
             // pipeline needs. Per-row quantity validation mirrors the
-            // pre-M35 single-quantity-box behavior exactly (invalid/blank/
+            // old single-quantity-box behavior exactly (invalid/blank/
             // &lt;1 silently corrected to 1, with a user-visible notice) -
             // just applied once per row instead of once total.
             bool anyQtyInvalid = false;
@@ -2478,7 +2477,7 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// The content panel's LIVE usable width (RightEdgePadding already
-        /// subtracted). M33 C2b: OnPanelResized updates _contentPanel's own
+        /// subtracted). OnPanelResized updates _contentPanel's own
         /// Width synchronously on every drag tick (no rebuild, no debounce),
         /// so this is always current - unlike a panelWidth value captured
         /// once at a control's build time (e.g. a TreeNodeState created
@@ -2502,9 +2501,9 @@ namespace GW2CraftingHelper.Views
         /// RenderPlan's own top so the restore-render rollback helper
         /// below can reach the exact same "nothing rendered yet" starting
         /// point RenderPlan itself builds from - drops the tree render
-        /// state (M38 WP-25: _treeController.ResetTreeRenderState - see
+        /// state (_treeController.ResetTreeRenderState - see
         /// that method's own doc comment), clears the relayout/re-ellipsis
-        /// action registries (M33 C2b - every closure in them captures
+        /// action registries (every closure in them captures
         /// controls from a render that is about to be discarded, so
         /// nothing here may outlive the dispose loop below), and disposes
         /// whatever controls currently live in _contentPanel. Order
@@ -2571,7 +2570,7 @@ namespace GW2CraftingHelper.Views
             // single-item plan is wrapped into a one-element list here so
             // CreateTreeSection/RefreshTreeContainerHeights always deal
             // with "a list of roots" - one root renders byte-identically to
-            // the pre-M35 single-tree path (see PlanContentHeightMath.
+            // the single-tree path (see PlanContentHeightMath.
             // MultiRootTreeFlowHeight's own doc comment).
             List<CraftingTreeNode> treeRoots = vm.MultiItemRoots != null && vm.MultiItemRoots.Count > 0
                 ? vm.MultiItemRoots
@@ -2931,11 +2930,9 @@ namespace GW2CraftingHelper.Views
                     new CraftStepsSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.RequiredDisciplines:
-                    // M38 WP-23/WP-23c: row rendering moved to
-                    // Views/Rendering/DisciplinesSectionRenderer, which now
-                    // also owns its own c-table header call (WP-23c moved
-                    // CreateCTableHeaderRow out of CraftingPlanView once
-                    // Required Recipes below was extracted too - see
+                    // Row rendering lives in
+                    // Views/Rendering/DisciplinesSectionRenderer, which
+                    // also owns its own c-table header call (see
                     // DisciplinesSectionRenderer's doc comment).
                     new DisciplinesSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
@@ -2953,13 +2950,10 @@ namespace GW2CraftingHelper.Views
                 default:
                     // Defensive fallback for a future section type added
                     // without a dedicated body builder - never leave a
-                    // section silently empty. M38 WP-23c: CreateTextRow
-                    // moved to Views/Rendering/TextRowRenderer (see that
-                    // class's doc comment). This is now the only remaining
-                    // call site inside CraftingPlanView itself - the
-                    // Summary section's noteRows loop (the other call site
-                    // WP-23c left in place) moved out too, into
-                    // Views/Rendering/SummarySectionRenderer, in WP-23d.
+                    // section silently empty. CreateTextRow lives in
+                    // Views/Rendering/TextRowRenderer (see that class's
+                    // doc comment); this is the only remaining call site
+                    // inside CraftingPlanView itself.
                     foreach (var row in section.Rows)
                     {
                         TextRowRenderer.CreateTextRow(row.Label, contentFlow, panelWidth, this);
@@ -3113,10 +3107,7 @@ namespace GW2CraftingHelper.Views
         // the RequiredDisciplines-style call in CreateCollapsibleSection
         // above). GetPillColors, which CreateShoppingRow used for its
         // source-tag panel colors, moved to Views/Rendering/PillColors.cs
-        // instead (see that file's doc comment) because RenderDecisionPills
-        // also needed it at the time (WP-25 later moved RenderDecisionPills
-        // itself onto TreeSectionController - see the "8. Tree rendering"
-        // region below).
+        // instead (see that file's doc comment).
 
         // --- Crafting Steps section ---
         //
@@ -3127,18 +3118,17 @@ namespace GW2CraftingHelper.Views
 
         // --- Required Disciplines / Required Recipes sections (c-table) ---
         //
-        // M38 WP-23/WP-23c: Required Disciplines' row rendering moved to
-        // Views/Rendering/DisciplinesSectionRenderer (WP-23 pilot); Required
-        // Recipes' row rendering (both row heights) moved to
-        // Views/Rendering/RecipesSectionRenderer (WP-23c). The shared
-        // c-table header (CreateCTableHeaderRow) moved to
-        // Views/Rendering/CTableHeaderRenderer in WP-23c once both callers
-        // were extracted section renderers - see that class's doc comment.
+        // Required Disciplines' row rendering lives in
+        // Views/Rendering/DisciplinesSectionRenderer; Required
+        // Recipes' row rendering (both row heights) in
+        // Views/Rendering/RecipesSectionRenderer; the shared
+        // c-table header (CreateCTableHeaderRow) in
+        // Views/Rendering/CTableHeaderRenderer - see that class's doc comment.
 
         // --- Summary / Total Cost section ---
         //
         // Row rendering (the cost-tile row and its
-        // CostTileHandle/TileCaptionFor helpers, the M35 MultiItemNote
+        // CostTileHandle/TileCaptionFor helpers, the MultiItemNote
         // banner row, and the per-currency CreateCurrencyRow rows) moved to
         // Views/Rendering/SummarySectionRenderer (see the
         // RequiredDisciplines-style call in CreateCollapsibleSection above).

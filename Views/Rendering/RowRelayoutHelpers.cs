@@ -9,8 +9,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // CraftStepsSectionRenderer, DisciplinesSectionRenderer,
     // RecipesSectionRenderer, ShoppingListSectionRenderer, and
     // UsedMaterialsSectionRenderer - confirmed byte-identical in shape
-    // across all five (see the WP-24 constant-by-constant table in the
-    // PR/commit body):
+    // across all five:
     //   Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, bottomClearance);
     //   sink.AddRelayout(w =>
     //   {

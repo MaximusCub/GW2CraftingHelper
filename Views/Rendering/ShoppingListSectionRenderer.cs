@@ -8,38 +8,22 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-23b (m38-a1-architecture.md S3b-T2, continuing the WP-23 pilot):
-    // moved verbatim out of CraftingPlanView's "7. Section builders
+    // Moved verbatim out of CraftingPlanView's "7. Section builders
     // (continued)" region - the Shopping List row list, its header row, and
     // its ShoppingSourceTag helper. Behavior is unchanged: same row
     // geometry, same PlanContentHeightMath/PlanRelayoutMath/
-    // ShoppingColumnMath calls (all three stay put in Services, per plan -
-    // DO-NOT-TOUCH), same LabelHelpers.CreateRowDivider usage
-    // (DO-NOT-TOUCH #6 - divider math and its M36b 1px scissor clearance
+    // ShoppingColumnMath calls, same LabelHelpers.CreateRowDivider usage
+    // (divider math and its 1px scissor clearance
     // untouched), same CoinCurrencyRenderer usage for the Each/Total cells.
     // The only edits inside the moved bodies are _relayoutActions.Add ->
     // the injected ISectionRelayoutSink.AddRelayout, _reellipsisActions.Add
     // -> ISectionRelayoutSink.AddReellipsis (both semantics-preserving
     // pass-throughs - see ISectionRelayoutSink's doc comment), and
-    // GetPillColors(...) -> PillColors.GetPillColors(...).
-    //
-    // The WP-23 pilot's FORWARD NOTE flagged this section by name:
-    // CreateShoppingRow also called CraftingPlanView's private static
-    // GetPillColors(PillKind, bool, out Color, out Color) for its
-    // source-tag panel colors. GetPillColors is ALSO called by
-    // CraftingPlanView.RenderDecisionPills (the recipe tree's decision
-    // pills, not yet extracted) - grepped before this move - so it could
-    // not simply move into this class the way ShoppingSourceTag did
-    // (ShoppingSourceTag has exactly one call site, inside CreateShoppingRow
-    // below, and moved here directly). Resolution: GetPillColors was
-    // extracted to its own Views/Rendering/PillColors.cs (analogous to the
-    // WP-21 Tier-1 extraction's RarityColors.cs), and CraftingPlanView's
-    // RenderDecisionPills now forwards to it - a forward
-    // CraftingPlanView -> Views/Rendering call, never the reverse edge the
-    // WP-21 findings fix (commit 5c56b2a) already reverted once.
+    // GetPillColors(...) -> PillColors.GetPillColors(...) (see PillColors'
+    // doc comment for why that helper lives in its own file).
     //
     // CreateShoppingRow's
-    // icon+ellipsized-name construction and its divider+relayout tail now
+    // icon+ellipsized-name construction and its divider+relayout tail
     // go through the two shared row-shape helpers - IconNameRowHelpers
     // (build via CreateIconAndEllipsizedName, re-ellipsize via
     // ReellipsizeName) and RowRelayoutHelpers.FinishRow - both extracted
@@ -49,8 +33,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // Everything this row does AFTER the name label - the tooltip-parts
     // build, the source-tag Panel, the qty label, the Each/Total coin cells -
     // is unchanged, still hand-rolled here (it does not match either shared
-    // shape). Geometry unchanged - see the WP-24 constant-by-constant table
-    // in the PR/commit body.
+    // shape).
     internal sealed class ShoppingListSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -109,8 +92,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // ColumnEdges instance (for the build), and the same cached
             // maxEachWidth/maxTotalWidth (for their relayout closures) - a
             // relayout tick re-invokes ShoppingColumnMath.ComputeEdges with
-            // the new panelWidth but these SAME data-derived maxima (M33
-            // C2b: the pre-scan above depends only on row data, never on
+            // the new panelWidth but these SAME data-derived maxima (the
+            // pre-scan above depends only on row data, never on
             // panelWidth, so it does not need to re-run on resize at all).
             CreateShoppingListHeaderRow(contentFlow, panelWidth, edges, maxEachWidth, maxTotalWidth);
             for (int i = 0; i < section.Rows.Count; i++)
@@ -203,7 +186,7 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         // Moved verbatim from CraftingPlanView.CreateShoppingRow, then
-        // WP-24-refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
+        // refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
         // the class doc comment above) - same geometry, same constants.
         private void CreateShoppingRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges,

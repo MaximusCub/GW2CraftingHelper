@@ -8,8 +8,8 @@ using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// Direct unit tests on the SellSideEconomics statics (M38 WP-12,
-    /// KNOWN-ISSUES #25) - the move out of CraftingPlanPipeline made these
+    /// Direct unit tests on the SellSideEconomics statics
+    /// (KNOWN-ISSUES #25) - the move out of CraftingPlanPipeline made these
     /// directly testable without going through the whole pipeline. The
     /// pre-existing CraftingPlanPipelineTests/MultiItemPlanTests byte-
     /// identical assertions remain the regression net for the move itself;

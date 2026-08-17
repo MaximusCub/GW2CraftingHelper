@@ -202,7 +202,7 @@ namespace GW2CraftingHelper.Tests.Services
             // Forge only if MysticForgeRecipeData actually recognizes it -
             // otherwise it must fall through to primary rather than being
             // silently swallowed as "not found" purely because it is
-            // negative. Guards against a real id-space collision: the M37
+            // negative. Guards against a real id-space collision: the
             // achievement/merchant seed recipes use negative ids (-1592..
             // -1595) adjacent to, but not part of, the Mystic Forge range,
             // and were previously never given a chance at primary on a

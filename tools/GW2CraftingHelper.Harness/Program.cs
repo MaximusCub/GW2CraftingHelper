@@ -409,7 +409,7 @@ namespace GW2CraftingHelper.Harness
         /// Runs a single generation and prints the raw pre-solve RecipeNode
         /// tree (recipe availability, independent of pricing) next to the
         /// solved CraftingTreeNode tree (the decision/pricing the live
-        /// module would render), for M33-style item-by-item parity
+        /// module would render), for item-by-item parity
         /// research. Ids are printed freely here - this is a dev-only tool,
         /// not the module's UI (see docs/KNOWN-ISSUES.md no-displayed-ids
         /// invariant, which only governs runtime UI surfaces).

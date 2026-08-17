@@ -271,13 +271,13 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(store.HasAnyOffer(200));
         }
 
-        // --- M37: shipped Homestead Refinement tier
+        // --- Shipped Homestead Refinement tier
         // data invariant. VendorBatchSolver.EvaluateVendorOffers admits any offer
         // whose HomesteadTier is null at every configured tier setting -
         // correct for the 21 one-time "Upgrade" purchase rows the same
         // three merchant pages also sell, but WRONG for a material-
         // conversion row, which would then silently reintroduce the
-        // pre-M37 always-max-tier defect PR #57 fixed. The solver has no
+        // always-max-tier defect PR #57 fixed. The solver has no
         // independent way to catch a mistagged row - this test is the
         // only defense against a future wiki re-scrape shipping one, since
         // otherwise the only existing check is a dev-time console warning
@@ -338,11 +338,11 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- M38 (WP-08 / tests T7): the shipped ref/vendor_offers.json
+        // --- The shipped ref/vendor_offers.json
         // (13.3MB) was already exercised through the production
         // VendorOfferLoader by the Homestead test above, but only for a
         // 237-row subset - this pins the loader's parse of the *entire*
-        // file, guarding the WP-08 ReadToEnd->DeserializeAsync(Stream)
+        // file, guarding the ReadToEnd->DeserializeAsync(Stream)
         // switch against silent drift (this file has no leading BOM;
         // the switch here is purely the perf P2a change, see
         // VendorOfferLoader.Load).
@@ -469,7 +469,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- M39 (WP-16 shape): onError callback, real IO failure. ---
+        // --- onError callback: real IO failure. ---
 
         [Fact]
         public void LoadBaseline_StreamThrows_InvokesOnErrorInsteadOfThrowing()

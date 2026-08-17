@@ -2,49 +2,30 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Pull-based, thread-safe, module-level state for the Crafting Plan
-    /// tab's status strip (W3B gate round 1 fix - "tab-switch strip
-    /// freeze/lost completion status", docs/KNOWN-ISSUES.md's W3B section).
+    /// tab's status strip ("tab-switch strip freeze/lost completion
+    /// status" - docs/KNOWN-ISSUES.md's W3B section).
     ///
     /// <para>
-    /// Round-1 root cause: CraftingPlanView's status-strip fields
-    /// (_generationInFlight/_currentPhaseText/_currentPhaseOrdinal) and its
-    /// _statusLabel control are both rebuilt every time the Crafting Plan
-    /// tab's Build() runs, but the completion callback only ever WROTE its
-    /// final text into whichever _statusLabel happened to be live at the
-    /// moment it drained - if the user had switched away and back while a
-    /// generation was still running, or the completion landed while the
-    /// user was on a different tab, that write either targeted a
-    /// since-discarded label or (per the pre-fix liveness-check ordering)
-    /// was skipped entirely, and nothing about the NEXT Build() cycle knew
-    /// a finished generation's status text even existed to restore. This
-    /// board inverts that: every write (Begin/UpdatePhase/Finish) only ever
-    /// updates PURE state here, never a Blish control, so it can never be
-    /// skipped by a view-liveness check and never race a rebuild. The
-    /// status strip becomes a PULL consumer instead - see
-    /// Views/CraftingPlanView.cs's SpinnerTick/RenderFromBoard (the live
-    /// spinner ticker, which reads this board every tick while armed) and
-    /// Build()'s own re-arm block (which reads a fresh Snapshot() on every
-    /// rebuild, regardless of whether a generation happens to still be
-    /// running, already finished, or never started).
+    /// CraftingPlanView's status-strip fields and its _statusLabel control
+    /// are rebuilt every time the tab's Build() runs, so a completion
+    /// callback that writes directly to a control can target a
+    /// since-discarded label or be skipped by a view-liveness check, and
+    /// nothing about the next Build() cycle would know a finished
+    /// generation's status text existed to restore. This board inverts
+    /// that: every write (Begin/UpdatePhase/Finish) only ever updates PURE
+    /// state here, never a Blish control, so it can never be skipped by a
+    /// liveness check and never race a rebuild. The status strip is a PULL
+    /// consumer - see Views/CraftingPlanView.cs's SpinnerTick/
+    /// RenderFromBoard (reads this board every tick while armed) and
+    /// Build()'s own re-arm block (reads a fresh Snapshot() on every
+    /// rebuild).
     /// </para>
     ///
     /// <para>
     /// Ownership: constructed once by Module and passed into
-    /// CraftingPlanView's constructor (LogViewFloor precedent - module-
-    /// level state outlives a single view build cycle). Unlike
-    /// LogViewFloor's watermark (a plain long re-injected into a brand
-    /// new LogTabContent via constructor delegates on every tab visit,
-    /// since Blish reconstructs LogTabContent per visit), CraftingPlanView
-    /// itself is a SINGLETON - Module.Initialize() constructs exactly one
-    /// instance and every later tab visit only re-invokes its Build()
-    /// method - so a single constructor-injected reference is enough for
-    /// this state to "survive a rebuild": there is no second instance to
-    /// re-inject into. It still lives on Module (not as a CraftingPlanView
-    /// field) to match the established module-level-state ownership
-    /// pattern for exactly this class of bug, and to keep the door open
-    /// for a future CraftingPlanView reconstruction-per-tab refactor
-    /// (matching every other tab view in this module) without this state
-    /// needing to move again.
+    /// CraftingPlanView's constructor, so the state outlives any single
+    /// view build cycle and stays with the module-level-state ownership
+    /// pattern used for exactly this class of bug.
     /// </para>
     ///
     /// <para>
@@ -67,8 +48,7 @@ namespace GW2CraftingHelper.Services
     /// </para>
     ///
     /// <para>
-    /// Stale-write rejection reuses the exact same pure predicates
-    /// CraftingPlanView's pre-fix strip logic used directly
+    /// Stale-write rejection reuses the same pure predicates
     /// (<see cref="StatusUpdateGuard"/> for cross-generation/already-closed
     /// staleness, <see cref="PhaseOrdinalGuard"/> for out-of-order phase
     /// events within the same generation - see each guard's own doc
@@ -169,8 +149,8 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W3D (plan persistence across module restarts): seeds this board
-        /// with a restored plan's staleness-banner text at module load,
+        /// Seeds this board with a restored plan's staleness-banner text
+        /// at module load (plan persistence across module restarts),
         /// before any real Generate has run this session - see
         /// Views/CraftingPlanView.cs's ApplyRestoredPlan and
         /// Services/PlanStore.cs's own doc comment. Uses sequence 0, which
@@ -184,9 +164,8 @@ namespace GW2CraftingHelper.Services
         /// is the board's own one-time initial seed - called at most once
         /// per module session, before the strip has shown anything else.
         /// <para>
-        /// no-op if a real
-        /// generation has already Begin()'n this session (_sequence != 0)
-        /// or is currently in flight - "called at most once... before the
+        /// No-op if a real generation has already Begin()'n this session
+        /// (_sequence != 0) or is currently in flight - "called at most once... before the
         /// strip has shown anything else" above is a caller EXPECTATION,
         /// not something this method used to enforce. Module.LoadAsync's
         /// restore drain can lag well behind the module's own Update() loop
@@ -202,7 +181,7 @@ namespace GW2CraftingHelper.Services
         /// (StatusUpdateGuard.ShouldApply(1, 0, ...) is false once _sequence
         /// is back to 0) and freeze its spinner on the next tick
         /// (PlanStripTickDecision.Decide sees Sequence 0 != myGen 1 and
-        /// stops) - exactly the W3B "lost completion status" bug this board
+        /// stops) - exactly the "lost completion status" bug this board
         /// exists to prevent. Checking _sequence == 0 alone would already
         /// be sufficient (Begin only ever moves _sequence away from 0, and
         /// never back), but the _inFlight check is kept too as a defensive,

@@ -37,9 +37,9 @@ namespace GW2CraftingHelper.Views
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
         private static readonly Color WarningTextColor = new Color(255, 200, 60);
 
-        // Mirrors Module.cs's own StaleThreshold constant. M39 scope does
-        // not add d1's proposed shared SnapshotRefreshIntervalMinutes
-        // setting (Feature 3 - out of scope for this milestone); this
+        // Mirrors Module.cs's own StaleThreshold constant. d1's proposed
+        // shared SnapshotRefreshIntervalMinutes
+        // setting (Feature 3) is deliberately not added; this
         // local constant keeps the staleness label's own threshold
         // reasonable in the meantime without inventing a second setting.
         private static readonly TimeSpan StaleThreshold = TimeSpan.FromMinutes(10);
@@ -381,7 +381,7 @@ namespace GW2CraftingHelper.Views
             };
 
             // Coin display panel - see UpdateCoinDisplay's doc comment for
-            // the M38 WP-22 repoint to the shared CoinCurrencyRenderer. The
+            // the repoint to the shared CoinCurrencyRenderer. The
             // actual UpdateCoinDisplay call is deferred to the marshaled
             // tail below (with ApplyStatusDisplay/RebuildContent) - see that
             // block's own comment for why.
@@ -1011,14 +1011,13 @@ namespace GW2CraftingHelper.Views
         // This used to carry its own
         // GetCoinColor/AddCoinSegment copies, byte-identical to the ones
         // CraftingPlanView carried before its own coin/currency rendering
-        // was extracted into Views/Rendering/CoinCurrencyRenderer (WP-21) -
+        // was extracted into Views/Rendering/CoinCurrencyRenderer -
         // the second independent encoding of the coin invariant. Both are
         // deleted; this now builds its own CoinSegmentSpec list (still
         // always exactly 3 segments - gold, silver, copper - via plain
         // ToString(), no leading-zero-unit omission or zero-padding: that
-        // formatting choice is unchanged from before this package,
-        // deliberately, per the M38 plan's behavior-preservation-by-
-        // default rule) via the shared CoinCurrencyRenderer.AddSegmentSpec
+        // formatting choice is unchanged,
+        // deliberately) via the shared CoinCurrencyRenderer.AddSegmentSpec
         // (bumped private -> internal for this reuse - a normal forward
         // MainView -> Views/Rendering consumer dependency; see the note at
         // CoinCurrencyRenderer.AddSegmentSpec for why this is not the same

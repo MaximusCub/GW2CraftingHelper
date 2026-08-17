@@ -1,7 +1,7 @@
 namespace GW2CraftingHelper.Models
 {
     /// <summary>
-    /// W4B (vendor cost-component leaves): a single TP-valued Item cost
+    /// A single TP-valued Item cost
     /// line of a winning BuyFromVendor decision, scaled to one tree
     /// occurrence's actual purchase quantity (unitsNeeded already applied -
     /// see VendorBatchSolver.EvaluateVendorOffers). GoldValue is captured

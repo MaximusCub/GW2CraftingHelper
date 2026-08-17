@@ -63,8 +63,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MixedCurrencyVendor_ZeroFilledCraft_BeatsFallbackVendor()
         {
-            // M33 partial-pricing parity (superseded
-            // "MixedCurrencyVendor_FallbackForUnpriceableCraftNode"): item
+            // Partial-pricing parity: item
             // 1 has no TP price, an unpriceable-and-unrecipeable ingredient
             // (so its craft cost is zero-filled per the new rule, not
             // disqualified), and a fallback-only mixed vendor offer (25
@@ -73,7 +72,7 @@ namespace GW2CraftingHelper.Tests.Services
             // craft is chosen over a real, priced vendor offer specifically
             // BECAUSE the craft total is an artificially cheap partial
             // total. This is intentional (gw2e's own behavior), not a
-            // regression - see M33 spec item 2d.
+            // regression.
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
@@ -267,8 +266,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiOccurrenceBulkVendorOffer_CoinCost_AggregatesBeforeCeiling()
         {
-            // Sibling to the currency case above (M34-B1 #1's class-level
-            // scope note): the identical bug shape applies to a bulk offer
+            // Sibling to the currency case above: the
+            // identical bug shape applies to a bulk offer
             // priced in COIN, not just non-coin currency. Same 179-unit
             // demand, same 3-for-3 batch shape, coin instead of currency:
             // ceil(179/3)*3 = 180, not the per-occurrence sum of 186.

@@ -8036,20 +8036,26 @@ tags, and superseded-design retellings deleted; genuine invariants kept
 trimmed at one canonical site. Comments and blank lines only - verified
 code-identical (comment-stripped before/after diff clean per commit).
 
-**Per-area line deltas (files touched, comment lines +added/-removed):**
+**Per-area line deltas (files touched, comment lines +added/-removed;
+measured via `git diff --numstat` against the master merge-base,
+including the findings-fix pass below):**
 
-- Services (incl. Diagnostics/Recipes): 63 files, +1733 -4461
-- Models: 26 files, +325 -807
-- Views (incl. Rendering): 23 files, +681 -1345
+- Services (incl. Diagnostics/Recipes): 75 files, +1871 -4651
+- Models: 31 files, +364 -848
+- Views (incl. Rendering): 25 files, +854 -1680
 - Module.cs: 1 file, +149 -426
+- Contracts: 1 file, +4 -4
 - tools (VendorOfferUpdater/RecipeSeeder/Harness/MysticForgeSeeder):
-  9 files, +92 -159
-- tests (module + updater suites): 97 files, +350 -351
-- Total: 208 files, net -4,198 lines (10 files with non-ASCII
-  em-dashes/arrows/box glyphs converted to ASCII; the flagged
-  InMemoryRecipeCacheStore em-dash was already fixed on origin/master -
-  the remaining instances of that class were in Services/Recipes and
-  tests, all fixed here)
+  9 files, +99 -175
+- tests (module + updater suites): 118 files, +567 -615
+- Total: 260 files, +3,908 -8,399, net -4,491 lines. 12 touched files
+  had non-ASCII bytes (em-dashes/arrows/box glyphs) converted to ASCII,
+  including Contracts/IItemSearchProvider.cs (missed by the original
+  sweep, fixed in the findings-fix pass); a repo-wide
+  `grep -P '[^\x00-\x7F]'` over every `.cs` file now returns zero
+  hits. The flagged InMemoryRecipeCacheStore em-dash was already fixed
+  on origin/master - the remaining instances of that class were in
+  Services/Recipes and tests, all fixed here.
 
 **Invariants relocated / canonicalized (from -> to):**
 
@@ -8089,8 +8095,23 @@ as corrected upstream (Gw2Constants festival-table scoping,
 VendorOfferUpdater round-trip save ordering) and were compressed to
 their corrected form.
 
+**Findings-fix pass (post-review):** the review of the sweep found the
+original commits had (a) missed Contracts/ entirely (em-dashes in
+IItemSearchProvider.cs), (b) reported three mutually inconsistent
+line-delta totals (the numbers above are now measured, not summed by
+hand), (c) left review-narration labels ("gate finding", "fix-pass",
+round markers, dates) and M##/WP-## process tags in both touched and
+untouched files, and (d) in a few places dropped a KNOWN-ISSUES pointer
+while keeping the milestone tag. All four were corrected in one
+follow-up commit: milestone/process tags and review-round narration
+removed repo-wide from `.cs` comments (doc-section pointers such as
+"KNOWN-ISSUES #26" or "docs/KNOWN-ISSUES.md's W4A entry" kept), dates
+removed from comments, and the dropped pointers restored. The pass was
+comment-only (every changed line is a comment or a `#region` label).
+
 **Validation:** build 0 errors after every batch; module suite
-1827/1827 after every batch; updater suite 207/207 after the tools and
-tests batches.
+1827/1827 after every batch (and after the findings-fix pass); updater
+suite 207/207 after the tools and tests batches (and after the
+findings-fix pass).
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

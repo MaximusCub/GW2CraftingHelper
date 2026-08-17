@@ -363,8 +363,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void UnpriceableRecipe_CanCraftIsTrue_ForceCraftSucceedsWithZeroFilledCost()
         {
-            // M33 partial-pricing parity (superseded
-            // "Override_ForcedCraftOnUnpriceableRecipe_IgnoredKeepsBuy"):
+            // Partial-pricing parity:
             // CanCraft now means "has a recipe" (gw2e's hasComponents), not
             // "recipe is fully priceable" - a recipe with an unpriceable
             // ingredient is always force-craftable (the ingredient just

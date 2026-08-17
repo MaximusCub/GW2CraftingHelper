@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class PlanSolverCapNoticeSuppressionTests
     {
-        // --- M37: Homestead mixed-offer cap-notice gap (KNOWN-ISSUES
+        // --- Homestead mixed-offer cap-notice gap (KNOWN-ISSUES
         // #24/#25 Section 3.3) - a fix was attempted here (summing each
         // occurrence's own true purchase count when occurrences disagreed
         // on the winning offer but agreed on the raw (DailyCap, WeeklyCap)
@@ -110,7 +110,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(plan.TimegatedItems);
         }
 
-        // --- Regressions for the M37 mixed-offer Weekly pair above
+        // --- Regressions for the mixed-offer Weekly pair above
         // found the Conflict-suppression parity claim for the KNOWN-ISSUES
         // #33 SeasonalCap package unverified: FinalizeVendorBatches checks
         // Seasonal inside the exact same "!state.Conflict" guard as Daily/

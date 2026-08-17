@@ -175,7 +175,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("s.png", row.CurrencyCosts[0].IconUrl);
         }
 
-        // --- M34-B2b: owned/needed split on shopping-row currency Total cells ---
+        // --- Owned/needed split on shopping-row currency Total cells ---
 
         [Fact]
         public void ShoppingList_VendorRow_OwnedCurrencyAmountsPresent_SetsOwnedQuantityOnCurrencyCosts()
@@ -363,7 +363,7 @@ namespace GW2CraftingHelper.Tests.Services
             // blank cell. This test locks in the
             // view-model side of that condition; the dash glyph itself is
             // rendered by CoinCurrencyRenderer.RenderValueCellRightAligned
-            // (Views/Rendering, M38 WP-21), which is Blish-only and not
+            // (Views/Rendering), which is Blish-only and not
             // covered here.
             var result = MakeResult(steps: new List<PlanStep>
             {

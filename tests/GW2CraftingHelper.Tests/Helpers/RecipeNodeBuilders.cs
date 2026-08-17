@@ -4,12 +4,12 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Tests.Helpers
 {
     /// <summary>
-    /// Shared RecipeNode/RecipeOption tree-builder helpers (M38 WP-01,
-    /// tests T2 / simplify #5). Leaf/Craftable/Option/WrapperOf were
+    /// Shared RecipeNode/RecipeOption tree-builder helpers.
+    /// Leaf/Craftable/Option/WrapperOf were
     /// byte-for-byte identical private static methods duplicated across
     /// PlanSolverTests and CraftingTreeBuilderTests, with near-identical
     /// narrower variants in several other test files - consolidated here
-    /// so future RecipeNode/RecipeOption field additions (e.g. the M37
+    /// so future RecipeNode/RecipeOption field additions (e.g. the
     /// achievement-bit fields) only need to be plumbed through once.
     ///
     /// Leaf's achievementId/achievementBit optional parameters exist only
@@ -84,7 +84,7 @@ namespace GW2CraftingHelper.Tests.Helpers
             return opt;
         }
 
-        // --- M35-B1: synthetic multi-item wrapper root (gw2e parity) ---
+        // --- Synthetic multi-item wrapper root (gw2e parity) ---
         public static RecipeNode WrapperOf(params RecipeNode[] itemRoots)
         {
             return Craftable(

@@ -15,9 +15,9 @@ namespace GW2CraftingHelper.Views
     /// and clear-view, backed directly by a ModuleLog's ring buffer.
     /// Pattern A (lightweight FlowPanel(CanScroll)) - label-per-row, no
     /// multi-column ellipsized rows that must reflow live during a resize
-    /// drag - so this does not opt into the M33
+    /// drag - so this does not opt into the
     /// PlanContentHeightMath/relayout-registry contract (that machinery is
-    /// CraftingPlanView-only, DO-NOT-TOUCH per M38).
+    /// CraftingPlanView-only).
     /// </summary>
     public class LogTabContent
     {

@@ -9,8 +9,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-23d (m38-a1-architecture.md S3b-T2, continuing the WP-23/WP-23b/
-    // WP-23c extractions): moved verbatim out of CraftingPlanView's "7.
+    // Moved verbatim out of CraftingPlanView's "7.
     // Section builders (continued)" region - the Summary/Total Cost section.
     //
     // The section is two formula-band tile rows (CreateFormulaBand), a
@@ -249,7 +248,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
             }
 
-            // M33 C2b [FANOUT]: every tile's caption + coin segments are
+            // [FANOUT]: every tile's caption + coin segments are
             // font-only (invariant to panelWidth) - only tileWidth/startX
             // and each tile's own centering offset move. No MeasureString.
             _sink.AddRelayout(w =>

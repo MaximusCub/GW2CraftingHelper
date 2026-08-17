@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     /// name/icon (CurrencyAmountViewModel), preferring live
     /// CurrencyMetadataService data and falling back to the offline
     /// Gw2Constants table - the exact same chain PlanViewModelBuilder's
-    /// Summary-section currency rows have used since M30 #3, now shared so
+    /// Summary-section currency rows have always used, shared so
     /// shopping-row and recipe-tree currency costs never
     /// drift from it. Blish-free (plain C#, no Blish/Gw2Sharp types) so the
     /// mapping is directly unit-testable - see CurrencyDisplayResolverTests.
@@ -61,7 +61,7 @@ namespace GW2CraftingHelper.Services
         /// non-null list), so callers can use a simple null/Count==0 check
         /// for "does this row/node have a currency cost at all".
         ///
-        /// ownedCurrencyAmounts (M34-B2b, gw2e's ownedCurrencies split -
+        /// ownedCurrencyAmounts (gw2e's ownedCurrencies split -
         /// optional, cosmetic only) sets each line's OwnedQuantity to
         /// min(line.Count, wallet amount) when the wallet holds any of that
         /// currency; null (not 0) when the caller has no wallet data at all

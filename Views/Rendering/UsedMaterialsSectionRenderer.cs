@@ -7,31 +7,26 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-23b (m38-a1-architecture.md S3b-T2, continuing the WP-23 pilot):
-    // moved verbatim out of CraftingPlanView's "7. Section builders
+    // Moved verbatim out of CraftingPlanView's "7. Section builders
     // (continued)" region - the Used Materials row list only. Behavior is
     // unchanged: same row geometry, same PlanContentHeightMath/
     // PlanRelayoutMath calls, same LabelHelpers.CreateRowDivider usage
-    // (DO-NOT-TOUCH #6 - divider math and its M36b 1px scissor clearance
+    // (divider math and its 1px scissor clearance
     // untouched). The only edit inside the moved bodies is
     // _relayoutActions.Add -> the injected ISectionRelayoutSink.AddRelayout
     // and _reellipsisActions.Add -> ISectionRelayoutSink.AddReellipsis, both
     // semantics-preserving pass-throughs (see ISectionRelayoutSink's doc
-    // comment). Per the WP-23 pilot's FORWARD NOTE, Used Materials depends
-    // only on the already-extracted IconControls/RarityColors/LabelHelpers/
-    // PlanRelayoutMath statics the pilot also used, so this section needed
-    // no further dependency resolution.
+    // comment).
     //
     // CreateUsedMaterialRow's
-    // icon+ellipsized-name construction and its divider+relayout tail now
+    // icon+ellipsized-name construction and its divider+relayout tail
     // go through the two shared row-shape helpers - IconNameRowHelpers
     // (build via CreateIconAndEllipsizedName, re-ellipsize via
     // ReellipsizeName) and RowRelayoutHelpers.FinishRow - both extracted
     // from this row and ShoppingListSectionRenderer.CreateShoppingRow, the
     // only two rows across the extracted renderers that actually share the
     // ellipsis shape (see IconNameRowHelpers' own doc comment for why
-    // Crafting Steps/Disciplines/Recipes rows do not). Geometry unchanged -
-    // see the WP-24 constant-by-constant table in the PR/commit body.
+    // Crafting Steps/Disciplines/Recipes rows do not).
     internal sealed class UsedMaterialsSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -41,7 +36,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // Mirrors the constructor-null-guard convention already used
             // for injected dependencies elsewhere in Views/ (ViewAdapter's
             // buildAction, SettingsTabContent's settings, FrameTicker's
-            // step) and by DisciplinesSectionRenderer, the WP-23 pilot - the
+            // step) and by DisciplinesSectionRenderer - the
             // sole production call site always passes `this`
             // (CraftingPlanView), but a later section renderer built on
             // this same pattern should fail loud, not with a deferred NRE
@@ -61,7 +56,7 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         // Moved verbatim from CraftingPlanView.CreateUsedMaterialRow, then
-        // WP-24-refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
+        // refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
         // the class doc comment above) - same geometry, same constants.
         private void CreateUsedMaterialRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
         {
@@ -105,11 +100,11 @@ namespace GW2CraftingHelper.Views.Rendering
             // only re-ellipsized at settle (RunReellipsis) to avoid a
             // MeasureString call per row per tick.
             //
-            // M36b: bottomClearance 0 - UsedMaterialRowHeight (36) is
+            // bottomClearance 0 - UsedMaterialRowHeight (36) is
             // immune to the Container.Paint round-trip defect (see
             // LabelHelpers.CreateRowDivider's doc comment) and its icon frame is
             // flush-fit with zero slack; giving it clearance it doesn't
-            // need would reintroduce the icon/divider overlap M36 fixed.
+            // need would reintroduce the icon/divider overlap.
             RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 0, _sink, w =>
             {
                 qtyLabel.Location = new Point(w - 8 - qtyWidth, 9);

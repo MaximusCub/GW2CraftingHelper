@@ -4,7 +4,7 @@ namespace GW2CraftingHelper.Services
     /// Classifies a raw Blish HUD wheel delta (GameService.Input.Mouse.
     /// State.ScrollWheelValue, itself sourced from Blish_HUD.Input.
     /// MouseEventArgs.WheelDelta) as either genuine or corrupted by a real
-    /// bug in the vendored library (M36, KNOWN-ISSUES #12 reopened and
+    /// bug in the vendored library (KNOWN-ISSUES #12, reopened and
     /// root-caused).
     ///
     /// ROOT CAUSE (confirmed by decompiling the shipped BlishHUD v1.3.0
@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Services
     /// so the getter "corrects" a value that was never wrapped in the first
     /// place, turning +240 into 240 - 65536 = -65296. This reproduces
     /// exactly the live-measured histogram (N = coalesced up-notch count,
-    /// 2026-07-21 instrumented user trace): N=2 -&gt; -65296, N=3 -&gt; -65176,
+    /// instrumented user trace): N=2 -&gt; -65296, N=3 -&gt; -65176,
     /// N=4 -&gt; -65056, N=5 -&gt; -64936, N=6 -&gt; -64816, N=7 -&gt; -64696,
     /// N=8 -&gt; -64576 (each is N*120 - 65536). A single up-notch (N=1,
     /// unsigned 120) sits exactly AT the threshold (not &gt; 120), so it is -

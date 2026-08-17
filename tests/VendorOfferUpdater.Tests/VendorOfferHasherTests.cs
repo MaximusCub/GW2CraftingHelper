@@ -216,7 +216,7 @@ namespace VendorOfferUpdater.Tests
         }
 
         // Omitting homesteadTier is equivalent to
-        // passing explicit null - it does NOT reproduce the pre-M37 hash,
+        // passing explicit null - it does NOT reproduce the pre-tier hash,
         // since ComputeOfferId appends the ";homesteadTier=" segment
         // unconditionally (as "null" when omitted). This only pins down
         // self-consistency of the default value, not backward

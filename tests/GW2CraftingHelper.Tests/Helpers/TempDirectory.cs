@@ -6,8 +6,8 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// <summary>
     /// A scratch directory for tests that exercise real file I/O
     /// (VendorOfferStore, RecipeCacheStore, etc.) without hand-rolling a
-    /// create/try/finally/delete block at every call site (M38 WP-01,
-    /// tests T4/T5 / simplify #5). Mirrors the constructor-creates /
+    /// create/try/finally/delete block at every call site.
+    /// Mirrors the constructor-creates /
     /// Dispose-deletes idiom already used by the per-test-class fixtures
     /// in SnapshotStoreTests, StatusStoreTests, and VendorOfferStoreTests,
     /// packaged so any individual test method

@@ -22,8 +22,8 @@ namespace GW2CraftingHelper.Views
     /// the module's data directory (useful when a user needs to attach
     /// snapshot.json/status.json/etc. to a bug report). Same shape as
     /// LogTabContent.cs: one FlowPanel(CanScroll),
-    /// Build(Container) populates it once, no relayout registry, no M33
-    /// involvement - nothing here is interactive beyond plain
+    /// Build(Container) populates it once, no relayout registry
+    /// - nothing here is interactive beyond plain
     /// selectable/copyable text, so there is nothing to keep "sticky"
     /// across tab revisits (see MainView.cs's own cross-cutting note on
     /// rebuild-per-visit).

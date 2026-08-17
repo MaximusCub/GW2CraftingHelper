@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace GW2CraftingHelper.Models
 {
     /// <summary>
-    /// On-disk shape for W3D (plan persistence across module restarts) -
+    /// On-disk shape for plan persistence across module restarts -
     /// everything Module needs to restore the Crafting Plan tab instantly
     /// on module load, with no network call and no re-solve. See
     /// Services/PlanStore.cs for the store that reads/writes this.
@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Models
         /// CraftingPlanResult.RequestedItems' own shape, but populated for
         /// every plan (single- or multi-item), not only a genuine
         /// multi-item batch. Not used to reconstruct the search box/
-        /// quantity inputs on restore (W3D spec item 5 - those stay at
+        /// quantity inputs on restore (those stay at
         /// their defaults); persisted for round-trip fidelity of the
         /// original request only.
         /// </summary>
@@ -79,8 +79,7 @@ namespace GW2CraftingHelper.Models
         /// The full displayed result, including its SolveContext - the
         /// prices/offers/metadata/tree a local
         /// CraftingPlanPipeline.ResolveWithOverrides re-solve needs to keep
-        /// working with no network call after a restart (W3D spec item 3's
-        /// correctness bar).
+        /// working with no network call after a restart.
         /// </summary>
         public CraftingPlanResult Result { get; set; }
 

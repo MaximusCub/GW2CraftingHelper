@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Pure content-height arithmetic (Blish-free, unit-testable) for the
     /// plan view's collapsible section bodies and recipe-tree child
-    /// containers. M33 C2a directive A: these containers used to rely on
+    /// containers. These containers used to rely on
     /// Blish's FlowPanel HeightSizingMode.AutoSize, which only converges
     /// one nested level per real engine frame (Container.DoUpdate sizes a
     /// container from its children's CURRENT bounds before recursing into
@@ -86,9 +86,8 @@ namespace GW2CraftingHelper.Services
         /// Views/Rendering/CraftStepsSectionRenderer.CreateCraftStepRow) with
         /// plain TimegatedNotice info rows (FallbackTextRowHeight, via the
         /// shared Views/Rendering/TextRowRenderer.CreateTextRow helper - see
-        /// Views/Rendering/CraftStepsSectionRenderer.Render, M38 WP-23c:
-        /// renamed from CraftingPlanView.CreateCraftingStepsBody during the
-        /// move), so height is summed per-row rather than assumed uniform.
+        /// Views/Rendering/CraftStepsSectionRenderer.Render),
+        /// so height is summed per-row rather than assumed uniform.
         /// </summary>
         private static int CraftingStepsBodyHeight(IReadOnlyList<PlanRowViewModel> rows)
         {
@@ -184,20 +183,20 @@ namespace GW2CraftingHelper.Services
             return total;
         }
 
-        // M35 (gw2efficiency parity - multi-item plans): thin visual gap
+        // Thin visual gap
         // CraftingPlanView draws between two consecutive top-level trees in
         // a multi-item batch, so N stacked full item trees read as N
         // distinct blocks rather than blending into one continuous list of
         // rows. Never inserted for a single root (roots.Count == 1), which
-        // is what keeps that case byte-identical to the pre-M35 height.
+        // is what keeps that case byte-identical to the single-item height.
         public const int MultiRootDividerHeight = 12;
 
         /// <summary>
-        /// M35 (gw2efficiency parity - multi-item plans): total height of
+        /// Total height of
         /// the Recipe Tree section's single shared content FlowPanel when
         /// it holds N top-level trees stacked (gw2e's own "N independent
         /// top-level recipe trees" render, its synthetic wrapper node never
-        /// surfacing - docs/gw2e-parity-spec.md, the M34 r1 report) rather
+        /// surfacing - docs/gw2e-parity-spec.md) rather
         /// than one. Each requested item's own root node already IS its own
         /// full icon/name/quantity/pill/cost row (CraftingTreeNode, same
         /// shape TreeNodeHeight already sizes for a single-item plan) - so

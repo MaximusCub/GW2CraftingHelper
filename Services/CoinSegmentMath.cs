@@ -4,16 +4,14 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Pure coin/currency segment-width arithmetic (Blish-free,
-    /// unit-testable) - moved verbatim out of CoinCurrencyRenderer (M38
-    /// WP-21 findings fix) together with the plain data specs
+    /// unit-testable) - moved verbatim out of CoinCurrencyRenderer
+    /// together with the plain data specs
     /// (CoinSegmentSpec/CurrencySegmentSpec) and the geometry constants
     /// (CoinIconSize/CoinLabelIconGap/CoinSegmentGap) the arithmetic is
     /// built from - the specs and constants have no meaning apart from the
-    /// formulas below, so they moved with them. An earlier findings-fix
-    /// pass on this branch instead added a test file that called
-    /// CoinCurrencyRenderer (Views/Rendering, Blish-bound) directly; that
-    /// would have violated the repo invariant that tests must never
-    /// reference UI code. This extraction is the invariant-compliant fix:
+    /// formulas below, so they moved with them. The extraction exists so
+    /// the arithmetic is testable without a test referencing UI code
+    /// (repo invariant: tests must never reference UI code).
     /// CoinCurrencyRenderer.TotalCoinSegmentsWidth/TotalCurrencySegmentsWidth
     /// now call straight through to this class; everything else that
     /// touches Label/Panel/BitmapFont (BuildCoinSegments, LayoutCoinSegments,

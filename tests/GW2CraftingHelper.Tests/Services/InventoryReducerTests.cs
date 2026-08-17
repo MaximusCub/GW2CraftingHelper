@@ -84,12 +84,12 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(5, tree.Recipes[0].Ingredients[0].Quantity);
         }
 
-        // --- M37: CloneNode must preserve the new fields ---
+        // --- CloneNode must preserve the achievement-dedup fields (KNOWN-ISSUES #26) ---
 
         [Fact]
         public void CloneNode_PreservesAchievementFieldsAndDedupFlag()
         {
-            // Same bug CLASS as the M33 Finding 2 fix for
+            // Same bug CLASS as CloneOption once dropping
             // RecipeOption.ExpectedOutputCount (see CloneOption's own doc
             // comment): any RecipeNode field not explicitly copied here is
             // silently dropped (C# default) on every Reduce() clone.
@@ -180,8 +180,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(15, option.Ingredients[0].Quantity);
         }
 
-        // --- Mystic Clover-style EV recipe tests (M33 fix-pass Critical
-        // finding 2: CloneOption previously dropped ExpectedOutputCount,
+        // --- Mystic Clover-style EV recipe tests
+        // (CloneOption previously dropped ExpectedOutputCount,
         // and the crafts-needed recompute previously always used the
         // nominal OutputCount instead of ExpectedOutputCount - either bug
         // alone silently disables EV pricing whenever an account snapshot
@@ -481,8 +481,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(result.ReducedTree.IsLeaf);
         }
 
-        // ---- M34-B2a #2: multi-recipe-option pool consumption fix ----
-        // (m1 Finding 5 / m34-r2-gw2e-owned-materials.md Section 6.2.5:
+        // ---- Multi-recipe-option pool consumption ----
+        // (m34-r2-gw2e-owned-materials.md Section 6.2.5:
         // previously EVERY RecipeOption on a node drained the shared pool,
         // not just the one the solver would eventually choose - untested
         // before this milestone, since every fixture above uses a single
@@ -566,7 +566,7 @@ namespace GW2CraftingHelper.Tests.Services
             // options' CraftsNeeded/ingredient Quantity must still be
             // rescaled to the node's own (self-)reduced Quantity, so
             // PlanSolver's cost comparison across options stays consistent
-            // (M33 Finding 1 parity - every option is always evaluated).
+            // (every option is always evaluated).
             var optionA = new RecipeOption { RecipeId = 10, OutputCount = 2, CraftsNeeded = 5 };
             optionA.Ingredients.Add(Leaf(2, 10)); // perCraft = 10/5 = 2
             var optionB = new RecipeOption { RecipeId = 20, OutputCount = 2, CraftsNeeded = 5 };
@@ -592,7 +592,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(6, result.ReducedTree.Recipes[1].Ingredients[0].Quantity);
         }
 
-        // ---- M34-B2a #1: per-node owned-quantity attribution ----
+        // ---- Per-node owned-quantity attribution ----
 
         [Fact]
         public void OwnedQuantityUsedByNode_RecordsConsumptionKeyedByNodeObject()
@@ -1229,7 +1229,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             // The ingredient's own Quantity still rescales to match the
             // node's new (already-reduced) demand - unconditional, per
-            // ReduceNode's doc comment (M33 Finding 1) - so 2, not the
+            // ReduceNode's doc comment - so 2, not the
             // original 5. What the guide actually gates is pool
             // CONSUMPTION: the ingredient's own 5 owned units in the pool
             // are never touched, since the node was decided Buy.
@@ -1280,8 +1280,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void StaleRecipeIdInGuide_NoOptionMatches_SuppressesAllConsumptionForThatNode()
         {
-            // Coverage: a guide entry present FOR this
-            // node's NodeId, with Source == Craft, but whose RecipeId
+            // Coverage: a guide entry present FOR this node's NodeId,
+            // with Source == Craft, but whose RecipeId
             // matches NEITHER option (a stale/UnknownSource guide entry -
             // e.g. the tree's recipe options changed between the guide
             // solve and this Reduce call, which should never happen in
@@ -1424,9 +1424,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Sourced_MissingNodeInGuide_FallsBackToPrimaryHeuristic()
         {
-            // Coverage: MissingNodeInGuide_
-            // FallsBackToPrimaryHeuristic above pins this defensive
-            // fallback only on the flat-Dictionary overload - production
+            // Coverage: MissingNodeInGuide_FallsBackToPrimaryHeuristic
+            // above pins this defensive fallback only on the
+            // flat-Dictionary overload - production
             // exclusively calls the AccountItemIndex-sourced overload this
             // class mirrors (see ReduceNodeSourced's own doc comment,
             // which claims "identical reasoning" without a dedicated pin).

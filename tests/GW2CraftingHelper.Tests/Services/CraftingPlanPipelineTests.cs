@@ -441,7 +441,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromTp, result.Plan.Steps[0].Source);
         }
 
-        // --- W4B: vendor cost-component leaves, end-to-end through the real pipeline ---
+        // --- Vendor cost-component leaves, end-to-end through the real pipeline ---
 
         /// <summary>
         /// Real field case shape: a vendor-only item (no recipe, no TP
@@ -796,22 +796,15 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// Gate finding (receipt/what-if captions, live repro):
-        /// same fixture shape as
-        /// MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadataAndOwnership
-        /// (a Craft-baseline item whose Recipes are non-empty, manually
-        /// overridden to BuyFromVendor via ResolveWithOverrides against a
-        /// 2+-kind vendor offer) - proves the stacked "component leaves +
-        /// reference branch" shape CraftingTreeBuilder.BuildNode produces
-        /// for this case (MixedOfferNode_AlsoHasRecipe_StacksComponentLeavesThenReferenceBranch's
-        /// non-override twin) survives the ResolveWithOverrides round trip
-        /// intact, and that ReceiptCaptionHelper - the exact consumer
-        /// TreeSectionController's three render call sites feed - still
-        /// finds a valid split on the resulting node. This is the deepest
-        /// Blish-free seam that reaches the live "root overridden to
-        /// VENDOR" repro: TreeSectionController itself cannot be exercised
-        /// here (Blish-bound), so a real render-path miss beyond this
-        /// point would not surface as a failure here - see KNOWN-ISSUES.md.
+        /// Proves the stacked "component leaves + reference branch" shape
+        /// CraftingTreeBuilder.BuildNode produces for a Craft-baseline item
+        /// overridden to BuyFromVendor survives the ResolveWithOverrides
+        /// round trip, and that ReceiptCaptionHelper - the exact consumer
+        /// TreeSectionController's render call sites feed - still finds a
+        /// valid split on the resulting node. This is the deepest
+        /// Blish-free seam for this path: TreeSectionController itself is
+        /// Blish-bound, so a render-path miss beyond this point cannot
+        /// surface here - see KNOWN-ISSUES.md.
         /// </summary>
         [Fact]
         public async Task MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_ProducesReferenceBranchWithValidCaptionSplit()
@@ -903,7 +896,7 @@ namespace GW2CraftingHelper.Tests.Services
                 ReceiptCaptionHelper.CaptionForChildIndex(splitIndex, splitIndex));
         }
 
-        // M38 WP-14: this test used to prove the (now-deleted, test-only)
+        // This test used to prove the (now-deleted, test-only)
         // GenerateAsync produced the same base plan as GenerateStructuredAsync
         // with a null snapshot, plus the latter's extra structured fields.
         // With only one entry point left, the assertion intent becomes:
@@ -1154,29 +1147,13 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(400, opportunity.MinRating);
         }
 
-        // Fix (gate finding 1): end-to-end pipeline coverage
-        // for RecipeSheetSavingsCalculator's production wiring. The B8
-        // narrowing (see KNOWN-ISSUES.md item 3) moved the calculator's
-        // offer source from the well-covered _vendorOfferStore field onto
-        // _offersForRecipeSheetItem - a Func computed once in the
-        // constructor and never separately pinned. Measured: replacing
-        // that whole assignment with `_offersForRecipeSheetItem = null;`
-        // left all 1773 pre-existing tests green, silently disabling every
-        // recipe-sheet-savings note in production with no crash. Reuses
-        // the same competency-exclusion fixture shape as
-        // GenerateStructuredAsync_CraftExcludedByCompetency_
-        // PopulatesCompetencyOpportunities above (untrained discipline
-        // forces the cheaper Craft option out, so the baseline decision is
-        // BuyFromTp with an automatic reference branch -
-        // CraftingTreeBuilder's own wantsReferenceBranch gate, no manual
-        // override needed) plus a REAL temp-directory VendorOfferStore
-        // (repo invariant: real stores, not fakes) carrying a coin-priced
-        // recipe-sheet offer and a non-empty recipeSheetItemIdByRecipeId -
-        // both real CraftingPlanPipeline constructor params, so no test
-        // double stands in for either. Asserts NON-EMPTY, not merely
-        // NotNull - unlike the four pre-existing B8 tests, which only pin
-        // the null-delegate/empty-map guards and never exercise the
-        // delegate actually being called and returning real data.
+        // End-to-end coverage of RecipeSheetSavingsCalculator's production
+        // wiring through _offersForRecipeSheetItem (see KNOWN-ISSUES.md
+        // item 3), a Func computed once in the pipeline constructor:
+        // nulling that assignment leaves every other test green while
+        // silently disabling recipe-sheet-savings notes in production, so
+        // this test asserts a NON-EMPTY note via a real temp-directory
+        // VendorOfferStore, unlike the guard-only tests above.
         [Fact]
         public async Task GenerateStructuredAsync_RecipeSheetSavings_EndToEnd_PopulatesOpportunity()
         {
@@ -1721,7 +1698,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             // These 6 phase prefixes are shared with (were originally pinned
             // against) the now-deleted GenerateAsync and must still appear
-            // with timing (M38 WP-10: the dead "Resolve vendor offers" step
+            // with timing (the dead "Resolve vendor offers" step
             // was removed along with the always-null VendorOfferResolver
             // seam); GenerateStructuredAsync's own additional phases
             // (Inventory reduction, Fetch currency metadata, Fetch learned
@@ -1793,7 +1770,7 @@ namespace GW2CraftingHelper.Tests.Services
                 priceBasis: PriceBasis.InstantBuy);
 
             // All 9 expected phase messages in pipeline order
-            // (M38 WP-10: the dead "Resolving vendor offers..." message was
+            // (the dead "Resolving vendor offers..." message was
             // removed along with the always-null VendorOfferResolver seam)
             var expectedSubstrings = new[]
             {
@@ -1834,7 +1811,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- W3B: generation progress + rich logging ---
+        // --- Generation progress + rich logging ---
 
         [Fact]
         public async Task GenerateStructuredAsync_ReportsPhaseEventsInOrderWithSanePayloads()
@@ -2218,8 +2195,8 @@ namespace GW2CraftingHelper.Tests.Services
 
                 var items = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } };
 
-                // No requestLabel supplied - matches every pre-W3B caller
-                // (and any future non-UI caller) that bypasses
+                // No requestLabel supplied - matches every caller
+                // (including any future non-UI caller) that bypasses
                 // CraftingPlanView's item-name resolution.
                 await pipeline.GenerateStructuredAsync(
                     items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
@@ -2348,8 +2325,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_BuildingTreePhaseEvent_CarriesFirstRunHintAsDetail()
         {
-            // The pre-W3B "(may take several seconds on
-            // first run)" PlanStatus hint is now unreachable once the view
+            // The old "(may take several seconds on
+            // first run)" PlanStatus hint is unreachable once the view
             // passes progress: null - it must still surface somewhere live,
             // via PlanPhaseEvent.Detail on the BuildingTree event (see
             // PlanStripTickDecision.FormatPhaseText).
@@ -2912,7 +2889,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(result.SolveContext.CurrencyValuation.TryGetCopperValue(2, out _));
         }
 
-        // --- M37: Homestead Refinement efficiency tiers
+        // --- Homestead Refinement efficiency tiers
         // are snapshotted on PlanSolveContext at generation time and reused
         // as-is by a local override re-solve, matching every other
         // settings-snapshot field on that class (CurrencyValuation,
@@ -3028,7 +3005,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- Own-materials valuation (M28) ---
+        // --- Own-materials valuation ---
 
         private static CraftingPlanPipeline BuildOwnMaterialsPipeline(
             out InMemoryPriceApiClient priceApi, int ingredientCount = 5)
@@ -3248,7 +3225,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(result.MaterialOpportunityCost);
         }
 
-        // --- M34-B2b: "Ignore" pill threaded through ResolveWithOverrides ---
+        // --- "Ignore" pill threaded through ResolveWithOverrides ---
 
         [Fact]
         public async Task ResolveWithOverrides_IgnoredItemIds_ZeroesIngredientCost()
@@ -3318,7 +3295,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task Structured_ValuedMode_UsedMaterialPrices_AlreadyCoveredByTreeFetch()
         {
-            // Design assertion (see M28 spec): prices are fetched for
+            // Design assertion: prices are fetched for
             // allItemIds, which is collected from the PRE-reduction tree
             // (Step 2 runs before Step 6's reduction), so every used
             // material - being a tree item that reduction happened to
@@ -3467,7 +3444,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- M34-B2a #3: force-buy pre-pass (zero-owned baseline) ---
+        // --- Force-buy pre-pass (zero-owned baseline) ---
 
         /// <summary>
         /// Reuses BuildOwnMaterialsPipeline's identical tree shape (item 1
@@ -3705,7 +3682,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Control for the test above: Free mode never runs the
             // force-buy pre-pass, so the (misleadingly cheap) post-
-            // reduction craft path wins normally, same as before M34.
+            // reduction craft path wins normally.
             var pipeline = BuildForceBuyPipeline(out _);
 
             var result = await pipeline.GenerateStructuredAsync(
@@ -3799,7 +3776,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(100, resolved.Plan.TotalCoinCost);
         }
 
-        // --- M34-B2a #4: owned currency (cosmetic only, never affects decisions) ---
+        // --- Owned currency (cosmetic only, never affects decisions) ---
 
         private static CraftingPlanPipeline BuildVendorCurrencyPipeline(
             out VendorOfferStore store, string tempDir)
@@ -3975,7 +3952,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- M38 WP-18 (tests T6/T8/T9): pipeline-level cancellation,
+        // --- Pipeline-level cancellation,
         // dependency-throws (degrade vs abort), and Ignore x owned-materials
         // interaction coverage. Every existing test above calls
         // GenerateStructuredAsync with CancellationToken.None and a fully-

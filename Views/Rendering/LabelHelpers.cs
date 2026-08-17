@@ -5,10 +5,9 @@ using MonoGame.Extended.BitmapFonts;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-21 (Tier-1 static renderer extraction, m38-a1-architecture.md
-    // S3b-T1): moved verbatim out of CraftingPlanView's "11. Generic
-    // control/format helpers" region (KNOWN-ISSUES #23 / DO-NOT-TOUCH #6 -
-    // CreateRowDivider's divider math and its M36b 1px scissor clearance
+    // Moved verbatim out of CraftingPlanView's "11. Generic
+    // control/format helpers" region (KNOWN-ISSUES #23 -
+    // CreateRowDivider's divider math and its 1px scissor clearance
     // constants move byte-identical, unchanged from below) - private
     // static -> internal static, no logic changes. Callers in
     // CraftingPlanView now qualify as LabelHelpers.CreateRowDivider /
@@ -70,9 +69,9 @@ namespace GW2CraftingHelper.Views.Rendering
         /// Callers pass 1 for the vulnerable 44px/32px row types above and 0
         /// for the immune 36px row types (CreateUsedMaterialRow,
         /// CreateShoppingRow, CreateRecipeRow's no-sublabel branch) - those
-        /// three were tuned in M36 to a flush icon(0..34) + divider(34..36)
+        /// three were tuned to a flush icon(0..34) + divider(34..36)
         /// fit with zero slack, and giving them clearance they don't need
-        /// would reintroduce the icon/divider overlap M36 fixed.
+        /// would reintroduce the icon/divider overlap that fix removed.
         /// </summary>
         internal static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight, int bottomClearance)
         {

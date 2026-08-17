@@ -62,7 +62,7 @@ namespace GW2CraftingHelper.Services
         // because only a fallback-tier offer (unvalued non-coin currency)
         // exists and would be used as a last resort. It intentionally does
         // NOT distinguish "genuinely comparable" from "fallback-only" by
-        // itself - a future display-layer pass (M33 backlog #18) should
+        // itself - a future display-layer pass should
         // read Source/TotalCost/VendorCurrencyCosts on the committed
         // decision to decide how to present a non-chosen Vendor
         // alternative, rather than treating this flag alone as "equally

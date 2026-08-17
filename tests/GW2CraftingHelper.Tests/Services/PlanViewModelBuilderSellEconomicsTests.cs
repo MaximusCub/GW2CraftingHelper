@@ -112,8 +112,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("buy-order prices", costTile.TooltipText);
         }
 
-        // --- Own-materials opportunity cost (M28) - now the cost band's
-        // middle "Your Materials Used" tile, per the W4A collapse rule ---
+        // --- Own-materials opportunity cost - the cost band's
+        // middle "Your Materials Used" tile, per the collapse rule ---
 
         [Fact]
         public void MaterialOpportunityCostPositive_ExpandsCostBandToThreeTiles()

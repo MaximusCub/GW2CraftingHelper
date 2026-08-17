@@ -16,9 +16,9 @@ namespace GW2CraftingHelper.Services
         // (Blish-free) does the actual conversion so that logic is unit-testable.
         public SettingEntry<string> CurrencyValuationsJson { get; private set; }
 
-        // gw2efficiency-style "value own materials" (M28; M34-B2a #3
-        // upgraded this from a display-only opportunity-cost tweak into a
-        // real force-buy pre-pass - see OwnedMaterialsForceBuyPrePass;
+        // gw2efficiency-style "value own materials" (upgraded over time
+        // from a display-only opportunity-cost tweak into a real
+        // force-buy pre-pass - see OwnedMaterialsForceBuyPrePass;
         // the VOM design (Candidate A) further upgraded it into a full
         // decision-invariant reduction - see InventoryReducer's
         // zeroOwnedDecisions doc comment): when enabled, a node is
@@ -57,7 +57,7 @@ namespace GW2CraftingHelper.Services
         public SettingEntry<int> HomesteadMetalTier { get; private set; }
         public SettingEntry<int> HomesteadWoodTier { get; private set; }
 
-        // M33 C1 (#12 diagnostics): gates the scroll-machinery diagnostic
+        // Gates the scroll-machinery diagnostic
         // logging in CraftingPlanView (wheel events, restore/guard writes
         // and state transitions). Default false; instrumentation only -
         // never changes scroll/guard/restore behavior.
@@ -85,8 +85,8 @@ namespace GW2CraftingHelper.Services
         // session at Module.LoadAsync - see ModuleLogStore.PruneOlderThan.
         public SettingEntry<int> LogRetentionDays { get; private set; }
 
-        // M39 (log system, d2-log-system.md Section 5/tab-roadmap-proposal
-        // Section 2.1): the ONE diagnostics toggle for the whole module -
+        // The ONE diagnostics toggle for the whole module
+        // (d2-log-system.md Section 5) -
         // subsumes ScrollDiagnosticsEnabled above and additionally gates
         // whether Debug-level ModuleLog entries reach the file sink (they
         // always still land in the in-memory ring regardless - see

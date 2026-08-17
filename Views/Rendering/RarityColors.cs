@@ -2,8 +2,7 @@ using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-21 (Tier-1 static renderer extraction, m38-a1-architecture.md
-    // S3b-T1): moved verbatim out of CraftingPlanView's "10./11. Coin/
+    // Moved verbatim out of CraftingPlanView's "10./11. Coin/
     // currency value rendering primitives" and "Generic control/format
     // helpers" regions - private static -> internal static, no logic
     // changes. Callers in CraftingPlanView now qualify as
@@ -23,7 +22,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // next to the tinted frames around it (this row's icon frame
                 // in particular sits beside Fine/Rare/etc. frames that are
                 // clearly colored). Distinct from the (60, 60, 60)
-                // unknown/absent-rarity fallback below - M19 design intent.
+                // unknown/absent-rarity fallback below - deliberate.
                 case "Basic": return new Color(90, 90, 90);
                 case "Fine": return new Color(98, 164, 218);
                 case "Masterwork": return new Color(26, 147, 6);

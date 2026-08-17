@@ -1240,21 +1240,12 @@ namespace VendorOfferUpdater
 
                 int effectiveDelay = Math.Max(200, delayMs);
 
-                // Resilience fix: the ONLY save call used to
-                // sit after this loop, and the per-page catch only caught
-                // HttpRequestException. A JsonException from a non-JSON/
-                // HTML response (JsonDocument.Parse in
-                // WikiSmwClient.FetchWikitextAsync), an
-                // OperationCanceledException from Ctrl-C
-                // (ct.ThrowIfCancellationRequested/Task.Delay), or any
-                // other exception then aborted the whole method and
-                // discarded every page already fetched THIS run - a
-                // re-run would re-fetch all of them, and the caller
-                // (RunAsync) never even reaches Step 4/5/6 to write any
-                // output. The try/finally below saves whatever this pass
-                // fetched no matter how the loop exits; a parse failure is
-                // now treated exactly like an HTTP failure (warn, leave
-                // this one page uncached, continue with the rest).
+                // The try/finally below saves whatever this pass fetched
+                // no matter how the loop exits (Ctrl-C, parse failure,
+                // transport error), so a mid-run failure keeps the pages
+                // already fetched; a parse failure is treated exactly like
+                // an HTTP failure (warn, leave this one page uncached,
+                // continue with the rest).
                 try
                 {
                     for (int i = 0; i < toFetch.Count; i++)

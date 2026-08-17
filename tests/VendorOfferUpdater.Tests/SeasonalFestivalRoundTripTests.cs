@@ -38,7 +38,7 @@ namespace VendorOfferUpdater.Tests
     /// other one of its nine offers - stay byte-for-byte identical to what
     /// was hand-tagged before; a fresh scrape of ANY merchant recomputes
     /// new OfferIds for that merchant, per VendorOfferHasher's own doc
-    /// comment on the M37/Astral Acclaim hash-format migration, so
+    /// comment on the Astral Acclaim hash-format migration, so
     /// touching Candy Corn Vendor (Weekly) in that pass would have broken
     /// the "3 known offer IDs survive identically" requirement). See
     /// docs/KNOWN-ISSUES.md for the full partial-coverage note (thousands

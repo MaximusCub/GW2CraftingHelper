@@ -2,8 +2,8 @@ namespace GW2CraftingHelper.Models
 {
     /// <summary>
     /// Which account-inventory sources the Snapshot tab's search/filter row
-    /// should include (M39 snapshot search,
-    /// d1-snapshot-about-settings.md Feature 1). All four default to true
+    /// should include (d1-snapshot-about-settings.md Feature 1).
+    /// All four default to true
     /// (show everything), matching the pre-search-box tab's implicit
     /// no-filter behavior. "Characters" is a single combined toggle
     /// covering every "Character:&lt;name&gt;"-encoded source, not a

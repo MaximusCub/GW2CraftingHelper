@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Models
         /// collected into a plan at all, see PlanSolver.Collect - but kept
         /// numerically distinct anyway). Note: PlanResultBuilder no longer
         /// uses a bare `recipeId &lt; 0` sign check to identify Mystic
-        /// Forge recipes (a real id-space collision with the M37
+        /// Forge recipes (a real id-space collision with the
         /// achievement/merchant seed recipes, ref/recipes_seed.json ids
         /// -1592..-1595, made that unsound) - it now checks the recipe's
         /// own declared Disciplines instead.

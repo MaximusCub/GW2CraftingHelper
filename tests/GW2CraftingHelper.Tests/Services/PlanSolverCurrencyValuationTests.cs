@@ -316,27 +316,18 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         /// <summary>
-        /// Gate finding (value-detail hover, live repro): the
-        /// live case reported a CRAFT root's value-detail hover
-        /// (ValueDetailTooltipBuilder) not firing for a Deldrimor Steel
-        /// Ingot-shaped plan whose subtree contains a Philosopher's Stone-
-        /// style BuyFromVendor child priced entirely in a valued non-coin
-        /// currency (spirit shards, curated default 3600 copper/unit -
-        /// Models/CurrencyDecisionDefaults.cs). The sibling test above
+        /// The sibling test above
         /// (ComparisonValue_RollsUpThroughAncestorCraft_MatchesDecisionOnlyExpectation)
-        /// already proves the raw SolverDecision.ComparisonValue rolls up
-        /// correctly through the solver; this test walks the SAME shape one
-        /// layer further - through CraftingTreeBuilder.BuildTree (which
-        /// copies decision.ComparisonValue verbatim onto
+        /// proves the raw SolverDecision.ComparisonValue rolls up correctly
+        /// through the solver; this test walks the SAME shape one layer
+        /// further - through CraftingTreeBuilder.BuildTree (which copies
+        /// decision.ComparisonValue verbatim onto
         /// CraftingTreeNode.DecisionValue) and then
         /// ValueDetailTooltipBuilder.TryBuild, the exact two production
         /// steps between a solved decision and the tooltip a CRAFT pill
-        /// hover renders - to determine whether the fold-up genuinely
-        /// reaches the pill, or is lost somewhere between the two.
-        /// CurrencyDecisionDefaults' own curated value is used (via
-        /// CurrencyValuation.WithDefaults) rather than a hand-picked test
-        /// valuation, matching the live report's own "curated default
-        /// value" wording exactly.
+        /// hover renders. CurrencyDecisionDefaults' own curated value is
+        /// used (via CurrencyValuation.WithDefaults) rather than a
+        /// hand-picked test valuation.
         /// </summary>
         [Fact]
         public void CraftRoot_VendorChildValuedInCuratedCurrency_ValueDetailTooltipFires()

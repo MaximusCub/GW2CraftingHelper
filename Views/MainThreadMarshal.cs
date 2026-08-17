@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Views
     /// drains a re-queued callback again within the SAME frame instead of
     /// waiting for the next real Update() tick, so it cannot be used to
     /// step work across multiple frames (empirically confirmed via live
-    /// trace during M30 - 400 same-frame re-queues observed in one drain).
+    /// trace - 400 same-frame re-queues observed in one drain).
     /// For multi-frame work, drive it from Control.DoUpdate instead - see
     /// FrameTicker in CraftingPlanView.
     /// </para>

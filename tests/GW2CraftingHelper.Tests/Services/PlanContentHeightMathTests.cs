@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Tests.Services
     /// Exercises the real PlanContentHeightMath arithmetic against the same
     /// row-height constants CraftingPlanView's row builders use, so a future
     /// change to one side without the other would show up here as a wrong
-    /// expected value rather than a silent drift (M33 C2a directive A).
+    /// expected value rather than a silent drift.
     /// </summary>
     public class PlanContentHeightMathTests
     {
@@ -104,7 +104,6 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void RecipeRowHeightNoSublabel_ExactlyFitsIconFramePlusDivider()
         {
-            // M36 fix-pass (MUSTFIX-3):
             // Views/Rendering/RecipesSectionRenderer.CreateRecipeRow's
             // no-sublabel branch
             // places a 34px rarity-framed icon at y=0
@@ -325,10 +324,10 @@ namespace GW2CraftingHelper.Tests.Services
         // StillOneCostTileRowHeight) asserted
         // PlanContentHeightMath.SummaryBodyHeight's shape via
         // PlanRowType.CoinTotal. Deleted as dead code (KNOWN-ISSUES W4A
-        // follow-up, closed under the high-evidence-zone policy - see
+        // entry, closed under the high-evidence-zone policy - see
         // docs/KNOWN-ISSUES.md's policy note): CoinTotal was never emitted
         // by PlanViewModelBuilder, and SummaryBodyHeight was unreachable
-        // for a real Summary section since W4A routed
+        // for a real Summary section once the redesign routed
         // PlanSectionType.Summary to SummarySectionLayoutMath.BodyHeight
         // instead. Deleted together with the enum member and the method
         // (see Models/PlanViewModel.cs, Services/PlanContentHeightMath.cs).

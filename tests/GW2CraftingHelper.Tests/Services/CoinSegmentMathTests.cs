@@ -4,16 +4,13 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // M38 WP-21 findings fix: TotalCoinSegmentsWidth/TotalCurrencySegmentsWidth,
-    // their plain data specs (CoinSegmentSpec/CurrencySegmentSpec), and the
-    // geometry constants they're built from were extracted verbatim out of
-    // CoinCurrencyRenderer (Views/Rendering, Blish-bound) into this
+    // TotalCoinSegmentsWidth/TotalCurrencySegmentsWidth, their plain data
+    // specs (CoinSegmentSpec/CurrencySegmentSpec), and the geometry
+    // constants they're built from were extracted verbatim out of
+    // CoinCurrencyRenderer (Views/Rendering, Blish-bound) into a
     // Blish-free class so the arithmetic can be tested without referencing
-    // UI code (repo invariant: tests must never reference UI code). An
-    // earlier findings-fix pass on this branch instead added a test file
-    // under tests/.../Views/Rendering/ that called CoinCurrencyRenderer
-    // directly - that violated the invariant and has been replaced by this
-    // file. Expected values are computed against the real
+    // UI code (repo invariant: tests must never reference UI code).
+    // Expected values are computed against the real
     // CoinLabelIconGap/CoinIconSize/CoinSegmentGap constants rather than
     // re-deriving the formula, so a future constant change updates the
     // assertions' inputs, not just the production code, catching drift -

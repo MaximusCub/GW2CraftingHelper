@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class PlanSolverMultiItemWrapperTests
     {
-        // --- M35-B1: synthetic multi-item wrapper root (gw2e parity) ---
+        // --- Synthetic multi-item wrapper root (gw2e parity) ---
         // WrapperOf lives in Helpers/RecipeNodeBuilders.cs.
 
         [Fact]

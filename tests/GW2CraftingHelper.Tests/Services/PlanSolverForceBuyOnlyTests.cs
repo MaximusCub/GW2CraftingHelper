@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class PlanSolverForceBuyOnlyTests
     {
-        // --- M34-B2a #3: cost diagnostics + force-buy-only exclusion ---
+        // --- Cost diagnostics + force-buy-only exclusion ---
 
         [Fact]
         public void CostDiagnostics_PopulatedForEveryItemNode_RegardlessOfDecision()

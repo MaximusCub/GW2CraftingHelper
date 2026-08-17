@@ -79,7 +79,7 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// int[] twin of the IReadOnlyList&lt;int&gt; overload above, same
-        /// formula. Every M33 C2b per-frame relayout closure (replayed on
+        /// formula. Every per-frame relayout closure (replayed on
         /// every OnPanelResized drag tick) calls this with
         /// SegmentLayoutHandle.TextWidths, which is always a concrete
         /// int[]; without this overload the compiler binds those hot-path

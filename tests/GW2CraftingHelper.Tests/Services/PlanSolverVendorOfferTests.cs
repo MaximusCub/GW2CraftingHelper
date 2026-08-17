@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class PlanSolverVendorOfferTests
     {
-        // --- VendorCurrencyCosts threading tests (M33 spec item 5) ---
+        // --- VendorCurrencyCosts threading tests ---
 
         [Fact]
         public void VendorCurrencyCosts_ThreadedOntoSolverDecisionAndPlanStep()
@@ -412,7 +412,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(300, plan.TotalCoinCost);
         }
 
-        // --- W4B: SolverDecision.VendorItemCosts/VendorHasRawCoin ---
+        // --- SolverDecision.VendorItemCosts/VendorHasRawCoin ---
 
         [Fact]
         public void MixedItemAndCurrencyOffer_PopulatesVendorItemCosts_AndNotHasRawCoin()

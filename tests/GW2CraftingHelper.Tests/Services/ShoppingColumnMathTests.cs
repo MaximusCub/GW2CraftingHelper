@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void TypicalValues_FallBackToFixedMinimums()
         {
             // Small coin values (well under the fixed minimums) -> edges
-            // fall back to the same minimums as the pre-M32-#? fixed-width
+            // fall back to the same minimums as the old fixed-width
             // geometry, so ordinary short lists render exactly as before.
             var edges = ShoppingColumnMath.ComputeEdges(totalRightEdge: 792, maxEachWidth: 40, maxTotalWidth: 60);
 
@@ -118,8 +118,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(10 + 5 + 100, width);
         }
 
-        // --- SegmentRunWidth(int[], ...) overload (M33 UX-wave fix-pass:
-        // the per-frame resize hot path passes SegmentLayoutHandle.TextWidths,
+        // --- SegmentRunWidth(int[], ...) overload
+        // (the per-frame resize hot path passes SegmentLayoutHandle.TextWidths,
         // a concrete int[], to a non-allocating overload rather than the
         // IReadOnlyList<int> one above; both must agree on every result) ---
 

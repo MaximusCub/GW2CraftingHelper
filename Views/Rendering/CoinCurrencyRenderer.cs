@@ -8,8 +8,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // M38 WP-21 (Tier-1 static renderer extraction, m38-a1-architecture.md
-    // S3b-T1): moved verbatim out of CraftingPlanView's "10. Coin/currency
+    // Moved verbatim out of CraftingPlanView's "10. Coin/currency
     // value rendering primitives" region - private static -> internal
     // static, no logic changes. The coin-icon-right-of-number invariant
     // (repo CLAUDE.md) now lives in this one named place. Callers in
@@ -38,7 +37,7 @@ namespace GW2CraftingHelper.Views.Rendering
         // spec list can be laid out left-anchored, right-anchored (table
         // price columns), or centered (cost tiles) without re-measuring.
 
-        // M38 WP-21 findings fix: CoinIconSize/CoinLabelIconGap/CoinSegmentGap,
+        // CoinIconSize/CoinLabelIconGap/CoinSegmentGap,
         // CoinSegmentSpec/CurrencySegmentSpec, and the TotalCoinSegmentsWidth/
         // TotalCurrencySegmentsWidth arithmetic moved to Services/CoinSegmentMath.cs
         // (Blish-free, unit-tested) so the width formulas can be tested without
@@ -75,7 +74,7 @@ namespace GW2CraftingHelper.Views.Rendering
         // padding formatting - a deliberate MainView behavior, out of this
         // package's scope to change) without duplicating this measure-
         // and-wrap one-liner.
-        // NOTE: this is NOT the same precedent as the WP-21-prep
+        // NOTE: this is NOT the same precedent as the earlier
         // GetPillColors private -> internal bump. That bump was reverted
         // back to private (commit 5c56b2a) specifically to stop
         // Views/Rendering from depending back on CraftingPlanView and keep

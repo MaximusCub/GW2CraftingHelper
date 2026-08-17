@@ -256,7 +256,7 @@ namespace GW2CraftingHelper.Tests.Services
                 75375, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
 
-            // The recipe is still fully craftable (M33 "hasComponents"
+            // The recipe is still fully craftable (the "hasComponents"
             // guarantee, same as an all-unvalued-currency recipe) - a
             // GuildUpgrade ingredient does not disqualify the recipe.
             Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);

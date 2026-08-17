@@ -6,8 +6,8 @@ using System.Text;
 namespace GW2CraftingHelper.Services.Diagnostics
 {
     /// <summary>
-    /// W3B (generation progress + rich logging): formats a compact,
-    /// coarse-phase timing summary for the CraftingPlanPipeline's "Info on
+    /// Formats a compact, coarse-phase timing summary for the
+    /// CraftingPlanPipeline's "Info on
     /// finish" ModuleLog line - e.g. "tree 120ms, prices 8400ms (418
     /// items), solve 30ms, item details 9200ms, display 250ms - total
     /// 19036ms (phases 18158ms)". Pure function over the SAME raw
