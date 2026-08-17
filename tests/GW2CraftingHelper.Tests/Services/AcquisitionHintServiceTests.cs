@@ -9,10 +9,14 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class AcquisitionHintServiceTests
     {
-        // Mirrors the real ref/acquisition_hints_seed.json content (the
-        // five wiki-verified entries from docs/KNOWN-ISSUES.md item 8, plus
-        // the M33 item-17 Gift of Battle entry) so this test also guards
-        // the production seed file's shape.
+        // In-file fixture with 6 of the now-7 real ref/acquisition_hints_
+        // seed.json entries (the five wiki-verified entries from docs/
+        // KNOWN-ISSUES.md item 8, plus the M33 item-17 Gift of Battle
+        // entry) - exercises AcquisitionHintService.Load's parsing shape
+        // in isolation. The separate Load_ShippedSeedFile_* test below
+        // reads the actual shipped file and pins its real (7-entry) count,
+        // so drift between this fixture and the production seed is caught
+        // there, not here.
         private const string ValidEnvelopeJson = @"{
             ""schemaVersion"": 1,
             ""generatedAt"": ""2026-07-20T00:00:00Z"",
