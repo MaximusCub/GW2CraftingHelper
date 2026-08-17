@@ -357,18 +357,23 @@ occurrence. This lives in `Services/VendorBatchSolver.cs`
 **Why:** Rounding per-occurrence instead of per-total overstates cost.
 The canonical regression case: needing 179 of a vendor item sold in
 batches of some size that should round up to a total of 180, not 186 -
-the bug that motivated pinning this arithmetic as do-not-touch. The class
-also carries the Astral Acclaim / Wizard's Vault seasonal purchase cap
-(`SeasonalCap`, independent of the pre-existing daily/weekly cap fields)
-and the Homestead Refinement efficiency-tier discount, both threaded
-through the exact same merged-batch machinery rather than as separate
-paths.
+the bug that motivated pinning this arithmetic as a high-evidence zone
+(formerly do-not-touch; see `docs/KNOWN-ISSUES.md`'s policy note). The
+class also carries the Astral Acclaim / Wizard's Vault seasonal purchase
+cap (`SeasonalCap`, independent of the pre-existing daily/weekly cap
+fields) and the Homestead Refinement efficiency-tier discount, both
+threaded through the exact same merged-batch machinery rather than as
+separate paths.
 
-**Where:** `Services/VendorBatchSolver.cs`. This arithmetic is
-documented-essential (do-not-touch): WP-11 and WP-15 restructured the
-*shape* around it (an out-param bundle became a result struct; the whole
-engine moved out of `PlanSolver` into its own class) but never touched the
-arithmetic itself - both moves are diffable as pure code motion.
+**Where:** `Services/VendorBatchSolver.cs`. This arithmetic is a
+documented-essential high-evidence zone (formerly do-not-touch): WP-11
+and WP-15 restructured the *shape* around it (an out-param bundle became
+a result struct; the whole engine moved out of `PlanSolver` into its own
+class) but never touched the arithmetic itself - both moves are diffable
+as pure code motion. A change to the arithmetic itself is permitted when
+it carries characterization tests of current behavior, the standard
+adversarial review pipeline, and an explicit improved/regressed-nothing
+statement, per the high-evidence-zone policy.
 
 **Full history:** KNOWN-ISSUES items 20.1, 20.2, 28, 33.
 
