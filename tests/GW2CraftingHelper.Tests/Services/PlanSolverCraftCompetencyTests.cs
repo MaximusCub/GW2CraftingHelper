@@ -521,5 +521,65 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(30, opportunity.CraftCost);
             Assert.Equal(70, opportunity.DeltaCost);
         }
+
+        // --- Characterization: CompetencyOpportunityCalculator is a real
+        // downstream consumer of AllocateVendorNodeCosts' merged-ceil
+        // remainder shape (quorum verdict C6, merged-ceil-remainder
+        // stream). Item 200 has two tree occurrences (qty 1 each) of the
+        // SAME "100 for 1000c" bulk vendor offer used by the VendorBatchSolver-
+        // level characterization above, each also eligible for the SAME
+        // untrained-but-cheaper craft recipe (real cost 100/unit via leaf
+        // item 300). CompetencyOpportunityCalculator.Walk records the
+        // FIRST tree occurrence whose own SubtreeCost clears the
+        // CheapestCraftRealCost gate - NOT simply the first occurrence in
+        // the tree - so which occurrence's (possibly skewed) allocated
+        // share gets reported depends on AllocateVendorNodeCosts' own
+        // per-occurrence math:
+        //   PRE-FIX, this used to report an inflated 890 delta: occ1's
+        //   floor share (10) did not clear the 100 gate, so the walk fell
+        //   through to occ2, whose skewed remainder share (990) did -
+        //   reporting a number that only existed because of tree
+        //   position, not real economics.
+        //   FIXED: occ1's fair proportional share (500) now clears the
+        //   gate on first encounter, reporting the true 400 delta; occ2
+        //   is never evaluated for recording once item 200 is already in
+        //   byItemId.
+        [Fact]
+        public void MergedVendorLeaf_UnequalOccurrenceShares_CompetencyDeltaUsesFairProportionalShare()
+        {
+            var occ1 = Craftable(200, 1,
+                Option(20, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(300, 1)));
+            var occ2 = Craftable(200, 1,
+                Option(20, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(300, 1)));
+            var tree = Craftable(1, 1, Option(10, 1, 1, occ1, occ2));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 300, new ItemPrice { ItemId = 300, BuyInstant = 100 } }
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 200, new List<VendorOffer> { CoinVendorOffer(200, 1000, outputCount: 100) } }
+            };
+            var characterDisciplines = new List<SnapshotCharacterDiscipline>();
+
+            var root = SolveAndBuildRootNode(tree, prices, vendorOffers, characterDisciplines);
+
+            Assert.Equal(CraftingDecision.Craft, root.Decision);
+            Assert.Equal(2, root.Children.Count);
+            Assert.Equal(CraftingDecision.BuyFromVendor, root.Children[0].Decision);
+            Assert.Equal(CraftingDecision.BuyFromVendor, root.Children[1].Decision);
+            // Fair proportional split (500/500), matching the
+            // VendorBatchSolver-level characterization.
+            Assert.Equal(500, root.Children[0].SubtreeCost);
+            Assert.Equal(500, root.Children[1].SubtreeCost);
+
+            var result = new CraftingPlanResult { CraftingTree = root };
+            CompetencyOpportunityCalculator.Apply(result);
+
+            var opportunity = Assert.Single(result.CompetencyOpportunities);
+            Assert.Equal(200, opportunity.ItemId);
+            Assert.Equal(100, opportunity.CraftCost);
+            Assert.Equal(400, opportunity.DeltaCost);
+        }
     }
 }

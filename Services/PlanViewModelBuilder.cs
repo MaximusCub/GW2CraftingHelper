@@ -440,7 +440,16 @@ namespace GW2CraftingHelper.Services
             {
                 string currencyName = CurrencyDisplayResolver.ResolveName(cc.CurrencyId, result.CurrencyMetadata);
                 string iconUrl = CurrencyDisplayResolver.ResolveIconUrl(cc.CurrencyId, result.CurrencyMetadata);
-                int required = (int)cc.Amount;
+                // Adversarial-review round-2 finding (merged-ceil-remainder
+                // quorum, 2026-08): a plain unchecked `(int)cc.Amount` cast
+                // silently wraps NEGATIVE once Amount exceeds int.MaxValue,
+                // which then made `fullyCovered = owned >= required` true
+                // for almost any owned amount below - the exact opposite of
+                // what a currency requirement this large should show.
+                // ClampToInt (same convention as VendorBatchSolver's own
+                // long-to-int clamp) keeps this a very large but still
+                // correctly-ordered positive number instead.
+                int required = ClampToInt(cc.Amount);
 
                 // W4A (user-mandated): UNCLAMPED - the real wallet holding,
                 // even when it exceeds what the plan needs. Null (not 0)
@@ -1609,6 +1618,21 @@ namespace GW2CraftingHelper.Services
 
             string displayText = string.Join(" / ", displayParts);
             return $"{displayText} {recipeMinRating}";
+        }
+
+        /// <summary>
+        /// Clamps a long to int.MaxValue rather than letting a plain
+        /// `(int)` cast overflow/wrap negative - same convention as
+        /// VendorBatchSolver's own private ClampToInt (a currency Amount
+        /// this large is already an extreme edge case; showing the largest
+        /// representable int is safer than a corrupted negative required
+        /// quantity, which downstream owned-vs-required comparisons - see
+        /// BuildCurrencyTableRows' fullyCovered check - would otherwise
+        /// misread as fully covered).
+        /// </summary>
+        private static int ClampToInt(long value)
+        {
+            return value > int.MaxValue ? int.MaxValue : (int)value;
         }
     }
 }

@@ -53,8 +53,17 @@ namespace GW2CraftingHelper.Models
         /// log line, empty Crafting Plan tab on first load after upgrade) -
         /// a known, already-exercised, safe fresh-start, not a crash.
         /// </para>
+        /// <para>
+        /// Bumped 2 -&gt; 3 (quality-audit B1: the persisted graph grew
+        /// members with no matching version bump). See
+        /// docs/KNOWN-ISSUES.md ("Quality-audit cleanup, phase 1") for
+        /// the rationale and tests/Models/PersistedPlanSchemaMemberSetTests.cs
+        /// for the reflective guard - it now walks the whole graph
+        /// reachable from PersistedPlan, not just the four types named
+        /// above, and fails on any rename/add/remove/retype.
+        /// </para>
         /// </summary>
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why

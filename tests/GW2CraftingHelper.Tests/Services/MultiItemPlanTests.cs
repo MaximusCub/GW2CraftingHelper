@@ -1324,13 +1324,14 @@ namespace GW2CraftingHelper.Tests.Services
         /// SellableQuantity/NetSaleValue/CraftingProfit summing code this
         /// milestone added actually runs. AllocateVendorNodeCosts
         /// redistributes the corrected 20-coin batch total across the two
-        /// occurrences proportionally by demand (UnitCost x quantity),
-        /// with the last-seen occurrence absorbing the ceiling remainder
-        /// (8 to root 100, 12 to root 200 - see AllocateVendorNodeCosts'
-        /// own doc comment) - proving the batch's CraftingProfit uses this
-        /// real, non-duplicated per-root share (which sums to EXACTLY
-        /// Plan.TotalCoinCost) rather than double-counting or dropping the
-        /// shared portion.
+        /// occurrences by largest-remainder apportionment, proportional to
+        /// each occurrence's own quantity share of demand (see that
+        /// method's own doc comment) - here an even 10/10 split, since
+        /// both occurrences need the same quantity (2) of the shared
+        /// material and 20 divides 4 exactly - proving the batch's
+        /// CraftingProfit uses this real, non-duplicated per-root share
+        /// (which sums to EXACTLY Plan.TotalCoinCost) rather than double-
+        /// counting or dropping the shared portion.
         /// </summary>
         [Fact]
         public async Task GenerateStructuredAsync_TwoItems_SharedBulkVendorMaterial_BothTradable_CraftingProfitUsesRealNonDuplicatedSharedCost()
@@ -1416,8 +1417,8 @@ namespace GW2CraftingHelper.Tests.Services
                 // Each root's own allocated share of the merged vendor
                 // batch (not double-counted, not dropped) sums to exactly
                 // Plan.TotalCoinCost.
-                Assert.Equal(8, batch.MultiItemRoots[0].SubtreeCost);
-                Assert.Equal(12, batch.MultiItemRoots[1].SubtreeCost);
+                Assert.Equal(10, batch.MultiItemRoots[0].SubtreeCost);
+                Assert.Equal(10, batch.MultiItemRoots[1].SubtreeCost);
                 Assert.Equal(
                     batch.MultiItemRoots[0].SubtreeCost.Value + batch.MultiItemRoots[1].SubtreeCost.Value,
                     batch.Plan.TotalCoinCost);

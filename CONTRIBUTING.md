@@ -85,6 +85,20 @@ request.
   introducing new structure for a small change.
 - Keep edits focused; avoid unrelated refactors or formatting churn in the
   same change as a behavior fix.
+- **STANDING RULE (Recipe Tree row/pill features):** every new tree-row or
+  decision-pill feature extracts its pure text/decision computation into a
+  tested, Blish-free `Services/` composer BEFORE wiring it into
+  `Views/Rendering/TreeSectionController.cs` - the 8-for-8 proven pattern
+  (`DecisionPillPlanner`, `ValueDetailTooltipBuilder`,
+  `PillSubduingEvaluator`/`PillSubduingTooltipBuilder`,
+  `ReceiptCaptionHelper`, `CurrencyDisplayResolver`,
+  `TreeRowTooltipComposer`, ...). Only the actual Blish-bound
+  Panel/Label/event-wiring belongs in `TreeSectionController` itself. This
+  is not a suggestion to eventually split `TreeSectionController` into a
+  stateful/stateless pair - that split was evaluated and rejected by
+  decision (see `docs/ARCHITECTURE.md` section 5); the class stays a
+  single owner with a single lifetime, and every new feature's logic grows
+  the `Services/` side of that boundary, never a second stateful class.
 
 ## Where seed/reference data comes from
 

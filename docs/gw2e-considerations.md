@@ -2,6 +2,12 @@
 
 Date: 2026-08-15
 
+> DO-NOT-TOUCH references below predate the 2026-08-17 high-evidence-zone
+> policy - see docs/KNOWN-ISSUES.md's policy note. A DO-NOT-TOUCH citation
+> is no longer a blocking verdict; it is a proof requirement (see that
+> note for what proof looks like). Individual entries below have not been
+> re-litigated under the new rule.
+
 This is a living document, not a to-do list. Every entry below is a place
 where GW2CraftingHelper does something differently from gw2efficiency (gw2e)
 on purpose, or where matching gw2e exactly is blocked by one of this repo's
