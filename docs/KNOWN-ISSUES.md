@@ -6974,3 +6974,127 @@ taken.
 restates why each remaining candidate stays open.
 
 Gate: not applicable - comment/test/wording cleanup with no visual surface beyond a conditional notice clause (suite-pinned). Merged under the maintainer's standing merge directive (2026-08-16).
+
+## Merged-ceil remainder: largest-remainder apportionment + display-layer narrowing fix (2026-08-17)
+
+**Milestone goal:** quorum verdict C6 (TARGETED_FIX_ONLY plus the
+judge's own new finding) on the `merged-ceil-remainder` stream, which
+enters `VendorBatchSolver` - a former high-evidence/freeze zone
+(maintainer-retired 2026-08-17) - so per that retirement's own terms,
+characterize the current behavior in tests BEFORE changing it, then
+fix, then prove improved-X/regressed-nothing.
+
+**What changed:**
+1. **Characterization commit (`25fc887`).** Pinned
+   `AllocateVendorNodeCosts`' pre-fix "UnitCost * quantity per non-last
+   occurrence, last occurrence absorbs the entire remaining balance"
+   shape before touching it: the unbounded equal-quantity case (a "100
+   for 1000c" bulk offer split 1+1 rendered 10/990), the sum invariant,
+   and three real downstream consumers -
+   `CompetencyOpportunityCalculator` (real Solve()+
+   `CraftingTreeBuilder`+calculator round trip),
+   `RecipeSheetSavingsCalculator` (fixture bridging the same
+   arithmetic), and `SellSideEconomics.ApplyBatchSellSideEconomics`/
+   `CraftingProfit` (real Solve() round trip). Every assertion is
+   commented with the exact number the fix commit re-baselines it to.
+2. **Fix commit (`938f6c9`).** Replaced that shape with largest-
+   remainder (Hamilton) apportionment: each occurrence's floor share is
+   `step.TotalCost * quantity / totalQuantity`, and the leftover
+   (always strictly fewer coppers than there are occurrences - a
+   standard apportionment identity, proven in the commit message) goes
+   one each to the occurrences with the largest fractional remainder,
+   ties broken by first-seen (DFS) order. Divergence between any two
+   equal-quantity occurrences is now bounded to <=1 copper (was
+   unbounded). The flagship 179-unit/"3 for 3"-Laurel regression shape
+   (quantities 4/4/4/83/84, hand-verified floors 4/4/4/83/84 + the one
+   leftover copper landing on the 84-quantity occurrence via its 84/179
+   fraction, the largest) is **unchanged**: still 4/4/4/83/85 summing
+   to 180. Re-baselined the four pinned characterization tests plus one
+   pre-existing (not new) test that turned out to depend on the old
+   skewed shape (`MultiItemPlanTests.
+   GenerateStructuredAsync_TwoItems_SharedBulkVendorMaterial_
+   BothTradable_...`: two symmetric roots sharing a "5 for 20 coin"
+   material used to split 8/12 by tree-position accident, now split
+   evenly 10/10).
+3. **New bug (judge-found, real, unrelated to the vendor-batch math):
+   `Services/PlanViewModelBuilder.cs` `BuildCurrencyTableRows` narrowed
+   `CurrencyCost.Amount` (long) to int with a plain `(int)` cast. Past
+   `int.MaxValue` this silently wraps NEGATIVE, and
+   `fullyCovered = owned >= required` then reads true for almost any
+   owned amount - the opposite of what a currency requirement that
+   large should show. Class-swept (grepped Services/Models/Views for
+   any other unchecked long-to-int narrowing of an Amount/TotalCost/
+   UnitCost/Count-shaped field): this was the only one. Fixed with
+   `ClampToInt` (clamp to `int.MaxValue`), the identical convention
+   `VendorBatchSolver.ClampToInt` already uses for the same class of
+   risk. New boundary test
+   (`PlanViewModelBuilderSummaryTests.
+   CurrencyTable_AmountExceedsIntRange_ClampsRatherThanWrapsNegative`)
+   confirmed reproducing the bug pre-fix and passing post-fix.
+4. **C6(b) currencyMap "overstates" claim - verified NOT a bug.** The
+   quorum verdict named a prior claim that a Conflict-tier vendor
+   step's `currencyMap` accumulation "overstates" cost. Searched this
+   repo exhaustively (`docs/KNOWN-ISSUES.md`, `docs/ARCHITECTURE.md`,
+   `docs/gw2e-considerations.md`, `docs/research/gw2e-convergence-
+   matrix.md`, every other tracked doc, and code comments across
+   `Services/`/`Models/`) plus every sibling worktree on this machine
+   (`wt-hezone`, `wt-qp1`, `wt-valuedetail`) for the exact wording or
+   any equivalent ("double-count", "inflate", "overcounts") tied to
+   `currencyMap`/Conflict - found no such claim anywhere accessible to
+   this stream. Recording the correct verdict here as the authoritative
+   reference regardless, so any surviving reference elsewhere resolves
+   against this entry: a Conflict-tier step (two tree occurrences that
+   genuinely prefer different vendor offers - see
+   `PlanSolverVendorBatchingTests.
+   MultiOccurrenceDifferentWinningOffers_LeavesPerOccurrenceSumUnmerged`)
+   never runs through `AllocateVendorNodeCosts` at all
+   (`VendorOfferOutputCount` stays 0, guarded out at that method's own
+   entry). Its `currencyMap`/`Required` total is exactly the sum of
+   each occurrence's own genuinely-different, individually-correct
+   currency cost - which is also exactly the shopping list's summed
+   `PlanStep.Quantity` and the sum of the real tree leaves' own
+   `Decision.TotalCost` (152 coin in that test's own 1-for-2 + 100-for-
+   150 shape: 2 + 150 = 152, matching `vendorStep.TotalCost`,
+   `plan.TotalCoinCost`, and `result.Decisions[tree.NodeId].TotalCost`
+   all at once). This is correct, not an overstatement: there is no
+   single true merged offer to ceil across two occurrences that
+   genuinely used different offers, so forcing one would misrepresent
+   the real purchases rather than fix anything. Changing Conflict-tier
+   `currencyMap` to disagree with `Required`/the shopping list/the tree
+   leaves would create the real internal inconsistency the alternative
+   claim would have introduced.
+
+**Validation performed:**
+- Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
+  C:/Dev/Blish/wt-qceil/GW2CraftingHelper.csproj -p:Platform=x64` -
+  0 errors (pre-existing StyleCop warnings only, none in any touched
+  file).
+- Tests: `"/mnt/c/Program Files/dotnet/dotnet.exe" test
+  C:/Dev/Blish/wt-qceil/tests/GW2CraftingHelper.Tests/
+  GW2CraftingHelper.Tests.csproj` - 1773/1773 green (baseline ~1768 +
+  4 characterization + 1 boundary test), including the flagship
+  regression run standalone to confirm it is byte-identical to before.
+- Self-review (Code Reviewer Mode) on both runtime-affecting files:
+  `AllocateVendorNodeCosts`' leftover-distribution loop is proven to
+  always terminate with `leftover == 0` (apportionment identity in the
+  fix commit message - no divide-by-zero, no negative-leftover, no
+  loop-exhaustion edge case); `PlanViewModelBuilder`'s clamp matches
+  its own established sibling convention exactly.
+
+**Repo Invariants Checklist:**
+- [x] No Blish HUD references added to tests
+- [x] Tests exercise real production paths (three of the four
+  characterization tests are genuine `Solve()`+builder+calculator round
+  trips, not mirrored logic)
+- [x] No fake file I/O tests introduced
+- [x] Pricing logic preserves multi-source correctness (Conflict-tier
+  currency handling explicitly re-verified unchanged per item 4 above)
+- [x] IDs remain internal-only (not displayed)
+
+**Risks / follow-ups:** none new. The C6(b) correction (item 4) is
+recorded here as the authoritative verdict since no prior claim was
+locatable to edit in place; if the orchestrator has the original claim
+in a stream this session could not see, that record should be updated
+to point back here rather than restate the (incorrect) claim.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
