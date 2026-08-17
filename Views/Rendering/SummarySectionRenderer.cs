@@ -25,8 +25,9 @@ namespace GW2CraftingHelper.Views.Rendering
     // TextRowRenderer), and a new subdued footnote row (CreateFootnoteRow).
     // Height agreement for this new shape lives in
     // Services/SummarySectionLayoutMath.BodyHeight, not
-    // PlanContentHeightMath (DO-NOT-TOUCH for this package) - see that
-    // class's own doc comment for the full rationale.
+    // PlanContentHeightMath (a high-evidence zone, formerly DO-NOT-TOUCH,
+    // for this package - see docs/KNOWN-ISSUES.md's policy note) - see
+    // that class's own doc comment for the full rationale.
     internal sealed class SummarySectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -84,9 +85,6 @@ namespace GW2CraftingHelper.Views.Rendering
                     case PlanRowType.SummaryFootnote:
                         footnoteRows.Add(row);
                         break;
-                        // PlanRowType.CoinTotal is never emitted by
-                        // PlanViewModelBuilder any more (see that enum
-                        // member's own doc comment) - no case needed here.
                 }
             }
 
