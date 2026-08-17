@@ -9,6 +9,21 @@ namespace GW2CraftingHelper.Models
         public List<UsedMaterial> UsedMaterials { get; set; }
         public List<RequiredDiscipline> RequiredDisciplines { get; set; }
         public List<RequiredRecipe> RequiredRecipes { get; set; }
+
+        // Adversarial-review fix (#7, source-selection-simplification
+        // design-law gap): nodes where craft was excluded from the
+        // AUTOMATIC pick specifically because no character meets the
+        // winning recipe's discipline requirement (see
+        // SolverDecision.CraftExcludedByCompetency), even though it would
+        // have been cheaper - see CraftingPlanPipeline.
+        // BuildCompetencyOpportunities. Null/empty when nothing qualifies
+        // (no snapshot, nothing excluded, or every exclusion was cost-
+        // neutral-or-worse). Rendered by PlanViewModelBuilder.
+        // BuildNotesSection as concrete "would save N" Plan Notes lines,
+        // per the maintainer's design law (opportunities/considerations go
+        // to Plan Notes with concrete numbers) - never fed back into any
+        // cost/comparison.
+        public List<CompetencyOpportunity> CompetencyOpportunities { get; set; }
         public CraftingTreeNode CraftingTree { get; set; }
         public List<string> DebugLog { get; set; }
 

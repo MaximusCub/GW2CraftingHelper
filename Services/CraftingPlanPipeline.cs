@@ -262,8 +262,14 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
             if (useForceBuyPrePass)
             {
+                // Adversarial-review fix (Critical #3, source-selection-
+                // simplification): threaded effectiveCharacterDisciplines
+                // through so this throwaway solve is competency-aware too -
+                // see ComputeForceBuyOnlyNodeIds' own characterDisciplines
+                // doc comment for the propagation failure this closes.
                 forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
+                    _solver, tree, prices, vendorOffers, priceBasis, valuation,
+                    characterDisciplines: effectiveCharacterDisciplines);
 
                 var zeroOwnedSolve = _solver.Solve(
                     tree, prices, vendorOffers, priceBasis,
@@ -310,7 +316,14 @@ namespace GW2CraftingHelper.Services
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
                 assignNodeIds: !useForceBuyPrePass,
                 homesteadTiers: tiers,
-                characterDisciplines: effectiveCharacterDisciplines);
+                characterDisciplines: effectiveCharacterDisciplines,
+                // Adversarial-review fix (Critical #4, source-selection-
+                // simplification): threaded so a losing pill's raw-quantity
+                // StrictDomination claim never compares a craft ingredient
+                // InventoryReducer already discounted against an unrelated
+                // vendor line it never discounted - see PlanSolver.Evaluate's
+                // own ownedQuantityUsedByNode doc comment.
+                ownedQuantityUsedByNode: ownedQuantityUsedByNode);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -439,6 +452,12 @@ namespace GW2CraftingHelper.Services
             // annotation-only, same architectural role as SellSideEconomics
             // above - writes only result.ExcessCraftOutputs.
             ExcessCraftOutputCalculator.Apply(result, prices, metadata);
+
+            // Adversarial-review fix (#7, source-selection-simplification
+            // design-law gap): same annotation-only role, writes only
+            // result.CompetencyOpportunities - see that calculator's own
+            // doc comment.
+            CompetencyOpportunityCalculator.Apply(result);
 
             // Capture inputs so the UI can re-solve locally with per-node
             // overrides (no network round-trips).
@@ -743,8 +762,14 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, SolverDecision> zeroOwnedDecisions = null;
             if (useForceBuyPrePass)
             {
+                // Adversarial-review fix (Critical #3, source-selection-
+                // simplification): threaded effectiveCharacterDisciplines
+                // through so this throwaway solve is competency-aware too -
+                // see ComputeForceBuyOnlyNodeIds' own characterDisciplines
+                // doc comment for the propagation failure this closes.
                 forceBuyOnlyNodeIds = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
-                    _solver, tree, prices, vendorOffers, priceBasis, valuation);
+                    _solver, tree, prices, vendorOffers, priceBasis, valuation,
+                    characterDisciplines: effectiveCharacterDisciplines);
 
                 var zeroOwnedSolve = _solver.Solve(
                     tree, prices, vendorOffers, priceBasis,
@@ -789,7 +814,14 @@ namespace GW2CraftingHelper.Services
                 forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
                 assignNodeIds: !useForceBuyPrePass,
                 homesteadTiers: tiers,
-                characterDisciplines: effectiveCharacterDisciplines);
+                characterDisciplines: effectiveCharacterDisciplines,
+                // Adversarial-review fix (Critical #4, source-selection-
+                // simplification): threaded so a losing pill's raw-quantity
+                // StrictDomination claim never compares a craft ingredient
+                // InventoryReducer already discounted against an unrelated
+                // vendor line it never discounted - see PlanSolver.Evaluate's
+                // own ownedQuantityUsedByNode doc comment.
+                ownedQuantityUsedByNode: ownedQuantityUsedByNode);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -900,6 +932,12 @@ namespace GW2CraftingHelper.Services
             // call site walks CraftingTree.
             ExcessCraftOutputCalculator.Apply(result, prices, metadata);
 
+            // Adversarial-review fix (#7, source-selection-simplification
+            // design-law gap): same annotation-only role, writes only
+            // result.CompetencyOpportunities - see that calculator's own
+            // doc comment.
+            CompetencyOpportunityCalculator.Apply(result);
+
             result.SolveContext = new PlanSolveContext
             {
                 TargetItemId = Gw2Constants.MultiItemWrapperItemId,
@@ -999,6 +1037,18 @@ namespace GW2CraftingHelper.Services
             RecipeNode solveTree = context.Tree;
             List<UsedMaterial> usedMaterials = context.UsedMaterials;
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId = context.OwnedQuantityUsedByNodeId;
+            // Adversarial-review fix (Critical #4, source-selection-
+            // simplification): reference-keyed twin of
+            // ownedQuantityUsedByNodeId above, for PlanSolver.Evaluate's
+            // own StrictDomination-reliability check - only ever populated
+            // when this call actually re-reduces below (a fresh
+            // Dictionary<RecipeNode,int> keyed to THIS call's own
+            // solveTree nodes). Stays null when reusing the frozen,
+            // already-generation-time-reduced context.Tree verbatim - no
+            // regression (this StrictDomination check did not exist before
+            // this fix either), just not yet covered for that narrower
+            // branch.
+            Dictionary<RecipeNode, int> resolveOwnedQuantityUsedByNode = null;
 
             // Defensive: UnreducedTree is only ever set alongside a reducer
             // at generation time (see PlanSolveContext.UnreducedTree's doc
@@ -1024,6 +1074,7 @@ namespace GW2CraftingHelper.Services
                 solveTree = reduced.ReducedTree;
                 usedMaterials = reduced.UsedMaterials;
                 ownedQuantityUsedByNodeId = BuildOwnedQuantityUsedByNodeId(reduced.OwnedQuantityUsedByNode);
+                resolveOwnedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
             }
 
             // M34-B2a #3: reapply the SAME force-buy pre-pass result the
@@ -1047,7 +1098,8 @@ namespace GW2CraftingHelper.Services
                 assignNodeIds: false,
                 ignoredItemIds: ignoredItemIds,
                 homesteadTiers: context.HomesteadTiers,
-                characterDisciplines: context.CharacterDisciplines);
+                characterDisciplines: context.CharacterDisciplines,
+                ownedQuantityUsedByNode: resolveOwnedQuantityUsedByNode);
 
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(
@@ -1117,6 +1169,12 @@ namespace GW2CraftingHelper.Services
             // BuildCraftingTreeResult populated, so it needs no single-vs-
             // batch branch of its own.
             ExcessCraftOutputCalculator.Apply(result, context.Prices, context.Metadata);
+
+            // Adversarial-review fix (#7, source-selection-simplification
+            // design-law gap): same annotation-only role, writes only
+            // result.CompetencyOpportunities - see that calculator's own
+            // doc comment.
+            CompetencyOpportunityCalculator.Apply(result);
 
             result.SolveContext = context;
 

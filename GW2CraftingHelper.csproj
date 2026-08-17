@@ -117,9 +117,11 @@
     <Compile Include="Models\CurrencyMetadata.cs" />
     <Compile Include="Models\CraftingPlanResult.cs" />
     <Compile Include="Models\ExcessCraftOutput.cs" />
+    <Compile Include="Models\CompetencyOpportunity.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
     <Compile Include="Services\ExcessCraftOutputCalculator.cs" />
+    <Compile Include="Services\CompetencyOpportunityCalculator.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />

@@ -904,12 +904,15 @@ namespace GW2CraftingHelper.Services
         /// design-plan-notes.md (Notes section, Option 1 - single flat
         /// section, one shared NoteLine row shape). Assembles rows in a
         /// fixed order - excess/reclaim lines, then a total (only when 2+
-        /// excess lines exist), then competency lines, then the gambling-
-        /// forge scope line (0 or 1) - so re-solves and screenshots stay
-        /// diffable. Returns a section with zero rows when every note kind
-        /// is empty; the caller (Build()) only appends it to vm.Sections
-        /// when Rows.Count > 0, so an empty Notes section never renders a
-        /// header at all.
+        /// excess lines exist), then competency lines (disciplines a
+        /// COMMITTED Craft step already needs), then competency
+        /// OPPORTUNITY lines (adversarial-review fix #7 - disciplines that
+        /// would make the plan cost LESS, for a node craft was excluded
+        /// from on competency grounds), then the gambling-forge scope line
+        /// (0 or 1) - so re-solves and screenshots stay diffable. Returns a
+        /// section with zero rows when every note kind is empty; the
+        /// caller (Build()) only appends it to vm.Sections when Rows.Count
+        /// &gt; 0, so an empty Notes section never renders a header at all.
         /// </summary>
         private PlanSectionViewModel BuildNotesSection(CraftingPlanResult result)
         {
@@ -1022,6 +1025,45 @@ namespace GW2CraftingHelper.Services
                     });
                     noteEntryCount++;
                 }
+            }
+
+            // 2b. Competency OPPORTUNITY lines (adversarial-review fix #7,
+            // design-law gap) - alphabetical by resolved item name, same
+            // ordering precedent as the excess/reclaim lines above.
+            // Distinct from the "2. Competency lines" block just above:
+            // that block explains disciplines the plan ALREADY needs (a
+            // committed Craft step); this one surfaces disciplines that
+            // would let the plan cost LESS than it currently does, for a
+            // node the automatic pick excluded craft from specifically on
+            // competency grounds (CompetencyOpportunityCalculator has
+            // already filtered out force-buy-pre-pass exclusions, manual-
+            // override-to-craft nodes, and cost-neutral-or-worse cases -
+            // every entry here is a genuine, concrete "train this and
+            // save N" opportunity).
+            if (result.CompetencyOpportunities != null && result.CompetencyOpportunities.Count > 0)
+            {
+                var opportunityRows = new List<(string Name, PlanRowViewModel Row)>(
+                    result.CompetencyOpportunities.Count);
+                foreach (var opportunity in result.CompetencyOpportunities)
+                {
+                    string name = ResolveName(opportunity.ItemId, result.ItemMetadata);
+                    string disciplines = opportunity.Disciplines != null && opportunity.Disciplines.Count > 0
+                        ? string.Join(" or ", opportunity.Disciplines)
+                        : "the required discipline";
+
+                    opportunityRows.Add((name, new PlanRowViewModel
+                    {
+                        RowType = PlanRowType.NoteLine,
+                        Label = $"{name}: could be crafted for less - no character has " +
+                            $"{disciplines} {opportunity.MinRating}",
+                        CoinValue = opportunity.DeltaCost
+                    }));
+                    noteEntryCount++;
+                }
+
+                section.Rows.AddRange(opportunityRows
+                    .OrderBy(r => r.Name, StringComparer.Ordinal)
+                    .Select(r => r.Row));
             }
 
             // 3. Gambling-forge scope note (0 or 1 logical entry). Wording

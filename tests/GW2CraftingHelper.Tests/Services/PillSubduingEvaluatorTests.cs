@@ -67,6 +67,30 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(PillSubduingRule.Weighted, result.Rule);
             Assert.Equal(300, result.ValueMarginCopper);
             Assert.Null(result.Deltas);
+            Assert.True(result.HasNonCoinCost);
+        }
+
+        [Fact]
+        public void Weighted_PureCoinBothSides_HasNonCoinCostFalse()
+        {
+            // Adversarial-review finding: TP selected at 500c, CRAFT
+            // losing with DecisionValue 800c and no Currency/Item cost
+            // line on either side (plain gold difference) -
+            // StrictDomination cannot fire (losing's RawCoin, 0, is LOWER
+            // than selected's, 500 - a genuine tradeoff priced via a
+            // Currency ingredient elsewhere in the craft recipe, not shown
+            // here as a CostLine since it is folded straight into
+            // DecisionValue by the caller), so Weighted fires. The
+            // resulting HasNonCoinCost must be false so the tooltip never
+            // blames "your current currency values" for a pure-coin gap.
+            var selected = Available(rawCoin: 500, decisionValue: 500);
+            var losing = Available(rawCoin: 0, decisionValue: 800);
+
+            var result = PillSubduingEvaluator.Evaluate(selected, losing);
+
+            Assert.Equal(PillSubduingRule.Weighted, result.Rule);
+            Assert.Equal(300, result.ValueMarginCopper);
+            Assert.False(result.HasNonCoinCost);
         }
 
         [Fact]

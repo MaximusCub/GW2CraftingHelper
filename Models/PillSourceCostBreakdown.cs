@@ -21,9 +21,14 @@ namespace GW2CraftingHelper.Models
     /// item barter lines (Type == "Item", e.g. Globs of Ectoplasm) - raw
     /// quantities only, deliberately never gold-valued here (see
     /// RawCoin's own doc comment for why). Reusing CostLine avoids a
-    /// second near-identical model type; Count is always >= 1 and lines
-    /// are pre-grouped (one entry per distinct (Type, Id) pair, duplicate
-    /// ingredient/cost-line entries already summed).
+    /// second near-identical model type; lines are pre-grouped (one entry
+    /// per distinct (Type, Id) pair, duplicate ingredient/cost-line
+    /// entries already summed). Adversarial-review correction: Count can
+    /// be 0 for a craft ingredient line fully covered by owned stock
+    /// (InventoryReducer reduces the underlying RecipeNode.Quantity to 0
+    /// post-reduction, never removes the line) - harmless for
+    /// StrictDomination (0 vs 0 never trips a strict inequality), but the
+    /// "always >= 1" claim this doc comment previously made was false.
     /// </summary>
     public class PillSourceCostBreakdown
     {
@@ -33,6 +38,48 @@ namespace GW2CraftingHelper.Models
         /// every other field is meaningless/default when this is false.
         /// </summary>
         public bool IsAvailable { get; set; }
+
+        /// <summary>
+        /// Adversarial-review fix (Critical #5, source-selection-
+        /// simplification): true when this breakdown does NOT fully
+        /// represent every cost component of its source - currently, a
+        /// craft recipe with a GuildUpgrade or other unrecognized
+        /// ingredient type (BuildCraftCostBreakdown has no representable
+        /// "kind" for it, so the line is silently omitted entirely, unlike
+        /// an Item/Currency line whose Count can legitimately be 0). A
+        /// pill's own cost total (TotalCost/ComparisonValue) is
+        /// unaffected - only this DISPLAY-side raw decomposition is
+        /// incomplete. Both PillSubduingRule.StrictDomination and Weighted
+        /// are refused whenever either compared side IsIncomplete - the
+        /// same conservative "no breakdown data, don't claim a
+        /// comparison" posture CraftingTreeNode.VendorComponentCostsUnreliable
+        /// already takes for an unreliable merged-vendor-step breakdown.
+        /// False (the default) for every other source.
+        /// </summary>
+        public bool IsIncomplete { get; set; }
+
+        /// <summary>
+        /// Adversarial-review fix (Critical #4, source-selection-
+        /// simplification): true when at least one of this CRAFT source's
+        /// direct ingredients had its RecipeNode.Quantity reduced by owned
+        /// account stock (InventoryReducer.ReducedTreeResult.
+        /// OwnedQuantityUsedByNode) before this breakdown was built. Craft
+        /// ingredient lines come from the (possibly owned-stock-reduced)
+        /// crafting tree, while a losing VENDOR offer's own item cost
+        /// lines are computed independently and are NEVER discounted by
+        /// owned stock (a vendor trade-in is not a tree node at all) - so
+        /// comparing the two sides' raw quantities kind-by-kind can be
+        /// exactly backwards (a craft ingredient reduced to 10 by 10 owned
+        /// Globs of Ectoplasm can look "cheaper" than a vendor's un-
+        /// reduced 15, even when the real out-of-pocket craft cost is
+        /// actually the higher of the two). Gates StrictDomination ONLY -
+        /// Weighted stays valid, since DecisionValue already reflects the
+        /// real, correctly-discounted economics on both sides. False (the
+        /// default) whenever the caller does not thread owned-usage data
+        /// through (every pre-existing caller/test), reproducing pre-
+        /// existing behavior exactly.
+        /// </summary>
+        public bool RawQuantitiesReducedByOwnedStock { get; set; }
 
         /// <summary>
         /// Raw coin this source needs, EXCLUDING any TP-value folded from

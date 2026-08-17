@@ -3,6 +3,7 @@ using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
 using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
+using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
@@ -154,6 +155,88 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
             Assert.Equal(60, result.Decisions[0].TotalCost);
+        }
+
+        [Fact]
+        public void MultiRecipeNode_OneCompetentOneNot_CompetentSiblingAutoWinsOverExcludedCheaperOne()
+        {
+            // Adversarial-review Critical #1: a node with SEVERAL sibling
+            // RecipeOptions (routine - CompositeRecipeApiClient merges API
+            // recipe ids with MysticForgeRecipeData for the same output,
+            // and the API itself can return more than one recipe per
+            // output) must not have its ENTIRE craft arm excluded just
+            // because the single CHEAPEST option happens to be untrained.
+            // Recipe 10 (Weaponsmith 500, 600c) is cheaper than recipe 11
+            // (MysticForge - inherently available, 800c), but the account
+            // has no Weaponsmith - so the auto-pick must fall through to
+            // the more expensive but ACTUALLY CRAFTABLE recipe 11 (800c),
+            // never default to TP at 1000c.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(2, 1)),
+                Option(11, 1, 1, new List<string> { "MysticForge" }, 0, Leaf(3, 1)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 600 } },
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 800 } }
+            };
+            var solver = new PlanSolver();
+            var characterDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+            };
+
+            var result = solver.Solve(
+                tree, prices, null, PriceBasis.InstantBuy,
+                overrides: null, currencyValuation: null,
+                characterDisciplines: characterDisciplines);
+
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.Equal(800, result.Decisions[0].TotalCost);
+            Assert.Equal(11, result.Decisions[0].RecipeId);
+            Assert.True(result.Decisions[0].CanCraft);
+        }
+
+        [Fact]
+        public void NonCompetentAccount_OnlyAlternativeIsFallbackTierVendor_StillAutoCraftsRatherThanDroppingCost()
+        {
+            // Adversarial-review Critical #6: the "a genuine next-best
+            // source must exist" guard must NOT count a FALLBACK-tier
+            // vendor offer (unvalued non-coin currency, e.g. karma-only) as
+            // a real alternative. Node has a fully-priced comparable craft
+            // (60c) the account cannot craft (untrained Weaponsmith), no TP
+            // price, and only a karma-only vendor offer. Before this fix,
+            // competency excluded craft, PickCheapest returned
+            // UnknownSource, and the terminal fallback branch committed
+            // BuyFromVendor at fallbackVendorCoinCost (0c coin) - silently
+            // dropping the node's real 60c priced cost and defaulting onto
+            // an unvalued karma purchase. Craft must still auto-win here:
+            // nothing genuinely comparable exists to default to instead.
+            var tree = Craftable(1, 1,
+                Option(10, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(2, 2)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+                // No price for item 1 itself - no TP alternative.
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, coinCost: 0, currencyId: 23, currencyCount: 500000) } }
+            };
+            var solver = new PlanSolver();
+            var characterDisciplines = new List<SnapshotCharacterDiscipline>
+            {
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 0 }
+            };
+
+            var result = solver.Solve(
+                tree, prices, vendorOffers, PriceBasis.InstantBuy,
+                overrides: null, currencyValuation: null,
+                characterDisciplines: characterDisciplines);
+
+            Assert.Equal(AcquisitionSource.Craft, result.Decisions[0].Source);
+            Assert.Equal(60, result.Decisions[0].TotalCost);
+            Assert.Equal(10, result.Decisions[0].RecipeId);
         }
 
         [Fact]

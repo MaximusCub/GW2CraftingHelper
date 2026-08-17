@@ -116,5 +116,19 @@ namespace GW2CraftingHelper.Services
         public PillSourceCostBreakdown CraftCostBreakdown { get; internal set; }
         public PillSourceCostBreakdown BuyFromTpCostBreakdown { get; internal set; }
         public PillSourceCostBreakdown BuyFromVendorCostBreakdown { get; internal set; }
+
+        // Adversarial-review fix (#7, source-selection-simplification
+        // design-law gap): straight passthrough of PlanSolver.Decision's
+        // own matching fields - see that field's own doc comment. True
+        // only when craft was excluded from the AUTOMATIC pick because no
+        // character meets the winning recipe's discipline requirement
+        // (never for the force-buy pre-pass's own, separately-explained
+        // exclusion). CraftExcludedRealCost/Disciplines/MinRating describe
+        // the recipe that would have won - only meaningful when
+        // CraftExcludedByCompetency is true.
+        public bool CraftExcludedByCompetency { get; internal set; }
+        public long? CraftExcludedRealCost { get; internal set; }
+        public IReadOnlyList<string> CraftExcludedDisciplines { get; internal set; }
+        public int CraftExcludedMinRating { get; internal set; }
     }
 }

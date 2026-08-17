@@ -53,20 +53,42 @@ namespace GW2CraftingHelper.Services
         /// assign this tree's (deterministic, stable-across-repeat-solves)
         /// NodeIds - its own Plan/Decisions are discarded.
         /// </summary>
+        /// <param name="characterDisciplines">
+        /// Adversarial-review fix (Critical #3, source-selection-
+        /// simplification): the SAME per-character discipline snapshot the
+        /// caller's zero-owned guide solve and real solve both receive.
+        /// Without this, this throwaway solve was the ONLY solve of a
+        /// generation still running competency-UNKNOWN: for a parent node P
+        /// with a not-actually-craftable child ingredient C, THIS solve's
+        /// own recursive Evaluate(C) call never excludes craft on
+        /// competency grounds, so C commits Craft (its cheap, untrained
+        /// price) and that price folds straight into P's own craftCost sum
+        /// (via the ingredientCost accumulation in Evaluate's recipe loop) -
+        /// while the real, competency-aware solve commits C to BuyFromTp
+        /// instead, giving P a very different real craftCost. The 85%
+        /// force-buy comparison was therefore derived from craft costs the
+        /// real solve could never actually produce, silently diverging
+        /// forceBuyOnlyNodeIds from the tree it gets applied to. Null (the
+        /// default) reproduces this method's pre-existing behavior exactly
+        /// - competency UNKNOWN, matching every other caller of
+        /// PlanSolver.Solve that omits this parameter.
+        /// </param>
         public static ISet<int> ComputeForceBuyOnlyNodeIds(
             PlanSolver solver,
             RecipeNode tree,
             IReadOnlyDictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             PriceBasis priceBasis,
-            CurrencyValuation currencyValuation)
+            CurrencyValuation currencyValuation,
+            IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
         {
             var diagnostics = new Dictionary<int, (long? BuyCost, long? CraftCost)>();
 
             solver.Solve(
                 tree, prices, vendorOffers, priceBasis,
                 overrides: null, currencyValuation: currencyValuation,
-                forceBuyOnlyNodeIds: null, costDiagnostics: diagnostics);
+                forceBuyOnlyNodeIds: null, costDiagnostics: diagnostics,
+                characterDisciplines: characterDisciplines);
 
             var forced = new HashSet<int>();
             foreach (var kvp in diagnostics)

@@ -28,7 +28,8 @@ namespace GW2CraftingHelper.Services
         /// The losing option's RawCoin and every CostLine kind are each
         /// greater than or equal to the selected option's (missing kinds
         /// on either side treated as zero), with at least one strictly
-        /// greater - "always more expensive - same currencies, N more X".
+        /// greater - "always more expensive - needs everything the
+        /// selected option needs, plus N more X".
         /// Needs no valuation at all: this is a fact about raw quantities,
         /// true regardless of the user's currency values (covers e.g.
         /// Amalgamated Rift Essence: a vendor trade-in needing the SAME
@@ -70,11 +71,29 @@ namespace GW2CraftingHelper.Services
         /// <summary>StrictDomination only: every kind (Coin/Currency/Item) where losing &gt; selected. Null for every other rule.</summary>
         public IReadOnlyList<PillCostDelta> Deltas { get; }
 
-        public PillSubduingResult(PillSubduingRule rule, long? valueMarginCopper, IReadOnlyList<PillCostDelta> deltas)
+        /// <summary>
+        /// Weighted only (adversarial-review finding): true when either
+        /// side's PillSourceCostBreakdown.CostLines is non-empty, i.e. a
+        /// non-coin (Currency/Item) cost participates SOMEWHERE in this
+        /// comparison. Weighted very commonly fires on a pure-gold
+        /// difference with no currency valuation involved at all
+        /// (StrictDomination cannot fire whenever the losing side's
+        /// RawCoin is LOWER than the selected side's - e.g. losing craft
+        /// beats selected TP on raw coin but loses on DecisionValue for an
+        /// unrelated reason), so the tooltip wording must not blame "your
+        /// current currency values" for a difference that never touched a
+        /// currency valuation. False (the default) for every other rule.
+        /// </summary>
+        public bool HasNonCoinCost { get; }
+
+        public PillSubduingResult(
+            PillSubduingRule rule, long? valueMarginCopper, IReadOnlyList<PillCostDelta> deltas,
+            bool hasNonCoinCost = false)
         {
             Rule = rule;
             ValueMarginCopper = valueMarginCopper;
             Deltas = deltas;
+            HasNonCoinCost = hasNonCoinCost;
         }
     }
 
@@ -99,19 +118,44 @@ namespace GW2CraftingHelper.Services
                 return PillSubduingResult.None;
             }
 
-            // STRICT DOMINATION checked first - a stronger, valuation-free
-            // claim, preferred over WEIGHTED whenever both would apply.
-            var deltas = TryComputeDomination(selected, losing);
-            if (deltas != null)
+            // Adversarial-review fix (Critical #5): an incomplete
+            // breakdown (a real cost component with no representable
+            // line - see PillSourceCostBreakdown.IsIncomplete's own doc
+            // comment) cannot honestly support ANY subduing claim on
+            // either side - the same conservative posture
+            // VendorComponentCostsUnreliable already takes elsewhere.
+            if (selected.IsIncomplete || losing.IsIncomplete)
             {
-                return new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
+                return PillSubduingResult.None;
+            }
+
+            // Adversarial-review fix (Critical #4): a raw-quantity
+            // StrictDomination claim is unreliable the moment either side
+            // is a CRAFT breakdown whose ingredients were discounted by
+            // owned stock the other (vendor) side never sees - see
+            // PillSourceCostBreakdown.RawQuantitiesReducedByOwnedStock's
+            // own doc comment. Weighted (below) is unaffected - its
+            // DecisionValue figures already reflect the real, correctly-
+            // discounted economics on both sides.
+            if (!selected.RawQuantitiesReducedByOwnedStock && !losing.RawQuantitiesReducedByOwnedStock)
+            {
+                // STRICT DOMINATION checked first - a stronger, valuation-
+                // free claim, preferred over WEIGHTED whenever both would
+                // apply.
+                var deltas = TryComputeDomination(selected, losing);
+                if (deltas != null)
+                {
+                    return new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
+                }
             }
 
             if (selected.DecisionValue.HasValue && losing.DecisionValue.HasValue &&
                 losing.DecisionValue.Value > selected.DecisionValue.Value)
             {
                 long margin = losing.DecisionValue.Value - selected.DecisionValue.Value;
-                return new PillSubduingResult(PillSubduingRule.Weighted, margin, null);
+                bool hasNonCoinCost = (selected.CostLines != null && selected.CostLines.Count > 0) ||
+                    (losing.CostLines != null && losing.CostLines.Count > 0);
+                return new PillSubduingResult(PillSubduingRule.Weighted, margin, null, hasNonCoinCost);
             }
 
             return PillSubduingResult.None;

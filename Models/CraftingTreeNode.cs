@@ -246,6 +246,22 @@ namespace GW2CraftingHelper.Models
         public PillSourceCostBreakdown BuyFromTpCostBreakdown { get; set; }
         public PillSourceCostBreakdown BuyFromVendorCostBreakdown { get; set; }
 
+        // Adversarial-review fix (#7, source-selection-simplification
+        // design-law gap): straight passthrough of SolverDecision's own
+        // matching fields - true when craft was excluded from the
+        // AUTOMATIC pick specifically because no character meets the
+        // winning recipe's discipline requirement (never for the force-buy
+        // pre-pass's own, separately-explained exclusion). Consumed by
+        // CompetencyOpportunityCalculator to build a concrete "crafting
+        // would save N" Plan Notes line - never fed back into any
+        // displayed cost. CraftExcludedRealCost/Disciplines/MinRating
+        // describe the recipe that would have won; only meaningful when
+        // CraftExcludedByCompetency is true.
+        public bool CraftExcludedByCompetency { get; set; }
+        public long? CraftExcludedRealCost { get; set; }
+        public IReadOnlyList<string> CraftExcludedDisciplines { get; set; }
+        public int CraftExcludedMinRating { get; set; }
+
         public IReadOnlyList<CraftingTreeNode> Children
         {
             get => _children;

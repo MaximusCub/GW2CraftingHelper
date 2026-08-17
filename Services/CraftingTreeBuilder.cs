@@ -198,6 +198,13 @@ namespace GW2CraftingHelper.Services
             treeNode.CraftCostBreakdown = decision.CraftCostBreakdown;
             treeNode.BuyFromTpCostBreakdown = decision.BuyFromTpCostBreakdown;
             treeNode.BuyFromVendorCostBreakdown = decision.BuyFromVendorCostBreakdown;
+            // Adversarial-review fix (#7): see CraftingTreeNode's own
+            // matching field doc comments - straight passthrough, consumed
+            // by CompetencyOpportunityCalculator.
+            treeNode.CraftExcludedByCompetency = decision.CraftExcludedByCompetency;
+            treeNode.CraftExcludedRealCost = decision.CraftExcludedRealCost;
+            treeNode.CraftExcludedDisciplines = decision.CraftExcludedDisciplines;
+            treeNode.CraftExcludedMinRating = decision.CraftExcludedMinRating;
             treeNode.VendorCurrencyCosts = decision.Source == AcquisitionSource.BuyFromVendor
                 ? decision.VendorCurrencyCosts
                 : null;
