@@ -13,12 +13,18 @@ namespace GW2CraftingHelper.Services
     /// (EvaluateVendorOffers, FinalizeVendorBatches, AllocateVendorNodeCosts,
     /// MergeVendorCurrencyCosts, VendorBatchesEqual, ScaleCostLines).
     /// PlanSolver holds one instance as an injected collaborator (see its
-    /// constructor); every method here is byte-for-byte the same body it
-    /// had as a PlanSolver private static - this is a class move, not a
-    /// rewrite. The merged-ceil arithmetic itself is DO-NOT-TOUCH
-    /// (m38-cleanup-plan.md #7, KNOWN-ISSUES #20.1/#20.2/#28 - the
-    /// Obsidian Shard 179-&gt;180-not-186 repro) and is unchanged by this
-    /// move. The nested types below were `private` on PlanSolver; they are
+    /// constructor); every method here was byte-for-byte the same body it
+    /// had as a PlanSolver private static at the time of this move - a
+    /// class move, not a rewrite. The merged-ceil arithmetic itself was
+    /// DO-NOT-TOUCH at the time (m38-cleanup-plan.md #7, KNOWN-ISSUES
+    /// #20.1/#20.2/#28 - the Obsidian Shard 179-&gt;180-not-186 repro) and
+    /// was unchanged by the move itself. That freeze was retired
+    /// 2026-08-17 (characterization-first proof required, see
+    /// KNOWN-ISSUES) and AllocateVendorNodeCosts has since been rewritten
+    /// (largest-remainder/Hamilton apportionment - see that method's own
+    /// doc comment), so "byte-for-byte"/"unchanged" no longer describes
+    /// the class as a whole. The nested types below were `private` on
+    /// PlanSolver; they are
     /// `internal` here only because PlanSolver (a different class, same
     /// assembly) still needs to declare fields/locals of these types -
     /// still no wider than the original private scope from outside this
@@ -829,21 +835,53 @@ namespace GW2CraftingHelper.Services
         /// reasoning FinalizeVendorBatches itself already applies to
         /// step.TotalCost.
         ///
-        /// Allocation uses the corrected step's own UnitCost (already the
-        /// winning offer's true per-unit rate - see FinalizeVendorBatches)
-        /// times each occurrence's own Quantity, with the LAST occurrence
-        /// (in first-seen DFS order, per vendorOccurrences' construction in
-        /// PlanSolver.AggregateStep) absorbing the exact remainder so the
+        /// Allocation is largest-remainder (Hamilton) apportionment,
+        /// proportional to each occurrence's own Quantity share of the
+        /// step's total demand: floor(step.TotalCost * quantity /
+        /// totalQuantity) per occurrence, then the leftover copper(s) -
+        /// step.TotalCost minus the sum of floors, always fewer than
+        /// occurrences.Count - go one each to the occurrences with the
+        /// largest fractional remainder (numerator mod totalQuantity),
+        /// ties broken by first-seen (DFS) order for determinism. The
         /// allocated shares always sum to precisely step.TotalCost - no
-        /// drift, no invented precision.
+        /// drift, no invented precision - and any two occurrences of
+        /// EQUAL quantity now diverge by at most 1 copper. The multiply
+        /// widens to decimal (see the loop below) specifically so this
+        /// holds unconditionally - no long overflow is possible for any
+        /// step.TotalCost/Quantity pair either field's own type can hold.
+        ///
+        /// Quorum verdict C6 (merged-ceil-remainder stream, 2026-08):
+        /// replaces the prior "UnitCost * quantity per occurrence, last
+        /// occurrence absorbs everything else" shape, which gave every
+        /// non-last occurrence only its own per-unit rate (no share of
+        /// any wasted batch-overrun cost) while dumping the ENTIRE
+        /// overrun - unbounded for equal-quantity occurrences - onto
+        /// whichever occurrence happened to land last in DFS order. See
+        /// PlanSolverVendorBatchingTests.
+        /// MultiOccurrenceEqualQuantityBulkVendorOffer_BatchOverrunSharedProportionally
+        /// (renamed from ..._PreFix_LastOccurrenceAbsorbsEntireBatchOverrun by
+        /// this same fix) for the canonical repro: two 1-unit
+        /// occurrences of a "100 for 1000c" bulk offer used to render
+        /// 10/990; now render 500/500 (1000 * 1/2 = 500 exactly, no
+        /// remainder to distribute). The flagship 179-unit/"3 for 3"
+        /// regression shape (4/4/4/83/84 quantities, step.TotalCost 180)
+        /// is UNCHANGED by this: floors 4/4/4/83/84 sum to 179, leaving a
+        /// single leftover copper that lands on the 84-quantity occurrence
+        /// (remainder 84/179, the largest), giving the same 4/4/4/83/85
+        /// split the prior algorithm happened to also produce for that
+        /// specific shape - see
+        /// MultiOccurrenceBulkVendorOffer_CorrectionPropagatesThroughFourCraftLevelsAndBranches.
         ///
         /// W4B review-fix note: a component leaf's raw VendorItemCosts/
         /// VendorCurrencyCosts (captured pre-merge, per occurrence, by
         /// EvaluateVendorOffers) are NOT re-derived here the way TotalCost
         /// is - they can disagree with the corrected share this method
-        /// computes whenever a step merges 2+ tree occurrences. This method
-        /// itself is unchanged (DO-NOT-TOUCH: merged-ceil batching math);
-        /// the caller (PlanSolver.Solve, see FlagUnreliableVendorComponentCosts)
+        /// computes whenever a step merges 2+ tree occurrences, and that
+        /// stays true across the C6 largest-remainder rewrite above: only
+        /// the TotalCost allocation shape changed, not this gap. (Formerly
+        /// DO-NOT-TOUCH: merged-ceil batching math - retired 2026-08-17;
+        /// changes here now require characterization-first proof, see
+        /// KNOWN-ISSUES.) The caller (PlanSolver.Solve, see FlagUnreliableVendorComponentCosts)
         /// reads this method's own already-public outputs (vendorOccurrences,
         /// stepMap) AFTER it returns to mark which decisions must suppress
         /// component-leaf display for that reason - see
@@ -862,19 +900,69 @@ namespace GW2CraftingHelper.Services
                 }
 
                 var occurrences = kvp.Value;
+
+                long totalQuantity = 0L;
+                for (int i = 0; i < occurrences.Count; i++)
+                {
+                    totalQuantity += occurrences[i].Quantity;
+                }
+                if (totalQuantity <= 0)
+                {
+                    // Defensive only: vendorOccurrences' construction
+                    // (PlanSolver.AggregateStep) never records a
+                    // non-positive Quantity in practice. Leaves this
+                    // step's occurrences untouched rather than divide by
+                    // zero.
+                    continue;
+                }
+
+                var shares = new long[occurrences.Count];
+                var remainders = new long[occurrences.Count];
                 long allocated = 0L;
                 for (int i = 0; i < occurrences.Count; i++)
                 {
-                    var (nodeId, quantity) = occurrences[i];
-                    long share = (i == occurrences.Count - 1)
-                        ? step.TotalCost - allocated
-                        : step.UnitCost * quantity;
-                    allocated += share;
+                    // Review fix (overflow): step.TotalCost * quantity can
+                    // exceed long range (up to totalQuantity times larger
+                    // than the old UnitCost * quantity product this shape
+                    // replaced), and on wrap the numerator goes negative,
+                    // silently breaking the sum-to-step.TotalCost invariant
+                    // below. Widened to decimal for the multiply/divide:
+                    // step.TotalCost is long (<= ~9.2e18) and Quantity is
+                    // int (<= ~2.1e9), so their product (<= ~1.98e28) is
+                    // always well inside decimal's range (~7.9e28) - no
+                    // overflow possible for any value either operand's own
+                    // type can hold. Both operands are whole coppers, so
+                    // truncating back to long after the divide is exact,
+                    // matching the prior integer-division floor.
+                    decimal numerator = (decimal)step.TotalCost * occurrences[i].Quantity;
+                    shares[i] = (long)(numerator / totalQuantity);
+                    remainders[i] = (long)(numerator % totalQuantity);
+                    allocated += shares[i];
+                }
 
-                    if (memo.TryGetValue(nodeId, out var decision))
+                long leftover = step.TotalCost - allocated;
+                if (leftover > 0)
+                {
+                    var byLargestRemainder = Enumerable.Range(0, occurrences.Count)
+                        .OrderByDescending(i => remainders[i])
+                        .ThenBy(i => i);
+                    foreach (int i in byLargestRemainder)
                     {
-                        decision.TotalCost = share;
-                        memo[nodeId] = decision;
+                        if (leftover <= 0)
+                        {
+                            break;
+                        }
+                        shares[i]++;
+                        leftover--;
+                    }
+                }
+
+                for (int i = 0; i < occurrences.Count; i++)
+                {
+                    if (memo.TryGetValue(occurrences[i].NodeId, out var decision))
+                    {
+                        decision.TotalCost = shares[i];
+                        memo[occurrences[i].NodeId] = decision;
                     }
                 }
             }
