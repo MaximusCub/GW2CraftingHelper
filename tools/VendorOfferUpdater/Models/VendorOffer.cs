@@ -35,12 +35,12 @@ namespace VendorOfferUpdater.Models
         // this tool; nothing here interprets it.
         public int? SeasonalCap { get; set; }
 
-        // M37 (KNOWN-ISSUES #24): Homestead Refinement efficiency tier
+        // Homestead Refinement efficiency tier
         // (0/1/2) this offer row corresponds to, or null for a non-
         // Homestead-Refinement offer. See ConvertToOffer/HomesteadTierResolver.
         public int? HomesteadTier { get; set; }
 
-        // opportunity-notes (SEASONAL VENDOR TIP, review-fix): additive
+        // Additive
         // pass-through mirror of the runtime Models/VendorOffer.cs field
         // (see that file's own doc comment) - same round-trip-safety
         // reason SeasonalCap/HomesteadTier are both mirrored here. Without

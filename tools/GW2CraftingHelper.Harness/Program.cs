@@ -76,7 +76,7 @@ namespace GW2CraftingHelper.Harness
             bool printCacheStats = false;
             bool clearOverlayCache = false;
             bool dumpTree = false;
-            // M37 (KNOWN-ISSUES #24): -1 = not specified -> pipeline default
+            // -1 = not specified -> pipeline default
             // (HomesteadEfficiencyTiers.Default, tier 0 for every material).
             // Applies the SAME tier uniformly to Fiber/Metal/Wood - a single
             // flag is sufficient for this offline verification tool; the
@@ -118,7 +118,7 @@ namespace GW2CraftingHelper.Harness
                         if (i + 1 < args.Length)
                         {
                             homesteadTier = int.Parse(args[++i], CultureInfo.InvariantCulture);
-                            // Adversarial-review finding: HomesteadEfficiencyTiers'
+                            // HomesteadEfficiencyTiers'
                             // constructor throws ArgumentOutOfRangeException for
                             // any tier > 2, and this flag's own usage string below
                             // documents <0|1|2> as the only valid values - reject
@@ -296,7 +296,7 @@ namespace GW2CraftingHelper.Harness
                     currencyMetadataService: null,
                     acquisitionHints: acquisitionHints);
 
-                // M37 (KNOWN-ISSUES #24): null (unspecified --homestead-tier)
+                // Null (unspecified --homestead-tier)
                 // -> GenerateStructuredAsync's own default
                 // (HomesteadEfficiencyTiers.Default, tier 0 everywhere).
                 HomesteadEfficiencyTiers homesteadTiers = null;
@@ -382,7 +382,7 @@ namespace GW2CraftingHelper.Harness
                         }
                     };
                 case 3:
-                    // M37 (KNOWN-ISSUES #24): Klobjarne Geirr is the
+                    // Klobjarne Geirr is the
                     // concrete, currently-generatable plan the milestone's
                     // research report identified as reaching Homestead
                     // Refinement - via Gift of the Homesteader -> Gift of

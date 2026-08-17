@@ -20,18 +20,12 @@ namespace GW2CraftingHelper.RecipeSeeder
         private const int BatchSize = 200;
         private const int MaxConcurrency = 4;
 
-        // KNOWN-ISSUES recipe-ingestion bug class (2026-08-15): mirrors
-        // Gw2RecipeApiClient.SchemaVersion (Services/Gw2RecipeApiClient.cs)
-        // exactly, including the rationale for pinning a literal date
-        // instead of "v=latest" - see that constant's doc comment. Kept as
-        // its own separate constant rather than referencing the main
-        // assembly's copy: this tool already duplicates BaseUrl the same
-        // way, and the two callers (live runtime client vs. offline seeder)
-        // are allowed to re-pin independently if one is updated without the
-        // other. Without this, the seeder's own /v2/recipes id list and
-        // batch detail fetches silently omit every currency-ingredient-era
-        // recipe (~188 recipes, e.g. 14025/Amalgamated Rift Essence) from
-        // the seed files it writes - the exact bug this fix closes.
+        // Mirrors Gw2RecipeApiClient.SchemaVersion, including the
+        // rationale for pinning a literal date instead of "v=latest" -
+        // see that constant's doc comment. A separate constant so the
+        // runtime client and the offline seeder can re-pin independently.
+        // Without the pin, the seeder silently omits every
+        // currency-ingredient-era recipe from the seed files it writes.
         private const string SchemaVersion = "2026-08-15";
 
         private static int Main(string[] args)
@@ -120,7 +114,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                 Console.WriteLine(
                     $" {allRecipes.Count} fetched ({sw.ElapsedMilliseconds}ms)");
 
-                // Step 4: Build search index (outputItemId → recipeIds)
+                // Step 4: Build search index (outputItemId -> recipeIds)
                 var searchIndex = new Dictionary<int, List<int>>();
                 foreach (var recipe in allRecipes.Values)
                 {
@@ -245,7 +239,7 @@ namespace GW2CraftingHelper.RecipeSeeder
             return 0;
         }
 
-        // Review-fix (recipe-ingestion-fix): internal (not private) + the
+        // Internal (not private) + the
         // matching InternalsVisibleTo in this project's .csproj so
         // GW2CraftingHelper.RecipeSeeder.Tests can assert the schema-
         // version query parameter on the actual outgoing request, mirroring
@@ -313,7 +307,7 @@ namespace GW2CraftingHelper.RecipeSeeder
             return result;
         }
 
-        // Review-fix (recipe-ingestion-fix): internal, see
+        // Internal, see
         // FetchAllRecipeIdsAsync's matching doc comment above.
         internal static async Task<List<RawRecipe>> FetchRecipeBatchAsync(
             HttpClient httpClient, List<int> ids)
@@ -379,7 +373,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                                 Type = ing.TryGetProperty("type", out var t)
                                     ? t.GetString() ?? "Item" : "Item",
                                 // KNOWN-ISSUES recipe-ingestion bug class
-                                // (2026-08-15): mirrors
+                                //: mirrors
                                 // Gw2RecipeApiClient.ParseRecipe's own "id"-
                                 // with-"item_id"-fallback fix. This one is
                                 // not just a shape mismatch but a crash: with
@@ -456,7 +450,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                             Id = id,
                             OutputItemId = outId.GetInt32(),
                             OutputItemCount = outCount.GetInt32(),
-                            // Review-fix (recipe-ingestion-fix): this field
+                            // This field
                             // was previously never copied from the source
                             // JSON, silently dropping every hand-authored
                             // fractional EV override (e.g. recipe -1591,

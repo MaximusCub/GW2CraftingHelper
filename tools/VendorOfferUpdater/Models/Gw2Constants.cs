@@ -7,7 +7,7 @@ namespace VendorOfferUpdater.Models
     {
         public const int CoinCurrencyId = 1;
 
-        // M37 (KNOWN-ISSUES #24): the three Homestead Refinement output
+        // The three Homestead Refinement output
         // materials. Mirrors Models/Gw2Constants.cs's identical constants
         // in the main app - kept as a separate copy here since this tool
         // does not reference the main app's assembly (see the existing
@@ -24,41 +24,15 @@ namespace VendorOfferUpdater.Models
         }
 
         /// <summary>
-        /// opportunity-notes follow-up (2026-08-16, festival-vendor
-        /// auto-tagging): the GW2 Wiki's own display-name text for each of
-        /// the six festivals Blish HUD's FestivalContext recognizes, as it
-        /// appears in a vendor NPC page's {{Temporary|...|seasonal=...}}
-        /// (or, on a minority of pages, {{Temporary|...|event=...}} - see
-        /// TemporaryTemplateParser) template parameter - mapped to the
-        /// internal lowercase festival name key each value matches
-        /// EXACTLY. Never fuzzy-matched or guessed: a wiki value not
-        /// present as a key here (e.g. a one-off non-festival event) must
-        /// leave the offer untagged, see ResolveSeasonalFestivalKey below.
-        ///
-        /// Both sides of every mapping were independently MEASURED, not
-        /// invented:
-        ///   - Wiki display names: fetched live via api.guildwars2.com's
-        ///     wiki mirror, api.php?action=parse&amp;prop=wikitext,
-        ///     2026-08-16, against one real festival vendor NPC page per
-        ///     festival: "Candy Corn Vendor (Weekly)"
-        ///     (seasonal=Halloween), "Dragon Bash Merchant (Weekly)"
-        ///     (seasonal=Dragon Bash), "Wintersday Trader (Weekly)"
-        ///     (seasonal=Wintersday), "Festival Rewards Vendor (Weekly)"
-        ///     (seasonal=Festival of the Four Winds), "New Year Vendor"
-        ///     (seasonal=Lunar New Year), "Super Adventure Box Weekly
-        ///     Trader" (seasonal=Super Adventure Festival).
-        ///   - Internal key strings: MEASURED via `strings -e l` (raw
-        ///     UTF-16LE text scan) against
-        ///     packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe - the
-        ///     literal lowercase user-string-heap values "halloween",
-        ///     "dragonbash", "wintersday", "festivalofthefourwinds",
-        ///     "lunarnewyear", "superadventurefestival" all appear
-        ///     verbatim next to their matching get_Festival_* property-
-        ///     getter method names - the same technique the runtime
-        ///     Models/Gw2Constants.cs's HalloweenFestivalName doc comment
-        ///     used to measure "halloween" alone (via .NET reflection
-        ///     there instead of a raw string scan, but confirming the
-        ///     identical value).
+        /// The GW2 Wiki's display-name text for each of the six festivals
+        /// Blish HUD's FestivalContext recognizes, as it appears in a
+        /// vendor page's {{Temporary|...|seasonal=...}} (or event=)
+        /// template parameter, mapped to the internal lowercase festival
+        /// key. Matched EXACTLY, never fuzzy: a wiki value not listed here
+        /// must leave the offer untagged (ResolveSeasonalFestivalKey).
+        /// Both sides of every mapping were measured (live wiki fetches
+        /// and a raw string scan of Blish HUD.exe), not invented - add a
+        /// new entry only with both sides verified.
         /// </summary>
         public static readonly Dictionary<string, string> FestivalKeysByWikiDisplayName =
             new Dictionary<string, string>(StringComparer.Ordinal)

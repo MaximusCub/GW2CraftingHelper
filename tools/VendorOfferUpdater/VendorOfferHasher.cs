@@ -18,7 +18,7 @@ namespace VendorOfferUpdater
             IReadOnlyList<string>? locations,
             int? dailyCap,
             int? weeklyCap,
-            // M37 (KNOWN-ISSUES #24): optional so a caller need not pass
+            // Optional so a caller need not pass
             // it, but this does NOT keep the hash byte-for-byte identical
             // to the pre-M37 value: the ";homesteadTier=" segment below is
             // appended unconditionally (as "null" when omitted), so any
@@ -28,7 +28,7 @@ namespace VendorOfferUpdater
             // untouched baseline objects through rather than recomputing
             // them. Mirrors Services/VendorOfferHasher.cs exactly.
             int? homesteadTier = null,
-            // Astral Acclaim package (KNOWN-ISSUES #28): same non-backward-
+            // Astral Acclaim package: same non-backward-
             // compatible-hash caveat as homesteadTier above, appended last
             // so existing positional callers that already pass homesteadTier
             // keep meaning exactly what they meant before this parameter
