@@ -18,10 +18,15 @@ namespace GW2CraftingHelper.Services
         // VendorBatchesEqual, ScaleCostLines) now lives in the injected
         // VendorBatchSolver collaborator (Services/VendorBatchSolver.cs)
         // instead of this class's own private statics. Pure move - the
-        // merged-ceil arithmetic itself is DO-NOT-TOUCH
-        // (m38-cleanup-plan.md #7) and is unchanged; only the call shape
-        // moved. The parameterless constructor keeps every existing
-        // `new PlanSolver()` call site unchanged.
+        // merged-ceil arithmetic itself was DO-NOT-TOUCH at the time
+        // (m38-cleanup-plan.md #7) and was unchanged by this move; only
+        // the call shape moved. That freeze was retired 2026-08-17
+        // (characterization-first proof required, see KNOWN-ISSUES) and
+        // the arithmetic has since been rewritten (largest-remainder/
+        // Hamilton apportionment - see AllocateVendorNodeCosts' own doc
+        // comment), so it is no longer unchanged. The parameterless
+        // constructor keeps every existing `new PlanSolver()` call site
+        // unchanged.
         private readonly VendorBatchSolver _vendorBatchSolver;
 
         public PlanSolver()
@@ -477,9 +482,14 @@ namespace GW2CraftingHelper.Services
             // order from vendorOccurrences - so shares always sum to
             // precisely the step total, no drift, no invented precision,
             // and no unbounded skew toward whichever occurrence happens to
-            // land last. AllocateVendorNodeCosts (VendorBatchSolver,
-            // DO-NOT-TOUCH: merged-ceil batching math) corrects TotalCost
-            // for every occurrence of a merged vendor step but has no reason
+            // land last (the multiply widens to decimal, mirroring
+            // AllocateVendorNodeCosts' own overflow fix, so this holds
+            // unconditionally - no long overflow is possible for any
+            // totalCurrencyValue/Quantity pair either field's own type can
+            // hold). AllocateVendorNodeCosts (VendorBatchSolver; merged-ceil
+            // batching math, formerly DO-NOT-TOUCH - retired 2026-08-17, see
+            // KNOWN-ISSUES) corrects TotalCost for every occurrence of a
+            // merged vendor step but has no reason
             // to know about ComparisonValue at all; done here in the
             // PlanSolver-side wrapper instead, exactly mirroring how
             // FlagUnreliableVendorComponentCosts just below already reads
@@ -550,9 +560,19 @@ namespace GW2CraftingHelper.Services
                     long allocatedCurrency = 0L;
                     for (int i = 0; i < occurrences.Count; i++)
                     {
-                        long numerator = totalCurrencyValue * occurrences[i].Quantity;
-                        currencyShares[i] = numerator / totalQuantity;
-                        currencyRemainders[i] = numerator % totalQuantity;
+                        // Review fix (overflow): mirrors AllocateVendorNodeCosts'
+                        // own fix for the identical exposure - totalCurrencyValue
+                        // (long) * quantity (int) can exceed long range, and on
+                        // wrap the numerator goes negative, silently breaking the
+                        // sum-to-totalCurrencyValue invariant below. Widened to
+                        // decimal: the product (<= ~9.2e18 * ~2.1e9 = ~1.98e28)
+                        // always fits decimal's range (~7.9e28), so no overflow
+                        // is possible for any value either operand's own type can
+                        // hold. Both operands are whole coppers, so truncating
+                        // back to long after the divide is exact.
+                        decimal numerator = (decimal)totalCurrencyValue * occurrences[i].Quantity;
+                        currencyShares[i] = (long)(numerator / totalQuantity);
+                        currencyRemainders[i] = (long)(numerator % totalQuantity);
                         allocatedCurrency += currencyShares[i];
                     }
 
@@ -610,8 +630,9 @@ namespace GW2CraftingHelper.Services
             // vendor step, but a decision's VendorItemCosts/VendorCurrencyCosts
             // (captured pre-merge, per occurrence) are never re-derived the
             // same way - see FlagUnreliableVendorComponentCosts' own doc
-            // comment. Deliberately kept OUT of VendorBatchSolver (DO-NOT-
-            // TOUCH: merged-ceil batching math) - this only READS
+            // comment. Deliberately kept OUT of VendorBatchSolver (merged-
+            // ceil batching math, formerly DO-NOT-TOUCH - retired
+            // 2026-08-17, see KNOWN-ISSUES) - this only READS
             // AllocateVendorNodeCosts' own already-public inputs/outputs
             // (vendorOccurrences, stepMap) after it returns, and writes a
             // new auxiliary flag; it changes no cost, no share, no batch
@@ -2230,7 +2251,8 @@ namespace GW2CraftingHelper.Services
         /// Read-only with respect to VendorBatchSolver: only inspects
         /// stepMap/vendorOccurrences and writes the new auxiliary flag on
         /// `memo` - never touches TotalCost, UnitCost, or any batch/ceil
-        /// arithmetic (all DO-NOT-TOUCH, computed entirely by
+        /// arithmetic (merged-ceil batching math, formerly DO-NOT-TOUCH -
+        /// retired 2026-08-17, see KNOWN-ISSUES; still computed entirely by
         /// AllocateVendorNodeCosts/FinalizeVendorBatches above).
         /// </summary>
         private static void FlagUnreliableVendorComponentCosts(

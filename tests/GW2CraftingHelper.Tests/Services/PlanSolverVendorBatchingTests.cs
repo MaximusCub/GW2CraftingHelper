@@ -625,6 +625,77 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(650, leafComparisonSum);
         }
 
+        [Fact]
+        public void MultiOccurrenceMergedVendorOffer_ValuedCurrency_ComparisonValueDivergesPerOccurrenceUnderOldSharingRule()
+        {
+            // Review fix (UNTESTED RUNTIME CHANGE, merged-ceil-remainder
+            // stream): the sibling test above only ever asserted the SUMMED
+            // ComparisonValue across occurrences (leafComparisonSum), which
+            // is identical (250/250 in that test's own shape) whether
+            // RecomputeComparisonValues' currency-equivalent share loop uses
+            // the deleted "last occurrence absorbs the remainder" shape or
+            // the largest-remainder (Hamilton) apportionment 0b60ceb
+            // replaced it with - so no test ever exercised the PER-
+            // OCCURRENCE divergence between those two algorithms. This test
+            // does, using the review's own reproducer: two qty-3 occurrences
+            // (equal quantities, so AllocateVendorNodeCosts' TotalCost split
+            // is already an even 3/3 either way) with a valued currency line
+            // whose total value (10) is NOT evenly divisible by the total
+            // quantity (6) - the condition that made the two algorithms
+            // actually disagree.
+            //
+            // Old (deleted) shape: currencyUnitRate = totalCurrencyValue /
+            // totalQuantity = 10 / 6 = 1 (integer division); the first
+            // (non-last) occurrence gets rate * quantity = 1 * 3 = 3, and
+            // the last occurrence absorbs the entire remaining balance,
+            // 10 - 3 = 7. A 3/7 split for two structurally identical
+            // purchases, entirely an artifact of tree position - the same
+            // failure mode 938f6c9 fixed for AllocateVendorNodeCosts'
+            // TotalCost split, left unfixed here until 0b60ceb.
+            //
+            // New (Hamilton) shape: numerator = totalCurrencyValue *
+            // quantity = 10 * 3 = 30 for each occurrence; 30 / 6 = 5 with
+            // remainder 0 for both, so the currency share splits evenly
+            // 5/5 - no tree-position artifact. Added to each occurrence's
+            // own TotalCost share (3 coin each), ComparisonValue is 8/8, not
+            // the old algorithm's 6/10.
+            var leafA = Leaf(99, 3);
+            var leafB = Leaf(99, 3);
+            var tree = Craftable(1, 1, Option(10, 1, 1, leafA, leafB));
+            var prices = new Dictionary<int, ItemPrice>();
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 99, new List<VendorOffer> { MixedVendorOffer(99, 6, 7, 10, outputCount: 6) } }
+            };
+            var valuation = new CurrencyValuation(new Dictionary<int, long> { { 7, 1 } });
+            var solver = new PlanSolver();
+
+            var result = solver.Solve(tree, prices, vendorOffers, PriceBasis.InstantBuy, null, valuation);
+            var plan = result.Plan;
+
+            Assert.Equal(6, plan.TotalCoinCost);
+            var currencyCost = Assert.Single(plan.CurrencyCosts, c => c.CurrencyId == 7);
+            Assert.Equal(10, currencyCost.Amount);
+
+            var decisionA = result.Decisions[leafA.NodeId];
+            var decisionB = result.Decisions[leafB.NodeId];
+            Assert.Equal(AcquisitionSource.BuyFromVendor, decisionA.Source);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, decisionB.Source);
+
+            // TotalCost splits evenly regardless of which algorithm is
+            // used (already exercised by AllocateVendorNodeCosts' own
+            // tests) - asserted here only as a precondition for the
+            // ComparisonValue check below.
+            Assert.Equal(3, decisionA.TotalCost);
+            Assert.Equal(3, decisionB.TotalCost);
+
+            // The actual regression coverage: BOTH occurrences must land on
+            // 8, not the old algorithm's 6/10 (or any tree-position-
+            // dependent split).
+            Assert.Equal(8, decisionA.ComparisonValue);
+            Assert.Equal(8, decisionB.ComparisonValue);
+        }
+
         // --- Characterization: AllocateVendorNodeCosts' pre-fix
         // bounded-divergence largest-remainder apportionment (quorum
         // verdict C6, merged-ceil-remainder stream) ---

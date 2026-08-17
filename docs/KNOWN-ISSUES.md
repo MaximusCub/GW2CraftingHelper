@@ -7063,32 +7063,82 @@ fix, then prove improved-X/regressed-nothing.
    `currencyMap` to disagree with `Required`/the shopping list/the tree
    leaves would create the real internal inconsistency the alternative
    claim would have introduced.
+5. **Review-fix commit (`0b60ceb`).** A follow-up review found the
+   class sweep for item 2/938f6c9's largest-remainder apportionment had
+   missed a second runtime path: `PlanSolver.RecomputeComparisonValues`'
+   currency-equivalent share loop still used the deleted "last
+   occurrence absorbs the remainder" shape, letting `ComparisonValue`
+   diverge from the corrected `TotalCost` by up to `step.Quantity - 1`
+   copper for a merged step. Converted to the same largest-remainder
+   (Hamilton) apportionment `AllocateVendorNodeCosts` uses. Also fixed
+   the caller comment describing the deleted shape, a dangling renamed-
+   test reference, one (of several) self-contradicting "DO-NOT-TOUCH"
+   line, the flagship regression test's explanatory comment, and added
+   a three-equal-quantity-occurrence tie-break test. This runtime change
+   shipped with no new characterization pin of its own - see item 6.
+6. **Review-response commit (this one).** A further review on `0b60ceb`
+   found: (a) item 5's `RecomputeComparisonValues` rewrite was still
+   unpinned - the only test touching that path asserted the summed
+   `ComparisonValue` across occurrences, which is identical under both
+   the old and new algorithm for its 2x qty-1 shape, so the actual
+   per-occurrence divergence was never exercised; added
+   `MultiOccurrenceMergedVendorOffer_ValuedCurrency_
+   ComparisonValueDivergesPerOccurrenceUnderOldSharingRule` (two qty-3
+   occurrences, currency value 10 not evenly divisible by total
+   quantity 6 - old algorithm gives 3/7, new gives 5/5) to close that
+   gap. (b) item 5's DO-NOT-TOUCH sweep fixed only one of five stale
+   instances (`VendorBatchSolver.cs:873`); the remaining four
+   (`VendorBatchSolver.cs` class doc, `PlanSolver.cs` class doc, and two
+   more `PlanSolver.cs` call-site comments) still asserted the merged-
+   ceil arithmetic was frozen/unchanged when this stream had already
+   rewritten it - corrected all four to note the 2026-08-17 retirement
+   instead. (c) both largest-remainder apportionment sites
+   (`AllocateVendorNodeCosts` and `RecomputeComparisonValues`) multiply
+   a `long` total by an occurrence's `int` quantity without an overflow
+   guard; on a large-enough total the product silently wraps negative,
+   breaking the "shares always sum to the total" invariant both doc
+   comments assert unconditionally. Widened both multiply/divide sites
+   to `decimal` (whose range comfortably covers any `long` x `int`
+   product either field's own type can hold), removing the overflow
+   risk entirely rather than just documenting it as a limitation.
 
 **Validation performed:**
 - Build: `"/mnt/c/Program Files/dotnet/dotnet.exe" build
   C:/Dev/Blish/wt-qceil/GW2CraftingHelper.csproj -p:Platform=x64` -
-  0 errors (pre-existing StyleCop warnings only, none in any touched
-  file).
+  0 errors. StyleCop warnings are pre-existing project-wide (1789 at
+  HEAD, none new in this commit's own diff), but MEASURED across the
+  whole `merged-ceil-remainder` stream (ce64423 baseline vs. this
+  commit's HEAD, full rebuild): `PlanSolver.cs` 134->142,
+  `VendorBatchSolver.cs` 50->54, `PlanViewModelBuilder.cs` 158->160 -
+  +14 new SA1512/SA1513/SA1515 warnings introduced across the stream's
+  five commits (mostly comment-blank-line spacing in the new blocks),
+  correcting item 3/4/5's repeated "none in any touched file" claim,
+  which was false for this stream from `0b60ceb` onward.
 - Tests: `"/mnt/c/Program Files/dotnet/dotnet.exe" test
   C:/Dev/Blish/wt-qceil/tests/GW2CraftingHelper.Tests/
-  GW2CraftingHelper.Tests.csproj` - 1773/1773 green (baseline ~1768 +
-  4 characterization + 1 boundary test), including the flagship
-  regression run standalone to confirm it is byte-identical to before.
-- Self-review (Code Reviewer Mode) on both runtime-affecting files:
-  `AllocateVendorNodeCosts`' leftover-distribution loop is proven to
-  always terminate with `leftover == 0` (apportionment identity in the
-  fix commit message - no divide-by-zero, no negative-leftover, no
-  loop-exhaustion edge case); `PlanViewModelBuilder`'s clamp matches
-  its own established sibling convention exactly.
+  GW2CraftingHelper.Tests.csproj` - MEASURED 1775/1775 green (1774 at
+  `0b60ceb` + 1 new per-occurrence characterization test from item 6a),
+  correcting the stale "1773/1773" count this entry previously carried
+  (actual count at `0b60ceb` was already 1774/1774, one more than
+  recorded, from the tie-break test item 5 added).
+- Self-review (Code Reviewer Mode) on all runtime-affecting edits: the
+  `decimal` widening cannot itself overflow for any `long`/`int` pair
+  either field's own type can hold (long max ~9.2e18 x int max ~2.1e9
+  ~= 1.98e28, decimal max ~7.9e28); truncation back to `long` after the
+  divide is exact since both operands are whole coppers; the new test's
+  expected 5/5 vs. the old algorithm's 3/7 was hand-verified against
+  both algorithms' own arithmetic before asserting it.
 
 **Repo Invariants Checklist:**
 - [x] No Blish HUD references added to tests
-- [x] Tests exercise real production paths (three of the four
-  characterization tests are genuine `Solve()`+builder+calculator round
-  trips, not mirrored logic)
+- [x] Tests exercise real production paths (all characterization/
+  regression tests are genuine `Solve()`+builder round trips, not
+  mirrored logic)
 - [x] No fake file I/O tests introduced
 - [x] Pricing logic preserves multi-source correctness (Conflict-tier
-  currency handling explicitly re-verified unchanged per item 4 above)
+  currency handling explicitly re-verified unchanged per item 4 above;
+  the overflow fix changes no value for any realistic input, only
+  removes a wrap-around failure mode)
 - [x] IDs remain internal-only (not displayed)
 
 **Risks / follow-ups:** none new. The C6(b) correction (item 4) is
@@ -7096,5 +7146,10 @@ recorded here as the authoritative verdict since no prior claim was
 locatable to edit in place; if the orchestrator has the original claim
 in a stream this session could not see, that record should be updated
 to point back here rather than restate the (incorrect) claim.
+`VendorBatchSolver.cs:409`'s comment recounting a past review's own
+"one of the six DO-NOT-TOUCH merged-ceil batching methods" wording was
+left as-is (it accurately describes history at the time, not a present-
+tense claim about current code) - flagged here in case a future sweep
+disagrees.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

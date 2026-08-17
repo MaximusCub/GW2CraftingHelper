@@ -13,12 +13,18 @@ namespace GW2CraftingHelper.Services
     /// (EvaluateVendorOffers, FinalizeVendorBatches, AllocateVendorNodeCosts,
     /// MergeVendorCurrencyCosts, VendorBatchesEqual, ScaleCostLines).
     /// PlanSolver holds one instance as an injected collaborator (see its
-    /// constructor); every method here is byte-for-byte the same body it
-    /// had as a PlanSolver private static - this is a class move, not a
-    /// rewrite. The merged-ceil arithmetic itself is DO-NOT-TOUCH
-    /// (m38-cleanup-plan.md #7, KNOWN-ISSUES #20.1/#20.2/#28 - the
-    /// Obsidian Shard 179-&gt;180-not-186 repro) and is unchanged by this
-    /// move. The nested types below were `private` on PlanSolver; they are
+    /// constructor); every method here was byte-for-byte the same body it
+    /// had as a PlanSolver private static at the time of this move - a
+    /// class move, not a rewrite. The merged-ceil arithmetic itself was
+    /// DO-NOT-TOUCH at the time (m38-cleanup-plan.md #7, KNOWN-ISSUES
+    /// #20.1/#20.2/#28 - the Obsidian Shard 179-&gt;180-not-186 repro) and
+    /// was unchanged by the move itself. That freeze was retired
+    /// 2026-08-17 (characterization-first proof required, see
+    /// KNOWN-ISSUES) and AllocateVendorNodeCosts has since been rewritten
+    /// (largest-remainder/Hamilton apportionment - see that method's own
+    /// doc comment), so "byte-for-byte"/"unchanged" no longer describes
+    /// the class as a whole. The nested types below were `private` on
+    /// PlanSolver; they are
     /// `internal` here only because PlanSolver (a different class, same
     /// assembly) still needs to declare fields/locals of these types -
     /// still no wider than the original private scope from outside this
@@ -839,7 +845,10 @@ namespace GW2CraftingHelper.Services
         /// ties broken by first-seen (DFS) order for determinism. The
         /// allocated shares always sum to precisely step.TotalCost - no
         /// drift, no invented precision - and any two occurrences of
-        /// EQUAL quantity now diverge by at most 1 copper.
+        /// EQUAL quantity now diverge by at most 1 copper. The multiply
+        /// widens to decimal (see the loop below) specifically so this
+        /// holds unconditionally - no long overflow is possible for any
+        /// step.TotalCost/Quantity pair either field's own type can hold.
         ///
         /// Quorum verdict C6 (merged-ceil-remainder stream, 2026-08):
         /// replaces the prior "UnitCost * quantity per occurrence, last
@@ -912,9 +921,22 @@ namespace GW2CraftingHelper.Services
                 long allocated = 0L;
                 for (int i = 0; i < occurrences.Count; i++)
                 {
-                    long numerator = step.TotalCost * occurrences[i].Quantity;
-                    shares[i] = numerator / totalQuantity;
-                    remainders[i] = numerator % totalQuantity;
+                    // Review fix (overflow): step.TotalCost * quantity can
+                    // exceed long range (up to totalQuantity times larger
+                    // than the old UnitCost * quantity product this shape
+                    // replaced), and on wrap the numerator goes negative,
+                    // silently breaking the sum-to-step.TotalCost invariant
+                    // below. Widened to decimal for the multiply/divide:
+                    // step.TotalCost is long (<= ~9.2e18) and Quantity is
+                    // int (<= ~2.1e9), so their product (<= ~1.98e28) is
+                    // always well inside decimal's range (~7.9e28) - no
+                    // overflow possible for any value either operand's own
+                    // type can hold. Both operands are whole coppers, so
+                    // truncating back to long after the divide is exact,
+                    // matching the prior integer-division floor.
+                    decimal numerator = (decimal)step.TotalCost * occurrences[i].Quantity;
+                    shares[i] = (long)(numerator / totalQuantity);
+                    remainders[i] = (long)(numerator % totalQuantity);
                     allocated += shares[i];
                 }
 
