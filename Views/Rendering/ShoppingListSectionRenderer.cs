@@ -211,6 +211,17 @@ namespace GW2CraftingHelper.Views.Rendering
             // M34-B2b: owned/needed split for this row's currency cost(s),
             // cosmetic-only tooltip (avoids new inline layout math for a
             // fixed-height shopping row - see PlanContentHeightMath).
+            // shoplist-have-format: reworded off "N owned, M needed" (a
+            // total sitting next to the word OWNED caused a real
+            // misreading incident) to the HAVE/NEED vocabulary the
+            // decision pills already use elsewhere in the tree
+            // (DecisionPillPlanner's "HAVE N/M NEEDED"). cc.OwnedQuantity
+            // is deliberately clamped to cc.Amount so the HAVE/Amount pair
+            // always reads as a coverage fraction ("HAVE 500/500"); the
+            // parenthetical spells out the three numbers in full (what the
+            // plan requires, what you actually hold unclamped, and the
+            // shortfall) so a covered row whose real holding exceeds the
+            // requirement is never silently hidden by the clamp.
             if (row.CurrencyCosts != null)
             {
                 foreach (var cc in row.CurrencyCosts)
@@ -218,7 +229,18 @@ namespace GW2CraftingHelper.Views.Rendering
                     if (cc.OwnedQuantity.HasValue)
                     {
                         long needed = cc.Amount - cc.OwnedQuantity.Value;
-                        tooltipParts.Add($"{cc.Name}: {cc.OwnedQuantity.Value} owned, {needed} needed");
+                        string haveNeed = needed > 0
+                            ? $"HAVE {cc.OwnedQuantity.Value}/{cc.Amount}, NEED {needed}"
+                            : $"HAVE {cc.Amount}/{cc.Amount}";
+                        // RawOwnedQuantity is always set alongside
+                        // OwnedQuantity by CurrencyDisplayResolver.
+                        // ResolveAmounts; the ?? fallback only guards
+                        // against a future caller constructing this view
+                        // model directly with just OwnedQuantity set.
+                        long rawHeld = cc.RawOwnedQuantity ?? cc.OwnedQuantity.Value;
+                        tooltipParts.Add(
+                            $"{cc.Name}: {haveNeed} " +
+                            $"(plan requires {cc.Amount}, you hold {rawHeld}, shortfall {needed})");
                     }
                 }
             }
