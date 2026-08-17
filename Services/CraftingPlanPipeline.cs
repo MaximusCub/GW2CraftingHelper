@@ -76,7 +76,7 @@ namespace GW2CraftingHelper.Services
         // W3B review-fix: shared literal for both GenerateStructuredAsync's
         // single-item Step 1 and GenerateStructuredMultiAsync's Step 1 -
         // used both as the tree-building PlanPhaseEvent's Detail (surfaced
-        // live in CraftingPlanView.FormatPhaseText) and inside the
+        // live in PlanStripTickDecision.FormatPhaseText) and inside the
         // existing PlanStatus wording, so the two channels never drift out
         // of sync with each other.
         private const string FirstRunTreeHint = "may take several seconds on first run";
@@ -154,10 +154,10 @@ namespace GW2CraftingHelper.Services
             // Step 1: Build recipe tree
             // W3B review-fix: the "(may take several seconds on first run)"
             // hint now also rides the phase event's Detail (see
-            // PlanPhaseEvent.Detail and CraftingPlanView.FormatPhaseText),
-            // so it still reaches the live status strip now that the view
-            // passes progress: null below - see FirstRunTreeHint's own
-            // doc comment.
+            // PlanPhaseEvent.Detail and PlanStripTickDecision.
+            // FormatPhaseText), so it still reaches the live status strip
+            // now that the view passes progress: null below - see
+            // FirstRunTreeHint's own doc comment.
             phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {

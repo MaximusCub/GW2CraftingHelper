@@ -1,0 +1,368 @@
+using System.Collections.Generic;
+using GW2CraftingHelper.Models;
+using GW2CraftingHelper.Services;
+using Xunit;
+
+namespace GW2CraftingHelper.Tests.Services
+{
+    // tree-tooltip-composer milestone: TreeRowTooltipComposer is the
+    // Blish-free half of the Recipe Tree row tooltip (see
+    // TreeSectionController.RenderTreeNode for the actual
+    // BasicTooltipText/right-click wiring, which cannot be unit tested per
+    // repo invariant).
+    public class TreeRowTooltipComposerTests
+    {
+        private static CraftingTreeNode Node(
+            CraftingDecision decision,
+            string name = "Bolt of Damask",
+            int quantity = 1,
+            long? unitCost = null,
+            bool priceSideFellBack = false,
+            bool isCostComponent = false,
+            IReadOnlyList<CostLine> vendorCurrencyCosts = null,
+            string acquisitionHint = null)
+        {
+            return new CraftingTreeNode
+            {
+                NodeId = 1,
+                Name = name,
+                Decision = decision,
+                Quantity = quantity,
+                UnitCost = unitCost,
+                PriceSideFellBack = priceSideFellBack,
+                IsCostComponent = isCostComponent,
+                VendorCurrencyCosts = vendorCurrencyCosts,
+                AcquisitionHint = acquisitionHint
+            };
+        }
+
+        [Fact]
+        public void NullNode_ReturnsEmptyList()
+        {
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(null, null, null);
+
+            Assert.Empty(lines);
+        }
+
+        [Fact]
+        public void EveryFieldEmpty_ReturnsEmptyList()
+        {
+            var node = Node(CraftingDecision.Have, name: null, quantity: 0);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.Empty(lines);
+        }
+
+        [Fact]
+        public void QuantityGreaterThanOne_BuyFromTp_AddsUnitPriceLine()
+        {
+            var node = Node(CraftingDecision.BuyFromTp, quantity: 5, unitCost: 12345);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.Contains("Unit price: 1g 23s 45c", lines);
+        }
+
+        [Fact]
+        public void QuantityOne_BuyFromTp_NoUnitPriceLine()
+        {
+            // gw2e parity display rule: at quantity 1 the cost column
+            // already shows the unit's own total, so a duplicate "Unit
+            // price" tooltip line would be redundant.
+            var node = Node(CraftingDecision.BuyFromTp, quantity: 1, unitCost: 12345);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.DoesNotContain(lines, l => l.StartsWith("Unit price:"));
+        }
+
+        [Fact]
+        public void ZeroCoinUnitCost_WithCurrencyCosts_SuppressesCoinLine()
+        {
+            // Field-test finding B: a pure-currency vendor offer has
+            // UnitCost == 0 (not null), which used to render a misleading
+            // "0g 0s 0c" line - suppressed only when a currency cost line
+            // exists to show instead of it.
+            var currencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 10 } };
+            var node = Node(
+                CraftingDecision.BuyFromVendor, quantity: 5, unitCost: 0,
+                vendorCurrencyCosts: currencyCosts);
+            var metadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+            };
+            var plan = new PlanViewModel { CurrencyMetadata = metadata };
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+
+            Assert.DoesNotContain(lines, l => l.StartsWith("Unit price: 0g"));
+            Assert.Contains("Unit price: 2 Karma", lines);
+        }
+
+        [Fact]
+        public void ZeroCoinUnitCost_NoCurrencyCosts_StillRendersCoinLine()
+        {
+            // The suppression above is conditional on a currency cost
+            // existing - a genuinely zero-cost buy (no currency fallback)
+            // must still render its real "0g 0s 0c" line, not go silent.
+            var node = Node(CraftingDecision.BuyFromTp, quantity: 5, unitCost: 0);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.Contains("Unit price: 0g 0s 0c", lines);
+        }
+
+        [Fact]
+        public void PriceSideFellBack_BuyFromTp_NullPlan_UsesBasisAgnosticSentence()
+        {
+            // Nice-to-have (null-plan fallback, b18fb03 precedent): a null
+            // plan cannot know the actual PriceBasis, so it must get a
+            // basis-agnostic sentence rather than silently reading null as
+            // "false" and picking one side's wording as an unearned claim.
+            var node = Node(CraftingDecision.BuyFromTp, priceSideFellBack: true);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.Contains("Other trading post price side shown", lines);
+        }
+
+        [Fact]
+        public void PriceSideFellBack_BuyFromTp_BuyOrderBasis_NamesInstantBuyFallback()
+        {
+            var node = Node(CraftingDecision.BuyFromTp, priceSideFellBack: true);
+            var plan = new PlanViewModel { PriceBasis = PriceBasis.BuyOrder };
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+
+            Assert.Contains("Buy-order price unavailable - instant-buy price shown", lines);
+        }
+
+        [Fact]
+        public void PriceSideFellBack_BuyFromTp_InstantBuyBasis_NamesBuyOrderFallback()
+        {
+            var node = Node(CraftingDecision.BuyFromTp, priceSideFellBack: true);
+            var plan = new PlanViewModel { PriceBasis = PriceBasis.InstantBuy };
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+
+            Assert.Contains("Instant-buy price unavailable - buy-order price shown", lines);
+        }
+
+        [Fact]
+        public void PriceSideFellBack_CostComponentLeaf_UsesRowSentenceNotVendorSentence()
+        {
+            // A cost-component leaf's own Decision is always BuyFromVendor
+            // (see BuildVendorCostComponentLeaves), but IsCostComponent
+            // routes it into the "this row's own TP price fell back"
+            // branch, not the "one of this vendor row's cost items fell
+            // back" aggregate branch.
+            var node = Node(CraftingDecision.BuyFromVendor, priceSideFellBack: true, isCostComponent: true);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.Contains("Other trading post price side shown", lines);
+            Assert.DoesNotContain(lines, l => l.StartsWith("A vendor cost item's"));
+        }
+
+        [Fact]
+        public void PriceSideFellBack_BuyFromVendorParent_NullPlan_UsesVendorAggregateSentence()
+        {
+            var node = Node(CraftingDecision.BuyFromVendor, priceSideFellBack: true);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.Contains("A vendor cost item's other trading post price side shown", lines);
+        }
+
+        [Fact]
+        public void PriceSideFellBack_BuyFromVendorParent_BuyOrderBasis_UsesVendorInstantBuySentence()
+        {
+            var node = Node(CraftingDecision.BuyFromVendor, priceSideFellBack: true);
+            var plan = new PlanViewModel { PriceBasis = PriceBasis.BuyOrder };
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+
+            Assert.Contains(
+                "A vendor cost item's buy-order price is unavailable - its instant-buy price is used", lines);
+        }
+
+        [Fact]
+        public void PriceSideFellBack_BuyFromVendorParent_InstantBuyBasis_UsesVendorBuyOrderSentence()
+        {
+            // The BuyFromTp/IsCostComponent branch above already pins all
+            // three PriceBasis arms of its own ternary; this is the
+            // BuyFromVendor-parent aggregate branch's InstantBuy arm, the
+            // one remaining untested arm of that second ternary.
+            var node = Node(CraftingDecision.BuyFromVendor, priceSideFellBack: true);
+            var plan = new PlanViewModel { PriceBasis = PriceBasis.InstantBuy };
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+
+            Assert.Contains(
+                "A vendor cost item's instant-buy price is unavailable - its buy-order price is used", lines);
+        }
+
+        [Fact]
+        public void MixedCoinAndCurrencyVendorOffer_ShowsBothUnitPriceLinesInOrder()
+        {
+            // The composer's own comment claims "a mixed coin+currency
+            // offer still shows both lines below" - pin that a non-zero
+            // UnitCost together with a non-empty VendorCurrencyCosts
+            // renders both the coin line and the currency line, coin
+            // first, rather than the zero-coin suppression path.
+            var currencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 25 } };
+            var node = Node(
+                CraftingDecision.BuyFromVendor, quantity: 5, unitCost: 500,
+                vendorCurrencyCosts: currencyCosts);
+            var metadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+            };
+            var plan = new PlanViewModel { CurrencyMetadata = metadata };
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+
+            Assert.Equal(
+                new[] { "Unit price: 0g 5s 0c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
+                lines);
+        }
+
+        [Fact]
+        public void CurrencyUnitAmount_NonEvenDivision_UsesBundleLabel()
+        {
+            // ResolveTreeNodeUnitAmounts falls back to a "N for M" bundle
+            // label (Amount left at 0) whenever the total does not divide
+            // evenly by quantity - pin that BuildExtraTooltipLines renders
+            // that label rather than the numeric Amount.ToString() fork.
+            var currencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 10 } };
+            var node = Node(
+                CraftingDecision.BuyFromVendor, quantity: 3, unitCost: 0,
+                vendorCurrencyCosts: currencyCosts);
+            var metadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+            };
+            var plan = new PlanViewModel { CurrencyMetadata = metadata };
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+
+            Assert.Contains("Unit price: 10 for 3 Karma", lines);
+        }
+
+        [Fact]
+        public void NoPriceSideFellBack_NoCaveatLine()
+        {
+            var node = Node(CraftingDecision.BuyFromTp, priceSideFellBack: false);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.DoesNotContain(lines, l => l.Contains("trading post price side"));
+        }
+
+        [Theory]
+        [InlineData(CraftingDecision.Unknown)]
+        [InlineData(CraftingDecision.GuildUpgrade)]
+        public void AcquisitionHint_UnknownOrGuildUpgrade_IsIncluded(CraftingDecision decision)
+        {
+            var node = Node(decision, acquisitionHint: "Purchased from a Karma vendor.");
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.Contains("Purchased from a Karma vendor.", lines);
+        }
+
+        [Fact]
+        public void AcquisitionHint_OtherDecision_IsIgnored()
+        {
+            // AcquisitionHint is only meaningful on the "no priceable
+            // source, here is why" decisions - a Craft node carrying a
+            // stray hint value must not surface it.
+            var node = Node(CraftingDecision.Craft, acquisitionHint: "Purchased from a Karma vendor.");
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.DoesNotContain("Purchased from a Karma vendor.", lines);
+        }
+
+        [Fact]
+        public void AcquisitionHint_NullOrEmpty_NotAdded()
+        {
+            var node = Node(CraftingDecision.Unknown, name: null, acquisitionHint: null);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.Empty(lines);
+        }
+
+        [Fact]
+        public void CaptionText_InsertedAtFront_AheadOfOtherLines()
+        {
+            var node = Node(CraftingDecision.Unknown, acquisitionHint: "No listed source.");
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, "What if: crafted instead", null);
+
+            Assert.Equal("What if: crafted instead", lines[0]);
+            Assert.Contains("No listed source.", lines);
+        }
+
+        [Fact]
+        public void CaptionText_NullOrEmpty_NotInserted()
+        {
+            var node = Node(CraftingDecision.Have, name: null);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, "", null);
+
+            Assert.Empty(lines);
+        }
+
+        [Fact]
+        public void RealItemName_AddsWikiLinkLine()
+        {
+            var node = Node(CraftingDecision.Have, name: "Bolt of Damask");
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.Contains("Right-click: Open wiki page", lines);
+        }
+
+        [Theory]
+        [InlineData("Unknown Item")]
+        [InlineData("")]
+        [InlineData(null)]
+        [InlineData("   ")]
+        public void SentinelOrEmptyName_SuppressesWikiLinkLine(string name)
+        {
+            var node = Node(CraftingDecision.Have, name: name);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+
+            Assert.DoesNotContain("Right-click: Open wiki page", lines);
+        }
+
+        [Fact]
+        public void AllLinesTogether_RenderInEstablishedOrder()
+        {
+            // Order matters for on-screen readability: caption first (when
+            // present), then unit price, then the price-side caveat, then
+            // the acquisition hint, then the wiki-link affordance last -
+            // matching TreeSectionController.RenderTreeNode's original
+            // build order verbatim.
+            var node = Node(
+                CraftingDecision.BuyFromTp, name: "Bolt of Damask", quantity: 3, unitCost: 100,
+                priceSideFellBack: true);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, "Caption line", null);
+
+            Assert.Equal(
+                new[]
+                {
+                    "Caption line",
+                    "Unit price: 0g 1s 0c",
+                    "Other trading post price side shown",
+                    "Right-click: Open wiki page"
+                },
+                lines);
+        }
+    }
+}

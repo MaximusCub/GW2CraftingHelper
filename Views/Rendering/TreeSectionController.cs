@@ -723,155 +723,17 @@ namespace GW2CraftingHelper.Views.Rendering
             // once and reused verbatim by the settle re-ellipsis pass -
             // only the "is the name actually truncated" line needs to be
             // reconsidered when nameMaxWidth changes.
-            var extraTooltipLines = new List<string>();
-            if (node.Quantity > 1 &&
-                (node.Decision == CraftingDecision.BuyFromTp ||
-                 node.Decision == CraftingDecision.BuyFromVendor))
-            {
-                // Field-test finding B: a pure-currency vendor offer
-                // (spirit shards, karma, ...) has UnitCost == 0 (not null -
-                // see CraftingTreeBuilder.BuildNode), which used to render a
-                // misleading "0g 0s 0c" instead of the real per-unit
-                // currency cost; a mixed coin+currency offer still shows
-                // both lines below. The coin line is suppressed only when
-                // it is genuinely zero AND a currency cost exists to show
-                // instead of it.
-                bool hasCurrencyCosts = node.VendorCurrencyCosts != null && node.VendorCurrencyCosts.Count > 0;
-                if (node.UnitCost.HasValue && !(node.UnitCost.Value == 0 && hasCurrencyCosts))
-                {
-                    extraTooltipLines.Add("Unit price: " + CoinCurrencyRenderer.FormatCoinText(node.UnitCost.Value));
-                }
-                if (node.Decision == CraftingDecision.BuyFromVendor && hasCurrencyCosts)
-                {
-                    var unitCurrencyAmounts = CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(
-                        node.VendorCurrencyCosts, node.Quantity, _getCurrentPlan()?.CurrencyMetadata);
-                    if (unitCurrencyAmounts != null)
-                    {
-                        foreach (var amount in unitCurrencyAmounts)
-                        {
-                            string amountText = amount.BundleLabel ?? amount.Amount.ToString();
-                            extraTooltipLines.Add($"Unit price: {amountText} {amount.Name}");
-                        }
-                    }
-                }
-            }
-
-            // AUDIT ROW 20/38 (gw2e price-side fallback parity, DISPLAY
-            // CAVEAT): this node's TP unit price came from the item's
-            // NON-preferred side because the preferred side had no
-            // listings (CraftingTreeBuilder.BuildNode/
-            // SolverDecision.PriceSideFellBack) - flag it so the number
-            // shown doesn't read as an ordinary preferred-side price.
-            // Deliberately outside the node.Quantity > 1 gate above: this
-            // caveat is about WHICH TP side priced the node, not about a
-            // qty=1 row already showing its own total as the unit price.
             //
-            // Review-fix (DISPLAY CAVEAT gap): also covers a BuyFromVendor
-            // cost-component leaf (node.IsCostComponent) whose own TP-
-            // valued barter price fell back the same way - see
-            // VendorItemCostLine.PriceSideFellBack and
-            // CraftingTreeBuilder.BuildVendorCostComponentLeaves.
-            //
-            // Review-fix round 3 (DISPLAY CAVEAT gap): also covers a plain
-            // BuyFromVendor node with no cost-component leaves at all (a
-            // pure item-barter offer, kindCount==1 - the common case - or
-            // any offer VendorComponentCostsUnreliable suppressed leaf
-            // synthesis for) - CraftingTreeBuilder.BuildNode sets that
-            // node's own PriceSideFellBack (OR across VendorItemCosts) in
-            // that case, so `node.Decision ==
-            // CraftingDecision.BuyFromVendor` on its own already covers
-            // both this case and the cost-component leaf above (a leaf's
-            // own Decision is always BuyFromVendor too - see
-            // BuildVendorCostComponentLeaves) - IsCostComponent is kept as
-            // an explicit disjunct anyway to document both producers by
-            // name rather than rely on that overlap implicitly.
-            //
-            // Review-fix round 7 (DISPLAY CAVEAT gap, multi-kind offers):
-            // BuildNode's parent-flag check widened further to also cover a
-            // BuyFromVendor node that DID get component leaves (2+ cost
-            // kinds) - its own coin total still includes the fallen-back
-            // item's value, and that parent node is exactly what renders
-            // collapsed by default a couple of levels deep
-            // (PlanContentHeightMath.IsNodeExpanded caps expansion at
-            // depth < 2), hiding the leaf-only caveat. `node.Decision ==
-            // CraftingDecision.BuyFromVendor` reads the widened parent flag
-            // with no further gate changes; the leaf below it (if any)
-            // keeps carrying its own flag too, so both rows can show a
-            // caveat with no double-render (they are separate tooltip
-            // lines on separate rows).
-            //
-            // Review-fix round 8 (misattributed caveat text on vendor
-            // rows): a BuyFromVendor PARENT's PriceSideFellBack is never
-            // about ITS OWN item's TP price - that node was not bought on
-            // the TP at all - it is an aggregate ("did any barter cost
-            // line fall back") folded up from VendorItemCosts so the
-            // caveat is reachable even when the offending leaf renders
-            // collapsed (see the BuildNode comments this mirrors). Reusing
-            // the BuyFromTp/cost-component-leaf sentence here asserted THIS
-            // row's item has no buy orders on the preferred side, which is
-            // false in general: the row's own item may have a perfectly
-            // healthy TP presence, or none at all - only one of its vendor
-            // cost items fell back. A BuyFromTp node and an IsCostComponent
-            // leaf both keep the original sentence unchanged - for those
-            // two, the flag genuinely describes the row's own price. A
-            // plain BuyFromVendor parent (not itself a cost-component leaf
-            // - a leaf's Decision is always BuyFromVendor too, so this is
-            // an explicit "not a leaf" carve-out, checked first) gets a
-            // distinct sentence naming the component instead of the row.
-            //
-            // Nice-to-have (null-plan fallback): _getCurrentPlan() is a
-            // real nullable return (see its other ?. call sites in this
-            // file), so it is hoisted to a local once here rather than
-            // called twice per branch. When it IS null, neither ternary
-            // below can know the actual PriceBasis - the old inline
-            // `_getCurrentPlan()?.PriceBasis == PriceBasis.BuyOrder`
-            // silently read that as false and picked the InstantBuy-
-            // unavailable wording, which is an unearned claim about which
-            // side fell back. A null plan instead gets a basis-agnostic
-            // sentence that states only the fact this code does know (the
-            // node's price came from the other TP side).
+            // tree-tooltip-composer milestone: the actual line-building
+            // logic (unit price, AUDIT ROW 20/38 price-side-fallback
+            // caveat, acquisition hint, caption, wiki-link line) moved
+            // verbatim to the pure, unit-tested
+            // Services/TreeRowTooltipComposer.cs - see that class's own doc
+            // comment and docs/ARCHITECTURE.md section 5's STANDING RULE.
+            // Only the Blish-bound right-click event wiring below stays
+            // here.
             var currentPlan = _getCurrentPlan();
-            if (node.PriceSideFellBack &&
-                (node.Decision == CraftingDecision.BuyFromTp || node.IsCostComponent))
-            {
-                extraTooltipLines.Add(currentPlan == null
-                    ? "Other trading post price side shown"
-                    : currentPlan.PriceBasis == PriceBasis.BuyOrder
-                        ? "Buy-order price unavailable - instant-buy price shown"
-                        : "Instant-buy price unavailable - buy-order price shown");
-            }
-            else if (node.PriceSideFellBack && node.Decision == CraftingDecision.BuyFromVendor)
-            {
-                extraTooltipLines.Add(currentPlan == null
-                    ? "A vendor cost item's other trading post price side shown"
-                    : currentPlan.PriceBasis == PriceBasis.BuyOrder
-                        ? "A vendor cost item's buy-order price is unavailable - its instant-buy price is used"
-                        : "A vendor cost item's instant-buy price is unavailable - its buy-order price is used");
-            }
-
-            // guildupgrade-ingredients fix: a GuildUpgrade node's
-            // acquisition-hint-style explanation (see CraftingTreeBuilder's
-            // "GuildUpgrade" branch) shares this same tooltip line as the
-            // Unknown case - both are "no priceable source, here is why"
-            // text, just for a different reason.
-            if ((node.Decision == CraftingDecision.Unknown || node.Decision == CraftingDecision.GuildUpgrade) &&
-                !string.IsNullOrEmpty(node.AcquisitionHint))
-            {
-                extraTooltipLines.Add(node.AcquisitionHint);
-            }
-
-            // UI-bundle milestone, Feature C (receipt/what-if captions):
-            // sanctioned tooltip fallback - see the class-level doc comment
-            // on the captionText parameter above. Inserted at the front,
-            // ahead of any unit-price/caveat lines already in
-            // extraTooltipLines - but on a row whose label got ellipsized,
-            // UpdateTreeRowTooltip itself prepends the full item name ahead
-            // of everything already in extraTooltipLines, so on those rows
-            // the caption reads second, after the name line, not first.
-            if (!string.IsNullOrEmpty(captionText))
-            {
-                extraTooltipLines.Insert(0, captionText);
-            }
+            var extraTooltipLines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, captionText, currentPlan);
 
             // UI-bundle milestone, Feature A (wiki links): this module's
             // FIRST external-URL launch (deliberate maintainer decision) -
@@ -934,7 +796,6 @@ namespace GW2CraftingHelper.Views.Rendering
                         WikiLinkLauncher.Open(WikiLinkBuilder.BuildItemPageUrl(nodeName));
                     }
                 };
-                extraTooltipLines.Add("Right-click: Open wiki page");
             }
 
             UpdateTreeRowTooltip(rowPanel, displayName, fullName, extraTooltipLines);

@@ -56,8 +56,8 @@ namespace GW2CraftingHelper.Services
         /// seconds on first run" on the very first BuildingTree event of a
         /// cold recipe cache (W3B review-fix - see
         /// CraftingPlanPipeline.FirstRunTreeHint and
-        /// CraftingPlanView.FormatPhaseText). Null for every phase that has
-        /// none.
+        /// PlanStripTickDecision.FormatPhaseText). Null for every phase
+        /// that has none.
         /// </summary>
         public string Detail { get; set; }
     }

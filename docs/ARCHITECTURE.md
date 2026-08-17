@@ -48,11 +48,16 @@ documented to fire at most once per real frame, which `QueueMainThreadUpdate`
 cannot guarantee under re-entrant re-queuing.
 
 **Where:** `Views/MainThreadMarshal.cs`; `FrameTicker` in
-`Views/CraftingPlanView.cs` has three live instances: `_scrollVerifyTicker`
-(scroll verify), `_resizeDebounceTicker` (resize-settle debounce), and
+`Views/CraftingPlanView.cs` has FOUR live instances (measured): `_scrollVerifyTicker`
+(scroll verify), `_resizeDebounceTicker` (resize-settle debounce),
 `_wheelWrapVerifyTicker` (wheel-wrap correction verify, driving
-`ApplyWheelWrapCorrection` - see section 2). Scroll restore itself is
-applied synchronously, not via a ticker - see section 3.
+`ApplyWheelWrapCorrection` - see section 2), and `_spinnerTicker` (the W3B
+status-strip spinner tick - see `ArmSpinnerTicker`/`SpinnerTick` and
+`Services/PlanStripTickDecision.cs`). All four are canceled/nulled together
+by `StopLiveTickers` (see `docs/KNOWN-ISSUES.md`'s `CraftingPlanView`
+hazard row for the tab-switch race this class of field is exposed to).
+Scroll restore itself is applied synchronously, not via a ticker - see
+section 3.
 
 **Verified: `Build()` itself also runs off the main thread.** Every one of
 this module's `_mainWindow.Tabs` entries (`LogTabContent`, `MainView`,
@@ -287,20 +292,65 @@ WP-24, WP-25) extracted:
   (`CoinCurrencyRenderer`, `RarityColors`, `IconControls`, `LabelHelpers`)
   also moved to `Views/Rendering/`.
 
+**TreeSectionController state/render split: rejected by decision, not
+deferred by oversight.** A later proposal to bisect `TreeSectionController`
+into a stateful collaborator (owning `_nodeOverrides`/`_ignoredItemIds`/
+`_nodeExpansion`/`_treeNodeStates`) and a separate stateless renderer,
+mirroring the six per-render section renderers above, was evaluated and
+rejected (quorum verdict D-2). The invariant this class exists to hold is
+one owner, one lifetime: the whole reason it is constructed once in
+`CraftingPlanView`'s own constructor (`Views/CraftingPlanView.cs` ~614)
+instead of freshly per render is that its override state must survive a
+local pill-click re-solve, and a two-class split would either duplicate
+that lifetime management across both halves or reintroduce a second
+implicit owner - the exact class of bug section 1's "one owner" primitives
+above exist to prevent, just at the object-graph level instead of the
+thread level. It is also already the most-coupled class in
+`Views/Rendering/` outside its own file - mentioned by name in 14
+production `.cs` files (`Module.cs` plus 9 `Services/` files and 4
+`Views/` files, not counting `Models/` shape-mirroring comments or test
+files), of which 13 are comment-only; the actual compile-time coupling is
+2 references, both in `Views/CraftingPlanView.cs` (the field declaration
+and the constructor call site) - plus, as measured pre-change at `ce64423`,
+3 doc mentions (this section's own bullet and "Where:" line, plus
+`docs/ROADMAP.md`; `docs/KNOWN-ISSUES.md` carried 42 more as historical
+narrative) - not 18, an earlier over-count that conflated this figure with
+something wider. That doc-mention count is a snapshot, not a live figure: every doc entry that names the class (including this one) adds mentions on landing, so no post-change total is stated here - reproduce the current count with `git grep -c TreeSectionController -- '*.md'`. A state/render split
+would not shrink that coupling, only relocate half of it across a new
+seam. The accepted alternative for future tree-row/pill features is not
+a class bisection: per
+the STANDING RULE (`CONTRIBUTING.md`), extract the pure text/decision
+computation for a given feature into a Blish-free, unit-tested composer
+under `Services/` first - `TreeRowTooltipComposer` (tree-tooltip-composer
+milestone) is the latest instance of the same pattern already behind
+`DecisionPillPlanner`, `ValueDetailTooltipBuilder`, `PillSubduingEvaluator`/
+`PillSubduingTooltipBuilder`, and `ReceiptCaptionHelper` - and keep wiring
+it into `TreeSectionController`'s existing single-owner shape rather than
+growing a second stateful class alongside it.
+
 **What stayed, and why (WP-26 cut):** The scroll/resize/wheel controller
 move (bundling `PreserveScrollAcross`, the wheel-wrap correction, and the
-three `FrameTicker`s into their own collaborator class) was scoped as
-WP-26 and explicitly **cut** on 2026-07-23. It was the single riskiest
-remaining move with zero functional payoff: the guarantees involved
-(frame-timing, subscription order, synchronous-registration) are asserted
-by construction and by the invariants in sections 1-4 above, not by any
-automated test, so a regression would only surface in live use, and a
-reliable synthetic drag-resize verification was not achievable. The five
-completed extractions already took `CraftingPlanView` from a ~4,802-line
-plan-authoring baseline down to ~2,802 lines - real progress, even though
-short of the plan's own 2,000-line target - so the remaining
-scroll/resize/wheel machinery stays in `CraftingPlanView.cs`, fully
-region-mapped with KNOWN-ISSUES anchor comments at each region head.
+`FrameTicker`s then in the class into their own collaborator class) was
+scoped as WP-26 and explicitly **cut** on 2026-07-23. It was the single
+riskiest remaining move with zero functional payoff: the guarantees
+involved (frame-timing, subscription order, synchronous-registration) are
+asserted by construction and by the invariants in sections 1-4 above, not
+by any automated test, so a regression would only surface in live use, and
+a reliable synthetic drag-resize verification was not achievable. The five
+completed extractions took `CraftingPlanView` from a ~4,802-line
+plan-authoring baseline down to ~2,802 lines at the time WP-26 was cut -
+real progress, even though short of the plan's own 2,000-line target - so
+the remaining scroll/resize/wheel machinery stays in `CraftingPlanView.cs`,
+fully region-mapped with KNOWN-ISSUES anchor comments at each region head.
+Measured current: `Views/CraftingPlanView.cs` is 3,674 lines (2026-08-17) -
+higher than the post-WP-26 figure above, which is expected, not a
+regression of the decomposition: every line added since (W3B status
+strip/spinner, currency-ux-package, gate-round fixes, the
+tree-tooltip-composer extraction itself, ...) is a legitimate feature/fix
+landing in the file the STANDING RULE (see the TreeSectionController
+state/render split entry above and `CONTRIBUTING.md`) still routes pure
+logic out of on the way in, not evidence the WP-21 through WP-25
+extractions eroded.
 
 **Where:** `Views/Rendering/ISectionRelayoutSink.cs`,
 `Views/Rendering/TreeSectionController.cs`, the six
