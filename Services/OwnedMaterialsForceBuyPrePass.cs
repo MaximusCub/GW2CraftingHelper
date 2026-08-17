@@ -60,12 +60,16 @@ namespace GW2CraftingHelper.Services
         /// forced. CompetencyIndependentForceBuyNodeIds is the (always
         /// smaller-or-equal) subset forced under BOTH that evaluation AND a
         /// second, competency-BLIND evaluation using the RAW cheapest recipe
-        /// regardless of training - i.e. genuinely forced no matter what the
-        /// account is trained in. PlanSolver.Evaluate gates
+        /// regardless of training - forced under both evaluations, a much
+        /// stronger signal than ForceBuyOnlyNodeIds alone but NOT a strict
+        /// training-independence guarantee (see the nuance below).
+        /// PlanSolver.Evaluate gates
         /// Decision.CheapestCraftUntrained on THIS narrower set (via
         /// Solve's competencyIndependentForceBuyNodeIds parameter), not on
         /// ForceBuyOnlyNodeIds membership, so a competency-caused force-buy
-        /// never silently suppresses a real training opportunity -
+        /// at the node's OWN recipe choice can no longer suppress a real
+        /// training opportunity - see the nuance below for the residual
+        /// child-inflation case that still can -
         /// PillSourceCostBreakdown/the solver's own forceBuyOnlyNodeIds
         /// parameter (solve behavior itself) still use ForceBuyOnlyNodeIds
         /// exactly as before this fix.
