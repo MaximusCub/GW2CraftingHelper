@@ -12,21 +12,9 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     public class PlanSolver
     {
-        // WP-15 (architecture S4a): the vendor-batching sub-engine (batch
-        // state types, EvaluateVendorOffers, FinalizeVendorBatches,
-        // AllocateVendorNodeCosts, MergeVendorCurrencyCosts,
-        // VendorBatchesEqual, ScaleCostLines) now lives in the injected
-        // VendorBatchSolver collaborator (Services/VendorBatchSolver.cs)
-        // instead of this class's own private statics. Pure move - the
-        // merged-ceil arithmetic itself was DO-NOT-TOUCH at the time
-        // (m38-cleanup-plan.md #7) and was unchanged by this move; only
-        // the call shape moved. That freeze was retired 2026-08-17
-        // (characterization-first proof required, see KNOWN-ISSUES) and
-        // the arithmetic has since been rewritten (largest-remainder/
-        // Hamilton apportionment - see AllocateVendorNodeCosts' own doc
-        // comment), so it is no longer unchanged. The parameterless
-        // constructor keeps every existing `new PlanSolver()` call site
-        // unchanged.
+        // The vendor-batching sub-engine lives in the injected
+        // VendorBatchSolver collaborator; the parameterless constructor
+        // keeps every existing `new PlanSolver()` call site unchanged.
         private readonly VendorBatchSolver _vendorBatchSolver;
 
         public PlanSolver()
@@ -39,10 +27,8 @@ namespace GW2CraftingHelper.Services
             _vendorBatchSolver = vendorBatchSolver ?? new VendorBatchSolver();
         }
 
-        // Was `private` - now `internal` (WP-15) so VendorBatchSolver's
-        // AllocateVendorNodeCosts (a different class, same assembly) can
-        // read/write a Decision by NodeId. No wider than that: still not
-        // visible outside this assembly.
+        // Internal (not private) so VendorBatchSolver's
+        // AllocateVendorNodeCosts can read/write a Decision by NodeId.
         internal struct Decision
         {
             public AcquisitionSource Source;
@@ -53,181 +39,100 @@ namespace GW2CraftingHelper.Services
             public long? TotalCost;
 
             // The value used to compare this decision against siblings at
-            // the PARENT level: same as TotalCost for TP buys, but for a
-            // COMPARABLE vendor offer it also folds in valued non-coin
-            // currency lines (see EvaluateVendorOffers), and for a
-            // COMPARABLE craft it is the sum of the chosen recipe's
-            // non-currency ingredient ComparisonValues PLUS any valued
-            // Currency ingredient of that same recipe (see the currency
-            // branch in Evaluate's recipe loop) - never their TotalCost.
-            // Keeping this separate from TotalCost stops a valued vendor
-            // offer's or currency ingredient's coin-equivalent value from
-            // being "laundered" away when an ancestor sums child costs to
-            // decide buy vs. craft. For a FALLBACK-tier decision (see
-            // HasUnvaluedCurrency below) this is instead always identical
-            // to TotalCost - real coin only, no valuation ever folded in -
-            // mirroring EvaluateVendorOffers' own fallback tier, which
-            // likewise discards all valuation the moment any currency line
-            // is unvalued rather than partially retaining it.
+            // the parent level: same as TotalCost for TP buys, but a
+            // comparable vendor offer folds in valued non-coin currency
+            // lines, and a comparable craft sums its ingredients'
+            // ComparisonValues plus any valued Currency ingredient - never
+            // their TotalCost. Keeping this separate from TotalCost stops
+            // a valued coin-equivalent from being "laundered" away when an
+            // ancestor sums child costs. For a fallback-tier decision (see
+            // HasUnvaluedCurrency) this is always identical to TotalCost -
+            // real coin only, no valuation ever folded in.
             public long? ComparisonValue;
             public int RecipeId;
             public List<CostLine> VendorCurrencyCosts;
 
-            // W4B: see SolverDecision.VendorItemCosts/VendorHasRawCoin's own
-            // doc comments - straight passthrough of
-            // VendorBatchSolver.VendorOfferEvaluation's matching fields for
-            // whichever offer (comparable or fallback) this decision
-            // committed to.
+            // Passthrough of VendorBatchSolver.VendorOfferEvaluation's
+            // matching fields for whichever offer this decision committed to.
             public List<VendorItemCostLine> VendorItemCosts;
             public bool VendorHasRawCoin;
 
-            // W4B review-fix (Critical): true once
-            // VendorBatchSolver.AllocateVendorNodeCosts has reallocated this
-            // occurrence's share of a vendor step that MERGED 2+ tree
-            // occurrences of the same item (see that method's own doc
-            // comment). TotalCost is corrected in that case, but
-            // VendorItemCosts/VendorCurrencyCosts above are NOT - they stay
-            // the pre-merge, per-occurrence-local numbers EvaluateVendorOffers
-            // originally captured for THIS occurrence alone, which can
-            // disagree with the corrected TotalCost/share once 2+ occurrences
-            // are folded into one true merged-ceil purchase.
-            // CraftingTreeBuilder.BuildVendorCostComponentLeaves checks this
-            // flag and suppresses leaf synthesis entirely whenever it is
-            // true, rather than render a component number it cannot prove
-            // still sums to the parent's own (corrected) total. Always false
-            // for a single-occurrence vendor buy (see
-            // AllocateVendorNodeCosts - nothing was actually reallocated
-            // there, so the original per-occurrence numbers stay accurate).
+            // True once AllocateVendorNodeCosts has reallocated this
+            // occurrence's share of a vendor step that merged 2+ tree
+            // occurrences: TotalCost is corrected, but VendorItemCosts/
+            // VendorCurrencyCosts stay the pre-merge per-occurrence
+            // numbers and may no longer sum to the corrected total.
+            // CraftingTreeBuilder suppresses component-leaf synthesis when
+            // set. Always false for a single-occurrence vendor buy.
             public bool VendorComponentCostsUnreliable;
 
             public bool CanCraft;
             public bool CanBuyTp;
             public bool CanBuyVendor;
 
-            // Craft/vendor comparability-parity fix (adversarial-review
-            // follow-up): true when THIS committed decision is fallback-tier
-            // - an unvalued currency, a GuildUpgrade ingredient, or any
-            // other non-Item ingredient type this module cannot price (see
-            // CraftingDecision's XML doc for the id-space rationale) -
-            // directly on a chosen recipe/vendor offer, or transitively via
-            // a chosen ingredient's own fallback-tier decision. A recipe
-            // consuming an ingredient whose decision carries this flag is
-            // itself demoted to fallback-tier (see the recipe loop's
-            // ingredient pass in Evaluate) - without this propagation, an
-            // unpriceable cost hidden two-plus Craft levels deep would
-            // silently "launder" back into a fully-comparable-looking
-            // ComparisonValue one level up, reopening the exact asymmetry
-            // this fix exists to close. Never surfaced on the public
-            // SolverDecision - purely an internal tier-tracking aid.
-            // currency-ux-package review fix (nice-to-have): this used to
-            // say "same scope as ComparisonValue itself", but
-            // SolverDecision.ComparisonValue is now public (Feature 3) -
-            // this field alone stays PlanSolver-internal.
+            // True when this committed decision is fallback-tier - an
+            // unvalued currency, GuildUpgrade, or other unpriceable
+            // ingredient type - directly on the chosen recipe/offer, or
+            // transitively via a chosen ingredient's own fallback-tier
+            // decision. Without the transitive propagation, an unpriceable
+            // cost two Craft levels deep would launder back into a
+            // comparable-looking ComparisonValue one level up. Never
+            // surfaced on the public SolverDecision.
             public bool HasUnvaluedCurrency;
 
-            // Winning vendor offer's batch shape (Source == BuyFromVendor
-            // only, null otherwise): the offer's own OutputCount and its
-            // UNSCALED per-batch coin/currency cost (one purchase, before
-            // this node's own occurrence-local unitsNeeded scaling). Carried
-            // so Collect/AggregateStep/FinalizeVendorBatches can re-derive a
-            // merged step's true cost from AGGREGATE demand and ceil once
-            // (M34-B1 #1 - gw2e parity), instead of trusting the sum of
-            // several already-independently-ceil'd per-occurrence costs.
+            // Winning vendor offer's batch shape (BuyFromVendor only):
+            // OutputCount and the unscaled per-batch cost, so
+            // FinalizeVendorBatches can re-derive a merged step's true
+            // cost from aggregate demand and ceil once, instead of summing
+            // several already-ceil'd per-occurrence costs.
             public VendorBatchSolver.VendorOfferBatch? VendorBatch;
 
-            // AUDIT ROW 20/38 (gw2e price-side fallback parity): true only
-            // for a BuyFromTp decision whose committed unit price came from
-            // the NON-preferred TP side (see GetUnitPrice's fallback
-            // overload) because the basis-preferred side had no listings
-            // (0). False for every other Source - Commit gates it on
-            // src == AcquisitionSource.BuyFromTp so a stale true from a
-            // sibling buyTotalCost computation can never leak onto a
-            // Craft/BuyFromVendor/UnknownSource decision. Surfaced on the
-            // public SolverDecision so CraftingTreeBuilder can flag the
-            // affected CraftingTreeNode for the unit-price tooltip caveat.
+            // True only for a BuyFromTp decision whose committed unit
+            // price came from the non-preferred TP side because the
+            // preferred side had no listings; Commit gates it on the
+            // Source so a stale true never leaks onto another decision.
+            // Drives the unit-price tooltip caveat.
             public bool PriceSideFellBack;
 
-            // source-selection-simplification (maintainer-approved
-            // redesign, docs/gw2e-considerations.md): raw cost breakdowns
-            // for EVERY feasible source at this node, computed regardless
-            // of which one wins (see PillSourceCostBreakdown's own doc
-            // comment for why - unlike VendorCurrencyCosts/VendorItemCosts
-            // above, which stay winner-only). Null (not IsAvailable=false)
-            // is never used here - each is always a real, non-null
-            // PillSourceCostBreakdown with IsAvailable reflecting the
-            // matching CanCraft/CanBuyTp/CanBuyVendor flag, so a consumer
-            // never needs a separate null check before reading
-            // IsAvailable. Feeds PillSubduingEvaluator via
-            // CraftingTreeNode's own matching fields - never read by
-            // PickCheapest or any cost total.
+            // Raw cost breakdowns for every feasible source at this node,
+            // computed regardless of which one wins. Always non-null, with
+            // IsAvailable mirroring CanCraft/CanBuyTp/CanBuyVendor. Feeds
+            // PillSubduingEvaluator; never read by PickCheapest or any
+            // cost total.
             public PillSourceCostBreakdown CraftCostBreakdown;
             public PillSourceCostBreakdown BuyFromTpCostBreakdown;
             public PillSourceCostBreakdown BuyFromVendorCostBreakdown;
 
-            // Adversarial-review fix (#7, source-selection-simplification
-            // design-law gap): true when craft was excluded from the
-            // AUTOMATIC pick SPECIFICALLY because no character meets the
-            // winning recipe's discipline requirement - distinct from the
-            // SAME craftExcludedFromAutoPick flag also being set by the
-            // force-buy pre-pass (M34-B2a #3), which needs no user-facing
-            // explanation (it is itself a deliberate, already-explained
-            // automatic choice). Never true when there was no genuine
-            // comparable alternative to fall back to (see
-            // hasComparableAlternative's own doc comment in Evaluate) -
-            // craft still auto-wins in that case, so there is nothing to
-            // report. Set unconditionally at every Commit call site,
-            // mirroring CanCraft/CanBuyTp/CanBuyVendor above.
+            // True when craft was excluded from the automatic pick
+            // specifically because no character meets the winning recipe's
+            // discipline requirement - distinct from the force-buy
+            // pre-pass also setting craftExcludedFromAutoPick, which needs
+            // no user-facing explanation. Never true when there was no
+            // comparable alternative to fall back to (craft still
+            // auto-wins then, so there is nothing to report).
             public bool CraftExcludedByCompetency;
 
-            // The real coin cost craft would have committed at (real, not
-            // valuation-inflated - same figure autoPickCraftRealCost
-            // itself is), and the winning recipe's own discipline
-            // requirement - only meaningful when CraftExcludedByCompetency
-            // is true; null/empty/0 otherwise. Lets a caller (Plan Notes)
+            // The real coin cost craft would have committed at, and the
+            // winning recipe's discipline requirement - only meaningful
+            // when CraftExcludedByCompetency is true. Lets Plan Notes
             // report "crafting would cost N less, but no character has
-            // Discipline R" with concrete numbers, per the maintainer's
-            // own design law (structured sections show the best-NOW
-            // option; opportunities/considerations go to Plan Notes with
-            // concrete numbers) - without this, the competency flip
-            // silently raised the plan's cost with no explanation
-            // anywhere the CRAFT pill is not subdued (it is CHEAPER, not
-            // more expensive, so neither subduing rule fires) and gets no
-            // tooltip either.
+            // Discipline R" with concrete numbers.
             public long? CraftExcludedRealCost;
             public IReadOnlyList<string> CraftExcludedDisciplines;
             public int CraftExcludedMinRating;
 
-            // Adversarial-review round-2 fix (finding #5): CraftExcludedByCompetency
-            // above is ONLY true when NO option in EITHER tier is
-            // competent - it stays false (no report) for two real shapes
-            // where competency still silently raised the plan's cost:
-            // (a) the cheapest COMPARABLE recipe is untrained, but a
-            // competent recipe exists only in the FALLBACK tier, so
-            // craftBreakdownDecisionValue is null and craft drops out of
-            // the comparable-tier PickCheapest race entirely (TP/vendor
-            // commits, unrelated to "excluded"); (b) a costlier competent
-            // SIBLING recipe wins Craft over a cheaper untrained one - the
-            // plan still crafts (CraftExcludedByCompetency's own
-            // "Decision == Craft -> nothing to report" precedent does not
-            // apply here, since the user never got a chance to compare
-            // against the cheap recipe at all). These four fields
-            // generalize the same "cheapest craft recipe overall is
-            // untrained" question, independent of whether the AUTOMATIC
-            // pick actually got excluded - CheapestCraftUntrained is true
-            // whenever the numerically cheapest raw craft candidate
-            // (comparable-tier preferred, exactly bestComparableOption ??
-            // bestFallbackOption - the SAME tier priority autoPickCraftOption
-            // uses, but without the competent-first override) fails
-            // CraftCompetencyEvaluator.AccountCanCraft, regardless of
-            // whether some OTHER (costlier, or other-tier) recipe is
-            // competent. Never true when bestRatingByDiscipline is null
-            // (competency UNKNOWN - never penalize on missing data, same
-            // contract CraftExcludedByCompetency/AccountCanCraft already
-            // use). Deliberately does NOT drive craftExcludedFromAutoPick
-            // or any other decision-affecting behavior - purely additive
-            // display data for CompetencyOpportunityCalculator, same
-            // "cosmetic, never fed back into a decision" contract
-            // CraftExcludedRealCost above already has.
+            // CraftExcludedByCompetency stays false for two shapes where
+            // competency still silently raised the plan's cost: a
+            // competent recipe exists only in the other tier, or a
+            // costlier competent sibling wins Craft over a cheaper
+            // untrained one. CheapestCraftUntrained generalizes the
+            // question: true whenever the numerically cheapest raw craft
+            // candidate (same tier priority as autoPickCraftOption, but
+            // without the competent-first override) fails AccountCanCraft.
+            // Never true when bestRatingByDiscipline is null (competency
+            // unknown - never penalize on missing data). Purely additive
+            // display data for CompetencyOpportunityCalculator; never
+            // drives a decision.
             public bool CheapestCraftUntrained;
             public long? CheapestCraftRealCost;
             public IReadOnlyList<string> CheapestCraftDisciplines;
@@ -235,21 +140,11 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Adversarial-review round-2 fix (finding #4): the single
-        /// resolved "which recipe would auto-win Craft" answer for one
-        /// Evaluate() call, replacing three independent reference-equality
-        /// ternary chains (one per field: comparison value, real cost,
-        /// recipe id) that each had to re-derive "which of the four
-        /// (comparable/fallback x competent/raw) tracked buckets did
-        /// autoPickCraftOption resolve to" by hand, against the same four
-        /// best*Option variables. Correct as long as all three chains stay
-        /// byte-for-byte in sync with each other and with the ??
-        /// precedence that picks autoPickCraftOption itself - a future
-        /// edit to that precedence (or a fifth bucket) could silently
-        /// desynchronise them, producing a Commit with one recipe's cost
-        /// and another recipe's RecipeId with no test catching it. Binding
-        /// Option/RealCost/ComparisonValue/RecipeId together in one struct,
-        /// resolved once, makes that failure mode structurally impossible.
+        /// The single resolved "which recipe would auto-win Craft" answer
+        /// for one Evaluate() call. Binding Option/RealCost/
+        /// ComparisonValue/RecipeId together, resolved once, keeps a
+        /// Commit from ever pairing one recipe's cost with another
+        /// recipe's id.
         /// </summary>
         private readonly struct CraftAutoPickCandidate
         {
@@ -257,10 +152,8 @@ namespace GW2CraftingHelper.Services
             public readonly long? RealCost;
 
             /// <summary>
-            /// The comparable-tier ComparisonValue (craftBreakdownDecisionValue's
-            /// own source) - null whenever this candidate is a fallback-tier
-            /// recipe (mirrors PillSourceCostBreakdown.DecisionValue's own
-            /// null contract: never valued for a fallback-tier pick).
+            /// The comparable-tier ComparisonValue - null whenever this
+            /// candidate is a fallback-tier recipe.
             /// </summary>
             public readonly long? ComparisonValue;
             public readonly int RecipeId;
@@ -286,104 +179,51 @@ namespace GW2CraftingHelper.Services
             PriceBasis priceBasis = PriceBasis.InstantBuy,
             IReadOnlyDictionary<int, AcquisitionSource> overrides = null,
             CurrencyValuation currencyValuation = null,
-            // M34-B2a #3 (gw2e "Value Own Materials" force-buy pre-pass):
-            // nodes in this set have craft excluded from the AUTOMATIC
-            // buy-vs-craft-vs-vendor comparison for this solve (buying
-            // outright beats crafting fresh components by gw2e's 15%
-            // margin - see OwnedMaterialsForceBuyPrePass). A manual
-            // per-node override in `overrides` still wins over this set,
-            // same as gw2e's own manual craft/buy pill always overriding
-            // its automatic pre-pass (docs/gw2e-parity-spec.md /
-            // m34-r2-gw2e-owned-materials.md Section 3.2).
+            // Nodes in this set have craft excluded from the automatic
+            // comparison (buying outright beats crafting fresh components
+            // by gw2e's 15% margin - see OwnedMaterialsForceBuyPrePass).
+            // A manual per-node override still wins.
             ISet<int> forceBuyOnlyNodeIds = null,
-            // Verification-review fix (source-selection-simplification):
-            // nodes in THIS set are force-buy-excluded under BOTH the
-            // competency-resolved AND a competency-BLIND (raw cheapest
-            // recipe, regardless of training) evaluation of the 0.85 rule -
-            // see OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult's own
-            // doc comment. A node can be in forceBuyOnlyNodeIds above
-            // WITHOUT being in this set (its force-buy exclusion is itself
-            // competency-caused - training would change the raw evaluation
-            // and empty the force-buy set). Used ONLY to gate
-            // cheapestCraftUntrained below, never craftExcludedFromAutoPick
-            // (forceBuyOnlyNodeIds/isForceBuyOnly alone still decides that,
-            // unchanged) - see cheapestCraftUntrained's own doc comment for
-            // why the two sets must stay separate. Null (the default, and
-            // every caller that never ran the pre-pass) disables the
-            // distinction entirely - isCompetencyIndependentForceBuy is
-            // then always false, same as before this parameter existed.
+            // Nodes force-buy-excluded under BOTH the competency-resolved
+            // and a competency-blind evaluation of the 0.85 rule (see
+            // OwnedMaterialsForceBuyPrePass.ForceBuyPrePassResult). Used
+            // only to gate cheapestCraftUntrained, never
+            // craftExcludedFromAutoPick. Null disables the distinction.
             ISet<int> competencyIndependentForceBuyNodeIds = null,
-            // M34-B2a #3: when non-null, populated with this node's raw
-            // (buyCost, craftCost) - the SAME numbers Evaluate already
-            // computes for every "Item" node regardless of decision - so a
-            // caller (OwnedMaterialsForceBuyPrePass) can apply gw2e's exact
+            // When non-null, populated with each node's raw (buyCost,
+            // craftCost) so OwnedMaterialsForceBuyPrePass can apply gw2e's
             // buyPrice &lt; craftDecisionPrice * 0.85 rule without
-            // duplicating this method's cost-aggregation logic. Never
-            // affects this solve's own Decisions/Plan.
+            // duplicating this method's aggregation. Never affects this
+            // solve's own Decisions/Plan.
             Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
-            // Verification-review fix: when non-null, populated with this
-            // node's RAW cheapest craft real cost - cheapestCraftRealCostOverall
-            // below, the SAME competency-BLIND figure cheapestCraftUntrained
-            // itself compares against, ignoring training entirely (unlike
-            // costDiagnostics' CraftCost, which is competency-RESOLVED). Lets
-            // OwnedMaterialsForceBuyPrePass run its second, competency-blind
-            // 0.85 evaluation from this SAME throwaway solve pass, without a
-            // second Solve() call. Never affects this solve's own Decisions/
-            // Plan.
+            // When non-null, populated with each node's raw
+            // competency-blind cheapest craft real cost, letting
+            // OwnedMaterialsForceBuyPrePass run its second 0.85 evaluation
+            // from this same throwaway solve without a second Solve() call.
             Dictionary<int, long?> rawCraftCostDiagnostics = null,
-            // M34-B2a #3: when false, this tree's existing node.NodeId
-            // values are trusted as-is instead of being reassigned from
-            // scratch - see RecipeNodeIds' doc comment for why a caller
-            // (CraftingPlanPipeline, when the force-buy pre-pass is active)
-            // needs this: the tree's ids were pre-assigned, and survived
-            // pruning via InventoryReducer.CloneNode's NodeId preservation,
-            // BEFORE this Solve() call, and must not be renumbered out from
-            // under the pre-pass's own already-computed forceBuyOnlyNodeIds
-            // set. Every other caller keeps the default (true), unchanged
-            // from this method's original always-reassign behavior.
+            // When false, the tree's existing NodeIds are trusted as-is:
+            // the force-buy pre-pass pre-assigned them (surviving pruning
+            // via CloneNode) and renumbering would desync its
+            // forceBuyOnlyNodeIds set.
             bool assignNodeIds = true,
-            // M34-B2b (gw2e "Ignore" pill): item ids in this set are
-            // treated as fully in-hand tree-wide for THIS solve only -
-            // every occurrence contributes zero cost, generates no
-            // crafting step or shopping row, and does not recurse into its
-            // own recipe's ingredients (matching gw2e's usedQuantity == 0
-            // => free/no-step rule - see m34-r2-gw2e-owned-materials.md
-            // Section 2.1/5). Unlike `overrides` (a per-NodeId craft/buy
-            // choice), this is per-ItemId, matching gw2e's own "Ignore
-            // marks every occurrence of that item id, tree-wide" semantics.
-            // Null (the default) behaves exactly as before this feature.
+            // Item ids treated as fully in-hand tree-wide for this solve:
+            // zero cost, no step or shopping row, no recursion into their
+            // ingredients (gw2e's usedQuantity == 0 rule). Per-ItemId,
+            // unlike the per-NodeId `overrides`.
             ISet<int> ignoredItemIds = null,
-            // M37 (KNOWN-ISSUES #24, gw2e parity): per-material Homestead
-            // Refinement efficiency tier configuration. Null (the default)
-            // behaves as HomesteadEfficiencyTiers.Default - tier 0 for
-            // every material, gw2e's own default - so every existing
-            // caller that doesn't know about this setting keeps excluding
-            // every Homestead Refinement offer above tier 0, exactly
-            // matching the live-defect fix's intended default behavior.
+            // Per-material Homestead Refinement efficiency tiers. Null
+            // behaves as HomesteadEfficiencyTiers.Default (tier 0 for
+            // every material, gw2e's own default).
             HomesteadEfficiencyTiers homesteadTiers = null,
-            // source-selection-simplification (maintainer-approved
-            // redesign, docs/gw2e-considerations.md): per-character
-            // crafting discipline data (the SAME snapshot passthrough
-            // PlanResultBuilder.Build and CraftingPlanResult.
-            // CharacterDisciplines already carry) - used ONLY to decide
-            // whether a Craft decision that would otherwise win the
-            // AUTOMATIC buy-vs-craft-vs-vendor comparison is actually
-            // craftable by this account (see CraftCompetencyEvaluator and
-            // the craftExcludedFromAutoPick competency branch below). Null
-            // (the default, and every pre-existing caller/test) reproduces
-            // this method's pre-existing behavior exactly - competency is
-            // UNKNOWN, never penalizes craft, matching the "no snapshot
-            // data = never penalize" contract CraftCompetencyEvaluator.
-            // AccountCanCraft documents on its own bestRatingByDiscipline
-            // parameter.
+            // Per-character discipline data, used only to decide whether a
+            // Craft decision that would win the automatic comparison is
+            // actually craftable by this account (see
+            // CraftCompetencyEvaluator). Null means competency is unknown
+            // and never penalizes craft.
             IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null,
-            // Adversarial-review fix (Critical #4, source-selection-
-            // simplification): see Evaluate's own matching parameter doc
-            // comment - reference-keyed owned-material usage from the SAME
-            // InventoryReducer.Reduce call that produced `tree` (when
-            // `tree` is a post-reduction tree). Null (the default, and
-            // every pre-existing caller) disables the
-            // RawQuantitiesReducedByOwnedStock check entirely.
+            // Reference-keyed owned-material usage from the same
+            // InventoryReducer.Reduce call that produced `tree`. Null
+            // disables the RawQuantitiesReducedByOwnedStock check.
             Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
@@ -391,9 +231,7 @@ namespace GW2CraftingHelper.Services
             var memo = new Dictionary<int, Decision>();
 
             // Built once per solve (not per node/recipe) - see
-            // CraftCompetencyEvaluator.BuildBestRatingByDiscipline's own doc
-            // comment for why this precomputed dictionary, not the raw
-            // list, is what Evaluate's recipe loop actually consults.
+            // CraftCompetencyEvaluator.BuildBestRatingByDiscipline.
             var bestRatingByDiscipline = CraftCompetencyEvaluator.BuildBestRatingByDiscipline(characterDisciplines);
 
             // Pre-pass: assign unique NodeIds to every node in the tree.
@@ -414,14 +252,9 @@ namespace GW2CraftingHelper.Services
             var craftOrder = new Dictionary<(int, int), int>();
             var vendorBatchTracking = new Dictionary<(int, AcquisitionSource, int), VendorBatchSolver.VendorBatchState>();
             var vendorOccurrences = new Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>>();
-            // M34 fix (wave-validator finding, post-fcbb277): every tree
-            // occurrence's own NodeId that fed a merged Craft-type stepKey,
-            // in first-seen (DFS) order - the Craft-side twin of
-            // vendorOccurrences above, needed for the same reason: a Craft
-            // PlanStep's TotalCost is Collect()'s running sum of
-            // decision.TotalCost across every occurrence of that
-            // (ItemId, RecipeId) craft, taken BEFORE the correction passes
-            // below ever run (see RefreshCraftStepCosts's doc comment).
+            // Every tree occurrence's NodeId that fed a merged Craft-type
+            // stepKey, in first-seen (DFS) order - the Craft-side twin of
+            // vendorOccurrences, consumed by RefreshCraftStepCosts.
             var craftOccurrences = new Dictionary<(int, AcquisitionSource, int), List<int>>();
             int craftCounter = 0;
 
@@ -435,71 +268,25 @@ namespace GW2CraftingHelper.Services
             // collects any post-solve "timegated" (cap-exceeded) notices.
             var timegatedItems = _vendorBatchSolver.FinalizeVendorBatches(stepMap, vendorBatchTracking, currencyMap);
 
-            // Pass 2c (M34 fix - Critical review finding): FinalizeVendorBatches
-            // only corrects the MERGED PlanStep/currencyMap view; it never
-            // touches `memo`, which is what the public Decisions dict (and,
-            // via CraftingTreeBuilder, every CraftingTreeNode.SubtreeCost -
-            // including the root row) is built from below. Without this,
-            // the Recipe Tree's own displayed totals kept showing the stale,
-            // per-occurrence-overcounted sum while the Total Cost summary
-            // (plan.TotalCoinCost, built from the corrected stepMap) showed
-            // the right number - the two sections of the same page
-            // disagreeing by exactly the rounding waste this fix eliminates.
-            // Re-derives each corrected vendor step's true per-occurrence
-            // share (AllocateVendorNodeCosts), then re-sums every Craft
-            // ancestor bottom-up from those corrected leaf values
-            // (RecomputeCraftCosts) so the correction propagates all the way
-            // to the root, exactly mirroring Evaluate's own bottom-up
-            // craftRealCost aggregation. RecomputeCraftCosts itself has no
-            // depth bound - it walks the ENTIRE chosen-path tree from
-            // `tree` down, so `memo`/Decisions/SubtreeCost are already
-            // fully correct at every level after this line, however deep.
-            // currency-ux-package review fix (finding 1, MEASURED - review
-            // round 2): the original approach here captured each vendor
-            // decision's PRE-CORRECTION (ComparisonValue - TotalCost) delta
-            // BEFORE calling AllocateVendorNodeCosts, then re-applied that
-            // same ABSOLUTE per-occurrence delta on top of the corrected
-            // (deduplicated) TotalCost once it returned. That double-counted
-            // any valued non-coin currency line: each pre-merge occurrence's
-            // delta already carried the FULL currency-equivalent cost of
-            // that occurrence's own individually-ceil'd purchase, so summing
-            // N occurrences' full deltas onto the one true merged batch
-            // multiplied the currency contribution by N while
-            // AllocateVendorNodeCosts correctly de-duplicated the coin side.
-            // Fixed by re-deriving the currency contribution from the
-            // CORRECTED merged batch shape instead of replaying stale
-            // per-occurrence deltas: step.VendorCurrencyCosts is already
-            // re-scaled to the true aggregate unitsNeeded by
-            // FinalizeVendorBatches above, so its valuation (via the same
-            // currencyValuation.TryGetCopperValue every other solver call
-            // site uses) is computed exactly ONCE per merged step, then that
-            // single total is allocated across occurrences the SAME
-            // largest-remainder (Hamilton) apportionment AllocateVendorNodeCosts
-            // itself uses for TotalCost (see that method's doc comment):
-            // floor(total * quantity / totalQuantity) per occurrence, with
-            // any leftover copper(s) going to the occurrences with the
-            // largest fractional remainder, ties broken by first-seen (DFS)
-            // order from vendorOccurrences - so shares always sum to
-            // precisely the step total, no drift, no invented precision,
-            // and no unbounded skew toward whichever occurrence happens to
-            // land last (the multiply widens to decimal, mirroring
-            // AllocateVendorNodeCosts' own overflow fix, so this holds
-            // unconditionally - no long overflow is possible for any
-            // totalCurrencyValue/Quantity pair either field's own type can
-            // hold). AllocateVendorNodeCosts (VendorBatchSolver; merged-ceil
-            // batching math, formerly DO-NOT-TOUCH - retired 2026-08-17, see
-            // KNOWN-ISSUES) corrects TotalCost for every occurrence of a
-            // merged vendor step but has no reason
-            // to know about ComparisonValue at all; done here in the
-            // PlanSolver-side wrapper instead, exactly mirroring how
-            // FlagUnreliableVendorComponentCosts just below already reads
-            // that method's outputs after the fact rather than touching
-            // VendorBatchSolver itself. Mirrors AllocateVendorNodeCosts' own
-            // guard (step.VendorOfferOutputCount <= 0 means occurrences
-            // disagreed on the winning offer - the Conflict case - so each
-            // occurrence's own memo ComparisonValue is already individually
-            // correct for its own genuinely different purchase and is left
-            // untouched here, exactly as TotalCost is).
+            // Pass 2c: FinalizeVendorBatches only corrects the merged
+            // PlanStep/currencyMap view, never `memo` - which is what the
+            // public Decisions dict and every CraftingTreeNode.SubtreeCost
+            // are built from. Re-derive each corrected vendor step's true
+            // per-occurrence share (AllocateVendorNodeCosts), then re-sum
+            // every Craft ancestor bottom-up (RecomputeCraftCosts, no
+            // depth bound) so the correction propagates to the root.
+            //
+            // The currency-equivalent contribution is re-derived from the
+            // corrected merged batch shape rather than replaying stale
+            // per-occurrence deltas (which double-counted valued currency
+            // lines): step.VendorCurrencyCosts is already re-scaled to the
+            // aggregate unitsNeeded, so its valuation is computed once per
+            // merged step, then allocated across occurrences with the same
+            // largest-remainder (Hamilton) apportionment
+            // AllocateVendorNodeCosts uses for TotalCost - shares always
+            // sum to precisely the step total. A step with
+            // VendorOfferOutputCount <= 0 (occurrences disagreed on the
+            // winning offer) is left untouched, exactly as TotalCost is.
             _vendorBatchSolver.AllocateVendorNodeCosts(stepMap, vendorOccurrences, memo);
 
             foreach (var kvp in vendorOccurrences)
@@ -524,29 +311,19 @@ namespace GW2CraftingHelper.Services
                     }
                     catch (OverflowException)
                     {
-                        // Defense in depth, matching RecomputeComparisonValues'
-                        // and EvaluateVendorOffers' own no-crash posture for
-                        // an absurd valuation input: fall back to whatever
-                        // was accumulated before the overflow rather than
-                        // letting an uncaught exception fail the whole
-                        // Solve(). In practice this offer would already have
-                        // been demoted to fallback tier (comparisonValue ==
-                        // totalCost, delta == 0) at Evaluate() time before an
-                        // overflow this large could occur here.
+                        // Fall back to whatever was accumulated before the
+                        // overflow rather than failing the whole Solve() -
+                        // matches RecomputeComparisonValues' and
+                        // EvaluateVendorOffers' no-crash posture.
                     }
                 }
 
                 var occurrences = kvp.Value;
 
-                // class-sweep fix (MEASURED): mirrors AllocateVendorNodeCosts'
-                // own largest-remainder (Hamilton) apportionment exactly -
-                // this is the sibling of that method's TotalCost allocation,
-                // apportioning the currency-equivalent share instead. Using
-                // the deleted "last occurrence absorbs the remainder" shape
-                // here (as before) let ComparisonValue diverge from the
-                // fairly-apportioned TotalCost by up to step.Quantity - 1
-                // copper for a merged step, undoing the bound the class
-                // sweep on 938f6c9 was supposed to establish everywhere.
+                // Mirrors AllocateVendorNodeCosts' largest-remainder
+                // (Hamilton) apportionment; a "last occurrence absorbs the
+                // remainder" shape let ComparisonValue diverge from the
+                // apportioned TotalCost by up to step.Quantity - 1 copper.
                 long totalQuantity = 0L;
                 for (int i = 0; i < occurrences.Count; i++)
                 {
@@ -560,16 +337,10 @@ namespace GW2CraftingHelper.Services
                     long allocatedCurrency = 0L;
                     for (int i = 0; i < occurrences.Count; i++)
                     {
-                        // Review fix (overflow): mirrors AllocateVendorNodeCosts'
-                        // own fix for the identical exposure - totalCurrencyValue
-                        // (long) * quantity (int) can exceed long range, and on
-                        // wrap the numerator goes negative, silently breaking the
-                        // sum-to-totalCurrencyValue invariant below. Widened to
-                        // decimal: the product (<= ~9.2e18 * ~2.1e9 = ~1.98e28)
-                        // always fits decimal's range (~7.9e28), so no overflow
-                        // is possible for any value either operand's own type can
-                        // hold. Both operands are whole coppers, so truncating
-                        // back to long after the divide is exact.
+                        // totalCurrencyValue (long) * quantity (int) can
+                        // exceed long range; widened to decimal, which holds
+                        // any such product. Both operands are whole coppers,
+                        // so truncating back to long is exact.
                         decimal numerator = (decimal)totalCurrencyValue * occurrences[i].Quantity;
                         currencyShares[i] = (long)(numerator / totalQuantity);
                         currencyRemainders[i] = (long)(numerator % totalQuantity);
@@ -593,36 +364,23 @@ namespace GW2CraftingHelper.Services
                         }
                     }
                 }
-                // else: totalQuantity <= 0 is defensive only (vendorOccurrences'
-                // construction, AggregateStep, never records a non-positive
-                // Quantity in practice) - currencyShares stays all-zero rather
-                // than divide by zero, matching AllocateVendorNodeCosts' own
-                // guard for the same condition.
+                // else: totalQuantity <= 0 is defensive only - currencyShares
+                // stays all-zero rather than divide by zero.
 
                 for (int i = 0; i < occurrences.Count; i++)
                 {
                     int nodeId = occurrences[i].NodeId;
                     long currencyShare = currencyShares[i];
 
-                    // currency-ux-package regression fix (MEASURED): mirrors
-                    // RecomputeComparisonValues' own fallback-tier guard at
-                    // its `decision.HasUnvaluedCurrency ? ... : comparisonValue`
-                    // line - a fallback-tier offer (ANY unvalued non-coin
-                    // line, see VendorBatchSolver Evaluate) deliberately
-                    // commits ComparisonValue == TotalCost with no valuation
-                    // folded in. Without this guard this pass overwrote that
-                    // with a fabricated partial figure (only the valued lines
-                    // folded in, the unvalued line silently dropped), which
-                    // then made the value-detail tooltip's divergence check
-                    // fire and render a precise-looking optimization price
-                    // for an offer that was never actually valued.
-                    // Consequence: a skipped fallback-tier decision keeps
-                    // its PRE-correction ComparisonValue, so ComparisonValue
-                    // == TotalCost need not hold for it after the merged
-                    // correction. Contained today (ValueDetailTooltipBuilder
-                    // bails on VendorComponentCostsUnreliable, and
-                    // RecomputeComparisonValues overwrites Craft ancestors);
-                    // a new consumer must not assume that invariant here.
+                    // A fallback-tier offer deliberately commits
+                    // ComparisonValue == TotalCost with no valuation folded
+                    // in; overwriting it with a partial figure made the
+                    // value-detail tooltip render a precise-looking price
+                    // for an offer that was never valued. Consequence: a
+                    // skipped fallback-tier decision keeps its
+                    // pre-correction ComparisonValue, so ComparisonValue ==
+                    // TotalCost need not hold for it after the merged
+                    // correction - a new consumer must not assume it.
                     if (memo.TryGetValue(nodeId, out var decision) && decision.TotalCost.HasValue &&
                         !decision.HasUnvaluedCurrency)
                     {
@@ -632,46 +390,23 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // W4B review-fix (Critical): AllocateVendorNodeCosts above
-            // corrects decision.TotalCost for every occurrence of a merged
-            // vendor step, but a decision's VendorItemCosts/VendorCurrencyCosts
-            // (captured pre-merge, per occurrence) are never re-derived the
-            // same way - see FlagUnreliableVendorComponentCosts' own doc
-            // comment. Deliberately kept OUT of VendorBatchSolver (merged-
-            // ceil batching math, formerly DO-NOT-TOUCH - retired
-            // 2026-08-17, see KNOWN-ISSUES) - this only READS
-            // AllocateVendorNodeCosts' own already-public inputs/outputs
-            // (vendorOccurrences, stepMap) after it returns, and writes a
-            // new auxiliary flag; it changes no cost, no share, no batch
-            // selection.
+            // AllocateVendorNodeCosts corrects decision.TotalCost, but
+            // VendorItemCosts/VendorCurrencyCosts (captured pre-merge) are
+            // never re-derived - see FlagUnreliableVendorComponentCosts.
+            // Kept out of VendorBatchSolver: it only reads that method's
+            // outputs and writes an auxiliary flag.
             FlagUnreliableVendorComponentCosts(stepMap, vendorOccurrences, memo);
             RecomputeCraftCosts(tree, memo, ignoredItemIds);
 
-            // currency-ux-package review fix (finding 1, MEASURED): mirrors
-            // RecomputeCraftCosts immediately above, but for ComparisonValue
-            // instead of TotalCost - RecomputeCraftCosts re-sums every Craft
-            // ancestor's real coin cost bottom-up from corrected leaves
-            // without ever touching ComparisonValue, so a Craft node above a
-            // vendor-corrected leaf kept the same stale pair the vendor-leaf
-            // delta pass above exists to fix. Must run after both
-            // AllocateVendorNodeCosts (leaves) and RecomputeCraftCosts
-            // (TotalCost) so it walks fully corrected inputs.
+            // The ComparisonValue twin of RecomputeCraftCosts above; must
+            // run after both AllocateVendorNodeCosts and
+            // RecomputeCraftCosts so it walks fully corrected inputs.
             RecomputeComparisonValues(tree, memo, ignoredItemIds, valuation);
 
-            // Pass 2d (M34 fix - wave-validator finding): stepMap's
-            // Craft-type PlanStep entries are NOT touched by anything
-            // above - AggregateStep (inside Collect, pass 2) summed
-            // decision.TotalCost across occurrences BEFORE this line ever
-            // ran, so every Craft row of the "Crafting Steps" shopping
-            // list would otherwise permanently show the stale
-            // pre-correction total even though `memo`/the Recipe Tree
-            // (just corrected above) and plan.TotalCoinCost (summed from
-            // FinalizeVendorBatches' already-corrected vendor/TP steps
-            // below) both show the right number - see
-            // RefreshCraftStepCosts's doc comment for why a full
-            // restructure to avoid this snapshot-then-correct ordering
-            // entirely was assessed and rejected in favor of this
-            // targeted refresh.
+            // Pass 2d: stepMap's Craft-type PlanStep entries were summed
+            // before the correction passes ran; refresh them so the
+            // Crafting Steps rows agree with the corrected tree and
+            // totals - see RefreshCraftStepCosts.
             RefreshCraftStepCosts(stepMap, craftOccurrences, memo);
 
             // Build ordered step list: buys/unknowns first, then crafts in bottom-up order
@@ -707,14 +442,11 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // Fourth-site fix (adversarial-review follow-up): a coin-typed
-            // Currency ingredient (Collect's currencyMap accumulation above)
-            // is real copper spent directly in a recipe, with no Buy step of
-            // its own to be caught by the loop above - fold it into
-            // totalCoinCost here so the Total Cost summary agrees with the
-            // Recipe Tree and Craft shopping-list row, which already include
-            // it via decision.TotalCost. Excluded from currencyCosts below
-            // so it never double-displays as a "currency 1" line.
+            // A coin-typed Currency ingredient is real copper spent
+            // directly in a recipe, with no Buy step of its own - fold it
+            // into totalCoinCost so the Total Cost summary agrees with the
+            // Recipe Tree and Craft rows. Excluded from currencyCosts so
+            // it never double-displays as a "currency 1" line.
             if (currencyMap.TryGetValue(Gw2Constants.CoinCurrencyId, out long coinIngredientTotal))
             {
                 totalCoinCost = checked(totalCoinCost + coinIngredientTotal);
@@ -749,10 +481,7 @@ namespace GW2CraftingHelper.Services
                     Source = kvp.Value.Source,
                     RecipeId = kvp.Value.RecipeId,
                     TotalCost = kvp.Value.TotalCost,
-                    // currency-ux-package (Feature 3): public passthrough of
-                    // the private Decision.ComparisonValue this memo entry
-                    // already carried - see SolverDecision.ComparisonValue's
-                    // own doc comment for the decision-only invariant.
+                    // Public passthrough of the private Decision.ComparisonValue.
                     ComparisonValue = kvp.Value.ComparisonValue,
                     VendorCurrencyCosts = kvp.Value.VendorCurrencyCosts,
                     VendorItemCosts = kvp.Value.VendorItemCosts,
@@ -784,21 +513,15 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Evaluates the cheapest acquisition for <paramref name="node"/> and
-        /// commits it to <paramref name="memo"/>. Returns the decision's
-        /// ComparisonValue (see Decision), NOT its real coin TotalCost -
-        /// callers summing ingredient costs for a parent craft are summing
-        /// comparison values, which is required for the parent's own
-        /// craft-vs-buy comparison to be correct (see Decision.ComparisonValue).
-        /// EVERY "Item" ingredient of EVERY recipe on this node is
-        /// evaluated (and therefore gets its own memo entry) regardless of
-        /// whether this node ends up bought, crafted via a different
-        /// recipe, or unpriceable itself - see the recipe loop below. Any
-        /// non-"Item" ingredient (Currency, GuildUpgrade, or an
-        /// unrecognized type) is never Evaluate()-called and therefore
-        /// never gets a memo entry - see the Item-positive guard at the
-        /// top of this method and the hasUnvaluedCurrency skip in the
-        /// recipe loop below.
+        /// Evaluates the cheapest acquisition for <paramref name="node"/>
+        /// and commits it to <paramref name="memo"/>. Returns the
+        /// decision's ComparisonValue, NOT its real coin TotalCost -
+        /// callers summing ingredient costs for a parent craft need
+        /// comparison values for the parent's own craft-vs-buy comparison
+        /// (see Decision.ComparisonValue). Every "Item" ingredient of
+        /// every recipe gets its own memo entry regardless of what this
+        /// node ends up choosing; non-"Item" ingredients are never
+        /// Evaluate()-called and get no memo entry.
         /// </summary>
         private long? Evaluate(
             RecipeNode node,
@@ -809,45 +532,26 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, AcquisitionSource> overrides,
             CurrencyValuation currencyValuation,
             ISet<int> forceBuyOnlyNodeIds = null,
-            // Verification-review fix: see Solve's own matching parameter
-            // doc comment - threaded through the recursion unchanged, same
-            // as forceBuyOnlyNodeIds above.
             ISet<int> competencyIndependentForceBuyNodeIds = null,
             Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
-            // Verification-review fix: see Solve's own matching parameter
-            // doc comment - threaded through the recursion unchanged, same
-            // as costDiagnostics above.
             Dictionary<int, long?> rawCraftCostDiagnostics = null,
             ISet<int> ignoredItemIds = null,
             HomesteadEfficiencyTiers homesteadTiers = null,
-            // source-selection-simplification: precomputed account best-
-            // rating-per-discipline lookup (see Solve's own
-            // characterDisciplines parameter and CraftCompetencyEvaluator).
-            // Threaded through the recursion unchanged - built exactly once
-            // per Solve() call, never per node.
+            // Precomputed account best-rating-per-discipline lookup; built
+            // exactly once per Solve() call, never per node.
             IReadOnlyDictionary<string, int> bestRatingByDiscipline = null,
-            // Adversarial-review fix (Critical #4, source-selection-
-            // simplification): reference-keyed per-node owned-material
-            // usage from InventoryReducer.Reduce (see
-            // ReducedTreeResult.OwnedQuantityUsedByNode) - the SAME node
-            // objects Evaluate walks here whenever this is the "real" solve
-            // over a POST-reduction tree, so a direct reference lookup
-            // needs no NodeId translation. Used only to flag a craft
-            // breakdown whose direct ingredients were touched by owned-
-            // stock reduction as unreliable for StrictDomination - see
-            // BuildCraftCostBreakdown's own doc comment. Threaded through
-            // the recursion unchanged, exactly like bestRatingByDiscipline;
-            // null (every pre-existing caller/test) disables the check
-            // entirely, reproducing pre-existing behavior.
+            // Reference-keyed per-node owned-material usage from
+            // InventoryReducer.Reduce - the same node objects Evaluate
+            // walks on a post-reduction tree, so no NodeId translation is
+            // needed. Only flags a craft breakdown as unreliable for
+            // StrictDomination (see BuildCraftCostBreakdown); null
+            // disables the check.
             Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null)
         {
             // Item-positive guard (not an enumerated deny-list): only an
-            // "Item" node is ever priced here. The ingredient loop below
-            // never recurses into a non-Item ingredient (it goes through
-            // hasUnvaluedCurrency instead), so this is defense-in-depth for
-            // a future direct caller - see CraftingDecision's XML doc for
-            // the id-space rationale and HasUnvaluedCurrency's doc comment
-            // above for how the fallback tier absorbs an unpriceable type.
+            // "Item" node is ever priced here; the ingredient loop never
+            // recurses into a non-Item ingredient, so this is
+            // defense-in-depth for a future direct caller.
             if (node.IngredientType != "Item")
             {
                 return null;
@@ -855,16 +559,11 @@ namespace GW2CraftingHelper.Services
 
             var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
 
-            // M34-B2b: an "Ignore"-d item id is treated as fully in-hand for
-            // THIS node - zero cost, no recipe/vendor/TP evaluation, and (by
-            // never recursing into node.Recipes here) no draw on this
-            // node's own ingredients either, matching gw2e's "an un-crafted
-            // branch never asks for its ingredients" rule (Section 1.3 of
-            // the r2 report) applied to the synthetic fully-owned case.
-            // CanCraft/CanBuyTp/CanBuyVendor are left false: this node's own
-            // real feasibility is irrelevant once ignored, and
-            // CraftingTreeBuilder never reads them for an ignored node
-            // anyway (it short-circuits to Have, same as Quantity == 0).
+            // An "Ignore"-d item id is fully in-hand: zero cost, no
+            // evaluation, and no recursion into its own ingredients
+            // (gw2e's "an un-crafted branch never asks for its
+            // ingredients"). CanCraft/CanBuyTp/CanBuyVendor stay false;
+            // CraftingTreeBuilder short-circuits to Have anyway.
             if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
             {
                 memo[node.NodeId] = new Decision
@@ -878,11 +577,8 @@ namespace GW2CraftingHelper.Services
                     CanBuyTp = false,
                     CanBuyVendor = false,
                     VendorBatch = null,
-                    // source-selection-simplification: kept non-null for
-                    // the same reason CanCraft/CanBuyTp/CanBuyVendor are
-                    // explicitly false rather than omitted - see this
-                    // block's own doc comment (CraftingTreeBuilder never
-                    // reads any of these for an ignored node either way).
+                    // Kept non-null for the same reason the flags above
+                    // are explicitly false rather than omitted.
                     CraftCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false },
                     BuyFromTpCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false },
                     BuyFromVendorCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false }
@@ -892,21 +588,16 @@ namespace GW2CraftingHelper.Services
 
             long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices, priceBasis, out bool buyPriceSideFellBack);
 
-            // Evaluate vendor offers. Offers costing only coin (directly or via
-            // TP-priced item barter) are comparable with TP/craft coin costs and
-            // compete in PickCheapest. Offers with non-coin currency lines
-            // (karma, essences, ...) are comparable too, but ONLY when every
-            // one of those currencies has a user-provided valuation
-            // (currencyValuation) - their coin-equivalent (coin part + valued
-            // currency lines) is what competes. Offers with any unvalued
-            // currency line are NOT comparable with coin - rating them by
-            // their coin part alone would make e.g. a 500k-karma offer beat
-            // every coin option - and are kept only as a fallback when
-            // nothing priceable exists (repo invariant: avoid invalid
-            // currency comparisons / never invent exchange rates). Either
-            // way, a winning offer's non-coin currency lines are always
-            // reported on the plan (VendorCurrencyCosts) - valuation only
-            // affects comparison, never the displayed currency cost.
+            // Evaluate vendor offers. Coin-only offers (directly or via
+            // TP-priced barter) compete in PickCheapest. Offers with
+            // non-coin currency lines compete only when every such
+            // currency has a user-provided valuation; with any unvalued
+            // line the offer is NOT comparable (rating it by its coin part
+            // alone would let a 500k-karma offer beat every coin option)
+            // and is kept only as a fallback when nothing priceable exists
+            // (repo invariant: never invent exchange rates). A winning
+            // offer's non-coin lines are always reported on the plan -
+            // valuation affects comparison, never the displayed cost.
             var vendorEvaluation = _vendorBatchSolver.EvaluateVendorOffers(
                 node, prices, vendorOffers, priceBasis, currencyValuation, tiers);
             long? comparableVendorValue = vendorEvaluation.BestComparableValue;
@@ -917,55 +608,34 @@ namespace GW2CraftingHelper.Services
             List<CostLine> fallbackVendorCurrencyCosts = vendorEvaluation.FallbackCurrencyCosts;
             VendorBatchSolver.VendorOfferBatch? fallbackVendorBatch = vendorEvaluation.FallbackBatch;
 
-            // W4B: see SolverDecision.VendorItemCosts/VendorHasRawCoin's doc
-            // comments.
             List<VendorItemCostLine> comparableVendorItemCosts = vendorEvaluation.BestComparableItemCosts;
             bool comparableVendorHasRawCoin = vendorEvaluation.BestComparableHasRawCoin;
             List<VendorItemCostLine> fallbackVendorItemCosts = vendorEvaluation.FallbackItemCosts;
             bool fallbackVendorHasRawCoin = vendorEvaluation.FallbackHasRawCoin;
 
-            // Evaluate recipe options. EVERY non-currency ingredient of
-            // EVERY recipe is always evaluated (M33 Finding 1 fix) - no
-            // short-circuit on the first unpriceable ingredient - so every
-            // node in the tree always gets a memo/decision entry, even deep
-            // under a recipe this node ultimately doesn't choose.
+            // Evaluate recipe options. Every non-currency ingredient of
+            // every recipe is always evaluated - no short-circuit on the
+            // first unpriceable ingredient - so every node always gets a
+            // memo entry, even under a recipe this node doesn't choose.
             //
-            // An unpriceable ingredient no longer disqualifies its recipe
-            // (M33 partial-pricing parity, echoing gw2e's craftPrice =
-            // sum(component.craftResultPrice || 0)): it contributes ZERO to
-            // this recipe's craft cost instead, so craftCost/craftRealCost
-            // are always defined whenever node.Recipes is non-empty (gw2e's
-            // "hasComponents"). This intentionally makes coin totals
-            // partial when a descendant is genuinely unpriceable - the
-            // descendant still surfaces as its own (Unknown or
-            // force-crafted) node with its own decision.
-            // Recipe candidates split into COMPARABLE and FALLBACK tiers -
-            // mirrors VendorBatchSolver.EvaluateVendorOffers' comparable/
-            // fallback split exactly (see that method's doc comment): a
-            // recipe with a Currency-type ingredient that has NO
-            // user-provided valuation is comparable-ineligible - its craft
-            // cost never competes with TP/vendor coin costs in
-            // PickCheapest below, since an unvalued currency's real cost is
-            // unknown and ranking the recipe by its priced ingredients
-            // alone would hide that unknown cost (the craft/vendor
-            // comparability asymmetry this split fixes - a heavy-currency
-            // recipe could otherwise be declared "cheapest" while its real
-            // cost stayed invisible). Such a recipe is still tracked as a
-            // FALLBACK candidate - offered (CanCraft stays true below, the
-            // M33 guarantee) and used only when nothing coin-comparable
-            // exists anywhere for this node (see the terminal fallback
-            // branch further down), exactly like a fallback-only vendor
-            // offer. A recipe with no Currency ingredients, or where every
-            // one is valued, is COMPARABLE and competes on equal footing
-            // with TP/vendor, same as before this fix.
+            // An unpriceable ingredient doesn't disqualify its recipe
+            // (gw2e's craftPrice = sum(component.craftResultPrice || 0)):
+            // it contributes zero, so craftCost is defined whenever
+            // recipes exist. Coin totals are then deliberately partial;
+            // the descendant still surfaces with its own decision.
+            //
+            // Recipe candidates split into COMPARABLE and FALLBACK tiers,
+            // mirroring EvaluateVendorOffers: a recipe with an unvalued
+            // Currency ingredient never competes on coin cost (its real
+            // cost is unknown, and ranking by priced ingredients alone
+            // would hide it), but stays offered (CanCraft true) and is
+            // used when nothing coin-comparable exists.
             long? bestComparableCraftCost = null;
             long? bestComparableCraftRealCost = null;
             int bestComparableRecipeId = 0;
-            // source-selection-simplification: the winning recipe OBJECT
-            // (not just its id) alongside bestComparableRecipeId, so the
-            // competency check after this loop can read its Disciplines/
-            // MinRating without a second lookup - see craftExcludedFromAutoPick
-            // below.
+            // The winning recipe object (not just its id), so the
+            // competency check can read Disciplines/MinRating without a
+            // second lookup.
             RecipeOption bestComparableOption = null;
 
             long? bestFallbackCraftCost = null;
@@ -973,20 +643,12 @@ namespace GW2CraftingHelper.Services
             int bestFallbackRecipeId = 0;
             RecipeOption bestFallbackOption = null;
 
-            // source-selection-simplification adversarial-review fix
-            // (Critical #1): tracked IN ADDITION to bestComparable*/
-            // bestFallback* above, restricted to recipes that pass
-            // CraftCompetencyEvaluator.AccountCanCraft - the cheapest
-            // option a character can ACTUALLY craft, per tier. A node
-            // routinely carries several sibling RecipeOptions (API +
-            // Mystic Forge merged by CompositeRecipeApiClient, or several
-            // API recipes for one output); gating the auto-pick on only
-            // the single cheapest option's competency wrongly excluded the
-            // whole Craft arm even when a costlier sibling recipe in the
-            // SAME tier was fully craftable. bestComparableOption/
-            // bestFallbackOption themselves stay unfiltered - canCraft and
-            // the manual-override branch below still read those, exactly
-            // as before this fix.
+            // Tracked in addition to bestComparable*/bestFallback*,
+            // restricted to recipes that pass AccountCanCraft: gating the
+            // auto-pick on only the single cheapest option's competency
+            // wrongly excluded the whole Craft arm even when a costlier
+            // sibling recipe in the same tier was fully craftable. The
+            // unfiltered bests still feed canCraft and manual overrides.
             long? bestCompetentComparableCraftCost = null;
             long? bestCompetentComparableCraftRealCost = null;
             int bestCompetentComparableRecipeId = 0;
@@ -999,41 +661,24 @@ namespace GW2CraftingHelper.Services
 
             foreach (var recipe in node.Recipes)
             {
-                // craftCost sums ingredient ComparisonValues (Evaluate's
-                // return value) and drives recipe selection/PickCheapest.
-                // craftRealCost sums the same ingredients' REAL TotalCost
-                // (read back from memo, since Evaluate no longer returns it)
-                // and becomes the committed decision's real coin cost.
+                // craftCost sums ingredient ComparisonValues and drives
+                // recipe selection; craftRealCost sums the same
+                // ingredients' real TotalCost (read back from memo) and
+                // becomes the committed decision's real coin cost.
                 //
-                // EV pricing (Mystic Clover-style fractional MF recipes,
-                // M33 item 7 - CORRECTED): this recipe's ingredient
-                // quantities were already scaled by RecipeService (and kept
-                // in sync by InventoryReducer) using CraftsNeeded =
-                // ceil(quantity / ExpectedOutputCount), i.e. the number of
-                // Mystic Forge ATTEMPTS needed at the recipe's expected
-                // success rate, not the nominal integer output. That means
-                // every ingredient node's Quantity - and therefore its
-                // already-summed cost below - already reflects the full
-                // expected cost of producing enough successes. No further
-                // ratio adjustment happens here: doing so on top of the
-                // pre-scaled quantities would double-amortize the cost and
-                // (per the M33 Critical fix) make this Craft decision's own
-                // TotalCost unreconcilable with the sum of the Buy steps it
-                // recursively spawns. A no-op for every ordinary recipe
-                // either way, since ExpectedOutputCount defaults to
-                // OutputCount there.
+                // EV pricing (fractional Mystic Forge recipes): ingredient
+                // quantities were already scaled by RecipeService using
+                // CraftsNeeded = ceil(quantity / ExpectedOutputCount), so
+                // the summed costs already reflect the expected number of
+                // attempts; adjusting again here would double-amortize.
+                // A no-op for ordinary recipes (ExpectedOutputCount
+                // defaults to OutputCount).
                 long craftCost = 0L;
                 long craftRealCost = 0L;
-                // Accumulated separately from craftCost and only folded in
-                // at the end IF this recipe stays comparable - mirrors
-                // EvaluateVendorOffers' identical valuationCopper/allValued
-                // split (VendorBatchSolver.cs ~274-320). Without this
-                // separation, a recipe mixing one VALUED currency
-                // ingredient with a second, UNVALUED one would still let
-                // the valued line's copper contaminate craftCost even
-                // though the recipe as a whole is fallback-tier (adversarial
-                // review finding: the donor discards ALL valuation the
-                // moment any line is unvalued, never partially retains it).
+                // Accumulated separately and folded in only if this recipe
+                // stays comparable - mirrors EvaluateVendorOffers'
+                // valuationCopper/allValued split: a fallback-tier recipe
+                // discards ALL valuation, never partially retains it.
                 long valuationCopper = 0L;
                 bool hasUnvaluedCurrency = false;
 
@@ -1041,19 +686,12 @@ namespace GW2CraftingHelper.Services
                 {
                     if (ingredient.IngredientType == "Currency")
                     {
-                        // Mirrors EvaluateVendorOffers' identical coin-vs-
-                        // currency routing (VendorBatchSolver.cs ~230-240):
-                        // a Currency-type ingredient tagged with the coin
-                        // currency id IS real copper, not a "currency"
-                        // needing a user valuation at all -
-                        // CurrencyValuation hard-throws if ever keyed on
-                        // that id (Models/CurrencyValuation.cs), so without
-                        // this branch a coin-typed ingredient could never
-                        // be valued and would unconditionally demote its
-                        // recipe to the fallback tier (adversarial review
-                        // finding). Contributes directly to both the
-                        // comparison and real cost, like any other coin
-                        // amount.
+                        // A Currency ingredient tagged with the coin
+                        // currency id IS real copper - CurrencyValuation
+                        // hard-throws if keyed on that id, so without this
+                        // branch a coin-typed ingredient would always
+                        // demote its recipe to the fallback tier.
+                        // Contributes to both comparison and real cost.
                         if (ingredient.Id == Gw2Constants.CoinCurrencyId)
                         {
                             craftCost += (long)ingredient.Quantity;
@@ -1062,21 +700,11 @@ namespace GW2CraftingHelper.Services
                         }
 
                         // Currencies contribute to the craft-vs-buy
-                        // DECISION value only (via a caller-supplied
-                        // per-unit valuation - the same CurrencyValuation
-                        // mechanism EvaluateVendorOffers already uses below
-                        // for vendor currency lines), never to the
-                        // displayed real coin cost - matches r1 sections
-                        // 4.2/4.3: a currency cost can tip a recipe out of
-                        // being the cheapest option, but the plan's gold
-                        // total never invents an exchange rate for it. An
-                        // unvalued currency demotes this recipe to the
-                        // fallback tier below (see hasUnvaluedCurrency)
-                        // instead of silently contributing zero to a
-                        // fully-comparable cost - the exact fix this split
-                        // exists for - matching the treatment
-                        // EvaluateVendorOffers already gives an unvalued
-                        // vendor currency line.
+                        // decision value only (via user valuation), never
+                        // to the displayed real coin cost - the plan's
+                        // gold total never invents an exchange rate. An
+                        // unvalued currency demotes the recipe to the
+                        // fallback tier instead of contributing zero.
                         if (currencyValuation != null &&
                             currencyValuation.TryGetCopperValue(ingredient.Id, out long copperPerUnit))
                         {
@@ -1087,11 +715,8 @@ namespace GW2CraftingHelper.Services
                             catch (OverflowException)
                             {
                                 // Absurd valuation input; demote to fallback
-                                // rather than crash or silently treat this
-                                // recipe as comparable - mirrors
-                                // EvaluateVendorOffers' identical per-line
-                                // valuation-overflow handling (allValued =
-                                // false).
+                                // rather than crash - mirrors
+                                // EvaluateVendorOffers.
                                 hasUnvaluedCurrency = true;
                             }
                         }
@@ -1104,16 +729,10 @@ namespace GW2CraftingHelper.Services
 
                     if (ingredient.IngredientType != "Item")
                     {
-                        // Non-Item ingredient (Currency handled above;
-                        // GuildUpgrade/unrecognized types land here) - never
-                        // priced via currencyValuation/GetBuyCost/vendor
-                        // offers, since its id space has no defined
-                        // relationship to any of those (see CraftingDecision's
-                        // XML doc for the id-space rationale). Demotes the
-                        // recipe to the fallback tier via the same machinery
-                        // an unvalued Currency ingredient uses above, and
-                        // contributes zero to both craftCost and
-                        // craftRealCost.
+                        // Non-Item ingredient (GuildUpgrade/unrecognized):
+                        // its id space has no relationship to prices or
+                        // valuations, so it demotes the recipe to the
+                        // fallback tier and contributes zero.
                         hasUnvaluedCurrency = true;
                         continue;
                     }
@@ -1127,36 +746,24 @@ namespace GW2CraftingHelper.Services
                     var ingredientDecision = memo[ingredient.NodeId];
                     craftRealCost += ingredientDecision.TotalCost ?? 0L;
 
-                    // Transitive fallback-tier propagation (adversarial
-                    // review finding): a chosen ingredient whose OWN
-                    // committed decision is fallback-tier (an unvalued
-                    // currency somewhere in ITS subtree) taints this recipe
-                    // too, even though this recipe's own direct Currency
-                    // ingredients (if any) are all fine. Without this, a
-                    // currency cost hidden one Craft level down would
-                    // "launder" back into a fully-comparable-looking
-                    // ancestor - the exact asymmetry this fix exists to
-                    // close, now closed transitively as well as directly.
+                    // Transitive fallback-tier propagation: a chosen
+                    // ingredient whose own decision is fallback-tier
+                    // taints this recipe too - otherwise a currency cost
+                    // one Craft level down would launder back into a
+                    // comparable-looking ancestor.
                     if (ingredientDecision.HasUnvaluedCurrency)
                     {
                         hasUnvaluedCurrency = true;
                     }
                 }
 
-                // Valuation only ever reaches craftCost when this recipe
-                // stays comparable - mirrors EvaluateVendorOffers' allValued
-                // gate exactly (see valuationCopper's doc comment above).
+                // Valuation only reaches craftCost when this recipe stays
+                // comparable - mirrors EvaluateVendorOffers' allValued gate.
                 if (!hasUnvaluedCurrency)
                 {
-                    // Adversarial-review follow-up: guarded the same way as
-                    // the per-line valuationCopper accumulation above -
-                    // craftCost (from non-currency ingredients) and
-                    // valuationCopper can each individually stay within
-                    // range while their SUM still overflows. Demoting to
-                    // fallback here rather than letting an uncaught
-                    // OverflowException crash the whole Solve() call
-                    // matches this recipe loop's existing "absurd input ->
-                    // fallback, never crash" precedent.
+                    // craftCost and valuationCopper can each stay in range
+                    // while their sum overflows; demote to fallback rather
+                    // than crash.
                     try
                     {
                         craftCost = checked(craftCost + valuationCopper);
@@ -1168,29 +775,14 @@ namespace GW2CraftingHelper.Services
                 }
 
                 // Cost tie-break within each tier: lowest RecipeId, so the
-                // choice is deterministic regardless of recipe list order -
-                // same rule as before this fix, now applied separately per
-                // tier so a cheap-looking fallback recipe can never
-                // out-rank (or get out-ranked by) a comparable one here;
-                // that competition happens later, in PickCheapest/the
-                // terminal fallback branch, exactly like vendor's own
-                // comparable-vs-fallback split.
+                // choice is deterministic regardless of recipe list order.
                 if (hasUnvaluedCurrency)
                 {
-                    // Ranked on REAL cost only (craftRealCost, never the
-                    // valuation-tainted craftCost) - mirrors
-                    // EvaluateVendorOffers' fallback tier, which ranks
-                    // purely on totalCoinCost once !allValued (adversarial
-                    // review finding: craftCost can still carry a
-                    // comparable-but-valued DESCENDANT's inflated
-                    // ComparisonValue even after the direct-ingredient
-                    // valuationCopper gate above, since that gate only
-                    // covers this recipe's OWN currency lines). Both
-                    // bestFallbackCraftCost and bestFallbackCraftRealCost
-                    // are intentionally set to the same real value here, so
-                    // this recipe's returned ComparisonValue (see Commit
-                    // call sites below) can never carry hidden valuation
-                    // upward either.
+                    // Ranked on real cost only (never the valuation-
+                    // tainted craftCost), and both fallback fields are set
+                    // to the same real value so the returned
+                    // ComparisonValue can never carry hidden valuation
+                    // upward.
                     if (!bestFallbackCraftCost.HasValue ||
                         craftRealCost < bestFallbackCraftCost.Value ||
                         (craftRealCost == bestFallbackCraftCost.Value && recipe.RecipeId < bestFallbackRecipeId))
@@ -1201,8 +793,7 @@ namespace GW2CraftingHelper.Services
                         bestFallbackOption = recipe;
                     }
 
-                    // Critical #1 fix: same tie-break, restricted to
-                    // competent recipes - see the declaration block above.
+                    // Same tie-break, restricted to competent recipes.
                     if (CraftCompetencyEvaluator.AccountCanCraft(
                             recipe.Disciplines, recipe.MinRating, bestRatingByDiscipline) &&
                         (!bestCompetentFallbackCraftCost.HasValue ||
@@ -1227,8 +818,7 @@ namespace GW2CraftingHelper.Services
                         bestComparableOption = recipe;
                     }
 
-                    // Critical #1 fix: same tie-break, restricted to
-                    // competent recipes - see the declaration block above.
+                    // Same tie-break, restricted to competent recipes.
                     if (CraftCompetencyEvaluator.AccountCanCraft(
                             recipe.Disciplines, recipe.MinRating, bestRatingByDiscipline) &&
                         (!bestCompetentComparableCraftCost.HasValue ||
@@ -1243,115 +833,54 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // canCraft = "hasComponents" (gw2e): true whenever a recipe
-            // exists at all, since craft cost is now always defined (see
-            // above) - comparable or fallback tier alike (M33 guarantee:
-            // CanCraft/the CRAFT pill stay true even when the only recipe
-            // is fallback-tier and cannot win the automatic comparison). A
-            // node with a COMPARABLE recipe but no buy price therefore
-            // always force-crafts via PickCheapest below (craftBeatsBuy is
-            // true whenever buyCost is null), matching gw2e's
-            // isCheaperToCraft = craftPrice-defined && (!buyPrice || ...).
+            // canCraft = gw2e's "hasComponents": true whenever a recipe
+            // exists, comparable or fallback tier alike. A node with a
+            // comparable recipe but no buy price always force-crafts via
+            // PickCheapest (craftBeatsBuy is true when buyCost is null).
             bool canCraft = bestComparableCraftCost.HasValue || bestFallbackCraftCost.HasValue;
             bool canBuyTp = buyTotalCost.HasValue;
             bool canBuyVendor = comparableVendorValue.HasValue ||
                                 fallbackVendorCoinCost.HasValue;
 
-            // M34-B2a #3: gw2e's "Value Own Materials" force-buy pre-pass
-            // marks this node craft:false BEFORE the automatic comparison
-            // below - a manual override (checked next, using the
-            // unmodified canCraft flag above) still always wins, matching
-            // gw2e's own manual pill always beating its automatic pre-pass.
-            // Solver behavior here is UNCHANGED by the
-            // competencyIndependentForceBuyNodeIds distinction further down
-            // - forceBuyOnlyNodeIds/isForceBuyOnly alone still decides
-            // craftExcludedFromAutoPick, exactly as before. See
-            // cheapestCraftUntrained's own doc comment below for why THAT
-            // field needs a separate, competency-independent answer instead
-            // of this raw membership check.
+            // The force-buy pre-pass marks this node craft:false before
+            // the automatic comparison; a manual override (checked next,
+            // using the unmodified canCraft) still always wins.
             bool isForceBuyOnly = forceBuyOnlyNodeIds != null &&
                 forceBuyOnlyNodeIds.Contains(node.NodeId);
             bool craftExcludedFromAutoPick = isForceBuyOnly;
 
-            // source-selection-simplification (maintainer-approved
-            // redesign, docs/gw2e-considerations.md): a Craft source should
-            // only win the AUTOMATIC pick when some character can actually
-            // craft it. Checked against whichever recipe would actually be
-            // used if craft auto-wins - comparable-tier preferred, the
-            // SAME priority costDiagnostics below (finding #2) now records
-            // too - never the OTHER tier's recipe. Folded into the SAME
-            // craftExcludedFromAutoPick flag the force-buy pre-pass uses:
-            // identical effect (craft never wins PickCheapest/the terminal
-            // fallback race below), so this is purely additive to an
-            // existing, already-proven seam - canCraft (the CRAFT pill's
-            // own feasibility flag) and the manual-override branch above
-            // are BOTH computed from the unmodified bestComparable/
-            // bestFallback values and never read this flag, so CRAFT stays
-            // clickable and a manual override to Craft is unaffected. A
-            // null bestRatingByDiscipline (no snapshot discipline data at
-            // all) makes AccountCanCraft always return true - competency
-            // UNKNOWN never penalizes craft, preserving pre-existing
-            // behavior exactly for every caller that doesn't pass
-            // characterDisciplines. Also gated on a genuine COMPARABLE
-            // next-best source actually existing to default to - a node
-            // whose ONLY feasible acquisition path is Craft must still
-            // auto-pick Craft regardless of competency (nothing else to
-            // fall back to; excluding it here would drop this node's cost
-            // out of the plan entirely - UnknownSource, null TotalCost -
-            // even though it has a real, priced recipe, which corrupts
-            // totals rather than merely changing a default).
+            // Craft should only win the automatic pick when some character
+            // can actually craft it - checked against whichever recipe
+            // would actually be used. Folded into the same
+            // craftExcludedFromAutoPick flag the force-buy pre-pass uses;
+            // canCraft and the manual-override branch never read it, so
+            // CRAFT stays clickable. Null bestRatingByDiscipline means
+            // competency unknown and never penalizes.
             //
-            // Adversarial-review fix (Critical #6): the guard used to read
-            // (canBuyTp || canBuyVendor) - but canBuyVendor is true for a
-            // FALLBACK-tier vendor offer too (an unvalued non-coin
-            // currency, e.g. karma-only). A node with a fully-priced craft,
-            // no TP price, and only a fallback vendor offer would exclude
-            // craft here, PickCheapest would return UnknownSource (neither
-            // side is comparable), and the terminal fallback branch would
-            // then commit BuyFromVendor at fallbackVendorCoinCost (often
-            // 0c coin, an unvalued-currency-only purchase) - silently
-            // dropping the node's real priced cost out of the plan's gold
-            // total, exactly the corruption this guard exists to prevent.
-            // Requiring a COMPARABLE alternative (buyTotalCost or
-            // comparableVendorValue) closes that gap: a fallback-only
-            // vendor offer no longer counts as "a genuine next-best
-            // source", so this node still auto-crafts (and, per the
-            // terminal fallback branch, competes fairly against that same
-            // fallback vendor offer on REAL coin cost if craft is itself
-            // only fallback-tier).
+            // Also gated on a genuine COMPARABLE next-best source
+            // existing: a node whose only path is Craft must still
+            // auto-pick Craft, or its cost drops out of the plan entirely
+            // (UnknownSource, null TotalCost). A fallback-tier vendor
+            // offer does not count as a genuine alternative - excluding
+            // craft for one would commit an unvalued-currency purchase and
+            // silently drop the node's real priced cost from the gold
+            // total.
             bool hasComparableAlternative = buyTotalCost.HasValue || comparableVendorValue.HasValue;
-            // Critical #1 fix: prefer the best COMPETENT option in each
-            // tier (comparable first, fallback otherwise - same priority
-            // as the raw bestComparableOption/bestFallbackOption pick
-            // elsewhere), falling back to the raw (possibly-incompetent)
-            // best only when NO competent option exists anywhere for this
-            // node. That raw fallback is NOT merely informational (Critical
-            // #6 interaction): when hasComparableAlternative is also false
-            // (nothing else to default to), craftExcludedFromAutoPick below
-            // stays FALSE and this raw/incompetent recipe DOES go on to win
-            // automatically, via autoPickCraftRealCost/
-            // craftBreakdownDecisionValue further down - the pre-existing
+            // Prefer the best competent option per tier (comparable
+            // first), falling back to the raw best only when no competent
+            // option exists anywhere. That raw fallback still wins
+            // automatically when hasComparableAlternative is false - the
             // "no genuine alternative -> auto-craft regardless of
-            // competency" carve-out, now expressed through this same
-            // fall-through instead of a separate raw-value read at each
-            // commit site. This is also the recipe fed to
-            // BuildCraftCostBreakdown below, so the CRAFT pill's own
-            // domination/weighted comparison is computed from whichever
-            // recipe would actually be used, competent or not.
+            // competency" carve-out. Also the recipe fed to
+            // BuildCraftCostBreakdown, so the CRAFT pill's comparison uses
+            // whichever recipe would actually be used.
             bool anyCompetentCraftOption = bestCompetentComparableOption != null ||
                 bestCompetentFallbackOption != null;
 
-            // Adversarial-review round-2 fix (finding #4): resolved ONCE
-            // into a single CraftAutoPickCandidate (see its own doc
-            // comment) instead of the four separate best*Option variables
-            // being re-compared by reference at three more sites further
-            // down - comparable-first, fallback otherwise, competent-
-            // preferred within each tier, same precedence as the original
-            // "?? chain" this replaces. A fallback-tier candidate's
-            // ComparisonValue is null (see CraftAutoPickCandidate.
-            // ComparisonValue's own doc comment); Option null (no recipe
-            // at all) is the only case that leaves every field at its
-            // default.
+            // Resolved once into a single CraftAutoPickCandidate -
+            // comparable-first, fallback otherwise, competent-preferred
+            // within each tier. A fallback-tier candidate's
+            // ComparisonValue is null; a null Option means no recipe at all.
             CraftAutoPickCandidate? autoPickCandidate;
             if (bestCompetentComparableOption != null)
             {
@@ -1384,35 +913,22 @@ namespace GW2CraftingHelper.Services
 
             RecipeOption autoPickCraftOption = autoPickCandidate?.Option;
 
-            // Critical #1 fix (unchanged rationale, now read straight off
-            // the resolved candidate): DecisionValue must reflect the TIER
-            // autoPickCraftOption actually came from - null whenever it is
-            // a fallback-tier pick, violating PillSourceCostBreakdown.
-            // DecisionValue's own null contract otherwise (null whenever
-            // any cost component is unvalued).
+            // DecisionValue must reflect the tier autoPickCraftOption came
+            // from - null for a fallback-tier pick, per
+            // PillSourceCostBreakdown.DecisionValue's null contract.
             long? craftBreakdownDecisionValue = autoPickCandidate?.ComparisonValue;
 
-            // Critical #1/#6 fix (unchanged rationale): the REAL cost/
-            // RecipeId twin of craftBreakdownDecisionValue above, feeding
-            // PickCheapest and the two Craft Commit sites below so they
-            // always operate on the SAME recipe autoPickCraftOption/
-            // craftBreakdown represent - correctly falls all the way back
-            // to the RAW (possibly-incompetent) bestComparable/
-            // bestFallback cost whenever NO competent option exists
-            // ANYWHERE and craftExcludedFromAutoPick is false (the "no
-            // genuine alternative exists, must still auto-pick craft
-            // regardless of competency" carve-out - see
-            // hasComparableAlternative's own doc comment above).
+            // The real cost/RecipeId twin of craftBreakdownDecisionValue,
+            // feeding PickCheapest and the Craft Commit sites so they
+            // always operate on the same recipe; falls back to the raw
+            // (possibly-incompetent) cost when nothing competent exists
+            // and craftExcludedFromAutoPick is false.
             long? autoPickCraftRealCost = autoPickCandidate?.RealCost;
             int autoPickRecipeId = autoPickCandidate?.RecipeId ?? 0;
 
-            // Adversarial-review fix (#7): tracked SEPARATELY from
-            // craftExcludedFromAutoPick (which the force-buy pre-pass
-            // ALSO sets, above) so a Plan Notes consumer can tell "excluded
-            // because no character is trained" apart from "excluded
-            // because Value Own Materials says buying is cheaper" - the
-            // latter needs no explanation, the former does (see
-            // Decision.CraftExcludedByCompetency's own doc comment).
+            // Tracked separately from craftExcludedFromAutoPick (which the
+            // force-buy pre-pass also sets) so Plan Notes can tell "no
+            // character is trained" apart from "buying is cheaper".
             bool craftExcludedByCompetency = autoPickCraftOption != null &&
                 hasComparableAlternative &&
                 !anyCompetentCraftOption;
@@ -1421,40 +937,22 @@ namespace GW2CraftingHelper.Services
                 craftExcludedFromAutoPick = true;
             }
 
-            // Adversarial-review round-2 fix (finding #5): see
-            // Decision.CheapestCraftUntrained's own doc comment - the
-            // numerically cheapest raw craft candidate overall, SAME tier
-            // priority as autoPickCraftOption but without the competent-
-            // first override, so this can be untrained even while
-            // autoPickCraftOption itself resolved to a different
-            // (competent) recipe.
+            // The numerically cheapest raw craft candidate overall - same
+            // tier priority as autoPickCraftOption but without the
+            // competent-first override, so this can be untrained even when
+            // the auto pick resolved to a competent recipe.
             RecipeOption cheapestCraftOptionOverall = bestComparableOption ?? bestFallbackOption;
             long? cheapestCraftRealCostOverall = bestComparableOption != null
                 ? bestComparableCraftRealCost
                 : bestFallbackCraftRealCost;
 
-            // Verification-review fix (second pass): gated on
-            // !isCompetencyIndependentForceBuy, NOT !isForceBuyOnly - see
-            // competencyIndependentForceBuyNodeIds' own doc comment on
-            // Solve() for the full rationale. The original fix (gating on
-            // raw forceBuyOnlyNodeIds membership) over-corrected: force-buy
-            // membership can ITSELF be competency-caused, because
-            // CraftingPlanPipeline threads characterDisciplines into
-            // OwnedMaterialsForceBuyPrePass's own throwaway solve, whose
-            // craft diagnostic is the COMPETENCY-RESOLVED cost (this same
-            // method's craftBreakdownDecisionValue ?? autoPickCraftRealCost,
-            // recorded into costDiagnostics further down). A node whose
-            // cheap recipe is untrained can therefore land in
-            // forceBuyOnlyNodeIds ONLY because competency demoted the
-            // pre-pass's own craft cost to a costlier competent recipe -
-            // training would empty the force-buy set and let the cheap
-            // recipe win for real, which is exactly the opportunity this
-            // field exists to report. isCompetencyIndependentForceBuy is
-            // true only for a node forced under BOTH the competency-
-            // resolved AND a competency-BLIND evaluation of the 0.85 rule -
-            // i.e. genuinely forced regardless of training, where reporting
-            // an opportunity here would indeed promise a saving training
-            // can never unlock.
+            // Gated on !isCompetencyIndependentForceBuy, not
+            // !isForceBuyOnly: force-buy membership can itself be
+            // competency-caused (the pre-pass's craft diagnostic is
+            // competency-resolved), in which case training would empty the
+            // force-buy set - exactly the opportunity this field reports.
+            // Only a node forced under both evaluations of the 0.85 rule
+            // is genuinely forced regardless of training.
             bool isCompetencyIndependentForceBuy = competencyIndependentForceBuyNodeIds != null &&
                 competencyIndependentForceBuyNodeIds.Contains(node.NodeId);
             bool cheapestCraftUntrained = !isCompetencyIndependentForceBuy &&
@@ -1463,11 +961,9 @@ namespace GW2CraftingHelper.Services
                 !CraftCompetencyEvaluator.AccountCanCraft(
                     cheapestCraftOptionOverall.Disciplines, cheapestCraftOptionOverall.MinRating, bestRatingByDiscipline);
 
-            // source-selection-simplification: raw cost breakdowns for
-            // EVERY feasible source at this node - see
-            // PillSourceCostBreakdown's own doc comment for why these are
-            // computed unconditionally (not just for whichever source
-            // wins) and never fed back into any cost/comparison above.
+            // Raw cost breakdowns for every feasible source, computed
+            // unconditionally and never fed back into any comparison (see
+            // PillSourceCostBreakdown).
             var tpBreakdown = canBuyTp
                 ? new PillSourceCostBreakdown
                 {
@@ -1486,11 +982,9 @@ namespace GW2CraftingHelper.Services
             }
             else if (fallbackVendorCoinCost.HasValue)
             {
-                // Fallback tier = an unvalued non-coin currency line exists
-                // somewhere on this offer - DecisionValue stays null (see
-                // PillSourceCostBreakdown.DecisionValue's own doc comment),
-                // mirroring hasUnvaluedCurrency's craft-side treatment
-                // below exactly.
+                // Fallback tier: an unvalued non-coin currency line exists
+                // on this offer - DecisionValue stays null, mirroring
+                // hasUnvaluedCurrency's craft-side treatment.
                 vendorBreakdown = BuildVendorCostBreakdown(
                     fallbackVendorCoinCost, fallbackVendorCurrencyCosts, fallbackVendorItemCosts, null);
             }
@@ -1499,45 +993,27 @@ namespace GW2CraftingHelper.Services
                 vendorBreakdown = new PillSourceCostBreakdown { IsAvailable = false };
             }
 
-            // M34-B2a #3: raw diagnostics for OwnedMaterialsForceBuyPrePass -
-            // recorded regardless of forceBuyOnlyNodeIds/decision, so the
-            // pre-pass (a throwaway solve with neither set) can read the
-            // same numbers the real solve would have used. Adversarial-
-            // review round-2 fix (finding #2): moved here (past competency
-            // resolution) and changed from the raw bestComparableCraftCost
-            // ?? bestFallbackCraftCost to craftBreakdownDecisionValue ??
-            // autoPickCraftRealCost - the EXACT same tier/competency-
-            // resolved pair the Craft commit sites below use (comparable-
-            // tier ComparisonValue when autoPickCraftOption resolved to a
-            // comparable-tier recipe, else the fallback-tier real cost;
-            // null when no craft option exists at all). The old figure
-            // ignored competency entirely (always the numerically cheapest
-            // recipe in each tier), so whenever competency demoted the
-            // real solve's pick to a costlier competent sibling recipe (or
-            // excluded craft entirely), the 85% force-buy comparison below
-            // was derived from a craft cost the real solve would never
-            // actually commit to.
+            // Raw diagnostics for OwnedMaterialsForceBuyPrePass, recorded
+            // regardless of decision. CraftCost is the same tier/
+            // competency-resolved pair the Craft commit sites use - a
+            // competency-blind figure here would let the 0.85 comparison
+            // run on a craft cost the real solve would never commit to.
             if (costDiagnostics != null)
             {
                 costDiagnostics[node.NodeId] = (buyTotalCost, craftBreakdownDecisionValue ?? autoPickCraftRealCost);
             }
 
-            // Verification-review fix: the RAW (competency-BLIND) twin of
-            // the costDiagnostics write above - cheapestCraftRealCostOverall
-            // is already computed regardless of training (see its own doc
-            // comment), so recording it here lets OwnedMaterialsForceBuyPrePass
-            // run its second 0.85 evaluation from this SAME throwaway solve
-            // pass, without a second Solve() call.
+            // The competency-blind twin of the write above, letting the
+            // pre-pass run its second 0.85 evaluation without a second
+            // Solve() call.
             if (rawCraftCostDiagnostics != null)
             {
                 rawCraftCostDiagnostics[node.NodeId] = cheapestCraftRealCostOverall;
             }
 
-            // Adversarial-review fix (Critical #4): true when ANY direct
-            // ingredient of the recipe this breakdown represents was
-            // itself reduced by owned account stock - see
-            // PillSourceCostBreakdown.RawQuantitiesReducedByOwnedStock's
-            // own doc comment.
+            // True when any direct ingredient of this breakdown's recipe
+            // was reduced by owned account stock (see
+            // PillSourceCostBreakdown.RawQuantitiesReducedByOwnedStock).
             bool craftIngredientsReducedByOwnedStock = autoPickCraftOption != null &&
                 ownedQuantityUsedByNode != null &&
                 AnyIngredientReducedByOwnedStock(autoPickCraftOption, ownedQuantityUsedByNode);
@@ -1545,21 +1021,15 @@ namespace GW2CraftingHelper.Services
                 ? BuildCraftCostBreakdown(autoPickCraftOption, craftBreakdownDecisionValue, craftIngredientsReducedByOwnedStock)
                 : new PillSourceCostBreakdown { IsAvailable = false };
 
-            // cost = real coin (Decision.TotalCost / display); comparisonValue
-            // = parent-comparison value (Decision.ComparisonValue). Commit
-            // returns comparisonValue - see Decision.ComparisonValue and the
-            // Evaluate summary doc for why the two must stay separate.
-            // hasUnvaluedCurrency defaults to false (every comparable-tier
-            // and TP-buy commit site below) and is passed true only from the
-            // fallback-tier commit sites - see Decision.HasUnvaluedCurrency.
+            // cost = real coin (Decision.TotalCost); comparisonValue =
+            // parent-comparison value; Commit returns comparisonValue.
+            // hasUnvaluedCurrency is passed true only from the
+            // fallback-tier commit sites.
             long? Commit(
                 AcquisitionSource src, long? cost, long? comparisonValue,
                 int recipeId, List<CostLine> vendorCurrencyCosts,
                 VendorBatchSolver.VendorOfferBatch? vendorBatch = null,
-                // W4B: only ever passed non-default by the 3 BuyFromVendor
-                // call sites below - every Craft/BuyFromTp/UnknownSource
-                // Commit call keeps the defaults (null/false), same as they
-                // already do for vendorCurrencyCosts/vendorBatch above.
+                // Only passed non-default by the BuyFromVendor call sites.
                 List<VendorItemCostLine> vendorItemCosts = null,
                 bool vendorHasRawCoin = false,
                 bool hasUnvaluedCurrency = false)
@@ -1578,31 +1048,16 @@ namespace GW2CraftingHelper.Services
                     CanBuyVendor = canBuyVendor,
                     HasUnvaluedCurrency = hasUnvaluedCurrency,
                     VendorBatch = vendorBatch,
-                    // AUDIT ROW 20/38: only ever true for the committed
-                    // Source actually being BuyFromTp - buyPriceSideFellBack
-                    // is computed unconditionally above regardless of which
-                    // Source ultimately wins, so this gate stops it leaking
-                    // onto a Craft/BuyFromVendor/UnknownSource commit.
+                    // buyPriceSideFellBack is computed unconditionally, so
+                    // gate on the committed Source actually being BuyFromTp.
                     PriceSideFellBack = src == AcquisitionSource.BuyFromTp && buyPriceSideFellBack,
-                    // source-selection-simplification: attached
-                    // unconditionally, same as CanCraft/CanBuyTp/
-                    // CanBuyVendor just above - see the breakdown-building
-                    // block ahead of this Commit definition and
-                    // PillSourceCostBreakdown's own doc comment.
                     CraftCostBreakdown = craftBreakdown,
                     BuyFromTpCostBreakdown = tpBreakdown,
                     BuyFromVendorCostBreakdown = vendorBreakdown,
-                    // Adversarial-review fix (#7): attached unconditionally,
-                    // same as CanCraft/CanBuyTp/CanBuyVendor above - see
-                    // Decision.CraftExcludedByCompetency's own doc comment.
                     CraftExcludedByCompetency = craftExcludedByCompetency,
                     CraftExcludedRealCost = craftExcludedByCompetency ? autoPickCraftRealCost : null,
                     CraftExcludedDisciplines = craftExcludedByCompetency ? autoPickCraftOption?.Disciplines : null,
                     CraftExcludedMinRating = craftExcludedByCompetency ? (autoPickCraftOption?.MinRating ?? 0) : 0,
-                    // Adversarial-review round-2 fix (finding #5):
-                    // attached unconditionally, same pattern as
-                    // CraftExcludedByCompetency above - see
-                    // Decision.CheapestCraftUntrained's own doc comment.
                     CheapestCraftUntrained = cheapestCraftUntrained,
                     CheapestCraftRealCost = cheapestCraftUntrained ? cheapestCraftRealCostOverall : null,
                     CheapestCraftDisciplines = cheapestCraftUntrained ? cheapestCraftOptionOverall?.Disciplines : null,
@@ -1619,8 +1074,7 @@ namespace GW2CraftingHelper.Services
                 if (forced == AcquisitionSource.Craft && canCraft)
                 {
                     // Comparable-first, fallback otherwise - same
-                    // precedence VendorBatchSolver's own override handling
-                    // uses just below for BuyFromVendor.
+                    // precedence as VendorBatchSolver's override handling.
                     return bestComparableCraftCost.HasValue
                         ? Commit(AcquisitionSource.Craft, bestComparableCraftRealCost, bestComparableCraftCost, bestComparableRecipeId, null)
                         : Commit(AcquisitionSource.Craft, bestFallbackCraftRealCost, bestFallbackCraftCost, bestFallbackRecipeId, null, hasUnvaluedCurrency: true);
@@ -1637,22 +1091,11 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // Three-way comparison: vendor (coin part + any valued currency
-            // lines) vs TP buy vs craft. Only the COMPARABLE craft cost
-            // participates here - a fallback-tier craft (unvalued currency
-            // ingredient) never competes on coin cost, exactly like a
-            // fallback-tier vendor offer never does (comparableVendorValue,
-            // never fallbackVendorCoinCost, is passed here too).
-            // Critical #1/#6 fix: craftBreakdownDecisionValue - the SAME
-            // comparable-tier cost autoPickCraftOption/craftBreakdown
-            // represent (competent-preferred, raw only when nothing
-            // competent exists anywhere AND there is no other genuine
-            // alternative to fall back to) - null whenever
-            // autoPickCraftOption is a fallback-tier recipe instead, so
-            // this arm correctly contributes nothing to the comparable-tier
-            // PickCheapest race in that case (mirrors a fallback-tier
-            // vendor offer's own comparableVendorValue-vs-fallbackVendorCoinCost
-            // split exactly).
+            // Three-way comparison: vendor (coin + valued currency lines)
+            // vs TP buy vs craft. Only the comparable craft cost
+            // participates - craftBreakdownDecisionValue is null for a
+            // fallback-tier pick, so that arm contributes nothing here,
+            // exactly like a fallback-tier vendor offer.
             var source = PickCheapest(
                 buyTotalCost,
                 craftExcludedFromAutoPick ? null : craftBreakdownDecisionValue,
@@ -1670,68 +1113,29 @@ namespace GW2CraftingHelper.Services
 
             if (source == AcquisitionSource.Craft)
             {
-                // Critical #1/#6 fix: commit the SAME recipe PickCheapest
-                // just compared above (autoPickCraftOption/
-                // craftBreakdownDecisionValue/autoPickCraftRealCost/
-                // autoPickRecipeId) - the competent comparable option when
-                // one exists, or the raw comparable option when nothing is
-                // competent anywhere but craft still had no genuine
-                // alternative to lose to.
+                // Commit the same recipe PickCheapest just compared - the
+                // competent comparable option when one exists, or the raw
+                // one when nothing competent exists and craft had no
+                // genuine alternative to lose to.
                 return Commit(AcquisitionSource.Craft, autoPickCraftRealCost, craftBreakdownDecisionValue, autoPickRecipeId, null);
             }
 
-            // Fallback: nothing COMPARABLE beat buy (source == UnknownSource
-            // here implies buyCost, the comparable craft cost passed above,
-            // and comparableVendorValue are ALL null - if a comparable
-            // craft recipe had a value, PickCheapest would already have
-            // returned Craft or BuyFromTp, never UnknownSource, since a
-            // comparable craftCost is always defined whenever a comparable
-            // recipe exists). A fallback-tier craft (unvalued currency
-            // ingredient) or a fallback-tier vendor offer (unvalued
-            // non-coin currency line) is a concrete, fully-known
-            // acquisition even though its full cost cannot be honestly
-            // compared with coin, and each is used as a last resort here -
-            // exactly like EvaluateVendorOffers' own fallback tier already
-            // was for vendor alone. When both a fallback craft and a
-            // fallback vendor offer exist, mirrors PickCheapest's own
-            // craft/vendor tie-break above: the numerically cheaper of the
-            // two wins, an exact tie keeps vendor - "someone must still be
-            // picked" (this engine's pre-existing vendor-fallback
-            // precedent), extended to cover craft's new fallback tier too.
-            // Force-buy-only nodes (craftExcludedFromAutoPick) never fall
-            // back to craft either, consistent with craft being excluded
-            // from every automatic path for that node. Otherwise (neither
-            // fallback exists) this is gw2e's "Not sold or crafted" - no
-            // recipe, no price, genuinely no known source.
+            // Fallback: nothing comparable beat buy (UnknownSource here
+            // implies buyCost, the comparable craft cost, and
+            // comparableVendorValue are all null). A fallback-tier craft
+            // or vendor offer is a concrete acquisition even though its
+            // full cost cannot honestly be compared with coin, and is
+            // used as a last resort. When both exist, the numerically
+            // cheaper REAL coin cost wins and an exact tie keeps vendor -
+            // comparing real cost (never the valuation-tainted craftCost)
+            // keeps both sides on the same scale. Force-buy-only nodes
+            // never fall back to craft. Otherwise this is gw2e's "Not
+            // sold or crafted".
             //
-            // Adversarial-review fix (critical): this comparison MUST use
-            // bestFallbackCraftRealCost, not bestFallbackCraftCost. The two
-            // differ whenever any valuation-derived copper reached
-            // bestFallbackCraftCost (see the recipe loop above) - comparing
-            // that valuation-inclusive number against fallbackVendorCoinCost
-            // (always real coin only - EvaluateVendorOffers discards
-            // valuationCopper the moment an offer is not allValued, see its
-            // allValued gate) mixed two different scales and could let a
-            // real-coin-cheaper vendor offer lose to a craft cost inflated
-            // by a valuation the vendor side never carries. Both sides here
-            // are now real coin only, exactly like EvaluateVendorOffers'
-            // own fallback-vs-fallback ranking.
-            // Critical #1/#6 fix: autoPickCraftRealCost, gated to ONLY the
-            // fallback tier (craftBreakdownDecisionValue null means
-            // autoPickCraftOption is not a comparable-tier recipe - either
-            // it is a fallback-tier one, or there is no craft option at
-            // all, in which case autoPickCraftRealCost is itself null too).
-            // A comparable-tier autoPickCraftOption that legitimately lost
-            // PickCheapest above (to a cheaper TP/vendor) must NOT get a
-            // second chance here - matches the pre-existing "only a
-            // genuinely fallback-tier craft competes as a last resort"
-            // rule. Like bestCompetentFallbackCraftRealCost before it, this
-            // is REAL coin only (never a valuation-inflated figure) and,
-            // via autoPickCraftOption's own fallback-through-to-raw
-            // resolution, correctly still degrades to the raw
-            // (possibly-incompetent) fallback recipe when nothing is
-            // competent anywhere and there is no other genuine alternative
-            // - see hasComparableAlternative's own doc comment above.
+            // autoPickCraftRealCost is gated to the fallback tier only
+            // (craftBreakdownDecisionValue null): a comparable-tier craft
+            // that legitimately lost PickCheapest must not get a second
+            // chance here.
             long? fallbackCraftCost = craftExcludedFromAutoPick || craftBreakdownDecisionValue.HasValue
                 ? null
                 : autoPickCraftRealCost;
@@ -1747,10 +1151,8 @@ namespace GW2CraftingHelper.Services
                 }
 
                 // fallbackCraftCost == autoPickCraftRealCost here (the
-                // fallback-tier commit sites intentionally use the same
-                // real value for both cost and comparisonValue - see the
-                // recipe loop's own bestFallbackCraftCost/
-                // bestFallbackCraftRealCost doc comment).
+                // fallback-tier commit sites use the same real value for
+                // both cost and comparisonValue).
                 return Commit(AcquisitionSource.Craft, autoPickCraftRealCost, autoPickCraftRealCost, autoPickRecipeId, null, hasUnvaluedCurrency: true);
             }
 
@@ -1758,20 +1160,12 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Pick cheapest among TP buy, craft, and vendor - gw2e tie-break
-        /// parity (r1 sections 1.1/3.2, normative directive #1): TP buy is
-        /// the baseline and wins every tie. Craft wins only when STRICTLY
-        /// cheaper than buy; a missing buy price counts as "beats buy"
-        /// (force-craft - gw2e's isCheaperToCraft = craftPrice-defined &&
-        /// (!buyPrice || decisionPrice &lt; buyPrice)). Vendor is modeled
-        /// like a gw2e Merchant recipe and follows the identical rule
-        /// against buy (strictly cheaper wins, tie -&gt; buy). When both
-        /// craft and vendor beat buy, the numerically cheaper of the two
-        /// wins; an exact craft/vendor tie keeps vendor (this engine's
-        /// pre-existing precedent for that specific case - not specified
-        /// by the gw2e source, which models vendor as just another recipe
-        /// candidate rather than a separate comparison arm).
-        /// Returns UnknownSource if none are available.
+        /// Pick cheapest among TP buy, craft, and vendor. TP buy is the
+        /// baseline and wins every tie; craft or vendor win only when
+        /// strictly cheaper, and a missing buy price counts as "beats buy"
+        /// (force-craft). When both craft and vendor beat buy, the
+        /// numerically cheaper wins; an exact craft/vendor tie keeps
+        /// vendor. Returns UnknownSource if none are available.
         /// </summary>
         private static AcquisitionSource PickCheapest(
             long? buyCost, long? craftCost, long? vendorCost)
@@ -1807,15 +1201,11 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// source-selection-simplification: decomposes a winning-or-
-        /// fallback vendor offer's ALREADY-EVALUATED cost fields
-        /// (VendorBatchSolver.EvaluateVendorOffers' own output - never
-        /// recomputed here) into a PillSourceCostBreakdown. RawCoin
-        /// subtracts each item line's own GoldValue back out of coinCost
-        /// (which already has it folded in - see VendorItemCostLine's own
-        /// doc comment) so the item's raw quantity is what competes in
-        /// strict-domination comparisons, not its TP-valued gold - see
-        /// PillSourceCostBreakdown.RawCoin's own doc comment.
+        /// Decomposes a winning-or-fallback vendor offer's already-
+        /// evaluated cost fields into a PillSourceCostBreakdown. RawCoin
+        /// subtracts each item line's GoldValue back out of coinCost so
+        /// the item's raw quantity is what competes in strict-domination
+        /// comparisons, not its TP-valued gold.
         /// </summary>
         private static PillSourceCostBreakdown BuildVendorCostBreakdown(
             long? coinCost, List<CostLine> currencyCosts, List<VendorItemCostLine> itemCosts, long? decisionValue)
@@ -1845,31 +1235,19 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// source-selection-simplification: decomposes a candidate craft
-        /// recipe's DIRECT (non-recursive) ingredient list into a
-        /// PillSourceCostBreakdown - a Currency-type ingredient becomes a
-        /// raw currency line (or RawCoin, for the coin currency id
-        /// itself), an Item-type ingredient becomes a raw item line at
-        /// its OWN stated quantity (already scaled to this node's real
-        /// demand by RecipeService/InventoryReducer, same granularity as
-        /// VendorItemCostLine.Quantity - see that field's own doc
-        /// comment), directly comparable to a vendor offer's own item cost
-        /// lines by id with NO pricing/recursion needed. A GuildUpgrade or
-        /// other unrecognized ingredient type contributes no line here
-        /// (mirrors the recipe loop's own hasUnvaluedCurrency treatment
-        /// for those types - there is no representable "kind" for them) -
-        /// marks the returned breakdown IsIncomplete instead (adversarial-
-        /// review fix, Critical #5), so a real cost this breakdown cannot
-        /// represent never manufactures a false StrictDomination/Weighted
-        /// claim in either direction. Duplicate ingredient entries of the
-        /// same (Type, Id) are summed into one line.
+        /// Decomposes a candidate recipe's direct ingredient list into a
+        /// PillSourceCostBreakdown: Currency ingredients become raw
+        /// currency lines (or RawCoin for the coin id), Item ingredients
+        /// become raw item lines at their stated quantity - directly
+        /// comparable to a vendor offer's cost lines with no pricing or
+        /// recursion. A GuildUpgrade/unrecognized ingredient has no
+        /// representable line and marks the breakdown IsIncomplete, so an
+        /// unrepresentable cost never manufactures a false domination
+        /// claim. Duplicate (Type, Id) entries are summed.
         /// </summary>
         /// <param name="rawQuantitiesReducedByOwnedStock">
-        /// Adversarial-review fix (Critical #4): see
-        /// PillSourceCostBreakdown.RawQuantitiesReducedByOwnedStock's own
-        /// doc comment - stamped straight through onto the returned
-        /// breakdown, computed by the caller (which has access to
-        /// ownedQuantityUsedByNode) rather than here.
+        /// Stamped straight onto the returned breakdown; computed by the
+        /// caller, which has access to ownedQuantityUsedByNode.
         /// </param>
         private static PillSourceCostBreakdown BuildCraftCostBreakdown(
             RecipeOption option, long? decisionValue, bool rawQuantitiesReducedByOwnedStock = false)
@@ -1925,16 +1303,10 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Adversarial-review fix (Critical #4): true when at least one of
-        /// <paramref name="option"/>'s direct Item ingredients is a key in
-        /// <paramref name="ownedQuantityUsedByNode"/> with a
-        /// strictly-positive owned-usage amount - i.e. InventoryReducer
-        /// actually consumed some owned stock at that ingredient node
-        /// before this Solve() ran. Reference-keyed lookup: the ingredient
-        /// RecipeNode objects here are the SAME instances InventoryReducer
-        /// walked (this Solve() call runs on its ReducedTree), so no
-        /// NodeId translation is needed. Currency ingredients are never
-        /// reduced by owned ITEM stock and are skipped.
+        /// True when at least one of <paramref name="option"/>'s direct
+        /// Item ingredients was actually reduced by owned stock.
+        /// Reference-keyed: the ingredient nodes are the same instances
+        /// InventoryReducer walked. Currency ingredients are skipped.
         /// </summary>
         private static bool AnyIngredientReducedByOwnedStock(
             RecipeOption option, Dictionary<RecipeNode, int> ownedQuantityUsedByNode)
@@ -1965,26 +1337,12 @@ namespace GW2CraftingHelper.Services
         {
             if (node.IngredientType == "Currency")
             {
-                // Adversarial-review follow-up (fourth-site finding): a
-                // Currency-type node tagged with the COIN currency id is
-                // real copper, already folded into its consuming Craft
-                // decision's TotalCost (see Evaluate's recipe loop and
-                // RecomputeCraftCosts) - so it accumulates into currencyMap
-                // via the SAME per-occurrence walk as every other currency
-                // below (Collect visits each Currency node exactly once per
-                // tree occurrence, matching how Evaluate/RecomputeCraftCosts
-                // count it exactly once per occurrence too - no double
-                // count). It must still never surface as a plan.CurrencyCosts
-                // "currency 1" line (coin has its own dedicated display, see
-                // the repo's coin-icon display rules) - the currencyMap ->
-                // currencyCosts conversion below routes this key into
-                // totalCoinCost instead and excludes it from currencyCosts.
-                // Without that routing, this coin total would reach the
-                // Recipe Tree and the Craft shopping-list row (both read
-                // from decision.TotalCost) but NOT plan.TotalCoinCost (which
-                // only sums BuyFromTp/BuyFromVendor steps, never Craft steps,
-                // to avoid double-counting nested Buy costs) - a fourth site
-                // silently disagreeing with the other three.
+                // A coin-typed Currency node is real copper, already in
+                // its consuming Craft decision's TotalCost; it accumulates
+                // into currencyMap once per occurrence like any currency,
+                // but the conversion below routes it into totalCoinCost
+                // and excludes it from currencyCosts (coin has its own
+                // display) so all cost surfaces agree.
                 if (currencyMap.ContainsKey(node.Id))
                 {
                     currencyMap[node.Id] = checked(currencyMap[node.Id] + node.Quantity);
@@ -1998,61 +1356,32 @@ namespace GW2CraftingHelper.Services
 
             if (node.IngredientType != "Item")
             {
-                // Non-Item node (Currency handled above; GuildUpgrade/
-                // unrecognized types land here): never accumulates into
-                // currencyMap and carries no memo entry (see Evaluate's
-                // ingredient loop), so no decision/step-generation code
-                // below ever runs for it - see CraftingDecision's XML doc
-                // for the id-space rationale.
+                // Non-Item node (GuildUpgrade/unrecognized): never
+                // accumulates into currencyMap and carries no memo entry,
+                // so no step generation runs for it.
                 return;
             }
 
-            // M37 (KNOWN-ISSUES #26 fix-pass finding): a Quantity == 0
-            // "Item" node draws no demand of its own and must never
-            // generate a shopping/craft step - matches
-            // CraftingTreeBuilder.BuildNode's own Quantity == 0 early
-            // return (the "already owned" collapse, checked first there
-            // too) for the SAME reason, regardless of WHY it is zero
-            // (genuine full ownership via InventoryReducer, or a duplicate
-            // occurrence zeroed by AchievementBitDedupPrePass). Without
-            // this guard, a zeroed node whose "real" counterpart resolves
-            // to a DIFFERENT stepKey (e.g. Craft vs. Buy - so the two never
-            // merge via the ordinary per-stepKey aggregation below) leaves
-            // a standalone "buy/craft 0 units, 0 cost" ghost row in
-            // Plan.Steps: reproduced and confirmed via manual trace while
-            // verifying this exact claim for the M37 achievement-bit dedup
-            // feature (docs/research/m37-r3-achievement-dedup.md Section
-            // 4.2 flags this as needing verification, not assumption) - see
-            // PlanSolverTests' QuantityZeroNode_* cases for the covering
-            // scenario.
-            // This was already a latent gap for the pre-existing genuinely-
-            // owned case (the comment immediately below, predating this
-            // fix, already claimed a real Quantity == 0 node produces "no
-            // step" - this guard is what makes that claim actually true).
+            // A Quantity == 0 "Item" node draws no demand and must never
+            // generate a step - matches CraftingTreeBuilder.BuildNode's
+            // own Quantity == 0 collapse, whether zeroed by
+            // InventoryReducer or AchievementBitDedupPrePass. Without this
+            // guard, a zeroed node whose "real" counterpart resolves to a
+            // different stepKey leaves a "0 units, 0 cost" ghost row.
             //
-            // Invariant this guard relies on (not enforced here, only
-            // documented): every "Item" node that reaches this line with
-            // Quantity == 0 must already have empty Recipes. True today
-            // because both InventoryReducer.ReduceNode and
-            // AchievementBitDedupPrePass always pair Quantity = 0 with
-            // Recipes.Clear(). If that pairing is ever broken by a future
-            // pre-pass or bug, this guard would silently skip recursing
-            // into that node's children too - dropping their real,
-            // nonzero-Quantity costs from the plan, not just suppressing a
-            // zero-cost ghost row for the parent - so keep any new
-            // Quantity-zeroing code paired with clearing Recipes.
+            // Relied-on invariant: every "Item" node reaching here with
+            // Quantity == 0 already has empty Recipes (both zeroing sites
+            // pair Quantity = 0 with Recipes.Clear()). If that pairing is
+            // ever broken, this guard would skip the node's children and
+            // drop their real costs - keep any new Quantity-zeroing code
+            // paired with clearing Recipes.
             if (node.Quantity == 0)
             {
                 return;
             }
 
-            // M34-B2b: an ignored item generates no crafting step and no
-            // shopping row at all - it is fully in-hand, same as a real
-            // Quantity == 0 node's "usedQuantity == 0 -> no step" gw2e
-            // parity target (Section 5 of the r2 report). Evaluate already
-            // committed a zero-cost memo entry for it (never recursing into
-            // its own ingredients), so skipping it here as well keeps the
-            // plan free of a bogus "buy 0-cost N units" row.
+            // An ignored item generates no step or shopping row; Evaluate
+            // already committed a zero-cost memo entry without recursing.
             if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
             {
                 return;
@@ -2063,20 +1392,12 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            // M35 (gw2e parity, multi-item plans): the synthetic multi-item
-            // wrapper root (see Gw2Constants.MultiItemWrapperItemId) is
-            // never a real acquisition - it exists purely so Evaluate can
-            // price N selected item roots together under one throwaway
-            // "recipe". Recurse straight into that recipe's own Ingredients
-            // (the N real item roots) WITHOUT ever generating a step/
-            // craftOrder entry for the wrapper's own Craft decision -
-            // echoes gw2e's componentTree.html hiding the fake
-            // `multipleRecipeTree` node from the rendered Crafting Steps
-            // list (docs/gw2e-parity-spec.md, the M34 r1 multi-item
-            // research report). Evaluate always force-crafts this node
-            // (it has a recipe and no buy price - Gw2Constants sentinel ids
-            // are never in `prices`), so decision.Source is always Craft
-            // here; the explicit check still guards against future change.
+            // The synthetic multi-item wrapper root is never a real
+            // acquisition: recurse straight into its recipe's ingredients
+            // (the N real roots) without generating a step/craftOrder
+            // entry for the wrapper itself. Evaluate always force-crafts
+            // it (recipe, no buy price); the check still guards against
+            // future change.
             if (node.Id == Gw2Constants.MultiItemWrapperItemId &&
                 decision.Source == AcquisitionSource.Craft)
             {
@@ -2116,12 +1437,10 @@ namespace GW2CraftingHelper.Services
             else if (decision.Source == AcquisitionSource.BuyFromVendor)
             {
                 // Vendor currency costs are folded into currencyMap once,
-                // after the whole tree is collected and every merged vendor
-                // step's true (aggregate-then-ceil) cost is known - see
-                // VendorBatchSolver.FinalizeVendorBatches. Folding the still-
-                // per-occurrence decision.VendorCurrencyCosts in here would
-                // re-introduce the exact per-occurrence-then-sum overcount
-                // FinalizeVendorBatches exists to fix (M34-B1 #1).
+                // after every merged vendor step's aggregate-then-ceil
+                // cost is known (FinalizeVendorBatches); folding the
+                // per-occurrence costs here would re-introduce the
+                // overcount that pass exists to fix.
                 var stepKey = (node.Id, AcquisitionSource.BuyFromVendor, 0);
                 AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
             }
@@ -2143,13 +1462,10 @@ namespace GW2CraftingHelper.Services
         {
             if (decision.Source == AcquisitionSource.Craft)
             {
-                // M34 fix (wave-validator finding): remembers every
-                // individual tree occurrence's own NodeId that fed this
-                // merged Craft stepKey, in first-seen (DFS) order, so
-                // RefreshCraftStepCosts can re-sum this step's true total
-                // from `memo` AFTER RecomputeCraftCosts corrects it - see
-                // that method's doc comment. Mirrors the vendor-side
-                // occurrence bookkeeping just below for BuyFromVendor.
+                // Remembers each occurrence's NodeId that fed this merged
+                // Craft stepKey, in first-seen (DFS) order, for
+                // RefreshCraftStepCosts - the Craft twin of the vendor
+                // bookkeeping below.
                 if (!craftOccurrences.TryGetValue(stepKey, out var craftOccurrenceList))
                 {
                     craftOccurrenceList = new List<int>();
@@ -2181,14 +1497,10 @@ namespace GW2CraftingHelper.Services
                     };
                 }
 
-                // M34 fix (Critical review finding, PlanSolver.cs:1038):
-                // remembers every individual tree occurrence's own NodeId
-                // and Quantity that fed this merged vendor stepKey, in
-                // first-seen (DFS) order, so AllocateVendorNodeCosts can
-                // redistribute FinalizeVendorBatches' corrected merged total
-                // back to each occurrence's own memo entry afterward - see
-                // that method's doc comment for why this per-node fixup is
-                // necessary in addition to the stepMap-level one.
+                // Remembers each occurrence's NodeId and Quantity that fed
+                // this merged vendor stepKey, in first-seen (DFS) order,
+                // so AllocateVendorNodeCosts can redistribute the
+                // corrected merged total back to each memo entry.
                 if (!vendorOccurrences.TryGetValue(stepKey, out var occurrenceList))
                 {
                     occurrenceList = new List<(int NodeId, int Quantity)>();
@@ -2241,26 +1553,15 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// W4B review-fix (Critical): marks every occurrence of a MERGED
-        /// (2+ tree occurrences) vendor step's memo entry with
-        /// Decision.VendorComponentCostsUnreliable = true, so
-        /// CraftingTreeBuilder never synthesizes a cost-component leaf for
-        /// it (see that field's own doc comment on why the raw
-        /// VendorItemCosts/VendorCurrencyCosts stop being trustworthy once
-        /// AllocateVendorNodeCosts reallocates the step's corrected total
-        /// across occurrences). Runs strictly AFTER AllocateVendorNodeCosts
-        /// so this sees the SAME stepMap/vendorOccurrences that method's own
-        /// reallocation used - the exact gate
-        /// (`step.VendorOfferOutputCount &gt; 0`) that decides whether a
-        /// step was actually corrected, plus occurrences.Count &gt; 1 for
-        /// "genuinely merged" (a single-occurrence step's share always
-        /// equals step.TotalCost exactly, so nothing there is stale).
-        /// Read-only with respect to VendorBatchSolver: only inspects
-        /// stepMap/vendorOccurrences and writes the new auxiliary flag on
-        /// `memo` - never touches TotalCost, UnitCost, or any batch/ceil
-        /// arithmetic (merged-ceil batching math, formerly DO-NOT-TOUCH -
-        /// retired 2026-08-17, see KNOWN-ISSUES; still computed entirely by
-        /// AllocateVendorNodeCosts/FinalizeVendorBatches above).
+        /// Marks every occurrence of a merged (2+ occurrence) vendor
+        /// step's memo entry VendorComponentCostsUnreliable, so
+        /// CraftingTreeBuilder never synthesizes a cost-component leaf
+        /// from the stale pre-merge numbers. Runs strictly after
+        /// AllocateVendorNodeCosts, using the same
+        /// VendorOfferOutputCount &gt; 0 gate that decides whether a step
+        /// was corrected; a single-occurrence step's share always equals
+        /// step.TotalCost, so nothing there is stale. Read-only toward
+        /// VendorBatchSolver.
         /// </summary>
         private static void FlagUnreliableVendorComponentCosts(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
@@ -2292,38 +1593,12 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Re-sums every Craft decision's TotalCost bottom-up from its
-        /// chosen recipe's (now possibly AllocateVendorNodeCosts-corrected)
-        /// ingredient TotalCosts, mirroring Evaluate's own craftRealCost
-        /// aggregation (non-currency ingredients only - a currency
-        /// ingredient never contributes to real coin TotalCost, same as
-        /// Evaluate). Necessary because Evaluate computed every Craft
-        /// node's TotalCost bottom-up BEFORE FinalizeVendorBatches/
-        /// AllocateVendorNodeCosts ever ran, so a Craft node anywhere above
-        /// a corrected vendor-bought leaf - all the way up to the tree
-        /// root - would otherwise keep summing the leaf's stale
-        /// pre-correction share.
-        ///
-        /// Walks only the CHOSEN path (node.Recipes.FirstOrDefault(r =&gt;
-        /// r.RecipeId == decision.RecipeId), exactly like Collect) - never
-        /// the alternate, non-chosen recipes' ingredient nodes Evaluate also
-        /// memoized for comparison purposes, since those never fed the
-        /// solved plan and are not what the real tree displays.
-        ///
-        /// Depth is NOT bounded: this recurses down the entire chosen-path
-        /// subtree from whatever `node` it is called with (Solve calls it
-        /// once, with the tree root), so every Craft ancestor's `memo`
-        /// entry - and therefore every CraftingTreeNode.SubtreeCost derived
-        /// from it - is correct however many Craft levels separate it from
-        /// a corrected leaf. Confirmed by a 4-Craft-level, multi-branch
-        /// regression (see PlanSolverTests) and by a real-tree Harness dump
-        /// against the live Exordium recipe tree: root and every
-        /// intermediate Craft node's SubtreeCost already reconcile with
-        /// their children's corrected costs after this call returns. The
-        /// gap this class of bug actually hid in was elsewhere - see
-        /// RefreshCraftStepCosts below, which fixes the Craft-type
-        /// PlanStep (shopping-list row) side of the same correction that
-        /// this method already handled correctly for the Decisions/tree
-        /// side.
+        /// chosen recipe's (possibly corrected) ingredient TotalCosts,
+        /// mirroring Evaluate's craftRealCost aggregation. Needed because
+        /// Evaluate ran before FinalizeVendorBatches/
+        /// AllocateVendorNodeCosts, so Craft ancestors above a corrected
+        /// vendor leaf would keep summing the stale pre-correction share.
+        /// Walks only the chosen path, unbounded depth, from the tree root.
         /// </summary>
         private static long? RecomputeCraftCosts(
             RecipeNode node, Dictionary<int, Decision> memo, ISet<int> ignoredItemIds)
@@ -2361,17 +1636,11 @@ namespace GW2CraftingHelper.Services
                 {
                     if (ingredient.IngredientType == "Currency")
                     {
-                        // Adversarial-review follow-up (finding 3's sibling
-                        // site): a coin-typed Currency ingredient IS real
-                        // copper (see Evaluate's recipe loop, which now
-                        // folds it into both craftCost and craftRealCost
-                        // the same way) - it must be re-added here too, or
-                        // this re-derivation pass would silently strip the
-                        // coin contribution Evaluate's initial commit
-                        // already included, since this method otherwise
-                        // treats every Currency-type ingredient as
-                        // non-real-cost. A non-coin currency still
-                        // contributes nothing here, unchanged.
+                        // A coin-typed Currency ingredient is real copper
+                        // (Evaluate folds it into craftRealCost); it must
+                        // be re-added here or this re-derivation would
+                        // strip it. Non-coin currencies still contribute
+                        // nothing.
                         if (ingredient.Id == Gw2Constants.CoinCurrencyId)
                         {
                             craftRealCost += ingredient.Quantity;
@@ -2380,10 +1649,8 @@ namespace GW2CraftingHelper.Services
                     }
                     if (ingredient.IngredientType != "Item")
                     {
-                        // Non-Item ingredient (Currency handled above) -
-                        // never a real coin contribution; skip rather than
-                        // recurse into a node known upfront to carry no memo
-                        // entry (see Evaluate's ingredient loop).
+                        // Non-Item ingredient: never a real coin
+                        // contribution and carries no memo entry; skip.
                         continue;
                     }
                     craftRealCost += RecomputeCraftCosts(ingredient, memo, ignoredItemIds) ?? 0L;
@@ -2396,37 +1663,17 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// currency-ux-package review fix (finding 1, MEASURED): the
-        /// ComparisonValue twin of RecomputeCraftCosts immediately above -
-        /// same walk shape (chosen-path only, bottom-up, Item-positive
-        /// guard, ignoredItemIds short-circuit), but re-derives
-        /// Decision.ComparisonValue instead of Decision.TotalCost. Required
-        /// because RecomputeCraftCosts only re-sums real coin cost; a Craft
-        /// node sitting above a vendor-corrected leaf (see the
-        /// vendor-currency reallocation pass in Solve(), just before
-        /// RecomputeCraftCosts) would otherwise keep the ComparisonValue
-        /// Evaluate() committed BEFORE any vendor-batch correction ever ran,
-        /// silently drifting from the now-correct TotalCost - exactly the
-        /// stale pair ValueDetailTooltipBuilder was reading as a fabricated
-        /// currency divergence.
-        ///
-        /// Mirrors Evaluate's own recipe-ingredient loop for a comparable
-        /// recipe (coin-typed Currency ingredients contribute directly; a
-        /// valued non-coin Currency ingredient folds in its coin-equivalent
-        /// via <paramref name="currencyValuation"/>; a non-Item ingredient
-        /// contributes nothing) - EXCEPT it never needs to compute
-        /// hasUnvaluedCurrency itself, since decision.HasUnvaluedCurrency
-        /// already carries Evaluate's own tier decision (including
-        /// transitive propagation from a fallback-tier descendant, per that
-        /// field's doc comment) for the chosen recipe. A fallback-tier
-        /// decision's ComparisonValue is always set equal to its (already
-        /// corrected) TotalCost, exactly matching Evaluate's own fallback
-        /// commit sites (bestFallbackCraftCost == bestFallbackCraftRealCost)
-        /// - no valuation is ever folded in there, so none is re-folded in
-        /// here either. Descendants are still visited unconditionally so
-        /// their OWN ComparisonValue gets corrected regardless of this
-        /// node's tier; only the value aggregated INTO this node's own
-        /// result is gated on the tier.
+        /// The ComparisonValue twin of RecomputeCraftCosts - same walk
+        /// shape, but re-derives Decision.ComparisonValue. Without it, a
+        /// Craft node above a vendor-corrected leaf kept the
+        /// pre-correction ComparisonValue, drifting from the corrected
+        /// TotalCost. Mirrors Evaluate's ingredient loop for a comparable
+        /// recipe; decision.HasUnvaluedCurrency already carries the tier
+        /// (including transitive propagation), and a fallback-tier
+        /// decision's ComparisonValue is set equal to its corrected
+        /// TotalCost with no valuation folded in. Descendants are visited
+        /// unconditionally; only this node's own aggregation is gated on
+        /// the tier.
         /// </summary>
         private static long? RecomputeComparisonValues(
             RecipeNode node, Dictionary<int, Decision> memo, ISet<int> ignoredItemIds,
@@ -2451,12 +1698,9 @@ namespace GW2CraftingHelper.Services
 
             if (decision.Source != AcquisitionSource.Craft)
             {
-                // Non-Craft leaf: already corrected either by the
-                // vendor-currency reallocation pass in Solve() (BuyFromVendor)
-                // or never touched by any correction pass at all (BuyFromTp /
-                // UnknownSource - TotalCost == ComparisonValue for those
-                // from Evaluate() onward, and neither pass ever changes a
-                // TP-buy's TotalCost).
+                // Non-Craft leaf: already corrected by the vendor-currency
+                // reallocation pass (BuyFromVendor) or never touched
+                // (BuyFromTp/UnknownSource).
                 return decision.ComparisonValue;
             }
 
@@ -2474,13 +1718,9 @@ namespace GW2CraftingHelper.Services
                             continue;
                         }
 
-                        // Mirrors Evaluate's valuationCopper accumulation -
-                        // only ever folded in for a comparable-tier recipe.
+                        // Mirrors Evaluate's valuationCopper accumulation;
                         // decision.HasUnvaluedCurrency already reflects
-                        // whether this chosen recipe stayed comparable
-                        // (including transitive propagation), so no
-                        // per-line hasUnvaluedCurrency tracking is needed
-                        // here the way Evaluate itself needs it.
+                        // whether this recipe stayed comparable.
                         if (!decision.HasUnvaluedCurrency &&
                             currencyValuation != null &&
                             currencyValuation.TryGetCopperValue(ingredient.Id, out long copperPerUnit))
@@ -2491,14 +1731,9 @@ namespace GW2CraftingHelper.Services
                             }
                             catch (OverflowException)
                             {
-                                // Unreachable in practice: an overflowing
-                                // valuation would already have demoted this
-                                // recipe to fallback tier at Evaluate() time
-                                // (decision.HasUnvaluedCurrency), which the
-                                // guard above already excludes. Defense in
-                                // depth only, matching Evaluate's own
-                                // no-crash posture rather than letting an
-                                // uncaught exception fail the whole Solve().
+                                // Unreachable in practice (an overflowing
+                                // valuation already demoted this recipe at
+                                // Evaluate() time); defense in depth only.
                             }
                         }
                         continue;
@@ -2509,10 +1744,9 @@ namespace GW2CraftingHelper.Services
                         continue;
                     }
 
-                    // Always recurse regardless of THIS node's own tier, so
-                    // a nested Craft descendant's ComparisonValue is
-                    // corrected too - only the aggregation below (used for
-                    // THIS node's own result) is gated on HasUnvaluedCurrency.
+                    // Always recurse regardless of this node's tier so
+                    // nested descendants are corrected; only the
+                    // aggregation is gated on HasUnvaluedCurrency.
                     comparisonValue += RecomputeComparisonValues(ingredient, memo, ignoredItemIds, currencyValuation) ?? 0L;
                 }
             }
@@ -2527,44 +1761,15 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// M34 fix (wave-validator finding, post-fcbb277): re-derives every
-        /// Craft-type PlanStep's TotalCost from `memo` - AFTER
-        /// AllocateVendorNodeCosts/RecomputeCraftCosts have already
-        /// corrected it there - instead of trusting AggregateStep's running
-        /// sum from Collect(), which is built BEFORE those correction
-        /// passes ever run. Without this, a Craft row in the "Crafting
-        /// Steps" shopping list stayed permanently stale (the pre-merge,
-        /// per-occurrence-overcounted total) even though the SAME item's
-        /// Recipe Tree row (CraftingTreeNode.SubtreeCost, sourced from the
-        /// now-corrected `memo` via the public Decisions dict) and
-        /// plan.TotalCoinCost (summed from FinalizeVendorBatches' own
-        /// already-corrected Buy/Vendor steps) both showed the right
-        /// number - the exact "two sections of the same page disagree"
-        /// defect fcbb277 set out to eliminate, left half-fixed for the
-        /// Craft-step side.
-        ///
-        /// A full restructure - running the vendor-batch merge/allocation
-        /// BEFORE Collect ever builds a PlanStep, so no stale snapshot
-        /// could exist in the first place - was considered and rejected:
-        /// the merge needs each item's AGGREGATE demand across every tree
-        /// occurrence (FinalizeVendorBatches' whole premise), which is
-        /// only known once a full tree walk has completed, i.e. after a
-        /// Collect-shaped pass has already run. Reordering would therefore
-        /// mean two full tree walks (one to gather occurrence/demand data,
-        /// a second to build the now-correct PlanSteps) instead of the one
-        /// walk plus this narrow refresh - more moving parts for the same
-        /// asymptotic cost, not less. This method is the second walk's
-        /// cheaper equivalent: it revisits only the (few) Craft stepKeys
-        /// that exist, not the tree.
-        ///
-        /// Uses <paramref name="craftOccurrences"/> (built by AggregateStep,
-        /// the Craft-side twin of vendorOccurrences) rather than
-        /// re-deriving occurrences from the tree, so this stays a flat
-        /// stepMap-sized pass regardless of tree depth or branching. A
-        /// missing/null memo TotalCost (an unpriceable ingredient
-        /// somewhere in that craft's chosen recipe) contributes 0, matching
-        /// AggregateStep's own original null-handling (a null decision.
-        /// TotalCost never increments the running total there either).
+        /// Re-derives every Craft-type PlanStep's TotalCost from `memo`
+        /// after the correction passes, instead of trusting
+        /// AggregateStep's pre-correction running sum - otherwise a Craft
+        /// shopping-list row stays stale while the tree and totals show
+        /// the corrected number. Running the merge before Collect was
+        /// rejected: the merge needs aggregate demand, only known after a
+        /// full walk, so reordering would mean two full tree walks; this
+        /// is a flat stepMap-sized refresh instead. A missing/null memo
+        /// TotalCost contributes 0, matching AggregateStep.
         /// </summary>
         private static void RefreshCraftStepCosts(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
@@ -2624,27 +1829,13 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// AUDIT ROW 20/38 (gw2e price-side fallback parity): same as the
-        /// two-arg overload above, but also reports whether the preferred
-        /// side was empty (0) and this item's OTHER TP side was used
+        /// Same as the two-arg overload, but also reports whether the
+        /// preferred side was empty and the item's other TP side was used
         /// instead - gw2e's own live behavior (preferred side first,
-        /// same-item cross-side fallback when missing/zero, unpriced only
-        /// when BOTH sides are empty). Previously an item with an empty
-        /// preferred side returned 0 outright, which GetBuyCost's `> 0`
-        /// check then treated as fully unpriceable - dropping the BuyFromTp
-        /// option entirely even though the OTHER side had a real listing.
-        /// This is the single side-selection logic both PlanSolver.
-        /// GetBuyCost and VendorBatchSolver's per-item TP-valued cost-line
-        /// pricing call directly (review-fix: VendorBatchSolver switched
-        /// from the two-arg overload to this one so its own fell-back fact
-        /// reaches VendorItemCostLine.PriceSideFellBack rather than being
-        /// discarded), so both gain the fallback consistently without
-        /// duplicating the side-selection logic. The remaining two-arg
-        /// caller (CraftingPlanPipeline's Buy-All preset feasibility check)
-        /// only ever needs the `> 0` priceable check, not the fell-back
-        /// fact itself. 0 on both sides still returns 0 with the out param
-        /// false - the existing "unpriceable" handling at every call site
-        /// is unchanged.
+        /// cross-side fallback, unpriced only when both sides are empty).
+        /// The single side-selection logic shared with VendorBatchSolver's
+        /// cost-line pricing. 0 on both sides returns 0 with the out
+        /// param false.
         /// </summary>
         internal static int GetUnitPrice(ItemPrice price, PriceBasis priceBasis, out bool priceSideFellBack)
         {
