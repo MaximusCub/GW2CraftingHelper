@@ -5664,3 +5664,161 @@ own identical "cheapest priceable offer wins" precedent - new test
   not yet been confirmed against a real generated plan on-screen.
 
 Gate: PASS (negative checks) 2026-08-16 (orchestrator live desktop session). Seasonal exclusion verified as the headline: the ARE craft path now prices ectos at the real TP rate (~26s vs the old ~4s26 phantom Halloween vendor), the ecto row's vendor source is gone entirely, and the Candy Corn tip correctly does NOT render out of season; sheet-savings positive render suite-covered.
+
+## Festival-vendor auto-tagging follow-up (2026-08-16)
+
+**Milestone goal:** the previous SEASONAL VENDOR TIP pass (see section
+above) hand-tagged exactly three known Candy Corn Vendor (Weekly) ecto
+offers with `seasonalFestival`. This pass extends
+`tools/VendorOfferUpdater` to DERIVE the tag for any vendor, by parsing
+the GW2 Wiki's own `{{Temporary|...}}` template off each vendor NPC
+page's wikitext, so seasonal tagging is no longer a hand-curated
+one-off.
+
+**What changed:**
+- `TemporaryTemplateParser` (new): extracts the `seasonal=` (or, on a
+  minority of vendor pages, `event=` - both confirmed live) parameter
+  value out of a page's `{{Temporary|...}}`/`{{temporary|...}}` template.
+- `Gw2Constants.FestivalKeysByWikiDisplayName` /
+  `ResolveSeasonalFestivalKey` (tool copy, `Models/Gw2Constants.cs`):
+  curated, MEASURED mapping from the wiki's own festival display-name
+  text to the six internal `FestivalContext` name keys
+  (`halloween`/`dragonbash`/`wintersday`/`festivalofthefourwinds`/
+  `lunarnewyear`/`superadventurefestival`) - both sides independently
+  measured, never invented (wiki display names via six live
+  `api.php?action=parse&prop=wikitext` fetches, one per festival;
+  internal keys via a raw UTF-16LE string scan of `Blish HUD.exe`,
+  same technique the runtime `HalloweenFestivalName` constant already
+  used for `halloween` alone). A value not in this table (e.g. the
+  real, live-confirmed non-festival event vendors "Consortium Trader
+  (Fractal Rush)" / "Starter Equipment Vendor") is left untagged with a
+  console warning - never guessed.
+- `WikiSmwClient.FetchWikitextAsync` (new): fetches a single page's raw
+  wikitext via `action=parse&prop=wikitext` (no Semantic MediaWiki
+  property exists for a page's `{{Temporary}}` template, unlike every
+  other field this tool scrapes).
+- `Program.ResolveSeasonalFestivalValuesAsync` / `StripSubobjectSuffix`
+  (new, opt-in via `--tag-seasonal-festivals` + `--max-seasonal-pages`):
+  a new pipeline pass that fetches each distinct vendor PAGE's wikitext
+  (stripping the SMW subobject suffix - `WikiVendorResult.PageName` is
+  actually `"Page Title#vendorN"`, live-confirmed, NOT a fetchable page
+  title on its own) and caches the raw seasonal/event value by page
+  title in a new gitignored dev cache, `ref/seasonal_wikitext_cache.json`.
+  Deliberately opt-in, not part of every default run: no SMW property
+  means one extra HTTP request per distinct vendor page, which would
+  silently balloon the cost/time of the default
+  `./tools/refresh-vendor-data.sh` workflow if unioned into every run.
+- `ConvertToOffer` (Program.cs): resolves `WikiVendorResult.
+  TemporarySeasonalValue` to `VendorOffer.SeasonalFestival` via
+  `Gw2Constants.ResolveSeasonalFestivalKey` - deliberately NOT hashed
+  into `OfferId` (matches `VendorOffer.SeasonalFestival`'s own existing
+  doc comment), so tagging an already-shipped offer never changes its
+  identity.
+
+**`ref/vendor_offers.json` regeneration (partial coverage - read
+carefully):** `ref/wiki_vendor_cache.json` did not exist on disk in this
+worktree (dev-local, gitignored) at the start of this pass, so a full
+from-scratch re-scrape was explicitly NOT performed (would be an
+unbounded, many-thousand-page live operation, and is not what this
+follow-up asked for). Instead, a SCOPED live run
+(`--query` restricted to the known festival vendor list +
+`--tag-seasonal-festivals` + `--merge-into ref/vendor_offers.json`)
+live-tagged the six OTHER known festival vendor NPC pages: Dragon Bash
+Merchant (Weekly), Wintersday Trader (Weekly), Festival Rewards Vendor
+(Weekly), Gauntlet Ticket Vendor, New Year Vendor, Super Adventure Box
+Weekly Trader - 63 wiki rows -> 54 converted offers, net +2 vs the prior
+baseline (53536 -> 53538; 52 stale rows for those 6 merchants replaced).
+Candy Corn Vendor (Weekly) was deliberately EXCLUDED from this scoped
+`--query` (confirmed by first attempting a run that included it, which
+recomputed new `OfferId` hashes for all nine of its rows via
+`VendorOfferHasher`'s pre-existing, documented "any freshly-touched
+merchant gets new OfferIds" behavior - see that file's own M37/Astral
+Acclaim doc comment - breaking the "3 known offer IDs survive
+identically" requirement; reverted and re-run without it). Its three
+original hand-tagged offer IDs, and all nine of its offers, are
+confirmed byte-for-byte unchanged (see
+`SeasonalFestivalRoundTripTests`, updated this pass). The shipped
+baseline now carries `seasonalFestival` on 57 offers across all six
+known festivals, up from the original 3 (Halloween only). **This is
+still far from full coverage**: the vast majority of vendor pages on
+the wiki (thousands, well beyond the seven curated festival-vendor
+pages this pass touched) have not been checked for a `{{Temporary}}`
+tag at all - a real, non-partial pass requires a full Pass 1 re-scrape
+(populating `ref/wiki_vendor_cache.json` from scratch) followed by a
+full `--tag-seasonal-festivals` run, which is a many-hour live
+operation outside this pass's scope.
+
+**Repo Invariants Checklist:**
+- [x] No Blish HUD references added to tests (`tools/VendorOfferUpdater`
+  and its test project reference neither Blish HUD nor Gw2Sharp, same as
+  every existing file in that tree).
+- [x] Tests exercise real production paths (`TemporaryTemplateParser`,
+  `Gw2Constants.ResolveSeasonalFestivalKey`, `Program.ConvertToOffer`,
+  and `Program.ResolveSeasonalFestivalValuesAsync` are all exercised
+  directly - the latter through a real `WikiSmwClient` against a fake
+  `HttpMessageHandler`, matching `WikiSmwClientTests`' own established
+  pattern, not a mirrored/fake implementation of the pipeline logic).
+- [x] No fake file I/O tests introduced (the cache read/write path is
+  exercised through real `File.Exists`/`File.ReadAllText`/
+  `File.WriteAllText` calls against real temp files, cleaned up in a
+  `finally` block per test).
+- [x] Pricing logic preserves multi-source correctness (this pass adds
+  no new cost-line/currency logic at all - `SeasonalFestival` is a pure
+  metadata tag, untouched cost-resolution code path).
+- [x] IDs remain internal-only (no ids surfaced to any UI - this pass is
+  entirely inside `tools/VendorOfferUpdater`, a build-time data tool with
+  no UI surface).
+
+**Validation performed (measured, this pass's final state):**
+`"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-festivalscrape/tools/VendorOfferUpdater/
+VendorOfferUpdater.csproj` - 0 errors, 0 warnings.
+`"/mnt/c/Program Files/dotnet/dotnet.exe" build
+C:/Dev/Blish/wt-festivalscrape/GW2CraftingHelper.csproj -p:Platform=x64`
+- 0 errors (only pre-existing StyleCop warnings, none in files this pass
+touched). `"/mnt/c/Program Files/dotnet/dotnet.exe" test
+C:/Dev/Blish/wt-festivalscrape/tests/VendorOfferUpdater.Tests/
+VendorOfferUpdater.Tests.csproj` - 185 green (26 new: 13
+`TemporaryTemplateParserTests`, 5 `SeasonalFestivalMappingTests`, 8
+`ResolveSeasonalFestivalValuesAsyncTests`, plus `ConvertToOfferTests`
+grew by 9 new `SeasonalFestival`-threading cases; `SeasonalFestivalRoundTripTests`
+updated in place for the new 57-tag baseline, not counted as new).
+`"/mnt/c/Program Files/dotnet/dotnet.exe" test
+C:/Dev/Blish/wt-festivalscrape/tests/GW2CraftingHelper.Tests/
+GW2CraftingHelper.Tests.csproj` - 1673 green (0 new; one existing pinned
+count, `VendorOfferStoreTests.ShippedSeedFile_VendorOfferLoader_
+ParsesAllOffers`, updated from 53536 to 53538 to match the regenerated
+baseline). Both suites fully green.
+
+**Risks / follow-ups:**
+- Partial coverage, restated: only 7 vendor pages total (the 3
+  already-tagged Candy Corn Vendor (Weekly) rows left untouched, plus 6
+  freshly live-tagged) have ever been checked for a `{{Temporary}}` tag.
+  Every other vendor in the ~53.5k-offer dataset is unswept - a future
+  full Pass 1 re-scrape + `--tag-seasonal-festivals` run is needed for
+  real coverage, and per this file's own conservative safety-limit
+  design (`--max-seasonal-pages`, default 500) would need explicit
+  raising for a from-scratch sweep of every distinct vendor page.
+- The six wiki-display-name -> internal-key mappings are Halloween,
+  Dragon Bash, Wintersday, Festival of the Four Winds, Lunar New Year,
+  and Super Adventure Festival ONLY - if Blish HUD's `FestivalContext`
+  ever adds a seventh festival, `Gw2Constants.FestivalKeysByWikiDisplayName`
+  needs a new MEASURED entry (both a live wiki-page fetch and a
+  `Blish HUD.exe` string-heap check) before any vendor for it can be
+  tagged; until then any such vendor is silently left untagged with a
+  console warning (never guessed) - by design, not a bug.
+- `VendorOfferHasher`'s OfferId is NOT stable across a fresh scrape of
+  any merchant (pre-existing, documented behavior - see its own
+  M37/Astral Acclaim doc comment) - this pass deliberately worked around
+  that by excluding Candy Corn Vendor (Weekly) from its scoped query
+  rather than fixing the hasher itself (out of scope: it is not this
+  pass's task, and a hash-format change would ripple across all ~53.5k
+  offers in the shipped dataset).
+- No live desktop verification was performed for this pass specifically
+  - it is a pure data/tooling change (no new runtime UI-facing code
+  path; `SeasonalOfferFilter`/`SeasonalVendorTipCalculator` already
+  exist and are already covered by the prior SEASONAL VENDOR TIP pass's
+  live desktop gate above, and now simply see more tagged offers to act
+  on).
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
