@@ -1417,6 +1417,125 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("Plan.Steps[0] is null", lastMessage());
         }
 
+        // --- Quality-audit fix (B2): CompetencyOpportunities/
+        // ExcessCraftOutputs/RecipeSheetSavingsOpportunities/
+        // SeasonalVendorTips all had the exact same "list null-checked,
+        // entry not" gap the LoadLatest_NullEntryInPlanSteps test above
+        // covers for Plan.Steps - PlanViewModelBuilder.BuildNotesSection
+        // dereferences one field on each entry (opportunity.ItemId/
+        // excess.ItemId/opp.ItemId/tip.CostLines) with no per-entry null
+        // check, once the surrounding list-level Count > 0 guard passes.
+        // Each calculator (CompetencyOpportunityCalculator/
+        // ExcessCraftOutputCalculator/RecipeSheetSavingsCalculator/
+        // SeasonalVendorTipCalculator) always assigns its field to a
+        // (possibly empty) list for a real, non-null CraftingPlanResult -
+        // never leaves it null - so every real plan.json this module ever
+        // writes carries an actual (if often empty) JSON array here,
+        // exactly like Plan.Steps above; the corruption below overwrites
+        // that empty array wholesale rather than one existing element,
+        // since a fresh single-item fixture never triggers any of these
+        // four calculators into producing a real entry. ---
+
+        [Fact]
+        public async Task LoadLatest_NullEntryInCompetencyOpportunities_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.CompetencyOpportunities);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                jObj["Result"]["CompetencyOpportunities"] = new JArray(JValue.CreateNull());
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("CompetencyOpportunities[0] is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullEntryInExcessCraftOutputs_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.ExcessCraftOutputs);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                jObj["Result"]["ExcessCraftOutputs"] = new JArray(JValue.CreateNull());
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("ExcessCraftOutputs[0] is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullEntryInRecipeSheetSavingsOpportunities_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.RecipeSheetSavingsOpportunities);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                jObj["Result"]["RecipeSheetSavingsOpportunities"] = new JArray(JValue.CreateNull());
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("RecipeSheetSavingsOpportunities[0] is null", lastMessage());
+        }
+
+        [Fact]
+        public async Task LoadLatest_NullEntryInSeasonalVendorTips_ReturnsNullAndLogsWarnExactlyOnce()
+        {
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            Assert.NotNull(result.SeasonalVendorTips);
+
+            string json = SerializeAndCorrupt(Wrap(result, DateTime.Now), jObj =>
+            {
+                jObj["Result"]["SeasonalVendorTips"] = new JArray(JValue.CreateNull());
+            });
+            File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
+
+            var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Equal(1, warnCount());
+            Assert.Contains("structural validation", lastMessage());
+            Assert.Contains("SeasonalVendorTips[0] is null", lastMessage());
+        }
+
         // --- Post-W3D quick fix (user-sanctioned, compression only): the
         // on-disk container is now gzip, sniffed by its first two magic
         // bytes (0x1F 0x8B) so plan.json files written by the pre-gzip
