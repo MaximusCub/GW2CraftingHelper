@@ -8386,4 +8386,15 @@ Updater 207/207 and seeder 3/3 after the tools change. Note: the
 seeder DOES have a test project (tests/GW2CraftingHelper.RecipeSeeder.
 Tests, 3 tests), contrary to the batch brief.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (orchestrator live desktop session, 2026-08-17 late,
+sandbox at this branch's own build). B14's deferred visual check ran
+and PASSED: all four settings save rows (Currency Valuations,
+Homestead Refinement, Logging, Snapshot) render identically styled at
+their sections' ends, and a live Save click produced the green
+"Saved - <dated timestamp>" status label. The other five items carry
+no rendered surface beyond suite coverage (B8/B13/B11 pinned by
+tests incl. the new dispatcher-invariant and Split tests; B15 is
+tool-only). Session note: the settings Clear-checkbox suppress
+tooltip and the curated defaults (Spirit Shard 3600, Pristine Fractal
+Relic 1200) were re-verified live incidentally. Merged under the
+maintainer's standing merge directive (2026-08-16).
