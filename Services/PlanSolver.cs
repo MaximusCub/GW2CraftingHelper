@@ -199,6 +199,118 @@ namespace GW2CraftingHelper.Services
             }
         }
 
+        /// <summary>
+        /// Solve-invariant state threaded through every Evaluate()
+        /// recursion, constructed once per Solve() call. Only the node
+        /// under evaluation varies per call and stays a plain parameter.
+        /// Fields hold the locals Solve() previously threaded into
+        /// Evaluate(), already normalized where Solve() normalizes them.
+        /// </summary>
+        private sealed class EvaluateContext
+        {
+            public IReadOnlyDictionary<int, ItemPrice> Prices { get; }
+            public IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> VendorOffers { get; }
+            public Dictionary<int, Decision> Memo { get; }
+            public PriceBasis PriceBasis { get; }
+            public IReadOnlyDictionary<int, AcquisitionSource> Overrides { get; }
+            public CurrencyValuation CurrencyValuation { get; }
+            public ISet<int> ForceBuyOnlyNodeIds { get; }
+            public ISet<int> CompetencyIndependentForceBuyNodeIds { get; }
+            public Dictionary<int, (long? BuyCost, long? CraftCost)> CostDiagnostics { get; }
+            public Dictionary<int, long?> RawCraftCostDiagnostics { get; }
+            public ISet<int> IgnoredItemIds { get; }
+
+            /// <summary>Never null - normalized in the constructor.</summary>
+            public HomesteadEfficiencyTiers HomesteadTiers { get; }
+
+            /// <summary>
+            /// Precomputed account best-rating-per-discipline lookup; built
+            /// exactly once per Solve() call, never per node.
+            /// </summary>
+            public IReadOnlyDictionary<string, int> BestRatingByDiscipline { get; }
+
+            /// <summary>
+            /// Reference-keyed per-node owned-material usage from
+            /// InventoryReducer.Reduce - the same node objects Evaluate
+            /// walks on a post-reduction tree, so no NodeId translation is
+            /// needed. Only flags a craft breakdown as unreliable for
+            /// StrictDomination (see BuildCraftCostBreakdown); null
+            /// disables the check.
+            /// </summary>
+            public Dictionary<RecipeNode, int> OwnedQuantityUsedByNode { get; }
+
+            public EvaluateContext(
+                IReadOnlyDictionary<int, ItemPrice> prices,
+                IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
+                Dictionary<int, Decision> memo,
+                PriceBasis priceBasis,
+                IReadOnlyDictionary<int, AcquisitionSource> overrides,
+                CurrencyValuation currencyValuation,
+                ISet<int> forceBuyOnlyNodeIds,
+                ISet<int> competencyIndependentForceBuyNodeIds,
+                Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics,
+                Dictionary<int, long?> rawCraftCostDiagnostics,
+                ISet<int> ignoredItemIds,
+                HomesteadEfficiencyTiers homesteadTiers,
+                IReadOnlyDictionary<string, int> bestRatingByDiscipline,
+                Dictionary<RecipeNode, int> ownedQuantityUsedByNode)
+            {
+                Prices = prices;
+                VendorOffers = vendorOffers;
+                Memo = memo;
+                PriceBasis = priceBasis;
+                Overrides = overrides;
+                CurrencyValuation = currencyValuation;
+                ForceBuyOnlyNodeIds = forceBuyOnlyNodeIds;
+                CompetencyIndependentForceBuyNodeIds = competencyIndependentForceBuyNodeIds;
+                CostDiagnostics = costDiagnostics;
+                RawCraftCostDiagnostics = rawCraftCostDiagnostics;
+                IgnoredItemIds = ignoredItemIds;
+                HomesteadTiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
+                BestRatingByDiscipline = bestRatingByDiscipline;
+                OwnedQuantityUsedByNode = ownedQuantityUsedByNode;
+            }
+        }
+
+        /// <summary>
+        /// Solve-invariant accumulator state threaded through every
+        /// Collect() recursion, constructed once per Solve() call. The
+        /// node under collection varies per call and stays a plain
+        /// parameter, as does the craft-order counter (mutable
+        /// accumulation, threaded by ref).
+        /// </summary>
+        private sealed class CollectContext
+        {
+            public Dictionary<int, Decision> Memo { get; }
+            public Dictionary<(int, AcquisitionSource, int), PlanStep> StepMap { get; }
+            public Dictionary<int, long> CurrencyMap { get; }
+            public Dictionary<(int, int), int> CraftOrder { get; }
+            public Dictionary<(int, AcquisitionSource, int), VendorBatchSolver.VendorBatchState> VendorBatchTracking { get; }
+            public Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> VendorOccurrences { get; }
+            public Dictionary<(int, AcquisitionSource, int), List<int>> CraftOccurrences { get; }
+            public ISet<int> IgnoredItemIds { get; }
+
+            public CollectContext(
+                Dictionary<int, Decision> memo,
+                Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
+                Dictionary<int, long> currencyMap,
+                Dictionary<(int, int), int> craftOrder,
+                Dictionary<(int, AcquisitionSource, int), VendorBatchSolver.VendorBatchState> vendorBatchTracking,
+                Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
+                Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences,
+                ISet<int> ignoredItemIds)
+            {
+                Memo = memo;
+                StepMap = stepMap;
+                CurrencyMap = currencyMap;
+                CraftOrder = craftOrder;
+                VendorBatchTracking = vendorBatchTracking;
+                VendorOccurrences = vendorOccurrences;
+                CraftOccurrences = craftOccurrences;
+                IgnoredItemIds = ignoredItemIds;
+            }
+        }
+
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
         {
             return Solve(tree, prices, null);
@@ -276,7 +388,12 @@ namespace GW2CraftingHelper.Services
             }
 
             // Pass 1: decide buy vs craft vs vendor at every node
-            Evaluate(tree, prices, vendorOffers, memo, priceBasis, overrides, valuation, forceBuyOnlyNodeIds, competencyIndependentForceBuyNodeIds, costDiagnostics, rawCraftCostDiagnostics, ignoredItemIds, tiers, bestRatingByDiscipline, ownedQuantityUsedByNode);
+            var evaluateContext = new EvaluateContext(
+                prices, vendorOffers, memo, priceBasis, overrides, valuation,
+                forceBuyOnlyNodeIds, competencyIndependentForceBuyNodeIds,
+                costDiagnostics, rawCraftCostDiagnostics, ignoredItemIds, tiers,
+                bestRatingByDiscipline, ownedQuantityUsedByNode);
+            Evaluate(tree, evaluateContext);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
@@ -290,7 +407,10 @@ namespace GW2CraftingHelper.Services
             var craftOccurrences = new Dictionary<(int, AcquisitionSource, int), List<int>>();
             int craftCounter = 0;
 
-            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+            var collectContext = new CollectContext(
+                memo, stepMap, currencyMap, craftOrder, vendorBatchTracking,
+                vendorOccurrences, craftOccurrences, ignoredItemIds);
+            Collect(tree, collectContext, ref craftCounter);
 
             // Pass 2b: re-derive each merged vendor step's
             // true cost from its AGGREGATE Quantity and the winning offer's
@@ -546,7 +666,7 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Evaluates the cheapest acquisition for <paramref name="node"/>
-        /// and commits it to <paramref name="memo"/>. Returns the
+        /// and commits it to the context's memo. Returns the
         /// decision's ComparisonValue, NOT its real coin TotalCost -
         /// callers summing ingredient costs for a parent craft need
         /// comparison values for the parent's own craft-vs-buy comparison
@@ -555,30 +675,7 @@ namespace GW2CraftingHelper.Services
         /// node ends up choosing; non-"Item" ingredients are never
         /// Evaluate()-called and get no memo entry.
         /// </summary>
-        private long? Evaluate(
-            RecipeNode node,
-            IReadOnlyDictionary<int, ItemPrice> prices,
-            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
-            Dictionary<int, Decision> memo,
-            PriceBasis priceBasis,
-            IReadOnlyDictionary<int, AcquisitionSource> overrides,
-            CurrencyValuation currencyValuation,
-            ISet<int> forceBuyOnlyNodeIds = null,
-            ISet<int> competencyIndependentForceBuyNodeIds = null,
-            Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
-            Dictionary<int, long?> rawCraftCostDiagnostics = null,
-            ISet<int> ignoredItemIds = null,
-            HomesteadEfficiencyTiers homesteadTiers = null,
-            // Precomputed account best-rating-per-discipline lookup; built
-            // exactly once per Solve() call, never per node.
-            IReadOnlyDictionary<string, int> bestRatingByDiscipline = null,
-            // Reference-keyed per-node owned-material usage from
-            // InventoryReducer.Reduce - the same node objects Evaluate
-            // walks on a post-reduction tree, so no NodeId translation is
-            // needed. Only flags a craft breakdown as unreliable for
-            // StrictDomination (see BuildCraftCostBreakdown); null
-            // disables the check.
-            Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null)
+        private long? Evaluate(RecipeNode node, EvaluateContext ctx)
         {
             // Item-positive guard (not an enumerated deny-list): only an
             // "Item" node is ever priced here; the ingredient loop never
@@ -589,16 +686,14 @@ namespace GW2CraftingHelper.Services
                 return null;
             }
 
-            var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
-
             // An "Ignore"-d item id is fully in-hand: zero cost, no
             // evaluation, and no recursion into its own ingredients
             // (gw2e's "an un-crafted branch never asks for its
             // ingredients"). CanCraft/CanBuyTp/CanBuyVendor stay false;
             // CraftingTreeBuilder short-circuits to Have anyway.
-            if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+            if (ctx.IgnoredItemIds != null && ctx.IgnoredItemIds.Contains(node.Id))
             {
-                memo[node.NodeId] = new Decision
+                ctx.Memo[node.NodeId] = new Decision
                 {
                     Source = AcquisitionSource.UnknownSource,
                     TotalCost = 0L,
@@ -618,7 +713,7 @@ namespace GW2CraftingHelper.Services
                 return 0L;
             }
 
-            long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, prices, priceBasis, out bool buyPriceSideFellBack);
+            long? buyTotalCost = GetBuyCost(node.Id, node.Quantity, ctx.Prices, ctx.PriceBasis, out bool buyPriceSideFellBack);
 
             // Evaluate vendor offers. Coin-only offers (directly or via
             // TP-priced barter) compete in PickCheapest. Offers with
@@ -631,7 +726,7 @@ namespace GW2CraftingHelper.Services
             // offer's non-coin lines are always reported on the plan -
             // valuation affects comparison, never the displayed cost.
             var vendorEvaluation = _vendorBatchSolver.EvaluateVendorOffers(
-                node, prices, vendorOffers, priceBasis, currencyValuation, tiers);
+                node, ctx.Prices, ctx.VendorOffers, ctx.PriceBasis, ctx.CurrencyValuation, ctx.HomesteadTiers);
             long? comparableVendorValue = vendorEvaluation.BestComparableValue;
             long? comparableVendorCoinCost = vendorEvaluation.BestComparableCoinCost;
             List<CostLine> comparableVendorCurrencyCosts = vendorEvaluation.BestComparableCurrencyCosts;
@@ -720,8 +815,8 @@ namespace GW2CraftingHelper.Services
                         // gold total never invents an exchange rate. An
                         // unvalued currency demotes the recipe to the
                         // fallback tier instead of contributing zero.
-                        if (currencyValuation != null &&
-                            currencyValuation.TryGetCopperValue(ingredient.Id, out long copperPerUnit))
+                        if (ctx.CurrencyValuation != null &&
+                            ctx.CurrencyValuation.TryGetCopperValue(ingredient.Id, out long copperPerUnit))
                         {
                             try
                             {
@@ -752,13 +847,9 @@ namespace GW2CraftingHelper.Services
                         continue;
                     }
 
-                    long? ingredientCost = Evaluate(
-                        ingredient, prices, vendorOffers, memo, priceBasis, overrides, currencyValuation,
-                        forceBuyOnlyNodeIds, competencyIndependentForceBuyNodeIds, costDiagnostics,
-                        rawCraftCostDiagnostics, ignoredItemIds, tiers, bestRatingByDiscipline,
-                        ownedQuantityUsedByNode);
+                    long? ingredientCost = Evaluate(ingredient, ctx);
                     craftCost += ingredientCost ?? 0L;
-                    var ingredientDecision = memo[ingredient.NodeId];
+                    var ingredientDecision = ctx.Memo[ingredient.NodeId];
                     craftRealCost += ingredientDecision.TotalCost ?? 0L;
 
                     // Transitive fallback-tier propagation: a chosen
@@ -790,7 +881,7 @@ namespace GW2CraftingHelper.Services
                 }
 
                 bool competent = CraftCompetencyEvaluator.AccountCanCraft(
-                    recipe.Disciplines, recipe.MinRating, bestRatingByDiscipline);
+                    recipe.Disciplines, recipe.MinRating, ctx.BestRatingByDiscipline);
                 if (hasUnvaluedCurrency)
                 {
                     // Ranked on real cost only (never the valuation-
@@ -825,8 +916,8 @@ namespace GW2CraftingHelper.Services
             // The force-buy pre-pass marks this node craft:false before
             // the automatic comparison; a manual override (checked next,
             // using the unmodified canCraft) still always wins.
-            bool isForceBuyOnly = forceBuyOnlyNodeIds != null &&
-                forceBuyOnlyNodeIds.Contains(node.NodeId);
+            bool isForceBuyOnly = ctx.ForceBuyOnlyNodeIds != null &&
+                ctx.ForceBuyOnlyNodeIds.Contains(node.NodeId);
             bool craftExcludedFromAutoPick = isForceBuyOnly;
 
             // Craft should only win the automatic pick when some character
@@ -933,13 +1024,13 @@ namespace GW2CraftingHelper.Services
             // force-buy set - exactly the opportunity this field reports.
             // Only a node forced under both evaluations of the 0.85 rule
             // is genuinely forced regardless of training.
-            bool isCompetencyIndependentForceBuy = competencyIndependentForceBuyNodeIds != null &&
-                competencyIndependentForceBuyNodeIds.Contains(node.NodeId);
+            bool isCompetencyIndependentForceBuy = ctx.CompetencyIndependentForceBuyNodeIds != null &&
+                ctx.CompetencyIndependentForceBuyNodeIds.Contains(node.NodeId);
             bool cheapestCraftUntrained = !isCompetencyIndependentForceBuy &&
                 cheapestCraftOptionOverall != null &&
-                bestRatingByDiscipline != null &&
+                ctx.BestRatingByDiscipline != null &&
                 !CraftCompetencyEvaluator.AccountCanCraft(
-                    cheapestCraftOptionOverall.Disciplines, cheapestCraftOptionOverall.MinRating, bestRatingByDiscipline);
+                    cheapestCraftOptionOverall.Disciplines, cheapestCraftOptionOverall.MinRating, ctx.BestRatingByDiscipline);
 
             // Raw cost breakdowns for every feasible source, computed
             // unconditionally and never fed back into any comparison (see
@@ -978,25 +1069,25 @@ namespace GW2CraftingHelper.Services
             // competency-resolved pair the Craft commit sites use - a
             // competency-blind figure here would let the 0.85 comparison
             // run on a craft cost the real solve would never commit to.
-            if (costDiagnostics != null)
+            if (ctx.CostDiagnostics != null)
             {
-                costDiagnostics[node.NodeId] = (buyTotalCost, craftBreakdownDecisionValue ?? autoPickCraftRealCost);
+                ctx.CostDiagnostics[node.NodeId] = (buyTotalCost, craftBreakdownDecisionValue ?? autoPickCraftRealCost);
             }
 
             // The competency-blind twin of the write above, letting the
             // pre-pass run its second 0.85 evaluation without a second
             // Solve() call.
-            if (rawCraftCostDiagnostics != null)
+            if (ctx.RawCraftCostDiagnostics != null)
             {
-                rawCraftCostDiagnostics[node.NodeId] = cheapestCraftRealCostOverall;
+                ctx.RawCraftCostDiagnostics[node.NodeId] = cheapestCraftRealCostOverall;
             }
 
             // True when any direct ingredient of this breakdown's recipe
             // was reduced by owned account stock (see
             // PillSourceCostBreakdown.RawQuantitiesReducedByOwnedStock).
             bool craftIngredientsReducedByOwnedStock = autoPickCraftOption != null &&
-                ownedQuantityUsedByNode != null &&
-                AnyIngredientReducedByOwnedStock(autoPickCraftOption, ownedQuantityUsedByNode);
+                ctx.OwnedQuantityUsedByNode != null &&
+                AnyIngredientReducedByOwnedStock(autoPickCraftOption, ctx.OwnedQuantityUsedByNode);
             var craftBreakdown = autoPickCraftOption != null
                 ? BuildCraftCostBreakdown(autoPickCraftOption, craftBreakdownDecisionValue, craftIngredientsReducedByOwnedStock)
                 : new PillSourceCostBreakdown { IsAvailable = false };
@@ -1014,7 +1105,7 @@ namespace GW2CraftingHelper.Services
                 bool vendorHasRawCoin = false,
                 bool hasUnvaluedCurrency = false)
             {
-                memo[node.NodeId] = new Decision
+                ctx.Memo[node.NodeId] = new Decision
                 {
                     Source = src,
                     TotalCost = cost,
@@ -1048,8 +1139,8 @@ namespace GW2CraftingHelper.Services
 
             // A user override wins whenever it is feasible for this node;
             // infeasible overrides are ignored and the best path applies.
-            if (overrides != null &&
-                overrides.TryGetValue(node.NodeId, out var forced))
+            if (ctx.Overrides != null &&
+                ctx.Overrides.TryGetValue(node.NodeId, out var forced))
             {
                 if (forced == AcquisitionSource.Craft && canCraft)
                 {
@@ -1303,17 +1394,7 @@ namespace GW2CraftingHelper.Services
             return false;
         }
 
-        private void Collect(
-            RecipeNode node,
-            Dictionary<int, Decision> memo,
-            Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
-            Dictionary<int, long> currencyMap,
-            Dictionary<(int, int), int> craftOrder,
-            Dictionary<(int, AcquisitionSource, int), VendorBatchSolver.VendorBatchState> vendorBatchTracking,
-            Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
-            Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences,
-            ref int craftCounter,
-            ISet<int> ignoredItemIds = null)
+        private void Collect(RecipeNode node, CollectContext ctx, ref int craftCounter)
         {
             if (node.IngredientType == "Currency")
             {
@@ -1323,13 +1404,13 @@ namespace GW2CraftingHelper.Services
                 // but the conversion below routes it into totalCoinCost
                 // and excludes it from currencyCosts (coin has its own
                 // display) so all cost surfaces agree.
-                if (currencyMap.ContainsKey(node.Id))
+                if (ctx.CurrencyMap.ContainsKey(node.Id))
                 {
-                    currencyMap[node.Id] = checked(currencyMap[node.Id] + node.Quantity);
+                    ctx.CurrencyMap[node.Id] = checked(ctx.CurrencyMap[node.Id] + node.Quantity);
                 }
                 else
                 {
-                    currencyMap[node.Id] = node.Quantity;
+                    ctx.CurrencyMap[node.Id] = node.Quantity;
                 }
                 return;
             }
@@ -1362,12 +1443,12 @@ namespace GW2CraftingHelper.Services
 
             // An ignored item generates no step or shopping row; Evaluate
             // already committed a zero-cost memo entry without recursing.
-            if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+            if (ctx.IgnoredItemIds != null && ctx.IgnoredItemIds.Contains(node.Id))
             {
                 return;
             }
 
-            if (!memo.TryGetValue(node.NodeId, out var decision))
+            if (!ctx.Memo.TryGetValue(node.NodeId, out var decision))
             {
                 return;
             }
@@ -1386,7 +1467,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var itemRoot in wrapperRecipe.Ingredients)
                     {
-                        Collect(itemRoot, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+                        Collect(itemRoot, ctx, ref craftCounter);
                     }
                 }
                 return;
@@ -1400,19 +1481,19 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var ingredient in chosenRecipe.Ingredients)
                     {
-                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+                        Collect(ingredient, ctx, ref craftCounter);
                     }
                 }
 
                 // Record craft order (first time seeing this item+recipe as craft)
                 var craftOrderKey = (node.Id, decision.RecipeId);
-                if (!craftOrder.ContainsKey(craftOrderKey))
+                if (!ctx.CraftOrder.ContainsKey(craftOrderKey))
                 {
-                    craftOrder[craftOrderKey] = craftCounter++;
+                    ctx.CraftOrder[craftOrderKey] = craftCounter++;
                 }
 
                 var stepKey = (node.Id, AcquisitionSource.Craft, decision.RecipeId);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
+                AggregateStep(ctx.StepMap, stepKey, node, decision, ctx.VendorBatchTracking, ctx.VendorOccurrences, ctx.CraftOccurrences);
             }
             else if (decision.Source == AcquisitionSource.BuyFromVendor)
             {
@@ -1422,12 +1503,12 @@ namespace GW2CraftingHelper.Services
                 // per-occurrence costs here would re-introduce the
                 // overcount that pass exists to fix.
                 var stepKey = (node.Id, AcquisitionSource.BuyFromVendor, 0);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
+                AggregateStep(ctx.StepMap, stepKey, node, decision, ctx.VendorBatchTracking, ctx.VendorOccurrences, ctx.CraftOccurrences);
             }
             else
             {
                 var stepKey = (node.Id, decision.Source, 0);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
+                AggregateStep(ctx.StepMap, stepKey, node, decision, ctx.VendorBatchTracking, ctx.VendorOccurrences, ctx.CraftOccurrences);
             }
         }
 
