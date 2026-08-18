@@ -167,6 +167,38 @@ namespace GW2CraftingHelper.Services
             }
         }
 
+        /// <summary>
+        /// Running best-recipe state for one selection tier. Offer keeps
+        /// the lowest-Cost candidate, breaking an exact cost tie toward
+        /// the lowest RecipeId so selection is deterministic regardless of
+        /// recipe list order. Cost is the tier's ranking key; RealCost is
+        /// the real coin figure a Commit would use (the fallback tier
+        /// passes its real cost for both). Updating all four fields in one
+        /// place is the point - the four parallel-local copies this
+        /// replaced let one field fall out of step with the others (see
+        /// CraftAutoPickCandidate).
+        /// </summary>
+        private struct BestRecipeTracker
+        {
+            public long? Cost;
+            public long? RealCost;
+            public int RecipeId;
+            public RecipeOption Option;
+
+            public void Offer(long cost, long realCost, RecipeOption recipe)
+            {
+                if (!Cost.HasValue ||
+                    cost < Cost.Value ||
+                    (cost == Cost.Value && recipe.RecipeId < RecipeId))
+                {
+                    Cost = cost;
+                    RealCost = realCost;
+                    RecipeId = recipe.RecipeId;
+                    Option = recipe;
+                }
+            }
+        }
+
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
         {
             return Solve(tree, prices, null);
@@ -630,34 +662,17 @@ namespace GW2CraftingHelper.Services
             // cost is unknown, and ranking by priced ingredients alone
             // would hide it), but stays offered (CanCraft true) and is
             // used when nothing coin-comparable exists.
-            long? bestComparableCraftCost = null;
-            long? bestComparableCraftRealCost = null;
-            int bestComparableRecipeId = 0;
-            // The winning recipe object (not just its id), so the
-            // competency check can read Disciplines/MinRating without a
-            // second lookup.
-            RecipeOption bestComparableOption = null;
+            var bestComparable = default(BestRecipeTracker);
+            var bestFallback = default(BestRecipeTracker);
 
-            long? bestFallbackCraftCost = null;
-            long? bestFallbackCraftRealCost = null;
-            int bestFallbackRecipeId = 0;
-            RecipeOption bestFallbackOption = null;
-
-            // Tracked in addition to bestComparable*/bestFallback*,
+            // Tracked in addition to bestComparable/bestFallback,
             // restricted to recipes that pass AccountCanCraft: gating the
             // auto-pick on only the single cheapest option's competency
             // wrongly excluded the whole Craft arm even when a costlier
             // sibling recipe in the same tier was fully craftable. The
             // unfiltered bests still feed canCraft and manual overrides.
-            long? bestCompetentComparableCraftCost = null;
-            long? bestCompetentComparableCraftRealCost = null;
-            int bestCompetentComparableRecipeId = 0;
-            RecipeOption bestCompetentComparableOption = null;
-
-            long? bestCompetentFallbackCraftCost = null;
-            long? bestCompetentFallbackCraftRealCost = null;
-            int bestCompetentFallbackRecipeId = 0;
-            RecipeOption bestCompetentFallbackOption = null;
+            var bestCompetentComparable = default(BestRecipeTracker);
+            var bestCompetentFallback = default(BestRecipeTracker);
 
             foreach (var recipe in node.Recipes)
             {
@@ -774,61 +789,26 @@ namespace GW2CraftingHelper.Services
                     }
                 }
 
-                // Cost tie-break within each tier: lowest RecipeId, so the
-                // choice is deterministic regardless of recipe list order.
+                bool competent = CraftCompetencyEvaluator.AccountCanCraft(
+                    recipe.Disciplines, recipe.MinRating, bestRatingByDiscipline);
                 if (hasUnvaluedCurrency)
                 {
                     // Ranked on real cost only (never the valuation-
-                    // tainted craftCost), and both fallback fields are set
-                    // to the same real value so the returned
-                    // ComparisonValue can never carry hidden valuation
-                    // upward.
-                    if (!bestFallbackCraftCost.HasValue ||
-                        craftRealCost < bestFallbackCraftCost.Value ||
-                        (craftRealCost == bestFallbackCraftCost.Value && recipe.RecipeId < bestFallbackRecipeId))
+                    // tainted craftCost), passed for BOTH tracker slots so
+                    // the returned ComparisonValue can never carry hidden
+                    // valuation upward.
+                    bestFallback.Offer(craftRealCost, craftRealCost, recipe);
+                    if (competent)
                     {
-                        bestFallbackCraftCost = craftRealCost;
-                        bestFallbackCraftRealCost = craftRealCost;
-                        bestFallbackRecipeId = recipe.RecipeId;
-                        bestFallbackOption = recipe;
-                    }
-
-                    // Same tie-break, restricted to competent recipes.
-                    if (CraftCompetencyEvaluator.AccountCanCraft(
-                            recipe.Disciplines, recipe.MinRating, bestRatingByDiscipline) &&
-                        (!bestCompetentFallbackCraftCost.HasValue ||
-                        craftRealCost < bestCompetentFallbackCraftCost.Value ||
-                        (craftRealCost == bestCompetentFallbackCraftCost.Value && recipe.RecipeId < bestCompetentFallbackRecipeId)))
-                    {
-                        bestCompetentFallbackCraftCost = craftRealCost;
-                        bestCompetentFallbackCraftRealCost = craftRealCost;
-                        bestCompetentFallbackRecipeId = recipe.RecipeId;
-                        bestCompetentFallbackOption = recipe;
+                        bestCompetentFallback.Offer(craftRealCost, craftRealCost, recipe);
                     }
                 }
                 else
                 {
-                    if (!bestComparableCraftCost.HasValue ||
-                        craftCost < bestComparableCraftCost.Value ||
-                        (craftCost == bestComparableCraftCost.Value && recipe.RecipeId < bestComparableRecipeId))
+                    bestComparable.Offer(craftCost, craftRealCost, recipe);
+                    if (competent)
                     {
-                        bestComparableCraftCost = craftCost;
-                        bestComparableCraftRealCost = craftRealCost;
-                        bestComparableRecipeId = recipe.RecipeId;
-                        bestComparableOption = recipe;
-                    }
-
-                    // Same tie-break, restricted to competent recipes.
-                    if (CraftCompetencyEvaluator.AccountCanCraft(
-                            recipe.Disciplines, recipe.MinRating, bestRatingByDiscipline) &&
-                        (!bestCompetentComparableCraftCost.HasValue ||
-                        craftCost < bestCompetentComparableCraftCost.Value ||
-                        (craftCost == bestCompetentComparableCraftCost.Value && recipe.RecipeId < bestCompetentComparableRecipeId)))
-                    {
-                        bestCompetentComparableCraftCost = craftCost;
-                        bestCompetentComparableCraftRealCost = craftRealCost;
-                        bestCompetentComparableRecipeId = recipe.RecipeId;
-                        bestCompetentComparableOption = recipe;
+                        bestCompetentComparable.Offer(craftCost, craftRealCost, recipe);
                     }
                 }
             }
@@ -837,7 +817,7 @@ namespace GW2CraftingHelper.Services
             // exists, comparable or fallback tier alike. A node with a
             // comparable recipe but no buy price always force-crafts via
             // PickCheapest (craftBeatsBuy is true when buyCost is null).
-            bool canCraft = bestComparableCraftCost.HasValue || bestFallbackCraftCost.HasValue;
+            bool canCraft = bestComparable.Cost.HasValue || bestFallback.Cost.HasValue;
             bool canBuyTp = buyTotalCost.HasValue;
             bool canBuyVendor = comparableVendorValue.HasValue ||
                                 fallbackVendorCoinCost.HasValue;
@@ -874,37 +854,37 @@ namespace GW2CraftingHelper.Services
             // competency" carve-out. Also the recipe fed to
             // BuildCraftCostBreakdown, so the CRAFT pill's comparison uses
             // whichever recipe would actually be used.
-            bool anyCompetentCraftOption = bestCompetentComparableOption != null ||
-                bestCompetentFallbackOption != null;
+            bool anyCompetentCraftOption = bestCompetentComparable.Option != null ||
+                bestCompetentFallback.Option != null;
 
             // Resolved once into a single CraftAutoPickCandidate -
             // comparable-first, fallback otherwise, competent-preferred
             // within each tier. A fallback-tier candidate's
             // ComparisonValue is null; a null Option means no recipe at all.
             CraftAutoPickCandidate? autoPickCandidate;
-            if (bestCompetentComparableOption != null)
+            if (bestCompetentComparable.Option != null)
             {
                 autoPickCandidate = new CraftAutoPickCandidate(
-                    bestCompetentComparableOption, bestCompetentComparableCraftRealCost,
-                    bestCompetentComparableCraftCost, bestCompetentComparableRecipeId);
+                    bestCompetentComparable.Option, bestCompetentComparable.RealCost,
+                    bestCompetentComparable.Cost, bestCompetentComparable.RecipeId);
             }
-            else if (bestCompetentFallbackOption != null)
+            else if (bestCompetentFallback.Option != null)
             {
                 autoPickCandidate = new CraftAutoPickCandidate(
-                    bestCompetentFallbackOption, bestCompetentFallbackCraftRealCost,
-                    null, bestCompetentFallbackRecipeId);
+                    bestCompetentFallback.Option, bestCompetentFallback.RealCost,
+                    null, bestCompetentFallback.RecipeId);
             }
-            else if (bestComparableOption != null)
+            else if (bestComparable.Option != null)
             {
                 autoPickCandidate = new CraftAutoPickCandidate(
-                    bestComparableOption, bestComparableCraftRealCost,
-                    bestComparableCraftCost, bestComparableRecipeId);
+                    bestComparable.Option, bestComparable.RealCost,
+                    bestComparable.Cost, bestComparable.RecipeId);
             }
-            else if (bestFallbackOption != null)
+            else if (bestFallback.Option != null)
             {
                 autoPickCandidate = new CraftAutoPickCandidate(
-                    bestFallbackOption, bestFallbackCraftRealCost,
-                    null, bestFallbackRecipeId);
+                    bestFallback.Option, bestFallback.RealCost,
+                    null, bestFallback.RecipeId);
             }
             else
             {
@@ -941,10 +921,10 @@ namespace GW2CraftingHelper.Services
             // tier priority as autoPickCraftOption but without the
             // competent-first override, so this can be untrained even when
             // the auto pick resolved to a competent recipe.
-            RecipeOption cheapestCraftOptionOverall = bestComparableOption ?? bestFallbackOption;
-            long? cheapestCraftRealCostOverall = bestComparableOption != null
-                ? bestComparableCraftRealCost
-                : bestFallbackCraftRealCost;
+            RecipeOption cheapestCraftOptionOverall = bestComparable.Option ?? bestFallback.Option;
+            long? cheapestCraftRealCostOverall = bestComparable.Option != null
+                ? bestComparable.RealCost
+                : bestFallback.RealCost;
 
             // Gated on !isCompetencyIndependentForceBuy, not
             // !isForceBuyOnly: force-buy membership can itself be
@@ -1075,9 +1055,9 @@ namespace GW2CraftingHelper.Services
                 {
                     // Comparable-first, fallback otherwise - same
                     // precedence as VendorBatchSolver's override handling.
-                    return bestComparableCraftCost.HasValue
-                        ? Commit(AcquisitionSource.Craft, bestComparableCraftRealCost, bestComparableCraftCost, bestComparableRecipeId, null)
-                        : Commit(AcquisitionSource.Craft, bestFallbackCraftRealCost, bestFallbackCraftCost, bestFallbackRecipeId, null, hasUnvaluedCurrency: true);
+                    return bestComparable.Cost.HasValue
+                        ? Commit(AcquisitionSource.Craft, bestComparable.RealCost, bestComparable.Cost, bestComparable.RecipeId, null)
+                        : Commit(AcquisitionSource.Craft, bestFallback.RealCost, bestFallback.Cost, bestFallback.RecipeId, null, hasUnvaluedCurrency: true);
                 }
                 if (forced == AcquisitionSource.BuyFromTp && canBuyTp)
                 {
