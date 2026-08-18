@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
 using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
@@ -38,54 +36,31 @@ namespace GW2CraftingHelper.Services
         public static IReadOnlyDictionary<int, AcquisitionHint> Load(Stream stream)
         {
             var result = new Dictionary<int, AcquisitionHint>();
-            if (stream == null)
+            var envelope = JsonSeedReader.Deserialize<AcquisitionHintEnvelope>(stream);
+            if (envelope?.Hints == null)
             {
+                // Null/missing/unparsable seed - never invent hint data, so
+                // it just means no hints today.
                 return result;
             }
 
-            try
+            foreach (var entry in envelope.Hints)
             {
-                using (var reader = new StreamReader(stream))
+                if (entry == null)
                 {
-                    string json = reader.ReadToEnd();
-                    var options = new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    };
-                    var envelope = JsonSerializer.Deserialize<AcquisitionHintEnvelope>(json, options);
-                    if (envelope?.Hints == null)
-                    {
-                        return result;
-                    }
-
-                    foreach (var entry in envelope.Hints)
-                    {
-                        if (entry == null)
-                        {
-                            continue;
-                        }
-                        // Last-write-wins on duplicate item ids.
-                        result[entry.ItemId] = new AcquisitionHint
-                        {
-                            ItemId = entry.ItemId,
-                            Hint = entry.Hint,
-                            Badge = entry.Badge,
-                            SourceUrl = entry.SourceUrl,
-                            LastVerified = entry.LastVerified
-                        };
-                    }
-                    return result;
+                    continue;
                 }
+                // Last-write-wins on duplicate item ids.
+                result[entry.ItemId] = new AcquisitionHint
+                {
+                    ItemId = entry.ItemId,
+                    Hint = entry.Hint,
+                    Badge = entry.Badge,
+                    SourceUrl = entry.SourceUrl,
+                    LastVerified = entry.LastVerified
+                };
             }
-            catch (Exception)
-            {
-                // Malformed/empty JSON, unexpected shape, etc. - degrade to
-                // an empty dictionary rather than throw. Nothing was added
-                // to result before a parse failure, so it is still empty
-                // here. Never invent hint data, so an unparsable seed just
-                // means no hints today.
-                return result;
-            }
+            return result;
         }
     }
 }

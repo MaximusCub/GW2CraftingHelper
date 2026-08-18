@@ -317,62 +317,26 @@ namespace GW2CraftingHelper
                 _itemSearchProvider = new StaticItemSearchProvider();
             }
 
-            // Acquisition hints seed: wiki-derived guidance for items with
-            // no priceable source (docs/KNOWN-ISSUES.md item 8). Static
-            // local file, no async fetch needed - loaded once here and
-            // passed straight to the pipeline (simpler than
+            // Static-local-file seeds, no async fetch needed - loaded once
+            // here and passed straight to the pipeline (simpler than
             // CurrencyMetadataService, which hits a live API).
-            IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null;
-            try
-            {
-                using (var hintsStream = ContentsManager.GetFileStream("acquisition_hints_seed.json"))
-                {
-                    acquisitionHints = AcquisitionHintService.Load(hintsStream);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Info("Acquisition hints unavailable: [{0}] {1}", ex.GetType().Name, ex.Message);
-                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Acquisition hints unavailable: [{ex.GetType().Name}] {ex.Message}");
-                acquisitionHints = null;
-            }
+            // Acquisition hints: wiki-derived guidance for items with no
+            // priceable source (docs/KNOWN-ISSUES.md item 8).
+            IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = LoadSeedOrNull(
+                "acquisition_hints_seed.json", "Acquisition hints unavailable",
+                AcquisitionHintService.Load);
 
             // Daily craft-cooldown seed: wiki-verified recipes whose
-            // crafting action itself is server-capped. Same
-            // static-local-file loading shape as the acquisition hints seed
-            // just above - no async fetch needed.
-            IReadOnlyDictionary<int, DailyCooldownItem> dailyCooldownItems = null;
-            try
-            {
-                using (var cooldownStream = ContentsManager.GetFileStream("daily_cooldown_items.json"))
-                {
-                    dailyCooldownItems = DailyCooldownItemService.Load(cooldownStream);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Info("Daily cooldown items unavailable: [{0}] {1}", ex.GetType().Name, ex.Message);
-                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Daily cooldown items unavailable: [{ex.GetType().Name}] {ex.Message}");
-                dailyCooldownItems = null;
-            }
+            // crafting action itself is server-capped.
+            IReadOnlyDictionary<int, DailyCooldownItem> dailyCooldownItems = LoadSeedOrNull(
+                "daily_cooldown_items.json", "Daily cooldown items unavailable",
+                DailyCooldownItemService.Load);
 
             // Recipe-sheet seed: recipe id -> unlocking recipe-sheet item
-            // id for RecipeSheetSavingsCalculator. Same static-local-file
-            // loading shape as the hint/cooldown seeds above.
-            IReadOnlyDictionary<int, int> recipeSheetItemIdByRecipeId = null;
-            try
-            {
-                using (var recipeSheetStream = ContentsManager.GetFileStream("recipe_sheet_items.json"))
-                {
-                    recipeSheetItemIdByRecipeId = RecipeSheetItemSeedService.Load(recipeSheetStream);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Info("Recipe sheet items unavailable: [{0}] {1}", ex.GetType().Name, ex.Message);
-                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe sheet items unavailable: [{ex.GetType().Name}] {ex.Message}");
-                recipeSheetItemIdByRecipeId = null;
-            }
+            // id for RecipeSheetSavingsCalculator.
+            IReadOnlyDictionary<int, int> recipeSheetItemIdByRecipeId = LoadSeedOrNull(
+                "recipe_sheet_items.json", "Recipe sheet items unavailable",
+                RecipeSheetItemSeedService.Load);
 
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir, onStoreError);
             recipeOverlay.Load(currentGw2BuildId: null);
@@ -678,6 +642,31 @@ namespace GW2CraftingHelper
             }
 
             return activeFestivalNames;
+        }
+
+        /// <summary>
+        /// Shared shape for the static seed loads in Initialize(): open the
+        /// packaged file, hand the stream to the loader, and on ANY failure
+        /// log at Warn and return null so the module starts without that
+        /// seed. The broad catch is deliberate - a bad or missing seed file
+        /// must never block module load.
+        /// </summary>
+        private T LoadSeedOrNull<T>(string fileName, string unavailableLabel, Func<System.IO.Stream, T> load)
+            where T : class
+        {
+            try
+            {
+                using (var stream = ContentsManager.GetFileStream(fileName))
+                {
+                    return load(stream);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Info("{0}: [{1}] {2}", unavailableLabel, ex.GetType().Name, ex.Message);
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"{unavailableLabel}: [{ex.GetType().Name}] {ex.Message}");
+                return null;
+            }
         }
 
         protected override async Task LoadAsync()
