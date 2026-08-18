@@ -203,7 +203,8 @@ namespace GW2CraftingHelper.Services
         /// Solve-invariant state threaded through every Evaluate()
         /// recursion, constructed once per Solve() call. Only the node
         /// under evaluation varies per call and stays a plain parameter.
-        /// Field semantics match the same-named Solve() parameters.
+        /// Fields hold the locals Solve() previously threaded into
+        /// Evaluate(), already normalized where Solve() normalizes them.
         /// </summary>
         private sealed class EvaluateContext
         {
