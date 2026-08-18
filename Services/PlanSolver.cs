@@ -174,9 +174,9 @@ namespace GW2CraftingHelper.Services
         /// recipe list order. Cost is the tier's ranking key; RealCost is
         /// the real coin figure a Commit would use (the fallback tier
         /// passes its real cost for both). Updating all four fields in one
-        /// place is the point - the four parallel-local copies this
-        /// replaced let one field fall out of step with the others (see
-        /// CraftAutoPickCandidate).
+        /// place keeps them from falling out of step (see
+        /// CraftAutoPickCandidate). Mutable struct: use only as a direct
+        /// local - a copy forks the state and silently drops updates.
         /// </summary>
         private struct BestRecipeTracker
         {

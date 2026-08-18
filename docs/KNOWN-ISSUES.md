@@ -8231,4 +8231,8 @@ operand at current HEAD before hoisting). VendorBatchSolver's
 merged-ceil region untouched (high-evidence zone, out of scope).
 Build 0 errors, warning count 1745 -> 1744; suite 1837/1837 green.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (solver-internal refactor with characterize-first proof -
+the tie-break mutations that survived the baseline suite are killed by
+the new characterization tests both before and after the tracker
+refactor, per the mutation table above; no rendered surface changed,
+so no desktop gate applies; review found zero blocking findings).
