@@ -7,6 +7,45 @@ namespace GW2CraftingHelper.Services
 {
     public class CraftingTreeBuilder
     {
+        /// <summary>
+        /// Build-invariant lookup state threaded through every BuildNode/
+        /// BuildChildren recursion, constructed once per BuildTree() call.
+        /// The node/recipe under construction and insideReferenceBranch
+        /// vary per call and stay plain parameters. Field semantics match
+        /// the same-named BuildTree() parameters.
+        /// </summary>
+        private sealed class BuildContext
+        {
+            public IReadOnlyDictionary<int, SolverDecision> Decisions { get; }
+            public IReadOnlyDictionary<int, ItemMetadata> Metadata { get; }
+            public IReadOnlyDictionary<int, AcquisitionHint> Hints { get; }
+            public IReadOnlyDictionary<int, int> OwnedQuantityUsedByNodeId { get; }
+            public ISet<int> IgnoredItemIds { get; }
+            public IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadata { get; }
+            public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; }
+            public IReadOnlyDictionary<int, int> OwnedVendorItemAmounts { get; }
+
+            public BuildContext(
+                IReadOnlyDictionary<int, SolverDecision> decisions,
+                IReadOnlyDictionary<int, ItemMetadata> metadata,
+                IReadOnlyDictionary<int, AcquisitionHint> hints,
+                IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
+                ISet<int> ignoredItemIds,
+                IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata,
+                IReadOnlyDictionary<int, int> ownedCurrencyAmounts,
+                IReadOnlyDictionary<int, int> ownedVendorItemAmounts)
+            {
+                Decisions = decisions;
+                Metadata = metadata;
+                Hints = hints;
+                OwnedQuantityUsedByNodeId = ownedQuantityUsedByNodeId;
+                IgnoredItemIds = ignoredItemIds;
+                CurrencyMetadata = currencyMetadata;
+                OwnedCurrencyAmounts = ownedCurrencyAmounts;
+                OwnedVendorItemAmounts = ownedVendorItemAmounts;
+            }
+        }
+
         public CraftingTreeNode BuildTree(
             RecipeNode root,
             IReadOnlyDictionary<int, SolverDecision> decisions,
@@ -21,37 +60,30 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts = null,
             IReadOnlyDictionary<int, int> ownedVendorItemAmounts = null)
         {
-            return BuildNode(node: root, decisions: decisions, metadata: metadata, hints: hints,
-                insideReferenceBranch: false, ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId,
-                ignoredItemIds: ignoredItemIds, currencyMetadata: currencyMetadata,
-                ownedCurrencyAmounts: ownedCurrencyAmounts, ownedVendorItemAmounts: ownedVendorItemAmounts);
+            var ctx = new BuildContext(
+                decisions, metadata, hints, ownedQuantityUsedByNodeId,
+                ignoredItemIds, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts);
+            return BuildNode(root, ctx, insideReferenceBranch: false);
         }
 
         private static CraftingTreeNode BuildNode(
             RecipeNode node,
-            IReadOnlyDictionary<int, SolverDecision> decisions,
-            IReadOnlyDictionary<int, ItemMetadata> metadata,
-            IReadOnlyDictionary<int, AcquisitionHint> hints,
-            bool insideReferenceBranch,
-            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
-            ISet<int> ignoredItemIds,
-            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata,
-            IReadOnlyDictionary<int, int> ownedCurrencyAmounts,
-            IReadOnlyDictionary<int, int> ownedVendorItemAmounts)
+            BuildContext ctx,
+            bool insideReferenceBranch)
         {
             var treeNode = new CraftingTreeNode
             {
                 ItemId = node.Id,
                 NodeId = node.NodeId,
-                Name = ResolveName(node.Id, metadata),
-                IconUrl = ResolveIcon(node.Id, metadata),
-                Rarity = ResolveRarity(node.Id, metadata),
+                Name = ResolveName(node.Id, ctx.Metadata),
+                IconUrl = ResolveIcon(node.Id, ctx.Metadata),
+                Rarity = ResolveRarity(node.Id, ctx.Metadata),
                 Quantity = node.Quantity,
                 // Set uniformly for every node (including the early
                 // returns below), from the NodeId assigned by the Solve()
-                // call that produced `decisions`.
-                OwnedQuantityUsed = ownedQuantityUsedByNodeId != null &&
-                    ownedQuantityUsedByNodeId.TryGetValue(node.NodeId, out int ownedUsed)
+                // call that produced the context's decisions.
+                OwnedQuantityUsed = ctx.OwnedQuantityUsedByNodeId != null &&
+                    ctx.OwnedQuantityUsedByNodeId.TryGetValue(node.NodeId, out int ownedUsed)
                         ? ownedUsed
                         : 0
             };
@@ -72,7 +104,7 @@ namespace GW2CraftingHelper.Services
             // display a genuinely-owned node gets; IsIgnored alone
             // distinguishes the two for the pill layer.
             if (node.IngredientType == "Item" &&
-                ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+                ctx.IgnoredItemIds != null && ctx.IgnoredItemIds.Contains(node.Id))
             {
                 treeNode.Decision = CraftingDecision.Have;
                 treeNode.IsIgnored = true;
@@ -107,8 +139,8 @@ namespace GW2CraftingHelper.Services
             if (node.IngredientType == "Currency")
             {
                 treeNode.Decision = CraftingDecision.Currency;
-                treeNode.Name = CurrencyDisplayResolver.ResolveName(node.Id, currencyMetadata);
-                treeNode.IconUrl = CurrencyDisplayResolver.ResolveIconUrl(node.Id, currencyMetadata);
+                treeNode.Name = CurrencyDisplayResolver.ResolveName(node.Id, ctx.CurrencyMetadata);
+                treeNode.IconUrl = CurrencyDisplayResolver.ResolveIconUrl(node.Id, ctx.CurrencyMetadata);
                 treeNode.Rarity = null;
                 return treeNode;
             }
@@ -132,10 +164,10 @@ namespace GW2CraftingHelper.Services
             }
 
             // Look up solver decision by NodeId
-            if (!decisions.TryGetValue(node.NodeId, out var decision))
+            if (!ctx.Decisions.TryGetValue(node.NodeId, out var decision))
             {
                 treeNode.Decision = CraftingDecision.Unknown;
-                ApplyAcquisitionHint(treeNode, hints);
+                ApplyAcquisitionHint(treeNode, ctx.Hints);
                 return treeNode;
             }
 
@@ -194,9 +226,7 @@ namespace GW2CraftingHelper.Services
                     // decision reached inside a reference branch is still
                     // hypothetical and must keep suppressing further
                     // reference branches below it.
-                    treeNode.Children = BuildChildren(
-                        recipe, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId,
-                        ignoredItemIds, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts);
+                    treeNode.Children = BuildChildren(recipe, ctx, insideReferenceBranch);
                 }
             }
             else
@@ -214,8 +244,7 @@ namespace GW2CraftingHelper.Services
                 // guarantee. The node still shows its correct SubtreeCost.
                 List<CraftingTreeNode> componentLeaves = decision.Source == AcquisitionSource.BuyFromVendor &&
                     !decision.VendorComponentCostsUnreliable
-                    ? BuildVendorCostComponentLeaves(
-                        node.NodeId, decision, metadata, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts)
+                    ? BuildVendorCostComponentLeaves(node.NodeId, decision, ctx)
                     : null;
 
                 // A BuyFromVendor node's own coin cost always includes
@@ -261,10 +290,7 @@ namespace GW2CraftingHelper.Services
                     if (wantsReferenceBranch)
                     {
                         var referenceChildren = BuildChildren(
-                            node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true,
-                            ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId, ignoredItemIds: ignoredItemIds,
-                            currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
-                            ownedVendorItemAmounts: ownedVendorItemAmounts);
+                            node.Recipes[0], ctx, insideReferenceBranch: true);
                         componentLeaves.AddRange(referenceChildren);
                         treeNode.IsReferenceBranch = true;
                         ApplyReferenceRecipeInfo(treeNode, node.Recipes[0]);
@@ -274,16 +300,13 @@ namespace GW2CraftingHelper.Services
                 else if (wantsReferenceBranch)
                 {
                     treeNode.Children = BuildChildren(
-                        node.Recipes[0], decisions, metadata, hints, insideReferenceBranch: true,
-                        ownedQuantityUsedByNodeId: ownedQuantityUsedByNodeId, ignoredItemIds: ignoredItemIds,
-                        currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
-                        ownedVendorItemAmounts: ownedVendorItemAmounts);
+                        node.Recipes[0], ctx, insideReferenceBranch: true);
                     treeNode.IsReferenceBranch = true;
                     ApplyReferenceRecipeInfo(treeNode, node.Recipes[0]);
                 }
             }
 
-            ApplyAcquisitionHint(treeNode, hints);
+            ApplyAcquisitionHint(treeNode, ctx.Hints);
             return treeNode;
         }
 
@@ -322,10 +345,7 @@ namespace GW2CraftingHelper.Services
         private static List<CraftingTreeNode> BuildVendorCostComponentLeaves(
             int parentNodeId,
             SolverDecision decision,
-            IReadOnlyDictionary<int, ItemMetadata> metadata,
-            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata,
-            IReadOnlyDictionary<int, int> ownedCurrencyAmounts,
-            IReadOnlyDictionary<int, int> ownedVendorItemAmounts)
+            BuildContext ctx)
         {
             int currencyCount = decision.VendorCurrencyCosts?.Count ?? 0;
             int itemCount = decision.VendorItemCosts?.Count ?? 0;
@@ -349,9 +369,9 @@ namespace GW2CraftingHelper.Services
                     {
                         ItemId = line.ItemId,
                         NodeId = SyntheticComponentNodeId(parentNodeId, componentIndex++),
-                        Name = ResolveName(line.ItemId, metadata),
-                        IconUrl = ResolveIcon(line.ItemId, metadata),
-                        Rarity = ResolveRarity(line.ItemId, metadata),
+                        Name = ResolveName(line.ItemId, ctx.Metadata),
+                        IconUrl = ResolveIcon(line.ItemId, ctx.Metadata),
+                        Rarity = ResolveRarity(line.ItemId, ctx.Metadata),
                         Quantity = line.Quantity,
                         Decision = CraftingDecision.BuyFromVendor,
                         IsCostComponent = true,
@@ -360,7 +380,7 @@ namespace GW2CraftingHelper.Services
                         // method's own doc comment.
                         SubtreeCost = line.GoldValue,
                         UnitCost = line.Quantity > 0 ? line.GoldValue / line.Quantity : (long?)null,
-                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.ItemId, ownedVendorItemAmounts),
+                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.ItemId, ctx.OwnedVendorItemAmounts),
                         // This leaf's UnitCost came from the barter item's
                         // TP price, which can itself have fallen back to
                         // the non-preferred side; threaded through so the
@@ -384,12 +404,12 @@ namespace GW2CraftingHelper.Services
                     {
                         ItemId = line.Id,
                         NodeId = SyntheticComponentNodeId(parentNodeId, componentIndex++),
-                        Name = CurrencyDisplayResolver.ResolveName(line.Id, currencyMetadata),
-                        IconUrl = CurrencyDisplayResolver.ResolveIconUrl(line.Id, currencyMetadata),
+                        Name = CurrencyDisplayResolver.ResolveName(line.Id, ctx.CurrencyMetadata),
+                        IconUrl = CurrencyDisplayResolver.ResolveIconUrl(line.Id, ctx.CurrencyMetadata),
                         Quantity = line.Count,
                         Decision = CraftingDecision.BuyFromVendor,
                         IsCostComponent = true,
-                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.Id, ownedCurrencyAmounts)
+                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.Id, ctx.OwnedCurrencyAmounts)
                     });
                 }
             }
@@ -461,22 +481,13 @@ namespace GW2CraftingHelper.Services
 
         private static List<CraftingTreeNode> BuildChildren(
             RecipeOption recipe,
-            IReadOnlyDictionary<int, SolverDecision> decisions,
-            IReadOnlyDictionary<int, ItemMetadata> metadata,
-            IReadOnlyDictionary<int, AcquisitionHint> hints,
-            bool insideReferenceBranch,
-            IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId,
-            ISet<int> ignoredItemIds,
-            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata,
-            IReadOnlyDictionary<int, int> ownedCurrencyAmounts,
-            IReadOnlyDictionary<int, int> ownedVendorItemAmounts)
+            BuildContext ctx,
+            bool insideReferenceBranch)
         {
             var children = new List<CraftingTreeNode>(recipe.Ingredients.Count);
             foreach (var ingredient in recipe.Ingredients)
             {
-                children.Add(BuildNode(
-                    ingredient, decisions, metadata, hints, insideReferenceBranch, ownedQuantityUsedByNodeId,
-                    ignoredItemIds, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts));
+                children.Add(BuildNode(ingredient, ctx, insideReferenceBranch));
             }
             return children;
         }
