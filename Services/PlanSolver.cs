@@ -271,6 +271,45 @@ namespace GW2CraftingHelper.Services
             }
         }
 
+        /// <summary>
+        /// Solve-invariant accumulator state threaded through every
+        /// Collect() recursion, constructed once per Solve() call. The
+        /// node under collection varies per call and stays a plain
+        /// parameter, as does the craft-order counter (mutable
+        /// accumulation, threaded by ref).
+        /// </summary>
+        private sealed class CollectContext
+        {
+            public Dictionary<int, Decision> Memo { get; }
+            public Dictionary<(int, AcquisitionSource, int), PlanStep> StepMap { get; }
+            public Dictionary<int, long> CurrencyMap { get; }
+            public Dictionary<(int, int), int> CraftOrder { get; }
+            public Dictionary<(int, AcquisitionSource, int), VendorBatchSolver.VendorBatchState> VendorBatchTracking { get; }
+            public Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> VendorOccurrences { get; }
+            public Dictionary<(int, AcquisitionSource, int), List<int>> CraftOccurrences { get; }
+            public ISet<int> IgnoredItemIds { get; }
+
+            public CollectContext(
+                Dictionary<int, Decision> memo,
+                Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
+                Dictionary<int, long> currencyMap,
+                Dictionary<(int, int), int> craftOrder,
+                Dictionary<(int, AcquisitionSource, int), VendorBatchSolver.VendorBatchState> vendorBatchTracking,
+                Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
+                Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences,
+                ISet<int> ignoredItemIds)
+            {
+                Memo = memo;
+                StepMap = stepMap;
+                CurrencyMap = currencyMap;
+                CraftOrder = craftOrder;
+                VendorBatchTracking = vendorBatchTracking;
+                VendorOccurrences = vendorOccurrences;
+                CraftOccurrences = craftOccurrences;
+                IgnoredItemIds = ignoredItemIds;
+            }
+        }
+
         public SolveResult Solve(RecipeNode tree, IReadOnlyDictionary<int, ItemPrice> prices)
         {
             return Solve(tree, prices, null);
@@ -367,7 +406,10 @@ namespace GW2CraftingHelper.Services
             var craftOccurrences = new Dictionary<(int, AcquisitionSource, int), List<int>>();
             int craftCounter = 0;
 
-            Collect(tree, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+            var collectContext = new CollectContext(
+                memo, stepMap, currencyMap, craftOrder, vendorBatchTracking,
+                vendorOccurrences, craftOccurrences, ignoredItemIds);
+            Collect(tree, collectContext, ref craftCounter);
 
             // Pass 2b: re-derive each merged vendor step's
             // true cost from its AGGREGATE Quantity and the winning offer's
@@ -1351,17 +1393,7 @@ namespace GW2CraftingHelper.Services
             return false;
         }
 
-        private void Collect(
-            RecipeNode node,
-            Dictionary<int, Decision> memo,
-            Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
-            Dictionary<int, long> currencyMap,
-            Dictionary<(int, int), int> craftOrder,
-            Dictionary<(int, AcquisitionSource, int), VendorBatchSolver.VendorBatchState> vendorBatchTracking,
-            Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> vendorOccurrences,
-            Dictionary<(int, AcquisitionSource, int), List<int>> craftOccurrences,
-            ref int craftCounter,
-            ISet<int> ignoredItemIds = null)
+        private void Collect(RecipeNode node, CollectContext ctx, ref int craftCounter)
         {
             if (node.IngredientType == "Currency")
             {
@@ -1371,13 +1403,13 @@ namespace GW2CraftingHelper.Services
                 // but the conversion below routes it into totalCoinCost
                 // and excludes it from currencyCosts (coin has its own
                 // display) so all cost surfaces agree.
-                if (currencyMap.ContainsKey(node.Id))
+                if (ctx.CurrencyMap.ContainsKey(node.Id))
                 {
-                    currencyMap[node.Id] = checked(currencyMap[node.Id] + node.Quantity);
+                    ctx.CurrencyMap[node.Id] = checked(ctx.CurrencyMap[node.Id] + node.Quantity);
                 }
                 else
                 {
-                    currencyMap[node.Id] = node.Quantity;
+                    ctx.CurrencyMap[node.Id] = node.Quantity;
                 }
                 return;
             }
@@ -1410,12 +1442,12 @@ namespace GW2CraftingHelper.Services
 
             // An ignored item generates no step or shopping row; Evaluate
             // already committed a zero-cost memo entry without recursing.
-            if (ignoredItemIds != null && ignoredItemIds.Contains(node.Id))
+            if (ctx.IgnoredItemIds != null && ctx.IgnoredItemIds.Contains(node.Id))
             {
                 return;
             }
 
-            if (!memo.TryGetValue(node.NodeId, out var decision))
+            if (!ctx.Memo.TryGetValue(node.NodeId, out var decision))
             {
                 return;
             }
@@ -1434,7 +1466,7 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var itemRoot in wrapperRecipe.Ingredients)
                     {
-                        Collect(itemRoot, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+                        Collect(itemRoot, ctx, ref craftCounter);
                     }
                 }
                 return;
@@ -1448,19 +1480,19 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var ingredient in chosenRecipe.Ingredients)
                     {
-                        Collect(ingredient, memo, stepMap, currencyMap, craftOrder, vendorBatchTracking, vendorOccurrences, craftOccurrences, ref craftCounter, ignoredItemIds);
+                        Collect(ingredient, ctx, ref craftCounter);
                     }
                 }
 
                 // Record craft order (first time seeing this item+recipe as craft)
                 var craftOrderKey = (node.Id, decision.RecipeId);
-                if (!craftOrder.ContainsKey(craftOrderKey))
+                if (!ctx.CraftOrder.ContainsKey(craftOrderKey))
                 {
-                    craftOrder[craftOrderKey] = craftCounter++;
+                    ctx.CraftOrder[craftOrderKey] = craftCounter++;
                 }
 
                 var stepKey = (node.Id, AcquisitionSource.Craft, decision.RecipeId);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
+                AggregateStep(ctx.StepMap, stepKey, node, decision, ctx.VendorBatchTracking, ctx.VendorOccurrences, ctx.CraftOccurrences);
             }
             else if (decision.Source == AcquisitionSource.BuyFromVendor)
             {
@@ -1470,12 +1502,12 @@ namespace GW2CraftingHelper.Services
                 // per-occurrence costs here would re-introduce the
                 // overcount that pass exists to fix.
                 var stepKey = (node.Id, AcquisitionSource.BuyFromVendor, 0);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
+                AggregateStep(ctx.StepMap, stepKey, node, decision, ctx.VendorBatchTracking, ctx.VendorOccurrences, ctx.CraftOccurrences);
             }
             else
             {
                 var stepKey = (node.Id, decision.Source, 0);
-                AggregateStep(stepMap, stepKey, node, decision, vendorBatchTracking, vendorOccurrences, craftOccurrences);
+                AggregateStep(ctx.StepMap, stepKey, node, decision, ctx.VendorBatchTracking, ctx.VendorOccurrences, ctx.CraftOccurrences);
             }
         }
 
