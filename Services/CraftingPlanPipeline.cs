@@ -392,12 +392,7 @@ namespace GW2CraftingHelper.Services
                 currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
                 ownedVendorItemAmounts: ownedVendorItemAmounts);
 
-            // Single-vs-multi shape dispatch lives in ApplyForPlanShape
-            // (keyed on the wrapper-root sentinel), the same entry point
-            // ResolveWithOverrides uses. Equivalent to the old
-            // `items == null` check here because the list overload routes
-            // single-entry lists to the single-item path - pinned by
-            // MultiItemPlanTests.
+            // Shape dispatch: see SellSideEconomics.ApplyForPlanShape.
             SellSideEconomics.ApplyForPlanShape(
                 result, treeUsedForSolve, solveResult, prices,
                 targetItemId, quantity, items, priceBasis, usedMaterials, ownMaterialsMode);
