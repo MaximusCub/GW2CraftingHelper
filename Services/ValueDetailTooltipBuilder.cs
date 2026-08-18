@@ -142,21 +142,14 @@ namespace GW2CraftingHelper.Services
         }
 
         // Deliberately duplicates CoinCurrencyRenderer.FormatCoinText's
-        // plain "Xg Ys Zc" format (non-negative clamped) rather than
-        // referencing it - that class lives in Views.Rendering and is
-        // Blish-coupled, while this class must stay Blish-free to remain
-        // unit-testable (repo invariant). Both formats are trivial and
-        // must stay in lockstep only in spirit (same three-unit format),
-        // not by shared code.
+        // plain "Xg Ys Zc" FORMAT rather than referencing it - that class
+        // lives in Views.Rendering and is Blish-coupled, while this class
+        // must stay Blish-free to remain unit-testable (repo invariant).
+        // The split itself is shared via CoinSegmentMath.Split; only the
+        // trivial format string is kept in lockstep in spirit.
         private static string FormatCoin(long copper)
         {
-            if (copper < 0)
-            {
-                copper = 0;
-            }
-            long gold = copper / 10000;
-            long silver = (copper % 10000) / 100;
-            long cop = copper % 100;
+            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
             return $"{gold}g {silver}s {cop}c";
         }
     }

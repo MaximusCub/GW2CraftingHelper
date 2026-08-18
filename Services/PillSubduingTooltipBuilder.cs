@@ -66,20 +66,13 @@ namespace GW2CraftingHelper.Services
             return $"Always more expensive - needs everything the selected option needs, plus {suffix}";
         }
 
-        // Same gold/silver/copper split as ValueDetailTooltipBuilder's own
-        // FormatCoin, but a different output format (leading zero units
-        // omitted here, always three units there). Deliberately kept
-        // independent per Blish-free tooltip-builder class rather than
-        // shared - see that method's own doc comment for why.
+        // Shares CoinSegmentMath.Split with every other coin display site,
+        // but a different output format than ValueDetailTooltipBuilder's
+        // FormatCoin (leading zero units omitted here, always three units
+        // there) - the formats stay deliberately independent.
         private static string FormatCoin(long copper)
         {
-            if (copper < 0)
-            {
-                copper = 0;
-            }
-            long gold = copper / 10000;
-            long silver = (copper % 10000) / 100;
-            long cop = copper % 100;
+            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
 
             var sb = new StringBuilder();
             if (gold > 0)

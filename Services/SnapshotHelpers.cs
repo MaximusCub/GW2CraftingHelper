@@ -12,11 +12,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         internal static string FormatCoin(int copper)
         {
-            if (copper < 0) copper = 0;
-
-            int gold = copper / 10000;
-            int silver = (copper % 10000) / 100;
-            int cop = copper % 100;
+            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
             return $"Coin: {gold}g {silver}s {cop}c";
         }
 
