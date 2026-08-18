@@ -392,18 +392,15 @@ namespace GW2CraftingHelper.Services
                 currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
                 ownedVendorItemAmounts: ownedVendorItemAmounts);
 
-            if (items == null)
-            {
-                SellSideEconomics.ApplySellSideEconomics(
-                    result, treeUsedForSolve, solveResult, prices,
-                    targetItemId, quantity, priceBasis, usedMaterials, ownMaterialsMode);
-            }
-            else
-            {
-                SellSideEconomics.ApplyBatchSellSideEconomics(
-                    result, treeUsedForSolve, solveResult, prices, items,
-                    priceBasis, usedMaterials, ownMaterialsMode);
-            }
+            // Single-vs-multi shape dispatch lives in ApplyForPlanShape
+            // (keyed on the wrapper-root sentinel), the same entry point
+            // ResolveWithOverrides uses. Equivalent to the old
+            // `items == null` check here because the list overload routes
+            // single-entry lists to the single-item path - pinned by
+            // MultiItemPlanTests.
+            SellSideEconomics.ApplyForPlanShape(
+                result, treeUsedForSolve, solveResult, prices,
+                targetItemId, quantity, items, priceBasis, usedMaterials, ownMaterialsMode);
 
             // Annotation-only: writes only result.ExcessCraftOutputs.
             ExcessCraftOutputCalculator.Apply(result, prices, metadata);

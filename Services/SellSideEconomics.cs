@@ -80,35 +80,21 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// B8 shape fix: dispatches to ApplySellSideEconomics (single-item)
-        /// or ApplyBatchSellSideEconomics (multi-item) using the SAME
-        /// Gw2Constants.MultiItemWrapperItemId constant
-        /// ResolveWithOverrides' own if/else used before this refactor -
-        /// centralized here as a single self-dispatch entry point rather
-        /// than duplicated per call site, so a future caller sharing the
-        /// same "which shape is this plan" question does not need its own
-        /// copy of the check. NOT a pure move: the OPERAND checked against
-        /// that constant changed from context.Tree.Id (the generation-time
-        /// tree, read directly off the frozen context) to the `tree`
-        /// argument passed in here - at ResolveWithOverrides' own call
-        /// site this is solveTree, which is reduced.ReducedTree (a fresh
-        /// InventoryReducer clone, not context.Tree) whenever
-        /// context.UnreducedTree != null && _reducer != null. Only
-        /// equivalent today because InventoryReducer.CloneNode preserves
-        /// Id onto the clone and the wrapper root is never pruned - an
-        /// invariant nothing asserts, so a future CloneNode/pruning change
-        /// could silently desync the two. targetItemId/quantity are
-        /// consulted only by the single-item branch; requestedItems only by
-        /// the multi-item branch - the unused pair of arguments is simply
-        /// ignored by whichever branch does not run, exactly as each
-        /// branch's own existing parameter list already required. On a null
-        /// tree, the `tree != null &&` guard is defensive only, NOT a
-        /// behavior change from the old if/else: `context.Tree.Id` threw
-        /// NRE on a null Tree, and a null `tree` here still NREs, one frame
-        /// deeper, at itemRoot.NodeId inside ComputePerItemEconomics. Also
-        /// unreachable in production either way - ResolveWithOverrides
-        /// passes the same tree to _solver.Solve and BuildCraftingTreeResult
-        /// before dispatching here.
+        /// The calculator's single shape-dispatch entry point: routes to
+        /// ApplySellSideEconomics (single-item) or
+        /// ApplyBatchSellSideEconomics (multi-item) on the
+        /// Gw2Constants.MultiItemWrapperItemId root sentinel. Both pipeline
+        /// call sites (generation and ResolveWithOverrides) pass the tree
+        /// actually solved, which may be a reduced clone - the sentinel
+        /// check still holds only because InventoryReducer.CloneNode
+        /// preserves Id and the wrapper root is never pruned. The check
+        /// also agrees with the old generation-time `items == null` test
+        /// only because the list overload routes single-entry lists to the
+        /// single-item path (pinned by MultiItemPlanTests).
+        /// targetItemId/quantity are consulted only by the single-item
+        /// branch; requestedItems only by the batch branch. The
+        /// `tree != null` guard is defensive only: both branches NRE on a
+        /// null tree anyway, and no production caller passes one.
         /// </summary>
         internal static void ApplyForPlanShape(
             CraftingPlanResult result,
