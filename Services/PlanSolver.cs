@@ -388,11 +388,23 @@ namespace GW2CraftingHelper.Services
             }
 
             // Pass 1: decide buy vs craft vs vendor at every node
+            // Named throughout: 14 positionals with three same-typed
+            // ISet<int> params is a silent-transposition hazard.
             var evaluateContext = new EvaluateContext(
-                prices, vendorOffers, memo, priceBasis, overrides, valuation,
-                forceBuyOnlyNodeIds, competencyIndependentForceBuyNodeIds,
-                costDiagnostics, rawCraftCostDiagnostics, ignoredItemIds, tiers,
-                bestRatingByDiscipline, ownedQuantityUsedByNode);
+                prices: prices,
+                vendorOffers: vendorOffers,
+                memo: memo,
+                priceBasis: priceBasis,
+                overrides: overrides,
+                currencyValuation: valuation,
+                forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
+                competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
+                costDiagnostics: costDiagnostics,
+                rawCraftCostDiagnostics: rawCraftCostDiagnostics,
+                ignoredItemIds: ignoredItemIds,
+                homesteadTiers: tiers,
+                bestRatingByDiscipline: bestRatingByDiscipline,
+                ownedQuantityUsedByNode: ownedQuantityUsedByNode);
             Evaluate(tree, evaluateContext);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
