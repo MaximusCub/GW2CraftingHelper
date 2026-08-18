@@ -392,18 +392,10 @@ namespace GW2CraftingHelper.Services
                 currencyMetadata: currencyMetadata, ownedCurrencyAmounts: ownedCurrencyAmounts,
                 ownedVendorItemAmounts: ownedVendorItemAmounts);
 
-            if (items == null)
-            {
-                SellSideEconomics.ApplySellSideEconomics(
-                    result, treeUsedForSolve, solveResult, prices,
-                    targetItemId, quantity, priceBasis, usedMaterials, ownMaterialsMode);
-            }
-            else
-            {
-                SellSideEconomics.ApplyBatchSellSideEconomics(
-                    result, treeUsedForSolve, solveResult, prices, items,
-                    priceBasis, usedMaterials, ownMaterialsMode);
-            }
+            // Shape dispatch: see SellSideEconomics.ApplyForPlanShape.
+            SellSideEconomics.ApplyForPlanShape(
+                result, treeUsedForSolve, solveResult, prices,
+                targetItemId, quantity, items, priceBasis, usedMaterials, ownMaterialsMode);
 
             // Annotation-only: writes only result.ExcessCraftOutputs.
             ExcessCraftOutputCalculator.Apply(result, prices, metadata);

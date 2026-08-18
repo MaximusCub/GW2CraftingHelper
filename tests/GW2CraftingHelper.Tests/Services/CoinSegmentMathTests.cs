@@ -21,6 +21,37 @@ namespace GW2CraftingHelper.Tests.Services
         private const int LabelIconGap = CoinSegmentMath.CoinLabelIconGap;
         private const int SegmentGap = CoinSegmentMath.CoinSegmentGap;
 
+        // --- Split ---
+
+        // Pins the shared three-way coin split every display site now
+        // routes through (tooltip builders, SnapshotHelpers, MainView's
+        // coin panel, CoinCurrencyRenderer). Formatting differences stay
+        // with the callers; only the arithmetic is shared.
+        [Theory]
+        [InlineData(0L, 0L, 0L, 0L)]
+        [InlineData(1L, 0L, 0L, 1L)]
+        [InlineData(99L, 0L, 0L, 99L)]
+        [InlineData(100L, 0L, 1L, 0L)]
+        [InlineData(9999L, 0L, 99L, 99L)]
+        [InlineData(10000L, 1L, 0L, 0L)]
+        [InlineData(1234567L, 123L, 45L, 67L)]
+        public void Split_SplitsIntoGoldSilverCopper(long copper, long gold, long silver, long cop)
+        {
+            Assert.Equal((gold, silver, cop), CoinSegmentMath.Split(copper));
+        }
+
+        [Fact]
+        public void Split_NegativeInput_ClampsToZero()
+        {
+            // Negative coin amounts are never displayed; every caller used
+            // to clamp before splitting and the clamp moved into Split with
+            // the consolidation. Callers CAN pass negatives (e.g.
+            // ValueDetailTooltipBuilder's delta line), so this is
+            // load-bearing, not defensive.
+            Assert.Equal((0L, 0L, 0L), CoinSegmentMath.Split(-1));
+            Assert.Equal((0L, 0L, 0L), CoinSegmentMath.Split(long.MinValue));
+        }
+
         // --- TotalCoinSegmentsWidth ---
 
         [Fact]

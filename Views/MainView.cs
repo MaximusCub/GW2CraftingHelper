@@ -1049,11 +1049,7 @@ namespace GW2CraftingHelper.Views
                 child.Dispose();
             }
 
-            if (copper < 0) copper = 0;
-
-            int gold = copper / 10000;
-            int silver = (copper % 10000) / 100;
-            int cop = copper % 100;
+            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
 
             var font = GameService.Content.DefaultFont14;
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>(3);

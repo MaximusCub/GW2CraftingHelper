@@ -24,6 +24,23 @@ namespace GW2CraftingHelper.Services
         public const int CoinLabelIconGap = 2;
         public const int CoinSegmentGap = 6;
 
+        /// <summary>
+        /// The three-way coin split every display site uses: 10000 copper
+        /// per gold, 100 per silver. Negative input clamps to 0, matching
+        /// the clamp every caller applied before this consolidation - a
+        /// negative coin amount is never displayed. Formatting stays with
+        /// the callers on purpose: sites legitimately differ (always three
+        /// units vs leading-zero units omitted), only the split is shared.
+        /// </summary>
+        public static (long Gold, long Silver, long Copper) Split(long copper)
+        {
+            if (copper < 0)
+            {
+                copper = 0;
+            }
+            return (copper / 10000, (copper % 10000) / 100, copper % 100);
+        }
+
         public struct CoinSegmentSpec
         {
             public int AssetId;

@@ -128,6 +128,7 @@
     <Compile Include="Services\SeasonalOfferFilter.cs" />
     <Compile Include="Services\RecipeSheetSavingsCalculator.cs" />
     <Compile Include="Services\RecipeSheetItemSeedService.cs" />
+    <Compile Include="Services\JsonSeedReader.cs" />
     <Compile Include="Services\SeasonalVendorTipCalculator.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />

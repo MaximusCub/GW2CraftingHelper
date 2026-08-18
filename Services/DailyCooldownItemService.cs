@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
 using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
@@ -36,64 +34,36 @@ namespace GW2CraftingHelper.Services
         public static IReadOnlyDictionary<int, DailyCooldownItem> Load(Stream stream)
         {
             var result = new Dictionary<int, DailyCooldownItem>();
-            if (stream == null)
+            var envelope = JsonSeedReader.Deserialize<DailyCooldownEnvelope>(stream);
+            if (envelope?.Items == null)
             {
                 return result;
             }
 
-            try
+            foreach (var entry in envelope.Items)
             {
-                using (var reader = new StreamReader(stream))
+                if (entry == null || entry.ItemId <= 0 || entry.PerDayCap <= 0)
                 {
-                    string json = reader.ReadToEnd();
-                    var options = new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    };
-                    var envelope = JsonSerializer.Deserialize<DailyCooldownEnvelope>(json, options);
-                    if (envelope?.Items == null)
-                    {
-                        return result;
-                    }
-
-                    foreach (var entry in envelope.Items)
-                    {
-                        if (entry == null || entry.ItemId <= 0 || entry.PerDayCap <= 0)
-                        {
-                            // A zero/negative cap is not a real recipe
-                            // limit (and would divide-by-zero the "days
-                            // needed" math downstream) - skip rather than
-                            // invent a notice from malformed seed data.
-                            // an itemId <= 0 is
-                            // equally malformed (no PlanStep ever carries
-                            // one) - same guard shape as PerDayCap. This
-                            // guard is stricter than AcquisitionHintService.
-                            // Load, which does not validate ItemId; harmless
-                            // divergence, not a behavior change either
-                            // service depends on.
-                            continue;
-                        }
-                        // Last-write-wins on duplicate item ids, matching
-                        // AcquisitionHintService.
-                        result[entry.ItemId] = new DailyCooldownItem
-                        {
-                            ItemId = entry.ItemId,
-                            PerDayCap = entry.PerDayCap,
-                            SourceUrl = entry.SourceUrl,
-                            LastVerified = entry.LastVerified
-                        };
-                    }
-                    return result;
+                    // A zero/negative cap is not a real recipe limit (and
+                    // would divide-by-zero the "days needed" math
+                    // downstream); an itemId <= 0 is equally malformed (no
+                    // PlanStep ever carries one). Skip rather than invent a
+                    // notice from malformed seed data. Stricter than
+                    // AcquisitionHintService.Load, which does not validate
+                    // ItemId; harmless divergence.
+                    continue;
                 }
+                // Last-write-wins on duplicate item ids, matching
+                // AcquisitionHintService.
+                result[entry.ItemId] = new DailyCooldownItem
+                {
+                    ItemId = entry.ItemId,
+                    PerDayCap = entry.PerDayCap,
+                    SourceUrl = entry.SourceUrl,
+                    LastVerified = entry.LastVerified
+                };
             }
-            catch (Exception)
-            {
-                // Malformed/empty JSON, unexpected shape, etc. - degrade to
-                // an empty dictionary rather than throw, exactly like
-                // AcquisitionHintService. Nothing was added to result
-                // before a parse failure, so it is still empty here.
-                return result;
-            }
+            return result;
         }
     }
 }

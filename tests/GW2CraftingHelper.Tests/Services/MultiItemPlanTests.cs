@@ -103,6 +103,65 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(viaList.CraftingTree);
         }
 
+        /// <summary>
+        /// Pins the dispatcher invariant SellSideEconomics.ApplyForPlanShape
+        /// relies on: a single-entry list request routes to the single-item
+        /// path, so the solved tree root carries the real item id - never
+        /// Gw2Constants.MultiItemWrapperItemId - and the result keeps the
+        /// single-item shape. This is what makes the sentinel check agree
+        /// with the old `items == null` generation-time dispatch.
+        /// </summary>
+        [Fact]
+        public async Task GenerateStructuredAsync_SingleEntryList_RoutesToSingleItemShape()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Ingredient", "i.png");
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
+
+            var result = await pipeline.GenerateStructuredAsync(
+                new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 2 } },
+                null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            // Single-item path: real ids in the solve context, no wrapper
+            // sentinel anywhere ApplyForPlanShape could see one.
+            Assert.NotNull(result.SolveContext);
+            Assert.NotNull(result.SolveContext.Tree);
+            Assert.NotEqual(Gw2Constants.MultiItemWrapperItemId, result.SolveContext.Tree.Id);
+            Assert.Equal(1, result.SolveContext.TargetItemId);
+            Assert.Equal(2, result.SolveContext.Quantity);
+
+            // Single-shape result: no batch rollup fields.
+            Assert.Null(result.MultiItemRoots);
+            Assert.Null(result.RequestedItems);
+            Assert.NotNull(result.CraftingTree);
+        }
+
         private static void AssertTreesEqual(CraftingTreeNode expected, CraftingTreeNode actual)
         {
             Assert.Equal(expected.ItemId, actual.ItemId);

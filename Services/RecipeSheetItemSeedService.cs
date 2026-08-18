@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
 
 namespace GW2CraftingHelper.Services
 {
@@ -48,51 +46,27 @@ namespace GW2CraftingHelper.Services
         public static IReadOnlyDictionary<int, int> Load(Stream stream)
         {
             var result = new Dictionary<int, int>();
-            if (stream == null)
+            var envelope = JsonSeedReader.Deserialize<RecipeSheetItemEnvelope>(stream);
+            if (envelope?.Items == null)
             {
                 return result;
             }
 
-            try
+            foreach (var entry in envelope.Items)
             {
-                using (var reader = new StreamReader(stream))
+                if (entry == null || entry.RecipeId <= 0 || entry.SheetItemId <= 0)
                 {
-                    string json = reader.ReadToEnd();
-                    var options = new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    };
-                    var envelope = JsonSerializer.Deserialize<RecipeSheetItemEnvelope>(json, options);
-                    if (envelope?.Items == null)
-                    {
-                        return result;
-                    }
-
-                    foreach (var entry in envelope.Items)
-                    {
-                        if (entry == null || entry.RecipeId <= 0 || entry.SheetItemId <= 0)
-                        {
-                            // Malformed seed data (no real recipe/item ever
-                            // carries id <= 0) - skip rather than let a bad
-                            // row fabricate a lookup, same guard shape as
-                            // DailyCooldownItemService.Load.
-                            continue;
-                        }
-                        // Last-write-wins on duplicate recipe ids, matching
-                        // DailyCooldownItemService/AcquisitionHintService.
-                        result[entry.RecipeId] = entry.SheetItemId;
-                    }
-                    return result;
+                    // Malformed seed data (no real recipe/item ever carries
+                    // id <= 0) - skip rather than let a bad row fabricate a
+                    // lookup, same guard shape as
+                    // DailyCooldownItemService.Load.
+                    continue;
                 }
+                // Last-write-wins on duplicate recipe ids, matching
+                // DailyCooldownItemService/AcquisitionHintService.
+                result[entry.RecipeId] = entry.SheetItemId;
             }
-            catch (Exception)
-            {
-                // Malformed/empty JSON, unexpected shape, etc. - degrade to
-                // an empty dictionary rather than throw, exactly like
-                // DailyCooldownItemService. Nothing was added to result
-                // before a parse failure, so it is still empty here.
-                return result;
-            }
+            return result;
         }
     }
 }

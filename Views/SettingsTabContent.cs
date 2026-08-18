@@ -222,7 +222,7 @@ namespace GW2CraftingHelper.Views
             // price comparisons, same as any other unset currency.
             AddInfoLine("Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.", panelWidth);
 
-            AddSaveRow(panelWidth);
+            _statusLabel = AddSaveRow(panelWidth, SaveValuations);
         }
 
         /// <summary>
@@ -264,7 +264,7 @@ namespace GW2CraftingHelper.Views
             AddHomesteadTierRow(Gw2Constants.RefinedHomesteadMetalItemId, "Metal (Metal Forge)", panelWidth);
             AddHomesteadTierRow(Gw2Constants.RefinedHomesteadWoodItemId, "Wood (Lumber Mill)", panelWidth);
 
-            AddHomesteadSaveRow(panelWidth);
+            _homesteadStatusLabel = AddSaveRow(panelWidth, SaveHomesteadTiers);
         }
 
         private void AddHomesteadTierRow(int materialItemId, string materialLabel, int panelWidth)
@@ -319,33 +319,6 @@ namespace GW2CraftingHelper.Views
                 Input = input,
                 ErrorLabel = errorLabel
             });
-        }
-
-        private void AddHomesteadSaveRow(int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, 40),
-                Parent = _rootPanel
-            };
-
-            var saveButton = new StandardButton()
-            {
-                Text = "Save",
-                Size = new Point(80, 28),
-                Location = new Point(NameColumnX, 6),
-                Parent = rowPanel
-            };
-            saveButton.Click += (_, __) => SaveHomesteadTiers();
-
-            _homesteadStatusLabel = new Label()
-            {
-                Text = "",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(NameColumnX + 80 + 12, 12),
-                Parent = rowPanel
-            };
         }
 
         private void LoadCurrentHomesteadTiers()
@@ -429,7 +402,7 @@ namespace GW2CraftingHelper.Views
             AddLogDiagnosticsRow(panelWidth);
             AddLogMaxSizeRow(panelWidth);
             AddLogRetentionDaysRow(panelWidth);
-            AddLogSaveRow(panelWidth);
+            _logStatusLabel = AddSaveRow(panelWidth, SaveLoggingSettings);
         }
 
         private void AddLogDiagnosticsRow(int panelWidth)
@@ -556,33 +529,6 @@ namespace GW2CraftingHelper.Views
             };
         }
 
-        private void AddLogSaveRow(int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, 40),
-                Parent = _rootPanel
-            };
-
-            var saveButton = new StandardButton()
-            {
-                Text = "Save",
-                Size = new Point(80, 28),
-                Location = new Point(NameColumnX, 6),
-                Parent = rowPanel
-            };
-            saveButton.Click += (_, __) => SaveLoggingSettings();
-
-            _logStatusLabel = new Label()
-            {
-                Text = "",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(NameColumnX + 80 + 12, 12),
-                Parent = rowPanel
-            };
-        }
-
         private void LoadCurrentLoggingSettings()
         {
             if (_logMaxSizeInput != null)
@@ -685,7 +631,7 @@ namespace GW2CraftingHelper.Views
             AddInfoLine("How long a cached account snapshot may sit before an automatic background refresh runs.", panelWidth);
 
             AddSnapshotRefreshIntervalRow(panelWidth);
-            AddSnapshotSaveRow(panelWidth);
+            _snapshotStatusLabel = AddSaveRow(panelWidth, SaveSnapshotSettings);
         }
 
         private void AddSnapshotRefreshIntervalRow(int panelWidth)
@@ -730,33 +676,6 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 TextColor = ErrorTextColor,
                 Location = new Point(ErrorX, 7),
-                Parent = rowPanel
-            };
-        }
-
-        private void AddSnapshotSaveRow(int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, 40),
-                Parent = _rootPanel
-            };
-
-            var saveButton = new StandardButton()
-            {
-                Text = "Save",
-                Size = new Point(80, 28),
-                Location = new Point(NameColumnX, 6),
-                Parent = rowPanel
-            };
-            saveButton.Click += (_, __) => SaveSnapshotSettings();
-
-            _snapshotStatusLabel = new Label()
-            {
-                Text = "",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(NameColumnX + 80 + 12, 12),
                 Parent = rowPanel
             };
         }
@@ -971,7 +890,14 @@ namespace GW2CraftingHelper.Views
             row.DefaultStateLabel.TextColor = isCleared ? WarningTextColor : InfoTextColor;
         }
 
-        private void AddSaveRow(int panelWidth)
+        /// <summary>
+        /// The one save-row shape every section uses: a row panel holding
+        /// a Save button wired to onSave and a status label, returned so
+        /// the caller can keep its own field pointing at it. Construction
+        /// order and every control property match the four per-section
+        /// builders this replaced byte-for-byte.
+        /// </summary>
+        private Label AddSaveRow(int panelWidth, Action onSave)
         {
             var rowPanel = new Panel()
             {
@@ -986,9 +912,9 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(NameColumnX, 6),
                 Parent = rowPanel
             };
-            saveButton.Click += (_, __) => SaveValuations();
+            saveButton.Click += (_, __) => onSave();
 
-            _statusLabel = new Label()
+            return new Label()
             {
                 Text = "",
                 AutoSizeWidth = true,

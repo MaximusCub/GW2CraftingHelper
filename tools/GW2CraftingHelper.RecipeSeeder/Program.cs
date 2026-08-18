@@ -269,39 +269,27 @@ namespace GW2CraftingHelper.RecipeSeeder
             int total = batches.Count;
             var gate = new object();
 
-            using (var semaphore = new SemaphoreSlim(MaxConcurrency))
-            {
-                var tasks = batches.Select(async batch =>
+            await BoundedConcurrency.ForEachAsync(
+                batches, MaxConcurrency, async batch =>
                 {
-                    await semaphore.WaitAsync();
-                    try
+                    var recipes = await FetchRecipeBatchAsync(
+                        httpClient, batch);
+
+                    lock (gate)
                     {
-                        var recipes = await FetchRecipeBatchAsync(
-                            httpClient, batch);
-
-                        lock (gate)
+                        foreach (var recipe in recipes)
                         {
-                            foreach (var recipe in recipes)
-                            {
-                                result[recipe.Id] = recipe;
-                            }
+                            result[recipe.Id] = recipe;
+                        }
 
-                            completed++;
-                            if (completed % 10 == 0 || completed == total)
-                            {
-                                Console.Write(
-                                    $"\r  Batches: {completed}/{total}   ");
-                            }
+                        completed++;
+                        if (completed % 10 == 0 || completed == total)
+                        {
+                            Console.Write(
+                                $"\r  Batches: {completed}/{total}   ");
                         }
                     }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
-                }).ToList();
-
-                await Task.WhenAll(tasks);
-            }
+                }, CancellationToken.None);
 
             Console.WriteLine();
             return result;
@@ -525,34 +513,22 @@ namespace GW2CraftingHelper.RecipeSeeder
             int total = batches.Count;
             var gate = new object();
 
-            using (var semaphore = new SemaphoreSlim(MaxConcurrency))
-            {
-                var tasks = batches.Select(async batch =>
+            await BoundedConcurrency.ForEachAsync(
+                batches, MaxConcurrency, async batch =>
                 {
-                    await semaphore.WaitAsync();
-                    try
-                    {
-                        var items = await FetchItemBatchAsync(httpClient, batch);
+                    var items = await FetchItemBatchAsync(httpClient, batch);
 
-                        lock (gate)
+                    lock (gate)
+                    {
+                        result.AddRange(items);
+                        completed++;
+                        if (completed % 10 == 0 || completed == total)
                         {
-                            result.AddRange(items);
-                            completed++;
-                            if (completed % 10 == 0 || completed == total)
-                            {
-                                Console.Write(
-                                    $"\r  Batches: {completed}/{total}   ");
-                            }
+                            Console.Write(
+                                $"\r  Batches: {completed}/{total}   ");
                         }
                     }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
-                }).ToList();
-
-                await Task.WhenAll(tasks);
-            }
+                }, CancellationToken.None);
 
             Console.WriteLine();
             return result;

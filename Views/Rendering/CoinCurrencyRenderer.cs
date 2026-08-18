@@ -20,10 +20,7 @@ namespace GW2CraftingHelper.Views.Rendering
         // icons (BasicTooltipText has no inline-image support).
         internal static string FormatCoinText(long copper)
         {
-            if (copper < 0) copper = 0;
-            long gold = copper / 10000;
-            long silver = (copper % 10000) / 100;
-            long cop = copper % 100;
+            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
             return $"{gold}g {silver}s {cop}c";
         }
 
@@ -46,11 +43,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
         internal static List<CoinSegmentMath.CoinSegmentSpec> BuildCoinSegments(long copper, BitmapFont font)
         {
-            if (copper < 0) copper = 0;
-
-            long gold = copper / 10000;
-            long silver = (copper % 10000) / 100;
-            long cop = copper % 100;
+            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
 
             bool showGold = gold > 0;
             bool showSilver = showGold || silver > 0;
