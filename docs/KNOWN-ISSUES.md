@@ -8639,11 +8639,15 @@ Behavior is preserved except where a bullet says otherwise.
   ModuleLog.DeleteFileAndReset each spelled out 250ms, with the latter's
   doc asserting in prose that they matched. `ModuleLog.FlushDrainBudget`
   now carries it for both.
-- **Log toolbar status label bounded (behavior change):** the auto-sized
-  status label could run under the right-anchored Delete Log File button
-  at a narrow width. It is now ellipsized to the run between the two,
-  with the full string on the tooltip when shortened, re-fitted on
-  resize as well as on every status change.
+- **Log status moved to its own row (behavior change):** the auto-sized
+  status label shared the toolbar row with the three right-anchored
+  buttons and ran under the leftmost of them - at the enforced 930px
+  minimum window width the gap between them is only ~48px, so any real
+  status ("Log file deleted", "Nothing to copy") collided. It now sits
+  in a full-width 24px row beneath the toolbar, the same shape
+  MainView's `_statusPanel` already uses for the same reason; the
+  content panel starts below it. No truncation - the full text always
+  renders.
 - **Source-filter re-flow skipped when its inputs have not moved:** the
   Snapshot tab re-flowed the checkbox row on every resize event,
   including height-only ones. The flow pass now runs only when the
@@ -8655,11 +8659,18 @@ Behavior is preserved except where a bullet says otherwise.
   tail; a resize in that window wrote Location on controls belonging to
   the replaced panel. Cleared by reference swap next to the panel
   construction, so a concurrent main-thread read still sees a
-  consistent list.
+  consistent list - which holds only because each reader now takes the
+  field into a local once (`SetAllCharactersChecked` hoists the
+  checkbox list before its bounds check; `OnCharacterToggled` hoists the
+  master before its null check), rather than re-reading the field after
+  its own guard.
 - **No substring per character source:** SnapshotSearchResultBuilder.
   IsSourceEnabled compares the name half of "Character:<name>" in place
   with string.CompareOrdinal instead of allocating a Substring per
-  source per item on the keystroke path.
+  source per item on the keystroke path. Pinned by two tests the old
+  exact-hit/exact-miss pair could not catch: whole-name-only matching
+  (a strict prefix, a strict extension, and a case-only variant of an
+  excluded name all stay visible) and the zero-length name half.
 - **Comment/doc corrections:** ApiAccessDialog's claim that ModalDialog
   has fixed Regenerate/Cancel buttons (its confirm button is
   caller-named); ApplyStatusDisplay's claim that a Settings save changes
@@ -8681,6 +8692,6 @@ deliberately skipped:
 - **Tri-state master checkbox:** the two-state quirk recorded in the
   char-source-search section above stands.
 
-Validation: build 0 errors and the full suite green (1884) before each
-commit.
+Validation: build 0 errors and the full suite green before each commit
+(1884, then 1886 once the two IsSourceEnabled boundary tests landed).
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

@@ -659,6 +659,49 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(SnapshotSearchResultBuilder.IsSourceEnabled(CharSource("Bob"), filter));
         }
 
+        // Pins the in-place name comparison (no Substring) against the
+        // off-by-one and comparer mistakes an exact hit/miss pair cannot
+        // catch: only the whole name after the prefix counts, and only an
+        // ordinal match of it.
+        [Fact]
+        public void IsSourceEnabled_ExcludedCharacterMatchIsWholeNameAndOrdinal()
+        {
+            var filter = new SnapshotSourceFilter();
+            filter.UncheckedCharacters.Add("Bo");
+            filter.UncheckedCharacters.Add("Bobby");
+            filter.UncheckedCharacters.Add("bob");
+
+            // A strict prefix of the name, a strict extension of it, and a
+            // case-only variant are all different characters.
+            Assert.True(SnapshotSearchResultBuilder.IsSourceEnabled(CharSource("Bob"), filter));
+
+            // The same set still hides each of them under its own name.
+            Assert.False(SnapshotSearchResultBuilder.IsSourceEnabled(CharSource("Bo"), filter));
+            Assert.False(SnapshotSearchResultBuilder.IsSourceEnabled(CharSource("Bobby"), filter));
+            Assert.False(SnapshotSearchResultBuilder.IsSourceEnabled(CharSource("bob"), filter));
+
+            // An excluded name is matched against the name half only, never
+            // against the prefix or the whole raw source.
+            var prefixFilter = new SnapshotSourceFilter();
+            prefixFilter.UncheckedCharacters.Add(CharSource("Bob"));
+            Assert.True(SnapshotSearchResultBuilder.IsSourceEnabled(CharSource("Bob"), prefixFilter));
+        }
+
+        // Degenerate but reachable shape: a zero-length name half. The
+        // empty-string entry must match it and a non-empty one must not.
+        [Fact]
+        public void IsSourceEnabled_EmptyCharacterName_MatchesOnlyTheEmptyExclusion()
+        {
+            var emptyExcluded = new SnapshotSourceFilter();
+            emptyExcluded.UncheckedCharacters.Add("");
+            Assert.False(SnapshotSearchResultBuilder.IsSourceEnabled(AccountItemIndex.CharacterSourcePrefix, emptyExcluded));
+
+            var otherExcluded = new SnapshotSourceFilter();
+            otherExcluded.UncheckedCharacters.Add("Bob");
+            Assert.True(SnapshotSearchResultBuilder.IsSourceEnabled(AccountItemIndex.CharacterSourcePrefix, otherExcluded));
+            Assert.True(SnapshotSearchResultBuilder.IsSourceEnabled(CharSource("Bob"), emptyExcluded));
+        }
+
         [Fact]
         public void IsSourceEnabled_NullUncheckedCharacterSet_TreatedAsEveryCharacterChecked()
         {
