@@ -117,6 +117,21 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void Reduce_PreservesRootId_IncludingWrapperSentinel()
+        {
+            // Multi-item generation wraps per-item trees under a sentinel
+            // root and later keys off ReducedTree.Id to detect it
+            // (CraftingPlanPipeline), so CloneNode must carry the root Id
+            // through Reduce.
+            var tree = Craftable(Gw2Constants.MultiItemWrapperItemId, 1, 10, 1, Leaf(2, 5));
+            var index = new AccountItemIndex(null);
+
+            var result = _reducer.Reduce(tree, index, null);
+
+            Assert.Equal(Gw2Constants.MultiItemWrapperItemId, result.ReducedTree.Id);
+        }
+
+        [Fact]
         public void LeafFullyOwned_QuantityZero()
         {
             var tree = Leaf(100, 5);
@@ -547,8 +562,6 @@ namespace GW2CraftingHelper.Tests.Services
                 Recipes = new List<RecipeOption> { optionA, optionB }
             };
 
-            // Split across two sources, unlike the single-source Sourced_
-            // variant below.
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
@@ -1246,8 +1259,6 @@ namespace GW2CraftingHelper.Tests.Services
                 { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
             };
 
-            // Split across two sources, unlike the single-source Sourced_
-            // variant below.
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
@@ -1308,8 +1319,7 @@ namespace GW2CraftingHelper.Tests.Services
                 { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
             };
 
-            // Node's own stock split across two sources, unlike the
-            // single-source Sourced_ variant below.
+            // Node's own stock split across two sources.
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(1, 2, AccountItemIndex.SourceMaterialStorage),
@@ -1360,8 +1370,6 @@ namespace GW2CraftingHelper.Tests.Services
                 { 99, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
             };
 
-            // Split across two sources, unlike the single-source Sourced_
-            // variant below.
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
@@ -1416,8 +1424,6 @@ namespace GW2CraftingHelper.Tests.Services
                 { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 999 } }
             };
 
-            // Split across two sources, unlike the single-source Sourced_
-            // variant below.
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
