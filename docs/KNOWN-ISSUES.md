@@ -8457,4 +8457,25 @@ button (placement left of Copy/Clear view; confirm dialog shows a
 the Snapshot staleness label recoloring against a changed
 SnapshotRefreshIntervalMinutes setting. The sticky dropdown is also a
 one-look check (pick Wallet, switch tabs, return).
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-19, live desktop session over the Paint dummy,
+branch build 21aa2ac). All three surfaces verified from captures
+(preflight/ux1-ux6): (1) Delete Log File button renders leftmost of
+the three right-aligned Log toolbar buttons with the cannot-be-undone
+tooltip; clicking it raises the Confirm dialog with an explicit
+"Delete" button; post-confirm the status label reads "Log file
+deleted", the view rebuilds to exactly one entry ("[INFO] ... [log]
+Log file deleted by user"), and the on-disk module_log.jsonl was
+recreated containing exactly that one line. (2) Staleness label: the
+29-day-old canned preflight snapshot rendered the status line in the
+warning color with the "(29d ago)" age suffix under the
+setting-driven threshold; the new ModuleSettings ctor wiring
+introduced no render fault. (The line's "Aug 15" base timestamp
+alongside "(29d ago)" is the pre-existing persisted-failure-status +
+snapshot-age composition, not a defect - the base status was stamped
+at failure time by RefreshNowAsync, the suffix from CapturedAt.)
+(3) Sticky dropdown: picked Wallet, switched to Log and back -
+selection held and the list showed only currencies. Boundary
+behavior of the unified threshold is pinned by the 4 Blish-free
+IsStale tests; the recolor-flip-on-setting-change interaction was
+not exercised live (auto-refresh interference makes it observable
+only under API failure; covered by tests).
