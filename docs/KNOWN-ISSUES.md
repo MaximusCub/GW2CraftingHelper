@@ -8408,4 +8408,6 @@ maintainer's standing merge directive (2026-08-16).
 - InventoryReducerTests: trimmed five near-verbatim "split across two
   sources" comment repeats; section headers state the relationship once.
 Validation: module build 0 errors; suite 1847 green (1846 baseline + 1).
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (test-only change; the review's mutation check proved the
+new root-Id test fails through the real Reduce path when CloneNode
+drops the wrapper Id; suite 1847/1847; no rendered surface).
