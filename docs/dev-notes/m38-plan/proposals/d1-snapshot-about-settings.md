@@ -404,9 +404,16 @@ explicit perf note for.
 1. Single combined "Characters" checkbox (this proposal's choice) versus a
    per-character checkbox row (more granular, more UI, more state to keep
    sticky) - a real UX tradeoff, not resolved here.
+   RESOLVED (char-source-search): per-character checkboxes, wrapping onto
+   extra rows, with an "All Characters" master toggle once there is more
+   than one character. Stickiness is an exclusion set keyed by character
+   name, so a character new in a fresh snapshot defaults to checked.
 2. Should the search box also match against source/character labels (e.g.
    typing a character's name surfaces everything on that character), or
    stay scoped to item/currency names only (this proposal's choice)?
+   RESOLVED (char-source-search): character labels match; storage-location
+   labels and currencies do not. A character match only consults sources
+   that already survive the checkboxes, so the two compose as a plain AND.
 3. Exact GW2 structural slot-count caps (flagged INFERRED above) - worth an
    implementer double-checking if the "no debounce needed" perf conclusion
    is to be trusted on the largest realistic accounts.

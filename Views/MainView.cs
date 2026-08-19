@@ -63,16 +63,36 @@ namespace GW2CraftingHelper.Views
         // finding: Build() tears down and recreates every control on each
         // tab visit, so anything that should feel "sticky" across tab
         // switches must live in these instance fields, not the controls
-        // themselves, and be read back in when Build() reruns). All four
-        // source toggles default to true (show everything) and the
-        // content-type dropdown defaults to "All", matching the tab's
-        // pre-search implicit no-filter behavior.
+        // themselves, and be read back in when Build() reruns). Every source
+        // toggle defaults to true (show everything) and the content-type
+        // dropdown defaults to "All", matching the tab's pre-search implicit
+        // no-filter behavior.
+        // <para>
+        // Characters are held as the same exclusion set SnapshotSourceFilter
+        // takes, keyed by character name: a name absent from it is checked,
+        // so a character new in a fresh snapshot defaults to visible, and a
+        // deliberately-unchecked one stays unchecked across tab bounces and
+        // snapshot refreshes. Stale names (a deleted character) are left in
+        // the set rather than pruned per snapshot - they match nothing, and
+        // pruning would silently forget the user's choice whenever a
+        // degraded snapshot happened to omit a character.
+        // </para>
         private string _lastSearchText = "";
         private string _lastFilterSelection = "All";
         private bool _bankEnabled = true;
         private bool _materialStorageEnabled = true;
         private bool _sharedInventoryEnabled = true;
-        private bool _charactersEnabled = true;
+        private readonly HashSet<string> _uncheckedCharacters = new HashSet<string>(StringComparer.Ordinal);
+
+        // Roster driving the per-character checkboxes, rebuilt once per
+        // snapshot alongside _accountItemIndex/_itemsById.
+        private List<string> _characterNames = new List<string>();
+
+        // Set while a master-toggle cascade (or a master read-back) is
+        // writing Checked on other checkboxes, so their own CheckedChanged
+        // handlers do not each trigger their own RebuildContent - one user
+        // click stays one rebuild.
+        private bool _suppressSourceFilterEvents;
 
         // Trailing debounce for the search box's per-keystroke rebuild -
         // mirrors CraftingPlanView's ResizeDebounceMs/FrameTicker trailing-
@@ -104,11 +124,68 @@ namespace GW2CraftingHelper.Views
         private const int SearchRowY = StatusRowY + StatusRowHeight + 5;
         private const int SearchRowHeight = 35;
         private const int SourceFilterRowY = SearchRowY + SearchRowHeight + 3;
-        private const int SourceFilterHeight = 30;
-        private const int CoinRowY = SourceFilterRowY + SourceFilterHeight + 4;
         private const int CoinHeight = 24;
-        private const int ContentY = CoinRowY + CoinHeight + 4;
-        private const int TopRegionHeight = ContentY;
+        private const int SectionGapY = 4;
+
+        // The source-filter row's height is account-driven: it carries one
+        // checkbox per character (1 to 15+) and wraps onto extra rows rather
+        // than running off the window's right edge, so every row below it
+        // shifts down by whatever it ends up needing. _sourceFilterHeight
+        // holds the current measured value (see ApplyTopRegionLayout);
+        // SourceFilterSingleRowHeight is both the floor and the exact height
+        // the row had while it was four fixed checkboxes, so the common
+        // single-row case is pixel-identical to before.
+        private const int SourceFilterCellHeight = 25;
+        private const int SourceFilterCellGapX = 10;
+        private const int SourceFilterRowGapY = 4;
+        private const int SourceFilterTopPad = 3;
+        private const int SourceFilterBottomPad = 2;
+        private const int SourceFilterSingleRowHeight = SourceFilterTopPad + SourceFilterCellHeight + SourceFilterBottomPad;
+
+        // The row grows one cell per character, so it must have an upper
+        // bound: unbounded, a large roster in a short window pushes the
+        // result list to zero height with no way for the user to shrink the
+        // row back. Past the bound the row scrolls instead of growing (see
+        // ApplyTopRegionLayout), so no checkbox becomes unreachable, and the
+        // result list always keeps MinContentHeight.
+        private const int SourceFilterMaxRows = 4;
+        private const int SourceFilterMaxRowsHeight = SourceFilterTopPad
+            + (SourceFilterMaxRows * SourceFilterCellHeight)
+            + ((SourceFilterMaxRows - 1) * SourceFilterRowGapY)
+            + SourceFilterBottomPad;
+        private const int SourceFilterScrollbarAllowance = 20;
+        private const int MinContentHeight = 120;
+
+        // Checkbox width beyond its measured label: the box glyph plus its
+        // text gap. Reproduces the four widths this row previously hardcoded
+        // (e.g. "Bank" 70, "Material Storage" 170) from the measured text.
+        private const int CheckboxChromeWidth = 40;
+
+        private int _sourceFilterHeight = SourceFilterSingleRowHeight;
+        private int _containerWidth;
+        private int _containerHeight;
+
+        private int CoinRowY => SourceFilterRowY + _sourceFilterHeight + SectionGapY;
+        private int ContentY => CoinRowY + CoinHeight + SectionGapY;
+        private int TopRegionHeight => ContentY;
+
+        // Fixed distance from the filter row's bottom edge to the content
+        // region's top: the coin row and the gap on either side of it.
+        private const int BelowSourceFilterHeight = SectionGapY + CoinHeight + SectionGapY;
+
+        // Height the filter row may not exceed: never tall enough to drop
+        // the result list below MinContentHeight, never more than
+        // SourceFilterMaxRows of cells, and never below the single-row
+        // height the row had before it became account-sized.
+        private int MaxSourceFilterHeight
+        {
+            get
+            {
+                int budget = _containerHeight - SourceFilterRowY - BelowSourceFilterHeight - MinContentHeight;
+                int cap = budget < SourceFilterMaxRowsHeight ? budget : SourceFilterMaxRowsHeight;
+                return cap > SourceFilterSingleRowHeight ? cap : SourceFilterSingleRowHeight;
+            }
+        }
 
         private const int SearchBoxWidth = 300;
         private const int FilterDropdownWidth = 140;
@@ -125,10 +202,16 @@ namespace GW2CraftingHelper.Views
         private FlowPanel _contentPanel;
         private TextBox _searchBox;
         private Dropdown _filterDropdown;
-        private Checkbox _bankCheckbox;
-        private Checkbox _materialStorageCheckbox;
-        private Checkbox _sharedInventoryCheckbox;
-        private Checkbox _charactersCheckbox;
+        private Checkbox _charactersMasterCheckbox;
+
+        // Every source checkbox in flow order (the three storage locations,
+        // the All Characters master, then one per character) - the single
+        // list ApplyTopRegionLayout measures and positions.
+        private readonly List<Checkbox> _sourceFilterCells = new List<Checkbox>();
+
+        // Parallel to _characterNames by construction (built in one loop).
+        private readonly List<Checkbox> _characterCheckboxes = new List<Checkbox>();
+
         private StandardButton _clearButton;
         private StandardButton _refreshButton;
 
@@ -154,6 +237,7 @@ namespace GW2CraftingHelper.Views
             // a null items list, and so does BuildRepresentativeIndex.
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
             _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
+            _characterNames = SnapshotSearchResultBuilder.CollectCharacterNames(_snapshot);
             _initialStatus = initialStatus;
             _refreshAsync = refreshAsync;
             _apiAccessDialog = apiAccessDialog;
@@ -168,6 +252,25 @@ namespace GW2CraftingHelper.Views
             _snapshot = snapshot;
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
             _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
+
+            var characterNames = SnapshotSearchResultBuilder.CollectCharacterNames(_snapshot);
+            bool rosterChanged = !RosterEquals(_characterNames, characterNames);
+            _characterNames = characterNames;
+
+            // A refresh can add or drop a character, and that has to rebuild
+            // the checkbox row itself, not just the result list below. Only
+            // when the roster actually changed, though: this path is driven
+            // by the periodic background refresh, and rebuilding disposes the
+            // very checkbox a click may be mid-press on, losing the click.
+            if (rosterChanged)
+            {
+                RebuildSourceFilterRow();
+            }
+            else
+            {
+                ApplyTopRegionLayout();
+            }
+
             UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
             ApplyStatusDisplay();
             RebuildContent();
@@ -195,6 +298,8 @@ namespace GW2CraftingHelper.Views
             // here would race them.
 
             int w = buildPanel.ContentRegion.Width;
+            _containerWidth = w;
+            _containerHeight = buildPanel.ContentRegion.Height;
 
             // Header row
             _headerPanel = new Panel()
@@ -284,7 +389,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(SearchBoxWidth, 26),
                 Location = new Point(0, 5),
-                PlaceholderText = "Search items and currencies...",
+                PlaceholderText = "Search items, currencies, characters...",
                 Text = _lastSearchText ?? "",
                 Parent = _filterPanel
             };
@@ -313,73 +418,22 @@ namespace GW2CraftingHelper.Views
                 RebuildContent();
             };
 
-            // Source-filter row: one checkbox per storage location, all
-            // checked by default. Only meaningful when the content-type
-            // dropdown includes Items (All/Items) - left visible-but-inert
-            // when Wallet is selected rather than adding show/hide logic
-            // that itself needs testing (d1 Feature 1's deliberate
-            // simplicity choice).
+            // Source-filter row: one checkbox per storage location plus one
+            // per character, all checked by default. Only meaningful when
+            // the content-type dropdown includes Items (All/Items) - left
+            // visible-but-inert when Wallet is selected rather than adding
+            // show/hide logic that itself needs testing (d1 Feature 1's
+            // deliberate simplicity choice). The checkboxes themselves are
+            // created by RebuildSourceFilterRow from the marshaled tail
+            // below, not here: they are account-driven (so they must be
+            // rebuilt on every SetSnapshot too, from the main thread) and
+            // keeping the single creation path means the two entry points
+            // cannot drift.
             _sourceFilterPanel = new Panel()
             {
-                Size = new Point(w, SourceFilterHeight),
+                Size = new Point(w, _sourceFilterHeight),
                 Location = new Point(0, SourceFilterRowY),
                 Parent = buildPanel
-            };
-
-            _bankCheckbox = new Checkbox()
-            {
-                Text = "Bank",
-                Checked = _bankEnabled,
-                Size = new Point(70, 25),
-                Location = new Point(0, 3),
-                Parent = _sourceFilterPanel
-            };
-            _bankCheckbox.CheckedChanged += (_, __) =>
-            {
-                _bankEnabled = _bankCheckbox.Checked;
-                RebuildContent();
-            };
-
-            _materialStorageCheckbox = new Checkbox()
-            {
-                Text = "Material Storage",
-                Checked = _materialStorageEnabled,
-                Size = new Point(170, 25),
-                Location = new Point(80, 3),
-                Parent = _sourceFilterPanel
-            };
-            _materialStorageCheckbox.CheckedChanged += (_, __) =>
-            {
-                _materialStorageEnabled = _materialStorageCheckbox.Checked;
-                RebuildContent();
-            };
-
-            _sharedInventoryCheckbox = new Checkbox()
-            {
-                Text = "Shared Inventory",
-                Checked = _sharedInventoryEnabled,
-                Size = new Point(170, 25),
-                Location = new Point(260, 3),
-                Parent = _sourceFilterPanel
-            };
-            _sharedInventoryCheckbox.CheckedChanged += (_, __) =>
-            {
-                _sharedInventoryEnabled = _sharedInventoryCheckbox.Checked;
-                RebuildContent();
-            };
-
-            _charactersCheckbox = new Checkbox()
-            {
-                Text = "Characters",
-                Checked = _charactersEnabled,
-                Size = new Point(110, 25),
-                Location = new Point(440, 3),
-                Parent = _sourceFilterPanel
-            };
-            _charactersCheckbox.CheckedChanged += (_, __) =>
-            {
-                _charactersEnabled = _charactersCheckbox.Checked;
-                RebuildContent();
             };
 
             // Coin display panel - see UpdateCoinDisplay's doc comment for
@@ -502,6 +556,7 @@ namespace GW2CraftingHelper.Views
                 // can no longer see. Wasted work, not a hazard.
                 if (_headerPanel == null || _headerPanel.Parent == null) return;
 
+                RebuildSourceFilterRow();
                 UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
                 ApplyStatusDisplay();
                 RebuildContent();
@@ -514,14 +569,253 @@ namespace GW2CraftingHelper.Views
             int w = container.ContentRegion.Width;
             int h = container.ContentRegion.Height;
 
+            _containerWidth = w;
+            _containerHeight = h;
+
             _headerPanel.Size = new Point(w, HeaderHeight);
             _clearButton.Location = new Point(w - 220, 5);
             _refreshButton.Location = new Point(w - 110, 5);
             _statusPanel.Size = new Point(w, StatusRowHeight);
             _filterPanel.Size = new Point(w, SearchRowHeight);
-            _sourceFilterPanel.Size = new Point(w, SourceFilterHeight);
-            _coinPanel.Size = new Point(w, CoinHeight);
-            _contentPanel.Size = new Point(w, h - TopRegionHeight);
+
+            // Re-flows the source-filter checkboxes at the new width (a
+            // narrower window can push them onto more rows) and re-anchors
+            // the coin and content panels beneath whatever height that
+            // needs - the reason those two are not sized here directly.
+            ApplyTopRegionLayout();
+        }
+
+        /// <summary>
+        /// Disposes and recreates every source-filter checkbox from the
+        /// current roster, restoring each one's session-sticky checked state
+        /// (see <see cref="_uncheckedCharacters"/>), then re-flows the row.
+        /// Main-thread only, like every other control mutation here: both
+        /// call sites are <c>Build</c>'s marshaled tail and
+        /// <see cref="SetSnapshot"/> (itself only reached from
+        /// Module.Update's tick or a marshaled refresh tail).
+        /// </summary>
+        private void RebuildSourceFilterRow()
+        {
+            if (_sourceFilterPanel == null) return;
+
+            foreach (var child in _sourceFilterPanel.Children.ToArray())
+            {
+                child.Dispose();
+            }
+
+            _sourceFilterCells.Clear();
+            _characterCheckboxes.Clear();
+            _charactersMasterCheckbox = null;
+
+            AddSourceCheckbox("Bank", _bankEnabled, isChecked => _bankEnabled = isChecked);
+            AddSourceCheckbox("Material Storage", _materialStorageEnabled, isChecked => _materialStorageEnabled = isChecked);
+            AddSourceCheckbox("Shared Inventory", _sharedInventoryEnabled, isChecked => _sharedInventoryEnabled = isChecked);
+
+            // A master toggle earns its place only once there is more than
+            // one character to cascade to.
+            if (_characterNames.Count > 1)
+            {
+                _charactersMasterCheckbox = AddSourceCheckbox("All Characters", AllCharactersChecked(), SetAllCharactersChecked);
+            }
+
+            foreach (string name in _characterNames)
+            {
+                _characterCheckboxes.Add(AddSourceCheckbox(
+                    name,
+                    !_uncheckedCharacters.Contains(name),
+                    isChecked => OnCharacterToggled(name, isChecked)));
+            }
+
+            ApplyTopRegionLayout();
+        }
+
+        /// <summary>
+        /// Ordinal element-wise comparison of two rosters. Order is
+        /// meaningful and stable - CollectCharacterNames sorts - so two
+        /// snapshots of the same account compare equal.
+        /// </summary>
+        private static bool RosterEquals(List<string> left, List<string> right)
+        {
+            if (ReferenceEquals(left, right)) return true;
+            if (left == null || right == null) return false;
+            if (left.Count != right.Count) return false;
+
+            for (int i = 0; i < left.Count; i++)
+            {
+                if (!string.Equals(left[i], right[i], StringComparison.Ordinal)) return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Creates one source-filter checkbox, appends it to the flow order,
+        /// and wires its click to <paramref name="onChanged"/> plus a single
+        /// content rebuild. Location is a placeholder until
+        /// <see cref="ApplyTopRegionLayout"/> flows the row.
+        /// </summary>
+        private Checkbox AddSourceCheckbox(string text, bool isChecked, Action<bool> onChanged)
+        {
+            var checkbox = new Checkbox()
+            {
+                Text = text,
+                Checked = isChecked,
+                Size = new Point(MeasureCheckboxWidth(text), SourceFilterCellHeight),
+                Location = new Point(0, SourceFilterTopPad),
+                Parent = _sourceFilterPanel
+            };
+
+            checkbox.CheckedChanged += (_, __) =>
+            {
+                if (_suppressSourceFilterEvents) return;
+                onChanged(checkbox.Checked);
+                RebuildContent();
+            };
+
+            _sourceFilterCells.Add(checkbox);
+            return checkbox;
+        }
+
+        private static int MeasureCheckboxWidth(string text)
+        {
+            var font = GameService.Content.DefaultFont14;
+            int textWidth = (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
+            return textWidth + CheckboxChromeWidth;
+        }
+
+        private bool AllCharactersChecked()
+        {
+            foreach (string name in _characterNames)
+            {
+                if (_uncheckedCharacters.Contains(name)) return false;
+            }
+
+            return true;
+        }
+
+        private void SetAllCharactersChecked(bool isChecked)
+        {
+            _suppressSourceFilterEvents = true;
+            try
+            {
+                for (int i = 0; i < _characterNames.Count; i++)
+                {
+                    string name = _characterNames[i];
+                    if (isChecked)
+                    {
+                        _uncheckedCharacters.Remove(name);
+                    }
+                    else
+                    {
+                        _uncheckedCharacters.Add(name);
+                    }
+
+                    if (i < _characterCheckboxes.Count)
+                    {
+                        _characterCheckboxes[i].Checked = isChecked;
+                    }
+                }
+            }
+            finally
+            {
+                _suppressSourceFilterEvents = false;
+            }
+        }
+
+        private void OnCharacterToggled(string characterName, bool isChecked)
+        {
+            if (isChecked)
+            {
+                _uncheckedCharacters.Remove(characterName);
+            }
+            else
+            {
+                _uncheckedCharacters.Add(characterName);
+            }
+
+            if (_charactersMasterCheckbox != null)
+            {
+                _suppressSourceFilterEvents = true;
+                try
+                {
+                    _charactersMasterCheckbox.Checked = AllCharactersChecked();
+                }
+                finally
+                {
+                    _suppressSourceFilterEvents = false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Flows the source-filter checkboxes at the current width and
+        /// re-anchors the coin and content rows beneath the height that
+        /// needs - the one place <see cref="_sourceFilterHeight"/> (and
+        /// therefore CoinRowY/ContentY/TopRegionHeight) is written.
+        /// </summary>
+        private void ApplyTopRegionLayout()
+        {
+            int w = _containerWidth;
+
+            if (_sourceFilterPanel != null)
+            {
+                var widths = new List<int>(_sourceFilterCells.Count);
+                foreach (var checkbox in _sourceFilterCells)
+                {
+                    widths.Add(checkbox.Width);
+                }
+
+                var flow = SourceFilterFlowLayout.Layout(
+                    widths, w, SourceFilterCellHeight, SourceFilterCellGapX, SourceFilterRowGapY);
+                int height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
+
+                // Past the cap the row scrolls rather than growing, so the
+                // cells have to be re-flowed clear of the scrollbar strip -
+                // which can itself wrap one more cell, hence the second pass.
+                int cap = MaxSourceFilterHeight;
+                bool scroll = height > cap;
+                if (scroll)
+                {
+                    flow = SourceFilterFlowLayout.Layout(
+                        widths,
+                        w - SourceFilterScrollbarAllowance,
+                        SourceFilterCellHeight,
+                        SourceFilterCellGapX,
+                        SourceFilterRowGapY);
+                    height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
+                }
+
+                for (int i = 0; i < _sourceFilterCells.Count; i++)
+                {
+                    _sourceFilterCells[i].Location = new Point(flow.Cells[i].X, SourceFilterTopPad + flow.Cells[i].Y);
+                }
+
+                if (height < SourceFilterSingleRowHeight)
+                {
+                    height = SourceFilterSingleRowHeight;
+                }
+
+                _sourceFilterHeight = height < cap ? height : cap;
+                _sourceFilterPanel.CanScroll = scroll;
+                _sourceFilterPanel.Size = new Point(w, _sourceFilterHeight);
+            }
+
+            if (_coinPanel != null)
+            {
+                _coinPanel.Location = new Point(0, CoinRowY);
+                _coinPanel.Size = new Point(w, CoinHeight);
+            }
+
+            if (_contentPanel != null)
+            {
+                // MaxSourceFilterHeight already reserves MinContentHeight
+                // here; a window shorter than the fixed rows above the
+                // filter row can still drive this negative, and clamping at
+                // zero keeps the panel degenerate-but-valid.
+                int contentHeight = _containerHeight - TopRegionHeight;
+                _contentPanel.Location = new Point(0, ContentY);
+                _contentPanel.Size = new Point(w, contentHeight > 0 ? contentHeight : 0);
+            }
         }
 
         /// <summary>
@@ -825,12 +1119,21 @@ namespace GW2CraftingHelper.Views
 
             if (filter == "All" || filter == "Items")
             {
+                // Read from the sticky fields, not the checkboxes: the
+                // fields are the source of truth the controls are built
+                // from, and the controls do not exist until the row is
+                // rebuilt on the main thread. The exclusion set is copied
+                // (roster-sized, so tens of entries) rather than handed over
+                // by reference: SnapshotSourceFilter is a mutable public
+                // carrier, and nothing across that boundary promises to
+                // leave it alone - a normalizing or pruning pass on the far
+                // side would otherwise silently re-check the user's boxes.
                 var sourceFilter = new SnapshotSourceFilter
                 {
-                    Bank = _bankCheckbox?.Checked ?? true,
-                    MaterialStorage = _materialStorageCheckbox?.Checked ?? true,
-                    SharedInventory = _sharedInventoryCheckbox?.Checked ?? true,
-                    Characters = _charactersCheckbox?.Checked ?? true
+                    Bank = _bankEnabled,
+                    MaterialStorage = _materialStorageEnabled,
+                    SharedInventory = _sharedInventoryEnabled,
+                    UncheckedCharacters = new HashSet<string>(_uncheckedCharacters, StringComparer.Ordinal)
                 };
 
                 itemRows = SnapshotSearchResultBuilder.BuildItemRows(
@@ -856,9 +1159,9 @@ namespace GW2CraftingHelper.Views
                 string message;
                 if (filter == "Wallet")
                 {
-                    // Wallet has no per-source breakdown at all - the four
-                    // Bank/Material Storage/Shared Inventory/Characters
-                    // checkboxes are documented and implemented as having
+                    // Wallet has no per-source breakdown at all - the
+                    // storage-location and per-character checkboxes are
+                    // documented and implemented as having
                     // zero effect here (FilterWallet takes no
                     // SnapshotSourceFilter), so the items-oriented "in the
                     // selected sources" wording below would be factually
