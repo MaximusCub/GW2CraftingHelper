@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Blish_HUD;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views
@@ -36,7 +35,12 @@ namespace GW2CraftingHelper.Views
         // next to the view-only "Clear view".
         private const int DeleteButtonWidth = 120;
         private const int Gap = 8;
-        private const int StatusLabelX = LevelDropdownWidth + Gap + SearchBoxWidth + Gap + FollowCheckboxWidth + Gap;
+
+        // Full-width status row beneath the toolbar, mirroring MainView's
+        // own _statusPanel: the status label is auto-sized, so sharing the
+        // toolbar row with the three right-anchored buttons ran a long
+        // status underneath them at the module's default width.
+        private const int StatusRowHeight = 24;
 
         private static readonly Color DebugColor = new Color(130, 130, 130);
         private static readonly Color InfoColor = new Color(210, 210, 210);
@@ -49,6 +53,7 @@ namespace GW2CraftingHelper.Views
         private readonly ModalDialog _modalDialog;
 
         private Panel _toolbarPanel;
+        private Panel _statusPanel;
         private FlowPanel _contentPanel;
         private Dropdown _levelDropdown;
         private TextBox _searchBox;
@@ -57,10 +62,6 @@ namespace GW2CraftingHelper.Views
         private StandardButton _clearViewButton;
         private StandardButton _deleteFileButton;
         private Label _statusLabel;
-
-        // Untruncated status text: the label itself may only be holding an
-        // ellipsized form of it (see ApplyStatusLabelText).
-        private string _statusFullText = "";
 
         // Last Version this view has fully rendered up to (via either
         // RebuildRows or AppendNewRows) - PollForUpdates uses this both to
@@ -143,9 +144,10 @@ namespace GW2CraftingHelper.Views
         // one except Build's own tail, which IS the thing being awaited)
         // additionally defer to Build's tail rather than acting while it is
         // still pending. This is narrower than "every field this class
-        // touches is main-thread-only": the eight control fields (_toolbarPanel,
+        // touches is main-thread-only": the control fields (_toolbarPanel,
         // _levelDropdown, _searchBox, _followCheckbox, _clearViewButton,
-        // _copyButton, _statusLabel, _contentPanel) are still first
+        // _copyButton, _deleteFileButton, _statusPanel, _statusLabel,
+        // _contentPanel) are still first
         // PUBLISHED by the rest of Build()'s body on the ThreadPool thread,
         // same as every Blish view in this module - any main-thread read of
         // one of them (e.g. CopyToClipboard/SetStatus reading
@@ -265,20 +267,29 @@ namespace GW2CraftingHelper.Views
             };
             _deleteFileButton.Click += (_, __) => ConfirmDeleteLogFile();
 
+            _statusPanel = new Panel
+            {
+                Size = new Point(w, StatusRowHeight),
+                Location = new Point(0, ToolbarHeight),
+                Parent = container
+            };
+
             _statusLabel = new Label
             {
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = StatusColor,
-                Location = new Point(StatusLabelX, 12),
-                Parent = _toolbarPanel
+                // Y=2 inside this 24px row, matching MainView's own status
+                // label for the same DefaultFont14 clearance.
+                Location = new Point(0, 2),
+                Parent = _statusPanel
             };
 
             _contentPanel = new FlowPanel
             {
-                Size = new Point(w, container.ContentRegion.Height - ToolbarHeight),
-                Location = new Point(0, ToolbarHeight),
+                Size = new Point(w, container.ContentRegion.Height - ToolbarHeight - StatusRowHeight),
+                Location = new Point(0, ToolbarHeight + StatusRowHeight),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
                 Parent = container
@@ -290,7 +301,8 @@ namespace GW2CraftingHelper.Views
             {
                 int newWidth = container.ContentRegion.Width;
                 _toolbarPanel.Size = new Point(newWidth, ToolbarHeight);
-                _contentPanel.Size = new Point(newWidth, container.ContentRegion.Height - ToolbarHeight);
+                _statusPanel.Size = new Point(newWidth, StatusRowHeight);
+                _contentPanel.Size = new Point(newWidth, container.ContentRegion.Height - ToolbarHeight - StatusRowHeight);
                 PositionToolbarButtons(newWidth);
             };
 
@@ -315,7 +327,7 @@ namespace GW2CraftingHelper.Views
             // thread-only - see the correctness-invariant note on
             // _buildComplete's own doc comment for the narrower, precise
             // claim (the row-rendering state only) and what is deliberately
-            // left OUTSIDE it (the eight control fields Build() publishes
+            // left OUTSIDE it (the control fields Build() publishes
             // below, on this same ThreadPool thread).
             MainThreadMarshal.Run(() =>
             {
@@ -349,32 +361,6 @@ namespace GW2CraftingHelper.Views
             _deleteFileButton.Location = new Point(w - (ButtonWidth * 2) - DeleteButtonWidth - (Gap * 3), 5);
             _copyButton.Location = new Point(w - (ButtonWidth * 2) - (Gap * 2), 5);
             _clearViewButton.Location = new Point(w - ButtonWidth - Gap, 5);
-
-            ApplyStatusLabelText();
-        }
-
-        /// <summary>
-        /// Fits the status text into the run between the left control
-        /// cluster and the Delete Log File button (the leftmost of the
-        /// three right-anchored ones): the label is auto-sized, so at a
-        /// narrow toolbar a long status would otherwise run underneath it.
-        /// Follows the plan renderers' EllipsizeToWidth + tooltip-on-
-        /// truncate convention, so nothing is lost when it does not fit.
-        /// Re-run on every resize as well as on every status change,
-        /// because either can change the fit.
-        /// </summary>
-        private void ApplyStatusLabelText()
-        {
-            if (_statusLabel == null || _deleteFileButton == null)
-            {
-                return;
-            }
-
-            int available = _deleteFileButton.Location.X - StatusLabelX - Gap;
-            string display = LabelHelpers.EllipsizeToWidth(_statusLabel.Font, _statusFullText, available);
-
-            _statusLabel.Text = display;
-            _statusLabel.BasicTooltipText = display != _statusFullText ? _statusFullText : null;
         }
 
         /// <summary>
@@ -610,9 +596,8 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            _statusFullText = text ?? "";
             _statusLabel.TextColor = isError ? ErrorColor : StatusColor;
-            ApplyStatusLabelText();
+            _statusLabel.Text = text ?? "";
         }
 
         /// <summary>
