@@ -8508,15 +8508,19 @@ in that proposal, against their original opposite choices).
   degraded snapshot happened to omit a character.
 - **Layout mechanism:** the row is account-sized (1 to 15+ characters), so
   it can no longer use fixed X positions. MainView measures each label
-  with DefaultFont14 (plus a 40px box-and-gap constant that reproduces the
-  four widths the row previously hardcoded) and hands the widths to a new
+  with DefaultFont14 (plus a 40px box-and-gap constant chosen to land
+  close to the four widths the row previously hardcoded - an
+  approximation, not a reproduction: no single constant can make two
+  different 16-character labels both measure 170) and hands the widths to a new
   Blish-free SourceFilterFlowLayout, which wraps them left-to-right and
   returns per-cell offsets plus the height the row needs. CoinRowY /
   ContentY / TopRegionHeight became computed properties over that measured
   height, so the coin and content rows shift down by however many rows the
   filter wrapped onto - on build, on every snapshot, and on every resize
   (a narrower window re-wraps). Single-row height is floored at the exact
-  30px the row had before, so the common case is pixel-identical.
+  30px the row had before, so the common case is unchanged vertically -
+  the exact part of the reproduction; the cells' own X positions are the
+  measured approximation above.
 - **The row is bounded, and scrolls past the bound:** an account-sized row
   cannot be allowed to grow without limit - a large roster in a short
   window would otherwise push the result list to zero height, with no way
@@ -8547,6 +8551,11 @@ in that proposal, against their original opposite choices).
   master toggle (present only when there
   is more than one character) cascades check/uncheck-all behind a
   re-entrancy guard, so one user click stays one content rebuild.
+  **Known two-state quirk:** after unchecking the master, a character
+  first appearing in a later snapshot renders checked while the master
+  still reads unchecked - a deliberate consequence of the exclusion model
+  (only named characters are excluded, so an unknown name defaults to
+  visible); a tri-state master visual was considered and deferred.
   RebuildContent now reads the sticky fields rather than the controls,
   which is also what makes it safe while the row does not yet exist.
 - **Character-name search (commit 2):** typing a character's name
@@ -8619,3 +8628,59 @@ unreliable; the cap/scroll math was review-verified and the
 CanScroll-after-construction caveat stands as the one untested
 behavior - re-check visually if a large-roster account ever shows
 a scrolling filter row.
+
+## Nice to Have batch (nth-cleanup)
+
+The nine non-controversial Nice to Have findings from the PR #142 and
+#143 adversarial reviews, applied together on branch `nth-cleanup`.
+Behavior is preserved except where a bullet says otherwise.
+
+- **Flush drain budget hoisted:** Module.Unload and
+  ModuleLog.DeleteFileAndReset each spelled out 250ms, with the latter's
+  doc asserting in prose that they matched. `ModuleLog.FlushDrainBudget`
+  now carries it for both.
+- **Log toolbar status label bounded (behavior change):** the auto-sized
+  status label could run under the right-anchored Delete Log File button
+  at a narrow width. It is now ellipsized to the run between the two,
+  with the full string on the tooltip when shortened, re-fitted on
+  resize as well as on every status change.
+- **Source-filter re-flow skipped when its inputs have not moved:** the
+  Snapshot tab re-flowed the checkbox row on every resize event,
+  including height-only ones. The flow pass now runs only when the
+  available width or the height-driven row cap changed - the cap
+  because it decides whether the row scrolls and so re-flows narrower.
+- **Outgoing checkbox references dropped with the panel:** Build
+  replaces `_sourceFilterPanel` on a ThreadPool thread, but the three
+  fields holding its checkboxes were only refilled from the marshaled
+  tail; a resize in that window wrote Location on controls belonging to
+  the replaced panel. Cleared by reference swap next to the panel
+  construction, so a concurrent main-thread read still sees a
+  consistent list.
+- **No substring per character source:** SnapshotSearchResultBuilder.
+  IsSourceEnabled compares the name half of "Character:<name>" in place
+  with string.CompareOrdinal instead of allocating a Substring per
+  source per item on the keystroke path.
+- **Comment/doc corrections:** ApiAccessDialog's claim that ModalDialog
+  has fixed Regenerate/Cancel buttons (its confirm button is
+  caller-named); ApplyStatusDisplay's claim that a Settings save changes
+  the label and the auto-refresh gate together (it is re-read on the
+  next ApplyStatusDisplay call); the sticky-state field block's inert
+  `<para>` tags and design narration; CheckboxChromeWidth's
+  "reproduces the four widths" (it approximates them - only the
+  single-row height is exact, corrected in this file too);
+  SourceFilterFlowLayout's class-level `<paramref>` moved onto the
+  method that has the parameter; stray blank lines in
+  SourceFilterFlowLayoutTests.
+
+Open by choice - the two behavioral Nice to Haves this batch
+deliberately skipped:
+
+- **Character-search minimum query length:** a one-character query still
+  walks every source of every non-matching item. Left as is; the worst
+  case is still bounded by the empty-search rebuild.
+- **Tri-state master checkbox:** the two-state quirk recorded in the
+  char-source-search section above stands.
+
+Validation: build 0 errors and the full suite green (1884) before each
+commit.
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
