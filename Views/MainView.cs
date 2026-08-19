@@ -58,30 +58,18 @@ namespace GW2CraftingHelper.Views
         private readonly Action<string> _saveStatus;
         private readonly Action<string> _saveStatusThreadSafe;
 
-        // Session-sticky search/filter state (d1-snapshot-about-settings.md
-        // Feature 1's "Tab views are rebuilt from scratch" cross-cutting
-        // finding: Build() tears down and recreates every control on each
-        // tab visit, so anything that should feel "sticky" across tab
-        // switches must live in these instance fields, not the controls
-        // themselves, and be read back in when Build() reruns). Every source
-        // toggle defaults to true (show everything) and the content-type
-        // dropdown defaults to "All", matching the tab's pre-search implicit
-        // no-filter behavior.
-        // <para>
-        // Characters are held as the same exclusion set SnapshotSourceFilter
-        // takes, keyed by character name: a name absent from it is checked,
-        // so a character new in a fresh snapshot defaults to visible, and a
-        // deliberately-unchecked one stays unchecked across tab bounces and
-        // snapshot refreshes. Stale names (a deleted character) are left in
-        // the set rather than pruned per snapshot - they match nothing, and
-        // pruning would silently forget the user's choice whenever a
-        // degraded snapshot happened to omit a character.
-        // </para>
+        // Session-sticky search/filter state: Build() recreates every
+        // control per tab visit, so anything that has to survive a tab
+        // switch lives here and is read back in when Build() reruns.
         private string _lastSearchText = "";
         private string _lastFilterSelection = "All";
         private bool _bankEnabled = true;
         private bool _materialStorageEnabled = true;
         private bool _sharedInventoryEnabled = true;
+
+        // Exclusion set, keyed by character name: absent means checked, so
+        // a character new in a fresh snapshot defaults to visible. Stale
+        // names are never pruned.
         private readonly HashSet<string> _uncheckedCharacters = new HashSet<string>(StringComparer.Ordinal);
 
         // Roster driving the per-character checkboxes, rebuilt once per
@@ -157,8 +145,10 @@ namespace GW2CraftingHelper.Views
         private const int MinContentHeight = 120;
 
         // Checkbox width beyond its measured label: the box glyph plus its
-        // text gap. Reproduces the four widths this row previously hardcoded
-        // (e.g. "Bank" 70, "Material Storage" 170) from the measured text.
+        // text gap. Approximates the four widths this row previously
+        // hardcoded (e.g. "Bank" 70, "Material Storage" 170) from the
+        // measured text - close, not equal; only the single-row height is
+        // reproduced exactly.
         private const int CheckboxChromeWidth = 40;
 
         private int _sourceFilterHeight = SourceFilterSingleRowHeight;
@@ -991,7 +981,8 @@ namespace GW2CraftingHelper.Views
         /// SnapshotRefreshIntervalMinutes setting - the same threshold
         /// Module.Update()'s auto-refresh gate reads, re-read (clamped)
         /// on every call here just like that gate does, so a Settings tab
-        /// save changes both together. Called from every place the
+        /// save is picked up by the next call rather than needing a
+        /// rebuild. Called from every place the
         /// status text or the snapshot itself changes (Build's initial
         /// render, SetSnapshot, SetStatus) so the two can never drift out
         /// of sync with each other.
