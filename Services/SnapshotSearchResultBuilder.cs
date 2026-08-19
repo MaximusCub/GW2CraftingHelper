@@ -173,6 +173,67 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// Every character name the snapshot knows about, deduped and sorted
+        /// (case-insensitive, with an ordinal tiebreak so two names differing
+        /// only by case keep a deterministic order). Drives the Snapshot
+        /// tab's per-character source checkboxes, so it deliberately merges
+        /// both rosters the snapshot carries: the "Character:&lt;name&gt;"
+        /// item sources AND CharacterDisciplines - a character holding no
+        /// items at all still gets a checkbox as long as the snapshot saw it
+        /// somewhere. Zero-count item entries are kept here (unlike
+        /// AccountItemIndex, which drops them) for the same reason: the row
+        /// lists the roster, not what happens to be carried right now.
+        /// Returns an empty list, never null, for a null snapshot.
+        /// </summary>
+        public static List<string> CollectCharacterNames(AccountSnapshot snapshot)
+        {
+            var names = new List<string>();
+            if (snapshot == null)
+            {
+                return names;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+
+            if (snapshot.Items != null)
+            {
+                foreach (var entry in snapshot.Items)
+                {
+                    string source = entry?.Source;
+                    if (source == null || !source.StartsWith(AccountItemIndex.CharacterSourcePrefix, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    string name = source.Substring(AccountItemIndex.CharacterSourcePrefix.Length);
+                    if (name.Length > 0 && seen.Add(name))
+                    {
+                        names.Add(name);
+                    }
+                }
+            }
+
+            if (snapshot.CharacterDisciplines != null)
+            {
+                foreach (var discipline in snapshot.CharacterDisciplines)
+                {
+                    string name = discipline?.CharacterName;
+                    if (!string.IsNullOrEmpty(name) && seen.Add(name))
+                    {
+                        names.Add(name);
+                    }
+                }
+            }
+
+            names.Sort((a, b) =>
+            {
+                int byName = string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+                return byName != 0 ? byName : string.CompareOrdinal(a, b);
+            });
+            return names;
+        }
+
+        /// <summary>
         /// Case-insensitive substring filter over wallet entries by
         /// currency name only (source filtering does not apply to
         /// Wallet - currencies have no per-source breakdown at all).
@@ -211,9 +272,10 @@ namespace GW2CraftingHelper.Services
         /// True when the raw AccountItemIndex source string passes the
         /// currently-checked categories in <paramref name="filter"/>. A
         /// null filter is treated as "show everything" (matches the
-        /// controls' own all-checked default). A raw source string that
-        /// matches none of the four known shapes (Bank/MaterialStorage/
-        /// SharedInventory/Character:&lt;name&gt;) is shown regardless -
+        /// controls' own all-checked default), as is a character whose name
+        /// is absent from SnapshotSourceFilter.UncheckedCharacters. A raw
+        /// source string that matches none of the four known shapes
+        /// (Bank/MaterialStorage/SharedInventory/Character:&lt;name&gt;) is shown regardless -
         /// failing open rather than silently hiding real inventory data
         /// the module does not yet recognize (KNOWN-ISSUES #31's "never
         /// silently mask data" posture); there is no such source today.
@@ -232,7 +294,13 @@ namespace GW2CraftingHelper.Services
 
             if (rawSource.StartsWith(AccountItemIndex.CharacterSourcePrefix, StringComparison.Ordinal))
             {
-                return filter.Characters;
+                var excluded = filter.UncheckedCharacters;
+                if (excluded == null || excluded.Count == 0)
+                {
+                    return true;
+                }
+
+                return !excluded.Contains(rawSource.Substring(AccountItemIndex.CharacterSourcePrefix.Length));
             }
 
             switch (rawSource)
