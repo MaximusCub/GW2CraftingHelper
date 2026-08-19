@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using Blish_HUD;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
@@ -12,7 +13,8 @@ namespace GW2CraftingHelper.Views
     /// <summary>
     /// The Log tab's search/view pane (d2-log-system.md Section 3):
     /// level-filter dropdown, text search, follow-tail, copy-to-clipboard,
-    /// and clear-view, backed directly by a ModuleLog's ring buffer.
+    /// clear-view, and the confirm-gated destructive delete-log-file
+    /// action, backed directly by a ModuleLog's ring buffer.
     /// Pattern A (lightweight FlowPanel(CanScroll)) - label-per-row, no
     /// multi-column ellipsized rows that must reflow live during a resize
     /// drag - so this does not opt into the
@@ -28,6 +30,10 @@ namespace GW2CraftingHelper.Views
         private const int SearchBoxWidth = 220;
         private const int FollowCheckboxWidth = 90;
         private const int ButtonWidth = 100;
+        // Wider than ButtonWidth - "Delete Log File" is deliberately
+        // spelled out in full so the destructive scope is unmistakable
+        // next to the view-only "Clear view".
+        private const int DeleteButtonWidth = 120;
         private const int Gap = 8;
 
         private static readonly Color DebugColor = new Color(130, 130, 130);
@@ -38,6 +44,7 @@ namespace GW2CraftingHelper.Views
         private static readonly Color StatusColor = new Color(170, 170, 170);
 
         private readonly ModuleLog _log;
+        private readonly ModalDialog _modalDialog;
 
         private Panel _toolbarPanel;
         private FlowPanel _contentPanel;
@@ -46,6 +53,7 @@ namespace GW2CraftingHelper.Views
         private Checkbox _followCheckbox;
         private StandardButton _copyButton;
         private StandardButton _clearViewButton;
+        private StandardButton _deleteFileButton;
         private Label _statusLabel;
 
         // Last Version this view has fully rendered up to (via either
@@ -175,9 +183,10 @@ namespace GW2CraftingHelper.Views
         private readonly Func<long> _getClearedBeforeVersion;
         private readonly Action<long> _setClearedBeforeVersion;
 
-        public LogTabContent(ModuleLog log, Func<long> getClearedBeforeVersion, Action<long> setClearedBeforeVersion)
+        public LogTabContent(ModuleLog log, ModalDialog modalDialog, Func<long> getClearedBeforeVersion, Action<long> setClearedBeforeVersion)
         {
             _log = log ?? throw new ArgumentNullException(nameof(log));
+            _modalDialog = modalDialog ?? throw new ArgumentNullException(nameof(modalDialog));
             _getClearedBeforeVersion = getClearedBeforeVersion ?? throw new ArgumentNullException(nameof(getClearedBeforeVersion));
             _setClearedBeforeVersion = setClearedBeforeVersion ?? throw new ArgumentNullException(nameof(setClearedBeforeVersion));
         }
@@ -240,6 +249,15 @@ namespace GW2CraftingHelper.Views
                 Parent = _toolbarPanel
             };
             _copyButton.Click += (_, __) => CopyToClipboard();
+
+            _deleteFileButton = new StandardButton
+            {
+                Text = "Delete Log File",
+                Size = new Point(DeleteButtonWidth, 28),
+                BasicTooltipText = "Permanently delete the log file from disk and clear the in-memory log. Cannot be undone.",
+                Parent = _toolbarPanel
+            };
+            _deleteFileButton.Click += (_, __) => ConfirmDeleteLogFile();
 
             _statusLabel = new Label
             {
@@ -319,6 +337,10 @@ namespace GW2CraftingHelper.Views
 
         private void PositionToolbarButtons(int w)
         {
+            // Delete Log File sits leftmost of the three so the two
+            // view-only buttons keep their established right-edge spots
+            // and the destructive one is not the easiest to reach.
+            _deleteFileButton.Location = new Point(w - (ButtonWidth * 2) - DeleteButtonWidth - (Gap * 3), 5);
             _copyButton.Location = new Point(w - (ButtonWidth * 2) - (Gap * 2), 5);
             _clearViewButton.Location = new Point(w - ButtonWidth - Gap, 5);
         }
@@ -479,6 +501,42 @@ namespace GW2CraftingHelper.Views
             // LogTabContent being built for the next tab visit.
             _setClearedBeforeVersion(_log.Version);
             RebuildRowsIfBuilt();
+        }
+
+        /// <summary>
+        /// The destructive counterpart to <see cref="ClearView"/> (d2's
+        /// Open Question 4): deletes the on-disk log file and clears the
+        /// in-memory ring via <see cref="ModuleLog.DeleteFileAndReset"/>,
+        /// behind the same ModalDialog confirm the Crafting Plan tab uses
+        /// for its own regenerate gate. The confirm callback fires on the
+        /// main thread (a ModalDialog button Click handler), but the
+        /// destructive work runs on Task.Run: DeleteFileAndReset drains
+        /// the flush queue (bounded) and then takes the file gate for real
+        /// disk IO - a lock the background FlushLoop can hold through a
+        /// slow append or full-file trim, exactly the cross-thread stall
+        /// ModuleLog.Write's own doc comment forbids on a
+        /// latency-sensitive thread. The status/rebuild tail marshals back
+        /// via MainThreadMarshal.Run, the same thread every other rebuild
+        /// entry point here already runs on.
+        /// </summary>
+        private void ConfirmDeleteLogFile()
+        {
+            _modalDialog.Show(
+                "This permanently deletes the log file from disk. Continue?",
+                () =>
+                {
+                    Task.Run(() =>
+                    {
+                        _log.DeleteFileAndReset();
+                        MainThreadMarshal.Run(() =>
+                        {
+                            SetStatus("Log file deleted", isError: false);
+                            RebuildRowsIfBuilt();
+                        });
+                    });
+                },
+                null,
+                confirmText: "Delete");
         }
 
         private void CopyToClipboard()

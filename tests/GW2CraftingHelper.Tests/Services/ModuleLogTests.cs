@@ -391,5 +391,84 @@ namespace GW2CraftingHelper.Tests.Services
             var log = new ModuleLog();
             log.PruneOlderThan(14);
         }
+
+        // --- DeleteFileAndReset: the destructive "clear log file" action
+        // (file + ring together, plus a trace entry), against a REAL
+        // ModuleLogStore/temp dir. ---
+
+        [Fact]
+        public void DeleteFileAndReset_ClearsRingAndFile_LeavesOnlyTraceEntry()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                var store = new ModuleLogStore(tmp.Path);
+                var log = new ModuleLog();
+                log.Configure(store, 0, null);
+
+                log.Write(ModuleLogLevel.Info, "t", "one");
+                log.Write(ModuleLogLevel.Warn, "t", "two");
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.Equal(2, store.ReadAll().Count);
+                long versionBefore = log.Version;
+
+                log.DeleteFileAndReset();
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+
+                // Ring holds only the trace entry; Version stayed monotonic
+                // (the delete's own trace write bumped it, nothing reset it).
+                var snapshot = log.Snapshot();
+                Assert.Single(snapshot);
+                Assert.Equal(ModuleLogLevel.Info, snapshot[0].Level);
+                Assert.Contains("deleted", snapshot[0].Message, StringComparison.OrdinalIgnoreCase);
+                Assert.Equal(versionBefore + 1, log.Version);
+
+                // File was recreated with exactly the trace entry.
+                var fileEntries = store.ReadAll();
+                Assert.Single(fileEntries);
+                Assert.Contains("deleted", fileEntries[0].Message, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        [Fact]
+        public void DeleteFileAndReset_NextSessionSeed_DoesNotResurrectDeletedEntries()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                var store = new ModuleLogStore(tmp.Path);
+                var log = new ModuleLog();
+                log.Configure(store, 0, null);
+
+                log.Write(ModuleLogLevel.Info, "t", "pre-delete");
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+
+                log.DeleteFileAndReset();
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+
+                // Simulate the next session: a fresh ModuleLog seeding from
+                // the same on-disk store. This is exactly why a view-only
+                // floor is not enough - the file seed must have nothing to
+                // resurrect except the trace entry.
+                var nextSession = new ModuleLog();
+                nextSession.Configure(new ModuleLogStore(tmp.Path), 0, null);
+                nextSession.SeedFromStore();
+
+                var seeded = nextSession.Snapshot();
+                Assert.Single(seeded);
+                Assert.Contains("deleted", seeded[0].Message, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        [Fact]
+        public void DeleteFileAndReset_NoStoreAttached_ClearsRingAndWritesTraceEntry()
+        {
+            var log = new ModuleLog();
+            log.Write(ModuleLogLevel.Info, "t", "one");
+
+            log.DeleteFileAndReset();
+
+            var snapshot = log.Snapshot();
+            Assert.Single(snapshot);
+            Assert.Contains("deleted", snapshot[0].Message, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

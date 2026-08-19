@@ -2107,7 +2107,8 @@ namespace GW2CraftingHelper.Views
                         _suppressToggle = false;
                         _ownMaterialsCheckbox.Enabled = true;
                         _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
-                    });
+                    },
+                    confirmText: "Regenerate");
                 return;
             }
 

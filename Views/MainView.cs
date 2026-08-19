@@ -37,13 +37,6 @@ namespace GW2CraftingHelper.Views
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
         private static readonly Color WarningTextColor = new Color(255, 200, 60);
 
-        // Mirrors Module.cs's own StaleThreshold constant. d1's proposed
-        // shared SnapshotRefreshIntervalMinutes
-        // setting (Feature 3) is deliberately not added; this
-        // local constant keeps the staleness label's own threshold
-        // reasonable in the meantime without inventing a second setting.
-        private static readonly TimeSpan StaleThreshold = TimeSpan.FromMinutes(10);
-
         private AccountSnapshot _snapshot;
         private AccountItemIndex _accountItemIndex;
 
@@ -60,6 +53,7 @@ namespace GW2CraftingHelper.Views
         private string _initialStatus;
         private readonly Func<Task<AccountSnapshot>> _refreshAsync;
         private readonly ApiAccessDialog _apiAccessDialog;
+        private readonly ModuleSettings _settings;
         private readonly Action _clearCache;
         private readonly Action<string> _saveStatus;
         private readonly Action<string> _saveStatusThreadSafe;
@@ -70,12 +64,11 @@ namespace GW2CraftingHelper.Views
         // tab visit, so anything that should feel "sticky" across tab
         // switches must live in these instance fields, not the controls
         // themselves, and be read back in when Build() reruns). All four
-        // source toggles default to true (show everything), matching the
-        // tab's pre-search implicit no-filter behavior. The pre-existing
-        // content-type dropdown deliberately keeps its own prior (reset-
-        // to-default) behavior - only the NEW controls added by this
-        // feature get this treatment.
+        // source toggles default to true (show everything) and the
+        // content-type dropdown defaults to "All", matching the tab's
+        // pre-search implicit no-filter behavior.
         private string _lastSearchText = "";
+        private string _lastFilterSelection = "All";
         private bool _bankEnabled = true;
         private bool _materialStorageEnabled = true;
         private bool _sharedInventoryEnabled = true;
@@ -148,6 +141,7 @@ namespace GW2CraftingHelper.Views
             string initialStatus,
             Func<Task<AccountSnapshot>> refreshAsync,
             ApiAccessDialog apiAccessDialog,
+            ModuleSettings settings,
             Action clearCache,
             Action<string> saveStatus,
             Action<string> saveStatusThreadSafe)
@@ -163,6 +157,7 @@ namespace GW2CraftingHelper.Views
             _initialStatus = initialStatus;
             _refreshAsync = refreshAsync;
             _apiAccessDialog = apiAccessDialog;
+            _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _clearCache = clearCache;
             _saveStatus = saveStatus;
             _saveStatusThreadSafe = saveStatusThreadSafe;
@@ -308,8 +303,15 @@ namespace GW2CraftingHelper.Views
             _filterDropdown.Items.Add("All");
             _filterDropdown.Items.Add("Items");
             _filterDropdown.Items.Add("Wallet");
-            _filterDropdown.SelectedItem = "All";
-            _filterDropdown.ValueChanged += (_, __) => RebuildContent();
+            // Restored before the ValueChanged subscription (matching the
+            // search box's Text-then-TextChanged order above) so the
+            // read-back itself never triggers a redundant rebuild.
+            _filterDropdown.SelectedItem = _lastFilterSelection;
+            _filterDropdown.ValueChanged += (_, __) =>
+            {
+                _lastFilterSelection = _filterDropdown.SelectedItem ?? "All";
+                RebuildContent();
+            };
 
             // Source-filter row: one checkbox per storage location, all
             // checked by default. Only meaningful when the content-type
@@ -646,8 +648,11 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// Composes the header status label's text (base status text plus
         /// a staleness-age suffix, e.g. "Updated - Aug 15, 2026 3:41 PM
-        /// (2m ago)") and recolors it once the snapshot is older than
-        /// <see cref="StaleThreshold"/>. Called from every place the
+        /// (2m ago)") and recolors it once the snapshot is older than the
+        /// SnapshotRefreshIntervalMinutes setting - the same threshold
+        /// Module.Update()'s auto-refresh gate reads, re-read (clamped)
+        /// on every call here just like that gate does, so a Settings tab
+        /// save changes both together. Called from every place the
         /// status text or the snapshot itself changes (Build's initial
         /// render, SetSnapshot, SetStatus) so the two can never drift out
         /// of sync with each other.
@@ -671,7 +676,8 @@ namespace GW2CraftingHelper.Views
                 TimeSpan age = DateTime.UtcNow - _snapshot.CapturedAt;
                 string ageText = StatusText.ForSnapshotAge(age);
                 text = string.IsNullOrEmpty(text) ? ageText : $"{text} ({ageText})";
-                _statusLabel.TextColor = age >= StaleThreshold ? WarningTextColor : _defaultStatusColor;
+                var staleThreshold = TimeSpan.FromMinutes(_settings.GetClampedSnapshotRefreshIntervalMinutes());
+                _statusLabel.TextColor = StatusText.IsStale(age, staleThreshold) ? WarningTextColor : _defaultStatusColor;
             }
             else
             {

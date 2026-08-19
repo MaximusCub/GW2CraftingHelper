@@ -41,7 +41,10 @@ namespace GW2CraftingHelper.Views
             _window.Moved += OnWindowMoved;
         }
 
-        public void Show(string message, Action onConfirm, Action onCancel)
+        // confirmText is required so every caller states its own verb
+        // ("Regenerate", "Delete") - a default here would hand an
+        // unrelated caller the wrong label on a destructive confirm.
+        public void Show(string message, Action onConfirm, Action onCancel, string confirmText)
         {
             if (_isShowing) return;
             _isShowing = true;
@@ -76,7 +79,7 @@ namespace GW2CraftingHelper.Views
 
             var confirmBtn = new StandardButton()
             {
-                Text = "Regenerate",
+                Text = confirmText,
                 Size = new Point(btnW, 25),
                 Location = new Point(btnX, btnY),
                 Parent = _window
