@@ -8596,4 +8596,26 @@ character and confirm the list empties rather than the search overriding
 the box; (4) the bounded row - shrink the window until the filter row hits
 its cap and confirm the result list keeps its minimum height, the row
 gains a working scrollbar, and the checkboxes do not sit under it.
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS on items (1)-(3), (4) not exercisable live (2026-08-19,
+Paint-dummy desktop session, branch build b59df59, captures
+preflight/cs1-cs5). The canned preflight snapshot was enriched with
+three character-sourced items (Mystic Coin 25 + Mystic Clover 5 on
+"Maximus Test", Orichalcum Ore 50 on "Alt Number Two"; original
+backed up as snapshot.json.pre-charsrc-bak) so both rosters were
+live. (1) The row rendered Bank / Material Storage / Shared
+Inventory / All Characters / Alt Number Two / Maximus Test on one
+measured row, no clipping; the merged Mystic Clover row showed
+"x35 - Material Storage 30, Character: Maximus Test 5". (2)
+Unchecking Alt Number Two hid Orichalcum Ore and dropped the All
+Characters master; a Log-tab bounce restored the boxes exactly as
+left with the row still filtered. (3) Typing lowercase "maximus"
+surfaced exactly the two Maximus Test items (account-wide
+breakdowns intact) and no wallet rows; unchecking Maximus Test with
+the search still active emptied the list to the message 'No items
+match "maximus" in the selected sources' - AND-composition
+confirmed live. (4) The 4-row cap cannot be reached with a
+2-character roster and synthetic resize-grip drags are documented
+unreliable; the cap/scroll math was review-verified and the
+CanScroll-after-construction caveat stands as the one untested
+behavior - re-check visually if a large-roster account ever shows
+a scrolling filter row.
