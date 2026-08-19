@@ -8695,4 +8695,15 @@ deliberately skipped:
 
 Validation: build 0 errors and the full suite green before each commit
 (1884, then 1886 once the two IsSourceEnabled boundary tests landed).
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-19, Paint-dummy desktop session, branch build
+3310169, capture preflight/nth1-log-status.png). The one visual
+surface in the batch is the Log status row rework (review Must Fix):
+clicking Copy on an empty log rendered "Nothing to copy" on its own
+full-width row directly below the toolbar - full text, no overlap
+with the Delete Log File / Copy / Clear view buttons, with the "No
+log entries yet." empty state below it. Everything else in the batch
+is comments/docs, a constant hoist, allocation removal (pinned by 2
+new Blish-free tests), and the resize early-out + reader hoists,
+which are code-review-verified (the verify pass caught and the
+orchestrator fixed a third un-hoisted reader in ApplyTopRegionLayout
+before release). Suite 1886/1886.
