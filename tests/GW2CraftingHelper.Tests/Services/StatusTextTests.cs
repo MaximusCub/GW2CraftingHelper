@@ -106,6 +106,41 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("1d ago", StatusText.ForSnapshotAge(TimeSpan.FromDays(1)));
         }
 
+        // ---- IsStale (the staleness label and Module.Update()'s
+        // auto-refresh gate share ONE threshold, sourced from
+        // SnapshotRefreshIntervalMinutes - the threshold is a parameter
+        // here precisely so the caller's setting value flows through
+        // rather than being hardcoded on either side) ----
+
+        [Fact]
+        public void IsStale_AgeBelowThreshold_ReturnsFalse()
+        {
+            Assert.False(StatusText.IsStale(TimeSpan.FromMinutes(9), TimeSpan.FromMinutes(10)));
+        }
+
+        [Fact]
+        public void IsStale_AgeEqualToThreshold_ReturnsTrue()
+        {
+            Assert.True(StatusText.IsStale(TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10)));
+        }
+
+        [Fact]
+        public void IsStale_AgeAboveThreshold_ReturnsTrue()
+        {
+            Assert.True(StatusText.IsStale(TimeSpan.FromMinutes(11), TimeSpan.FromMinutes(10)));
+        }
+
+        [Fact]
+        public void IsStale_SameAge_DifferentThresholds_ThresholdDecides()
+        {
+            // The same 6-minute-old snapshot is stale under a 5-minute
+            // setting and fresh under a 10-minute one - pins that the
+            // verdict tracks the supplied threshold, not a constant.
+            TimeSpan age = TimeSpan.FromMinutes(6);
+            Assert.True(StatusText.IsStale(age, TimeSpan.FromMinutes(5)));
+            Assert.False(StatusText.IsStale(age, TimeSpan.FromMinutes(10)));
+        }
+
         // ---- ForRefreshFailure (field-tested pain: the
         // Snapshot tab's Refresh Now used to show only bare
         // "Refresh Failed - {time}" regardless of cause) ----

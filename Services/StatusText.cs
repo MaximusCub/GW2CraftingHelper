@@ -56,6 +56,20 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// Whether a snapshot of the given age counts as stale against the
+        /// caller-supplied threshold. The Snapshot tab's staleness recolor
+        /// (Views/MainView.cs) and Module.Update()'s auto-refresh gate both
+        /// derive their threshold from
+        /// ModuleSettings.GetClampedSnapshotRefreshIntervalMinutes, so the
+        /// warning color and the auto-refresh can never disagree about
+        /// which snapshots are stale.
+        /// </summary>
+        public static bool IsStale(TimeSpan age, TimeSpan staleThreshold)
+        {
+            return age >= staleThreshold;
+        }
+
+        /// <summary>
         /// Cause text for a failed Refresh Now (Views/MainView.cs), keyed
         /// by SnapshotFailureClassifier's classification - the field-tested
         /// fix for the "Refresh Failed" dead end (at CHARACTER

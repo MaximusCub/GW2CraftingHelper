@@ -401,6 +401,7 @@ namespace GW2CraftingHelper
                 _lastStatus,
                 UserRefreshAsync,
                 _apiAccessDialog,
+                _settings,
                 ClearCache,
                 SaveStatus,
                 SaveStatusThreadSafe
@@ -797,7 +798,7 @@ namespace GW2CraftingHelper
             // than caching it, so a Settings tab save takes effect on the
             // very next Update() without any separate live-push plumbing.
             var staleThreshold = TimeSpan.FromMinutes(_settings.GetClampedSnapshotRefreshIntervalMinutes());
-            if (DateTime.UtcNow - _currentSnapshot.CapturedAt < staleThreshold) return;
+            if (!StatusText.IsStale(DateTime.UtcNow - _currentSnapshot.CapturedAt, staleThreshold)) return;
             if (!_snapshotService.HasRequiredPermissions()) return;
 
             _ = RefreshSnapshotInBackgroundAsync();
