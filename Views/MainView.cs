@@ -436,12 +436,14 @@ namespace GW2CraftingHelper.Views
             // controls belonging to a panel this method has already
             // replaced. Fresh lists rather than Clear() - the main thread
             // may be walking the old ones at this instant, and a reference
-            // swap leaves it a consistent list either way. Every reader
-            // already tolerates the empty state (it is also the state
-            // before the first Build): ApplyTopRegionLayout flows zero
-            // cells to the single-row height, SetAllCharactersChecked
-            // bounds-checks the parallel list, and OnCharacterToggled
-            // null-guards the master.
+            // swap leaves it a consistent list either way, PROVIDED each
+            // reader takes the field into a local once rather than
+            // re-reading it after its own guard - SetAllCharactersChecked
+            // and OnCharacterToggled both do. Every reader also tolerates
+            // the empty/null state, which is the state before the first
+            // Build anyway: ApplyTopRegionLayout flows zero cells to the
+            // single-row height, SetAllCharactersChecked bounds-checks the
+            // parallel list, and OnCharacterToggled null-checks the master.
             _sourceFilterCells = new List<Checkbox>();
             _characterCheckboxes = new List<Checkbox>();
             _charactersMasterCheckbox = null;
@@ -714,6 +716,11 @@ namespace GW2CraftingHelper.Views
 
         private void SetAllCharactersChecked(bool isChecked)
         {
+            // One read of the field, not one per iteration: Build may swap
+            // in a fresh empty list at any point (see its own comment), and
+            // a bound taken from the old list must not index the new one.
+            var checkboxes = _characterCheckboxes;
+
             _suppressSourceFilterEvents = true;
             try
             {
@@ -729,9 +736,9 @@ namespace GW2CraftingHelper.Views
                         _uncheckedCharacters.Add(name);
                     }
 
-                    if (i < _characterCheckboxes.Count)
+                    if (i < checkboxes.Count)
                     {
-                        _characterCheckboxes[i].Checked = isChecked;
+                        checkboxes[i].Checked = isChecked;
                     }
                 }
             }
@@ -752,12 +759,15 @@ namespace GW2CraftingHelper.Views
                 _uncheckedCharacters.Add(characterName);
             }
 
-            if (_charactersMasterCheckbox != null)
+            // Read once: Build may null the field between the guard and the
+            // write (see its own comment).
+            var master = _charactersMasterCheckbox;
+            if (master != null)
             {
                 _suppressSourceFilterEvents = true;
                 try
                 {
-                    _charactersMasterCheckbox.Checked = AllCharactersChecked();
+                    master.Checked = AllCharactersChecked();
                 }
                 finally
                 {
