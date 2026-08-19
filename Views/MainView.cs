@@ -165,6 +165,16 @@ namespace GW2CraftingHelper.Views
         private int _containerWidth;
         private int _containerHeight;
 
+        // The two inputs the source-filter row was last flowed against:
+        // the available width, and MaxSourceFilterHeight (height-driven,
+        // and it decides whether the row scrolls and so re-flows narrower).
+        // A resize moving neither - most of a vertical drag - reuses the
+        // placements instead of re-running the flow and rewriting every
+        // checkbox Location. -1 is the invalid marker, set wherever the
+        // cell set itself changes.
+        private int _lastFlowWidth = -1;
+        private int _lastFlowCap = -1;
+
         private int CoinRowY => SourceFilterRowY + _sourceFilterHeight + SectionGapY;
         private int ContentY => CoinRowY + CoinHeight + SectionGapY;
         private int TopRegionHeight => ContentY;
@@ -445,6 +455,7 @@ namespace GW2CraftingHelper.Views
             _sourceFilterCells = new List<Checkbox>();
             _characterCheckboxes = new List<Checkbox>();
             _charactersMasterCheckbox = null;
+            _lastFlowWidth = -1;
 
             _sourceFilterPanel = new Panel()
             {
@@ -623,6 +634,7 @@ namespace GW2CraftingHelper.Views
             _sourceFilterCells.Clear();
             _characterCheckboxes.Clear();
             _charactersMasterCheckbox = null;
+            _lastFlowWidth = -1;
 
             AddSourceCheckbox("Bank", _bankEnabled, isChecked => _bankEnabled = isChecked);
             AddSourceCheckbox("Material Storage", _materialStorageEnabled, isChecked => _materialStorageEnabled = isChecked);
@@ -769,6 +781,12 @@ namespace GW2CraftingHelper.Views
         /// re-anchors the coin and content rows beneath the height that
         /// needs - the one place <see cref="_sourceFilterHeight"/> (and
         /// therefore CoinRowY/ContentY/TopRegionHeight) is written.
+        /// <para>
+        /// The flow pass itself is skipped when neither of its two inputs
+        /// moved (see <see cref="_lastFlowWidth"/>); the rows below are
+        /// re-anchored either way, since a height-only resize still moves
+        /// the content panel's bottom edge.
+        /// </para>
         /// </summary>
         private void ApplyTopRegionLayout()
         {
@@ -776,45 +794,55 @@ namespace GW2CraftingHelper.Views
 
             if (_sourceFilterPanel != null)
             {
-                var widths = new List<int>(_sourceFilterCells.Count);
-                foreach (var checkbox in _sourceFilterCells)
-                {
-                    widths.Add(checkbox.Width);
-                }
-
-                var flow = SourceFilterFlowLayout.Layout(
-                    widths, w, SourceFilterCellHeight, SourceFilterCellGapX, SourceFilterRowGapY);
-                int height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
-
-                // Past the cap the row scrolls rather than growing, so the
-                // cells have to be re-flowed clear of the scrollbar strip -
-                // which can itself wrap one more cell, hence the second pass.
+                // Read before the early-out: the cap is height-driven, so a
+                // height-only resize can change it, and with it whether the
+                // row scrolls (and therefore re-flows narrower).
                 int cap = MaxSourceFilterHeight;
-                bool scroll = height > cap;
-                if (scroll)
-                {
-                    flow = SourceFilterFlowLayout.Layout(
-                        widths,
-                        w - SourceFilterScrollbarAllowance,
-                        SourceFilterCellHeight,
-                        SourceFilterCellGapX,
-                        SourceFilterRowGapY);
-                    height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
-                }
 
-                for (int i = 0; i < _sourceFilterCells.Count; i++)
+                if (w != _lastFlowWidth || cap != _lastFlowCap)
                 {
-                    _sourceFilterCells[i].Location = new Point(flow.Cells[i].X, SourceFilterTopPad + flow.Cells[i].Y);
-                }
+                    var widths = new List<int>(_sourceFilterCells.Count);
+                    foreach (var checkbox in _sourceFilterCells)
+                    {
+                        widths.Add(checkbox.Width);
+                    }
 
-                if (height < SourceFilterSingleRowHeight)
-                {
-                    height = SourceFilterSingleRowHeight;
-                }
+                    var flow = SourceFilterFlowLayout.Layout(
+                        widths, w, SourceFilterCellHeight, SourceFilterCellGapX, SourceFilterRowGapY);
+                    int height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
 
-                _sourceFilterHeight = height < cap ? height : cap;
-                _sourceFilterPanel.CanScroll = scroll;
-                _sourceFilterPanel.Size = new Point(w, _sourceFilterHeight);
+                    // Past the cap the row scrolls rather than growing, so the
+                    // cells have to be re-flowed clear of the scrollbar strip -
+                    // which can itself wrap one more cell, hence the second pass.
+                    bool scroll = height > cap;
+                    if (scroll)
+                    {
+                        flow = SourceFilterFlowLayout.Layout(
+                            widths,
+                            w - SourceFilterScrollbarAllowance,
+                            SourceFilterCellHeight,
+                            SourceFilterCellGapX,
+                            SourceFilterRowGapY);
+                        height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
+                    }
+
+                    for (int i = 0; i < _sourceFilterCells.Count; i++)
+                    {
+                        _sourceFilterCells[i].Location = new Point(flow.Cells[i].X, SourceFilterTopPad + flow.Cells[i].Y);
+                    }
+
+                    if (height < SourceFilterSingleRowHeight)
+                    {
+                        height = SourceFilterSingleRowHeight;
+                    }
+
+                    _sourceFilterHeight = height < cap ? height : cap;
+                    _sourceFilterPanel.CanScroll = scroll;
+                    _sourceFilterPanel.Size = new Point(w, _sourceFilterHeight);
+
+                    _lastFlowWidth = w;
+                    _lastFlowCap = cap;
+                }
             }
 
             if (_coinPanel != null)
