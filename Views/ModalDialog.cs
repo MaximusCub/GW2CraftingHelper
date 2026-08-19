@@ -41,7 +41,10 @@ namespace GW2CraftingHelper.Views
             _window.Moved += OnWindowMoved;
         }
 
-        public void Show(string message, Action onConfirm, Action onCancel)
+        // confirmText defaults to the pre-existing hardcoded label so the
+        // regenerate-confirm call sites stay unchanged; destructive
+        // callers (the Log tab's Delete Log File) pass their own verb.
+        public void Show(string message, Action onConfirm, Action onCancel, string confirmText = "Regenerate")
         {
             if (_isShowing) return;
             _isShowing = true;
@@ -76,7 +79,7 @@ namespace GW2CraftingHelper.Views
 
             var confirmBtn = new StandardButton()
             {
-                Text = "Regenerate",
+                Text = confirmText,
                 Size = new Point(btnW, 25),
                 Location = new Point(btnX, btnY),
                 Parent = _window

@@ -549,6 +549,7 @@ namespace GW2CraftingHelper
                 {
                     _logContent = new LogTabContent(
                         ModuleLog.Shared,
+                        _modalDialog,
                         () => _logViewClearedBeforeVersion,
                         v => _logViewClearedBeforeVersion = v);
                     _logContent.Build(c);

@@ -450,8 +450,9 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Clears the in-memory ring only (never the on-disk file - see
-        /// ModuleLogStore.DeleteAll for that). Production's only caller is
-        /// Module.Unload; deliberately does NOT reset Version/_totalWritten
+        /// ModuleLogStore.DeleteAll for that). Production callers are
+        /// Module.Unload and <see cref="DeleteFileAndReset"/>; deliberately
+        /// does NOT reset Version/_totalWritten
         /// - Version must stay monotonic so a Log tab mid-poll can never
         /// observe it move backwards.
         /// </summary>
@@ -462,6 +463,51 @@ namespace GW2CraftingHelper.Services
                 Array.Clear(_ring, 0, _ring.Length);
                 _count = 0;
             }
+        }
+
+        /// <summary>
+        /// The destructive "clear log file" action (d2-log-system.md
+        /// Section 7, Open Question 4 - distinct from the Log tab's
+        /// view-only Clear): deletes the on-disk file AND clears the
+        /// in-memory ring, then writes one Info entry recording the
+        /// deletion so the action itself stays traceable (that entry also
+        /// recreates the file, via the ordinary flush queue). Both halves
+        /// are required - clearing only the view floor would let
+        /// SeedFromStore resurrect every entry from the file next session,
+        /// and deleting only the file would leave this session's ring
+        /// intact. Version stays monotonic throughout (the ring clear is
+        /// <see cref="Clear"/>'s own, which never resets it).
+        /// <para>
+        /// Starts with a brief, bounded drain of the pending flush queue
+        /// (same 250ms budget as Module.Unload's own best-effort drain) so
+        /// entries queued before this call land in the file BEFORE it is
+        /// deleted rather than resurrecting it afterwards. Best-effort: an
+        /// entry still in flight past the budget (a hung disk) can land in
+        /// the recreated file - a stale line in the new log, not a
+        /// correctness hazard. The drain is a spin-wait on the calling
+        /// thread; in practice the queue is empty at the moment a user
+        /// clicks the button, so the common cost is zero.
+        /// </para>
+        /// </summary>
+        public void DeleteFileAndReset()
+        {
+            WaitForPendingFileWrites(TimeSpan.FromMilliseconds(250));
+
+            lock (_fileGate)
+            {
+                try
+                {
+                    _store?.DeleteAll();
+                }
+                catch (Exception ex)
+                {
+                    _onStoreError?.Invoke("Failed to delete log file", ex);
+                }
+            }
+
+            Clear();
+
+            Write(ModuleLogLevel.Info, "log", "Log file deleted by user");
         }
 
         private void AppendToRingLocked(ModuleLogEntry entry)
