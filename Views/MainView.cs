@@ -342,7 +342,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(SearchBoxWidth, 26),
                 Location = new Point(0, 5),
-                PlaceholderText = "Search items and currencies...",
+                PlaceholderText = "Search items, currencies, characters...",
                 Text = _lastSearchText ?? "",
                 Parent = _filterPanel
             };

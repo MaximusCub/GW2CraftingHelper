@@ -67,12 +67,24 @@ namespace GW2CraftingHelper.Services
         /// Builds one <see cref="SnapshotSearchRow"/> per distinct itemId in
         /// <paramref name="itemsById"/> that (a) matches
         /// <paramref name="searchText"/> by case-insensitive substring
-        /// against the item's own name (never against source/character
-        /// labels - Feature 1 Open Question 2's accepted choice) and (b)
-        /// has a positive total once <paramref name="sourceFilter"/> has
-        /// excluded any unchecked sources. An item with zero quantity
+        /// against the item's own name OR against the name of a character
+        /// holding it (Feature 1 Open Question 2, resolved in favor of
+        /// source-label matching; storage-location labels stay unmatched)
+        /// and (b) has a positive total once <paramref name="sourceFilter"/>
+        /// has excluded any unchecked sources. An item with zero quantity
         /// across the checked sources drops out of the list entirely
-        /// rather than appearing as a zero-count row. Rows are sorted by
+        /// rather than appearing as a zero-count row.
+        /// <para>
+        /// The two compose as a plain AND: only sources that survive the
+        /// filter are consulted for the character match, so an unchecked
+        /// character's rows stay hidden even when its own name is typed. A
+        /// row surfaced by a character match still reports the account-wide
+        /// total and full breakdown across the checked sources, not just the
+        /// matched character's share - the matched character appears in the
+        /// breakdown either way, and the total keeps meaning the same thing
+        /// on every row in the list.
+        /// </para>
+        /// Rows are sorted by
         /// name (ordinal, case-insensitive) for a stable, predictable
         /// order across rebuilds. Returns an empty list, never null, for
         /// null/empty <paramref name="itemsById"/> or a null
@@ -83,7 +95,10 @@ namespace GW2CraftingHelper.Services
         /// - this method never re-scans the raw per-source entry list
         /// itself, so it stays cheap to call on every keystroke as long as
         /// the caller builds the map once per snapshot rather than once
-        /// per call.
+        /// per call. Character matching costs a full source walk for every
+        /// item whose name does not match, where a name-only search could
+        /// skip straight past it; that is bounded above by the empty-search
+        /// rebuild, which already walks every source of every item.
         /// </para>
         /// </summary>
         public static List<SnapshotSearchRow> BuildItemRows(
@@ -101,6 +116,7 @@ namespace GW2CraftingHelper.Services
             }
 
             string trimmedSearch = (searchText ?? string.Empty).Trim();
+            bool searching = trimmedSearch.Length > 0;
 
             foreach (var kvp in itemsById)
             {
@@ -109,15 +125,12 @@ namespace GW2CraftingHelper.Services
                 // Never display raw item IDs (repo invariant).
                 string name = string.IsNullOrWhiteSpace(kvp.Value.Name) ? "Unknown Item" : kvp.Value.Name;
 
-                if (trimmedSearch.Length > 0 &&
-                    name.IndexOf(trimmedSearch, StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    continue;
-                }
+                bool nameMatches = !searching || name.IndexOf(trimmedSearch, StringComparison.OrdinalIgnoreCase) >= 0;
 
                 var prioritizedSources = AccountItemIndex.GetPrioritizedSources(itemId, index, activeCharacterName);
                 var breakdown = new List<SnapshotSourceCount>();
                 int total = 0;
+                bool characterMatches = false;
 
                 foreach (var source in prioritizedSources)
                 {
@@ -132,6 +145,11 @@ namespace GW2CraftingHelper.Services
                         continue;
                     }
 
+                    if (searching && !nameMatches && !characterMatches)
+                    {
+                        characterMatches = CharacterNameMatches(source, trimmedSearch);
+                    }
+
                     breakdown.Add(new SnapshotSourceCount { Label = FormatSourceLabel(source), Count = quantity });
                     total += quantity;
                 }
@@ -141,6 +159,11 @@ namespace GW2CraftingHelper.Services
                     // Every source carrying this item was filtered out (or
                     // the item genuinely has zero quantity everywhere) -
                     // drop the row entirely rather than show a zero total.
+                    continue;
+                }
+
+                if (!nameMatches && !characterMatches)
+                {
                     continue;
                 }
 
@@ -266,6 +289,20 @@ namespace GW2CraftingHelper.Services
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// True when <paramref name="search"/> occurs (case-insensitively)
+        /// in the character-name half of a "Character:&lt;name&gt;" source.
+        /// The scan starts past the encoding prefix, so searching "char"
+        /// matches a character actually named e.g. "Charr Hoarder" and never
+        /// the internal token itself, and it takes no substring (this runs
+        /// per source per item on the keystroke path).
+        /// </summary>
+        private static bool CharacterNameMatches(string rawSource, string search)
+        {
+            return rawSource.StartsWith(AccountItemIndex.CharacterSourcePrefix, StringComparison.Ordinal)
+                && rawSource.IndexOf(search, AccountItemIndex.CharacterSourcePrefix.Length, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>

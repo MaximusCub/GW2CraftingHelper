@@ -411,6 +411,9 @@ explicit perf note for.
 2. Should the search box also match against source/character labels (e.g.
    typing a character's name surfaces everything on that character), or
    stay scoped to item/currency names only (this proposal's choice)?
+   RESOLVED (char-source-search): character labels match; storage-location
+   labels and currencies do not. A character match only consults sources
+   that already survive the checkboxes, so the two compose as a plain AND.
 3. Exact GW2 structural slot-count caps (flagged INFERRED above) - worth an
    implementer double-checking if the "no debounce needed" perf conclusion
    is to be trusted on the largest realistic accounts.

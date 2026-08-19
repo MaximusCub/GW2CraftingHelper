@@ -199,17 +199,145 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(result);
         }
 
+        // ---- BuildItemRows: character-label search ----
+
         [Fact]
-        public void BuildItemRows_SearchText_NeverMatchesSourceOrCharacterLabel()
+        public void BuildItemRows_SearchText_MatchesCharacterNameCaseInsensitive()
         {
-            // Feature 1 Open Question 2's accepted choice: search is scoped
-            // to item names only, never source/character labels.
-            var items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 10, CharSource("Zaeed")) };
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(1, "Iron Ore", 10, CharSource("Zaeed")),
+                Entry(2, "Linen Scrap", 5, AccountItemIndex.SourceBank)
+            };
             var index = new AccountItemIndex(items);
 
             var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "zaeed", new SnapshotSourceFilter(), null);
 
+            Assert.Single(result);
+            Assert.Equal("Iron Ore", result[0].Name);
+        }
+
+        [Fact]
+        public void BuildItemRows_CharacterMatch_ReportsAccountWideTotalNotJustThatCharacter()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(1, "Iron Ore", 10, CharSource("Zaeed")),
+                Entry(1, "Iron Ore", 500, AccountItemIndex.SourceBank)
+            };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "Zaeed", new SnapshotSourceFilter(), null);
+
+            Assert.Single(result);
+            Assert.Equal(510, result[0].TotalCount);
+            Assert.Equal(2, result[0].Breakdown.Count);
+            Assert.Contains(result[0].Breakdown, b => b.Label == "Character: Zaeed");
+        }
+
+        [Fact]
+        public void BuildItemRows_SearchText_DoesNotMatchTheCharacterEncodingPrefix()
+        {
+            // "Character:" is an internal encoding token, not part of any
+            // character's name - searching it must not surface everything.
+            var items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 10, CharSource("Zaeed")) };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "character", new SnapshotSourceFilter(), null);
+
             Assert.Empty(result);
+        }
+
+        [Fact]
+        public void BuildItemRows_SearchText_DoesNotMatchStorageLocationLabels()
+        {
+            var items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 10, AccountItemIndex.SourceBank) };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "bank", new SnapshotSourceFilter(), null);
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public void BuildItemRows_CharacterSearch_HonorsThatCharactersUncheckedBox()
+        {
+            // AND-composition: an unchecked character stays hidden even when
+            // its own name is what was typed.
+            var items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 10, CharSource("Zaeed")) };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "Zaeed", Unchecked("Zaeed"), null);
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public void BuildItemRows_CharacterSearch_UncheckedOtherCharacterStillDropsFromTheMatchedRow()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(1, "Iron Ore", 10, CharSource("Zaeed")),
+                Entry(1, "Iron Ore", 4, CharSource("Bob"))
+            };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "Zaeed", Unchecked("Bob"), null);
+
+            Assert.Single(result);
+            Assert.Equal(10, result[0].TotalCount);
+            Assert.Single(result[0].Breakdown);
+            Assert.Equal("Character: Zaeed", result[0].Breakdown[0].Label);
+        }
+
+        [Fact]
+        public void BuildItemRows_CharacterSearch_SurfacesEveryItemThatCharacterHolds()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(1, "Iron Ore", 10, CharSource("Zaeed")),
+                Entry(2, "Linen Scrap", 3, CharSource("Zaeed")),
+                Entry(3, "Ancient Wood", 7, CharSource("Bob"))
+            };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "zae", new SnapshotSourceFilter(), null);
+
+            Assert.Equal(2, result.Count);
+            Assert.Equal("Iron Ore", result[0].Name);
+            Assert.Equal("Linen Scrap", result[1].Name);
+        }
+
+        [Fact]
+        public void BuildItemRows_CharacterSearch_ItemNameMatchStillWinsOnItsOwn()
+        {
+            // A name match needs no character behind it, and a row matched
+            // both ways appears exactly once.
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(1, "Ore of Zaeed", 10, AccountItemIndex.SourceBank),
+                Entry(2, "Iron Ore", 3, CharSource("Zaeed"))
+            };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "zaeed", new SnapshotSourceFilter(), null);
+
+            Assert.Equal(2, result.Count);
+            Assert.Equal("Iron Ore", result[0].Name);
+            Assert.Equal("Ore of Zaeed", result[1].Name);
+        }
+
+        [Fact]
+        public void FilterWallet_CharacterName_LeavesCurrenciesUnaffected()
+        {
+            // Currencies have no per-character holding at all, so a
+            // character-name search must not start listing them.
+            var wallet = new List<SnapshotWalletEntry>
+            {
+                new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 100 }
+            };
+
+            Assert.Empty(SnapshotSearchResultBuilder.FilterWallet(wallet, "Zaeed"));
         }
 
         [Fact]
