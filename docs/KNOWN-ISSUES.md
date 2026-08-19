@@ -8411,3 +8411,44 @@ Validation: module build 0 errors; suite 1847 green (1846 baseline + 1).
 Gate: PASS (test-only change; the review's mutation check proved the
 new root-Id test fails through the real Reduce path when CloneNode
 drops the wrapper Id; suite 1847/1847; no rendered surface).
+
+## Log + Snapshot UX: three small items (log-snapshot-ux)
+
+- **Staleness-threshold unification:** MainView's private 10-minute
+  StaleThreshold constant (and its now-false "setting deliberately not
+  added" comment) deleted; the staleness label now reads the same
+  clamped SnapshotRefreshIntervalMinutes setting Module.Update()'s
+  auto-refresh gate reads, re-read on every ApplyStatusDisplay call so
+  a Settings save moves both together. Both sides share the new pure
+  StatusText.IsStale predicate, pinned by 4 Blish-free tests
+  (boundary at age == threshold; same age flips verdict under 5m vs
+  10m thresholds). MainView takes ModuleSettings via its ctor
+  (CraftingPlanView's DI shape).
+- **Delete Log File (d2 OQ4):** ModuleLogStore.DeleteAll was dead API;
+  now wired to a "Delete Log File" toolbar button on the Log tab,
+  confirm-gated via the existing ModalDialog (whose Show gained an
+  optional confirm-button label, defaulting to the prior hardcoded
+  "Regenerate"). Ring-reset seam: new ModuleLog.DeleteFileAndReset -
+  bounded 250ms flush-queue drain, file delete under the file gate,
+  ring clear via Clear() (Version stays monotonic), then one Info
+  trace entry recording the deletion (also recreates the file). 3 new
+  Blish-free tests against a real ModuleLogStore/temp dir, including
+  a next-session SeedFromStore proving deleted entries cannot be
+  resurrected from the file.
+- **Sticky content-type dropdown:** the Snapshot tab's All/Items/Wallet
+  dropdown now session-sticky via _lastFilterSelection, matching the
+  search text and four source checkboxes; the comment defending the
+  reset-to-default asymmetry is deleted. Restored before the
+  ValueChanged subscription, so the read-back cannot trigger a
+  redundant rebuild.
+
+Validation per commit: module build 0 errors; suite green throughout -
+1847 baseline -> 1851 (IsStale tests) -> 1854 (DeleteFileAndReset
+tests) -> 1854 (commit 3 is view-only). Two rendered surfaces await
+the orchestrator's desktop check: the Log tab's new Delete Log File
+button (placement left of Copy/Clear view; confirm dialog shows a
+"Delete" button; post-confirm the view shows only the trace entry) and
+the Snapshot staleness label recoloring against a changed
+SnapshotRefreshIntervalMinutes setting. The sticky dropdown is also a
+one-look check (pick Wallet, switch tabs, return).
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
