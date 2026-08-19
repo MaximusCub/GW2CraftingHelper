@@ -206,11 +206,13 @@ namespace GW2CraftingHelper.Views
 
         // Every source checkbox in flow order (the three storage locations,
         // the All Characters master, then one per character) - the single
-        // list ApplyTopRegionLayout measures and positions.
-        private readonly List<Checkbox> _sourceFilterCells = new List<Checkbox>();
+        // list ApplyTopRegionLayout measures and positions. Not readonly:
+        // Build swaps in fresh lists rather than clearing these in place,
+        // see there.
+        private List<Checkbox> _sourceFilterCells = new List<Checkbox>();
 
         // Parallel to _characterNames by construction (built in one loop).
-        private readonly List<Checkbox> _characterCheckboxes = new List<Checkbox>();
+        private List<Checkbox> _characterCheckboxes = new List<Checkbox>();
 
         private StandardButton _clearButton;
         private StandardButton _refreshButton;
@@ -428,7 +430,22 @@ namespace GW2CraftingHelper.Views
             // below, not here: they are account-driven (so they must be
             // rebuilt on every SetSnapshot too, from the main thread) and
             // keeping the single creation path means the two entry points
-            // cannot drift.
+            // cannot drift. The three fields holding the OUTGOING panel's
+            // checkboxes are dropped here rather than in that tail: until
+            // it lands, a resize on the main thread would otherwise flow
+            // controls belonging to a panel this method has already
+            // replaced. Fresh lists rather than Clear() - the main thread
+            // may be walking the old ones at this instant, and a reference
+            // swap leaves it a consistent list either way. Every reader
+            // already tolerates the empty state (it is also the state
+            // before the first Build): ApplyTopRegionLayout flows zero
+            // cells to the single-row height, SetAllCharactersChecked
+            // bounds-checks the parallel list, and OnCharacterToggled
+            // null-guards the master.
+            _sourceFilterCells = new List<Checkbox>();
+            _characterCheckboxes = new List<Checkbox>();
+            _charactersMasterCheckbox = null;
+
             _sourceFilterPanel = new Panel()
             {
                 Size = new Point(w, _sourceFilterHeight),
