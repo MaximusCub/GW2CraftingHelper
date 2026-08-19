@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using Blish_HUD;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
@@ -507,10 +508,16 @@ namespace GW2CraftingHelper.Views
         /// Open Question 4): deletes the on-disk log file and clears the
         /// in-memory ring via <see cref="ModuleLog.DeleteFileAndReset"/>,
         /// behind the same ModalDialog confirm the Crafting Plan tab uses
-        /// for its own regenerate gate. Both the confirm and cancel
-        /// callbacks run on the main thread (ModalDialog button Click
-        /// handlers), the same thread every other rebuild entry point here
-        /// already runs on.
+        /// for its own regenerate gate. The confirm callback fires on the
+        /// main thread (a ModalDialog button Click handler), but the
+        /// destructive work runs on Task.Run: DeleteFileAndReset drains
+        /// the flush queue (bounded) and then takes the file gate for real
+        /// disk IO - a lock the background FlushLoop can hold through a
+        /// slow append or full-file trim, exactly the cross-thread stall
+        /// ModuleLog.Write's own doc comment forbids on a
+        /// latency-sensitive thread. The status/rebuild tail marshals back
+        /// via MainThreadMarshal.Run, the same thread every other rebuild
+        /// entry point here already runs on.
         /// </summary>
         private void ConfirmDeleteLogFile()
         {
@@ -518,9 +525,15 @@ namespace GW2CraftingHelper.Views
                 "This permanently deletes the log file from disk. Continue?",
                 () =>
                 {
-                    _log.DeleteFileAndReset();
-                    SetStatus("Log file deleted", isError: false);
-                    RebuildRowsIfBuilt();
+                    Task.Run(() =>
+                    {
+                        _log.DeleteFileAndReset();
+                        MainThreadMarshal.Run(() =>
+                        {
+                            SetStatus("Log file deleted", isError: false);
+                            RebuildRowsIfBuilt();
+                        });
+                    });
                 },
                 null,
                 confirmText: "Delete");

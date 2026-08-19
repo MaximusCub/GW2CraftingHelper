@@ -41,10 +41,10 @@ namespace GW2CraftingHelper.Views
             _window.Moved += OnWindowMoved;
         }
 
-        // confirmText defaults to the pre-existing hardcoded label so the
-        // regenerate-confirm call sites stay unchanged; destructive
-        // callers (the Log tab's Delete Log File) pass their own verb.
-        public void Show(string message, Action onConfirm, Action onCancel, string confirmText = "Regenerate")
+        // confirmText is required so every caller states its own verb
+        // ("Regenerate", "Delete") - a default here would hand an
+        // unrelated caller the wrong label on a destructive confirm.
+        public void Show(string message, Action onConfirm, Action onCancel, string confirmText)
         {
             if (_isShowing) return;
             _isShowing = true;

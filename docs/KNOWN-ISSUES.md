@@ -8426,15 +8426,21 @@ drops the wrapper Id; suite 1847/1847; no rendered surface).
   (CraftingPlanView's DI shape).
 - **Delete Log File (d2 OQ4):** ModuleLogStore.DeleteAll was dead API;
   now wired to a "Delete Log File" toolbar button on the Log tab,
-  confirm-gated via the existing ModalDialog (whose Show gained an
-  optional confirm-button label, defaulting to the prior hardcoded
-  "Regenerate"). Ring-reset seam: new ModuleLog.DeleteFileAndReset -
-  bounded 250ms flush-queue drain, file delete under the file gate,
-  ring clear via Clear() (Version stays monotonic), then one Info
-  trace entry recording the deletion (also recreates the file). 3 new
-  Blish-free tests against a real ModuleLogStore/temp dir, including
-  a next-session SeedFromStore proving deleted entries cannot be
-  resurrected from the file.
+  confirm-gated via the existing ModalDialog (whose Show gained a
+  confirm-button label parameter - required after review, so every
+  caller states its own verb; the regenerate call site passes
+  "Regenerate" explicitly). Ring-reset seam: new
+  ModuleLog.DeleteFileAndReset - bounded 250ms flush-queue drain,
+  file delete under the file gate, ring clear via Clear() (Version
+  stays monotonic), then one Info trace entry recording the deletion
+  (also recreates the file). Review fix: the confirm callback no
+  longer runs DeleteFileAndReset on the main thread - the drain plus
+  an unbounded file-gate acquisition (FlushLoop can hold it through a
+  slow append or full-file trim) could hitch a render frame - it runs
+  on Task.Run, with the status/rebuild tail marshaled back via
+  MainThreadMarshal.Run. 3 new Blish-free tests against a real
+  ModuleLogStore/temp dir, including a next-session SeedFromStore
+  proving deleted entries cannot be resurrected from the file.
 - **Sticky content-type dropdown:** the Snapshot tab's All/Items/Wallet
   dropdown now session-sticky via _lastFilterSelection, matching the
   search text and four source checkboxes; the comment defending the

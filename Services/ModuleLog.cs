@@ -488,6 +488,16 @@ namespace GW2CraftingHelper.Services
         /// thread; in practice the queue is empty at the moment a user
         /// clicks the button, so the common cost is zero.
         /// </para>
+        /// <para>
+        /// Blocks the calling thread beyond that budget too: after the
+        /// drain it acquires <see cref="_fileGate"/> with no bound and
+        /// does real disk IO under it, and FlushLoop can legitimately
+        /// hold that lock through a slow append or full-file trim (the
+        /// stall <see cref="Write"/>'s doc comment exists to keep off
+        /// latency-sensitive threads). Never call this from the main/UI
+        /// thread - the Log tab runs it on Task.Run and marshals its UI
+        /// tail back.
+        /// </para>
         /// </summary>
         public void DeleteFileAndReset()
         {
