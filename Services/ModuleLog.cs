@@ -160,6 +160,12 @@ namespace GW2CraftingHelper.Services
         // just-finished FlushLoop that has not yet decremented.
         private int _pendingFileWrites;
 
+        // Shared best-effort drain budget for the two callers that need
+        // queued writes on disk before they proceed: Module.Unload and
+        // <see cref="DeleteFileAndReset"/>. Short by design - neither may
+        // hang on a stuck flush.
+        internal static readonly TimeSpan FlushDrainBudget = TimeSpan.FromMilliseconds(250);
+
         public ModuleLog(int ringCapacity = DefaultRingCapacity)
         {
             if (ringCapacity <= 0)
@@ -479,7 +485,7 @@ namespace GW2CraftingHelper.Services
         /// <see cref="Clear"/>'s own, which never resets it).
         /// <para>
         /// Starts with a brief, bounded drain of the pending flush queue
-        /// (same 250ms budget as Module.Unload's own best-effort drain) so
+        /// (<see cref="FlushDrainBudget"/>) so
         /// entries queued before this call land in the file BEFORE it is
         /// deleted rather than resurrecting it afterwards. Best-effort: an
         /// entry still in flight past the budget (a hung disk) can land in
@@ -501,7 +507,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public void DeleteFileAndReset()
         {
-            WaitForPendingFileWrites(TimeSpan.FromMilliseconds(250));
+            WaitForPendingFileWrites(FlushDrainBudget);
 
             lock (_fileGate)
             {
