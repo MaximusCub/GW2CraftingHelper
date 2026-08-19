@@ -141,8 +141,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new RecipeService(recipeApi),
                 new TradingPostService(priceApi),
                 new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                reducer: new InventoryReducer());
+                new ItemMetadataService(itemApi));
 
             var result = await pipeline.GenerateStructuredAsync(
                 new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 2 } },
