@@ -573,11 +573,10 @@ namespace GW2CraftingHelper.Views
 
             foreach (string name in _characterNames)
             {
-                string characterName = name;
                 _characterCheckboxes.Add(AddSourceCheckbox(
                     name,
                     !_uncheckedCharacters.Contains(name),
-                    isChecked => OnCharacterToggled(characterName, isChecked)));
+                    isChecked => OnCharacterToggled(name, isChecked)));
             }
 
             ApplyTopRegionLayout();
