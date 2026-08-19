@@ -58,30 +58,18 @@ namespace GW2CraftingHelper.Views
         private readonly Action<string> _saveStatus;
         private readonly Action<string> _saveStatusThreadSafe;
 
-        // Session-sticky search/filter state (d1-snapshot-about-settings.md
-        // Feature 1's "Tab views are rebuilt from scratch" cross-cutting
-        // finding: Build() tears down and recreates every control on each
-        // tab visit, so anything that should feel "sticky" across tab
-        // switches must live in these instance fields, not the controls
-        // themselves, and be read back in when Build() reruns). Every source
-        // toggle defaults to true (show everything) and the content-type
-        // dropdown defaults to "All", matching the tab's pre-search implicit
-        // no-filter behavior.
-        // <para>
-        // Characters are held as the same exclusion set SnapshotSourceFilter
-        // takes, keyed by character name: a name absent from it is checked,
-        // so a character new in a fresh snapshot defaults to visible, and a
-        // deliberately-unchecked one stays unchecked across tab bounces and
-        // snapshot refreshes. Stale names (a deleted character) are left in
-        // the set rather than pruned per snapshot - they match nothing, and
-        // pruning would silently forget the user's choice whenever a
-        // degraded snapshot happened to omit a character.
-        // </para>
+        // Session-sticky search/filter state: Build() recreates every
+        // control per tab visit, so anything that has to survive a tab
+        // switch lives here and is read back in when Build() reruns.
         private string _lastSearchText = "";
         private string _lastFilterSelection = "All";
         private bool _bankEnabled = true;
         private bool _materialStorageEnabled = true;
         private bool _sharedInventoryEnabled = true;
+
+        // Exclusion set, keyed by character name: absent means checked, so
+        // a character new in a fresh snapshot defaults to visible. Stale
+        // names are never pruned.
         private readonly HashSet<string> _uncheckedCharacters = new HashSet<string>(StringComparer.Ordinal);
 
         // Roster driving the per-character checkboxes, rebuilt once per
@@ -157,13 +145,25 @@ namespace GW2CraftingHelper.Views
         private const int MinContentHeight = 120;
 
         // Checkbox width beyond its measured label: the box glyph plus its
-        // text gap. Reproduces the four widths this row previously hardcoded
-        // (e.g. "Bank" 70, "Material Storage" 170) from the measured text.
+        // text gap. Approximates the four widths this row previously
+        // hardcoded (e.g. "Bank" 70, "Material Storage" 170) from the
+        // measured text - close, not equal; only the single-row height is
+        // reproduced exactly.
         private const int CheckboxChromeWidth = 40;
 
         private int _sourceFilterHeight = SourceFilterSingleRowHeight;
         private int _containerWidth;
         private int _containerHeight;
+
+        // The two inputs the source-filter row was last flowed against:
+        // the available width, and MaxSourceFilterHeight (height-driven,
+        // and it decides whether the row scrolls and so re-flows narrower).
+        // A resize moving neither - most of a vertical drag - reuses the
+        // placements instead of re-running the flow and rewriting every
+        // checkbox Location. -1 is the invalid marker, set wherever the
+        // cell set itself changes.
+        private int _lastFlowWidth = -1;
+        private int _lastFlowCap = -1;
 
         private int CoinRowY => SourceFilterRowY + _sourceFilterHeight + SectionGapY;
         private int ContentY => CoinRowY + CoinHeight + SectionGapY;
@@ -206,11 +206,13 @@ namespace GW2CraftingHelper.Views
 
         // Every source checkbox in flow order (the three storage locations,
         // the All Characters master, then one per character) - the single
-        // list ApplyTopRegionLayout measures and positions.
-        private readonly List<Checkbox> _sourceFilterCells = new List<Checkbox>();
+        // list ApplyTopRegionLayout measures and positions. Not readonly:
+        // Build swaps in fresh lists rather than clearing these in place,
+        // see there.
+        private List<Checkbox> _sourceFilterCells = new List<Checkbox>();
 
         // Parallel to _characterNames by construction (built in one loop).
-        private readonly List<Checkbox> _characterCheckboxes = new List<Checkbox>();
+        private List<Checkbox> _characterCheckboxes = new List<Checkbox>();
 
         private StandardButton _clearButton;
         private StandardButton _refreshButton;
@@ -428,7 +430,26 @@ namespace GW2CraftingHelper.Views
             // below, not here: they are account-driven (so they must be
             // rebuilt on every SetSnapshot too, from the main thread) and
             // keeping the single creation path means the two entry points
-            // cannot drift.
+            // cannot drift. The three fields holding the OUTGOING panel's
+            // checkboxes are dropped here rather than in that tail: until
+            // it lands, a resize on the main thread would otherwise flow
+            // controls belonging to a panel this method has already
+            // replaced. Fresh lists rather than Clear() - the main thread
+            // may be walking the old ones at this instant, and a reference
+            // swap leaves it a consistent list either way, PROVIDED each
+            // reader takes the field into a local once rather than
+            // re-reading it after its own guard - SetAllCharactersChecked,
+            // OnCharacterToggled and ApplyTopRegionLayout all do. Every
+            // reader also tolerates
+            // the empty/null state, which is the state before the first
+            // Build anyway: ApplyTopRegionLayout flows zero cells to the
+            // single-row height, SetAllCharactersChecked bounds-checks the
+            // parallel list, and OnCharacterToggled null-checks the master.
+            _sourceFilterCells = new List<Checkbox>();
+            _characterCheckboxes = new List<Checkbox>();
+            _charactersMasterCheckbox = null;
+            _lastFlowWidth = -1;
+
             _sourceFilterPanel = new Panel()
             {
                 Size = new Point(w, _sourceFilterHeight),
@@ -606,6 +627,7 @@ namespace GW2CraftingHelper.Views
             _sourceFilterCells.Clear();
             _characterCheckboxes.Clear();
             _charactersMasterCheckbox = null;
+            _lastFlowWidth = -1;
 
             AddSourceCheckbox("Bank", _bankEnabled, isChecked => _bankEnabled = isChecked);
             AddSourceCheckbox("Material Storage", _materialStorageEnabled, isChecked => _materialStorageEnabled = isChecked);
@@ -695,6 +717,11 @@ namespace GW2CraftingHelper.Views
 
         private void SetAllCharactersChecked(bool isChecked)
         {
+            // One read of the field, not one per iteration: Build may swap
+            // in a fresh empty list at any point (see its own comment), and
+            // a bound taken from the old list must not index the new one.
+            var checkboxes = _characterCheckboxes;
+
             _suppressSourceFilterEvents = true;
             try
             {
@@ -710,9 +737,9 @@ namespace GW2CraftingHelper.Views
                         _uncheckedCharacters.Add(name);
                     }
 
-                    if (i < _characterCheckboxes.Count)
+                    if (i < checkboxes.Count)
                     {
-                        _characterCheckboxes[i].Checked = isChecked;
+                        checkboxes[i].Checked = isChecked;
                     }
                 }
             }
@@ -733,12 +760,15 @@ namespace GW2CraftingHelper.Views
                 _uncheckedCharacters.Add(characterName);
             }
 
-            if (_charactersMasterCheckbox != null)
+            // Read once: Build may null the field between the guard and the
+            // write (see its own comment).
+            var master = _charactersMasterCheckbox;
+            if (master != null)
             {
                 _suppressSourceFilterEvents = true;
                 try
                 {
-                    _charactersMasterCheckbox.Checked = AllCharactersChecked();
+                    master.Checked = AllCharactersChecked();
                 }
                 finally
                 {
@@ -752,6 +782,12 @@ namespace GW2CraftingHelper.Views
         /// re-anchors the coin and content rows beneath the height that
         /// needs - the one place <see cref="_sourceFilterHeight"/> (and
         /// therefore CoinRowY/ContentY/TopRegionHeight) is written.
+        /// <para>
+        /// The flow pass itself is skipped when neither of its two inputs
+        /// moved (see <see cref="_lastFlowWidth"/>); the rows below are
+        /// re-anchored either way, since a height-only resize still moves
+        /// the content panel's bottom edge.
+        /// </para>
         /// </summary>
         private void ApplyTopRegionLayout()
         {
@@ -759,45 +795,60 @@ namespace GW2CraftingHelper.Views
 
             if (_sourceFilterPanel != null)
             {
-                var widths = new List<int>(_sourceFilterCells.Count);
-                foreach (var checkbox in _sourceFilterCells)
-                {
-                    widths.Add(checkbox.Width);
-                }
-
-                var flow = SourceFilterFlowLayout.Layout(
-                    widths, w, SourceFilterCellHeight, SourceFilterCellGapX, SourceFilterRowGapY);
-                int height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
-
-                // Past the cap the row scrolls rather than growing, so the
-                // cells have to be re-flowed clear of the scrollbar strip -
-                // which can itself wrap one more cell, hence the second pass.
+                // Read before the early-out: the cap is height-driven, so a
+                // height-only resize can change it, and with it whether the
+                // row scrolls (and therefore re-flows narrower).
                 int cap = MaxSourceFilterHeight;
-                bool scroll = height > cap;
-                if (scroll)
-                {
-                    flow = SourceFilterFlowLayout.Layout(
-                        widths,
-                        w - SourceFilterScrollbarAllowance,
-                        SourceFilterCellHeight,
-                        SourceFilterCellGapX,
-                        SourceFilterRowGapY);
-                    height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
-                }
 
-                for (int i = 0; i < _sourceFilterCells.Count; i++)
+                if (w != _lastFlowWidth || cap != _lastFlowCap)
                 {
-                    _sourceFilterCells[i].Location = new Point(flow.Cells[i].X, SourceFilterTopPad + flow.Cells[i].Y);
-                }
+                    // Single read: Build's ThreadPool body swaps this field,
+                    // so the count and the indexer below must come from the
+                    // same list.
+                    var cells = _sourceFilterCells;
 
-                if (height < SourceFilterSingleRowHeight)
-                {
-                    height = SourceFilterSingleRowHeight;
-                }
+                    var widths = new List<int>(cells.Count);
+                    foreach (var checkbox in cells)
+                    {
+                        widths.Add(checkbox.Width);
+                    }
 
-                _sourceFilterHeight = height < cap ? height : cap;
-                _sourceFilterPanel.CanScroll = scroll;
-                _sourceFilterPanel.Size = new Point(w, _sourceFilterHeight);
+                    var flow = SourceFilterFlowLayout.Layout(
+                        widths, w, SourceFilterCellHeight, SourceFilterCellGapX, SourceFilterRowGapY);
+                    int height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
+
+                    // Past the cap the row scrolls rather than growing, so the
+                    // cells have to be re-flowed clear of the scrollbar strip -
+                    // which can itself wrap one more cell, hence the second pass.
+                    bool scroll = height > cap;
+                    if (scroll)
+                    {
+                        flow = SourceFilterFlowLayout.Layout(
+                            widths,
+                            w - SourceFilterScrollbarAllowance,
+                            SourceFilterCellHeight,
+                            SourceFilterCellGapX,
+                            SourceFilterRowGapY);
+                        height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
+                    }
+
+                    for (int i = 0; i < cells.Count; i++)
+                    {
+                        cells[i].Location = new Point(flow.Cells[i].X, SourceFilterTopPad + flow.Cells[i].Y);
+                    }
+
+                    if (height < SourceFilterSingleRowHeight)
+                    {
+                        height = SourceFilterSingleRowHeight;
+                    }
+
+                    _sourceFilterHeight = height < cap ? height : cap;
+                    _sourceFilterPanel.CanScroll = scroll;
+                    _sourceFilterPanel.Size = new Point(w, _sourceFilterHeight);
+
+                    _lastFlowWidth = w;
+                    _lastFlowCap = cap;
+                }
             }
 
             if (_coinPanel != null)
@@ -946,7 +997,8 @@ namespace GW2CraftingHelper.Views
         /// SnapshotRefreshIntervalMinutes setting - the same threshold
         /// Module.Update()'s auto-refresh gate reads, re-read (clamped)
         /// on every call here just like that gate does, so a Settings tab
-        /// save changes both together. Called from every place the
+        /// save is picked up by the next call rather than needing a
+        /// rebuild. Called from every place the
         /// status text or the snapshot itself changes (Build's initial
         /// render, SetSnapshot, SetStatus) so the two can never drift out
         /// of sync with each other.

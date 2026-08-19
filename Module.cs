@@ -833,7 +833,7 @@ namespace GW2CraftingHelper
             // effort only: Unload must never hang on a stuck flush (a
             // locked/very slow disk), so this is capped short rather than
             // waited on indefinitely.
-            ModuleLog.Shared.WaitForPendingFileWrites(TimeSpan.FromMilliseconds(250));
+            ModuleLog.Shared.WaitForPendingFileWrites(ModuleLog.FlushDrainBudget);
 
             // The in-memory ring is cleared only here (process exit / module
             // disable) - never by any in-tab user action. The on-disk file

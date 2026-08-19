@@ -4,7 +4,6 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-
     public class SourceFilterFlowLayoutTests
     {
         private const int CellHeight = 25;
@@ -125,5 +124,4 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, result.Cells[1].Y);
         }
     }
-
 }

@@ -337,7 +337,7 @@ namespace GW2CraftingHelper.Services
                     return true;
                 }
 
-                return !excluded.Contains(rawSource.Substring(AccountItemIndex.CharacterSourcePrefix.Length));
+                return !IsExcludedCharacter(rawSource, excluded);
             }
 
             switch (rawSource)
@@ -347,6 +347,33 @@ namespace GW2CraftingHelper.Services
                 case AccountItemIndex.SourceSharedInventory: return filter.SharedInventory;
                 default: return true;
             }
+        }
+
+        /// <summary>
+        /// True when the character-name half of a "Character:&lt;name&gt;"
+        /// source appears in the exclusion set. Compares the name in place
+        /// rather than taking a substring (this runs per source per item on
+        /// the keystroke path), which trades the set's O(1) lookup for a
+        /// scan of it - bounded by the roster, and only reached at all once
+        /// the user has unchecked something. Ordinal, matching the
+        /// comparer SnapshotSourceFilter's set is created with.
+        /// </summary>
+        private static bool IsExcludedCharacter(string rawSource, HashSet<string> excluded)
+        {
+            int prefixLength = AccountItemIndex.CharacterSourcePrefix.Length;
+            int nameLength = rawSource.Length - prefixLength;
+
+            foreach (string name in excluded)
+            {
+                if (name != null
+                    && name.Length == nameLength
+                    && string.CompareOrdinal(rawSource, prefixLength, name, 0, nameLength) == 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

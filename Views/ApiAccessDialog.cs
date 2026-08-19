@@ -22,7 +22,8 @@ namespace GW2CraftingHelper.Views
     /// window's own size, TopMost, a stable Id, Show()/Hide() semantics) -
     /// but is a SEPARATE class rather than a generalization of ModalDialog
     /// itself: ModalDialog's shape (one short sentence, fixed "Confirm"
-    /// title, fixed Regenerate/Cancel buttons) does not fit a multi-line
+    /// title, a caller-named confirm button beside a fixed Cancel) does
+    /// not fit a multi-line
     /// numbered checklist with a different title and a Retry/Close pair,
     /// and its message Label is not wrapped at all - fine for its own
     /// short sentence, but this dialog's checklist items are full

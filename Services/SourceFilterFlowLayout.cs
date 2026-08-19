@@ -30,15 +30,15 @@ namespace GW2CraftingHelper.Services
     /// carried while it was four fixed checkboxes. Blish-free by
     /// construction: callers measure their own label widths and apply the
     /// returned offsets (see Views/MainView.cs).
-    /// <para>
-    /// A cell wider than <paramref name="availableWidth"/> still gets placed
-    /// at the start of its own row rather than being dropped or looping
-    /// forever - overflowing one oversized label is strictly better than
-    /// hiding a filter the user cannot then re-enable.
-    /// </para>
     /// </summary>
     public static class SourceFilterFlowLayout
     {
+        /// <summary>
+        /// A cell wider than <paramref name="availableWidth"/> still gets
+        /// placed at the start of its own row rather than being dropped or
+        /// looping forever - overflowing one oversized label is strictly
+        /// better than hiding a filter the user cannot then re-enable.
+        /// </summary>
         public static SourceFilterFlowResult Layout(
             IReadOnlyList<int> cellWidths,
             int availableWidth,

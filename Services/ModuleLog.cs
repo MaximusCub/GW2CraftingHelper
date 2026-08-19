@@ -160,6 +160,12 @@ namespace GW2CraftingHelper.Services
         // just-finished FlushLoop that has not yet decremented.
         private int _pendingFileWrites;
 
+        // Shared best-effort drain budget for the two callers that need
+        // queued writes on disk before they proceed: Module.Unload and
+        // <see cref="DeleteFileAndReset"/>. Short by design - neither may
+        // hang on a stuck flush.
+        internal static readonly TimeSpan FlushDrainBudget = TimeSpan.FromMilliseconds(250);
+
         public ModuleLog(int ringCapacity = DefaultRingCapacity)
         {
             if (ringCapacity <= 0)
@@ -388,10 +394,12 @@ namespace GW2CraftingHelper.Services
         /// every file-sink write enqueued so far has been fully processed
         /// (written, or failed-with-callback), or until
         /// <paramref name="timeout"/> elapses. Returns true if it observed
-        /// the queue go idle, false on timeout. Production use is limited
-        /// to a best-effort drain in Module.Unload (so a burst of recent
+        /// the queue go idle, false on timeout. Production use is the
+        /// best-effort <see cref="FlushDrainBudget"/> drain in Module.Unload
+        /// (so a burst of recent
         /// diagnostics gets a brief chance to reach disk before the process
-        /// tears down); its main purpose is letting tests deterministically
+        /// tears down) and in <see cref="DeleteFileAndReset"/>; its main
+        /// purpose is letting tests deterministically
         /// await the background flush instead of asserting on a race.
         /// </summary>
         public bool WaitForPendingFileWrites(TimeSpan timeout)
@@ -479,7 +487,7 @@ namespace GW2CraftingHelper.Services
         /// <see cref="Clear"/>'s own, which never resets it).
         /// <para>
         /// Starts with a brief, bounded drain of the pending flush queue
-        /// (same 250ms budget as Module.Unload's own best-effort drain) so
+        /// (<see cref="FlushDrainBudget"/>) so
         /// entries queued before this call land in the file BEFORE it is
         /// deleted rather than resurrecting it afterwards. Best-effort: an
         /// entry still in flight past the budget (a hung disk) can land in
@@ -501,7 +509,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public void DeleteFileAndReset()
         {
-            WaitForPendingFileWrites(TimeSpan.FromMilliseconds(250));
+            WaitForPendingFileWrites(FlushDrainBudget);
 
             lock (_fileGate)
             {
