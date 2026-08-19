@@ -438,8 +438,9 @@ namespace GW2CraftingHelper.Views
             // may be walking the old ones at this instant, and a reference
             // swap leaves it a consistent list either way, PROVIDED each
             // reader takes the field into a local once rather than
-            // re-reading it after its own guard - SetAllCharactersChecked
-            // and OnCharacterToggled both do. Every reader also tolerates
+            // re-reading it after its own guard - SetAllCharactersChecked,
+            // OnCharacterToggled and ApplyTopRegionLayout all do. Every
+            // reader also tolerates
             // the empty/null state, which is the state before the first
             // Build anyway: ApplyTopRegionLayout flows zero cells to the
             // single-row height, SetAllCharactersChecked bounds-checks the
@@ -801,8 +802,13 @@ namespace GW2CraftingHelper.Views
 
                 if (w != _lastFlowWidth || cap != _lastFlowCap)
                 {
-                    var widths = new List<int>(_sourceFilterCells.Count);
-                    foreach (var checkbox in _sourceFilterCells)
+                    // Single read: Build's ThreadPool body swaps this field,
+                    // so the count and the indexer below must come from the
+                    // same list.
+                    var cells = _sourceFilterCells;
+
+                    var widths = new List<int>(cells.Count);
+                    foreach (var checkbox in cells)
                     {
                         widths.Add(checkbox.Width);
                     }
@@ -826,9 +832,9 @@ namespace GW2CraftingHelper.Views
                         height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
                     }
 
-                    for (int i = 0; i < _sourceFilterCells.Count; i++)
+                    for (int i = 0; i < cells.Count; i++)
                     {
-                        _sourceFilterCells[i].Location = new Point(flow.Cells[i].X, SourceFilterTopPad + flow.Cells[i].Y);
+                        cells[i].Location = new Point(flow.Cells[i].X, SourceFilterTopPad + flow.Cells[i].Y);
                     }
 
                     if (height < SourceFilterSingleRowHeight)

@@ -8662,8 +8662,9 @@ Behavior is preserved except where a bullet says otherwise.
   consistent list - which holds only because each reader now takes the
   field into a local once (`SetAllCharactersChecked` hoists the
   checkbox list before its bounds check; `OnCharacterToggled` hoists the
-  master before its null check), rather than re-reading the field after
-  its own guard.
+  master before its null check; `ApplyTopRegionLayout` hoists the cell
+  list before its count/indexer walk), rather than re-reading the field
+  after its own guard.
 - **No substring per character source:** SnapshotSearchResultBuilder.
   IsSourceEnabled compares the name half of "Character:<name>" in place
   with string.CompareOrdinal instead of allocating a Substring per
