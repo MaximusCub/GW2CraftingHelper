@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Blish_HUD;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views
@@ -35,6 +36,7 @@ namespace GW2CraftingHelper.Views
         // next to the view-only "Clear view".
         private const int DeleteButtonWidth = 120;
         private const int Gap = 8;
+        private const int StatusLabelX = LevelDropdownWidth + Gap + SearchBoxWidth + Gap + FollowCheckboxWidth + Gap;
 
         private static readonly Color DebugColor = new Color(130, 130, 130);
         private static readonly Color InfoColor = new Color(210, 210, 210);
@@ -55,6 +57,10 @@ namespace GW2CraftingHelper.Views
         private StandardButton _clearViewButton;
         private StandardButton _deleteFileButton;
         private Label _statusLabel;
+
+        // Untruncated status text: the label itself may only be holding an
+        // ellipsized form of it (see ApplyStatusLabelText).
+        private string _statusFullText = "";
 
         // Last Version this view has fully rendered up to (via either
         // RebuildRows or AppendNewRows) - PollForUpdates uses this both to
@@ -265,7 +271,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = StatusColor,
-                Location = new Point(LevelDropdownWidth + Gap + SearchBoxWidth + Gap + FollowCheckboxWidth + Gap, 12),
+                Location = new Point(StatusLabelX, 12),
                 Parent = _toolbarPanel
             };
 
@@ -343,6 +349,32 @@ namespace GW2CraftingHelper.Views
             _deleteFileButton.Location = new Point(w - (ButtonWidth * 2) - DeleteButtonWidth - (Gap * 3), 5);
             _copyButton.Location = new Point(w - (ButtonWidth * 2) - (Gap * 2), 5);
             _clearViewButton.Location = new Point(w - ButtonWidth - Gap, 5);
+
+            ApplyStatusLabelText();
+        }
+
+        /// <summary>
+        /// Fits the status text into the run between the left control
+        /// cluster and the Delete Log File button (the leftmost of the
+        /// three right-anchored ones): the label is auto-sized, so at a
+        /// narrow toolbar a long status would otherwise run underneath it.
+        /// Follows the plan renderers' EllipsizeToWidth + tooltip-on-
+        /// truncate convention, so nothing is lost when it does not fit.
+        /// Re-run on every resize as well as on every status change,
+        /// because either can change the fit.
+        /// </summary>
+        private void ApplyStatusLabelText()
+        {
+            if (_statusLabel == null)
+            {
+                return;
+            }
+
+            int available = _deleteFileButton.Location.X - StatusLabelX - Gap;
+            string display = LabelHelpers.EllipsizeToWidth(_statusLabel.Font, _statusFullText, available);
+
+            _statusLabel.Text = display;
+            _statusLabel.BasicTooltipText = display != _statusFullText ? _statusFullText : null;
         }
 
         /// <summary>
@@ -578,8 +610,9 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            _statusLabel.Text = text;
+            _statusFullText = text ?? "";
             _statusLabel.TextColor = isError ? ErrorColor : StatusColor;
+            ApplyStatusLabelText();
         }
 
         /// <summary>
