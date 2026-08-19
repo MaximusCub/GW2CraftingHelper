@@ -394,10 +394,12 @@ namespace GW2CraftingHelper.Services
         /// every file-sink write enqueued so far has been fully processed
         /// (written, or failed-with-callback), or until
         /// <paramref name="timeout"/> elapses. Returns true if it observed
-        /// the queue go idle, false on timeout. Production use is limited
-        /// to a best-effort drain in Module.Unload (so a burst of recent
+        /// the queue go idle, false on timeout. Production use is the
+        /// best-effort <see cref="FlushDrainBudget"/> drain in Module.Unload
+        /// (so a burst of recent
         /// diagnostics gets a brief chance to reach disk before the process
-        /// tears down); its main purpose is letting tests deterministically
+        /// tears down) and in <see cref="DeleteFileAndReset"/>; its main
+        /// purpose is letting tests deterministically
         /// await the background flush instead of asserting on a race.
         /// </summary>
         public bool WaitForPendingFileWrites(TimeSpan timeout)

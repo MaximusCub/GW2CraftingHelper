@@ -365,7 +365,7 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ApplyStatusLabelText()
         {
-            if (_statusLabel == null)
+            if (_statusLabel == null || _deleteFileButton == null)
             {
                 return;
             }
