@@ -64,12 +64,11 @@ namespace GW2CraftingHelper.Views
         // tab visit, so anything that should feel "sticky" across tab
         // switches must live in these instance fields, not the controls
         // themselves, and be read back in when Build() reruns). All four
-        // source toggles default to true (show everything), matching the
-        // tab's pre-search implicit no-filter behavior. The pre-existing
-        // content-type dropdown deliberately keeps its own prior (reset-
-        // to-default) behavior - only the NEW controls added by this
-        // feature get this treatment.
+        // source toggles default to true (show everything) and the
+        // content-type dropdown defaults to "All", matching the tab's
+        // pre-search implicit no-filter behavior.
         private string _lastSearchText = "";
+        private string _lastFilterSelection = "All";
         private bool _bankEnabled = true;
         private bool _materialStorageEnabled = true;
         private bool _sharedInventoryEnabled = true;
@@ -304,8 +303,15 @@ namespace GW2CraftingHelper.Views
             _filterDropdown.Items.Add("All");
             _filterDropdown.Items.Add("Items");
             _filterDropdown.Items.Add("Wallet");
-            _filterDropdown.SelectedItem = "All";
-            _filterDropdown.ValueChanged += (_, __) => RebuildContent();
+            // Restored before the ValueChanged subscription (matching the
+            // search box's Text-then-TextChanged order above) so the
+            // read-back itself never triggers a redundant rebuild.
+            _filterDropdown.SelectedItem = _lastFilterSelection;
+            _filterDropdown.ValueChanged += (_, __) =>
+            {
+                _lastFilterSelection = _filterDropdown.SelectedItem ?? "All";
+                RebuildContent();
+            };
 
             // Source-filter row: one checkbox per storage location, all
             // checked by default. Only meaningful when the content-type
