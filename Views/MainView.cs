@@ -125,6 +125,7 @@ namespace GW2CraftingHelper.Views
         private const int SearchRowHeight = 35;
         private const int SourceFilterRowY = SearchRowY + SearchRowHeight + 3;
         private const int CoinHeight = 24;
+        private const int SectionGapY = 4;
 
         // The source-filter row's height is account-driven: it carries one
         // checkbox per character (1 to 15+) and wraps onto extra rows rather
@@ -141,6 +142,20 @@ namespace GW2CraftingHelper.Views
         private const int SourceFilterBottomPad = 2;
         private const int SourceFilterSingleRowHeight = SourceFilterTopPad + SourceFilterCellHeight + SourceFilterBottomPad;
 
+        // The row grows one cell per character, so it must have an upper
+        // bound: unbounded, a large roster in a short window pushes the
+        // result list to zero height with no way for the user to shrink the
+        // row back. Past the bound the row scrolls instead of growing (see
+        // ApplyTopRegionLayout), so no checkbox becomes unreachable, and the
+        // result list always keeps MinContentHeight.
+        private const int SourceFilterMaxRows = 4;
+        private const int SourceFilterMaxRowsHeight = SourceFilterTopPad
+            + (SourceFilterMaxRows * SourceFilterCellHeight)
+            + ((SourceFilterMaxRows - 1) * SourceFilterRowGapY)
+            + SourceFilterBottomPad;
+        private const int SourceFilterScrollbarAllowance = 20;
+        private const int MinContentHeight = 120;
+
         // Checkbox width beyond its measured label: the box glyph plus its
         // text gap. Reproduces the four widths this row previously hardcoded
         // (e.g. "Bank" 70, "Material Storage" 170) from the measured text.
@@ -150,9 +165,27 @@ namespace GW2CraftingHelper.Views
         private int _containerWidth;
         private int _containerHeight;
 
-        private int CoinRowY => SourceFilterRowY + _sourceFilterHeight + 4;
-        private int ContentY => CoinRowY + CoinHeight + 4;
+        private int CoinRowY => SourceFilterRowY + _sourceFilterHeight + SectionGapY;
+        private int ContentY => CoinRowY + CoinHeight + SectionGapY;
         private int TopRegionHeight => ContentY;
+
+        // Fixed distance from the filter row's bottom edge to the content
+        // region's top: the coin row and the gap on either side of it.
+        private const int BelowSourceFilterHeight = SectionGapY + CoinHeight + SectionGapY;
+
+        // Height the filter row may not exceed: never tall enough to drop
+        // the result list below MinContentHeight, never more than
+        // SourceFilterMaxRows of cells, and never below the single-row
+        // height the row had before it became account-sized.
+        private int MaxSourceFilterHeight
+        {
+            get
+            {
+                int budget = _containerHeight - SourceFilterRowY - BelowSourceFilterHeight - MinContentHeight;
+                int cap = budget < SourceFilterMaxRowsHeight ? budget : SourceFilterMaxRowsHeight;
+                return cap > SourceFilterSingleRowHeight ? cap : SourceFilterSingleRowHeight;
+            }
+        }
 
         private const int SearchBoxWidth = 300;
         private const int FilterDropdownWidth = 140;
@@ -219,11 +252,25 @@ namespace GW2CraftingHelper.Views
             _snapshot = snapshot;
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
             _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
-            _characterNames = SnapshotSearchResultBuilder.CollectCharacterNames(_snapshot);
-            // The roster the per-character checkboxes are built from just
-            // changed (a refresh can add or drop a character), so the row
-            // itself is rebuilt, not just the result list below.
-            RebuildSourceFilterRow();
+
+            var characterNames = SnapshotSearchResultBuilder.CollectCharacterNames(_snapshot);
+            bool rosterChanged = !RosterEquals(_characterNames, characterNames);
+            _characterNames = characterNames;
+
+            // A refresh can add or drop a character, and that has to rebuild
+            // the checkbox row itself, not just the result list below. Only
+            // when the roster actually changed, though: this path is driven
+            // by the periodic background refresh, and rebuilding disposes the
+            // very checkbox a click may be mid-press on, losing the click.
+            if (rosterChanged)
+            {
+                RebuildSourceFilterRow();
+            }
+            else
+            {
+                ApplyTopRegionLayout();
+            }
+
             UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
             ApplyStatusDisplay();
             RebuildContent();
@@ -583,6 +630,25 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
+        /// Ordinal element-wise comparison of two rosters. Order is
+        /// meaningful and stable - CollectCharacterNames sorts - so two
+        /// snapshots of the same account compare equal.
+        /// </summary>
+        private static bool RosterEquals(List<string> left, List<string> right)
+        {
+            if (ReferenceEquals(left, right)) return true;
+            if (left == null || right == null) return false;
+            if (left.Count != right.Count) return false;
+
+            for (int i = 0; i < left.Count; i++)
+            {
+                if (!string.Equals(left[i], right[i], StringComparison.Ordinal)) return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Creates one source-filter checkbox, appends it to the flow order,
         /// and wires its click to <paramref name="onChanged"/> plus a single
         /// content rebuild. Location is a placeholder until
@@ -701,14 +767,36 @@ namespace GW2CraftingHelper.Views
 
                 var flow = SourceFilterFlowLayout.Layout(
                     widths, w, SourceFilterCellHeight, SourceFilterCellGapX, SourceFilterRowGapY);
+                int height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
+
+                // Past the cap the row scrolls rather than growing, so the
+                // cells have to be re-flowed clear of the scrollbar strip -
+                // which can itself wrap one more cell, hence the second pass.
+                int cap = MaxSourceFilterHeight;
+                bool scroll = height > cap;
+                if (scroll)
+                {
+                    flow = SourceFilterFlowLayout.Layout(
+                        widths,
+                        w - SourceFilterScrollbarAllowance,
+                        SourceFilterCellHeight,
+                        SourceFilterCellGapX,
+                        SourceFilterRowGapY);
+                    height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
+                }
 
                 for (int i = 0; i < _sourceFilterCells.Count; i++)
                 {
                     _sourceFilterCells[i].Location = new Point(flow.Cells[i].X, SourceFilterTopPad + flow.Cells[i].Y);
                 }
 
-                int height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
-                _sourceFilterHeight = height > SourceFilterSingleRowHeight ? height : SourceFilterSingleRowHeight;
+                if (height < SourceFilterSingleRowHeight)
+                {
+                    height = SourceFilterSingleRowHeight;
+                }
+
+                _sourceFilterHeight = height < cap ? height : cap;
+                _sourceFilterPanel.CanScroll = scroll;
                 _sourceFilterPanel.Size = new Point(w, _sourceFilterHeight);
             }
 
@@ -720,9 +808,10 @@ namespace GW2CraftingHelper.Views
 
             if (_contentPanel != null)
             {
-                // Enough wrapped filter rows in a short window can push the
-                // content region past the bottom edge; clamping at zero
-                // keeps the panel degenerate-but-valid rather than negative.
+                // MaxSourceFilterHeight already reserves MinContentHeight
+                // here; a window shorter than the fixed rows above the
+                // filter row can still drive this negative, and clamping at
+                // zero keeps the panel degenerate-but-valid.
                 int contentHeight = _containerHeight - TopRegionHeight;
                 _contentPanel.Location = new Point(0, ContentY);
                 _contentPanel.Size = new Point(w, contentHeight > 0 ? contentHeight : 0);
@@ -1033,15 +1122,18 @@ namespace GW2CraftingHelper.Views
                 // Read from the sticky fields, not the checkboxes: the
                 // fields are the source of truth the controls are built
                 // from, and the controls do not exist until the row is
-                // rebuilt on the main thread. The exclusion set is passed by
-                // reference (the builder only reads it) rather than copied
-                // per keystroke.
+                // rebuilt on the main thread. The exclusion set is copied
+                // (roster-sized, so tens of entries) rather than handed over
+                // by reference: SnapshotSourceFilter is a mutable public
+                // carrier, and nothing across that boundary promises to
+                // leave it alone - a normalizing or pruning pass on the far
+                // side would otherwise silently re-check the user's boxes.
                 var sourceFilter = new SnapshotSourceFilter
                 {
                     Bank = _bankEnabled,
                     MaterialStorage = _materialStorageEnabled,
                     SharedInventory = _sharedInventoryEnabled,
-                    UncheckedCharacters = _uncheckedCharacters
+                    UncheckedCharacters = new HashSet<string>(_uncheckedCharacters, StringComparer.Ordinal)
                 };
 
                 itemRows = SnapshotSearchResultBuilder.BuildItemRows(

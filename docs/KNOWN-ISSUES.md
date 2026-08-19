@@ -8496,9 +8496,13 @@ in that proposal, against their original opposite choices).
   bare character name, and SnapshotSearchResultBuilder.IsSourceEnabled
   resolves a "Character:<name>" source against it. Exclusion (rather than
   inclusion) is what makes a character new in a fresh snapshot default to
-  checked without the filter knowing the roster; the same set is the
-  view's session-sticky state, so unchecked characters survive a tab
-  bounce exactly like the search text and the content-type dropdown.
+  checked without the filter knowing the roster; the view holds the same
+  kind of set as its session-sticky state, so unchecked characters survive
+  a tab bounce exactly like the search text and the content-type dropdown.
+  The sticky set is copied into the filter per rebuild rather than shared
+  by reference - SnapshotSourceFilter is a mutable public carrier, and a
+  later normalizing or pruning pass on the service side would otherwise
+  reach straight into the user's UI state and re-check their boxes.
   Stale names (a deleted character) are deliberately not pruned - they
   match nothing, and pruning would forget the user's choice whenever a
   degraded snapshot happened to omit a character.
@@ -8513,6 +8517,17 @@ in that proposal, against their original opposite choices).
   filter wrapped onto - on build, on every snapshot, and on every resize
   (a narrower window re-wraps). Single-row height is floored at the exact
   30px the row had before, so the common case is pixel-identical.
+- **The row is bounded, and scrolls past the bound:** an account-sized row
+  cannot be allowed to grow without limit - a large roster in a short
+  window would otherwise push the result list to zero height, with no way
+  for the user to shrink the row back (it cannot be collapsed, and the only
+  recourse would be enlarging a window that may already be at the display's
+  limit). MainView caps the row at whichever is smaller: four flowed rows,
+  or whatever leaves the result list 120px. Past the cap the panel gets
+  CanScroll and the cells are re-flowed clear of the scrollbar strip, so
+  every checkbox stays reachable rather than being clipped away. The
+  content panel's own clamp-at-zero stays as a floor for the case of a
+  window shorter than the fixed rows above the filter row.
 - **New roster seam:** SnapshotSearchResultBuilder.CollectCharacterNames
   merges the "Character:<name>" item sources with CharacterDisciplines, so
   a character holding no items still gets a checkbox, and keeps
@@ -8522,7 +8537,14 @@ in that proposal, against their original opposite choices).
   marshaled tail and from SetSnapshot, instead of inline in Build's
   ThreadPool-thread body. Two reasons: a roster change has to rebuild the
   row, not just the result list, and one creation path cannot drift from
-  the other. An "All Characters" master toggle (present only when there
+  the other. SetSnapshot rebuilds the row **only when the roster actually
+  changed** (ordinal element-wise compare against the previous names, which
+  CollectCharacterNames sorts, so it is stable): SetSnapshot is driven by
+  the periodic background refresh, and an unconditional rebuild disposes
+  the very checkbox a click may be mid-press on, silently losing the click,
+  besides reallocating the whole row for a byte-identical roster. An
+  unchanged roster still re-runs the layout pass. An "All Characters"
+  master toggle (present only when there
   is more than one character) cascades check/uncheck-all behind a
   re-entrancy guard, so one user click stays one content rebuild.
   RebuildContent now reads the sticky fields rather than the controls,
@@ -8555,6 +8577,10 @@ baseline -> 1876 (commit 1: per-character filter semantics, roster
 collection, flow-layout wrapping) -> 1884 (commit 2: character-label
 matching, AND-composition, wallet-unaffected). Commit 3 is docs plus one
 redundant loop-variable copy dropped from the row builder; suite 1884.
+Commit 4 applies the review's three Must Fix findings (row height bound +
+scroll, roster-change guard on the rebuild, defensive copy of the sticky
+set); all three land in MainView, which is Blish-coupled and therefore
+outside the test suite's reach - build 0 errors, suite still 1884.
 
 Desktop gate should look at: (1) the per-character checkbox row rendering
 with a multi-character snapshot - labels not clipped, no overflow past
@@ -8567,5 +8593,7 @@ come back as left, and that a Refresh Now does not silently re-check
 them; (3) character-name search - type a character's name and confirm
 its items appear while currencies do not, then uncheck that same
 character and confirm the list empties rather than the search overriding
-the box.
+the box; (4) the bounded row - shrink the window until the filter row hits
+its cap and confirm the result list keeps its minimum height, the row
+gains a working scrollbar, and the checkboxes do not sit under it.
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
