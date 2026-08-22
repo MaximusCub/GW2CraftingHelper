@@ -252,6 +252,14 @@ height, its promoted cost band, and the currency table's column edges) and
 `Services/TreeCostColumnMath.cs` (the recipe tree's per-denomination cost
 sub-columns and the whole-tree pre-scan that sizes them).
 
+The same shape covers the non-scrolling top strip:
+`Services/TopRegionLayoutMath.cs` holds its Y offsets, read by the initial
+`Build`, the item-row add/remove reflow and the resize handler. Its rows
+are not all unconditional - the Recipe Tree toolbar row appears only for a
+plan that has a tree - and the invariant it guarantees is that a hidden row
+costs exactly zero, so the strip with no toolbar is byte-identical to the
+strip before the row existed.
+
 **Full history:** KNOWN-ISSUES items 12, 14, 19.
 
 ---

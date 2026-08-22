@@ -84,6 +84,10 @@ namespace GW2CraftingHelper.Views.Rendering
         private readonly Action<IReadOnlyList<string>> _setLastDebugLog;
         private readonly Func<string, PlanSectionType, int, bool, Func<bool>, (Panel HeaderPanel, Label ArrowLabel, FlowPanel ContentFlow)> _createSectionHeader;
 
+        // Publishes (or, with null, withdraws) the five tree actions to
+        // whatever surface hosts their buttons - see TreeToolbarCommands.
+        private readonly Action<TreeToolbarCommands> _setTreeToolbar;
+
         private static readonly Logger Logger = Logger.GetLogger<TreeSectionController>();
 
         internal TreeSectionController(
@@ -97,7 +101,8 @@ namespace GW2CraftingHelper.Views.Rendering
             Func<PlanViewModel> getCurrentPlan,
             Action<PlanViewModel> setCurrentPlan,
             Action<IReadOnlyList<string>> setLastDebugLog,
-            Func<string, PlanSectionType, int, bool, Func<bool>, (Panel HeaderPanel, Label ArrowLabel, FlowPanel ContentFlow)> createSectionHeader)
+            Func<string, PlanSectionType, int, bool, Func<bool>, (Panel HeaderPanel, Label ArrowLabel, FlowPanel ContentFlow)> createSectionHeader,
+            Action<TreeToolbarCommands> setTreeToolbar)
         {
             // resolveOverridesSync is deliberately NOT null-guarded - the
             // sole production call site (CraftingPlanView's own
@@ -117,6 +122,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _setCurrentPlan = setCurrentPlan ?? throw new ArgumentNullException(nameof(setCurrentPlan));
             _setLastDebugLog = setLastDebugLog ?? throw new ArgumentNullException(nameof(setLastDebugLog));
             _createSectionHeader = createSectionHeader ?? throw new ArgumentNullException(nameof(createSectionHeader));
+            _setTreeToolbar = setTreeToolbar ?? throw new ArgumentNullException(nameof(setTreeToolbar));
         }
 
         // Per-node user decision overrides (keyed by solver NodeId) and
@@ -208,6 +214,11 @@ namespace GW2CraftingHelper.Views.Rendering
             _treeRoots = null;
             _treeFlow = null;
             _costColumnWidths = TreeCostColumnMath.CostColumnWidths.Empty;
+
+            // Withdrawn with the render pass that published them: the tree
+            // actions operate on the controls this reset is about to
+            // discard, and the next plan may have no tree at all.
+            _setTreeToolbar(null);
         }
 
         /// <summary>
@@ -297,81 +308,16 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             _treeNodeStates.Clear();
 
-            // The header's Click-to-toggle is wired inside CreateSectionHeader
-            // before these buttons exist; suppressToggle captures them by
-            // reference and reads their (assigned-below) MouseOver lazily,
-            // at click time - not at subscription time.
-            StandardButton expandAllButton = null;
-            StandardButton collapseAllButton = null;
-            StandardButton bestPathButton = null;
-            StandardButton craftAllButton = null;
-            StandardButton buyAllButton = null;
-
-            // Guard uses PRESS-time hover state: with a release-time check,
-            // pressing on the header background and releasing over a button
-            // dropped the click entirely (neither toggle nor button fired).
-            bool pressStartedOnButton = false;
-
+            // The five action buttons this header used to carry now live in
+            // CraftingPlanView's non-scrolling top strip - see
+            // TreeToolbarCommands. Nothing interactive is left in the header,
+            // so the suppressToggle guard (and the press-time hover flag it
+            // read) went with them.
             var header = _createSectionHeader(
-                "Recipe Tree", PlanSectionType.RecipeTree, panelWidth, true,
-                () => pressStartedOnButton);
-            var headerPanel = header.HeaderPanel;
+                "Recipe Tree", PlanSectionType.RecipeTree, panelWidth, true, null);
             var treeFlow = header.ContentFlow;
             _treeRoots = treeRoots as List<CraftingTreeNode> ?? new List<CraftingTreeNode>(treeRoots);
             _treeFlow = treeFlow;
-
-            // Header-row buttons, right-to-left per the spec's fixed
-            // offsets-from-the-right layout: Collapse All, Expand All, then
-            // the presets (Buy All / Craft All / Best Path) continuing
-            // leftward with 4px gaps so they never collide with the title.
-            int cursorX = panelWidth;
-            var headerButtons = new List<(StandardButton Button, int Width)>(5);
-            StandardButton PlaceButtonRight(string text, int width, string tooltipText)
-            {
-                cursorX -= width;
-                var button = new StandardButton()
-                {
-                    Text = text,
-                    Size = new Point(width, 24),
-                    Location = new Point(cursorX, 3),
-                    BasicTooltipText = tooltipText,
-                    Parent = headerPanel
-                };
-                headerButtons.Add((button, width));
-                cursorX -= 4;
-                return button;
-            }
-
-            collapseAllButton = PlaceButtonRight("Collapse All", 96,
-                "Collapses every branch of the Recipe Tree back down to the top level.");
-            expandAllButton = PlaceButtonRight("Expand All", 92,
-                "Expands every branch of the Recipe Tree, including nested children, so the full tree is visible.");
-            buyAllButton = PlaceButtonRight("Buy All", 70,
-                "Forces every ingredient with a Trading Post price to Buy from TP, throughout the whole tree " +
-                "including nodes hidden under bought items - replacing any manual choices already made. " +
-                "Ingredients with no Trading Post price fall back to the solver's normal choice.");
-            craftAllButton = PlaceButtonRight("Craft All", 76,
-                "Forces every ingredient with a known recipe to Craft, throughout the whole tree including " +
-                "nodes hidden under bought items - replacing any manual choices already made. Ingredients " +
-                "with no recipe fall back to the solver's normal choice.");
-            bestPathButton = PlaceButtonRight("Best Path", 80,
-                "Clears every manual override, including Craft All/Buy All, and re-solves for the solver's " +
-                "cheapest plan. Ignore selections are left unchanged.");
-
-            // Right-to-left button placement is font-only (fixed
-            // widths) - pure reposition on every drag tick, same order as
-            // PlaceButtonRight built them so the right-to-left offsets
-            // reproduce identically.
-            _sink.AddRelayout(w =>
-            {
-                int x = w;
-                foreach (var (button, width) in headerButtons)
-                {
-                    x -= width;
-                    button.Location = new Point(x, 3);
-                    x -= 4;
-                }
-            });
 
             // Cost-column pre-scan: ONE walk of the whole tree per render
             // pass, before any row is built, so every row (including the
@@ -443,18 +389,30 @@ namespace GW2CraftingHelper.Views.Rendering
             // this method returns to RenderPlan/PreserveScrollAcross.
             RefreshTreeContainerHeights();
 
-            // Decision presets: clear overrides / force craft-everywhere /
-            // force buy-everywhere (feasibility respected by the solver).
-            bestPathButton.Click += (_, __) =>
+            // Published last: every action below reads state this method
+            // just finished building.
+            _setTreeToolbar(new TreeToolbarCommands
             {
-                if (_nodeOverrides.Count == 0) return;
-                _nodeOverrides.Clear();
-                ApplyOverridesAndResolve(isBestPathPreset: true);
-            };
-            craftAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.Craft);
-            buyAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.BuyFromTp);
+                BestPath = ApplyBestPathPreset,
+                CraftAll = () => ApplyPreset(AcquisitionSource.Craft),
+                BuyAll = () => ApplyPreset(AcquisitionSource.BuyFromTp),
+                ExpandAll = ExpandAll,
+                CollapseAll = CollapseAll
+            });
+        }
 
-            expandAllButton.Click += (_, __) => _preserveScrollAcross(() =>
+        // Decision preset: clear every manual override and re-solve for the
+        // solver's own cheapest plan.
+        private void ApplyBestPathPreset()
+        {
+            if (_nodeOverrides.Count == 0) return;
+            _nodeOverrides.Clear();
+            ApplyOverridesAndResolve(isBestPathPreset: true);
+        }
+
+        private void ExpandAll()
+        {
+            _preserveScrollAcross(() =>
             {
                 // Building children appends to _treeNodeStates; index loop
                 // deliberately walks the growing list.
@@ -480,8 +438,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 RefreshTreeContainerHeights();
             });
+        }
 
-            collapseAllButton.Click += (_, __) => _preserveScrollAcross(() =>
+        private void CollapseAll()
+        {
+            _preserveScrollAcross(() =>
             {
                 foreach (var s in _treeNodeStates)
                 {
@@ -492,14 +453,6 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 RefreshTreeContainerHeights();
             });
-
-            headerPanel.LeftMouseButtonPressed += (_, __) =>
-            {
-                pressStartedOnButton =
-                    expandAllButton.MouseOver || collapseAllButton.MouseOver ||
-                    bestPathButton.MouseOver || craftAllButton.MouseOver ||
-                    buyAllButton.MouseOver;
-            };
         }
 
         // Moved verbatim from CraftingPlanView.ApplyPreset. No edits - both
