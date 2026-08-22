@@ -630,7 +630,7 @@ namespace GW2CraftingHelper.Views
             // this module's UI/log strings are English-only, so timestamp
             // formatting is pinned to InvariantCulture rather than the
             // ambient CurrentCulture - matching MainView.cs, Module.cs,
-            // SettingsTabContent.cs and LogTabContent.cs. This file's three
+            // SettingsTabContent.cs and LogTabContent.cs. This file's own
             // sites predate that policy (they originated the "MMM d, yyyy
             // h:mm tt" format string) and were converted to match it rather
             // than left on CurrentCulture, which would go on to produce a
@@ -3011,47 +3011,71 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Plan header: rarity-framed item icon + two-tone title ("Crafting
-        /// Plan for " in white, item name in its rarity color) + grey
-        /// quantity, centered as a unit; timestamp right-aligned below.
-        /// Mirrors gw2e's centered .tooltip-item + name header block.
+        /// Plan header: rarity-framed item icon + the item's own name in
+        /// its rarity colour + a grey quantity, left-aligned at the
+        /// content gutter every section below it also starts at.
+        ///
+        /// Three separate things used to compete here. The block was
+        /// CENTRED while everything under it was left-aligned, so the plan
+        /// had no single left edge. It carried a right-aligned "Generated:
+        /// ..." panel duplicating - to the minute - the timestamp the
+        /// fixed status strip 70px above already shows, so a plan opened
+        /// with the same text twice. And its title shared DefaultFont18
+        /// with every collapsible section header, leaving the page with no
+        /// typographic top level at all.
+        ///
+        /// So: the in-scroll timestamp is gone (the strip keeps it, and it
+        /// never scrolls away); the title is left-aligned and rendered at
+        /// DefaultFont32, and CreateSectionHeader drops to DefaultFont16,
+        /// so Font18-and-up now belongs to the page title alone. The
+        /// "Crafting Plan for " prefix is gone with it - the tab is
+        /// already titled "Crafting Plan" and the strip already says "Plan
+        /// generated", so the prefix cost half the title's width to repeat
+        /// what two other elements say.
         /// </summary>
         private void CreatePlanHeader(PlanViewModel vm, int panelWidth)
         {
-            const int headerHeight = 60;
-            const int headerTopPad = 10;
-            const int headerBottomPad = 4;
+            const int headerHeight = 56;
             const int iconSize = 40;
             const int iconBorder = 2;
-            const int iconPad = 8;
+            const int iconPad = 10;
+
+            // Same 8px content gutter the Summary section's tiles, the
+            // currency table's icon column and the footnote all start at.
+            const int headerX = 8;
 
             int frameSize = iconSize + iconBorder * 2;
 
-            var titleFont = GameService.Content.DefaultFont18;
-            var qtyFont = GameService.Content.DefaultFont16;
+            var titleFont = GameService.Content.DefaultFont32;
+            var qtyFont = GameService.Content.DefaultFont18;
 
-            string prefixText = "Crafting Plan for ";
             string nameText = vm.TargetItemName ?? "Unknown Item";
-            string qtyText = vm.TargetQuantity > 1 ? $" x {vm.TargetQuantity}" : "";
 
-            var prefixMeasure = titleFont.MeasureString(prefixText);
+            // "needed", not a bare count: the quantity here is what the
+            // plan still has to obtain after owned materials were
+            // subtracted, which is routinely smaller than the number in
+            // the Qty box the user typed (live capture ph13: box 77,
+            // header 42, 35 already owned). A bare "x 42" beside a box
+            // reading 77 reads as a bug. Deliberately not "to craft" -
+            // a root the solver decided to BUY is just as legitimate.
+            string qtyText = vm.TargetQuantity > 1 ? $" x {vm.TargetQuantity} needed" : "";
+
             var nameMeasure = titleFont.MeasureString(nameText);
-            int prefixWidth = (int)System.Math.Ceiling(prefixMeasure.Width);
             int nameWidth = (int)System.Math.Ceiling(nameMeasure.Width);
-            int textHeight = (int)System.Math.Ceiling(prefixMeasure.Height);
+            int textHeight = (int)System.Math.Ceiling(nameMeasure.Height);
 
-            int qtyWidth = 0;
+            int qtyHeight = 0;
             if (qtyText.Length > 0)
             {
-                qtyWidth = (int)System.Math.Ceiling(qtyFont.MeasureString(qtyText).Width);
+                qtyHeight = (int)System.Math.Ceiling(qtyFont.MeasureString(qtyText).Height);
             }
 
-            int totalTitleWidth = frameSize + iconPad + prefixWidth + nameWidth + qtyWidth;
-            int startX = PlanRelayoutMath.CenterX(panelWidth, totalTitleWidth);
-            int centerRegion = headerHeight - headerTopPad - headerBottomPad;
-            int iconY = headerTopPad + (centerRegion - frameSize) / 2;
-            // Anchor text to icon's visual center with -2px optical nudge for descenders
-            int textY = iconY + (frameSize - textHeight) / 2 - 2;
+            int iconY = (headerHeight - frameSize) / 2;
+            int textY = iconY + (frameSize - textHeight) / 2;
+            // Bottom-aligned against the much taller name rather than
+            // top-aligned, with a small optical lift off the descender
+            // line, so the two sit on one reading line.
+            int qtyY = textY + textHeight - qtyHeight - 4;
 
             var titlePanel = new Panel()
             {
@@ -3059,23 +3083,12 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            var iconFrame = IconControls.CreateRarityFramedIcon(
-                titlePanel, vm.TargetIconUrl, vm.TargetRarity, startX, iconY,
+            IconControls.CreateRarityFramedIcon(
+                titlePanel, vm.TargetIconUrl, vm.TargetRarity, headerX, iconY,
                 iconSize: iconSize, borderThickness: iconBorder);
 
-            int textX = startX + frameSize + iconPad;
-            var prefixLabel = new Label()
-            {
-                Text = prefixText,
-                Font = titleFont,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(textX, textY),
-                Parent = titlePanel
-            };
-            textX += prefixWidth;
-
-            var nameLabel = new Label()
+            int textX = headerX + frameSize + iconPad;
+            new Label()
             {
                 Text = nameText,
                 Font = titleFont,
@@ -3087,71 +3100,27 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(textX, textY),
                 Parent = titlePanel
             };
-            textX += nameWidth;
 
-            Label qtyLabel = null;
             if (qtyText.Length > 0)
             {
-                // DefaultFont16 sits a little taller than Font18's cap
-                // height at this weight; +3 keeps its baseline visually
-                // aligned with the name label instead of reading "raised".
-                qtyLabel = new Label()
+                new Label()
                 {
                     Text = qtyText,
                     Font = qtyFont,
                     TextColor = new Color(170, 170, 170),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(textX, textY + 3),
+                    Location = new Point(textX + nameWidth, qtyY),
                     Parent = titlePanel
                 };
             }
 
-            // Generated timestamp: right-aligned
-            var tsPanel = new Panel()
-            {
-                Size = new Point(panelWidth, 22),
-                Parent = _contentPanel
-            };
-
-            string tsText = $"Generated: {_planGeneratedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-            var tsFont = GameService.Content.DefaultFont14;
-            var tsMeasured = tsFont.MeasureString(tsText);
-            int tsWidth = (int)System.Math.Ceiling(tsMeasured.Width);
-
-            var tsLabel = new Label()
-            {
-                Text = tsText,
-                Font = tsFont,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(PlanRelayoutMath.RightAlignedX(panelWidth - 8, tsWidth), 2),
-                Parent = tsPanel
-            };
-
-            // Every measured width here (prefixWidth, nameWidth,
-            // qtyWidth, tsWidth) is font-only and invariant to panelWidth -
-            // only the centering/right-alignment anchors shift, so this is a
-            // pure reposition, no re-measure, on every drag tick.
-            _relayoutActions.Add(w =>
-            {
-                int newStartX = PlanRelayoutMath.CenterX(w, totalTitleWidth);
-                titlePanel.Size = new Point(w, headerHeight);
-                iconFrame.Location = new Point(newStartX, iconY);
-
-                int x = newStartX + frameSize + iconPad;
-                prefixLabel.Location = new Point(x, textY);
-                x += prefixWidth;
-                nameLabel.Location = new Point(x, textY);
-                x += nameWidth;
-                if (qtyLabel != null)
-                {
-                    qtyLabel.Location = new Point(x, textY + 3);
-                }
-
-                tsPanel.Size = new Point(w, 22);
-                tsLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, tsWidth), 2);
-            });
+            // Every x here is now a constant or a font-only measurement,
+            // so nothing in the title moves with the panel width - only
+            // the panel's own cosmetic width, same as TextRowRenderer's
+            // rows. The centring anchor (and the right-aligned timestamp
+            // that needed one) is gone.
+            _relayoutActions.Add(w => titlePanel.Size = new Point(w, headerHeight));
         }
 
         /// <summary>
@@ -3216,13 +3185,17 @@ namespace GW2CraftingHelper.Views
                 Parent = headerPanel
             };
 
+            // DefaultFont16, not 18: the plan title above now owns
+            // Font18-and-up (it renders at Font32), so a section header
+            // sharing Font18 with it would flatten the page back into one
+            // typographic level - see CreatePlanHeader.
             new Label()
             {
                 Text = title,
-                Font = GameService.Content.DefaultFont18,
+                Font = GameService.Content.DefaultFont16,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(22, 4),
+                Location = new Point(22, 5),
                 Parent = headerPanel
             };
 
@@ -3240,7 +3213,7 @@ namespace GW2CraftingHelper.Views
             // default 0.897 scale but vulnerable (~16-17%) at the "Small"
             // 0.81 scale, so it gets the same 1px bottom clearance as the
             // vulnerable row types (y = 30 - 2 - 1 = 27). Title text sits
-            // at y=4 with DefaultFont18 and remains clear of y=27.
+            // at y=5 with DefaultFont16 and remains clear of y=27.
             var headerDivider = new Panel()
             {
                 Size = new Point(panelWidth, 2),

@@ -37,7 +37,8 @@ namespace GW2CraftingHelper.Models
 
         /// <summary>
         /// When this plan was originally generated (the same value the
-        /// Crafting Plan tab's own "Generated: ..." header shows). Reused
+        /// Crafting Plan tab's own "Plan generated - ..." status strip
+        /// shows). Reused
         /// as-is by a later local override re-solve (see
         /// CraftingPlanPipeline.ResolveWithOverrides) - an override click
         /// re-solves locally with the SAME prices, it does not re-generate,
