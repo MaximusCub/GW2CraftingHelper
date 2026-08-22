@@ -4,45 +4,55 @@ using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
 using System;
+using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
     // design-plan-notes.md (Notes section, Option 1): renders every row of
-    // PlanSectionType.Notes - all PlanRowType.NoteLine - as a plain text
-    // row with an optional right-aligned coin cell. Mirrors TextRowRenderer's
-    // shape exactly, plus the coin cell CoinCurrencyRenderer.
-    // RenderValueCellRightAligned/RepositionValueCellRightAligned already
-    // give every shopping/tree value cell, drawn ONLY when row.CoinValue >
-    // 0 (the CreateCollapsibleSection default fallback would call plain
-    // TextRowRenderer.CreateTextRow for every row instead, which never
-    // renders a coin value at all - silently dropping every reclaim amount
-    // this section shows - so this section needs its own case in that
-    // switch rather than falling through to the default).
+    // PlanSectionType.Notes - all PlanRowType.NoteLine - as WRAPPED text
+    // with an optional right-aligned coin cell on its first line.
+    // RenderValueCellRightAligned/RepositionValueCellRightAligned are the
+    // same helpers that give every shopping/tree value cell, drawn ONLY
+    // when row.CoinValue > 0 (the CreateCollapsibleSection default fallback
+    // would call plain TextRowRenderer.CreateTextRow for every row instead,
+    // which never renders a coin value at all - silently dropping every
+    // reclaim amount this section shows - so this section needs its own
+    // case in that switch rather than falling through to the default).
     //
-    // Row-height discipline is load-bearing (design-plan-notes.md section
-    // 4): PlanSectionType.Notes gets no case in PlanContentHeightMath.
-    // SectionBodyHeight (a high-evidence zone, formerly DO-NOT-TOUCH; see
-    // docs/KNOWN-ISSUES.md's policy note) on purpose - it falls through to
-    // that method's existing default arm (rows.Count * FallbackTextRowHeight),
-    // which is only correct as long as EVERY NoteLine row - with or without
-    // a coin cell - renders at exactly that height. Both branches below use
-    // the same fixed rowHeight; the DEBUG assert at the end of CreateNoteRow
-    // is the load-bearing check this class's own correctness depends on.
+    // Row-height discipline is still load-bearing (design-plan-notes.md
+    // section 4) and unchanged in kind: a note is greedily wrapped into k
+    // lines by NotesSectionLayoutMath.WrapNote, and each LINE gets its own
+    // PlanContentHeightMath.FallbackTextRowHeight-tall Panel. So every
+    // panel this class builds is still exactly that height, the DEBUG
+    // assert at the end of CreateNoteRow still polices it, and the only
+    // thing that changed is how many of them a note produces. What did
+    // change is where the section's total height comes from: rows.Count is
+    // no longer the line count, so Render returns the height it actually
+    // built (sum over notes of lines * FallbackTextRowHeight, via
+    // NotesSectionLayoutMath.BodyHeight) and CreateCollapsibleSection uses
+    // that instead of PlanContentHeightMath.SectionBodyHeight's per-row
+    // default arm - the same special-casing Summary already has, with the
+    // stronger property that the number cannot drift from what was built
+    // because it IS what was built.
     //
-    // The label is now ellipsized against the
-    // available width (rightEdge minus the coin cell, when present) rather
-    // than a raw AutoSizeWidth label with no cap - matching every other
-    // label+right-value row shape in this codebase (UsedMaterialsSectionRenderer
-    // -> IconNameRowHelpers.CreateIconAndEllipsizedName / LabelHelpers.
-    // EllipsizeToWidth). Unlike that icon+name helper (which is
-    // icon-column-specific), this row has no icon, so it calls
-    // LabelHelpers.EllipsizeToWidth/PlanRelayoutMath.NameMaxWidthBeforeColumn
-    // directly rather than going through IconNameRowHelpers. A truncated
-    // row also gets a BasicTooltipText with the full, untruncated text -
-    // same "ellipsize + tooltip" contract as every other truncatable row.
-    // Re-ellipsized at settle via AddReellipsis, mirroring
-    // IconNameRowHelpers.ReellipsizeName's own "only touch Text/tooltip
-    // when the displayed string actually changed" gate.
+    // Wrapping replaced single-line ellipsis truncation (audit finding
+    // M14): at ~830px usable a note was cut near 100 characters into a
+    // hover-only tooltip, and the maintainer's UI law routes every
+    // opportunity and complex consideration into this section. Ellipsis
+    // survives only as the last-resort tail of a note that exceeds
+    // TextWrapMath.MaxWrappedLines, and of the resize path's slot cap
+    // below; both keep the full text on the row tooltip.
+    //
+    // Resize: the settle-time re-wrap (AddReellipsis) is pinned to the
+    // slot count built here - the row Panels already exist and the
+    // section's height was already finalized, and neither RunReellipsis nor
+    // ReplayRelayout is allowed to change a row height (see
+    // CraftingPlanView's _relayoutActions field comment). A narrower window
+    // therefore ellipsizes the tail into the last slot; a wider one leaves
+    // trailing slots blank until the next real render. Both are strictly
+    // more text than the pre-wrap single line, and a plan re-render (any
+    // Generate, tab reload, or section rebuild) re-wraps from scratch at
+    // the current width.
     internal sealed class NotesSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -58,22 +68,30 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         }
 
-        internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
+        /// <summary>
+        /// Renders every note row and returns the section body height that
+        /// was actually built - see this class's doc comment for why the
+        /// caller uses this instead of PlanContentHeightMath.
+        /// </summary>
+        internal int Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
+            int totalLines = 0;
             foreach (var row in section.Rows)
             {
-                CreateNoteRow(row, contentFlow, panelWidth);
+                totalLines += CreateNoteRow(row, contentFlow, panelWidth);
             }
+            return NotesSectionLayoutMath.BodyHeight(totalLines);
         }
 
-        private void CreateNoteRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
+        /// <summary>Returns how many line rows this note produced.</summary>
+        private int CreateNoteRow(PlanRowViewModel row, FlowPanel parent, int panelWidth)
         {
             const int rowHeight = PlanContentHeightMath.FallbackTextRowHeight;
-            const int labelX = 8;
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+            const int labelX = NotesSectionLayoutMath.LabelX;
             var font = GameService.Content.DefaultFont14;
+            var measure = LabelHelpers.MeasureWith(font);
 
-            string fullText = "  " + (row.Label ?? "");
+            string fullText = row.Label ?? "";
             bool hasCoin = row.CoinValue > 0;
 
             // Coin cell only when CoinValue > 0 - mirrors
@@ -83,88 +101,112 @@ namespace GW2CraftingHelper.Views.Rendering
             // cell at all rather than an unpriced dash - there is no price
             // concept for those lines to begin with.
             //
-            // MeasureValueWidth is called BEFORE the cell itself is built
-            // so the label's own max width can reserve room for it -
-            // mirrors MeasureValueWidth's own documented shopping-list
-            // pre-scan use, same "measure-then-build" ordering.
+            // MeasureValueWidth is called BEFORE the wrap so the FIRST
+            // line's own budget can reserve room for it - mirrors
+            // MeasureValueWidth's own documented shopping-list pre-scan
+            // use, same "measure-then-build" ordering.
             int coinCellWidth = hasCoin ? CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, null, font) : 0;
-            int gapBeforeCoin = hasCoin ? 12 : 0;
 
-            int maxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
-                panelWidth - 8, coinCellWidth, gapBeforeCoin, labelX);
-            string displayText = LabelHelpers.EllipsizeToWidth(font, fullText, maxWidth);
+            var wrapped = NotesSectionLayoutMath.WrapNote(fullText, panelWidth, coinCellWidth, measure);
+            int slotCount = wrapped.Lines.Count;
 
-            var label = new Label()
+            var linePanels = new List<Panel>(slotCount);
+            var lineLabels = new List<Label>(slotCount);
+            CoinCurrencyRenderer.ValueCellHandle coinHandle = null;
+
+            for (int i = 0; i < slotCount; i++)
             {
-                Text = displayText,
-                Font = font,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(labelX, 4),
-                Parent = rowPanel
-            };
-            if (displayText != fullText)
-            {
-                rowPanel.BasicTooltipText = row.Label ?? "";
-            }
-
-            if (hasCoin)
-            {
-                int rightEdge = panelWidth - 8;
-                var coinHandle = CoinCurrencyRenderer.RenderValueCellRightAligned(
-                    rowPanel, row.CoinValue, null, rightEdge, 4, font);
-
-                _sink.AddRelayout(w =>
+                var linePanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+                var label = new Label()
                 {
-                    rowPanel.Size = new Point(w, rowHeight);
-                    CoinCurrencyRenderer.RepositionValueCellRightAligned(coinHandle, w - 8, 4);
-                });
+                    Text = wrapped.Lines[i],
+                    Font = font,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(labelX, 4),
+                    Parent = linePanel
+                };
+
+                if (i == 0 && hasCoin)
+                {
+                    coinHandle = CoinCurrencyRenderer.RenderValueCellRightAligned(
+                        linePanel, row.CoinValue, null, panelWidth - NotesSectionLayoutMath.RightPadding, 4, font);
+                }
+
+                linePanels.Add(linePanel);
+                lineLabels.Add(label);
+
+#if DEBUG
+                // Load-bearing per this class's own doc comment: the Notes
+                // section's height is one FallbackTextRowHeight row per
+                // wrapped LINE, which is only correct when every line panel
+                // renders at exactly that height. The real ways a note line
+                // could break the contract are a child control growing
+                // taller than the row (a future WrapText/larger-font change
+                // to the label, or a coin cell taller than rowHeight - 4),
+                // so assert on the CHILDREN's own extents - re-reading
+                // linePanel.Height, set from the same const two statements
+                // above, would guard nothing.
+                foreach (var child in linePanel.Children)
+                {
+                    System.Diagnostics.Debug.Assert(
+                        child.Bottom <= rowHeight,
+                        "NotesSectionRenderer: every note line row's child controls must fit within " +
+                        "PlanContentHeightMath.FallbackTextRowHeight - see this class's own doc comment.");
+                }
+#endif
             }
-            else
+
+            ApplyTooltip(linePanels, wrapped.Truncated ? fullText : null);
+
+            var capturedCoinHandle = coinHandle;
+            _sink.AddRelayout(w =>
             {
-                _sink.AddRelayout(w => rowPanel.Size = new Point(w, rowHeight));
-            }
+                foreach (var linePanel in linePanels)
+                {
+                    linePanel.Size = new Point(w, rowHeight);
+                }
+                if (capturedCoinHandle != null)
+                {
+                    CoinCurrencyRenderer.RepositionValueCellRightAligned(
+                        capturedCoinHandle, w - NotesSectionLayoutMath.RightPadding, 4);
+                }
+            });
 
             _sink.AddReellipsis(w =>
             {
                 int newCoinCellWidth = hasCoin
                     ? CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, null, font)
                     : 0;
-                int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
-                    w - 8, newCoinCellWidth, gapBeforeCoin, labelX);
-                string newDisplayText = LabelHelpers.EllipsizeToWidth(font, fullText, newMaxWidth);
-                if (label.Text != newDisplayText)
+                var rewrapped = NotesSectionLayoutMath.WrapNote(
+                    fullText, w, newCoinCellWidth, measure, slotCount);
+
+                for (int i = 0; i < lineLabels.Count; i++)
                 {
-                    label.Text = newDisplayText;
-                    rowPanel.BasicTooltipText = newDisplayText != fullText ? (row.Label ?? "") : null;
+                    // Same "only touch Text when the displayed string
+                    // actually changed" gate IconNameRowHelpers.
+                    // ReellipsizeName uses.
+                    if (lineLabels[i].Text != rewrapped.Lines[i])
+                    {
+                        lineLabels[i].Text = rewrapped.Lines[i];
+                    }
                 }
+
+                ApplyTooltip(linePanels, rewrapped.Truncated ? fullText : null);
             });
 
-#if DEBUG
-            // Load-bearing per this class's own doc comment: PlanSectionType.
-            // Notes relies on PlanContentHeightMath's default arm (rows.Count
-            // * FallbackTextRowHeight; PlanContentHeightMath is a
-            // high-evidence zone, formerly DO-NOT-TOUCH), which is only
-            // correct when every row renders at exactly that height. Fail loud in
-            // DEBUG rather than silently drifting the section's real height
-            // out of sync with what CraftingPlanView computed for it.
-            //
-            // Re-reading rowPanel.Height here (set
-            // from the same const rowHeight two statements above the
-            // original version of this assert) can never fail - it guards
-            // nothing. The real ways a NoteLine could break the 28px
-            // contract are a child control growing taller than the row (a
-            // future WrapText/larger-font change to the label, or a coin
-            // cell taller than rowHeight - 4), so assert on the CHILDREN's
-            // own extents instead.
-            foreach (var child in rowPanel.Children)
+            return slotCount;
+        }
+
+        // Every line of a truncated note carries the full text, so a hover
+        // anywhere on the note reads the whole thing - not only its last
+        // line, which is the one that lost text.
+        private static void ApplyTooltip(List<Panel> linePanels, string tooltip)
+        {
+            foreach (var linePanel in linePanels)
             {
-                System.Diagnostics.Debug.Assert(
-                    child.Bottom <= rowHeight,
-                    "NotesSectionRenderer: every NoteLine row's child controls must fit within " +
-                    "PlanContentHeightMath.FallbackTextRowHeight - see this class's own doc comment.");
+                linePanel.BasicTooltipText = tooltip;
             }
-#endif
         }
     }
 }

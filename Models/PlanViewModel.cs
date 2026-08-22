@@ -17,10 +17,10 @@ namespace GW2CraftingHelper.Models
         // PlanViewModelBuilder.BuildNotesSection. Always last (Build()'s
         // section 7) since every note kind is a caveat ABOUT facts shown in
         // an earlier section. No PlanContentHeightMath case is added for
-        // this type on purpose - it falls through to that method's existing
-        // default arm (rows.Count * FallbackTextRowHeight), which is
-        // already correct as long as every NoteLine row renders at exactly
-        // that height (see NotesSectionRenderer's own doc comment).
+        // this type on purpose: a note wraps to as many fixed-height line
+        // rows as its text needs at the current width, so rows.Count is not
+        // the row count on screen. Its renderer reports the height it built
+        // instead (see NotesSectionRenderer's own doc comment).
         Notes,
 
         // Not a member of PlanViewModel.Sections (the tree renders from

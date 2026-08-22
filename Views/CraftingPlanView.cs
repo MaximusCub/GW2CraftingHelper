@@ -2903,6 +2903,13 @@ namespace GW2CraftingHelper.Views
             int relayoutCountBeforeBody = _relayoutActions.Count;
 #endif
 
+            // Notes is the one section whose height is not a function of
+            // its row list alone - a note wraps to as many fixed-height
+            // line rows as its text needs at this width - so its renderer
+            // reports the height it actually built. See
+            // Views/Rendering/NotesSectionRenderer's doc comment.
+            int? notesBodyHeight = null;
+
             // Every section gets its own table-column layout (spec: aligned
             // columns everywhere, not free-flowing text rows), so each has a
             // dedicated body builder rather than a generic per-row dispatch.
@@ -2943,7 +2950,8 @@ namespace GW2CraftingHelper.Views
                     // needs its own case rather than the default fallback
                     // below, since CreateTextRow never draws a coin value
                     // and this section's excess/reclaim lines carry one.
-                    new NotesSectionRenderer(this).Render(section, contentFlow, panelWidth);
+                    notesBodyHeight = new NotesSectionRenderer(this)
+                        .Render(section, contentFlow, panelWidth);
                     break;
                 // PlanSectionType.RequiredRecipes is handled entirely by
                 // CreateRequiredRecipesSection (early return above) - never
@@ -2979,10 +2987,13 @@ namespace GW2CraftingHelper.Views
             //
             // Summary is special-cased to SummarySectionLayoutMath.
             // BodyHeight instead of PlanContentHeightMath.SectionBodyHeight
-            // - see SummarySectionLayoutMath's own doc comment.
-            int bodyHeight = section.SectionType == PlanSectionType.Summary
+            // - see SummarySectionLayoutMath's own doc comment. Notes is
+            // special-cased one step further: its renderer already returned
+            // the wrapped-line height it built, which cannot drift from the
+            // rows on screen because it IS those rows.
+            int bodyHeight = notesBodyHeight ?? (section.SectionType == PlanSectionType.Summary
                 ? SummarySectionLayoutMath.BodyHeight(section.Rows)
-                : PlanContentHeightMath.SectionBodyHeight(section.SectionType, section.Rows);
+                : PlanContentHeightMath.SectionBodyHeight(section.SectionType, section.Rows));
             contentFlow.Size = new Point(panelWidth, bodyHeight);
         }
 

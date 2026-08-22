@@ -13,11 +13,16 @@ namespace GW2CraftingHelper.Services
     /// container from its children's CURRENT bounds before recursing into
     /// those children's own Update for that same frame) - the root cause of
     /// KNOWN-ISSUES #12/#14's multi-frame flash/stutter window. Every row
-    /// height in the plan view is a fixed constant (no text wrapping
-    /// anywhere in the file - only single-line ellipsis truncation), so the
+    /// height in the plan view is a fixed constant, so the
     /// total height of any section body or tree subtree is knowable
     /// synchronously from row counts/types and expansion state alone, with
     /// no need to wait for Blish layout to converge.
+    /// Every row height is still a fixed constant after the Plan Notes
+    /// section learned to wrap: a wrapped note renders one
+    /// FallbackTextRowHeight row per LINE, so only the row COUNT became
+    /// width-dependent, which is why Notes is sized by
+    /// NotesSectionLayoutMath/its renderer rather than by SectionBodyHeight
+    /// below (the same split Summary already has).
     /// CraftingPlanView uses these SAME constants both to size the
     /// AutoSize-replacement containers explicitly and to size the
     /// individual row Panels it creates, so the two paths cannot drift
