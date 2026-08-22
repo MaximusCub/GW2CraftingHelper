@@ -328,6 +328,59 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void BuildItemRows_OneCharacterQuery_MatchesItemNamesButNotCharacterHoldings()
+        {
+            // Minimum query length for character labels only: a single
+            // letter must not surface everything a character whose name
+            // contains it happens to hold, or the first keystrokes of an
+            // item search widen the list instead of narrowing it. Item
+            // names still match from the first letter.
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(1, "Iron Ore", 10, CharSource("Aria")),
+                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank)
+            };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "a", new SnapshotSourceFilter(), null);
+
+            Assert.Single(result);
+            Assert.Equal("Ancient Wood", result[0].Name);
+        }
+
+        [Fact]
+        public void BuildItemRows_TwoCharacterQuery_MatchesCharacterName()
+        {
+            // Exact boundary: two characters is the shortest query allowed
+            // to match a character label, and the same item that stayed
+            // hidden at one letter surfaces here.
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(1, "Iron Ore", 10, CharSource("Aria")),
+                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank)
+            };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "ar", new SnapshotSourceFilter(), null);
+
+            Assert.Single(result);
+            Assert.Equal("Iron Ore", result[0].Name);
+        }
+
+        [Fact]
+        public void BuildItemRows_PaddedOneCharacterQuery_StaysBelowTheCharacterMinimum()
+        {
+            // The length that counts is the trimmed one - surrounding
+            // whitespace must not buy a one-letter query character matching.
+            var items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 10, CharSource("Aria")) };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "  a  ", new SnapshotSourceFilter(), null);
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
         public void FilterWallet_CharacterName_LeavesCurrenciesUnaffected()
         {
             // Currencies have no per-character holding at all, so a

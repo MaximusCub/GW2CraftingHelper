@@ -23,6 +23,16 @@ namespace GW2CraftingHelper.Services
     public static class SnapshotSearchResultBuilder
     {
         /// <summary>
+        /// Shortest query allowed to match a character label. Item and
+        /// currency names keep matching from the first keystroke; only the
+        /// character half is held back, because a single letter surfaces
+        /// everything a character whose name contains it holds - so the
+        /// opening keystrokes of an item search would widen the list
+        /// instead of narrowing it (maintainer decision, char-search-min2).
+        /// </summary>
+        private const int MinCharacterSearchLength = 2;
+
+        /// <summary>
         /// Builds one representative <see cref="SnapshotItemEntry"/> per
         /// distinct itemId in <paramref name="items"/> (name/icon are
         /// resolved identically for every entry sharing an itemId - see
@@ -67,9 +77,11 @@ namespace GW2CraftingHelper.Services
         /// Builds one <see cref="SnapshotSearchRow"/> per distinct itemId in
         /// <paramref name="itemsById"/> that (a) matches
         /// <paramref name="searchText"/> by case-insensitive substring
-        /// against the item's own name OR against the name of a character
-        /// holding it (Feature 1 Open Question 2, resolved in favor of
-        /// source-label matching; storage-location labels stay unmatched)
+        /// against the item's own name OR - for queries of at least
+        /// <see cref="MinCharacterSearchLength"/> characters - against the
+        /// name of a character holding it (Feature 1 Open Question 2,
+        /// resolved in favor of source-label matching; storage-location
+        /// labels stay unmatched)
         /// and (b) has a positive total once <paramref name="sourceFilter"/>
         /// has excluded any unchecked sources. An item with zero quantity
         /// across the checked sources drops out of the list entirely
@@ -292,16 +304,19 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// True when <paramref name="search"/> occurs (case-insensitively)
-        /// in the character-name half of a "Character:&lt;name&gt;" source.
-        /// The scan starts past the encoding prefix, so searching "char"
-        /// matches a character actually named e.g. "Charr Hoarder" and never
-        /// the internal token itself, and it takes no substring (this runs
-        /// per source per item on the keystroke path).
+        /// True when <paramref name="search"/> is at least
+        /// <see cref="MinCharacterSearchLength"/> characters long and occurs
+        /// (case-insensitively) in the character-name half of a
+        /// "Character:&lt;name&gt;" source. The scan starts past the encoding
+        /// prefix, so searching "char" matches a character actually named
+        /// e.g. "Charr Hoarder" and never the internal token itself, and it
+        /// takes no substring (this runs per source per item on the
+        /// keystroke path).
         /// </summary>
         private static bool CharacterNameMatches(string rawSource, string search)
         {
-            return rawSource.StartsWith(AccountItemIndex.CharacterSourcePrefix, StringComparison.Ordinal)
+            return search.Length >= MinCharacterSearchLength
+                && rawSource.StartsWith(AccountItemIndex.CharacterSourcePrefix, StringComparison.Ordinal)
                 && rawSource.IndexOf(search, AccountItemIndex.CharacterSourcePrefix.Length, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
