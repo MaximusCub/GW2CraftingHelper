@@ -1,0 +1,38 @@
+using GW2CraftingHelper.Models;
+
+namespace GW2CraftingHelper.Services
+{
+    /// <summary>
+    /// The short source badge a Shopping List row carries next to its name
+    /// (Blish-free so the mapping is directly unit testable; the renderer
+    /// only turns the returned text into a tag).
+    /// <para>
+    /// Every shopping row type returns a badge. A plain Trading Post
+    /// purchase used to return null - "no badge" was the only thing saying
+    /// "buy this from the TP", which is a meaning the reader had to already
+    /// know. With TP badged, an unbadged shopping row is a defect rather
+    /// than a silent statement, which is what
+    /// <see cref="ForRow"/> returning null now means: a row type the
+    /// Shopping List does not emit.
+    /// </para>
+    /// </summary>
+    public static class ShoppingSourceBadge
+    {
+        public static string ForRow(PlanRowViewModel row)
+        {
+            if (row == null) return null;
+            switch (row.RowType)
+            {
+                case PlanRowType.ShoppingBuy: return "TP";
+                case PlanRowType.ShoppingVendor: return "VENDOR";
+                case PlanRowType.ShoppingCurrency: return "CURRENCY";
+                case PlanRowType.ShoppingUnknown:
+                    // Prefer the seeded wiki hint's badge (e.g. "SALVAGE",
+                    // "EXPLORE") when one exists - "UNKNOWN" remains the
+                    // fallback for no-source items with no seeded hint.
+                    return !string.IsNullOrEmpty(row.BadgeText) ? row.BadgeText : "UNKNOWN";
+                default: return null;
+            }
+        }
+    }
+}

@@ -112,7 +112,7 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             var font = GameService.Content.DefaultFont12;
             int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
-            int width = textWidth + 12;
+            int width = MeasureSmallTagWidth(text);
 
             var outer = new Panel()
             {
@@ -144,6 +144,18 @@ namespace GW2CraftingHelper.Views.Rendering
             };
 
             return outer;
+        }
+
+        /// <summary>
+        /// Width CreateSmallTag will give a tag of this text, without
+        /// building it - a caller that has to reserve room for the tag
+        /// before laying out what sits left of it (the shopping list's name
+        /// column) must not re-derive the +12 padding itself.
+        /// </summary>
+        internal static int MeasureSmallTagWidth(string text)
+        {
+            var font = GameService.Content.DefaultFont12;
+            return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width) + 12;
         }
 
         /// <summary>

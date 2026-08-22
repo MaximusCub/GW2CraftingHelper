@@ -1159,6 +1159,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 // border hue behind the label, so border-colored text has zero
                 // contrast against its own backdrop.
                 Color textColor = Color.White;
+                // Chrome (UNKNOWN/UNRECOGNIZED/CURRENCY/GUILD UPGRADE/the
+                // sole-source badge) reads one tier below a pill you can
+                // act on, matching the recessed ring PillColors gives it.
+                if (PillColors.IsNonInteractiveChrome(spec.Kind))
+                {
+                    textColor *= PillColors.NonInteractiveTextAlpha;
+                }
                 if (dimmed)
                 {
                     borderColor *= 0.35f;

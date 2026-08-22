@@ -136,6 +136,7 @@
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Services\ShoppingRowTooltipFormatter.cs" />
+    <Compile Include="Services\ShoppingSourceBadge.cs" />
     <Compile Include="Services\TreeRowTooltipComposer.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />
     <Compile Include="Services\AcquisitionHintService.cs" />
