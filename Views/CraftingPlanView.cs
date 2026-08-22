@@ -1812,11 +1812,11 @@ namespace GW2CraftingHelper.Views
         {
             _treeToolbarButtons.Clear();
 
+            // Size/Location/Visible are all settled by the
+            // PlaceTreeToolbarRow call at the bottom of this method, the
+            // one writer of them.
             _treeToolbarPanel = new Panel()
             {
-                Size = new Point(w, TopRegionLayoutMath.TreeToolbarRowHeight),
-                Location = new Point(0, rowY),
-                Visible = _treeToolbarVisible,
                 Parent = buildPanel
             };
 
@@ -1880,14 +1880,28 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Repositions the toolbar row and its right-anchored buttons -
-        /// pure geometry, no rebuild, so it is safe on every resize tick.
+        /// Repositions and re-sizes the toolbar row and its right-anchored
+        /// buttons - pure geometry, no rebuild, so it is safe on every
+        /// resize tick. The sole writer of the panel's Visible/Size, and it
+        /// reads _treeToolbarVisible, the same flag TopRegionLayoutMath is
+        /// handed.
+        /// <para>
+        /// A hidden row is given zero height as well as Visible = false.
+        /// The strip's arithmetic collapses the row entirely when it is
+        /// hidden, which puts its Y exactly on the status row - so a
+        /// full-height panel there would sit over the top few pixels of
+        /// the scrollable content area, and this way it cannot intercept
+        /// anything even if Blish's hit-testing ever stopped honouring
+        /// Visible.
+        /// </para>
         /// </summary>
         private void PlaceTreeToolbarRow(int w, int rowY)
         {
             if (_treeToolbarPanel == null) return;
 
-            _treeToolbarPanel.Size = new Point(w, TopRegionLayoutMath.TreeToolbarRowHeight);
+            _treeToolbarPanel.Visible = _treeToolbarVisible;
+            _treeToolbarPanel.Size = new Point(
+                w, _treeToolbarVisible ? TopRegionLayoutMath.TreeToolbarRowHeight : 0);
             _treeToolbarPanel.Location = new Point(0, rowY);
 
             int x = w - RightEdgePadding;
@@ -1910,9 +1924,6 @@ namespace GW2CraftingHelper.Views
             if (_treeToolbarVisible == visible) return;
 
             _treeToolbarVisible = visible;
-            if (_treeToolbarPanel == null) return;
-
-            _treeToolbarPanel.Visible = visible;
             ReflowTopRegion();
         }
 
@@ -3313,13 +3324,13 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Shared chrome for every collapsible section (the 6 PlanSectionType
-        /// sections and the Recipe Tree alike): caret + Font18 title, a 2px
+        /// sections and the Recipe Tree alike): caret + Font16 title, a 2px
         /// divider spanning the full width under the header, a hover wash on
         /// the whole clickable row, and click-to-toggle with expansion state
         /// persisted in _sectionExpansion under sectionKey. suppressToggle
-        /// lets a caller with its own header-row buttons (the tree's
-        /// Expand All / Collapse All / presets) veto the toggle when the
-        /// click landed on one of them.
+        /// lets a caller with its own header-row control veto the toggle
+        /// when the click landed on that control - only Required Recipes'
+        /// "Hide Unlocked" checkbox still needs it.
         /// </summary>
         private SectionHeaderHandle CreateSectionHeader(
             string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
