@@ -258,7 +258,22 @@ namespace GW2CraftingHelper.Views
             _reellipsisActions.Add(closure);
         }
 
+        void ISectionRelayoutSink.RequestRerenderAfterSettle()
+        {
+            _rerenderAfterSettlePending = true;
+        }
+
         int ISectionRelayoutSink.RelayoutCount => _relayoutActions.Count;
+
+        // Set by a re-ellipsis closure that cannot honour the registry's
+        // no-height-change contract at the settled width (today only the
+        // Notes section, whose row COUNT is width-dependent - see
+        // ISectionRelayoutSink.RequestRerenderAfterSettle). Set only from
+        // inside RunReellipsis and always cleared by the same
+        // ResizeSettleStep call, so it never carries across drags - the
+        // rebuild is deferred to the end of that call only because
+        // RenderPlan clears the registry RunReellipsis is iterating.
+        private bool _rerenderAfterSettlePending;
 
         // Trailing debounce for the resize-settle re-ellipsis pass. Every
         // relayout tick already runs synchronously in OnPanelResized (no
@@ -2001,7 +2016,12 @@ namespace GW2CraftingHelper.Views
         /// changes a row's Height, so - unlike the settle rebuild
         /// this replaces - nothing in RunReellipsis/ReplayRelayout can
         /// perturb scroll position; no PreserveScrollAcross wrapper is
-        /// needed around them. This method also arms the resize
+        /// needed around them. The one case that genuinely needs a new
+        /// height (a Notes line count that moved with the width) does not
+        /// stretch that contract: the closure requests a rebuild instead,
+        /// and this method runs it afterwards through PreserveScrollAcross
+        /// like every other rebuild - see RequestRerenderAfterSettle.
+        /// This method also arms the resize
         /// drag's single settle-time scroll-verify window, if a
         /// height-changing tick during the drag needs one - see
         /// StartResizeScrollVerify and _resizeScrollRestorePending.
@@ -2037,14 +2057,35 @@ namespace GW2CraftingHelper.Views
                 // any per-tick relayout closure was ever skipped or landed
                 // on a stale intermediate width. Cheap - no MeasureString.
                 ReplayRelayout(panelWidth);
+
+                // A closure asked for a rebuild because it could not honour
+                // the no-height-change contract at this width - the Notes
+                // section renders one fixed-height row per WRAPPED LINE, so
+                // a width that changes a note's line count changes the
+                // section's height. Deferred to here rather than done
+                // inside the closure because RenderPlan clears the very
+                // registry RunReellipsis was iterating, and routed through
+                // PreserveScrollAcross for the same reason every other
+                // rebuild (Generate, pill re-solve, hide-unlocked toggle)
+                // is. Once per settled drag at most, and only when a line
+                // count actually moved.
+                if (_rerenderAfterSettlePending && _currentPlan != null)
+                {
+                    PreserveScrollAcross(() => RenderPlan(_currentPlan));
+                }
             }
             catch (Exception ex)
             {
-                // The content panel was disposed between the last resize tick
-                // and the debounce firing (e.g. Build() ran again for a tab
-                // reload mid-drag). Degrade silently: whichever Build() call
-                // is current already rendered fresh content at its own width.
-                Logger.Warn(ex, "Resize settle pass skipped; content panel unavailable");
+                // Typically the content panel was disposed between the last
+                // resize tick and the debounce firing (e.g. Build() ran
+                // again for a tab reload mid-drag). Degrade silently:
+                // whichever Build() call is current already rendered fresh
+                // content at its own width.
+                Logger.Warn(ex, "Resize settle pass skipped");
+            }
+            finally
+            {
+                _rerenderAfterSettlePending = false;
             }
 
             // Bounded to a single window per settled drag (not per

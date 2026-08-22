@@ -40,19 +40,19 @@ namespace GW2CraftingHelper.Views.Rendering
     // hover-only tooltip, and the maintainer's UI law routes every
     // opportunity and complex consideration into this section. Ellipsis
     // survives only as the last-resort tail of a note that exceeds
-    // TextWrapMath.MaxWrappedLines, and of the resize path's slot cap
-    // below; both keep the full text on the row tooltip.
+    // TextWrapMath.MaxWrappedLines, which keeps the full text on the row
+    // tooltip.
     //
-    // Resize: the settle-time re-wrap (AddReellipsis) is pinned to the
-    // slot count built here - the row Panels already exist and the
-    // section's height was already finalized, and neither RunReellipsis nor
-    // ReplayRelayout is allowed to change a row height (see
-    // CraftingPlanView's _relayoutActions field comment). A narrower window
-    // therefore ellipsizes the tail into the last slot; a wider one leaves
-    // trailing slots blank until the next real render. Both are strictly
-    // more text than the pre-wrap single line, and a plan re-render (any
-    // Generate, tab reload, or section rebuild) re-wraps from scratch at
-    // the current width.
+    // Resize: the settle-time re-wrap (AddReellipsis) re-wraps at the
+    // settled width and writes the new text back into the row Panels built
+    // here - but ONLY while the line count is unchanged, since neither
+    // RunReellipsis nor ReplayRelayout may change a row height (see
+    // CraftingPlanView's _relayoutActions field comment) and this section
+    // spends one row per line. When the count moves, the closure requests
+    // one deferred rebuild instead (ISectionRelayoutSink.
+    // RequestRerenderAfterSettle), which re-wraps and re-heights the whole
+    // section from scratch in the same frame. Mid-drag the text is simply
+    // stale, exactly as every other section's ellipsized name is.
     internal sealed class NotesSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -108,13 +108,13 @@ namespace GW2CraftingHelper.Views.Rendering
             int coinCellWidth = hasCoin ? CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, null, font) : 0;
 
             var wrapped = NotesSectionLayoutMath.WrapNote(fullText, panelWidth, coinCellWidth, measure);
-            int slotCount = wrapped.Lines.Count;
+            int lineCount = wrapped.Lines.Count;
 
-            var linePanels = new List<Panel>(slotCount);
-            var lineLabels = new List<Label>(slotCount);
+            var linePanels = new List<Panel>(lineCount);
+            var lineLabels = new List<Label>(lineCount);
             CoinCurrencyRenderer.ValueCellHandle coinHandle = null;
 
-            for (int i = 0; i < slotCount; i++)
+            for (int i = 0; i < lineCount; i++)
             {
                 var linePanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
                 var label = new Label()
@@ -178,8 +178,23 @@ namespace GW2CraftingHelper.Views.Rendering
                 int newCoinCellWidth = hasCoin
                     ? CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, null, font)
                     : 0;
-                var rewrapped = NotesSectionLayoutMath.WrapNote(
-                    fullText, w, newCoinCellWidth, measure, slotCount);
+                var rewrapped = NotesSectionLayoutMath.WrapNote(fullText, w, newCoinCellWidth, measure);
+
+                if (rewrapped.Lines.Count != lineLabels.Count)
+                {
+                    // The note needs a different number of 28px rows than
+                    // it was built with, which is a HEIGHT change - the one
+                    // thing a re-ellipsis closure may not do (see
+                    // CraftingPlanView's _relayoutActions field comment).
+                    // Hand it to the rebuild path instead of forcing the
+                    // text into the wrong slot count: padding to fit would
+                    // leave blank rows sitting INSIDE the section until the
+                    // next render, and squeezing to fit would ellipsize
+                    // text that does fit at this width. The rebuild runs in
+                    // this same frame, before anything paints.
+                    _sink.RequestRerenderAfterSettle();
+                    return;
+                }
 
                 for (int i = 0; i < lineLabels.Count; i++)
                 {
@@ -195,7 +210,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 ApplyTooltip(linePanels, rewrapped.Truncated ? fullText : null);
             });
 
-            return slotCount;
+            return lineCount;
         }
 
         // Every line of a truncated note carries the full text, so a hover

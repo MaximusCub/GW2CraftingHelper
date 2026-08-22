@@ -63,13 +63,10 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Wraps one note into indented physical lines. The coin cell only
         /// ever sits on the FIRST line, so only that line's budget is
-        /// reduced by it; every later line gets the full width. slotCount
-        /// &gt; 0 pins the result to exactly that many lines (the resize
-        /// path - see TextWrapMath.WrapToSlots); 0 lets the note take as
-        /// many as it needs (the build path).
+        /// reduced by it; every later line gets the full width.
         /// </summary>
         public static TextWrapMath.WrappedText WrapNote(
-            string label, int panelWidth, int coinCellWidth, Func<string, int> measure, int slotCount = 0)
+            string label, int panelWidth, int coinCellWidth, Func<string, int> measure)
         {
             if (measure == null) throw new ArgumentNullException(nameof(measure));
 
@@ -77,15 +74,14 @@ namespace GW2CraftingHelper.Services
             int firstBudget = Clamp(TextBudget(panelWidth, coinCellWidth) - indentWidth);
             int restBudget = Clamp(TextBudget(panelWidth, 0) - indentWidth);
 
-            var wrapped = slotCount > 0
-                ? TextWrapMath.WrapToSlots(label ?? "", slotCount, firstBudget, restBudget, measure)
-                : TextWrapMath.Wrap(label ?? "", firstBudget, restBudget, measure);
+            var wrapped = TextWrapMath.Wrap(label ?? "", firstBudget, restBudget, measure);
 
             var indented = new string[wrapped.Lines.Count];
             for (int i = 0; i < wrapped.Lines.Count; i++)
             {
-                // An empty line is a padded slot, not content - indenting
-                // it would put stray whitespace in an otherwise blank row.
+                // An empty line is a deliberate blank line in the source
+                // text, not content - indenting it would put stray
+                // whitespace in an otherwise blank row.
                 indented[i] = wrapped.Lines[i].Length == 0 ? "" : LineIndent + wrapped.Lines[i];
             }
 

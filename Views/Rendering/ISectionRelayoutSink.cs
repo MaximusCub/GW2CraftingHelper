@@ -21,7 +21,9 @@ namespace GW2CraftingHelper.Views.Rendering
     /// the same "registered no relayout closures" warning it always did.
     ///
     /// Kept to exactly the two registries (plus the read-only
-    /// RelayoutCount) on purpose - a renderer that also needs shared
+    /// RelayoutCount and the settle-time rebuild request, both of which
+    /// concern the same two lists' replay) on purpose - a renderer that
+    /// also needs shared
     /// chrome (e.g. CreateSectionHeader) or a static primitive
     /// (LabelHelpers/IconControls/RarityColors/CoinCurrencyRenderer) reaches
     /// those directly; they take no dependency on CraftingPlanView already,
@@ -65,6 +67,26 @@ namespace GW2CraftingHelper.Views.Rendering
         /// the _reellipsisActions field comment on CraftingPlanView.
         /// </summary>
         void AddReellipsis(Action<int> closure);
+
+        /// <summary>
+        /// Asks for one full RenderPlan rebuild once the settle pass has
+        /// finished, for the case a re-ellipsis closure cannot honour its
+        /// no-height-change contract at the settled width: the Notes
+        /// section builds one fixed-height row per WRAPPED LINE, so a
+        /// width that changes a note's line count changes the section's
+        /// height, which only a rebuild may do. Called from inside a
+        /// re-ellipsis closure; the rebuild is deferred because RenderPlan
+        /// clears the very registry RunReellipsis is iterating.
+        /// <para>
+        /// Deliberately a request, not a rebuild: this stays a
+        /// registration-shaped seam onto CraftingPlanView's own state, and
+        /// the view decides when (and whether) to honour it, with the
+        /// scroll preservation a rebuild needs. A renderer whose closures
+        /// keep every row height fixed - every other section - never calls
+        /// it.
+        /// </para>
+        /// </summary>
+        void RequestRerenderAfterSettle();
 
         /// <summary>
         /// How many relayout closures are registered right now -

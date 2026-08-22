@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Tests.Services
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
         [Fact]
-        public void NonEmptyForgeOutputIds_ProducesExactlyThreeLines_RegardlessOfCount()
+        public void NonEmptyForgeOutputIds_ProducesExactlyOneRow_RegardlessOfCount()
         {
             var result = MakeResult(
                 probabilisticForgeOutputItemIds: new List<int> { 1, 2, 3 });
@@ -27,19 +27,16 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             var section = vm.Sections.Single(s => s.SectionType == PlanSectionType.Notes);
-            // INFERRED (no live desktop
-            // verification was performed): the single ~243-char row would
-            // have clipped horizontally at NotesSectionRenderer's panel
-            // edge, cutting off the "never models or shows them" caveat -
-            // split into 3 complete-sentence NoteLine rows. Still exactly
-            // ONE logical note regardless of forgeOutputIds.Count (see the
-            // "Notes (N)" assertion below, which counts logical entries,
-            // not rows).
-            Assert.Equal(3, section.Rows.Count);
-            Assert.All(section.Rows, r => Assert.Equal(PlanRowType.NoteLine, r.RowType));
-            string combined = string.Join(" ", section.Rows.Select(r => r.Label));
-            Assert.Contains("Mystic Clover", combined);
-            Assert.Contains("precursor forging", combined);
+            // One NoteLine row carrying the whole caveat: the renderer
+            // width-wraps it across as many fixed-height rows as it needs,
+            // so the builder no longer hand-splits it into complete
+            // sentences to keep the tail on screen. Still exactly ONE
+            // logical note regardless of forgeOutputIds.Count.
+            var noteRow = Assert.Single(section.Rows);
+            Assert.Equal(PlanRowType.NoteLine, noteRow.RowType);
+            Assert.Contains("Mystic Clover", noteRow.Label);
+            Assert.Contains("precursor forging", noteRow.Label);
+            Assert.Contains("never models or shows them", noteRow.Label);
             Assert.Equal("Notes (1)", section.Title);
         }
 

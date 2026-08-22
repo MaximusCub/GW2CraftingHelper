@@ -6,9 +6,9 @@ namespace GW2CraftingHelper.Tests.Services
 {
     // NotesSectionLayoutMath is the Plan Notes section's own wrap/height
     // arithmetic - the production seam Views/Rendering/NotesSectionRenderer
-    // calls once per note at build and again, slot-pinned, at resize
-    // settle. Tests drive it through the same Func<string,int> measurement
-    // the renderer passes a BitmapFont through.
+    // calls once per note at build and again at resize settle. Tests drive
+    // it through the same Func<string,int> measurement the renderer passes
+    // a BitmapFont through.
     public class NotesSectionLayoutMathTests
     {
         private static readonly Func<string, int> Fixed10 = s => (s ?? "").Length * 10;
@@ -115,9 +115,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void WrapNote_ExplicitLineBreaks_ComposeWithWidthWrapping()
         {
-            // The section already renders multi-sentence notes the builder
-            // pre-split into separate rows; a note whose own text carries
-            // breaks must keep them AND still width-wrap each piece.
+            // A note whose own text carries breaks must keep them AND
+            // still width-wrap each piece.
             const string note = "First sentence that is quite long and will not fit on a single line here.\n" +
                 "Second.";
 
@@ -128,32 +127,23 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void WrapNote_SlotPinned_PadsWithBlankLinesWhenTheNoteGotShorter()
+        public void WrapNote_NarrowingThenWideningRecoversTheOriginalLines()
         {
-            // The resize path widening: fewer lines needed than the row
-            // Panels already built.
-            var wrapped = NotesSectionLayoutMath.WrapNote("alpha beta", LivePanelWidth, 0, Fixed10, slotCount: 3);
-
-            Assert.Equal(3, wrapped.Lines.Count);
-            Assert.Equal("  alpha beta", wrapped.Lines[0]);
-            Assert.Equal("", wrapped.Lines[1]);
-            Assert.Equal("", wrapped.Lines[2]);
-            Assert.False(wrapped.Truncated);
-        }
-
-        [Fact]
-        public void WrapNote_SlotPinned_EllipsizesTheTailWhenTheNoteGotLonger()
-        {
-            // The resize path narrowing: more lines needed than the row
-            // Panels already built, so the last one keeps the ellipsis
-            // contract and the caller keeps a full-text tooltip.
+            // The resize path: the renderer re-wraps at the settled width
+            // and rebuilds the section whenever the line count moved, so
+            // the wrap at a given width must not depend on the width it
+            // was previously wrapped at - no blank padding, no leftover
+            // ellipsis.
             const string note = "Excess: 12x Glob of Ectoplasm reclaimable at the trading post today";
 
-            var wrapped = NotesSectionLayoutMath.WrapNote(note, 200, 0, Fixed10, slotCount: 2);
+            var wide = NotesSectionLayoutMath.WrapNote(note, LivePanelWidth, 0, Fixed10);
+            var narrow = NotesSectionLayoutMath.WrapNote(note, 200, 0, Fixed10);
+            var widenedBack = NotesSectionLayoutMath.WrapNote(note, LivePanelWidth, 0, Fixed10);
 
-            Assert.Equal(2, wrapped.Lines.Count);
-            Assert.True(wrapped.Truncated);
-            Assert.EndsWith("...", wrapped.Lines[1]);
+            Assert.True(narrow.Lines.Count > wide.Lines.Count);
+            Assert.Equal(wide.Lines, widenedBack.Lines);
+            Assert.All(widenedBack.Lines, line => Assert.NotEqual("", line));
+            Assert.All(widenedBack.Lines, line => Assert.DoesNotContain("...", line));
         }
 
         [Fact]

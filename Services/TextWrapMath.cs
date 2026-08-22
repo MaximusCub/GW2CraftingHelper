@@ -25,17 +25,17 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Absolute line cap for <see cref="Wrap"/>. A note wrapped against
-        /// the 20px width floor PlanRelayoutMath.NameMaxWidthBeforeColumn
-        /// clamps to could otherwise turn a few hundred characters into a
-        /// hundred rows; past this cap the tail is ellipsized into the last
-        /// line and the caller's tooltip carries the full text.
+        /// the 12px width floor NotesSectionLayoutMath clamps to could
+        /// otherwise turn a few hundred characters into a hundred rows;
+        /// past this cap the tail is ellipsized into the last line and the
+        /// caller's tooltip carries the full text.
         /// </summary>
         public const int MaxWrappedLines = 24;
 
         /// <summary>
         /// A wrap result: the physical lines to render, plus whether any
-        /// text was dropped (line cap or slot cap hit) and therefore needs
-        /// a full-text tooltip.
+        /// text was dropped (the line cap was hit) and therefore needs a
+        /// full-text tooltip.
         /// </summary>
         public readonly struct WrappedText
         {
@@ -93,30 +93,7 @@ namespace GW2CraftingHelper.Services
         public static WrappedText Wrap(
             string text, int firstLineMaxWidth, int maxWidth, Func<string, int> measure)
         {
-            return WrapCore(text, MaxWrappedLines, false, firstLineMaxWidth, maxWidth, measure);
-        }
-
-        /// <summary>
-        /// <see cref="Wrap"/> constrained to exactly slotCount lines: a
-        /// shorter wrap is padded with empty lines, a longer one has its
-        /// tail ellipsized into the last slot. This is the resize path -
-        /// the renderer builds one fixed-height row Panel per line at build
-        /// width and must keep that row count (and therefore the section's
-        /// already-finalized height) stable when the settle pass re-wraps
-        /// at a new width.
-        /// </summary>
-        public static WrappedText WrapToSlots(
-            string text, int slotCount, int firstLineMaxWidth, int maxWidth, Func<string, int> measure)
-        {
-            if (slotCount < 1) slotCount = 1;
-            return WrapCore(text, slotCount, true, firstLineMaxWidth, maxWidth, measure);
-        }
-
-        private static WrappedText WrapCore(
-            string text, int lineCap, bool pad, int firstLineMaxWidth, int maxWidth, Func<string, int> measure)
-        {
             if (measure == null) throw new ArgumentNullException(nameof(measure));
-            if (lineCap < 1) lineCap = 1;
 
             var lines = new List<string>();
             foreach (string segment in SplitHardBreaks(text))
@@ -125,29 +102,21 @@ namespace GW2CraftingHelper.Services
             }
 
             bool truncated = false;
-            if (lines.Count > lineCap)
+            if (lines.Count > MaxWrappedLines)
             {
                 // The tail is rebuilt from the lines that do not fit rather
                 // than from original offsets: wrapping drops the space runs
                 // it breaks on, so there is no exact substring to slice.
                 // Only the ellipsized head of this string is ever shown -
                 // the caller's tooltip carries the true text.
-                var tail = new StringBuilder(lines[lineCap - 1]);
-                for (int i = lineCap; i < lines.Count; i++)
+                var tail = new StringBuilder(lines[MaxWrappedLines - 1]);
+                for (int i = MaxWrappedLines; i < lines.Count; i++)
                 {
                     tail.Append(' ').Append(lines[i]);
                 }
-                lines.RemoveRange(lineCap - 1, lines.Count - (lineCap - 1));
+                lines.RemoveRange(MaxWrappedLines - 1, lines.Count - (MaxWrappedLines - 1));
                 lines.Add(Ellipsize(tail.ToString(), BudgetFor(lines.Count, firstLineMaxWidth, maxWidth), measure));
                 truncated = true;
-            }
-
-            if (pad)
-            {
-                while (lines.Count < lineCap)
-                {
-                    lines.Add("");
-                }
             }
 
             return new WrappedText(lines, truncated);

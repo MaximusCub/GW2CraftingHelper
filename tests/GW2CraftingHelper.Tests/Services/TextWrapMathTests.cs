@@ -215,44 +215,30 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(new[] { "alpha", "beta" }, wrapped.Lines);
         }
 
-        // --- WrapToSlots (the resize path) ---
-
         [Fact]
-        public void WrapToSlots_FewerLinesThanSlots_PadsWithEmptyLines()
+        public void Wrap_SameTextAtTheSameWidth_ProducesTheSameLineCount()
         {
-            var wrapped = TextWrapMath.WrapToSlots("alpha beta", 4, 200, 200, Fixed10);
+            // NotesSectionRenderer compares the settle-time wrap's line
+            // count against the one it built with and only rebuilds when
+            // they differ, so the wrap has to be deterministic for a width
+            // that did not change.
+            var first = TextWrapMath.Wrap("alpha beta gamma delta", 100, 100, Fixed10);
+            var second = TextWrapMath.Wrap("alpha beta gamma delta", 100, 100, Fixed10);
 
-            Assert.Equal(new[] { "alpha beta", "", "", "" }, wrapped.Lines);
-            Assert.False(wrapped.Truncated);
+            Assert.Equal(first.Lines, second.Lines);
         }
 
         [Fact]
-        public void WrapToSlots_MoreLinesThanSlots_EllipsizesTheTailIntoTheLastSlot()
+        public void Wrap_WiderBudget_NeedsFewerLines()
         {
-            var wrapped = TextWrapMath.WrapToSlots("alpha beta gamma delta", 2, 100, 100, Fixed10);
+            // The widen case behind the deferred rebuild: the same note
+            // genuinely needs fewer rows than it was built with.
+            var narrow = TextWrapMath.Wrap("alpha beta gamma delta", 100, 100, Fixed10);
+            var wide = TextWrapMath.Wrap("alpha beta gamma delta", 300, 300, Fixed10);
 
-            Assert.Equal(2, wrapped.Lines.Count);
-            Assert.Equal("alpha beta", wrapped.Lines[0]);
-            Assert.EndsWith("...", wrapped.Lines[1]);
-            Assert.True(wrapped.Truncated);
-        }
-
-        [Fact]
-        public void WrapToSlots_ExactFit_IsUntouchedAndNotTruncated()
-        {
-            var wrapped = TextWrapMath.WrapToSlots("alpha beta gamma", 2, 100, 100, Fixed10);
-
-            Assert.Equal(new[] { "alpha beta", "gamma" }, wrapped.Lines);
-            Assert.False(wrapped.Truncated);
-        }
-
-        [Fact]
-        public void WrapToSlots_ZeroSlots_StillProducesOneLine()
-        {
-            var wrapped = TextWrapMath.WrapToSlots("alpha beta gamma", 0, 100, 100, Fixed10);
-
-            Assert.Single(wrapped.Lines);
-            Assert.True(wrapped.Truncated);
+            Assert.True(wide.Lines.Count < narrow.Lines.Count);
+            Assert.False(wide.Truncated);
+            Assert.All(wide.Lines, line => Assert.DoesNotContain("...", line));
         }
     }
 }
