@@ -197,16 +197,38 @@ namespace GW2CraftingHelper.Views
         // it changes.
         private const string SettingsChangedStatus = "Settings changed - press Generate Plan to update";
 
+        // Shown while Generate resolves typed-but-unpicked row names against
+        // the search provider, before any plan work starts.
+        private const string ResolvingStatus = "Resolving items...";
+
+        // Separates the strip's standing notices from the status board's own
+        // text (and from each other).
+        private const string StatusNoticeSeparator = "  |  ";
+
+        // Two things that stay true about the plan on screen for longer than
+        // one status write: a toolbar change it does not include, and rows
+        // that were left out of it. Held as state rather than written
+        // straight into the label because RenderFromBoard re-renders the
+        // strip from _statusBoard about seven times a second during a
+        // generation and again on every rebuild - a bare SetStatus is erased
+        // within one spinner tick by the very run the notice is about.
+        private bool _settingsChangedPending;
+        private string _unresolvedRowsNotice;
+
         // How far the plan on screen is dimmed while a new one generates -
         // enough to read as superseded, not so far that it stops being
         // readable while you wait.
         private const float StalePlanOpacity = 0.45f;
 
-        // How many results the typed-name resolution pass asks for. Only an
-        // exact name match is adopted, so this just has to be wide enough
-        // for the wanted name to survive the provider's own ranking among
-        // items that share a prefix ("Mystic Clover" vs "Mystic Coin"); the
-        // suggestion list itself shows 8.
+        // How many results the typed-name resolution pass asks for. It has
+        // to be wide enough to hold EVERY item sharing the typed name, not
+        // just the first: a window that cut the second one off would turn
+        // an ambiguous name into a confident wrong pick. The shipped
+        // provider returns prefix matches in name order, so the items named
+        // exactly what was typed are the shortest of those and come first -
+        // several of them are visible well inside this limit whatever else
+        // matches. A provider that ranked results some other way would need
+        // this re-checked.
         private const int TypedNameSearchResults = 8;
 
         #endregion // 2. Generate orchestration (state)
@@ -1607,7 +1629,7 @@ namespace GW2CraftingHelper.Views
                 _priceBasis = e.CurrentValue == "Buy Orders"
                     ? PriceBasis.BuyOrder
                     : PriceBasis.InstantBuy;
-                SetStatus(SettingsChangedStatus);
+                MarkSettingsChanged();
             };
 
             // Inline per-plan toggle, disabled (not hidden) when Use Own
@@ -1633,7 +1655,7 @@ namespace GW2CraftingHelper.Views
             _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
             {
                 _valueOwnMaterials = e.Checked;
-                SetStatus(SettingsChangedStatus);
+                MarkSettingsChanged();
             };
 
             // Wired here, after _valueOwnMaterialsCheckbox is fully
@@ -2186,7 +2208,22 @@ namespace GW2CraftingHelper.Views
             // regenerates behind a confirm), so nothing is being made
             // stale here - but the toggle still only takes effect on the
             // next Generate, and saying so beats leaving "Ready" up.
-            SetStatus(SettingsChangedStatus);
+            MarkSettingsChanged();
+        }
+
+        /// <summary>
+        /// Records that a toolbar control the next Generate will act on has
+        /// changed, and re-renders the strip so the warning appears at once.
+        /// The warning is standing state, not a one-shot status write: a
+        /// generation already in flight re-renders the strip every spinner
+        /// tick and would otherwise wipe it within 150ms, ending on
+        /// "Plan generated - &lt;time&gt;" for a plan built with the setting
+        /// the user just changed away from.
+        /// </summary>
+        private void MarkSettingsChanged()
+        {
+            _settingsChangedPending = true;
+            RenderFromBoard(_statusBoard.Snapshot());
         }
 
         /// <summary>
@@ -2202,28 +2239,68 @@ namespace GW2CraftingHelper.Views
         /// touches controls from its first line. The marshal hop puts it
         /// back on the main thread; two overlapping calls are handled the
         /// way they always were, by _generateSequence.
+        /// <para>
+        /// It also owns the Generate button for the length of that
+        /// resolution - the generate body's own disable/re-enable pair
+        /// starts too late to cover it - and every path out of here hands
+        /// the button back, including the one where the marshaled callback
+        /// is dropped instead of queued.
+        /// </para>
         /// </summary>
         private async Task TriggerGenerate()
         {
             var pending = CollectUnresolvedTypedRows();
-            if (pending.Count > 0)
+            if (pending.Count == 0)
             {
-                var matches = await FindTypedRowMatchesAsync(pending);
-                MainThreadMarshal.Run(() =>
-                {
-                    // Torn down while the search was in flight (tab
-                    // switched away, module unloading) - nothing to
-                    // generate into, same bail every other deferred
-                    // callback in this file takes.
-                    if (_contentPanel == null || _contentPanel.Parent == null) return;
-
-                    AdoptTypedRowMatches(matches);
-                    _ = GenerateFromResolvedRows();
-                });
+                await GenerateFromResolvedRows(false);
                 return;
             }
 
-            await GenerateFromResolvedRows();
+            // The search below may genuinely await (the shipped provider
+            // does not, but the interface allows it and this whole hop
+            // exists because of that). Nothing downstream disables the
+            // button until a generation actually starts, so without this a
+            // click during the search would look like it did nothing and
+            // every further click would start another full generation -
+            // _generateSequence makes the last result win, it does not stop
+            // the redundant work.
+            SetGenerateEnabled(false);
+            SetStatus(ResolvingStatus);
+
+            var matches = await FindTypedRowMatchesAsync(pending);
+            bool queued = MainThreadMarshal.Run(() =>
+            {
+                // Resolution is over either way, so hand the button back
+                // first; GenerateFromResolvedRows disables it again itself,
+                // synchronously, if a run actually starts.
+                SetGenerateEnabled(true);
+
+                // Torn down while the search was in flight (tab
+                // switched away, module unloading) - nothing to
+                // generate into, same bail every other deferred
+                // callback in this file takes.
+                if (_contentPanel == null || _contentPanel.Parent == null) return;
+
+                bool anyAmbiguous = AdoptTypedRowMatches(matches);
+                _ = GenerateFromResolvedRows(anyAmbiguous);
+            });
+
+            if (!queued)
+            {
+                // Overlay is gone, so that callback will never drain and
+                // the button would stay disabled for the rest of this
+                // panel's life. The main-thread update loop this would
+                // otherwise race with is exactly what is missing.
+                SetGenerateEnabled(true);
+            }
+        }
+
+        private void SetGenerateEnabled(bool enabled)
+        {
+            if (_generateButton != null)
+            {
+                _generateButton.Enabled = enabled;
+            }
         }
 
         /// <summary>
@@ -2262,16 +2339,23 @@ namespace GW2CraftingHelper.Views
         /// Looks up each typed row name, keeping only exact matches, so
         /// Generate works for someone who typed the whole name and never
         /// opened the suggestion list. A partial name stays unresolved
-        /// rather than adopting whatever ranked first, and a failing search
-        /// resolves nothing - both land on the "pick an item from the
-        /// suggestion list" status. Runs off the main thread after its
-        /// first await, so it only reads its own snapshot and never touches
-        /// row state; adoption is AdoptTypedRowMatches' job.
+        /// rather than adopting whatever ranked first, a name several items
+        /// share stays unresolved too (see
+        /// <see cref="ItemRowSelection.MatchTypedName"/>), and a failing
+        /// search resolves nothing - all three land on a status pointing at
+        /// the suggestion list. Runs off the main thread after its first
+        /// await, so it only reads its own snapshot and never touches row
+        /// state; adoption is AdoptTypedRowMatches' job.
+        /// <para>
+        /// Every provider call is guarded, so this does not throw - which is
+        /// what lets the caller pair its button disable with a single
+        /// re-enable rather than a try/finally around the await.
+        /// </para>
         /// </summary>
-        private async Task<List<(ItemRowState Row, string Text, ItemSearchResult Match)>> FindTypedRowMatchesAsync(
+        private async Task<List<(ItemRowState Row, string Text, TypedNameMatch Match)>> FindTypedRowMatchesAsync(
             IReadOnlyList<(ItemRowState Row, string Text)> pending)
         {
-            var matches = new List<(ItemRowState Row, string Text, ItemSearchResult Match)>(pending.Count);
+            var matches = new List<(ItemRowState Row, string Text, TypedNameMatch Match)>(pending.Count);
             foreach (var entry in pending)
             {
                 IReadOnlyList<ItemSearchResult> results;
@@ -2286,8 +2370,8 @@ namespace GW2CraftingHelper.Views
                     continue;
                 }
 
-                var match = ItemRowSelection.FindExactNameMatch(results, entry.Text);
-                if (match != null)
+                var match = ItemRowSelection.MatchTypedName(results, entry.Text);
+                if (match.Kind != TypedNameMatchKind.None)
                 {
                     matches.Add((entry.Row, entry.Text, match));
                 }
@@ -2302,13 +2386,21 @@ namespace GW2CraftingHelper.Views
         /// suggestion or keep typing while the search is in flight, and
         /// neither may be overwritten by a result that describes the older
         /// text - that is the same stale-selection bug the search box's own
-        /// TextChanged handler exists to prevent.
+        /// TextChanged handler exists to prevent. Rows removed while the
+        /// search was in flight are skipped outright: their state belongs to
+        /// nothing once _itemRows no longer holds them, and their search box
+        /// has been disposed with the row panel.
+        /// <para>
+        /// Returns true when some row's name turned out to belong to more
+        /// than one item, which the caller reports rather than resolving.
+        /// </para>
         /// </summary>
-        private void AdoptTypedRowMatches(IReadOnlyList<(ItemRowState Row, string Text, ItemSearchResult Match)> matches)
+        private bool AdoptTypedRowMatches(IReadOnlyList<(ItemRowState Row, string Text, TypedNameMatch Match)> matches)
         {
+            bool anyAmbiguous = false;
             foreach (var entry in matches)
             {
-                if (entry.Row.ItemId.HasValue)
+                if (entry.Row.ItemId.HasValue || !_itemRows.Contains(entry.Row))
                 {
                     continue;
                 }
@@ -2318,25 +2410,40 @@ namespace GW2CraftingHelper.Views
                     continue;
                 }
 
-                entry.Row.ItemId = entry.Match.ItemId;
-                entry.Row.ItemName = entry.Match.Name;
+                if (entry.Match.Kind == TypedNameMatchKind.Ambiguous)
+                {
+                    anyAmbiguous = true;
+                    continue;
+                }
+
+                entry.Row.ItemId = entry.Match.Result.ItemId;
+                entry.Row.ItemName = entry.Match.Result.Name;
             }
+
+            return anyAmbiguous;
         }
 
-        private bool AnyRowHasSearchText()
+        /// <summary>
+        /// How many rows the user typed into that still resolve to no item.
+        /// Read after adoption: these rows are absent from the request the
+        /// plan is built from, so either nothing can be generated at all or
+        /// the plan is missing something the strip has to admit to.
+        /// </summary>
+        private int CountUnresolvedTypedRows()
         {
+            int count = 0;
             foreach (var row in _itemRows)
             {
-                if (!string.IsNullOrWhiteSpace(row.SearchBox?.Text))
+                if (!row.ItemId.HasValue && !string.IsNullOrWhiteSpace(row.SearchBox?.Text))
                 {
-                    return true;
+                    count++;
                 }
             }
 
-            return false;
+            return count;
         }
 
-        private async Task GenerateFromResolvedRows()
+        private async Task GenerateFromResolvedRows(bool anyAmbiguousTypedName)
         {
             // Gather every
             // row's selection + quantity into the request list the
@@ -2378,6 +2485,12 @@ namespace GW2CraftingHelper.Views
                 labelParts.Add($"{name} x{row.QuantityText}");
             }
 
+            // Rows with text that resolved to nothing. They are absent from
+            // requestItems either way; whether that means "nothing to
+            // generate" or "a plan missing an item you asked for" is
+            // decided below.
+            int unresolvedTypedRows = CountUnresolvedTypedRows();
+
             var requestItems = ItemRowRequestBuilder.Build(rowInputs);
             if (requestItems.Count == 0)
             {
@@ -2390,12 +2503,13 @@ namespace GW2CraftingHelper.Views
                 // or re-enables the button itself - leaving Generate stuck
                 // disabled. The button-disable/re-enable pairing below only
                 // ever runs once we know a generation will actually start.
-                // Two different mistakes: nothing typed anywhere, or text
+                // Three different mistakes: nothing typed anywhere, text
                 // that resolved to no item (a partial name, or one the
-                // typed-name pass above could not match). The old single
-                // "select an item" line was misleading for the second -
-                // the box looked filled in.
-                SetStatus(ItemRowSelection.EmptyRequestStatus(AnyRowHasSearchText()));
+                // typed-name pass above could not match), or a name several
+                // items share. The old single "select an item" line was
+                // misleading for the last two - the box looked filled in.
+                SetStatus(WithStandingNotices(
+                    ItemRowSelection.EmptyRequestStatus(unresolvedTypedRows > 0, anyAmbiguousTypedName)));
                 return;
             }
 
@@ -2424,6 +2538,15 @@ namespace GW2CraftingHelper.Views
             _generateButton.Enabled = false;
             _lastDebugLog = null;
 
+            // The strip's standing notices now describe THIS run: the
+            // toolbar settings it is being built with are no longer pending,
+            // and the rows it leaves out are the ones still unresolved. Set
+            // before ArmSpinnerTicker so the very first spinner render
+            // already carries them, and kept for the life of the plan they
+            // describe rather than written once and overwritten 150ms later.
+            _settingsChangedPending = false;
+            _unresolvedRowsNotice = ItemRowSelection.UnresolvedRowsNotice(unresolvedTypedRows);
+
             // Everything below the separator still shows the PREVIOUS
             // plan, timestamp and all, for as long as this run takes. Dim
             // it so it reads as superseded rather than current; the
@@ -2441,8 +2564,10 @@ namespace GW2CraftingHelper.Views
             {
                 // A one-shot notice takes priority over the very first
                 // spinner frame; the next phase event or spinner tick
-                // replaces it like any other status text.
-                SetStatus("Quantity was invalid - reset to 1. Generating...");
+                // replaces it like any other status text. Unlike the
+                // standing notices above, the thing it reports is already
+                // fixed on screen - the corrected quantity is in the box.
+                SetStatus(WithStandingNotices("Quantity was invalid - reset to 1. Generating..."));
             }
 
             // Live coarse-phase events drive the status strip's phase
@@ -2642,12 +2767,57 @@ namespace GW2CraftingHelper.Views
                 // glyph (and the label's overall AutoSizeWidth) moves,
                 // which reads as a normal spinner rather than shifting
                 // text.
-                SetStatus($"{text} {SpinnerFrames[_spinnerFrameIndex]}");
+                SetStatus(WithStandingNotices($"{text} {SpinnerFrames[_spinnerFrameIndex]}"));
             }
             else if (!string.IsNullOrEmpty(snapshot.FinalStatusText))
             {
-                SetStatus(snapshot.FinalStatusText);
+                SetStatus(WithStandingNotices(snapshot.FinalStatusText));
             }
+            else
+            {
+                // Nothing generated this session: the fresh label already
+                // reads "Ready", so only write when there is a standing
+                // notice that would otherwise be lost on this rebuild.
+                string standing = WithStandingNotices(null);
+                if (!string.IsNullOrEmpty(standing))
+                {
+                    SetStatus(standing);
+                }
+            }
+        }
+
+        /// <summary>
+        /// <paramref name="status"/> with the strip's standing notices
+        /// appended - the facts that outlive any single status write (see
+        /// _settingsChangedPending / _unresolvedRowsNotice). Returns
+        /// <paramref name="status"/> itself, allocating nothing, in the
+        /// ordinary case where there are none: this runs on every spinner
+        /// render for the whole of every generation.
+        /// </summary>
+        private string WithStandingNotices(string status)
+        {
+            if (_unresolvedRowsNotice == null && !_settingsChangedPending)
+            {
+                return status;
+            }
+
+            var parts = new List<string>(3);
+            if (!string.IsNullOrEmpty(status))
+            {
+                parts.Add(status);
+            }
+
+            if (_unresolvedRowsNotice != null)
+            {
+                parts.Add(_unresolvedRowsNotice);
+            }
+
+            if (_settingsChangedPending)
+            {
+                parts.Add(SettingsChangedStatus);
+            }
+
+            return string.Join(StatusNoticeSeparator, parts);
         }
 
         /// <summary>

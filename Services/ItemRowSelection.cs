@@ -25,6 +25,14 @@ namespace GW2CraftingHelper.Services
             "No item matched what you typed - pick an item from the suggestion list.";
 
         /// <summary>
+        /// Shown when the typed name belongs to more than one item. Item
+        /// ids are internal-only, so a plan for the wrong same-named item
+        /// would be undetectable on screen - the user has to say which one.
+        /// </summary>
+        public const string AmbiguousTextStatus =
+            "More than one item has that name - pick the one you want from the suggestion list.";
+
+        /// <summary>
         /// True when <paramref name="resolvedItemId"/> no longer describes
         /// what the search box reads and must be dropped. Case and
         /// surrounding whitespace do not count as divergence: the pick that
@@ -54,49 +62,128 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The search result whose name is exactly what was typed, or null
-        /// when the text only partly matches (or matches nothing). Used to
-        /// adopt a full name someone typed without ever opening the
-        /// suggestion list; a partial name must stay unresolved rather than
-        /// silently generate a plan for whichever result ranked first.
+        /// Matches what was typed against <paramref name="results"/> by
+        /// exact (trimmed, case-insensitive) name. Used to adopt a full
+        /// name someone typed without ever opening the suggestion list.
+        /// A partial name must stay unresolved rather than silently
+        /// generating a plan for whichever result ranked first, and so must
+        /// a name several items share: adopting the first of those would
+        /// plan for an arbitrary one of them, with nothing on screen to say
+        /// so - the name is identical and ids are never displayed.
+        /// Results repeating one item id count as that one item.
         /// </summary>
-        public static ItemSearchResult FindExactNameMatch(IReadOnlyList<ItemSearchResult> results, string text)
+        public static TypedNameMatch MatchTypedName(IReadOnlyList<ItemSearchResult> results, string text)
         {
+            var none = new TypedNameMatch(TypedNameMatchKind.None, null);
             if (results == null)
             {
-                return null;
+                return none;
             }
 
             string wanted = (text ?? string.Empty).Trim();
             if (wanted.Length == 0)
             {
-                return null;
+                return none;
             }
 
+            ItemSearchResult match = null;
             foreach (var result in results)
             {
-                if (result == null)
+                if (result == null || !NamesMatch(result.Name, wanted))
                 {
                     continue;
                 }
 
-                if (NamesMatch(result.Name, wanted))
+                if (match == null)
                 {
-                    return result;
+                    match = result;
+                    continue;
+                }
+
+                if (result.ItemId != match.ItemId)
+                {
+                    return new TypedNameMatch(TypedNameMatchKind.Ambiguous, null);
                 }
             }
 
-            return null;
+            return match == null
+                ? none
+                : new TypedNameMatch(TypedNameMatchKind.Unique, match);
         }
 
         /// <summary>
         /// What to tell the user when a Generate produced no request items:
-        /// blank rows and typed-but-unmatched rows are different mistakes
-        /// and need different fixes.
+        /// blank rows, typed-but-unmatched rows and a name shared by
+        /// several items are three different mistakes needing three
+        /// different fixes.
         /// </summary>
-        public static string EmptyRequestStatus(bool anyRowHasText)
+        public static string EmptyRequestStatus(bool anyRowHasText, bool anyAmbiguousName)
         {
+            if (anyAmbiguousName)
+            {
+                return AmbiguousTextStatus;
+            }
+
             return anyRowHasText ? UnmatchedTextStatus : NoItemsStatus;
         }
+
+        /// <summary>
+        /// What to add to the strip while a plan generates from SOME of the
+        /// rows: the ones that resolved to nothing are silently absent from
+        /// it otherwise, which is the same "the strip says one thing, the
+        /// plan is another" mistake as planning for the wrong item.
+        /// Null when every row with text resolved.
+        /// </summary>
+        public static string UnresolvedRowsNotice(int unresolvedRowCount)
+        {
+            if (unresolvedRowCount <= 0)
+            {
+                return null;
+            }
+
+            return unresolvedRowCount == 1
+                ? "1 row has no item selected and is not in this plan."
+                : unresolvedRowCount + " rows have no item selected and are not in this plan.";
+        }
+    }
+
+    /// <summary>
+    /// How a typed name lined up with the search results it was looked up
+    /// against.
+    /// </summary>
+    public enum TypedNameMatchKind
+    {
+        /// <summary>Nothing carries exactly that name.</summary>
+        None,
+
+        /// <summary>One item carries that name - safe to adopt.</summary>
+        Unique,
+
+        /// <summary>
+        /// Several different items carry that name. GW2 reuses item names
+        /// freely (three distinct items are called "Amethyst Gold Ring"),
+        /// so the name alone cannot say which one was meant.
+        /// </summary>
+        Ambiguous,
+    }
+
+    /// <summary>
+    /// The outcome of <see cref="ItemRowSelection.MatchTypedName"/>.
+    /// </summary>
+    public readonly struct TypedNameMatch
+    {
+        public TypedNameMatch(TypedNameMatchKind kind, ItemSearchResult result)
+        {
+            Kind = kind;
+            Result = result;
+        }
+
+        public TypedNameMatchKind Kind { get; }
+
+        /// <summary>
+        /// The item to adopt - non-null only when <see cref="Kind"/> is
+        /// <see cref="TypedNameMatchKind.Unique"/>.
+        /// </summary>
+        public ItemSearchResult Result { get; }
     }
 }

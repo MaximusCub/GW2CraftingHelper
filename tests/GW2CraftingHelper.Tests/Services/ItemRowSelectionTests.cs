@@ -70,7 +70,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void FindExactNameMatch_ExactName_ReturnsThatResult()
+        public void MatchTypedName_ExactName_ReturnsThatResult()
         {
             var results = new List<ItemSearchResult>
             {
@@ -78,22 +78,59 @@ namespace GW2CraftingHelper.Tests.Services
                 Result(19721, "Mystic Clover")
             };
 
-            var match = ItemRowSelection.FindExactNameMatch(results, "Mystic Clover");
+            var match = ItemRowSelection.MatchTypedName(results, "Mystic Clover");
 
-            Assert.NotNull(match);
-            Assert.Equal(19721, match.ItemId);
+            Assert.Equal(TypedNameMatchKind.Unique, match.Kind);
+            Assert.Equal(19721, match.Result.ItemId);
         }
 
         [Fact]
-        public void FindExactNameMatch_IsCaseAndWhitespaceInsensitive()
+        public void MatchTypedName_IsCaseAndWhitespaceInsensitive()
         {
             var results = new List<ItemSearchResult> { Result(19721, "Mystic Clover") };
 
-            Assert.Equal(19721, ItemRowSelection.FindExactNameMatch(results, "  mystic CLOVER ").ItemId);
+            Assert.Equal(19721, ItemRowSelection.MatchTypedName(results, "  mystic CLOVER ").Result.ItemId);
         }
 
         [Fact]
-        public void FindExactNameMatch_PartialName_ReturnsNull()
+        public void MatchTypedName_SeveralItemsShareTheName_IsAmbiguous()
+        {
+            // Real seed data: three distinct items are named "Amethyst Gold
+            // Ring", and the provider sorts by name, so all of them land in
+            // one result window. Adopting the first would plan for an
+            // arbitrary one of them with nothing on screen to say which -
+            // the names are identical and ids are never displayed.
+            var results = new List<ItemSearchResult>
+            {
+                Result(13318, "Amethyst Gold Ring"),
+                Result(13336, "Amethyst Gold Ring"),
+                Result(13532, "Amethyst Gold Ring")
+            };
+
+            var match = ItemRowSelection.MatchTypedName(results, "Amethyst Gold Ring");
+
+            Assert.Equal(TypedNameMatchKind.Ambiguous, match.Kind);
+            Assert.Null(match.Result);
+        }
+
+        [Fact]
+        public void MatchTypedName_SameItemListedTwice_IsStillUnique()
+        {
+            // Duplicate ids are one item, not a choice to put to the user.
+            var results = new List<ItemSearchResult>
+            {
+                Result(13318, "Amethyst Gold Ring"),
+                Result(13318, "amethyst gold ring")
+            };
+
+            var match = ItemRowSelection.MatchTypedName(results, "Amethyst Gold Ring");
+
+            Assert.Equal(TypedNameMatchKind.Unique, match.Kind);
+            Assert.Equal(13318, match.Result.ItemId);
+        }
+
+        [Fact]
+        public void MatchTypedName_PartialName_MatchesNothing()
         {
             // A prefix must not silently adopt the top-ranked result.
             var results = new List<ItemSearchResult>
@@ -102,22 +139,25 @@ namespace GW2CraftingHelper.Tests.Services
                 Result(19721, "Mystic Clover")
             };
 
-            Assert.Null(ItemRowSelection.FindExactNameMatch(results, "Mystic"));
+            var match = ItemRowSelection.MatchTypedName(results, "Mystic");
+
+            Assert.Equal(TypedNameMatchKind.None, match.Kind);
+            Assert.Null(match.Result);
         }
 
         [Fact]
-        public void FindExactNameMatch_NoResultsOrBlankText_ReturnsNull()
+        public void MatchTypedName_NoResultsOrBlankText_MatchesNothing()
         {
             var results = new List<ItemSearchResult> { Result(19721, "Mystic Clover") };
 
-            Assert.Null(ItemRowSelection.FindExactNameMatch(null, "Mystic Clover"));
-            Assert.Null(ItemRowSelection.FindExactNameMatch(new List<ItemSearchResult>(), "Mystic Clover"));
-            Assert.Null(ItemRowSelection.FindExactNameMatch(results, "   "));
-            Assert.Null(ItemRowSelection.FindExactNameMatch(results, null));
+            Assert.Equal(TypedNameMatchKind.None, ItemRowSelection.MatchTypedName(null, "Mystic Clover").Kind);
+            Assert.Equal(TypedNameMatchKind.None, ItemRowSelection.MatchTypedName(new List<ItemSearchResult>(), "Mystic Clover").Kind);
+            Assert.Equal(TypedNameMatchKind.None, ItemRowSelection.MatchTypedName(results, "   ").Kind);
+            Assert.Equal(TypedNameMatchKind.None, ItemRowSelection.MatchTypedName(results, null).Kind);
         }
 
         [Fact]
-        public void FindExactNameMatch_SkipsNullEntriesAndNullNames()
+        public void MatchTypedName_SkipsNullEntriesAndNullNames()
         {
             var results = new List<ItemSearchResult>
             {
@@ -126,29 +166,57 @@ namespace GW2CraftingHelper.Tests.Services
                 Result(19721, "Mystic Clover")
             };
 
-            Assert.Equal(19721, ItemRowSelection.FindExactNameMatch(results, "Mystic Clover").ItemId);
+            Assert.Equal(19721, ItemRowSelection.MatchTypedName(results, "Mystic Clover").Result.ItemId);
         }
 
         [Fact]
-        public void FindExactNameMatch_NullNameAgainstBlankText_StillReturnsNull()
+        public void MatchTypedName_NullNameAgainstBlankText_StillMatchesNothing()
         {
             // Blank text short-circuits before any comparison, so a
             // null-named result can never be matched by an empty box.
             var results = new List<ItemSearchResult> { new ItemSearchResult { ItemId = 1, Name = null } };
 
-            Assert.Null(ItemRowSelection.FindExactNameMatch(results, ""));
+            Assert.Equal(TypedNameMatchKind.None, ItemRowSelection.MatchTypedName(results, "").Kind);
         }
 
         [Fact]
         public void EmptyRequestStatus_NoRowHasText_AsksForASelection()
         {
-            Assert.Equal(ItemRowSelection.NoItemsStatus, ItemRowSelection.EmptyRequestStatus(false));
+            Assert.Equal(ItemRowSelection.NoItemsStatus, ItemRowSelection.EmptyRequestStatus(false, false));
         }
 
         [Fact]
         public void EmptyRequestStatus_TypedButUnresolved_PointsAtTheSuggestionList()
         {
-            Assert.Equal(ItemRowSelection.UnmatchedTextStatus, ItemRowSelection.EmptyRequestStatus(true));
+            Assert.Equal(ItemRowSelection.UnmatchedTextStatus, ItemRowSelection.EmptyRequestStatus(true, false));
+        }
+
+        [Fact]
+        public void EmptyRequestStatus_AmbiguousName_SaysTheNameIsShared()
+        {
+            // "No item matched what you typed" would be a lie here - several
+            // did, which is exactly the problem.
+            Assert.Equal(ItemRowSelection.AmbiguousTextStatus, ItemRowSelection.EmptyRequestStatus(true, true));
+        }
+
+        [Fact]
+        public void UnresolvedRowsNotice_EverythingResolved_SaysNothing()
+        {
+            Assert.Null(ItemRowSelection.UnresolvedRowsNotice(0));
+            Assert.Null(ItemRowSelection.UnresolvedRowsNotice(-1));
+        }
+
+        [Fact]
+        public void UnresolvedRowsNotice_SomeRowsLeftOut_CountsThem()
+        {
+            // A plan built from only some of the rows must admit to the rest
+            // rather than letting a requested item vanish silently.
+            Assert.Equal(
+                "1 row has no item selected and is not in this plan.",
+                ItemRowSelection.UnresolvedRowsNotice(1));
+            Assert.Equal(
+                "3 rows have no item selected and are not in this plan.",
+                ItemRowSelection.UnresolvedRowsNotice(3));
         }
     }
 }
