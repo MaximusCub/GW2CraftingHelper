@@ -177,6 +177,14 @@ namespace GW2CraftingHelper.Views
             _rows.Clear();
             _currencyNames.Clear();
 
+            // Same hazard as the stale _homesteadRows below: these point at
+            // the previous Build cycle's already-disposed controls until the
+            // currency section is rebuilt further down.
+            _currencyGridPanel = null;
+            _currencyFilterInput = null;
+            _currencyCountLabel = null;
+            _statusLabel = null;
+
             // Module.cs's Settings tab reuses this
             // SAME SettingsTabContent instance across every tab re-open
             // (unlike the Log tab's "new instance per open" factory), so
@@ -194,9 +202,7 @@ namespace GW2CraftingHelper.Views
 
             _rootPanel = new FlowPanel()
             {
-                Size = new Point(
-                    container.ContentRegion.Width,
-                    container.ContentRegion.Height - SaveBarHeight),
+                Size = ContentSizeBelowSaveBar(container),
                 Location = new Point(0, SaveBarHeight),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
@@ -206,9 +212,7 @@ namespace GW2CraftingHelper.Views
             container.Resized += (_, __) =>
             {
                 saveBar.Size = new Point(container.ContentRegion.Width, SaveBarHeight);
-                _rootPanel.Size = new Point(
-                    container.ContentRegion.Width,
-                    container.ContentRegion.Height - SaveBarHeight);
+                _rootPanel.Size = ContentSizeBelowSaveBar(container);
             };
 
             BuildHomesteadRefinementSection(panelWidth);
@@ -220,6 +224,12 @@ namespace GW2CraftingHelper.Views
             LoadCurrentHomesteadTiers();
             LoadCurrentLoggingSettings();
             LoadCurrentSnapshotSettings();
+        }
+
+        private static Point ContentSizeBelowSaveBar(Container container)
+        {
+            int height = container.ContentRegion.Height - SaveBarHeight;
+            return new Point(container.ContentRegion.Width, height > 0 ? height : 0);
         }
 
         private void BuildCurrencyValuationsSection(int panelWidth)
@@ -236,7 +246,7 @@ namespace GW2CraftingHelper.Views
             // What the "Plan Defaults" section header used to introduce: it
             // owned three info lines and no controls at all, so it is a note
             // under the pricing section it points at, not a section.
-            AddInfoLine("Price basis, \"Use Own Materials\" and \"Value own materials\" are chosen per plan in the Crafting Plan tab.", panelWidth);
+            AddInfoLine("Price basis and both \"own materials\" choices are set per plan in the Crafting Plan tab.", panelWidth);
 
             AddCurrencyFilterRow(panelWidth);
 
