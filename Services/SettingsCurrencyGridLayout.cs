@@ -5,20 +5,46 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Pure placement arithmetic (Blish-free, unit-testable) for the
-    /// Settings tab's currency list: which rows a filter query keeps, and
-    /// where each surviving row's cell sits in the one- or two-column grid.
-    /// The view (SettingsTabContent.ApplyCurrencyFilter) only copies the
-    /// results onto controls.
+    /// Settings tab's currency list: the horizontal extent of one cell,
+    /// which rows a filter query keeps, and where each surviving row's cell
+    /// sits in the one- or two-column grid. The view
+    /// (SettingsTabContent.AddCurrencyRow / ApplyCurrencyFilter) only copies
+    /// the results onto controls.
     /// </summary>
     public static class SettingsCurrencyGridLayout
     {
+        // Horizontal layout of one currency cell. These live here rather
+        // than in the view so MinColumnWidth below is derived from the same
+        // numbers the controls are placed with and cannot drift from them,
+        // and so the arithmetic is covered by Blish-free tests.
+        public const int CellNameX = 8;
+        public const int CellNameWidth = 170;
+        public const int CellInputX = CellNameX + CellNameWidth;
+        public const int CellInputWidth = 70;
+        public const int CellClearX = CellInputX + CellInputWidth + 6;
+
         /// <summary>
-        /// Narrowest column a two-up cell still fits in: name (8 + 170),
-        /// input (70), Clear checkbox and a short error tag - see
-        /// SettingsTabContent's Cell* constants. Below twice this, the grid
-        /// falls back to a single column rather than overlapping columns.
+        /// Room for the "Clear" checkbox (box plus its label at
+        /// DefaultFont14, ~7.7px per character).
         /// </summary>
-        public const int MinColumnWidth = 340;
+        public const int CellClearWidth = 70;
+
+        public const int CellTagX = CellClearX + CellClearWidth;
+
+        /// <summary>
+        /// Room for the widest string the cell's one tag slot shows:
+        /// "default 3600" (12 characters; 3600 is the largest value in
+        /// CurrencyDecisionDefaults), which the red "Invalid" tag and
+        /// "cleared" both fit inside.
+        /// </summary>
+        public const int CellTagWidth = 100;
+
+        /// <summary>
+        /// Narrowest column a two-up cell fits in - the full extent of the
+        /// cell above, tag included. Below twice this the grid falls back to
+        /// a single column rather than clipping the right-hand cells.
+        /// </summary>
+        public const int MinColumnWidth = CellTagX + CellTagWidth;
 
         public readonly struct CellPlacement
         {
@@ -63,6 +89,27 @@ namespace GW2CraftingHelper.Services
             return panelWidth >= 2 * MinColumnWidth ? 2 : 1;
         }
 
+        public static int ComputeColumnWidth(int panelWidth)
+        {
+            return panelWidth > 0 ? panelWidth / ComputeColumnCount(panelWidth) : 0;
+        }
+
+        /// <summary>
+        /// Height of the UNFILTERED grid. The view keeps the grid panel at
+        /// this height whatever the filter shows: Blish's Scrollbar resets
+        /// the scroll position to top on any content-height change (its
+        /// RecalculateLayout compares the previous scrollbar percent against
+        /// the recomputed one), so a per-keystroke height would yank the tab
+        /// back to the top on every filter character.
+        /// </summary>
+        public static int ComputeHeight(int count, int panelWidth, int rowHeight)
+        {
+            int columnCount = ComputeColumnCount(panelWidth);
+            int safeCount = count > 0 ? count : 0;
+            int rowCount = (safeCount + columnCount - 1) / columnCount;
+            return rowCount * (rowHeight > 0 ? rowHeight : 0);
+        }
+
         /// <summary>
         /// Case-insensitive substring match. A blank query matches
         /// everything (the unfiltered list); a null name never matches a
@@ -81,10 +128,19 @@ namespace GW2CraftingHelper.Services
         /// left-to-right, top-to-bottom with no gap for the hidden ones, so
         /// a filtered list is as short as its match count allows.
         /// </summary>
-        public static Grid Compute(IReadOnlyList<string> names, string filter, int panelWidth, int rowHeight)
+        /// <param name="alwaysShow">
+        /// Optional per-name override, in the same order as names: an entry
+        /// that is true is placed even when the filter rejects it. The view
+        /// passes the rows carrying an unsaved invalid amount, so Save's
+        /// "N invalid entries not saved" warning can never point at a tag
+        /// the filter is hiding.
+        /// </param>
+        public static Grid Compute(
+            IReadOnlyList<string> names, string filter, int panelWidth, int rowHeight,
+            IReadOnlyList<bool> alwaysShow = null)
         {
             int columnCount = ComputeColumnCount(panelWidth);
-            int columnWidth = panelWidth > 0 ? panelWidth / columnCount : 0;
+            int columnWidth = ComputeColumnWidth(panelWidth);
             int safeRowHeight = rowHeight > 0 ? rowHeight : 0;
 
             int count = names == null ? 0 : names.Count;
@@ -93,7 +149,8 @@ namespace GW2CraftingHelper.Services
 
             for (int i = 0; i < count; i++)
             {
-                if (!Matches(names[i], filter))
+                bool forced = alwaysShow != null && i < alwaysShow.Count && alwaysShow[i];
+                if (!forced && !Matches(names[i], filter))
                 {
                     cells[i] = new CellPlacement(false, 0, 0, -1);
                     continue;
