@@ -8752,4 +8752,15 @@ appear (no character holdings), then add the second letter and confirm
 that character's items appear. The per-character checkboxes and the
 AND-composition from char-source-search are unaffected and need no
 re-gating.
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-22, Paint-dummy desktop session, branch build
+651375c, captures preflight/m2a-one-char.png / m2b-two-char.png).
+The preflight roster's holder names all contain "t" (Maximus Test,
+Alt Number Two, Third Wheel, Ranger Of The North...), giving a clean
+discriminator: typing "t" returned only item/currency name matches
+with the 6-holder Green Wood Log ABSENT (the floor holding at one
+character); adding "h" ("th", matched by no item name) returned
+exactly Green Wood Log via Third Wheel / Ranger Of The North (the
+floor lifting at two). The reviewer's noted empty-state wording gap
+(a one-letter query's message does not mention the character-label
+floor) was observed as accurate-but-unexplained live; left as the
+recorded maintainer call.
