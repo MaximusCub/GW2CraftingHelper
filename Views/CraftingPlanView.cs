@@ -36,6 +36,17 @@ namespace GW2CraftingHelper.Views
         private const int RowHeight = 35;
         private const int InputRowY = 5;
 
+        // Item-row geometry, left to right: search box, "Qty:" label,
+        // quantity field, then the add/remove buttons. The buttons keep a
+        // clear gap from the quantity field so "+" does not read as its
+        // stepper, and the suggestion list opens SuggestionAnchorGap right
+        // of that field so it drops over scrollable content instead of the
+        // row's own inputs and the rows below it.
+        private const int QtyInputX = 240;
+        private const int QtyInputWidth = 50;
+        private const int RowButtonsX = 320;
+        private const int SuggestionAnchorGap = 12;
+
         // The top strip is InputRowsAreaHeight(N) item rows followed by
         // the controls/status/separator rows (see ComputeTopRegionLayout);
         // with N == 1 every Y offset reproduces the original fixed
@@ -1350,7 +1361,12 @@ namespace GW2CraftingHelper.Views
             };
             row.SearchBox = searchBox;
 
-            var suggestionPanel = new SuggestionPanel(searchBox, _itemSearchProvider);
+            // The list opens right of the Qty stepper rather than straight
+            // under the search box, where it used to cover this row's own
+            // quantity field and every row below it. The offset is measured
+            // from the search box's left edge, which is the row's origin.
+            var suggestionPanel = new SuggestionPanel(
+                searchBox, _itemSearchProvider, QtyInputX + QtyInputWidth + SuggestionAnchorGap);
             suggestionPanel.ItemSelected += (_, args) =>
             {
                 row.ItemId = args.ItemId;
@@ -1387,14 +1403,14 @@ namespace GW2CraftingHelper.Views
             var qtyInput = new TextBox()
             {
                 Text = string.IsNullOrEmpty(row.QuantityText) ? "1" : row.QuantityText,
-                Size = new Point(50, 28),
-                Location = new Point(240, 3),
+                Size = new Point(QtyInputWidth, 28),
+                Location = new Point(QtyInputX, 3),
                 Parent = rowPanel
             };
             qtyInput.TextChanged += (_, __) => row.QuantityText = qtyInput.Text;
             row.QtyInput = qtyInput;
 
-            int nextX = 300;
+            int nextX = RowButtonsX;
             if (ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count))
             {
                 var removeButton = new StandardButton()
@@ -1402,7 +1418,8 @@ namespace GW2CraftingHelper.Views
                     Text = "-",
                     Size = new Point(24, 24),
                     Location = new Point(nextX, 3),
-                    Parent = rowPanel
+                    Parent = rowPanel,
+                    BasicTooltipText = "Remove this item from the plan"
                 };
                 removeButton.Click += (_, __) => RemoveItemRow(row);
                 nextX += 24 + 8;
@@ -1415,7 +1432,10 @@ namespace GW2CraftingHelper.Views
                     Text = "+",
                     Size = new Point(24, 24),
                     Location = new Point(nextX, 3),
-                    Parent = rowPanel
+                    Parent = rowPanel,
+                    // Sitting next to the quantity field, a bare "+" reads
+                    // as a stepper. Say what it actually adds.
+                    BasicTooltipText = "Add another item to this plan"
                 };
                 addButton.Click += (_, __) => AddItemRow();
             }
