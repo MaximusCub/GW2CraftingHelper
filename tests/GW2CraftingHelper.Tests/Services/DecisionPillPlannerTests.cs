@@ -930,5 +930,75 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Empty(specs);
         }
+
+        // --- IsInteractive: which pills advertise a click ---
+        //
+        // The view wires handlers from this predicate on a live row, and
+        // (because a dimmed reference branch wires none at all) uses the
+        // same predicate to decide which dimmed pills need the "why did
+        // nothing happen" tooltip. A pill that answers true here and gets
+        // no handler is exactly the dead click that has to be explained.
+
+        [Fact]
+        public void IsInteractive_SourcePillsAndIgnore_True_SelectedAndAnnotationsFalse()
+        {
+            var node = Node(CraftingDecision.Craft, canCraft: true, canBuyTp: true, ownedQuantityUsed: 2);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            var craft = specs.Single(s => s.Text == "CRAFT");
+            var tp = specs.Single(s => s.Text == "TP");
+            var owned = specs.Single(s => s.Kind == PillKind.OwnedInfo);
+            var ignore = specs.Single(s => s.Kind == PillKind.Ignore);
+
+            // CRAFT is the committed choice: non-interactive, since
+            // clicking it would be a no-op re-solve.
+            Assert.Equal(PillKind.Selected, craft.Kind);
+            Assert.False(DecisionPillPlanner.IsInteractive(craft));
+            Assert.True(DecisionPillPlanner.IsInteractive(tp));
+            Assert.False(DecisionPillPlanner.IsInteractive(owned));
+            Assert.True(DecisionPillPlanner.IsInteractive(ignore));
+        }
+
+        [Fact]
+        public void IsInteractive_SubduedPill_StaysTrue()
+        {
+            // A decisively-losing option is styled muted but is still a
+            // real override - it must not be mistaken for chrome.
+            var spec = new PillSpec("VENDOR", AcquisitionSource.BuyFromVendor, PillKind.Subdued);
+
+            Assert.True(DecisionPillPlanner.IsInteractive(spec));
+        }
+
+        [Fact]
+        public void IsInteractive_SoleSourceAndBadgePills_False()
+        {
+            // One feasible source collapses to a Locked pill with no
+            // AcquisitionSource; UNKNOWN/UNRECOGNIZED/CURRENCY/GUILD
+            // UPGRADE do the same. None of them is a click target, so none
+            // needs a dead-click explanation when dimmed.
+            var soleSource = DecisionPillPlanner.BuildPillSpecs(
+                Node(CraftingDecision.Craft, canCraft: true)).Single(s => s.Text == "CRAFT");
+            var unrecognized = DecisionPillPlanner.BuildPillSpecs(
+                Node(CraftingDecision.UnrecognizedIngredient)).Single();
+            var guildUpgrade = DecisionPillPlanner.BuildPillSpecs(
+                Node(CraftingDecision.GuildUpgrade)).Single();
+
+            Assert.False(DecisionPillPlanner.IsInteractive(soleSource));
+            Assert.False(DecisionPillPlanner.IsInteractive(unrecognized));
+            Assert.False(DecisionPillPlanner.IsInteractive(guildUpgrade));
+        }
+
+        [Fact]
+        public void IsInteractive_IgnoredToggle_StaysTrue()
+        {
+            // The "IGNORED" state of the toggle carries no
+            // AcquisitionSource either, but un-ignoring is the whole point
+            // of the pill - Kind alone has to carry it.
+            var specs = DecisionPillPlanner.BuildPillSpecs(
+                Node(CraftingDecision.Have, isIgnored: true));
+
+            Assert.True(DecisionPillPlanner.IsInteractive(specs.Single(s => s.Text == "IGNORED")));
+            Assert.False(DecisionPillPlanner.IsInteractive(specs.Single(s => s.Text == "HAVE")));
+        }
     }
 }

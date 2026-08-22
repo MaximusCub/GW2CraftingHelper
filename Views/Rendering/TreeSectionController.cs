@@ -566,6 +566,25 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int TreeCostColumnWidth = 150;
         private const int TreeRightMargin = 8;
 
+        // Left-indent rule down a dimmed subtree: 2px wide (1px is not
+        // guaranteed a physical scanline under Blish's non-integer UI
+        // scale - see LabelHelpers.CreateRowDivider), drawn at every dimmed
+        // row's own indent channel and spanning the full row height, so
+        // consecutive rows at the same depth join into one continuous line
+        // and the branch reads as a single inactive block instead of a
+        // stack of independently-styled rows. Sits inside the existing
+        // TreeRowHeight, so no height math changes.
+        private const int TreeDimmedRuleWidth = 2;
+        private const int TreeDimmedRuleOffset = 8;
+        private static readonly Color TreeDimmedRuleColor = Color.White * 0.18f;
+
+        // What a dead click on a dimmed pill means, and the one action
+        // that makes it live again. Every dimmed row is somewhere under a
+        // node the solver decided to buy, so switching that node to CRAFT
+        // is always the answer, however deep the row sits.
+        private const string DimmedPillTooltip =
+            "Under a bought item - switch the parent to CRAFT to change this";
+
         /// <summary>
         /// Width the cost column actually needs this render: its fixed
         /// floor, or the pre-scanned sub-columns' real total when a tree
@@ -708,6 +727,23 @@ namespace GW2CraftingHelper.Views.Rendering
             // height arithmetic share one formula and cannot silently
             // desync - see that method's doc comment.
             bool isExpanded = PlanContentHeightMath.IsNodeExpanded(node.NodeId, depth, dimmed, _nodeExpansion);
+
+            // Left-indent rule (see TreeDimmedRuleColor). Drawn before
+            // every other child so nothing else in the row paints under it,
+            // and never on a live row.
+            if (dimmed)
+            {
+                int ruleX = indent - TreeDimmedRuleOffset;
+                if (ruleX < 0) ruleX = 0;
+                new Panel()
+                {
+                    Size = new Point(TreeDimmedRuleWidth, TreeRowHeight),
+                    Location = new Point(ruleX, 0),
+                    BackgroundColor = TreeDimmedRuleColor,
+                    Parent = rowPanel
+                };
+            }
+
             Label arrowLabel = null;
             if (hasChildren)
             {
@@ -1168,9 +1204,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 if (dimmed)
                 {
-                    borderColor *= 0.35f;
-                    fillColor *= 0.35f;
-                    textColor *= 0.35f;
+                    // PillColors.DimmedPillFactor, not the 0.35 this row's
+                    // name/quantity/cost use - see that constant's own doc
+                    // comment for why a pill needs a higher floor than the
+                    // text around it.
+                    borderColor *= PillColors.DimmedPillFactor;
+                    fillColor *= PillColors.DimmedPillFactor;
+                    textColor *= PillColors.DimmedPillFactor;
                 }
 
                 // Border simulated as an outer colored panel with a 1px-inset
@@ -1209,6 +1249,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 // work correctly today.
                 string tooltipText = null;
 
+                // The dimmed-only difference between this and the two flags
+                // below is exactly what the dead-click tooltip at the
+                // bottom of this loop has to explain.
+                bool clickableWhenActive = DecisionPillPlanner.IsInteractive(spec);
                 bool interactive = !dimmed && spec.Source.HasValue && _resolveOverridesSync != null;
                 bool ignoreInteractive = !dimmed && spec.Kind == PillKind.Ignore && _resolveOverridesSync != null;
                 if (interactive)
@@ -1409,6 +1453,23 @@ namespace GW2CraftingHelper.Views.Rendering
                     tooltipText = tooltipText == null
                         ? valueDetailText
                         : tooltipText + "\n\n" + valueDetailText;
+                }
+
+                // A dimmed row's would-be-clickable pills are inert: the
+                // reference branch under a bought item is a "what it would
+                // cost to craft instead" preview, not a live decision, so
+                // the click handlers above are never wired. They still draw
+                // a full pill set, so the only honest thing left is to say
+                // why the click did nothing and what to change to make it
+                // work. Appended, never assigned over: a dimmed Subdued
+                // pill already carries its "why it loses" text, and a
+                // dimmed committed pill can carry the value-detail hover
+                // (both resolved above), and neither may be clobbered.
+                if (dimmed && clickableWhenActive)
+                {
+                    tooltipText = tooltipText == null
+                        ? DimmedPillTooltip
+                        : tooltipText + "\n\n" + DimmedPillTooltip;
                 }
 
                 if (tooltipText != null)
