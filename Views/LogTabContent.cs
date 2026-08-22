@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Blish_HUD;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 
 namespace GW2CraftingHelper.Views
 {
@@ -14,11 +17,15 @@ namespace GW2CraftingHelper.Views
     /// level-filter dropdown, text search, follow-tail, copy-to-clipboard,
     /// clear-view, and the confirm-gated destructive delete-log-file
     /// action, backed directly by a ModuleLog's ring buffer.
-    /// Pattern A (lightweight FlowPanel(CanScroll)) - label-per-row, no
-    /// multi-column ellipsized rows that must reflow live during a resize
-    /// drag - so this does not opt into the
+    /// Pattern A (lightweight FlowPanel(CanScroll)): every row is a
+    /// fixed-height Panel of two ellipsized columns (dim prefix, message),
+    /// re-fitted by walking <see cref="_renderedRows"/> straight from the
+    /// container's own Resized handler. That is deliberately NOT the
     /// PlanContentHeightMath/relayout-registry contract (that machinery is
-    /// CraftingPlanView-only).
+    /// CraftingPlanView-only): rows here are uniform height, so there is no
+    /// per-section height math to keep in sync, and the tail-follow scroll
+    /// overshoots rather than restoring an exact offset, so there is no
+    /// settle/verify pass to defer the re-ellipsis into.
     /// </summary>
     public class LogTabContent
     {
@@ -40,6 +47,23 @@ namespace GW2CraftingHelper.Views
         // toolbar row with the three right-anchored buttons ran a long
         // status underneath them at the module's default width.
         private const int StatusRowHeight = 24;
+
+        // The FlowPanel scrolls, so a row sized to the panel's full width
+        // would run under the scrollbar strip. Same allowance MainView's
+        // own scrolling source-filter flow uses.
+        private const int ScrollbarAllowance = 20;
+
+        // Prefix column allowance for the "[tag]" part, in characters of
+        // the widest lowercase glyph. The module's own tags are all shorter
+        // than this ("scrolldiag" is the longest); a longer one ellipsizes
+        // rather than widening the column and pushing every message right.
+        private const int TagColumnChars = 10;
+
+        // The prefix is chrome, not content - dimmed so the message reads
+        // first, but still carrying the level tint so severity is legible
+        // at a glance down the column. Alpha-scaling matches this repo's
+        // existing dim idiom (TreeSectionController's `Color.White * 0.35f`).
+        private const float PrefixDimFactor = 0.7f;
 
         private static readonly Color DebugColor = new Color(130, 130, 130);
         private static readonly Color InfoColor = new Color(210, 210, 210);
@@ -131,7 +155,8 @@ namespace GW2CraftingHelper.Views
         // <para>
         // PRECISE INVARIANT (the claim this fix actually establishes, not a
         // broader one): <see cref="_renderedRows"/>, <see
-        // cref="_lastSeenVersion"/>, <see cref="_hasRenderedAnyRow"/>, the
+        // cref="_lastSeenVersion"/>, <see cref="_hasRenderedAnyRow"/>,
+        // <see cref="_fullPrefixWidth"/>, <see cref="_lastLayoutWidth"/>, the
         // Module-owned "Clear view" floor reached via
         // <see cref="_getClearedBeforeVersion"/>/
         // <see cref="_setClearedBeforeVersion"/>, this field, and
@@ -165,10 +190,32 @@ namespace GW2CraftingHelper.Views
         // below the ring's own current earliest-available index (i.e. the
         // underlying entry was evicted from the ring). Without this, the
         // incremental append path would leave stale rows on screen forever
-        // and grow _contentPanel's Label count without bound over a long
+        // and grow _contentPanel's child count without bound over a long
         // session - append-only alone only solves the "every frame" cost
         // the design doc warned about, not eviction.
-        private readonly Queue<(long AbsoluteIndex, Label Control)> _renderedRows = new Queue<(long AbsoluteIndex, Label Control)>();
+        // It is also what the container's Resized handler walks to re-fit
+        // every visible row's two columns to the new width.
+        private readonly Queue<LogRow> _renderedRows = new Queue<LogRow>();
+
+        /// <summary>
+        /// One rendered entry: a fixed-height Panel holding a dim
+        /// prefix Label ("[LEVEL] timestamp [tag]") at x=0 and the message
+        /// Label at the shared message-column x, each ellipsized to its own
+        /// column. The full strings are kept alongside the controls because
+        /// both are needed again on every resize - re-ellipsizing from
+        /// Label.Text would compound "..." onto already-truncated text - and
+        /// <see cref="FullLine"/> is the tooltip a shortened row carries.
+        /// </summary>
+        private sealed class LogRow
+        {
+            internal long AbsoluteIndex;
+            internal Panel Panel;
+            internal Label PrefixLabel;
+            internal Label MessageLabel;
+            internal string FullPrefix;
+            internal string FullMessage;
+            internal string FullLine;
+        }
 
         // The "Clear view" floor must not be a plain instance field
         // here: Blish constructs a brand new LogTabContent on every tab
@@ -303,6 +350,10 @@ namespace GW2CraftingHelper.Views
                 _statusPanel.Size = new Point(newWidth, StatusRowHeight);
                 _contentPanel.Size = new Point(newWidth, container.ContentRegion.Height - ToolbarHeight - StatusRowHeight);
                 PositionToolbarButtons(newWidth);
+
+                // After the panel's own resize, so RefitRows reads the new
+                // width from it rather than being handed one.
+                RefitRows();
             };
 
             // FIELD CRASH (docs/KNOWN-ISSUES.md): Build() itself
@@ -625,17 +676,10 @@ namespace GW2CraftingHelper.Views
             var result = GetFilteredEntries();
             _lastSeenVersion = result.Version;
 
+            var metrics = MeasureRowMetrics();
             foreach (var item in result.Filtered)
             {
-                var label = new Label
-                {
-                    Text = item.Line,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    TextColor = ColorForLevel(item.Entry.Level),
-                    Parent = _contentPanel
-                };
-                _renderedRows.Enqueue((item.AbsoluteIndex, label));
+                CreateRow(item.Entry, item.Line, item.AbsoluteIndex, metrics);
             }
 
             _hasRenderedAnyRow = result.Filtered.Count > 0;
@@ -664,7 +708,7 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Incremental counterpart to <see cref="RebuildRows"/> (d2 Section
-        /// 4.3): appends Label controls only for entries newer than
+        /// 4.3): appends rows only for entries newer than
         /// <see cref="_lastSeenVersion"/>, instead of tearing down and
         /// recreating every already-visible row. Only ever called from
         /// <see cref="PollForUpdates"/>, and only while
@@ -675,7 +719,7 @@ namespace GW2CraftingHelper.Views
         /// whose underlying ring entry has since been evicted (the ring
         /// only holds its own capacity's worth of history) - append-only
         /// with no matching removal would otherwise leave stale rows on
-        /// screen and grow the panel's Label count without bound over a
+        /// screen and grow the panel's child count without bound over a
         /// long session, which is exactly the kind of unbounded-retention
         /// regression the append fix must not trade the every-frame-cost
         /// regression for.
@@ -709,6 +753,9 @@ namespace GW2CraftingHelper.Views
             // there is no reason to re-invoke it every entry.
             long clearedBeforeVersion = _getClearedBeforeVersion();
 
+            // Measured once per pass, not per row - see MeasureRowMetrics.
+            var metrics = MeasureRowMetrics();
+
             for (long absoluteIndex = from; absoluteIndex < version; absoluteIndex++)
             {
                 if (!LogViewFloor.IsVisible(absoluteIndex, clearedBeforeVersion))
@@ -722,22 +769,18 @@ namespace GW2CraftingHelper.Views
                     continue;
                 }
 
-                var label = new Label
-                {
-                    Text = line,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    TextColor = ColorForLevel(entry.Level),
-                    Parent = _contentPanel
-                };
-                _renderedRows.Enqueue((absoluteIndex, label));
+                CreateRow(entry, line, absoluteIndex, metrics);
                 appendedAny = true;
             }
 
             while (_renderedRows.Count > 0 && _renderedRows.Peek().AbsoluteIndex < startIndex)
             {
                 var stale = _renderedRows.Dequeue();
-                stale.Control.Dispose();
+
+                // Disposing the row Panel disposes its two Labels with it
+                // (Container.Dispose walks its children), so the split does
+                // not leak the halves of an evicted row.
+                stale.Panel.Dispose();
             }
 
             _lastSeenVersion = version;
@@ -764,6 +807,245 @@ namespace GW2CraftingHelper.Views
         private void ScrollToBottom()
         {
             _contentPanel.VerticalScrollOffset = int.MaxValue;
+        }
+
+        /// <summary>
+        /// Shared column geometry for one render pass. Measured once per
+        /// pass rather than per row - every row in the panel shares the same
+        /// prefix column (that shared column is the point: the messages line
+        /// up so the eye can run down them) and the same fixed height.
+        /// </summary>
+        private struct RowMetrics
+        {
+            internal BitmapFont Font;
+            internal int RowWidth;
+            internal int RowHeight;
+            internal int PrefixWidth;
+            internal int MessageX;
+            internal int MessageMaxWidth;
+        }
+
+        // Cached across passes: measuring the prefix template costs a
+        // handful of MeasureString calls and the font never changes at
+        // runtime. Main-thread-only, like every other row-rendering field
+        // (see _buildComplete's own doc comment).
+        private int _fullPrefixWidth;
+
+        // Content width the currently-rendered rows were laid out against.
+        // Written by MeasureRowMetrics (the single place that reads the
+        // panel's width), read by RefitRows so a vertical-only resize drag -
+        // which cannot change any column - costs nothing per row.
+        private int _lastLayoutWidth = -1;
+
+        private RowMetrics MeasureRowMetrics()
+        {
+            var font = GameService.Content.DefaultFont14;
+            int contentWidth = _contentPanel?.Width ?? 0;
+            _lastLayoutWidth = contentWidth;
+
+            int rowWidth = Math.Max(0, contentWidth - ScrollbarAllowance);
+            int prefixWidth = LogRowLayout.PrefixWidth(FullPrefixWidth(font), rowWidth);
+
+            return new RowMetrics
+            {
+                Font = font,
+                RowWidth = rowWidth,
+                // +2 so a descender cannot touch the next row's ascender;
+                // the panel clips its children, so a row shorter than its
+                // own text would cut the text off rather than overflow.
+                RowHeight = Measure(font, "Ag").Height + 2,
+                PrefixWidth = prefixWidth,
+                MessageX = LogRowLayout.MessageX(prefixWidth),
+                MessageMaxWidth = LogRowLayout.MessageMaxWidth(rowWidth, prefixWidth)
+            };
+        }
+
+        /// <summary>
+        /// Width of the widest prefix the column ever has to hold:
+        /// "[LEVEL] yyyy-MM-dd HH:mm:ss [tag]" with the widest level name,
+        /// a timestamp built from the widest decimal digit, and a
+        /// <see cref="TagColumnChars"/> tag allowance. Sizing from a
+        /// worst-case template (rather than from the rows on screen) is what
+        /// keeps the message column at the same x on every row and across
+        /// both render paths - the incremental append sees only the new
+        /// entries, so a width derived from what it can see would drift away
+        /// from the rows a full rebuild produced.
+        /// </summary>
+        private int FullPrefixWidth(BitmapFont font)
+        {
+            if (_fullPrefixWidth > 0)
+            {
+                return _fullPrefixWidth;
+            }
+
+            char widestDigit = '0';
+            int widestDigitWidth = 0;
+            for (char digit = '0'; digit <= '9'; digit++)
+            {
+                int width = Measure(font, digit.ToString()).Width;
+                if (width > widestDigitWidth)
+                {
+                    widestDigitWidth = width;
+                    widestDigit = digit;
+                }
+            }
+
+            string stamp = string.Format(
+                CultureInfo.InvariantCulture,
+                "{0}{0}{0}{0}-{0}{0}-{0}{0} {0}{0}:{0}{0}:{0}{0}",
+                widestDigit);
+            string tagAllowance = " [" + new string('w', TagColumnChars) + "]";
+
+            int widest = 0;
+            foreach (ModuleLogLevel level in Enum.GetValues(typeof(ModuleLogLevel)))
+            {
+                string template = "[" + level.ToString().ToUpperInvariant() + "] " + stamp + tagAllowance;
+                widest = Math.Max(widest, Measure(font, template).Width);
+            }
+
+            _fullPrefixWidth = widest;
+            return _fullPrefixWidth;
+        }
+
+        private static (int Width, int Height) Measure(BitmapFont font, string text)
+        {
+            var size = font.MeasureString(text);
+            return ((int)Math.Ceiling(size.Width), (int)Math.Ceiling(size.Height));
+        }
+
+        /// <summary>
+        /// Builds one entry's row: a dim, level-tinted prefix Label at x=0
+        /// and the message Label at the shared message-column x, each with
+        /// an explicit width and each ellipsized to it. Shared by both
+        /// render paths so a full rebuild and an incremental append can
+        /// never produce differently-shaped rows.
+        /// </summary>
+        private void CreateRow(ModuleLogEntry entry, string line, long absoluteIndex, RowMetrics metrics)
+        {
+            Color levelColor = ColorForLevel(entry.Level);
+
+            var row = new LogRow
+            {
+                AbsoluteIndex = absoluteIndex,
+                FullPrefix = LogLineFormat.Prefix(entry),
+                FullMessage = LogLineFormat.Message(entry),
+                FullLine = line
+            };
+
+            row.Panel = new Panel
+            {
+                // Sized before it is parented so the flow panel does not
+                // see a zero-sized child first.
+                Size = new Point(metrics.RowWidth, metrics.RowHeight),
+                Parent = _contentPanel
+            };
+
+            row.PrefixLabel = new Label
+            {
+                AutoSizeWidth = false,
+                AutoSizeHeight = false,
+                TextColor = levelColor * PrefixDimFactor,
+                Location = new Point(0, 0),
+                Parent = row.Panel
+            };
+
+            row.MessageLabel = new Label
+            {
+                AutoSizeWidth = false,
+                AutoSizeHeight = false,
+                TextColor = levelColor,
+                Parent = row.Panel
+            };
+
+            ApplyRowLayout(row, metrics);
+            _renderedRows.Enqueue(row);
+        }
+
+        /// <summary>
+        /// (Re)fits one already-built row to the given geometry - the single
+        /// place row text and column sizes are assigned, so the initial
+        /// build and every resize re-fit cannot diverge.
+        /// </summary>
+        private static void ApplyRowLayout(LogRow row, RowMetrics metrics)
+        {
+            // Both texts are resolved BEFORE the columns are resized:
+            // KeepsFitting compares the new column width against the width
+            // the label is still carrying from the previous pass.
+            string prefixText = KeepsFitting(row.PrefixLabel, row.FullPrefix, metrics.PrefixWidth)
+                ? row.FullPrefix
+                : LabelHelpers.EllipsizeToWidth(metrics.Font, row.FullPrefix, metrics.PrefixWidth);
+            string messageText = KeepsFitting(row.MessageLabel, row.FullMessage, metrics.MessageMaxWidth)
+                ? row.FullMessage
+                : LabelHelpers.EllipsizeToWidth(metrics.Font, row.FullMessage, metrics.MessageMaxWidth);
+
+            row.Panel.Size = new Point(metrics.RowWidth, metrics.RowHeight);
+            row.PrefixLabel.Size = new Point(metrics.PrefixWidth, metrics.RowHeight);
+            row.MessageLabel.Location = new Point(metrics.MessageX, 0);
+            row.MessageLabel.Size = new Point(metrics.MessageMaxWidth, metrics.RowHeight);
+
+            // Assigning Label.Text invalidates layout, so only assign when
+            // the displayed string actually changed - the same gate
+            // IconNameRowHelpers.ReellipsizeName uses on the plan tab's own
+            // resize path.
+            if (!string.Equals(row.PrefixLabel.Text, prefixText, StringComparison.Ordinal))
+            {
+                row.PrefixLabel.Text = prefixText;
+            }
+
+            if (!string.Equals(row.MessageLabel.Text, messageText, StringComparison.Ordinal))
+            {
+                row.MessageLabel.Text = messageText;
+            }
+
+            // The tooltip is the only indication that a row is not showing
+            // everything, so it carries the WHOLE line (both columns) the
+            // moment either one had to shorten - the same "ellipsize +
+            // tooltip" contract every truncatable row in this module uses.
+            // Blish resolves a tooltip on the control under the mouse and
+            // does not bubble to the parent, so both Labels need it as well
+            // as the row Panel - the swallowed-hover class already fixed in
+            // ShoppingListSectionRenderer (docs/KNOWN-ISSUES.md).
+            bool shortened =
+                !string.Equals(prefixText, row.FullPrefix, StringComparison.Ordinal) ||
+                !string.Equals(messageText, row.FullMessage, StringComparison.Ordinal);
+            string tooltip = shortened ? row.FullLine : null;
+            if (!string.Equals(row.Panel.BasicTooltipText, tooltip, StringComparison.Ordinal))
+            {
+                row.Panel.BasicTooltipText = tooltip;
+                row.PrefixLabel.BasicTooltipText = tooltip;
+                row.MessageLabel.BasicTooltipText = tooltip;
+            }
+        }
+
+        /// <summary>
+        /// True when the label already shows the untruncated string and its
+        /// column only grew - it cannot have started to overflow, so the
+        /// MeasureString binary search inside EllipsizeToWidth can be
+        /// skipped. Matters on a horizontal resize drag, which re-fits every
+        /// visible row (up to the ring's 2000) on every tick.
+        /// </summary>
+        private static bool KeepsFitting(Label label, string full, int newWidth)
+        {
+            return ReferenceEquals(label.Text, full) && newWidth >= label.Width;
+        }
+
+        /// <summary>
+        /// Re-fits every visible row after a container resize. A
+        /// vertical-only drag leaves the content width alone and returns
+        /// here without touching a single row.
+        /// </summary>
+        private void RefitRows()
+        {
+            if (!IsLive || _contentPanel.Width == _lastLayoutWidth)
+            {
+                return;
+            }
+
+            var metrics = MeasureRowMetrics();
+            foreach (var row in _renderedRows)
+            {
+                ApplyRowLayout(row, metrics);
+            }
         }
 
         private (List<(ModuleLogEntry Entry, string Line, long AbsoluteIndex)> Filtered, int RawCount, long Version) GetFilteredEntries()
