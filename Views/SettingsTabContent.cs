@@ -78,6 +78,7 @@ namespace GW2CraftingHelper.Views
         private static readonly Color WarningTextColor = new Color(255, 200, 60);
 
         private const int RightEdgePadding = 20;
+        private const int SaveBarHeight = 40;
         private const int RowHeight = 30;
         private const int InfoRowHeight = 20;
         private const int NameColumnX = 16;
@@ -123,8 +124,12 @@ namespace GW2CraftingHelper.Views
         private readonly List<HomesteadTierRow> _homesteadRows = new List<HomesteadTierRow>();
 
         private FlowPanel _rootPanel;
+
+        // One status label for the whole tab, next to the one Save button in
+        // the header bar (see BuildSaveBar) - the four per-section Save rows
+        // and their four status labels this replaced are recorded in
+        // KNOWN-ISSUES (audit batch G supersedes B14).
         private Label _statusLabel;
-        private Label _homesteadStatusLabel;
 
         // The ONE "Diagnostics" checkbox + the two log-file
         // policy rows (max size / retention) - d2-log-system.md Section 5.
@@ -137,7 +142,6 @@ namespace GW2CraftingHelper.Views
         private Label _logMaxSizeErrorLabel;
         private TextBox _logRetentionDaysInput;
         private Label _logRetentionDaysErrorLabel;
-        private Label _logStatusLabel;
 
         // Standalone
         // "Snapshot" section, its own new section (not folded into "Plan
@@ -146,7 +150,6 @@ namespace GW2CraftingHelper.Views
         // Homestead tier rows above.
         private TextBox _snapshotRefreshIntervalInput;
         private Label _snapshotRefreshIntervalErrorLabel;
-        private Label _snapshotStatusLabel;
 
         public SettingsTabContent(ModuleSettings settings)
         {
@@ -170,9 +173,14 @@ namespace GW2CraftingHelper.Views
 
             int panelWidth = container.ContentRegion.Width - RightEdgePadding;
 
+            var saveBar = BuildSaveBar(container);
+
             _rootPanel = new FlowPanel()
             {
-                Size = new Point(container.ContentRegion.Width, container.ContentRegion.Height),
+                Size = new Point(
+                    container.ContentRegion.Width,
+                    container.ContentRegion.Height - SaveBarHeight),
+                Location = new Point(0, SaveBarHeight),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
                 Parent = container
@@ -180,16 +188,16 @@ namespace GW2CraftingHelper.Views
 
             container.Resized += (_, __) =>
             {
+                saveBar.Size = new Point(container.ContentRegion.Width, SaveBarHeight);
                 _rootPanel.Size = new Point(
                     container.ContentRegion.Width,
-                    container.ContentRegion.Height);
+                    container.ContentRegion.Height - SaveBarHeight);
             };
 
-            BuildCurrencyValuationsSection(panelWidth);
-            BuildPlanDefaultsSection(panelWidth);
             BuildHomesteadRefinementSection(panelWidth);
             BuildLoggingSection(panelWidth);
             BuildSnapshotSection(panelWidth);
+            BuildCurrencyValuationsSection(panelWidth);
 
             LoadCurrentValuations();
             LoadCurrentHomesteadTiers();
@@ -208,6 +216,10 @@ namespace GW2CraftingHelper.Views
             // default, if any", not "excluded". Use Clear to suppress a
             // default entirely.
             AddInfoLine("Some currencies show a default estimate and are valued automatically unless cleared.", panelWidth);
+            // What the "Plan Defaults" section header used to introduce: it
+            // owned three info lines and no controls at all, so it is a note
+            // under the pricing section it points at, not a section.
+            AddInfoLine("Price basis, \"Use Own Materials\" and \"Value own materials\" are chosen per plan in the Crafting Plan tab.", panelWidth);
 
             foreach (int currencyId in CuratedCurrencyIds)
             {
@@ -221,27 +233,6 @@ namespace GW2CraftingHelper.Views
             // suggest. Left blank (the default) simply keeps it out of
             // price comparisons, same as any other unset currency.
             AddInfoLine("Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.", panelWidth);
-
-            _statusLabel = AddSaveRow(panelWidth, SaveValuations);
-        }
-
-        /// <summary>
-        /// The "Value own materials" checkbox
-        /// that used to live here (AddValueOwnMaterialsRow) has
-        /// been relocated inline into Views/CraftingPlanView.cs's controls
-        /// panel, next to Use Own Materials/price basis - it is now a
-        /// per-plan session choice (like those two neighbors), not a
-        /// global setting, since ModuleSettings.ValueOwnMaterials is no
-        /// longer read on the live generation path. This info line
-        /// replaces the old checkbox, matching this section's existing
-        /// "chosen per plan" info lines above.
-        /// </summary>
-        private void BuildPlanDefaultsSection(int panelWidth)
-        {
-            AddSectionHeader("Plan Defaults", panelWidth);
-            AddInfoLine("Price basis (Instant Buy / Buy Orders) is chosen per plan in the Crafting Plan tab.", panelWidth);
-            AddInfoLine("The \"Use Own Materials\" default is also set per plan in the Crafting Plan tab.", panelWidth);
-            AddInfoLine("\"Value own materials\" (decision-invariant reduction + 15% sell-back guard) is also chosen per plan in the Crafting Plan tab.", panelWidth);
         }
 
         /// <summary>
@@ -263,8 +254,6 @@ namespace GW2CraftingHelper.Views
             AddHomesteadTierRow(Gw2Constants.RefinedHomesteadFiberItemId, "Fiber (Farm)", panelWidth);
             AddHomesteadTierRow(Gw2Constants.RefinedHomesteadMetalItemId, "Metal (Metal Forge)", panelWidth);
             AddHomesteadTierRow(Gw2Constants.RefinedHomesteadWoodItemId, "Wood (Lumber Mill)", panelWidth);
-
-            _homesteadStatusLabel = AddSaveRow(panelWidth, SaveHomesteadTiers);
         }
 
         private void AddHomesteadTierRow(int materialItemId, string materialLabel, int panelWidth)
@@ -332,7 +321,7 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void SaveHomesteadTiers()
+        private int SaveHomesteadTiers()
         {
             int invalidCount = 0;
             var parsedTiers = new Dictionary<int, int>();
@@ -369,19 +358,7 @@ namespace GW2CraftingHelper.Views
                 _settings.HomesteadWoodTier.Value = woodTier;
             }
 
-            if (_homesteadStatusLabel == null) return;
-
-            if (invalidCount == 0)
-            {
-                _homesteadStatusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-                _homesteadStatusLabel.TextColor = SuccessTextColor;
-            }
-            else
-            {
-                string entryWord = invalidCount == 1 ? "entry" : "entries";
-                _homesteadStatusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
-                _homesteadStatusLabel.TextColor = WarningTextColor;
-            }
+            return invalidCount;
         }
 
         /// <summary>
@@ -402,7 +379,6 @@ namespace GW2CraftingHelper.Views
             AddLogDiagnosticsRow(panelWidth);
             AddLogMaxSizeRow(panelWidth);
             AddLogRetentionDaysRow(panelWidth);
-            _logStatusLabel = AddSaveRow(panelWidth, SaveLoggingSettings);
         }
 
         private void AddLogDiagnosticsRow(int panelWidth)
@@ -551,7 +527,7 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void SaveLoggingSettings()
+        private int SaveLoggingSettings()
         {
             int invalidCount = 0;
 
@@ -602,19 +578,7 @@ namespace GW2CraftingHelper.Views
                 invalidCount++;
             }
 
-            if (_logStatusLabel == null) return;
-
-            if (invalidCount == 0)
-            {
-                _logStatusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-                _logStatusLabel.TextColor = SuccessTextColor;
-            }
-            else
-            {
-                string entryWord = invalidCount == 1 ? "entry" : "entries";
-                _logStatusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
-                _logStatusLabel.TextColor = WarningTextColor;
-            }
+            return invalidCount;
         }
 
         /// <summary>
@@ -631,7 +595,6 @@ namespace GW2CraftingHelper.Views
             AddInfoLine("How long a cached account snapshot may sit before an automatic background refresh runs.", panelWidth);
 
             AddSnapshotRefreshIntervalRow(panelWidth);
-            _snapshotStatusLabel = AddSaveRow(panelWidth, SaveSnapshotSettings);
         }
 
         private void AddSnapshotRefreshIntervalRow(int panelWidth)
@@ -692,7 +655,7 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void SaveSnapshotSettings()
+        private int SaveSnapshotSettings()
         {
             int invalidCount = 0;
 
@@ -710,19 +673,7 @@ namespace GW2CraftingHelper.Views
                 invalidCount++;
             }
 
-            if (_snapshotStatusLabel == null) return;
-
-            if (invalidCount == 0)
-            {
-                _snapshotStatusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-                _snapshotStatusLabel.TextColor = SuccessTextColor;
-            }
-            else
-            {
-                string entryWord = invalidCount == 1 ? "entry" : "entries";
-                _snapshotStatusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
-                _snapshotStatusLabel.TextColor = WarningTextColor;
-            }
+            return invalidCount;
         }
 
         private void AddSectionHeader(string title, int panelWidth)
@@ -891,18 +842,22 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// The one save-row shape every section uses: a row panel holding
-        /// a Save button wired to onSave and a status label, returned so
-        /// the caller can keep its own field pointing at it. Construction
-        /// order and every control property match the four per-section
-        /// builders this replaced byte-for-byte.
+        /// The tab's one Save button and its one status label, in a bar that
+        /// is a sibling of the scrolling content (not a row inside it), so
+        /// Save stays reachable from any scroll position. Anchored at the
+        /// TOP rather than as a bottom footer: LogTabContent already builds
+        /// a fixed toolbar this way above its own CanScroll FlowPanel, and a
+        /// top bar needs only ContentRegion.Width to place correctly - a
+        /// bottom footer would additionally depend on ContentRegion.Height
+        /// being final at Build time, whose failure mode is a Save bar
+        /// floating over the rows.
         /// </summary>
-        private Label AddSaveRow(int panelWidth, Action onSave)
+        private Panel BuildSaveBar(Container container)
         {
-            var rowPanel = new Panel()
+            var barPanel = new Panel()
             {
-                Size = new Point(panelWidth, 40),
-                Parent = _rootPanel
+                Size = new Point(container.ContentRegion.Width, SaveBarHeight),
+                Parent = container
             };
 
             var saveButton = new StandardButton()
@@ -910,18 +865,60 @@ namespace GW2CraftingHelper.Views
                 Text = "Save",
                 Size = new Point(80, 28),
                 Location = new Point(NameColumnX, 6),
-                Parent = rowPanel
+                BasicTooltipText = "Save every section on this tab.",
+                Parent = barPanel
             };
-            saveButton.Click += (_, __) => onSave();
+            saveButton.Click += (_, __) => SaveAll();
 
-            return new Label()
+            _statusLabel = new Label()
             {
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(NameColumnX + 80 + 12, 12),
-                Parent = rowPanel
+                Parent = barPanel
             };
+
+            return barPanel;
+        }
+
+        /// <summary>
+        /// Persists every section - currency valuations, Homestead tiers,
+        /// logging policy, snapshot refresh interval - in place of the four
+        /// per-section Save buttons. Each section keeps its own per-row
+        /// error labels and its own "invalid rows are left as previously
+        /// persisted" contract; only the confirmation is shared.
+        /// </summary>
+        private void SaveAll()
+        {
+            bool valuationsSaved = SaveValuations(out int invalidCount);
+            invalidCount += SaveHomesteadTiers();
+            invalidCount += SaveLoggingSettings();
+            invalidCount += SaveSnapshotSettings();
+
+            if (_statusLabel == null) return;
+
+            if (!valuationsSaved)
+            {
+                // Defensive branch (see SaveValuations' catch): the other
+                // three sections did persist, but a failed write is the
+                // headline and the per-row errors stay on screen.
+                _statusLabel.Text = "Save failed - see log";
+                _statusLabel.TextColor = ErrorTextColor;
+                return;
+            }
+
+            if (invalidCount == 0)
+            {
+                _statusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
+                _statusLabel.TextColor = SuccessTextColor;
+            }
+            else
+            {
+                string entryWord = invalidCount == 1 ? "entry" : "entries";
+                _statusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
+                _statusLabel.TextColor = WarningTextColor;
+            }
         }
 
         private void LoadCurrentValuations()
@@ -938,7 +935,12 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void SaveValuations()
+        /// <summary>
+        /// Returns false when the valuation could not be persisted at all;
+        /// invalidCount counts rows whose text did not parse (those keep
+        /// their previously-persisted value either way).
+        /// </summary>
+        private bool SaveValuations(out int invalidCount)
         {
             // Seeded from the currently-persisted valuation (not empty) so
             // an invalid row is left untouched below rather than silently
@@ -961,7 +963,7 @@ namespace GW2CraftingHelper.Views
             }
             var cleared = new HashSet<int>(persisted.ClearedCurrencyIds);
 
-            int invalidCount = 0;
+            invalidCount = 0;
 
             foreach (var row in _rows)
             {
@@ -1026,12 +1028,7 @@ namespace GW2CraftingHelper.Views
                 // thread.
                 Logger.Warn(ex, "Failed to save currency valuations");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "settings", $"Failed to save currency valuations: {ex.GetType().Name} - {ex.Message}");
-                if (_statusLabel != null)
-                {
-                    _statusLabel.Text = "Save failed - see log";
-                    _statusLabel.TextColor = ErrorTextColor;
-                }
-                return;
+                return false;
             }
 
             foreach (var row in _rows)
@@ -1039,19 +1036,7 @@ namespace GW2CraftingHelper.Views
                 RefreshCurrencyRowDefaultState(row, saved);
             }
 
-            if (_statusLabel == null) return;
-
-            if (invalidCount == 0)
-            {
-                _statusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-                _statusLabel.TextColor = SuccessTextColor;
-            }
-            else
-            {
-                string entryWord = invalidCount == 1 ? "entry" : "entries";
-                _statusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
-                _statusLabel.TextColor = WarningTextColor;
-            }
+            return true;
         }
     }
 }
