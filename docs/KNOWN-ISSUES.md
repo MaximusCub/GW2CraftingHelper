@@ -8707,3 +8707,123 @@ new Blish-free tests), and the resize early-out + reader hoists,
 which are code-review-verified (the verify pass caught and the
 orchestrator fixed a third un-hoisted reader in ApplyTopRegionLayout
 before release). Suite 1886/1886.
+
+## Audit batch G: Settings restructure (audit-g-settings)
+
+Six commits on audit-g-settings off master 47bb2c5, covering the three
+maintainer-approved UX audit findings against Views/SettingsTabContent.
+cs (M4 currency-list density, M5 save buttons + empty heading, M6
+visual structure). Persistence semantics are untouched - every setting
+is written by the same code, with the same validation, the same
+"invalid rows keep their persisted value" contract and the same
+three-state currency precedence as before; only layout, control
+placement and the confirmation surface changed.
+
+**Supersedes B14** (backlog-cleanup, gate PASS 2026-08-17): that batch
+deduplicated the four per-section save rows into one AddSaveRow helper
+and live-verified all four rendering identically with their green
+dated "Saved" labels. Under the maintainer-approved M5 the four rows
+and their four status labels are gone entirely, replaced by one Save,
+so that gate observation no longer describes the shipping UI. The
+dated green confirmation pattern itself is kept, once.
+
+- **One line per currency, two-up (M4):** each currency was a 54px
+  two-line row spanning the full panel while using only its left
+  portion - name/input/hint/error on line one, a default-state label
+  and Clear checkbox on line two - stacked 47 deep. Each is now a 30px
+  cell: name (ellipsized to 170px, full name on hover only when it did
+  not fit), input, Clear, and a short "Invalid" tag whose tooltip
+  carries the full rule. The default estimate moved into the input's
+  PlaceholderText ("default: N", or "cleared" when suppressed) and its
+  gw2efficiency attribution + editable/clearable wording onto the
+  input's tooltip, which is also where it stays readable once the user
+  types an override and hides the placeholder. Cells are packed
+  left-to-right, top-to-bottom into an absolutely-positioned grid
+  panel. Section height: ~2,690px -> ~880px (the row block itself
+  2,538 -> 720).
+- **Filter box (M4):** a "Filter currencies..." TextBox above the grid
+  hides non-matching cells and re-packs the rest, with a "N of 47
+  shown" counter beside it. Hidden rows are still read and written by
+  Save - filtering is display-only, nothing is dropped.
+- **Section order (M4):** the three short sections (Homestead
+  Refinement, Logging, Snapshot) now build before the long currency
+  section, so the tab opens on controls rather than on a wall of
+  currency rows.
+- **One Save for the tab (M5):** the four per-section Save buttons are
+  replaced by a single Save in a bar that is a sibling of the scrolling
+  FlowPanel, so it never scrolls away. SaveAll runs all four persists
+  in order - currency valuations (with its defensive "Save failed - see
+  log" branch), Homestead tiers, log max size (including the live
+  ModuleLog.MaxFileSizeBytes push) + retention days, snapshot refresh
+  interval - sums their invalid-entry counts and writes one status:
+  green "Saved - <date>" when everything parsed, amber "Saved - N
+  invalid entries not saved" otherwise. Per-row error labels are
+  unchanged. Placement note: the audit suggested a fixed footer; the
+  bar is anchored at the TOP instead, because LogTabContent already
+  builds a fixed toolbar this way above its own CanScroll FlowPanel
+  and a top bar needs only ContentRegion.Width, while a bottom footer
+  would also depend on ContentRegion.Height being final at Build time
+  (its failure mode being a Save bar floating over the rows).
+- **Empty heading demoted (M5):** "Plan Defaults" was a section header
+  with three info lines and no controls at all. It is now a single note
+  line under Currency Valuations, the pricing section it points at.
+- **Dividers (M6):** AddSectionHeader draws the same 2px
+  SectionDividerColor rule CraftingPlanView's section headers do
+  (bottom-anchored with 1px clearance in the 30px header), and each
+  currency cell carries a LabelHelpers.CreateRowDivider rule, hidden on
+  the cells of the last populated grid row so it re-anchors as the
+  filter re-packs the list. The cell's input sits at y=1 so it ends
+  clear of the rule at y=27.
+- **Layout math is Blish-free (M4):** Services/
+  SettingsCurrencyGridLayout.cs owns the filter predicate and the
+  packing math (column count, per-cell X/Y/row, grid height); the view
+  only copies placements onto controls. 24 new tests cover the
+  one/two-column boundary, blank/trimmed/case-insensitive matching,
+  re-packing around hidden entries, the empty result, null names and
+  non-positive width/height.
+- **Review-pass fixes (own commit):** Build now nulls the currency
+  grid/filter/count/status fields alongside the row lists it already
+  cleared (same stale-disposed-control class as the _homesteadRows
+  comment records); the scroll panel's height is clamped at 0 now that
+  the save bar is subtracted from it; the demoted note was shortened to
+  fit the panel width at the window's 930px minimum.
+- **Measured, not assumed:** the filter's re-flow relies on FlowPanel
+  subscribing to each child's Resized and skipping invisible children -
+  both confirmed by decompiling the shipped Blish HUD 1.3.0 binary
+  (FlowPanel.OnChildAdded -> ChangedChildOnResized ->
+  ReflowChildLayout, which filters on c.Visible), so setting the grid
+  panel's Height is enough and the first draft's extra Invalidate was
+  removed as a second reflow per keystroke.
+
+Known nuance, deliberately kept: if the user leaves an unparseable
+amount in a currency the filter is currently hiding, Save still reports
+it in the "N invalid entries not saved" count while its red tag is off
+screen. Nothing is lost (the hidden row keeps its persisted value) and
+clearing the filter shows the tag.
+
+Validation: build 0 errors and the full suite green before each commit
+(1886 baseline -> 1910 with the 24 new layout tests; the increase is
+all new tests, zero regressions).
+
+Desktop gate items (all in the Settings tab):
+1. Currency rows are one line each, two per line, with "default: N"
+   showing as placeholder text in the empty inputs and Clear on the
+   same line; the whole section fits in roughly a screen and a half
+   instead of four-plus screens.
+2. Typing in the filter box hides non-matching currencies and re-packs
+   the rest with no gaps; the counter reads "N of 47 shown"; clearing
+   the box restores all 47; the notes below the grid move up and down
+   with it.
+3. One Save button, visible without scrolling from any scroll position,
+   and one green dated "Saved - <date>" confirmation. Change one value
+   in EVERY section (a currency amount, a Homestead tier, log max size,
+   log retention, snapshot interval), click Save once, reopen the tab
+   and confirm all five persisted. Enter one bad value and confirm the
+   amber "1 invalid entry not saved" wording plus the per-row tag.
+4. A 2px rule under every section header, and a rule between currency
+   rows with none dangling under the last populated row (check both
+   unfiltered and with a filter that leaves an odd number of matches).
+5. Section order top to bottom: Homestead Refinement, Logging,
+   Snapshot, Currency Valuations; no "Plan Defaults" header anywhere,
+   with its note present under Currency Valuations.
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
