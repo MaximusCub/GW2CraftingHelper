@@ -74,6 +74,7 @@ namespace GW2CraftingHelper.Views
         }
 
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
+        private static readonly Color SectionDividerColor = new Color(130, 130, 130);
         private static readonly Color ErrorTextColor = new Color(255, 100, 100);
         private static readonly Color SuccessTextColor = new Color(150, 200, 150);
         private static readonly Color WarningTextColor = new Color(255, 200, 60);
@@ -96,9 +97,10 @@ namespace GW2CraftingHelper.Views
             public bool HasDefault;
             public long DefaultCopperPerUnit;
 
-            // The row's own one-line cell inside the currency grid,
-            // positioned by ApplyCurrencyFilter.
+            // The row's own one-line cell inside the currency grid, and the
+            // rule along its bottom - both driven by ApplyCurrencyFilter.
             public Panel Cell;
+            public Panel Divider;
 
             public TextBox Input;
             public Label ErrorLabel;
@@ -719,6 +721,18 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(NameColumnX, 4),
                 Parent = headerPanel
             };
+
+            // Same header rule as every CraftingPlanView section: 2px in
+            // SectionDividerColor, bottom-anchored with 1px clearance
+            // inside a 30px header (see LabelHelpers.CreateRowDivider for
+            // why 1px lines and flush anchoring are unsafe here).
+            new Panel()
+            {
+                Size = new Point(panelWidth, 2),
+                Location = new Point(0, RowHeight - 3),
+                BackgroundColor = SectionDividerColor,
+                Parent = headerPanel
+            };
         }
 
         private void AddInfoLine(string text, int panelWidth)
@@ -752,7 +766,10 @@ namespace GW2CraftingHelper.Views
         private const int CellClearX = CellInputX + CellInputWidth + 6;
         private const int CellErrorX = CellClearX + 62;
         private const int CellTextY = 6;
-        private const int CellInputY = 2;
+        // 1, not 2: the input then ends at y=27, clear of the row rule
+        // LabelHelpers.CreateRowDivider puts at 30 - 2 - 1.
+        private const int CellInputY = 1;
+        private const int CellDividerClearance = 1;
         private const int CurrencyFilterWidth = 200;
 
         private void AddCurrencyFilterRow(int panelWidth)
@@ -860,6 +877,10 @@ namespace GW2CraftingHelper.Views
                 HasDefault = hasDefault,
                 DefaultCopperPerUnit = defaultCopperPerUnit,
                 Cell = cellPanel,
+                // Shown/hidden per filter pass: the cells on the last
+                // populated grid row carry no rule (see ApplyCurrencyFilter).
+                Divider = LabelHelpers.CreateRowDivider(
+                    cellPanel, columnWidth, CurrencyRowHeight, CellDividerClearance),
                 Input = input,
                 ErrorLabel = errorLabel,
                 ClearCheckbox = clearCheckbox
@@ -888,6 +909,9 @@ namespace GW2CraftingHelper.Views
                 {
                     row.Cell.Location = new Point(placement.X, placement.Y);
                 }
+                // Hidden cells report Row = -1, so the guard below also
+                // keeps their rule off.
+                row.Divider.Visible = placement.Row >= 0 && placement.Row < grid.RowCount - 1;
             }
 
             _currencyGridPanel.Height = grid.Height;
