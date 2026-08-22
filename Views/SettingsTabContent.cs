@@ -1070,11 +1070,15 @@ namespace GW2CraftingHelper.Views
             }
 
             bool isCleared = valuation.IsCleared(row.CurrencyId);
+            bool hasOverride = valuation.TryGetCopperValue(row.CurrencyId, out _);
 
             row.ClearCheckbox.Checked = isCleared;
             row.DefaultLabel.Text = isCleared
                 ? "cleared"
-                : $"default {row.DefaultCopperPerUnit}";
+                : hasOverride
+                    ? $"was {row.DefaultCopperPerUnit}"
+                    : $"default {row.DefaultCopperPerUnit}";
+            row.DefaultLabel.TextColor = isCleared ? WarningTextColor : InfoTextColor;
         }
 
         /// <summary>

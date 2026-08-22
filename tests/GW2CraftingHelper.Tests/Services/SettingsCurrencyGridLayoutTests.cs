@@ -302,10 +302,13 @@ namespace GW2CraftingHelper.Tests.Services
             // the input's placeholder.
             foreach (var kvp in CurrencyDecisionDefaults.DefaultCopperPerUnit)
             {
-                string tag = "default " + kvp.Value.ToString(CultureInfo.InvariantCulture);
-                Assert.True(
-                    tag.Length * MaxCharWidthPx <= SettingsCurrencyGridLayout.CellTagWidth,
-                    $"Tag \"{tag}\" does not fit CellTagWidth {SettingsCurrencyGridLayout.CellTagWidth}");
+                string value = kvp.Value.ToString(CultureInfo.InvariantCulture);
+                foreach (string tag in new[] { "default " + value, "was " + value })
+                {
+                    Assert.True(
+                        tag.Length * MaxCharWidthPx <= SettingsCurrencyGridLayout.CellTagWidth,
+                        $"Tag \"{tag}\" does not fit CellTagWidth {SettingsCurrencyGridLayout.CellTagWidth}");
+                }
             }
         }
 
