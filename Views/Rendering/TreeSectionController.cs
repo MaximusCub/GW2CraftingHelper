@@ -1147,26 +1147,21 @@ namespace GW2CraftingHelper.Views.Rendering
             int x = pillColX;
 
             var pillWidths = new List<int>(specs.Count);
-            var tightPillWidths = new List<int>(specs.Count);
             foreach (var spec in specs)
             {
-                int textOnly = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width);
-                pillWidths.Add(textOnly + PillPadding);
-                tightPillWidths.Add(textOnly + TightPillPadding);
+                pillWidths.Add((int)System.Math.Ceiling(font.MeasureString(spec.Text).Width) + PillPadding);
             }
             int maxRightEdge = pillColX + TreePillColumnWidth - 4;
             var fit = PlanRelayoutMath.ComputePillFit(
-                pillWidths, tightPillWidths, PillGap, pillColX, maxRightEdge,
-                hidden => (int)System.Math.Ceiling(
-                    font.MeasureString(OverflowPillText(hidden)).Width) + TightPillPadding);
+                pillWidths, PillPadding - TightPillPadding, PillGap, pillColX, maxRightEdge,
+                MeasureOverflowPillWidth);
 
-            var chosenWidths = fit.ReducedPadding ? tightPillWidths : pillWidths;
-            int chosenPadding = fit.ReducedPadding ? TightPillPadding : PillPadding;
+            int chosenPadding = PillPadding - fit.WidthReduction;
 
             for (int specIndex = 0; specIndex < fit.VisibleCount; specIndex++)
             {
                 var spec = specs[specIndex];
-                int pillWidth = chosenWidths[specIndex];
+                int pillWidth = PlanRelayoutMath.ReducedWidth(pillWidths[specIndex], fit.WidthReduction);
                 int textWidth = pillWidth - chosenPadding;
 
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
@@ -1504,6 +1499,19 @@ namespace GW2CraftingHelper.Views.Rendering
         private static string OverflowPillText(int hiddenCount)
         {
             return "+" + hiddenCount;
+        }
+
+        /// <summary>
+        /// Width of the "+N" pill. A method group, not a lambda over the
+        /// row's font local: RenderDecisionPills runs once per tree row, so
+        /// a capturing closure would be one allocation per row on the
+        /// render path for a callback most rows never invoke.
+        /// </summary>
+        private static int MeasureOverflowPillWidth(int hiddenCount)
+        {
+            var font = GameService.Content.DefaultFont12;
+            return (int)System.Math.Ceiling(
+                font.MeasureString(OverflowPillText(hiddenCount)).Width) + TightPillPadding;
         }
 
         /// <summary>

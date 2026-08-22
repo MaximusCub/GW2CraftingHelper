@@ -256,35 +256,34 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ComputePillFit_AllFitAtFullPadding_NoTighteningNoOverflow()
         {
-            var full = new[] { 50, 60, 40 };
-            var tight = new[] { 44, 54, 34 };
+            var widths = new[] { 50, 60, 40 };
 
             var fit = PlanRelayoutMath.ComputePillFit(
-                full, tight, gap: 6, startX: 0, maxRightEdge: 240,
+                widths, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
                 overflowPillWidthForHidden: OverflowWidth);
 
             Assert.Equal(3, fit.VisibleCount);
             Assert.Equal(0, fit.HiddenCount);
-            Assert.False(fit.ReducedPadding);
+            Assert.Equal(0, fit.WidthReduction);
             Assert.Equal(0, fit.OverflowPillWidth);
         }
 
         [Fact]
         public void ComputePillFit_TighteningIsEnough_KeepsEveryPill()
         {
-            // 60+6+60+6+60+6+60 = 258 at full padding (one pill over 240),
-            // 54+6+54+6+54+6+54 = 234 tightened. Squeezing beats hiding a
-            // real option, so nothing is dropped and no "+N" appears.
-            var full = new[] { 60, 60, 60, 60 };
-            var tight = new[] { 54, 54, 54, 54 };
+            // 60+6+60+6+60+6+60 = 258 at full width (one pill over 240),
+            // 54+6+54+6+54+6+54 = 234 once each pill loses 6px. Squeezing
+            // beats hiding a real option, so nothing is dropped and no
+            // "+N" appears.
+            var widths = new[] { 60, 60, 60, 60 };
 
             var fit = PlanRelayoutMath.ComputePillFit(
-                full, tight, gap: 6, startX: 0, maxRightEdge: 240,
+                widths, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
                 overflowPillWidthForHidden: OverflowWidth);
 
             Assert.Equal(4, fit.VisibleCount);
             Assert.Equal(0, fit.HiddenCount);
-            Assert.True(fit.ReducedPadding);
+            Assert.Equal(6, fit.WidthReduction);
             Assert.Equal(0, fit.OverflowPillWidth);
         }
 
@@ -295,14 +294,13 @@ namespace GW2CraftingHelper.Tests.Services
             // "HAVE 12/20 NEEDED" annotation and IGNORE. Even tightened the
             // set overruns, so the row announces the remainder instead of
             // ending early.
-            var full = new[] { 60, 55, 60, 120, 55 };
-            var tight = new[] { 54, 49, 54, 114, 49 };
+            var widths = new[] { 60, 55, 60, 120, 55 };
 
             var fit = PlanRelayoutMath.ComputePillFit(
-                full, tight, gap: 6, startX: 0, maxRightEdge: 240,
+                widths, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
                 overflowPillWidthForHidden: OverflowWidth);
 
-            Assert.True(fit.ReducedPadding);
+            Assert.Equal(6, fit.WidthReduction);
             Assert.True(fit.HiddenCount > 0);
             Assert.Equal(5, fit.VisibleCount + fit.HiddenCount);
             Assert.Equal(OverflowWidth(fit.HiddenCount), fit.OverflowPillWidth);
@@ -312,7 +310,7 @@ namespace GW2CraftingHelper.Tests.Services
             int used = 0;
             for (int i = 0; i < fit.VisibleCount; i++)
             {
-                used += tight[i] + 6;
+                used += PlanRelayoutMath.ReducedWidth(widths[i], fit.WidthReduction) + 6;
             }
             Assert.True(used + fit.OverflowPillWidth <= 240);
         }
@@ -326,7 +324,7 @@ namespace GW2CraftingHelper.Tests.Services
             var widths = new[] { 100, 100, 100, 100 };
 
             var fit = PlanRelayoutMath.ComputePillFit(
-                widths, widths, gap: 6, startX: 0, maxRightEdge: 240,
+                widths, widthReduction: 0, gap: 6, startX: 0, maxRightEdge: 240,
                 overflowPillWidthForHidden: OverflowWidth);
 
             Assert.Equal(4, fit.VisibleCount + fit.HiddenCount);
@@ -339,11 +337,10 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Defensive: a null measurer must not throw or invent a pill it
             // cannot size - it reverts to the pre-existing behaviour.
-            var full = new[] { 60, 55, 60, 120, 55 };
-            var tight = new[] { 54, 49, 54, 114, 49 };
+            var widths = new[] { 60, 55, 60, 120, 55 };
 
             var fit = PlanRelayoutMath.ComputePillFit(
-                full, tight, gap: 6, startX: 0, maxRightEdge: 240,
+                widths, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
                 overflowPillWidthForHidden: null);
 
             Assert.Equal(0, fit.HiddenCount);
@@ -352,16 +349,17 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ComputePillFit_MismatchedReducedWidths_IgnoresThemRatherThanIndexing()
+        public void ComputePillFit_NoTighteningAvailable_SkipsStraightToOverflow()
         {
-            var full = new[] { 60, 55, 60, 120, 55 };
+            var widths = new[] { 60, 55, 60, 120, 55 };
 
             var fit = PlanRelayoutMath.ComputePillFit(
-                full, new[] { 54, 49 }, gap: 6, startX: 0, maxRightEdge: 240,
+                widths, widthReduction: 0, gap: 6, startX: 0, maxRightEdge: 240,
                 overflowPillWidthForHidden: OverflowWidth);
 
-            Assert.False(fit.ReducedPadding);
+            Assert.Equal(0, fit.WidthReduction);
             Assert.Equal(5, fit.VisibleCount + fit.HiddenCount);
+            Assert.True(fit.HiddenCount > 0);
         }
 
         [Fact]
@@ -370,7 +368,7 @@ namespace GW2CraftingHelper.Tests.Services
             var widths = new[] { 400 };
 
             var fit = PlanRelayoutMath.ComputePillFit(
-                widths, widths, gap: 6, startX: 0, maxRightEdge: 240,
+                widths, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
                 overflowPillWidthForHidden: OverflowWidth);
 
             Assert.Equal(1, fit.VisibleCount);
@@ -381,16 +379,24 @@ namespace GW2CraftingHelper.Tests.Services
         public void ComputePillFit_EmptyOrNull_ReturnsNothing()
         {
             var empty = PlanRelayoutMath.ComputePillFit(
-                new int[0], new int[0], gap: 6, startX: 0, maxRightEdge: 240,
+                new int[0], widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
                 overflowPillWidthForHidden: OverflowWidth);
             var none = PlanRelayoutMath.ComputePillFit(
-                null, null, gap: 6, startX: 0, maxRightEdge: 240,
+                null, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
                 overflowPillWidthForHidden: OverflowWidth);
 
             Assert.Equal(0, empty.VisibleCount);
             Assert.Equal(0, empty.HiddenCount);
             Assert.Equal(0, none.VisibleCount);
             Assert.Equal(0, none.HiddenCount);
+        }
+
+        [Fact]
+        public void ReducedWidth_NeverGoesBelowOnePixel()
+        {
+            Assert.Equal(54, PlanRelayoutMath.ReducedWidth(60, 6));
+            Assert.Equal(60, PlanRelayoutMath.ReducedWidth(60, 0));
+            Assert.Equal(1, PlanRelayoutMath.ReducedWidth(4, 20));
         }
     }
 }

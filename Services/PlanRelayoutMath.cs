@@ -125,6 +125,18 @@ namespace GW2CraftingHelper.Services
         public static int ComputeVisiblePillCount(
             IReadOnlyList<int> pillWidths, int gap, int startX, int maxRightEdge)
         {
+            return ComputeVisiblePillCount(pillWidths, 0, gap, startX, maxRightEdge);
+        }
+
+        /// <summary>
+        /// <see cref="ComputeVisiblePillCount"/> with every pill narrowed by
+        /// widthReduction - the tightened-padding pass, without a second
+        /// measured-width list existing for the tree to allocate per row.
+        /// A pill can never narrow below 1px however large the reduction.
+        /// </summary>
+        private static int ComputeVisiblePillCount(
+            IReadOnlyList<int> pillWidths, int widthReduction, int gap, int startX, int maxRightEdge)
+        {
             if (pillWidths == null || pillWidths.Count == 0)
             {
                 return 0;
@@ -134,7 +146,7 @@ namespace GW2CraftingHelper.Services
             int count = 0;
             for (int i = 0; i < pillWidths.Count; i++)
             {
-                int width = pillWidths[i];
+                int width = ReducedWidth(pillWidths[i], widthReduction);
                 if (i > 0 && x + width > maxRightEdge)
                 {
                     break;
@@ -146,23 +158,35 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// One pill's width at a given padding reduction, floored at 1px.
+        /// The renderer calls this too, so build and fit cannot disagree
+        /// about how wide a tightened pill is.
+        /// </summary>
+        public static int ReducedWidth(int fullWidth, int widthReduction)
+        {
+            int width = fullWidth - widthReduction;
+            return width > 1 ? width : 1;
+        }
+
+        /// <summary>
         /// How <see cref="ComputePillFit"/> resolved one tree row's pill
-        /// column: how many pills to draw, at which padding, how many were
-        /// left out, and how wide the trailing "+N" pill announcing them
-        /// must be (0 when nothing was left out).
+        /// column: how many pills to draw, how much narrower to draw them
+        /// (0 = their measured width), how many were left out, and how wide
+        /// the trailing "+N" pill announcing them must be (0 when nothing
+        /// was left out).
         /// </summary>
         public readonly struct PillFitPlan
         {
             public readonly int VisibleCount;
             public readonly int HiddenCount;
-            public readonly bool ReducedPadding;
+            public readonly int WidthReduction;
             public readonly int OverflowPillWidth;
 
-            public PillFitPlan(int visibleCount, int hiddenCount, bool reducedPadding, int overflowPillWidth)
+            public PillFitPlan(int visibleCount, int hiddenCount, int widthReduction, int overflowPillWidth)
             {
                 VisibleCount = visibleCount;
                 HiddenCount = hiddenCount;
-                ReducedPadding = reducedPadding;
+                WidthReduction = widthReduction;
                 OverflowPillWidth = overflowPillWidth;
             }
         }
@@ -173,9 +197,9 @@ namespace GW2CraftingHelper.Services
         /// <list type="number">
         /// <item><description>Every pill fits at its normal padding - draw
         /// them all, nothing else changes.</description></item>
-        /// <item><description>They fit once padding is tightened
-        /// (<paramref name="reducedWidths"/>) - draw them all at that
-        /// padding. Squeezing is cheaper than hiding a real option.
+        /// <item><description>They fit once every pill is narrowed by
+        /// <paramref name="widthReduction"/> - draw them all that narrow.
+        /// Squeezing is cheaper than hiding a real option.
         /// </description></item>
         /// <item><description>They still do not fit - reserve room for a
         /// trailing "+N" pill and draw as many tightened pills as fit
@@ -192,9 +216,9 @@ namespace GW2CraftingHelper.Services
         /// wrong count.
         /// <para>
         /// <paramref name="overflowPillWidthForHidden"/> measures "+N" for
-        /// a given N. Null (or a null/mismatched
-        /// <paramref name="reducedWidths"/>) degrades to the old
-        /// drop-silently behaviour rather than throwing.
+        /// a given N. Null degrades to the old drop-silently behaviour
+        /// rather than throwing, as does a non-positive
+        /// <paramref name="widthReduction"/> for the tightening step.
         /// </para>
         /// <para>
         /// Like <see cref="ComputeVisiblePillCount"/>, at least one pill is
@@ -204,39 +228,40 @@ namespace GW2CraftingHelper.Services
         /// </para>
         /// </summary>
         public static PillFitPlan ComputePillFit(
-            IReadOnlyList<int> fullWidths,
-            IReadOnlyList<int> reducedWidths,
+            IReadOnlyList<int> pillWidths,
+            int widthReduction,
             int gap,
             int startX,
             int maxRightEdge,
             Func<int, int> overflowPillWidthForHidden)
         {
-            if (fullWidths == null || fullWidths.Count == 0)
+            if (pillWidths == null || pillWidths.Count == 0)
             {
-                return new PillFitPlan(0, 0, false, 0);
+                return new PillFitPlan(0, 0, 0, 0);
             }
 
-            int fullFit = ComputeVisiblePillCount(fullWidths, gap, startX, maxRightEdge);
-            if (fullFit >= fullWidths.Count)
+            int count = pillWidths.Count;
+            int fullFit = ComputeVisiblePillCount(pillWidths, 0, gap, startX, maxRightEdge);
+            if (fullFit >= count)
             {
-                return new PillFitPlan(fullFit, 0, false, 0);
+                return new PillFitPlan(fullFit, 0, 0, 0);
             }
 
-            bool canReduce = reducedWidths != null && reducedWidths.Count == fullWidths.Count;
-            var widths = canReduce ? reducedWidths : fullWidths;
-
-            int reducedFit = ComputeVisiblePillCount(widths, gap, startX, maxRightEdge);
-            if (reducedFit >= widths.Count)
+            int reduction = widthReduction > 0 ? widthReduction : 0;
+            int reducedFit = reduction > 0
+                ? ComputeVisiblePillCount(pillWidths, reduction, gap, startX, maxRightEdge)
+                : fullFit;
+            if (reducedFit >= count)
             {
-                return new PillFitPlan(reducedFit, 0, canReduce, 0);
+                return new PillFitPlan(reducedFit, 0, reduction, 0);
             }
 
             if (overflowPillWidthForHidden == null)
             {
-                return new PillFitPlan(reducedFit, 0, canReduce, 0);
+                return new PillFitPlan(reducedFit, 0, reduction, 0);
             }
 
-            int hidden = widths.Count - reducedFit;
+            int hidden = count - reducedFit;
             int visible = reducedFit;
             int overflowWidth = 0;
             for (int i = 0; i < 4; i++)
@@ -244,8 +269,9 @@ namespace GW2CraftingHelper.Services
                 int candidateWidth = overflowPillWidthForHidden(hidden);
                 if (candidateWidth < 0) candidateWidth = 0;
 
-                int fit = ComputeVisiblePillCount(widths, gap, startX, maxRightEdge - candidateWidth - gap);
-                int nextHidden = widths.Count - fit;
+                int fit = ComputeVisiblePillCount(
+                    pillWidths, reduction, gap, startX, maxRightEdge - candidateWidth - gap);
+                int nextHidden = count - fit;
 
                 overflowWidth = candidateWidth;
                 visible = fit;
@@ -253,7 +279,7 @@ namespace GW2CraftingHelper.Services
                 hidden = nextHidden;
             }
 
-            return new PillFitPlan(visible, widths.Count - visible, canReduce, overflowWidth);
+            return new PillFitPlan(visible, count - visible, reduction, overflowWidth);
         }
 
         public readonly struct CostTileGeometry
