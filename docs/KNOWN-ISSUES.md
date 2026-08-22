@@ -8764,3 +8764,148 @@ floor lifting at two). The reviewer's noted empty-state wording gap
 (a one-letter query's message does not mention the character-label
 floor) was observed as accurate-but-unexplained live; left as the
 recorded maintainer call.
+
+## Audit batch K: Plan Notes wrapping (audit-k-notes)
+
+UX audit finding M14. `Views/Rendering/NotesSectionRenderer` locked each
+note to one `PlanContentHeightMath.FallbackTextRowHeight` (28px) row and
+ellipsized it with `LabelHelpers.EllipsizeToWidth`, with a DEBUG assert
+forbidding any child from exceeding that height. At ~830px usable that
+capped a note near 100 characters before the rest became hover-only
+tooltip text - while the maintainer's UI law routes every opportunity and
+every complex consideration into exactly this section.
+
+### Reconciliation: M14's one-row claim vs. the live capture's three lines
+
+The 2026-08-22 desktop captures (`preflight/ph11-scroll2.png`,
+`preflight/ph12-scroll3.png`, Mystic Clover x77) show the Notes header
+reading "Notes (1)" above THREE stacked text lines. That is not a note
+containing line breaks and is not evidence against M14:
+
+- `PlanViewModelBuilder.BuildNotesSection` block 5 emits the forge-scope
+  caveat as **three separate `PlanRowType.NoteLine` rows**, one complete
+  sentence each, with its own comment saying why ("a single ~243-char row
+  would edge-clip exactly the caveat the note exists to deliver, and the
+  split preserves the fixed height-per-row contract"). It is a
+  hand-authored workaround for M14, written at the builder, one plan-
+  content-specific note at a time.
+- The header's "(N)" counts logical note ENTRIES (`noteEntryCount`), not
+  physical rows, which is why three rows read as "Notes (1)".
+- No note Label in the builder contains a `\n` today. M14's claim -
+  every note row renders as exactly one ellipsized 28px line - was and is
+  accurate at the renderer.
+
+So the gap to close was greedy WIDTH-wrapping of a long unbroken line,
+which is what still ellipsized at ~100 characters. Explicit line breaks
+are supported anyway (they compose with width wrapping, each hard line
+wrapping on its own), so a future note can carry its own breaks without
+the builder having to pre-split rows.
+
+### What changed
+
+- **`Services/TextWrapMath`** (new, Blish-free): greedy word wrap with a
+  separate first-line budget, explicit-line-break splitting, hard-split
+  of a token wider than a whole line, a slot-pinned variant, and the
+  single-line ellipsis moved verbatim out of
+  `LabelHelpers.EllipsizeToWidth`. Measurement is a `Func<string,int>`
+  seam rather than a `BitmapFont` - the same shape
+  `SummarySectionLayoutMath` uses when it takes an already-measured
+  `widestNumberWidth`. `LabelHelpers.EllipsizeToWidth` is now the font
+  adapter over it, so the two truncation paths cannot drift.
+- **`Services/NotesSectionLayoutMath`** (new, Blish-free): the note text
+  budget (via the shared `PlanRelayoutMath.NameMaxWidthBeforeColumn`, not
+  a second copy), the per-note wrap, and the body height.
+- **`NotesSectionRenderer`**: one 28px row Panel per wrapped LINE. The
+  fixed row-height contract and the DEBUG child-extent assert are
+  unchanged - only the row COUNT became width-dependent.
+- **Height math**: the Notes arm now counts wrapped lines. `rows.Count`
+  is no longer the row count on screen, so `Render` returns the height it
+  built and `CreateCollapsibleSection` uses that (the same special-casing
+  Summary already has, with the stronger property that the number cannot
+  drift from what was built because it IS what was built).
+  `PlanContentHeightMath.SectionBodyHeight` is untouched; its class doc's
+  "no text wrapping anywhere in the file" sentence and
+  `PlanViewModel`'s matching comment were corrected.
+
+### Design decisions (recorded, not incidental)
+
+- **Over-long single word hard-splits, it does not ellipsize.** A token
+  wider than a whole line is broken across lines at the widest prefix
+  that fits, so nothing is lost - ellipsis is exactly the text loss this
+  work removes. Ellipsis survives only as the tail of a note past
+  `TextWrapMath.MaxWrappedLines` (24) or past the resize slot cap.
+- **Coin cell on the first line only**, so only the first line's budget
+  is reduced by it and every later line gets the full width.
+- **Continuation lines carry the same two-space indent** as the first, so
+  a wrapped note reads as one block rather than as several notes. Padded
+  (empty) slots are not indented.
+- **Resize re-wraps at settle, pinned to the slot count built at render.**
+  `RunReellipsis`/`ReplayRelayout` must never change a row's height (see
+  `CraftingPlanView`'s `_relayoutActions` field comment; that property is
+  what lets the settle pass skip scroll preservation entirely). So a
+  narrower window ellipsizes the tail into the last slot and a wider one
+  leaves trailing slots blank until the next real render. Both show
+  strictly more text than the pre-wrap single line, and any plan
+  re-render re-wraps from scratch at the current width. **Accepted
+  tradeoff, not an oversight** - making the section re-height mid-drag
+  would mean a rebuild inside the settle step and would give back the
+  no-height-change guarantee that pass currently relies on.
+- **A truncated note puts the full text on the tooltip of every one of
+  its rows**, not just the last one, so a hover anywhere on the note
+  reads the whole thing.
+
+### Tests (+42, 1890 -> 1932)
+
+`TextWrapMathTests` (26): ellipsis parity cases (fits whole, truncates,
+budget narrower than "...", non-positive budget, null measure); short
+text stays one line; empty and null text still produce one line; long
+text breaks at word boundaries with every word kept; no line exceeds its
+budget; wrapping consults the measurement rather than counting characters
+(a proportional measure where "i" is narrow); over-long word hard-splits
+losslessly, both alone and after normal words; explicit `\n`, `\r\n` and
+`\r` breaks compose with width wrapping and force a break even when the
+text would fit; blank source line keeps its own row; leading indent is
+content; the first-line budget is honored separately; past the line cap
+the tail ellipsizes and reports truncation; a zero budget terminates with
+the text intact; slot padding, slot overflow, exact fit, and zero slots.
+
+`NotesSectionLayoutMathTests` (16): the text budget reserves the coin
+cell plus its gap and matches the shared `NameMaxWidthBeforeColumn`
+formula; short note is one indented line; empty and null notes still
+occupy one row; the real forge-scope note wraps with no ellipsis and no
+lost words; every line of a wrapped note is indented; a valued note's
+first line is shorter than the rest and both respect their own budgets;
+explicit breaks compose with width wrapping; slot-pinned widening pads
+and slot-pinned narrowing ellipsizes with truncation reported; a very
+narrow panel does not degenerate; null measure throws; body height counts
+wrapped LINES (and would have been undercounted by the old per-row arm),
+zero/negative lines are zero, and one line is exactly
+`FallbackTextRowHeight`.
+
+Validation: module build 0 errors; suite 1932/1932.
+
+Desktop gate should look at:
+1. Generate the Mystic Clover x77 plan and open Notes. The forge-scope
+   caveat must render in full with no "..." anywhere in the section, and
+   the section body must end flush against its last line of text - no
+   clipped final row and no blank rows, which is the check that the
+   renderer's returned height matches what it built.
+2. A note long enough to wrap. The builder still pre-splits the
+   forge-scope note into three short sentences, so the wrap is best
+   forced by a plan carrying a long single-row note - a seasonal vendor
+   tip ("During <festival>: <merchant> trades <cost> for Nx <item>
+   (limit N purchases/week)") or a recipe-sheet savings lead-in, both of
+   which compose past 100 characters with real item and merchant names.
+   If the preflight account can produce one, confirm it wraps to two or
+   more indented lines instead of ending in "..."; if no such plan is
+   available, record this item as code-reasoned rather than observed.
+3. Valued notes (any Excess/reclaim line, or the "Total reclaimable
+   value" rollup): the coin amount must sit at the right of the note's
+   FIRST line with the icons still to the RIGHT of each number, and the
+   text must not run under it.
+4. Narrow the window until a note re-wraps, then widen it back. Mid-drag
+   the section must not jump or lose scroll position; at settle the text
+   re-flows within the rows that already exist (a narrower window may end
+   the note in "..." with the full text on hover, a wider one may leave a
+   blank row) - the recorded tradeoff above, not a defect.
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
