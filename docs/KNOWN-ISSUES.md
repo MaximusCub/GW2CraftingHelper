@@ -8710,10 +8710,10 @@ before release). Suite 1886/1886.
 
 ## Audit batch G: Settings restructure (audit-g-settings)
 
-Six commits on audit-g-settings off master 47bb2c5, covering the three
+Commits on audit-g-settings off master 47bb2c5, covering the three
 maintainer-approved UX audit findings against Views/SettingsTabContent.
 cs (M4 currency-list density, M5 save buttons + empty heading, M6
-visual structure). Persistence semantics are untouched - every setting
+visual structure), plus the review round that followed them. Persistence semantics are untouched - every setting
 is written by the same code, with the same validation, the same
 "invalid rows keep their persisted value" contract and the same
 three-state currency precedence as before; only layout, control
@@ -8732,19 +8732,49 @@ dated green confirmation pattern itself is kept, once.
   portion - name/input/hint/error on line one, a default-state label
   and Clear checkbox on line two - stacked 47 deep. Each is now a 30px
   cell: name (ellipsized to 170px, full name on hover only when it did
-  not fit), input, Clear, and a short "Invalid" tag whose tooltip
-  carries the full rule. The default estimate moved into the input's
-  PlaceholderText ("default: N", or "cleared" when suppressed) and its
-  gw2efficiency attribution + editable/clearable wording onto the
-  input's tooltip, which is also where it stays readable once the user
-  types an override and hides the placeholder. Cells are packed
+  not fit), input, Clear, and one tag slot at the right of the cell.
+  That slot shows the persisted default state ("default N", or
+  "cleared" when suppressed) and is taken over by the red "Invalid"
+  warning while an amount will not parse - only ever one of the two, so
+  a half-width cell needs room for one. The gw2efficiency attribution +
+  editable/clearable wording is on the input's tooltip. The input's
+  placeholder is the unit ("copper") on every row: Blish's TextBox
+  insets a placeholder 10px a side and draws it untruncated inside the
+  control's own scissor, so a 70px box shows ~50px of it - enough for
+  "copper", not for "default: 3600", which is why the default estimate
+  is a label and not the placeholder it briefly was. Cells are packed
   left-to-right, top-to-bottom into an absolutely-positioned grid
-  panel. Section height: ~2,690px -> ~880px (the row block itself
-  2,538 -> 720).
+  panel. Section height: ~2,690px -> ~880px two-up (the row block
+  itself 2,538 -> 720).
 - **Filter box (M4):** a "Filter currencies..." TextBox above the grid
   hides non-matching cells and re-packs the rest, with a "N of 47
   shown" counter beside it. Hidden rows are still read and written by
-  Save - filtering is display-only, nothing is dropped.
+  Save - filtering is display-only, nothing is dropped. A row whose
+  amount did not parse is forced back on screen by the next filter pass
+  whatever the query says (SettingsCurrencyGridLayout.Compute's
+  alwaysShow), so the save bar's "N invalid entries not saved" can
+  never point at a tag the filter is concealing.
+- **The grid panel holds its unfiltered height (M4):** Blish's
+  Scrollbar zeroes ScrollDistance/TargetScrollDistance whenever the
+  scrolling container's content height changes - its RecalculateLayout
+  captures the previous scrollbar percent, recomputes it from the
+  visible children, and resets on any difference - and it does so a
+  frame later, so the reset cannot be undone in place. Sizing the grid
+  to the match count therefore snapped the tab back to scroll-top on
+  every filter keystroke that changed the count. The grid panel is now
+  fixed at SettingsCurrencyGridLayout.ComputeHeight (the full 47-row
+  height for the current column count) and only the cells move; the
+  cost is trailing blank space under a filtered list, which is why the
+  grid is deliberately the last thing in the panel and the Astral
+  Acclaim note moved above it.
+- **Width changes are re-laid out (M4):** the row/header panels, the
+  header rules, the grid panel and every cell + cell rule are re-sized
+  from container.Resized (ApplyPanelWidth, early-out when the width did
+  not move, so a height-only resize or a vertical drag costs nothing).
+  Without it the tab kept the width it was first opened at: narrowing
+  the window left the second column of cells beyond the panel's right
+  edge, invisible and untypeable until the tab was closed and
+  re-opened.
 - **Section order (M4):** the three short sections (Homestead
   Refinement, Logging, Snapshot) now build before the long currency
   section, so the tab opens on controls rather than on a wall of
@@ -8775,12 +8805,22 @@ dated green confirmation pattern itself is kept, once.
   filter re-packs the list. The cell's input sits at y=1 so it ends
   clear of the rule at y=27.
 - **Layout math is Blish-free (M4):** Services/
-  SettingsCurrencyGridLayout.cs owns the filter predicate and the
-  packing math (column count, per-cell X/Y/row, grid height); the view
-  only copies placements onto controls. 24 new tests cover the
+  SettingsCurrencyGridLayout.cs owns the filter predicate, the packing
+  math (column count, column width, per-cell X/Y/row, grid height) AND
+  the cell's horizontal constants; the view aliases those constants at
+  compile time and only copies placements onto controls. MinColumnWidth
+  is now derived (CellTagX + CellTagWidth = 424) rather than
+  hand-estimated: the previous 340 was short of the cell it claimed to
+  size, so a two-up column between 680 and ~722px clipped the invalid
+  tag. Two-up now needs a 848px panel, below which the grid falls back
+  to one column - including at the window's 930px minimum, where the
+  section is 1,410px of rows rather than 720. 42 tests cover the
   one/two-column boundary, blank/trimmed/case-insensitive matching,
-  re-packing around hidden entries, the empty result, null names and
-  non-positive width/height.
+  re-packing around hidden entries, alwaysShow overrides (including a
+  short array), the empty result, null names, non-positive
+  width/height, the fixed height, and the width budgets - the tag
+  budget against every real value in CurrencyDecisionDefaults, so a
+  future six-figure default fails the suite instead of clipping.
 - **Review-pass fixes (own commit):** Build now nulls the currency
   grid/filter/count/status fields alongside the row lists it already
   cleared (same stale-disposed-control class as the _homesteadRows
@@ -8795,25 +8835,24 @@ dated green confirmation pattern itself is kept, once.
   panel's Height is enough and the first draft's extra Invalidate was
   removed as a second reflow per keystroke.
 
-Known nuance, deliberately kept: if the user leaves an unparseable
-amount in a currency the filter is currently hiding, Save still reports
-it in the "N invalid entries not saved" count while its red tag is off
-screen. Nothing is lost (the hidden row keeps its persisted value) and
-clearing the filter shows the tag.
-
 Validation: build 0 errors and the full suite green before each commit
-(1886 baseline -> 1910 with the 24 new layout tests; the increase is
-all new tests, zero regressions).
+(1886 baseline -> 1928 with the new layout tests; the increase is all
+new tests, zero regressions).
 
 Desktop gate items (all in the Settings tab):
-1. Currency rows are one line each, two per line, with "default: N"
-   showing as placeholder text in the empty inputs and Clear on the
-   same line; the whole section fits in roughly a screen and a half
-   instead of four-plus screens.
+1. Currency rows are one line each, with Clear on the same line and a
+   readable "default N" tag at the right of every defaulted cell (the
+   whole number, not a clipped one) - check a 4-digit default such as
+   Guild Commendation or Spirit Shard. Two cells per line once the
+   window is wide enough (panel >= 848px); one per line at the 930px
+   window minimum. The whole section fits in roughly a screen and a
+   half two-up instead of four-plus screens.
 2. Typing in the filter box hides non-matching currencies and re-packs
    the rest with no gaps; the counter reads "N of 47 shown"; clearing
-   the box restores all 47; the notes below the grid move up and down
-   with it.
+   the box restores all 47. Scroll down to the filter box first: the
+   panel must NOT jump back to the top on any keystroke, including
+   backspaces. The grid keeps its full height, so a short match list
+   leaves blank space below it.
 3. One Save button, visible without scrolling from any scroll position,
    and one green dated "Saved - <date>" confirmation. Change one value
    in EVERY section (a currency amount, a Homestead tier, log max size,
@@ -8826,4 +8865,12 @@ Desktop gate items (all in the Settings tab):
 5. Section order top to bottom: Homestead Refinement, Logging,
    Snapshot, Currency Valuations; no "Plan Defaults" header anywhere,
    with its note present under Currency Valuations.
+6. Resize the window while the Settings tab is open, both wider and
+   back down to the 930px minimum, and confirm every currency cell
+   stays inside the panel and stays typeable, the columns switch
+   between one-up and two-up, and the section-header rules span the new
+   width.
+7. Type a bad amount into one currency, filter it off screen, click
+   Save: the amber "1 invalid entry not saved" must be accompanied by
+   that row reappearing with its red "Invalid" tag despite the filter.
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
