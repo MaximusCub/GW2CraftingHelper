@@ -148,6 +148,40 @@ namespace GW2CraftingHelper.Views.Rendering
             public int AmountY;
         }
 
+        // Left edge a collapsed one-tile band's contents start at - the
+        // same 8px content gutter the currency table's icon column and the
+        // footnote row already use, so the section reads as one left edge.
+        private const int LoneTileContentX = 8;
+
+        private const int BandCaptionY = 4;
+
+        // Amounts are bottom-anchored this far above the band's bottom
+        // edge; 6 reproduces the previous fixed y=30 exactly for an
+        // unpromoted CostTileRowHeight band (56 - 6 - 20 == 30).
+        private const int BandAmountBottomPad = 6;
+
+        private static readonly Color BandCaptionColor = new Color(153, 153, 153);
+
+        // The result tile's caption is the one a user is actually looking
+        // for; it stays the same size as its siblings (so the band still
+        // reads as one formula) but is lifted out of the dim grey.
+        private static readonly Color PromotedCaptionColor = new Color(235, 235, 235);
+
+        // Warm, not red: the disclosure is a caveat about scope, not an
+        // error, and it must not read as an alarm on an ordinary plan.
+        private static readonly Color CurrencyNoteColor = new Color(206, 170, 92);
+
+        /// <summary>
+        /// Vertical space an amount run occupies: its own text height, or
+        /// the coin icon's if that is taller (an unpromoted DefaultFont16
+        /// run, where the 20px icons are the tallest thing in the row).
+        /// </summary>
+        private static int AmountBlockHeight(BitmapFont font)
+        {
+            int textHeight = (int)System.Math.Ceiling(font.MeasureString("0").Height);
+            return textHeight > CoinSegmentMath.CoinIconSize ? textHeight : CoinSegmentMath.CoinIconSize;
+        }
+
         /// <summary>
         /// A formula band - N equal-width stat tiles reading
         /// left-to-right as a formula ("Total Materials Value - Your
@@ -156,9 +190,12 @@ namespace GW2CraftingHelper.Views.Rendering
         /// rows belonging to ONE band (PlanViewModelBuilder groups
         /// CostFormulaTile/ProfitFormulaTile separately, and Render above
         /// re-groups by that same RowType), so two bands render as two
-        /// stacked CostTileRowHeight-tall rows, not one - see
-        /// Services/SummarySectionLayoutMath.BodyHeight, which sizes for
-        /// exactly that.
+        /// stacked tile rows, not one - the cost band at
+        /// SummarySectionLayoutMath.CostBandHeight and the profit band at
+        /// PlanContentHeightMath.CostTileRowHeight. rowHeight is the
+        /// caller's, not this method's, so BodyHeight and the row panel
+        /// built here are always the same number by construction; see
+        /// Services/SummarySectionLayoutMath.BodyHeight.
         ///
         /// Geometry matches ComputeCostTileGeometry's tile layout - EXCEPT
         /// for a collapsed one-tile band, which is left-aligned at the
@@ -209,40 +246,6 @@ namespace GW2CraftingHelper.Views.Rendering
         /// subtraction is never in question, only whether the FINAL
         /// result tile's displayed value is the true right-hand side.
         /// </summary>
-        // Left edge a collapsed one-tile band's contents start at - the
-        // same 8px content gutter the currency table's icon column and the
-        // footnote row already use, so the section reads as one left edge.
-        private const int LoneTileContentX = 8;
-
-        private const int BandCaptionY = 4;
-
-        // Amounts are bottom-anchored this far above the band's bottom
-        // edge; 6 reproduces the previous fixed y=30 exactly for an
-        // unpromoted CostTileRowHeight band (56 - 6 - 20 == 30).
-        private const int BandAmountBottomPad = 6;
-
-        private static readonly Color BandCaptionColor = new Color(153, 153, 153);
-
-        // The result tile's caption is the one a user is actually looking
-        // for; it stays the same size as its siblings (so the band still
-        // reads as one formula) but is lifted out of the dim grey.
-        private static readonly Color PromotedCaptionColor = new Color(235, 235, 235);
-
-        // Warm, not red: the disclosure is a caveat about scope, not an
-        // error, and it must not read as an alarm on an ordinary plan.
-        private static readonly Color CurrencyNoteColor = new Color(206, 170, 92);
-
-        /// <summary>
-        /// Vertical space an amount run occupies: its own text height, or
-        /// the coin icon's if that is taller (an unpromoted DefaultFont16
-        /// run, where the 20px icons are the tallest thing in the row).
-        /// </summary>
-        private static int AmountBlockHeight(BitmapFont font)
-        {
-            int textHeight = (int)System.Math.Ceiling(font.MeasureString("0").Height);
-            return textHeight > CoinSegmentMath.CoinIconSize ? textHeight : CoinSegmentMath.CoinIconSize;
-        }
-
         private void CreateFormulaBand(
             List<PlanRowViewModel> tileRows, FlowPanel parent, int panelWidth,
             BitmapFont resultAmountFont, int rowHeight,

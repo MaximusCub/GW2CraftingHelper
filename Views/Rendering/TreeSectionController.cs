@@ -385,12 +385,19 @@ namespace GW2CraftingHelper.Views.Rendering
             // than a build-time x. Counted by
             // PlanContentHeightMath.MultiRootTreeFlowHeight, which every
             // treeFlow height assignment goes through.
-            int headerCostColumnWidth = EffectiveCostColumnWidth();
-            CTableHeaderRenderer.CreateCTableHeaderRow(
-                treeFlow, panelWidth, "Item", TreeCaretColWidth + TreeIconFrameSize + TreeNameGap, "Cost", _sink,
-                middleLabel: "Source",
-                middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX);
+            // Guarded on the same "is there a tree at all" condition
+            // MultiRootTreeFlowHeight counts the header under: a header
+            // drawn over zero roots would be a row the section's own
+            // height math reserves nothing for.
+            if (_treeRoots.Count > 0)
+            {
+                int headerCostColumnWidth = EffectiveCostColumnWidth();
+                CTableHeaderRenderer.CreateCTableHeaderRow(
+                    treeFlow, panelWidth, "Item", TreeCaretColWidth + TreeIconFrameSize + TreeNameGap, "Cost", _sink,
+                    middleLabel: "Source",
+                    middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX);
+            }
 
 #if DEBUG
             int relayoutCountBeforeTree = _sink.RelayoutCount;
