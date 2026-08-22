@@ -39,7 +39,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.SummaryFootnote)
             };
 
-            int expected = PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
+            int expected = SummarySectionLayoutMath.CostBandHeight(false) + PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
         }
 
@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.SummaryFootnote)
             };
 
-            int expected = PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
+            int expected = SummarySectionLayoutMath.CostBandHeight(false) + PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
         }
 
@@ -72,7 +72,9 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.SummaryFootnote)
             };
 
-            int expected = 2 * PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
+            int expected = SummarySectionLayoutMath.CostBandHeight(false)
+                + PlanContentHeightMath.CostTileRowHeight
+                + PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
         }
 
@@ -88,7 +90,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.SummaryFootnote)
             };
 
-            int expected = PlanContentHeightMath.CostTileRowHeight
+            int expected = SummarySectionLayoutMath.CostBandHeight(true)
                 + PlanContentHeightMath.CTableHeaderRowHeight + 3 * PlanContentHeightMath.CurrencyRowHeight
                 + PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
@@ -103,7 +105,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.SummaryFootnote)
             };
 
-            int expected = PlanContentHeightMath.CostTileRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
+            int expected = SummarySectionLayoutMath.CostBandHeight(false) + PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
         }
 
@@ -120,7 +122,9 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.SummaryFootnote)
             };
 
-            int expected = 2 * PlanContentHeightMath.CostTileRowHeight + 2 * PlanContentHeightMath.FallbackTextRowHeight;
+            int expected = SummarySectionLayoutMath.CostBandHeight(false)
+                + PlanContentHeightMath.CostTileRowHeight
+                + 2 * PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
         }
 
@@ -141,10 +145,117 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.SummaryFootnote)
             };
 
-            int expected = 2 * PlanContentHeightMath.CostTileRowHeight
+            int expected = SummarySectionLayoutMath.CostBandHeight(true)
+                + PlanContentHeightMath.CostTileRowHeight
                 + PlanContentHeightMath.CTableHeaderRowHeight + 2 * PlanContentHeightMath.CurrencyRowHeight
                 + 2 * PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
+        }
+
+        // --- CostBandHeight + the currency disclosure line ---
+        //
+        // The cost band's result tile is the plan's headline figure and
+        // renders at a promoted amount font, so the band is taller than
+        // the profit band beside it; when the plan also has currency costs
+        // the band carries a disclosure line and grows again. Both numbers
+        // are pinned absolutely here (not recomputed from the same
+        // constants the production formula reads, which could never fail):
+        // a deliberate geometry change re-baselines these literals.
+
+        [Fact]
+        public void CostBandHeight_NoCurrencyNote_IsThePromotedTileRowHeight()
+        {
+            Assert.Equal(76, SummarySectionLayoutMath.CostBandHeight(false));
+        }
+
+        [Fact]
+        public void CostBandHeight_WithCurrencyNote_AddsExactlyOneNoteLine()
+        {
+            Assert.Equal(76 + 18, SummarySectionLayoutMath.CostBandHeight(true));
+            Assert.Equal(
+                SummarySectionLayoutMath.CostBandHeight(false) + SummarySectionLayoutMath.CostBandCurrencyNoteHeight,
+                SummarySectionLayoutMath.CostBandHeight(true));
+        }
+
+        [Fact]
+        public void CostBandHeight_IsTallerThanTheUnpromotedProfitBand()
+        {
+            Assert.True(SummarySectionLayoutMath.CostBandHeight(false) > PlanContentHeightMath.CostTileRowHeight);
+        }
+
+        [Fact]
+        public void BodyHeight_CurrencyRowsPresent_CostBandGrowsByTheNoteLine()
+        {
+            // The exact coupling the disclosure line depends on: the same
+            // "at least one CurrencyCost row" condition that makes the
+            // renderer draw the line must make BodyHeight reserve room for
+            // it, or the section body clips its own headline figure.
+            var withoutCurrency = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CostFormulaTile),
+                Row(PlanRowType.SummaryFootnote)
+            };
+            var withCurrency = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CostFormulaTile),
+                Row(PlanRowType.CurrencyCost),
+                Row(PlanRowType.SummaryFootnote)
+            };
+
+            int currencyTableHeight =
+                PlanContentHeightMath.CTableHeaderRowHeight + PlanContentHeightMath.CurrencyRowHeight;
+
+            Assert.Equal(
+                SummarySectionLayoutMath.BodyHeight(withoutCurrency)
+                    + currencyTableHeight
+                    + SummarySectionLayoutMath.CostBandCurrencyNoteHeight,
+                SummarySectionLayoutMath.BodyHeight(withCurrency));
+        }
+
+        [Fact]
+        public void CurrencyRequirementNote_NoCurrencies_IsNull()
+        {
+            Assert.Null(SummarySectionLayoutMath.CurrencyRequirementNote(0));
+            Assert.Null(SummarySectionLayoutMath.CurrencyRequirementNote(-1));
+        }
+
+        [Fact]
+        public void CurrencyRequirementNote_OneCurrency_ReadsSingular()
+        {
+            Assert.Equal("+ 1 currency required",
+                SummarySectionLayoutMath.CurrencyRequirementNote(1));
+        }
+
+        [Fact]
+        public void CurrencyRequirementNote_ManyCurrencies_StatesTheCount()
+        {
+            Assert.Equal("+ 3 currencies required",
+                SummarySectionLayoutMath.CurrencyRequirementNote(3));
+        }
+
+        [Fact]
+        public void CurrencyRequirementNoteTooltip_ListsEveryCurrencyName()
+        {
+            var rows = new List<PlanRowViewModel>
+            {
+                new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Blue Prophet Shard" },
+                new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Fractal Relic" },
+                new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Spirit Shard" }
+            };
+
+            string tooltip = SummarySectionLayoutMath.CurrencyRequirementNoteTooltip(rows);
+
+            Assert.StartsWith("Blue Prophet Shard, Fractal Relic, Spirit Shard", tooltip);
+            Assert.Contains("Currency table below", tooltip);
+        }
+
+        [Fact]
+        public void CurrencyRequirementNoteTooltip_NoRowsOrNoNames_IsNull()
+        {
+            Assert.Null(SummarySectionLayoutMath.CurrencyRequirementNoteTooltip(null));
+            Assert.Null(SummarySectionLayoutMath.CurrencyRequirementNoteTooltip(new List<PlanRowViewModel>()));
+            Assert.Null(SummarySectionLayoutMath.CurrencyRequirementNoteTooltip(
+                new List<PlanRowViewModel> { Row(PlanRowType.CurrencyCost) }));
         }
 
         // --- ComputeCurrencyColumnEdges ---

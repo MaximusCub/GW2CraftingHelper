@@ -44,6 +44,16 @@ namespace GW2CraftingHelper.Services
         public const int RecipeRowHeightNoSublabel = 36;
         public const int RecipeRowHeightWithSublabel = 44;
         public const int CostTileRowHeight = 56;
+
+        // The Summary section's COST formula band, whose result tile
+        // ("Actual Cost to Craft") carries a promoted amount font instead
+        // of the DefaultFont16 every other tile uses - it is the plan's
+        // headline figure, not one derived stat among three. Taller than
+        // CostTileRowHeight by exactly the extra leading that font needs
+        // plus a caption line's clearance. The profit band keeps
+        // CostTileRowHeight. See Services/SummarySectionLayoutMath.
+        // CostBandHeight, which is the only thing that reads this.
+        public const int PromotedCostTileRowHeight = 76;
         public const int CurrencyRowHeight = 28;
         public const int FallbackTextRowHeight = 28;
         public const int TreeRowHeight = 40;

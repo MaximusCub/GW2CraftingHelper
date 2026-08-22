@@ -102,6 +102,18 @@ namespace GW2CraftingHelper.Views.Rendering
             public (Label Label, Panel Icon)[] Controls;
             public int[] TextWidths;
 
+            /// <summary>
+            /// Extra y applied to the ICONS only, so a run whose number
+            /// labels are taller than CoinSegmentMath.CoinIconSize (the
+            /// Summary cost band's promoted result tile) can centre its
+            /// fixed-size coin icons against the text instead of leaving
+            /// them stuck to the text's top edge. Cached on the handle so
+            /// RepositionSegments reproduces the same offset without the
+            /// caller having to remember it. 0 everywhere else, which is
+            /// exactly the prior behaviour.
+            /// </summary>
+            public int IconYOffset;
+
             public static readonly SegmentLayoutHandle Empty =
                 new SegmentLayoutHandle { Controls = System.Array.Empty<(Label, Panel)>(), TextWidths = System.Array.Empty<int>() };
         }
@@ -109,10 +121,13 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <summary>
         /// Lays out coin segments left-to-right starting at x. alphaScale
         /// dims the number labels (not the icons - Panel has no tint
-        /// property) for dimmed not-crafted subtree rows.
+        /// property) for dimmed not-crafted subtree rows. iconYOffset
+        /// vertically centres the fixed-size icons against a taller number
+        /// font - see SegmentLayoutHandle.IconYOffset.
         /// </summary>
         internal static SegmentLayoutHandle LayoutCoinSegments(
-            Panel parent, List<CoinSegmentMath.CoinSegmentSpec> segments, int startX, int y, BitmapFont font, float alphaScale = 1f)
+            Panel parent, List<CoinSegmentMath.CoinSegmentSpec> segments, int startX, int y, BitmapFont font,
+            float alphaScale = 1f, int iconYOffset = 0)
         {
             var controls = new (Label, Panel)[segments.Count];
             var widths = new int[segments.Count];
@@ -137,7 +152,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 var icon = new Panel()
                 {
                     Size = new Point(CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinIconSize),
-                    Location = new Point(x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y),
+                    Location = new Point(x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y + iconYOffset),
                     BackgroundTexture = AsyncTexture2D.FromAssetId(seg.AssetId),
                     Parent = parent
                 };
@@ -147,7 +162,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 x += seg.TextWidth + CoinSegmentMath.CoinLabelIconGap + CoinSegmentMath.CoinIconSize + CoinSegmentMath.CoinSegmentGap;
             }
 
-            return new SegmentLayoutHandle { Controls = controls, TextWidths = widths };
+            return new SegmentLayoutHandle { Controls = controls, TextWidths = widths, IconYOffset = iconYOffset };
         }
 
         /// <summary>
@@ -167,7 +182,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 var (label, icon) = handle.Controls[i];
                 int textWidth = handle.TextWidths[i];
                 label.Location = new Point(x, y);
-                icon.Location = new Point(x + textWidth + CoinSegmentMath.CoinLabelIconGap, y);
+                icon.Location = new Point(x + textWidth + CoinSegmentMath.CoinLabelIconGap, y + handle.IconYOffset);
                 x += textWidth + CoinSegmentMath.CoinLabelIconGap + CoinSegmentMath.CoinIconSize + CoinSegmentMath.CoinSegmentGap;
             }
         }
