@@ -2878,16 +2878,38 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Dims (or restores) the plan area. A panel rebuilt mid-generation
-        /// starts undimmed and is left that way - Build renders whatever
-        /// plan state exists into a fresh FlowPanel, and the generation
-        /// that dimmed the old one has nothing left to restore.
+        /// Dims (or restores) the plan area, the Recipe Tree's action row
+        /// included. A panel rebuilt mid-generation starts undimmed and is
+        /// left that way - Build renders whatever plan state exists into a
+        /// fresh FlowPanel, and the generation that dimmed the old one has
+        /// nothing left to restore.
+        /// <para>
+        /// The toolbar row sits in the non-scrolling strip, outside
+        /// _contentPanel, so it does not inherit that dim - but its five
+        /// buttons mutate the very plan being superseded, and leaving them
+        /// at full brightness above a faded tree says the opposite of what
+        /// the dim says. Disabled as well as dimmed: Opacity does not block
+        /// hit-testing, so without this a Best Path click mid-run re-solves
+        /// a plan that is about to be thrown away. Both panels are created
+        /// in the same Build pass, so the _contentPanel guard above covers
+        /// the toolbar too.
+        /// </para>
         /// </summary>
         private void SetContentDimmed(bool dimmed)
         {
             if (_contentPanel == null || _contentPanel.Parent == null) return;
 
-            _contentPanel.Opacity = dimmed ? StalePlanOpacity : 1f;
+            float opacity = dimmed ? StalePlanOpacity : 1f;
+            _contentPanel.Opacity = opacity;
+
+            if (_treeToolbarPanel != null)
+            {
+                _treeToolbarPanel.Opacity = opacity;
+            }
+            foreach (var entry in _treeToolbarButtons)
+            {
+                entry.Button.Enabled = !dimmed;
+            }
         }
 
         /// <summary>
