@@ -172,6 +172,13 @@ namespace GW2CraftingHelper.Views
         private static readonly char[] SpinnerFrames = { '|', '/', '-', '\\' };
         private static readonly TimeSpan SpinnerTickInterval = TimeSpan.FromMilliseconds(150);
 
+        // How many results the typed-name resolution pass asks for. Only an
+        // exact name match is adopted, so this just has to be wide enough
+        // for the wanted name to survive the provider's own ranking among
+        // items that share a prefix ("Mystic Clover" vs "Mystic Coin"); the
+        // suggestion list itself shows 8.
+        private const int TypedNameSearchResults = 8;
+
         #endregion // 2. Generate orchestration (state)
 
         #region 8. Tree rendering (state)
@@ -1339,6 +1346,23 @@ namespace GW2CraftingHelper.Views
             };
             row.SuggestionPanel = suggestionPanel;
 
+            // A pick is the only thing that resolves a row, so editing the
+            // box afterwards has to drop that resolution - otherwise the
+            // box reads one item while Generate still plans the previously
+            // picked one. Subscribed after SuggestionPanel so a pick's own
+            // Text write clears here first and is re-resolved by the
+            // ItemSelected handler above, in that order.
+            searchBox.TextChanged += (_, __) =>
+            {
+                if (!ItemRowSelection.SelectionIsStale(row.ItemId, row.ItemName, searchBox.Text))
+                {
+                    return;
+                }
+
+                row.ItemId = null;
+                row.ItemName = null;
+            };
+
             new Label()
             {
                 Text = "Qty:",
@@ -2116,7 +2140,154 @@ namespace GW2CraftingHelper.Views
             _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
         }
 
+        /// <summary>
+        /// Generate's entry point. Rows the user typed a full item name
+        /// into but never picked from the suggestion list carry no item id;
+        /// they are resolved against the search provider here, before
+        /// GenerateFromResolvedRows decides whether anything is selected at
+        /// all. The resolution await lives in this thin wrapper rather than
+        /// inside GenerateFromResolvedRows because IItemSearchProvider may
+        /// complete asynchronously and Blish's host installs no
+        /// SynchronizationContext - everything after such an await would
+        /// otherwise run on a ThreadPool thread, and the generate body
+        /// touches controls from its first line. The marshal hop puts it
+        /// back on the main thread; two overlapping calls are handled the
+        /// way they always were, by _generateSequence.
+        /// </summary>
         private async Task TriggerGenerate()
+        {
+            var pending = CollectUnresolvedTypedRows();
+            if (pending.Count > 0)
+            {
+                var matches = await FindTypedRowMatchesAsync(pending);
+                MainThreadMarshal.Run(() =>
+                {
+                    // Torn down while the search was in flight (tab
+                    // switched away, module unloading) - nothing to
+                    // generate into, same bail every other deferred
+                    // callback in this file takes.
+                    if (_contentPanel == null || _contentPanel.Parent == null) return;
+
+                    AdoptTypedRowMatches(matches);
+                    _ = GenerateFromResolvedRows();
+                });
+                return;
+            }
+
+            await GenerateFromResolvedRows();
+        }
+
+        /// <summary>
+        /// The rows with search text but no resolved item, snapshotted with
+        /// their text on the main thread so the async resolution pass never
+        /// reads a Blish control off-thread.
+        /// </summary>
+        private List<(ItemRowState Row, string Text)> CollectUnresolvedTypedRows()
+        {
+            var pending = new List<(ItemRowState Row, string Text)>();
+            if (_itemSearchProvider == null)
+            {
+                return pending;
+            }
+
+            foreach (var row in _itemRows)
+            {
+                if (row.ItemId.HasValue)
+                {
+                    continue;
+                }
+
+                string text = row.SearchBox?.Text;
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+
+                pending.Add((row, text.Trim()));
+            }
+
+            return pending;
+        }
+
+        /// <summary>
+        /// Looks up each typed row name, keeping only exact matches, so
+        /// Generate works for someone who typed the whole name and never
+        /// opened the suggestion list. A partial name stays unresolved
+        /// rather than adopting whatever ranked first, and a failing search
+        /// resolves nothing - both land on the "pick an item from the
+        /// suggestion list" status. Runs off the main thread after its
+        /// first await, so it only reads its own snapshot and never touches
+        /// row state; adoption is AdoptTypedRowMatches' job.
+        /// </summary>
+        private async Task<List<(ItemRowState Row, string Text, ItemSearchResult Match)>> FindTypedRowMatchesAsync(
+            IReadOnlyList<(ItemRowState Row, string Text)> pending)
+        {
+            var matches = new List<(ItemRowState Row, string Text, ItemSearchResult Match)>(pending.Count);
+            foreach (var entry in pending)
+            {
+                IReadOnlyList<ItemSearchResult> results;
+                try
+                {
+                    results = await _itemSearchProvider.SearchAsync(
+                        entry.Text, TypedNameSearchResults, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex, "Item search failed while resolving a typed row name");
+                    continue;
+                }
+
+                var match = ItemRowSelection.FindExactNameMatch(results, entry.Text);
+                if (match != null)
+                {
+                    matches.Add((entry.Row, entry.Text, match));
+                }
+            }
+
+            return matches;
+        }
+
+        /// <summary>
+        /// Commits the typed-name matches on the main thread, re-checking
+        /// each row against what it holds NOW: the user can pick a
+        /// suggestion or keep typing while the search is in flight, and
+        /// neither may be overwritten by a result that describes the older
+        /// text - that is the same stale-selection bug the search box's own
+        /// TextChanged handler exists to prevent.
+        /// </summary>
+        private void AdoptTypedRowMatches(IReadOnlyList<(ItemRowState Row, string Text, ItemSearchResult Match)> matches)
+        {
+            foreach (var entry in matches)
+            {
+                if (entry.Row.ItemId.HasValue)
+                {
+                    continue;
+                }
+
+                if (!ItemRowSelection.NamesMatch(entry.Row.SearchBox?.Text, entry.Text))
+                {
+                    continue;
+                }
+
+                entry.Row.ItemId = entry.Match.ItemId;
+                entry.Row.ItemName = entry.Match.Name;
+            }
+        }
+
+        private bool AnyRowHasSearchText()
+        {
+            foreach (var row in _itemRows)
+            {
+                if (!string.IsNullOrWhiteSpace(row.SearchBox?.Text))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private async Task GenerateFromResolvedRows()
         {
             // Gather every
             // row's selection + quantity into the request list the
@@ -2170,7 +2341,12 @@ namespace GW2CraftingHelper.Views
                 // or re-enables the button itself - leaving Generate stuck
                 // disabled. The button-disable/re-enable pairing below only
                 // ever runs once we know a generation will actually start.
-                SetStatus("Select at least one item before generating.");
+                // Two different mistakes: nothing typed anywhere, or text
+                // that resolved to no item (a partial name, or one the
+                // typed-name pass above could not match). The old single
+                // "select an item" line was misleading for the second -
+                // the box looked filled in.
+                SetStatus(ItemRowSelection.EmptyRequestStatus(AnyRowHasSearchText()));
                 return;
             }
 
