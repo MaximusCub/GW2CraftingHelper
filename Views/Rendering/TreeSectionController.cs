@@ -4,6 +4,7 @@ using Blish_HUD.Input;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using System;
 using System.Collections.Generic;
 
@@ -574,6 +575,15 @@ namespace GW2CraftingHelper.Views.Rendering
         // and the branch reads as a single inactive block instead of a
         // stack of independently-styled rows. Sits inside the existing
         // TreeRowHeight, so no height math changes.
+        // Decision-pill chrome. TightPillPadding is the first thing tried
+        // when a row's pills do not fit: 3px of side padding instead of 6
+        // still reads as a pill, and squeezing beats hiding a real option
+        // (PlanRelayoutMath.ComputePillFit).
+        private const int PillHeight = 20;
+        private const int PillGap = 6;
+        private const int PillPadding = 12;
+        private const int TightPillPadding = 6;
+
         private const int TreeDimmedRuleWidth = 2;
         private const int TreeDimmedRuleOffset = 8;
         private static readonly Color TreeDimmedRuleColor = Color.White * 0.18f;
@@ -1085,7 +1095,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     foreach (var pill in pillPanels)
                     {
                         pill.Location = new Point(x, 10);
-                        x += pill.Width + 6;
+                        x += pill.Width + PillGap;
                     }
                 }
                 if (costCell != null)
@@ -1152,11 +1162,19 @@ namespace GW2CraftingHelper.Views.Rendering
         /// than let trailing pills render on top of the right-aligned cost
         /// column (this row has no wrap/second-line support - TreeRowHeight
         /// is a fixed per-row height shared by every layout/scroll-height
-        /// calculation in this file), only as many pills as
-        /// PlanRelayoutMath.ComputeVisiblePillCount says fit are rendered -
-        /// see that method's doc comment for why this naturally drops the
-        /// lower-priority (OwnedInfo/Ignore) pills first while always
-        /// keeping at least the first (most important) pill.
+        /// calculation in this file), PlanRelayoutMath.ComputePillFit
+        /// decides the column: all pills at normal padding, else all pills
+        /// at tightened padding, else as many tightened pills as fit
+        /// alongside a trailing "+N" pill naming what was left out.
+        /// Trailing pills used to be dropped with nothing on the row to say
+        /// they existed at all.
+        /// <para>
+        /// The budget is width-INVARIANT: maxRightEdge - pillColX is always
+        /// TreePillColumnWidth - 4, whatever the panel width, because both
+        /// endpoints move together. That is why the fit is resolved once at
+        /// build time and the resize closure only repositions - there is no
+        /// window width at which a hidden pill would have fit.
+        /// </para>
         /// </summary>
         // Moved verbatim from CraftingPlanView.RenderDecisionPills. Only
         // edit: the interactive/ignoreInteractive click handlers write
@@ -1176,19 +1194,27 @@ namespace GW2CraftingHelper.Views.Rendering
             int x = pillColX;
 
             var pillWidths = new List<int>(specs.Count);
+            var tightPillWidths = new List<int>(specs.Count);
             foreach (var spec in specs)
             {
-                int measuredWidth = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width) + 12;
-                pillWidths.Add(measuredWidth);
+                int textOnly = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width);
+                pillWidths.Add(textOnly + PillPadding);
+                tightPillWidths.Add(textOnly + TightPillPadding);
             }
             int maxRightEdge = pillColX + TreePillColumnWidth - 4;
-            int visibleCount = PlanRelayoutMath.ComputeVisiblePillCount(pillWidths, 6, pillColX, maxRightEdge);
+            var fit = PlanRelayoutMath.ComputePillFit(
+                pillWidths, tightPillWidths, PillGap, pillColX, maxRightEdge,
+                hidden => (int)System.Math.Ceiling(
+                    font.MeasureString(OverflowPillText(hidden)).Width) + TightPillPadding);
 
-            for (int specIndex = 0; specIndex < visibleCount; specIndex++)
+            var chosenWidths = fit.ReducedPadding ? tightPillWidths : pillWidths;
+            int chosenPadding = fit.ReducedPadding ? TightPillPadding : PillPadding;
+
+            for (int specIndex = 0; specIndex < fit.VisibleCount; specIndex++)
             {
                 var spec = specs[specIndex];
-                int pillWidth = pillWidths[specIndex];
-                int textWidth = pillWidth - 12;
+                int pillWidth = chosenWidths[specIndex];
+                int textWidth = pillWidth - chosenPadding;
 
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
                 // White, not borderColor: Selected/Available fills expose the
@@ -1213,32 +1239,8 @@ namespace GW2CraftingHelper.Views.Rendering
                     textColor *= PillColors.DimmedPillFactor;
                 }
 
-                // Border simulated as an outer colored panel with a 1px-inset
-                // fill panel - same nesting technique as IconControls.CreateRarityFramedIcon.
-                var outer = new Panel()
-                {
-                    Size = new Point(pillWidth, 20),
-                    Location = new Point(x, pillY),
-                    BackgroundColor = borderColor,
-                    Parent = rowPanel
-                };
-                var inner = new Panel()
-                {
-                    Size = new Point(pillWidth - 2, 18),
-                    Location = new Point(1, 1),
-                    BackgroundColor = fillColor,
-                    Parent = outer
-                };
-                var label = new Label()
-                {
-                    Text = spec.Text,
-                    Font = font,
-                    TextColor = textColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point((pillWidth - 2 - textWidth) / 2, 2),
-                    Parent = inner
-                };
+                var outer = CreatePillPanel(rowPanel, spec.Text, font, pillWidth, textWidth, x, pillY,
+                    borderColor, fillColor, textColor, out Panel inner, out Label label);
 
                 // tooltipText is resolved once below, then stamped onto
                 // outer/inner/label together - the inner fill panel and
@@ -1480,10 +1482,115 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
 
                 pillPanels.Add(outer);
-                x += pillWidth + 6;
+                x += pillWidth + PillGap;
+            }
+
+            if (fit.HiddenCount > 0)
+            {
+                RenderOverflowPill(rowPanel, specs, fit, font, x, pillY, dimmed, pillPanels);
             }
 
             return pillPanels;
+        }
+
+        /// <summary>
+        /// The trailing "+N" pill: the row admitting that N of its pills
+        /// did not fit, instead of the column simply ending early. Styled
+        /// as non-interactive chrome, because it is - clicking it does
+        /// nothing, and its tooltip names what is missing.
+        /// <para>
+        /// Deliberately NOT wired to a popup offering the hidden options.
+        /// The hidden pills are almost always the trailing annotation and
+        /// the IGNORE toggle, and a real affordance means a new
+        /// popup/menu surface (and its own dismiss, focus and scroll
+        /// behaviour) hanging off a case that tightened padding already
+        /// resolves most of the time. The tooltip states the fact; the
+        /// desktop gate decides whether the fact needs an affordance.
+        /// </para>
+        /// <para>
+        /// The tooltip does not suggest widening the window: the pill
+        /// column's budget is fixed at TreePillColumnWidth regardless of
+        /// panel width (see RenderDecisionPills), so that advice would be
+        /// false.
+        /// </para>
+        /// </summary>
+        private void RenderOverflowPill(
+            Panel rowPanel, IReadOnlyList<PillSpec> specs, PlanRelayoutMath.PillFitPlan fit,
+            BitmapFont font, int x, int pillY, bool dimmed, List<Panel> pillPanels)
+        {
+            string text = OverflowPillText(fit.HiddenCount);
+            int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
+
+            PillColors.GetPillColors(PillKind.Locked, false, out Color borderColor, out Color fillColor);
+            Color textColor = Color.White * PillColors.NonInteractiveTextAlpha;
+            if (dimmed)
+            {
+                borderColor *= PillColors.DimmedPillFactor;
+                fillColor *= PillColors.DimmedPillFactor;
+                textColor *= PillColors.DimmedPillFactor;
+            }
+
+            var hiddenTexts = new List<string>(fit.HiddenCount);
+            for (int i = fit.VisibleCount; i < specs.Count; i++)
+            {
+                hiddenTexts.Add(specs[i].Text);
+            }
+            string tooltipText = $"No room to show: {string.Join(", ", hiddenTexts)}";
+
+            var outer = CreatePillPanel(
+                rowPanel, text, font, fit.OverflowPillWidth, textWidth, x, pillY,
+                borderColor, fillColor, textColor, out Panel inner, out Label label);
+
+            outer.BasicTooltipText = tooltipText;
+            inner.BasicTooltipText = tooltipText;
+            label.BasicTooltipText = tooltipText;
+
+            pillPanels.Add(outer);
+        }
+
+        private static string OverflowPillText(int hiddenCount)
+        {
+            return "+" + hiddenCount;
+        }
+
+        /// <summary>
+        /// One pill's three nested controls (border panel, inset fill
+        /// panel, centered label) - shared by the decision pills and the
+        /// trailing "+N" pill so the two can never disagree about pill
+        /// chrome. Border simulated as an outer colored panel with a
+        /// 1px-inset fill panel, the same nesting technique
+        /// IconControls.CreateRarityFramedIcon uses.
+        /// </summary>
+        private static Panel CreatePillPanel(
+            Panel rowPanel, string text, BitmapFont font, int pillWidth, int textWidth,
+            int x, int pillY, Color borderColor, Color fillColor, Color textColor,
+            out Panel inner, out Label label)
+        {
+            var outer = new Panel()
+            {
+                Size = new Point(pillWidth, PillHeight),
+                Location = new Point(x, pillY),
+                BackgroundColor = borderColor,
+                Parent = rowPanel
+            };
+            inner = new Panel()
+            {
+                Size = new Point(pillWidth - 2, PillHeight - 2),
+                Location = new Point(1, 1),
+                BackgroundColor = fillColor,
+                Parent = outer
+            };
+            label = new Label()
+            {
+                Text = text,
+                Font = font,
+                TextColor = textColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point((pillWidth - 2 - textWidth) / 2, 2),
+                Parent = inner
+            };
+            return outer;
         }
     }
 }
