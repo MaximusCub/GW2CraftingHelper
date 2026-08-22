@@ -372,12 +372,38 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // The length that counts is the trimmed one - surrounding
             // whitespace must not buy a one-letter query character matching.
-            var items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 10, CharSource("Aria")) };
+            // The bank item is the control: it proves the padded query still
+            // reaches item names, so an empty character result means the
+            // minimum held rather than that the query matched nothing at all.
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(1, "Iron Ore", 10, CharSource("Aria")),
+                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank)
+            };
             var index = new AccountItemIndex(items);
 
             var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "  a  ", new SnapshotSourceFilter(), null);
 
-            Assert.Empty(result);
+            Assert.Single(result);
+            Assert.Equal("Ancient Wood", result[0].Name);
+        }
+
+        [Fact]
+        public void BuildItemRows_PaddedTwoCharacterQuery_MatchesCharacterName()
+        {
+            // The padded counterpart of the boundary test: whitespace must
+            // not cost a two-letter query its character matching either.
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(1, "Iron Ore", 10, CharSource("Aria")),
+                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank)
+            };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(ItemsById(items), index, "  ar  ", new SnapshotSourceFilter(), null);
+
+            Assert.Single(result);
+            Assert.Equal("Iron Ore", result[0].Name);
         }
 
         [Fact]
