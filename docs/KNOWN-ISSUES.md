@@ -8838,3 +8838,125 @@ What the desktop gate should look at:
    plainly and do not clip.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+---
+
+## Audit batch E: tree interaction honesty (audit-de-cost-tree)
+
+Four maintainer-approved UX-audit findings, all one story: a pill's
+appearance should tell you whether you can click it, and the tree's
+actions should be reachable when you need them.
+
+- **H3, dimmed pills lied.** A reference branch under a bought item ("what
+  it would cost to craft instead") drew a full, full-strength-looking pill
+  set that no click handler was ever wired to, and nothing explained the
+  silence. Three parts: (1) any pill whose click is dead only because the
+  row is dimmed now carries "Under a bought item - switch the parent to
+  CRAFT to change this", appended rather than assigned over, so a dimmed
+  Subdued pill keeps its "why it loses" text and a dimmed committed pill
+  keeps its value-detail hover; (2) the predicate for "is this a click
+  target" moved to `DecisionPillPlanner.IsInteractive`, because the view
+  read it twice - once to wire handlers, once to decide who needs
+  explaining - and those two readings drifting apart is how the dimmed set
+  ended up silent; (3) a dimmed row's pills dim to 0.6 rather than the
+  0.35 its name/quantity/cost still use (at 0.35 every hue crushed to the
+  same near-black ring), and the "this whole branch is inactive" job moved
+  to a 2px rule down the dimmed row's own indent channel, which joins
+  across consecutive rows into one continuous line per depth. The rule
+  sits inside the existing `TreeRowHeight`; no height math changed.
+
+- **M3, the toolbar scrolled away.** Best Path / Craft All / Buy All /
+  Expand All / Collapse All lived in the Recipe Tree's section header,
+  inside the scrolling content area, so a long plan scrolled Collapse All
+  off screen at exactly the point it became worth pressing. They now sit
+  in a dedicated row of the non-scrolling top strip, right-anchored, under
+  a "Recipe Tree:" label naming what they act on; the section title stays
+  in the scroll flow with the tree. The three plan-mutating presets are
+  separated from the two view-only actions by a wider gap. The state they
+  mutate stays with `TreeSectionController`, which publishes a
+  `TreeToolbarCommands` instance on every tree render and withdraws it in
+  `ResetTreeRenderState`; the buttons read that field at click time, so a
+  click between one render dropping a tree and the next publishing one
+  does nothing rather than reaching into disposed controls. The strip's Y
+  arithmetic moved to the Blish-free `Services/TopRegionLayoutMath`, whose
+  guarantee is that a hidden toolbar row costs exactly zero - the strip
+  without it is byte-identical to the strip before the row existed.
+
+- **M11, chrome looked clickable and TP looked like nothing.**
+  UNKNOWN/UNRECOGNIZED/CURRENCY/GUILD UPGRADE drew the same crisp grey
+  ring an Available pill draws; `PillKind.Locked` now recesses its ring to
+  45% alpha and drops its label to 78% white. `PillKind.Subdued`
+  deliberately does not follow - it looks muted but is a real click
+  target, which is exactly what its separate switch arm was kept for.
+  Separately, the Shopping List badged VENDOR/CURRENCY/UNKNOWN rows and
+  left Trading Post rows bare, so "no badge" silently meant TP; every row
+  is badged now, which makes an unbadged row a defect rather than a
+  statement. Badging the majority row type promoted a latent overlap - the
+  name column's ellipsis budget never reserved room for the tag - so the
+  tag width is now subtracted from that budget in both the build and the
+  re-ellipsis pass.
+
+- **L6, pills vanished silently.** A tree row's pill column is a fixed
+  240px budget and pills past it were simply not rendered, with nothing on
+  the row to say they existed; the IGNORE toggle is emitted last, so it
+  was usually first to go. `PlanRelayoutMath.ComputePillFit` now escalates:
+  draw everything at normal padding; failing that, tighten side padding
+  from 6px to 3px and draw everything; failing that, draw as many tightened
+  pills as fit alongside a trailing "+N" pill whose tooltip names exactly
+  what was left out. Tightening alone resolves the common case, so "+N" is
+  the rare tail. Its tooltip deliberately does not say "widen the window":
+  `pillColX` and `maxRightEdge` move together, so the budget is the same at
+  every panel width and no window size would have shown the hidden pills.
+  That same width-invariance is why the fit is resolved once at build time
+  while the resize closure only repositions. Per the finding, the "+N" pill
+  is not wired to a popup offering the hidden options: the hidden pills are
+  almost always the trailing annotation and the IGNORE toggle, and a real
+  affordance means a new popup surface with its own dismiss/focus/scroll
+  behaviour hanging off a case tightening already resolves - the desktop
+  gate decides whether the fact needs an affordance.
+
+Height-math check at this HEAD: nothing in this batch changes a
+renderer-emitted height. The dimmed rule and every pill (including "+N")
+live inside the unchanged `TreeRowHeight`; the shopping tag lives inside
+the unchanged `ShoppingRowHeight`; the tree's section header is a fixed
+30px whether or not it holds buttons. The one new height contract is the
+top strip's, and `TopRegionLayoutMathTests` pins it with absolute pixel
+literals in both toolbar states.
+
+Validation: build 0 errors, full suite 1968 passed / 0 failed (1906
+baseline, 1939 after batch D). No new test references Blish.
+
+What the desktop gate should look at:
+
+1. **Toolbar placement:** generate a plan long enough to scroll, expand
+   several branches, scroll to the bottom. All five buttons must still be
+   on screen and working. Confirm Collapse All from that scrolled position
+   actually collapses, and that Best Path / Craft All / Buy All still
+   re-solve. At minimum window width (930) the five buttons must not
+   collide with the "Recipe Tree:" label.
+2. **Toolbar row appearing:** with no plan on screen, the strip must show
+   no toolbar row and no gap where one would be. Press Generate; the row
+   must appear once, with everything below it shifting down by exactly one
+   row, and the content area must not flash or lose scroll position.
+   Generating a second plan must not shift anything.
+3. **Dimmed branch:** expand a bought node's reference branch. The pills
+   must be readable as pills (not a row of near-black rings), a single
+   continuous vertical rule must run down the branch's left indent, and
+   hovering a dimmed CRAFT/TP/VENDOR or IGNORE pill must show the "Under a
+   bought item" line. Hovering a dimmed pill that already had a tooltip
+   (a Subdued pill, or a committed pill with value detail) must show BOTH,
+   not one replacing the other.
+4. **Non-interactive chrome:** find an UNKNOWN or CURRENCY pill next to a
+   clickable Available pill on another row. The two must be
+   distinguishable at a glance without hovering.
+5. **"+N" pill:** find a row with many pills (a partly-owned item with
+   three sources, so CRAFT/TP/VENDOR + "HAVE n/m NEEDED" + IGNORE). Either
+   every pill fits at the tightened padding - which is the expected common
+   outcome - or a "+N" pill sits at the end whose tooltip names exactly the
+   pills that are missing. A row must never simply end early with pills
+   silently gone. Confirm the tightened pills still read cleanly.
+6. **Shopping badges:** every Shopping List row must carry a badge, TP
+   rows included, and a long item name must not push its badge into the
+   Amount column.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
