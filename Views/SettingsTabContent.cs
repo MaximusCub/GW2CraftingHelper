@@ -924,10 +924,12 @@ namespace GW2CraftingHelper.Views
                 row.Divider.Visible = placement.Row >= 0 && placement.Row < grid.RowCount - 1;
             }
 
+            // Moves the notes below the grid up/down with it: the height set
+            // raises Resized, which FlowPanel subscribes to per child
+            // (OnChildAdded -> ChangedChildOnResized -> ReflowChildLayout,
+            // decompiled from the shipped 1.3.0 binary), so no explicit
+            // invalidation is needed here.
             _currencyGridPanel.Height = grid.Height;
-            // The grid is one child of a SingleTopToBottom FlowPanel, so the
-            // rows below it only move once that panel re-flows.
-            _rootPanel?.Invalidate();
 
             if (_currencyCountLabel != null)
             {
