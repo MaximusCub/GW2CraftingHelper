@@ -2,6 +2,7 @@ using Blish_HUD;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
@@ -19,16 +20,22 @@ namespace GW2CraftingHelper.Views.Rendering
     // column has to be fixed, not per-row). Defaulted to null/0 so the
     // Required Recipes call site (still a plain left/right header) needs no
     // change. Like leftLabel, middleLabel sits at a fixed X computed once
-    // by the caller before this row is built - it is never repositioned by
-    // the AddRelayout closure below (only rowPanel.Size and the
-    // right-aligned column move on resize, per the interface's "position/
-    // width-only" contract - see ISectionRelayoutSink.AddRelayout's doc
-    // comment).
+    // by the caller before this row is built.
+    //
+    // middleXForWidth exists for the ONE caller whose middle column is not
+    // fixed: the Recipe Tree's "Source" header sits over the decision-pill
+    // column, whose x is derived from the panel width
+    // (PlanRelayoutMath.ComputeTreeColumnEdges), so a build-time constant
+    // would strand it the moment the window is dragged. Supplying it opts
+    // that label into the AddRelayout closure below; omitting it keeps the
+    // previous fixed-x behaviour for every other caller. Still
+    // position-only, per the interface's "position/width-only" contract -
+    // see ISectionRelayoutSink.AddRelayout's doc comment.
     internal static class CTableHeaderRenderer
     {
         internal static void CreateCTableHeaderRow(
             FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel, ISectionRelayoutSink sink,
-            string middleLabel = null, int middleX = 0)
+            string middleLabel = null, int middleX = 0, Func<int, int> middleXForWidth = null)
         {
             var rowPanel = new Panel()
             {
@@ -43,13 +50,15 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(leftX, 5), Parent = rowPanel
             };
+            Label middleLabelControl = null;
             if (!string.IsNullOrEmpty(middleLabel))
             {
-                new Label()
+                middleLabelControl = new Label()
                 {
                     Text = middleLabel, Font = font, TextColor = Color.White,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(middleX, 5), Parent = rowPanel
+                    Location = new Point(middleXForWidth != null ? middleXForWidth(panelWidth) : middleX, 5),
+                    Parent = rowPanel
                 };
             }
             var rightLabelControl = LabelHelpers.CreateRightAlignedLabel(rowPanel, rightLabel, font, Color.White, panelWidth - 8, 5);
@@ -58,6 +67,10 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 rowPanel.Size = new Point(w, PlanContentHeightMath.CTableHeaderRowHeight);
                 rightLabelControl.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, rightLabelControl.Width), 5);
+                if (middleLabelControl != null && middleXForWidth != null)
+                {
+                    middleLabelControl.Location = new Point(middleXForWidth(w), 5);
+                }
             });
         }
     }

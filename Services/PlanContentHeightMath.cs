@@ -214,14 +214,24 @@ namespace GW2CraftingHelper.Services
         /// root, plus one MultiRootDividerHeight gap between each pair of
         /// consecutive roots (never before the first or after the last). A
         /// one-element roots list (the single-item case) has no divider at
-        /// all and is therefore byte-identical to calling
-        /// TreeNodeHeight(roots[0], 0, false, ...) directly.
+        /// all, so a single-item plan differs from
+        /// TreeNodeHeight(roots[0], 0, false, ...) by exactly the column
+        /// header below.
+        /// <para>
+        /// One CTableHeaderRowHeight column header
+        /// (TreeSectionController.CreateTreeSection builds it into the
+        /// same FlowPanel, above every root) precedes the roots whenever
+        /// there is a tree at all - the tree's right-hand columns are
+        /// unlabelled otherwise, unlike every other c-table in the plan.
+        /// An empty/absent roots list renders no tree and therefore no
+        /// header either, and still measures 0.
+        /// </para>
         /// </summary>
         public static int MultiRootTreeFlowHeight(
             IReadOnlyList<CraftingTreeNode> roots, IReadOnlyDictionary<int, bool> expansionOverrides)
         {
             if (roots == null || roots.Count == 0) return 0;
-            int total = 0;
+            int total = CTableHeaderRowHeight;
             for (int i = 0; i < roots.Count; i++)
             {
                 if (i > 0) total += MultiRootDividerHeight;

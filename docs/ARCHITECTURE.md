@@ -244,6 +244,14 @@ somewhere, reopening the same race.
 anchors, cost-tile geometry) used by both the build path and the
 in-place resize relayout path.
 
+Two sections own extra arithmetic of the same kind, in the same shape
+(pure, Blish-free, called from both the build path and the relayout
+closures, so the two cannot drift):
+`Services/SummarySectionLayoutMath.cs` (the Total Cost section's body
+height, its promoted cost band, and the currency table's column edges) and
+`Services/TreeCostColumnMath.cs` (the recipe tree's per-denomination cost
+sub-columns and the whole-tree pre-scan that sizes them).
+
 **Full history:** KNOWN-ISSUES items 12, 14, 19.
 
 ---

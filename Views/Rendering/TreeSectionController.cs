@@ -178,6 +178,17 @@ namespace GW2CraftingHelper.Views.Rendering
         private List<CraftingTreeNode> _treeRoots;
         private FlowPanel _treeFlow;
 
+        // Per-render-pass widest value per coin denomination (plus the
+        // widest whole currency run) across the ENTIRE tree, so every
+        // row's cost cell lands in the same sub-columns and the coin icons
+        // form straight vertical rules - see Services/TreeCostColumnMath,
+        // including why this covers every node rather than only the rows
+        // currently expanded. Scanned once in CreateTreeSection and read
+        // by every RenderTreeNode call of that pass, including the ones a
+        // later expand click builds lazily.
+        private TreeCostColumnMath.CostColumnWidths _costColumnWidths =
+            TreeCostColumnMath.CostColumnWidths.Empty;
+
         /// <summary>
         /// Per-render-pass reset, called from
         /// CraftingPlanView.RenderPlan before it disposes/rebuilds the
@@ -195,6 +206,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _treeNodeStates.Clear();
             _treeRoots = null;
             _treeFlow = null;
+            _costColumnWidths = TreeCostColumnMath.CostColumnWidths.Empty;
         }
 
         /// <summary>
@@ -359,6 +371,26 @@ namespace GW2CraftingHelper.Views.Rendering
                     x -= 4;
                 }
             });
+
+            // Cost-column pre-scan: ONE walk of the whole tree per render
+            // pass, before any row is built, so every row (including the
+            // ones an expand click builds later) anchors to the same
+            // sub-columns. Never re-run per row draw or per resize tick -
+            // the widths are data-derived, not panelWidth-derived.
+            _costColumnWidths = ScanCostColumnWidths(_treeRoots);
+
+            // Column headers over the two columns a tree row's right-hand
+            // side actually has. "Source" tracks the pill column, which
+            // moves with the panel width, hence middleXForWidth rather
+            // than a build-time x. Counted by
+            // PlanContentHeightMath.MultiRootTreeFlowHeight, which every
+            // treeFlow height assignment goes through.
+            int headerCostColumnWidth = EffectiveCostColumnWidth();
+            CTableHeaderRenderer.CreateCTableHeaderRow(
+                treeFlow, panelWidth, "Item", TreeCaretColWidth + TreeIconFrameSize + TreeNameGap, "Cost", _sink,
+                middleLabel: "Source",
+                middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
+                    w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX);
 
 #if DEBUG
             int relayoutCountBeforeTree = _sink.RelayoutCount;
@@ -528,6 +560,51 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int TreeRightMargin = 8;
 
         /// <summary>
+        /// Width the cost column actually needs this render: its fixed
+        /// floor, or the pre-scanned sub-columns' real total when a tree
+        /// full of multi-gold (or currency-priced) values needs more. The
+        /// column's RIGHT edge never moves, so widening it only pushes the
+        /// decision pills and the name budget left - which is the point:
+        /// before, a wide cost run silently overprinted the pills.
+        /// </summary>
+        private int EffectiveCostColumnWidth()
+        {
+            int scanned = TreeCostColumnMath.TotalWidth(_costColumnWidths);
+            return scanned > TreeCostColumnWidth ? scanned : TreeCostColumnWidth;
+        }
+
+        /// <summary>
+        /// Blish-bound half of the cost-column pre-scan: the pure walk
+        /// lives in TreeCostColumnMath.Scan, this supplies the two
+        /// measurements it cannot make itself. Number strings are memoised
+        /// because a tree repeats them heavily ("00", "42", ...), so
+        /// MeasureString runs once per DISTINCT string rather than once
+        /// per node; the currency callback only fires for the handful of
+        /// vendor nodes that draw a currency run at all.
+        /// </summary>
+        private TreeCostColumnMath.CostColumnWidths ScanCostColumnWidths(IReadOnlyList<CraftingTreeNode> roots)
+        {
+            var font = GameService.Content.DefaultFont14;
+            var measured = new Dictionary<string, int>();
+            var metadata = _getCurrentPlan()?.CurrencyMetadata;
+
+            return TreeCostColumnMath.Scan(
+                roots,
+                text =>
+                {
+                    if (!measured.TryGetValue(text, out int width))
+                    {
+                        width = (int)Math.Ceiling(font.MeasureString(text).Width);
+                        measured[text] = width;
+                    }
+                    return width;
+                },
+                node => CoinCurrencyRenderer.TotalCurrencySegmentsWidth(
+                    CoinCurrencyRenderer.BuildCurrencySegments(
+                        CurrencyDisplayResolver.ResolveAmounts(node.VendorCurrencyCosts, metadata), font)));
+        }
+
+        /// <summary>
         /// Recomputes and re-assigns the explicit
         /// Height of every tree childFlow container plus the top-level
         /// treeFlow, from the SAME PlanContentHeightMath arithmetic used to
@@ -673,10 +750,17 @@ namespace GW2CraftingHelper.Views.Rendering
                 ? (int)System.Math.Ceiling(nameFont.MeasureString(qtyPrefix).Width)
                 : 0;
 
+            // Snapshot, not a live field read: every closure below outlives
+            // this call, and the next render pass resets _costColumnWidths
+            // before rebuilding. Capturing the value keeps a row's build-time
+            // columns and its own relayout arithmetic identical by
+            // construction.
+            var columnWidths = _costColumnWidths;
+            int costColumnWidth = EffectiveCostColumnWidth();
             var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
-                panelWidth, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+                panelWidth, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
             int pillColX = edges.PillColX;
-            int costRightEdge = edges.CostRightEdge;
+            var costEdges = TreeCostColumnMath.ComputeEdges(edges.CostRightEdge, columnWidths);
 
             string fullName = node.Name ?? "";
             string displayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
@@ -800,8 +884,14 @@ namespace GW2CraftingHelper.Views.Rendering
             // single locked/HAVE/CURRENCY pill when there is no choice.
             var pillPanels = RenderDecisionPills(rowPanel, node, pillColX, 10, dimmed);
 
-            // Cost column: right-aligned so coin amounts line up vertically
-            // across every row regardless of digit count. Only rendered
+            // Cost column: four right-aligned sub-columns (gold, silver,
+            // copper, then any non-coin currency), each sized by this
+            // render's pre-scan of the whole tree, so the coin ICONS land
+            // on the same x on every row - see
+            // Services/TreeCostColumnMath. Right-aligning the run as a
+            // whole (the previous shape) lined up only the run's right
+            // edge, which a mixed coin/currency row shares with nothing.
+            // Only rendered
             // when this node has a real committed decision with a cost
             // figure at all (SubtreeCost.HasValue) - HAVE/CURRENCY/UNKNOWN
             // nodes carry no SubtreeCost and keep the column blank exactly
@@ -821,17 +911,21 @@ namespace GW2CraftingHelper.Views.Rendering
             // the breakdown lives one expand-click away as real child
             // rows, instead of one very long segmented row colliding with
             // the layout.
-            bool hasCostComponentChildren = node.Children.Count > 0 && node.Children[0].IsCostComponent;
             CoinCurrencyRenderer.ValueCellHandle costCell = null;
             if (node.SubtreeCost.HasValue)
             {
                 var costFont = GameService.Content.DefaultFont14;
-                var currencyAmounts = hasCostComponentChildren
-                    ? null
-                    : CurrencyDisplayResolver.ResolveAmounts(
-                        node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata);
-                costCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
-                    rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
+                // TreeCostColumnMath.ShowsCurrencySegments, not a
+                // hand-repeated cost-component check: the pre-scan reserves
+                // the currency sub-column from that same predicate, so a
+                // second copy here could reserve for rows that never draw
+                // and vice versa.
+                var currencyAmounts = TreeCostColumnMath.ShowsCurrencySegments(node)
+                    ? CurrencyDisplayResolver.ResolveAmounts(
+                        node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata)
+                    : null;
+                costCell = CoinCurrencyRenderer.RenderValueCellInSubColumns(
+                    rowPanel, node.SubtreeCost.Value, currencyAmounts, costEdges, 12, costFont, dimmed ? 0.35f : 1f);
             }
 
             // Child container. Children of a non-Craft decision are this
@@ -940,7 +1034,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 rowPanel.Size = new Point(w, TreeRowHeight);
                 var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
 
                 if (pillPanels.Count > 0)
                 {
@@ -953,7 +1047,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 if (costCell != null)
                 {
-                    CoinCurrencyRenderer.RepositionValueCellRightAligned(costCell, e.CostRightEdge, 12);
+                    CoinCurrencyRenderer.RepositionValueCellInSubColumns(
+                        costCell, TreeCostColumnMath.ComputeEdges(e.CostRightEdge, columnWidths), 12);
                 }
                 if (childFlow != null)
                 {
@@ -963,7 +1058,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink.AddReellipsis(w =>
             {
                 var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
                 string newDisplayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
                 if (nameLabel.Text != newDisplayName)
                 {

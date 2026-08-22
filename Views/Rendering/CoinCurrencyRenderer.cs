@@ -43,22 +43,22 @@ namespace GW2CraftingHelper.Views.Rendering
 
         internal static List<CoinSegmentMath.CoinSegmentSpec> BuildCoinSegments(long copper, BitmapFont font)
         {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-
-            bool showGold = gold > 0;
-            bool showSilver = showGold || silver > 0;
+            // Which units show, and how they are padded, is
+            // CoinSegmentMath.FormatSegmentTexts' call - the recipe tree's
+            // per-denomination column pre-scan measures the same strings,
+            // so neither can drift from the other.
+            var (goldText, silverText, copperText) = CoinSegmentMath.FormatSegmentTexts(copper);
 
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>(3);
-            if (showGold)
+            if (goldText != null)
             {
-                AddSegmentSpec(segments, font, 156904, gold.ToString());
+                AddSegmentSpec(segments, font, CoinSegmentMath.GoldAssetId, goldText);
             }
-            if (showSilver)
+            if (silverText != null)
             {
-                AddSegmentSpec(segments, font, 156907, showGold ? silver.ToString("D2") : silver.ToString());
+                AddSegmentSpec(segments, font, CoinSegmentMath.SilverAssetId, silverText);
             }
-            // Copper always renders (even "0") so a zero total is never a blank row.
-            AddSegmentSpec(segments, font, 156902, showSilver ? cop.ToString("D2") : cop.ToString());
+            AddSegmentSpec(segments, font, CoinSegmentMath.CopperAssetId, copperText);
             return segments;
         }
 
@@ -114,6 +114,16 @@ namespace GW2CraftingHelper.Views.Rendering
             /// </summary>
             public int IconYOffset;
 
+            /// <summary>
+            /// Each coin segment's denomination asset id, parallel to
+            /// Controls - the recipe tree's per-denomination sub-columns
+            /// need to map an already-built control back to the column it
+            /// belongs in when repositioning. Null for currency runs and
+            /// for coin runs laid out as one contiguous run, neither of
+            /// which repositions per denomination.
+            /// </summary>
+            public int[] AssetIds;
+
             public static readonly SegmentLayoutHandle Empty =
                 new SegmentLayoutHandle { Controls = System.Array.Empty<(Label, Panel)>(), TextWidths = System.Array.Empty<int>() };
         }
@@ -135,34 +145,48 @@ namespace GW2CraftingHelper.Views.Rendering
             for (int i = 0; i < segments.Count; i++)
             {
                 var seg = segments[i];
-                Color textColor = GetCoinColor(seg.AssetId);
-                if (alphaScale < 1f) textColor *= alphaScale;
-
-                var label = new Label()
-                {
-                    Text = seg.Text,
-                    Font = font,
-                    TextColor = textColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(x, y),
-                    Parent = parent
-                };
-
-                var icon = new Panel()
-                {
-                    Size = new Point(CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinIconSize),
-                    Location = new Point(x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y + iconYOffset),
-                    BackgroundTexture = AsyncTexture2D.FromAssetId(seg.AssetId),
-                    Parent = parent
-                };
-
-                controls[i] = (label, icon);
+                controls[i] = CreateCoinSegment(parent, seg, x, y, font, alphaScale, iconYOffset);
                 widths[i] = seg.TextWidth;
                 x += seg.TextWidth + CoinSegmentMath.CoinLabelIconGap + CoinSegmentMath.CoinIconSize + CoinSegmentMath.CoinSegmentGap;
             }
 
             return new SegmentLayoutHandle { Controls = controls, TextWidths = widths, IconYOffset = iconYOffset };
+        }
+
+        /// <summary>
+        /// One coin segment's two controls at an explicit x - the shared
+        /// body of the contiguous-run and per-denomination-sub-column
+        /// layouts, so the two can never disagree about how a segment is
+        /// built (colour, dimming, or the coin invariant's icon-right-of-
+        /// number geometry).
+        /// </summary>
+        private static (Label Label, Panel Icon) CreateCoinSegment(
+            Panel parent, CoinSegmentMath.CoinSegmentSpec seg, int x, int y, BitmapFont font,
+            float alphaScale, int iconYOffset)
+        {
+            Color textColor = GetCoinColor(seg.AssetId);
+            if (alphaScale < 1f) textColor *= alphaScale;
+
+            var label = new Label()
+            {
+                Text = seg.Text,
+                Font = font,
+                TextColor = textColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(x, y),
+                Parent = parent
+            };
+
+            var icon = new Panel()
+            {
+                Size = new Point(CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinIconSize),
+                Location = new Point(x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y + iconYOffset),
+                BackgroundTexture = AsyncTexture2D.FromAssetId(seg.AssetId),
+                Parent = parent
+            };
+
+            return (label, icon);
         }
 
         /// <summary>
@@ -191,9 +215,9 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             switch (assetId)
             {
-                case 156904: return new Color(255, 204, 0);
-                case 156907: return new Color(192, 192, 192);
-                case 156902: return new Color(205, 127, 50);
+                case CoinSegmentMath.GoldAssetId: return new Color(255, 204, 0);
+                case CoinSegmentMath.SilverAssetId: return new Color(192, 192, 192);
+                case CoinSegmentMath.CopperAssetId: return new Color(205, 127, 50);
                 default: return Color.White;
             }
         }
@@ -410,6 +434,118 @@ namespace GW2CraftingHelper.Views.Rendering
             int startX = rightEdgeX - (coinWidth + gap + currencyWidth);
             RepositionSegments(handle.CoinSegments, startX, y);
             RepositionSegments(handle.CurrencySegments, startX + coinWidth + gap, y);
+        }
+
+        // --- Per-denomination sub-columns (recipe tree cost column) ---
+        //
+        // The tree's cost column right-aligns each DENOMINATION in its own
+        // sub-column instead of right-aligning the whole run, so the coin
+        // icons line up vertically down the tree instead of sitting
+        // wherever the digit counts happen to leave them. Column widths
+        // come from a per-render pre-scan of the whole tree
+        // (Services/TreeCostColumnMath) - never re-measured per row.
+        //
+        // Everything below reuses the same segment builders, colours and
+        // dash fallback as the right-aligned path above; only the x of
+        // each already-built segment differs.
+
+        private static int SubColumnRightEdge(TreeCostColumnMath.CostSubColumnEdges edges, int assetId)
+        {
+            switch (assetId)
+            {
+                case CoinSegmentMath.GoldAssetId: return edges.GoldRightEdge;
+                case CoinSegmentMath.SilverAssetId: return edges.SilverRightEdge;
+                default: return edges.CopperRightEdge;
+            }
+        }
+
+        /// <summary>
+        /// Sub-column twin of RenderValueCellRightAligned: coin segments
+        /// land in their own denomination's sub-column, any currency run
+        /// right-aligns to the trailing currency sub-column, and a value
+        /// with neither still renders the unpriceable dash - aligned to
+        /// the copper sub-column rather than the raw column edge, so a
+        /// dash sits under the coin figures it stands in for rather than
+        /// out past the currency band.
+        /// </summary>
+        internal static ValueCellHandle RenderValueCellInSubColumns(
+            Panel parent, long copper, IReadOnlyList<CurrencyAmountViewModel> currencyAmounts,
+            TreeCostColumnMath.CostSubColumnEdges edges, int y, BitmapFont font, float alphaScale = 1f)
+        {
+            bool hasCoin = copper > 0;
+            bool hasCurrency = currencyAmounts != null && currencyAmounts.Count > 0;
+
+            if (!hasCoin && !hasCurrency)
+            {
+                Color dashColor = alphaScale < 1f ? UnpricedDashColor * alphaScale : UnpricedDashColor;
+                var dashLabel = LabelHelpers.CreateRightAlignedLabel(
+                    parent, UnpricedDashText, font, dashColor, edges.CopperRightEdge, y);
+                return new ValueCellHandle
+                {
+                    CoinSegments = SegmentLayoutHandle.Empty,
+                    CurrencySegments = SegmentLayoutHandle.Empty,
+                    DashLabel = dashLabel
+                };
+            }
+
+            var coinHandle = SegmentLayoutHandle.Empty;
+            if (hasCoin)
+            {
+                var coinSegments = BuildCoinSegments(copper, font);
+                var controls = new (Label, Panel)[coinSegments.Count];
+                var widths = new int[coinSegments.Count];
+                var assetIds = new int[coinSegments.Count];
+                for (int i = 0; i < coinSegments.Count; i++)
+                {
+                    var seg = coinSegments[i];
+                    int x = SubColumnRightEdge(edges, seg.AssetId) - TreeCostColumnMath.SegmentWidth(seg.TextWidth);
+                    controls[i] = CreateCoinSegment(parent, seg, x, y, font, alphaScale, 0);
+                    widths[i] = seg.TextWidth;
+                    assetIds[i] = seg.AssetId;
+                }
+                coinHandle = new SegmentLayoutHandle { Controls = controls, TextWidths = widths, AssetIds = assetIds };
+            }
+
+            var currencySegments = BuildCurrencySegments(currencyAmounts, font);
+            int currencyRunWidth = TotalCurrencySegmentsWidth(currencySegments);
+            var currencyHandle = LayoutCurrencySegments(
+                parent, currencySegments, edges.CurrencyRightEdge - currencyRunWidth, y, font, alphaScale);
+
+            return new ValueCellHandle { CoinSegments = coinHandle, CurrencySegments = currencyHandle };
+        }
+
+        /// <summary>
+        /// Non-allocating reposition twin to RenderValueCellInSubColumns -
+        /// moves an existing cell to a new set of sub-column edges using
+        /// only the cached per-segment text widths and denominations. No
+        /// MeasureString, no new controls.
+        /// </summary>
+        internal static void RepositionValueCellInSubColumns(
+            ValueCellHandle handle, TreeCostColumnMath.CostSubColumnEdges edges, int y)
+        {
+            if (handle.DashLabel != null)
+            {
+                handle.DashLabel.Location = new Point(edges.CopperRightEdge - handle.DashLabel.Width, y);
+                return;
+            }
+
+            var coin = handle.CoinSegments;
+            if (coin.AssetIds != null)
+            {
+                for (int i = 0; i < coin.Controls.Length; i++)
+                {
+                    int textWidth = coin.TextWidths[i];
+                    int x = SubColumnRightEdge(edges, coin.AssetIds[i]) - TreeCostColumnMath.SegmentWidth(textWidth);
+                    var (label, icon) = coin.Controls[i];
+                    label.Location = new Point(x, y);
+                    icon.Location = new Point(x + textWidth + CoinSegmentMath.CoinLabelIconGap, y + coin.IconYOffset);
+                }
+            }
+
+            int currencyRunWidth = ShoppingColumnMath.SegmentRunWidth(
+                handle.CurrencySegments.TextWidths, CoinSegmentMath.CoinIconSize,
+                CoinSegmentMath.CoinLabelIconGap, CoinSegmentMath.CoinSegmentGap);
+            RepositionSegments(handle.CurrencySegments, edges.CurrencyRightEdge - currencyRunWidth, y);
         }
     }
 }
