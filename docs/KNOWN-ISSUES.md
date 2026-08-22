@@ -8707,3 +8707,92 @@ new Blish-free tests), and the resize early-out + reader hoists,
 which are code-review-verified (the verify pass caught and the
 orchestrator fixed a third un-hoisted reader in ApplyTopRegionLayout
 before release). Suite 1886/1886.
+
+## Audit batch F: input flow (audit-f-input-flow)
+
+Four maintainer-approved UX-audit findings on the Crafting Plan tab's
+input flow, plus one regression the first of them exposed.
+
+- **H4, stale resolved item (the correctness bug):** a row's item id was
+  set only by a suggestion pick and never cleared, and nothing else ever
+  assigned it. Editing the search box afterwards therefore left the plan
+  generating for the previously picked item while the box read the new
+  name - "Mystic Clover" on screen, Deldrimor Steel Ingot in the plan.
+  Three parts: (1) a search-box `TextChanged` handler drops the row's
+  resolved item once the text diverges from the resolved name, with case
+  and surrounding whitespace not counting as divergence; (2) Generate
+  first resolves typed-but-unpicked rows against the item search
+  provider, adopting an exact case-insensitive name match only - a
+  partial name stays unresolved rather than planning for whatever ranked
+  first, and the adoption is re-checked on the main thread against what
+  the row holds at that moment, so a pick or a further keystroke landing
+  during the search cannot be overwritten by a result describing older
+  text; (3) with nothing resolved, the status now distinguishes "Select
+  at least one item before generating." (every row blank) from "No item
+  matched what you typed - pick an item from the suggestion list."
+  (text that resolved to nothing), where the old copy told someone
+  staring at a filled-in box to select an item.
+  The decisions live in the new Blish-free `Services/ItemRowSelection.cs`
+  (staleness rule, exact-name match, status copy), covered by 15 tests.
+  `TriggerGenerate` is now a thin wrapper that owns the resolution await
+  and marshals back before the generate body, which touches controls from
+  its first line; the body is `GenerateFromResolvedRows`.
+- **Typed text across a row add/remove (regression from H4):** rebuilt
+  rows seeded their search box from `ItemName`, which H4 now clears, so
+  typing a name and pressing "+" wiped it. Rows keep the text they last
+  showed (`ItemRowState.TypedText`) and seed from that.
+- **M1, deferred controls honesty:** the Prices dropdown, Value Own
+  Materials, and Use Own Materials on the no-plan path now write
+  "Settings changed - press Generate Plan to update" to the status label
+  as they change - they look like the instant-apply controls on other
+  tabs but only affect the next plan. (Use Own Materials with a plan on
+  screen already regenerates behind a confirm, so it is not deferred.)
+  A generation also dims the plan area to 0.45 opacity, restored in the
+  `finally` that already covers success, failure and cancellation alike;
+  a superseded generation returns at its `myGen` check and leaves the dim
+  to the newer generation that owns it.
+- **M15, suggestion list occlusion:** the list opened directly under the
+  search box, over this row's quantity field and every row below it.
+  `SuggestionPanel` takes an anchor offset and opens that far right of
+  the text box - right of the Qty stepper - clamped so a window at the
+  right screen edge cannot push it off. It still overlaps part of the
+  persistent controls row (the Prices dropdown's right half and Value Own
+  Materials) and this row's own +/- buttons while open; anchoring cannot
+  clear a full-width controls row, and this is the position the finding
+  approved.
+- **M16, the "+" button:** moved right of the quantity field so it no
+  longer abuts it and reads as a Qty stepper, and given the tooltip "Add
+  another item to this plan". The "-" button beside it got the same
+  treatment ("Remove this item from the plan") rather than leaving the
+  sibling half-fixed.
+
+Validation: build 0 errors and the full suite green per commit (1901,
+up from 1886 with the 15 new ItemRowSelection tests). No new test
+references Blish.
+
+What the desktop gate should look at:
+
+1. **Stale-pick invalidation, live:** pick an item from the suggestion
+   list, then edit the box to a different item's name and press Generate.
+   The plan must be for what the box says (or, for a partial name, the
+   "pick an item from the suggestion list" status) - never for the
+   earlier pick. Also: type a full item name without ever opening the
+   list and press Generate; it should plan that item.
+2. **Settings-changed status:** change Prices or Value Own Materials with
+   a plan on screen; the status line under the toolbar must switch to
+   "Settings changed - press Generate Plan to update" instead of leaving
+   the "Plan generated - <time>" line up. Known limit: a tab switch
+   re-renders the status from the status board and brings the timestamp
+   back.
+3. **Dimmed stale plan:** press Generate with a plan already on screen -
+   the plan area should visibly dim for the run and return to full
+   opacity when it finishes, on a successful run and on a failing one
+   (an offline/error run is the one worth checking).
+4. **Suggestion list position:** open the list on the first of two rows
+   and confirm the second row's search box and quantity field stay
+   visible and clickable, and that the list stays inside the window at
+   minimum window width (930).
+5. **Button tooltips:** hover "+" and "-" and confirm the tooltips read
+   plainly and do not clip.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
