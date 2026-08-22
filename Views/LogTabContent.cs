@@ -53,11 +53,16 @@ namespace GW2CraftingHelper.Views
         // own scrolling source-filter flow uses.
         private const int ScrollbarAllowance = 20;
 
-        // Prefix column allowance for the "[tag]" part, in characters of
-        // the widest lowercase glyph. The module's own tags are all shorter
-        // than this ("scrolldiag" is the longest); a longer one ellipsizes
-        // rather than widening the column and pushing every message right.
-        private const int TagColumnChars = 10;
+        // Prefix column allowance for the "[tag]" part, counted in 'w'
+        // glyphs and sized off the longest tag written anywhere in the tree:
+        // "snapshot-fetch", 14 characters. The margin is the glyph itself -
+        // every tag in this module is lowercase ASCII plus '-', all narrower
+        // than 'w' - so a somewhat longer tag still fits; anything past that
+        // ellipsizes rather than widening the column and pushing every
+        // message right. Load-bearing: too small an allowance renders the
+        // module's most common WARN source permanently truncated (and
+        // permanently tooltip-flagged) at every window width.
+        private const int TagColumnChars = 14;
 
         // The prefix is chrome, not content - dimmed so the message reads
         // first, but still carrying the level tint so severity is legible
@@ -1033,6 +1038,19 @@ namespace GW2CraftingHelper.Views
         /// Re-fits every visible row after a container resize. A
         /// vertical-only drag leaves the content width alone and returns
         /// here without touching a single row.
+        /// <para>
+        /// Wrapped in SuspendLayout/ResumeLayout for the same reason
+        /// CraftingPlanView.ReplayRelayout is (see its doc comment):
+        /// assigning a row Panel's Size fires that Panel's own Resized
+        /// event, which FlowPanel wires to a full reflow of ALL its
+        /// children - so an unsuspended loop over a full ring would cost
+        /// O(rows^2) position writes, plus a fresh children array per
+        /// reflow, on every frame of a horizontal drag. Suspending the
+        /// parent propagates down (Blish's IsLayoutSuspended walks the
+        /// parent chain); ResumeLayout(false) leaves the single coalesced
+        /// reflow to Blish's own next-frame UpdateLayout rather than
+        /// forcing it synchronously here.
+        /// </para>
         /// </summary>
         private void RefitRows()
         {
@@ -1042,9 +1060,18 @@ namespace GW2CraftingHelper.Views
             }
 
             var metrics = MeasureRowMetrics();
-            foreach (var row in _renderedRows)
+
+            _contentPanel.SuspendLayout();
+            try
             {
-                ApplyRowLayout(row, metrics);
+                foreach (var row in _renderedRows)
+                {
+                    ApplyRowLayout(row, metrics);
+                }
+            }
+            finally
+            {
+                _contentPanel.ResumeLayout(false);
             }
         }
 

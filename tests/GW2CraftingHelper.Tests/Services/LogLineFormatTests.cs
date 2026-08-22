@@ -86,6 +86,45 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void MultiLineMessage_CollapsesToOneLine()
+        {
+            // A log row is a fixed-height Panel that clips what it cannot
+            // draw, and MeasureString reports a multi-line string's WIDEST
+            // LINE - so without this, a message whose first line happened to
+            // fit rendered as that line alone, with no ellipsis and no
+            // tooltip to say the rest had been dropped.
+            Assert.Equal(
+                "line one line two line three",
+                LogLineFormat.Message(Entry("plan", "line one\r\nline two\tline three\n")));
+        }
+
+        [Fact]
+        public void LeadingBreaks_AreDroppedRatherThanIndentingTheMessage()
+        {
+            Assert.Equal("boom", LogLineFormat.Message(Entry("plan", "\r\n\tboom")));
+        }
+
+        [Fact]
+        public void SingleLineMessage_IsReturnedUnchanged()
+        {
+            // No allocation on the common path, and the row keeps one stable
+            // string instance to re-ellipsize from across resizes.
+            const string message = "solver ran in 12ms";
+            Assert.Same(message, LogLineFormat.Message(Entry("plan", message)));
+        }
+
+        [Fact]
+        public void Line_OfAMultiLineMessage_IsStillASingleLine()
+        {
+            // Copy joins these with Environment.NewLine and the tooltip shows
+            // one of them, so an embedded break here would emit a ragged
+            // multi-line block for a single entry.
+            string line = LogLineFormat.Line(Entry("plan", "failed:\nSystem.Net.Http.HttpRequestException"));
+            Assert.Equal("[WARN] 2026-08-16 14:03:09 [plan] failed: System.Net.Http.HttpRequestException", line);
+            Assert.DoesNotContain("\n", line);
+        }
+
+        [Fact]
         public void Compose_ToleratesNullHalves()
         {
             Assert.Equal(" ", LogLineFormat.Compose(null, null));
