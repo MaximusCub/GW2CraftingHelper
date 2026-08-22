@@ -145,6 +145,13 @@ namespace GW2CraftingHelper.Views
         {
             public int? ItemId;
             public string ItemName;
+
+            // What the search box last read, kept whether or not it
+            // resolved to an item. ItemName alone cannot carry this: it is
+            // dropped the moment the text stops describing the picked item,
+            // so seeding a rebuilt row from it would wipe half-typed text
+            // on every row add/remove.
+            public string TypedText;
             public string QuantityText = "1";
 
             public Panel RowPanel;
@@ -1354,7 +1361,7 @@ namespace GW2CraftingHelper.Views
             var searchBox = new AutocompleteTextBox()
             {
                 PlaceholderText = "Search items...",
-                Text = row.ItemName ?? "",
+                Text = row.TypedText ?? row.ItemName ?? "",
                 Size = new Point(200, 28),
                 Location = new Point(0, 3),
                 Parent = rowPanel
@@ -1382,6 +1389,8 @@ namespace GW2CraftingHelper.Views
             // ItemSelected handler above, in that order.
             searchBox.TextChanged += (_, __) =>
             {
+                row.TypedText = searchBox.Text;
+
                 if (!ItemRowSelection.SelectionIsStale(row.ItemId, row.ItemName, searchBox.Text))
                 {
                     return;
