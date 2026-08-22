@@ -172,6 +172,18 @@ namespace GW2CraftingHelper.Views
         private static readonly char[] SpinnerFrames = { '|', '/', '-', '\\' };
         private static readonly TimeSpan SpinnerTickInterval = TimeSpan.FromMilliseconds(150);
 
+        // The toolbar's Use Own Materials / Prices / Value Own Materials
+        // controls only take effect on the next Generate, unlike the
+        // instant-apply controls that look just like them on other tabs.
+        // Every one of them says so through the status label at the moment
+        // it changes.
+        private const string SettingsChangedStatus = "Settings changed - press Generate Plan to update";
+
+        // How far the plan on screen is dimmed while a new one generates -
+        // enough to read as superseded, not so far that it stops being
+        // readable while you wait.
+        private const float StalePlanOpacity = 0.45f;
+
         // How many results the typed-name resolution pass asks for. Only an
         // exact name match is adopted, so this just has to be wide enough
         // for the wanted name to survive the provider's own ranking among
@@ -1566,6 +1578,7 @@ namespace GW2CraftingHelper.Views
                 _priceBasis = e.CurrentValue == "Buy Orders"
                     ? PriceBasis.BuyOrder
                     : PriceBasis.InstantBuy;
+                SetStatus(SettingsChangedStatus);
             };
 
             // Inline per-plan toggle, disabled (not hidden) when Use Own
@@ -1591,6 +1604,7 @@ namespace GW2CraftingHelper.Views
             _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
             {
                 _valueOwnMaterials = e.Checked;
+                SetStatus(SettingsChangedStatus);
             };
 
             // Wired here, after _valueOwnMaterialsCheckbox is fully
@@ -2138,6 +2152,12 @@ namespace GW2CraftingHelper.Views
 
             _useOwnMaterials = newValue;
             _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
+
+            // Only reached with no plan on screen (the branch above
+            // regenerates behind a confirm), so nothing is being made
+            // stale here - but the toggle still only takes effect on the
+            // next Generate, and saying so beats leaving "Ready" up.
+            SetStatus(SettingsChangedStatus);
         }
 
         /// <summary>
@@ -2375,6 +2395,12 @@ namespace GW2CraftingHelper.Views
             _generateButton.Enabled = false;
             _lastDebugLog = null;
 
+            // Everything below the separator still shows the PREVIOUS
+            // plan, timestamp and all, for as long as this run takes. Dim
+            // it so it reads as superseded rather than current; the
+            // finally below restores it on every exit path.
+            SetContentDimmed(true);
+
             // Live spinner + phase-text status strip, replacing the old
             // static "Generating..." for the whole run. ArmSpinnerTicker
             // (an instance method, not a TriggerGenerate-local closure) lets
@@ -2521,8 +2547,29 @@ namespace GW2CraftingHelper.Views
                     _spinnerTicker = null;
                     if (_contentPanel == null || _contentPanel.Parent == null) return;
                     _generateButton.Enabled = true;
+
+                    // The single restore point for the dim applied at the
+                    // start of this generation - this finally runs on
+                    // success, failure and cancellation alike. A
+                    // superseded generation returns at the myGen check
+                    // above instead, leaving the dim to the newer
+                    // generation that now owns it.
+                    SetContentDimmed(false);
                 });
             }
+        }
+
+        /// <summary>
+        /// Dims (or restores) the plan area. A panel rebuilt mid-generation
+        /// starts undimmed and is left that way - Build renders whatever
+        /// plan state exists into a fresh FlowPanel, and the generation
+        /// that dimmed the old one has nothing left to restore.
+        /// </summary>
+        private void SetContentDimmed(bool dimmed)
+        {
+            if (_contentPanel == null || _contentPanel.Parent == null) return;
+
+            _contentPanel.Opacity = dimmed ? StalePlanOpacity : 1f;
         }
 
         /// <summary>
