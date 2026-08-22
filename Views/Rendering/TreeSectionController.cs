@@ -1205,6 +1205,18 @@ namespace GW2CraftingHelper.Views.Rendering
                 bool clickableWhenActive = DecisionPillPlanner.IsInteractive(spec);
                 bool interactive = !dimmed && spec.Source.HasValue && _resolveOverridesSync != null;
                 bool ignoreInteractive = !dimmed && spec.Kind == PillKind.Ignore && _resolveOverridesSync != null;
+
+                // Built outside the interactive arm below: a decisively-
+                // losing pill owes the reader its "why it loses" text
+                // whether or not this row's clicks are wired, and a dimmed
+                // row's pills are exactly the ones that are not. Pure text
+                // derived from the spec, so it costs nothing to resolve
+                // here and null for every other kind.
+                string subduingText = spec.Kind == PillKind.Subdued
+                    ? PillSubduingTooltipBuilder.Build(
+                        spec.SubduingResult, plan?.ItemMetadata, plan?.CurrencyMetadata)
+                    : null;
+
                 if (interactive)
                 {
                     tooltipText = $"Switch to {spec.Text}";
@@ -1213,14 +1225,9 @@ namespace GW2CraftingHelper.Views.Rendering
                     // tooltip gains the "why" explanation, appended after
                     // the ordinary "Switch to X" line rather than replacing
                     // it, since clicking still does exactly that.
-                    if (spec.Kind == PillKind.Subdued)
+                    if (subduingText != null)
                     {
-                        string subduingText = PillSubduingTooltipBuilder.Build(
-                            spec.SubduingResult, plan?.ItemMetadata, plan?.CurrencyMetadata);
-                        if (subduingText != null)
-                        {
-                            tooltipText += "\n\n" + subduingText;
-                        }
+                        tooltipText += "\n\n" + subduingText;
                     }
                     var source = spec.Source.Value;
                     outer.Click += (_, __) =>
@@ -1252,6 +1259,14 @@ namespace GW2CraftingHelper.Views.Rendering
                     Color restingBorder = borderColor;
                     outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
                     outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
+                }
+                else if (spec.Kind == PillKind.Subdued)
+                {
+                    // Reached only when the click is NOT wired - a dimmed
+                    // row, or no re-solve callback at all. The pill still
+                    // shows why this option loses; the dead-click line
+                    // below is appended after it, never over it.
+                    tooltipText = subduingText;
                 }
                 else if (spec.Kind == PillKind.Locked)
                 {
@@ -1412,9 +1427,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 // a full pill set, so the only honest thing left is to say
                 // why the click did nothing and what to change to make it
                 // work. Appended, never assigned over: a dimmed Subdued
-                // pill already carries its "why it loses" text, and a
-                // dimmed committed pill can carry the value-detail hover
-                // (both resolved above), and neither may be clobbered.
+                // pill carries its "why it loses" text (resolved in its own
+                // arm above, which exists precisely because the interactive
+                // arm never runs on a dimmed row), and a dimmed committed
+                // pill can carry the value-detail hover - neither may be
+                // clobbered.
                 if (dimmed && clickableWhenActive)
                 {
                     tooltipText = tooltipText == null
