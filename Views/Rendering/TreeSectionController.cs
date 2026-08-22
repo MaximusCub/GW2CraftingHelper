@@ -1462,7 +1462,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// false.
         /// </para>
         /// </summary>
-        private void RenderOverflowPill(
+        private static void RenderOverflowPill(
             Panel rowPanel, IReadOnlyList<PillSpec> specs, PlanRelayoutMath.PillFitPlan fit,
             BitmapFont font, int x, int pillY, bool dimmed, List<Panel> pillPanels)
         {
@@ -1541,6 +1541,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 BackgroundColor = fillColor,
                 Parent = outer
             };
+            // Clamped: a decision pill's width is its text plus padding, so
+            // the offset is always positive there, but the "+N" pill's
+            // width was reserved before its final N was known - a
+            // digit-count change would otherwise start its label left of
+            // its own pill.
+            int labelX = (pillWidth - 2 - textWidth) / 2;
+            if (labelX < 0) labelX = 0;
             label = new Label()
             {
                 Text = text,
@@ -1548,7 +1555,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 TextColor = textColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point((pillWidth - 2 - textWidth) / 2, 2),
+                Location = new Point(labelX, 2),
                 Parent = inner
             };
             return outer;
