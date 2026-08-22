@@ -8915,6 +8915,30 @@ actions should be reachable when you need them.
   behaviour hanging off a case tightening already resolves - the desktop
   gate decides whether the fact needs an affordance.
 
+Review round (audit-de-cost-tree), two defects found against the batch as
+written and fixed on the same branch:
+
+- **H3's dimmed Subdued pill did not actually keep its "why it loses"
+  text.** `PillSubduingTooltipBuilder.Build` was called only inside the
+  `if (interactive)` arm, and `interactive` is false on a dimmed row, so
+  the pill the bullet above (and gate step 3) names as the both-tooltips
+  case showed only the "Under a bought item" line. The subduing text is
+  now built from the spec before the interactivity branch - it is pure
+  text and never depended on the click wiring - and `PillKind.Subdued`
+  gained its own tooltip arm for the not-wired case. Gate step 3's
+  "must show BOTH" is now the behaviour the code implements.
+
+- **M3 moved the five actions out of the region batch F dims.**
+  `SetContentDimmed` (the "this is the plan you are replacing" fade
+  applied for the length of a Generate run) writes only
+  `_contentPanel.Opacity`, and the toolbar row is parented to the strip,
+  so the buttons that mutate the superseded plan sat at full brightness
+  above a faded tree - and, since Opacity does not block hit-testing,
+  Best Path / Buy All still re-solved it mid-run. `SetContentDimmed` now
+  drives the toolbar panel's opacity and disables the five buttons for
+  the length of the run, restoring both on every exit path the content
+  dim is restored on.
+
 Height-math check at this HEAD: nothing in this batch changes a
 renderer-emitted height. The dimmed rule and every pill (including "+N")
 live inside the unchanged `TreeRowHeight`; the shopping tag lives inside
@@ -8958,5 +8982,10 @@ What the desktop gate should look at:
 6. **Shopping badges:** every Shopping List row must carry a badge, TP
    rows included, and a long item name must not push its badge into the
    Amount column.
+7. **Toolbar during a re-generate:** with a plan on screen, change a
+   setting and press Generate. For the length of the run the toolbar row
+   must fade with the plan below it and its five buttons must be
+   unclickable, then both must come back at full strength when the new
+   plan lands - including on a cancelled or failed run.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
