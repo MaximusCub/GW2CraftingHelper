@@ -10363,4 +10363,24 @@ making `BasicTooltipView`'s max width relative to the screen.
    There must be no growing stutter on hover and no second tooltip ever
    visible at once.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS after one gate-found Critical was fixed and re-gated
+(2026-08-23 desktop sessions, captures preflight/gT1-gT6). The
+FIRST gate run crashed Blish fatally on the second hover:
+RichTooltipSurface.DisposeContent built a List directly from
+Children, and ControlCollection.CopyTo throws by design - the empty
+first build survived, the first content REPOINT died
+(InvalidOperationException through Tooltip.HandleMouseMoved,
+process-fatal). Fixed in b57be54 with the repo's established
+Children.ToArray() idiom (ten existing sites; this file was the
+sole deviation) and re-gated: four hover repoints across different
+controls survived. Verified live on the fixed build: the rich
+value-detail tooltip renders OPAQUE (zero bleed-through of the
+table behind - the H6 translucency defect is dead), with coin
+amounts as real icon runs (gold/silver/copper icons right of the
+numbers, per the invariant) for Currencies and Optimization price,
+the opportunity-cost sentence wrapped inside the box, and the box
+inside the window; a 3-second held hover showed no flicker (the
+mouse opt-out working). The bottom/right edge-clamp cases and the
+wiki right-click-on-name behavior were not staged live; both are
+pinned by TooltipLayoutMath tests and the review round's
+label-handler verification respectively.
