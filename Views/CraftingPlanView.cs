@@ -3515,7 +3515,7 @@ namespace GW2CraftingHelper.Views
             // tree root - the very item this header names - is the id. A
             // multi-item batch has no single target and no single tooltip
             // either (TreeRoot is null there by design).
-            var statContent = BuildTargetStatTooltip(vm.TreeRoot?.ItemId ?? 0);
+            var statContent = TreeRowTooltipComposer.BuildStatTooltipContent(vm.TreeRoot, _getItemStatBlock);
             if (!statContent.IsEmpty)
             {
                 // Stamped on the Label as well as the panel: a Label lying
@@ -3550,20 +3550,6 @@ namespace GW2CraftingHelper.Views
             // rows. The centring anchor (and the right-aligned timestamp
             // that needed one) is gone.
             _relayoutActions.Add(w => titlePanel.Size = new Point(w, headerHeight));
-        }
-
-        /// <summary>
-        /// The plan target's stat tooltip block, or empty content when the
-        /// session has no stats for it (a restored plan, a multi-item
-        /// batch, or no lookup wired at all).
-        /// </summary>
-        private TooltipContent BuildTargetStatTooltip(int itemId)
-        {
-            if (_getItemStatBlock == null || itemId <= 0)
-            {
-                return TooltipContent.Empty;
-            }
-            return ItemStatTooltipComposer.BuildContent(_getItemStatBlock(itemId));
         }
 
         /// <summary>

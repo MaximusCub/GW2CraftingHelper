@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using GW2CraftingHelper.Models;
 
@@ -53,6 +54,61 @@ namespace GW2CraftingHelper.Services
             // policy per path, never both on one string.
             return TooltipTextFormat.WrapLines(
                 BuildExtraTooltipContent(node, captionText, currentPlan).ToPlainLines());
+        }
+
+        /// <summary>
+        /// A row's item stat block as tooltip content, or empty content
+        /// when the session has no stats for it - or when the row's id is
+        /// not an item id in the first place (see
+        /// <see cref="RowIdIsAnItemId"/>). Never fetches; the lookup is a
+        /// read of an already-populated session cache.
+        /// </summary>
+        public static TooltipContent BuildStatTooltipContent(
+            CraftingTreeNode node,
+            Func<int, ItemStatBlock> getStatBlock)
+        {
+            if (getStatBlock == null || !RowIdIsAnItemId(node))
+            {
+                return TooltipContent.Empty;
+            }
+
+            return ItemStatTooltipComposer.BuildContent(getStatBlock(node.ItemId));
+        }
+
+        /// <summary>
+        /// Whether <see cref="CraftingTreeNode.ItemId"/> holds a real item
+        /// id on this row. It is one numeric slot shared by three id spaces
+        /// (see <see cref="CraftingDecision"/>): item ids, wallet currency
+        /// ids, and guild upgrade ids. Id 24 is BOTH a real item and the
+        /// currency "Pristine Fractal Relics", and the widened metadata
+        /// fetch can put the item's entry in the very dictionary the stat
+        /// cache is filled from - so an item-keyed stat lookup on a
+        /// currency row is the same cross-domain collision
+        /// <see cref="CraftingTreeBuilder"/> already guards icon and rarity
+        /// against, only worse: a stat block's FIRST line is the item's
+        /// name in its rarity colour, and it displaces the row's own name
+        /// line.
+        /// </summary>
+        public static bool RowIdIsAnItemId(CraftingTreeNode node)
+        {
+            if (node == null || node.ItemId <= 0)
+            {
+                return false;
+            }
+
+            if (node.Decision == CraftingDecision.Currency ||
+                node.Decision == CraftingDecision.GuildUpgrade ||
+                node.Decision == CraftingDecision.UnrecognizedIngredient)
+            {
+                return false;
+            }
+
+            // A vendor cost-component leaf carries Decision ==
+            // BuyFromVendor whether it is a barter ITEM or a CURRENCY; only
+            // the item half gets a SubtreeCost (its gold value), because a
+            // currency's cost cell is deliberately blank. Same
+            // discriminator the currency cost-component pill tooltip uses.
+            return !(node.IsCostComponent && !node.SubtreeCost.HasValue);
         }
 
         /// <summary>

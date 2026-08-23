@@ -905,7 +905,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // Width-invariant like extraTooltipContent, so it is composed
             // once per row per render and reused verbatim by the settle
             // re-ellipsis closure rather than recomposed there.
-            var statTooltipContent = BuildStatTooltipContent(node.ItemId);
+            var statTooltipContent = TreeRowTooltipComposer.BuildStatTooltipContent(node, _getItemStatBlock);
 
             // This module's only external-URL launch - a context action
             // (right-click), not a visible icon. Every tree
@@ -1226,20 +1226,6 @@ namespace GW2CraftingHelper.Views.Rendering
             TooltipFacility.ApplyRich(rowPanel, content);
             TooltipFacility.ApplyRich(nameLabel, content);
             TooltipFacility.ApplyRich(qtyLabel, content);
-        }
-
-        /// <summary>
-        /// This row's item stat tooltip block, or empty content when the
-        /// session has no stats for it. Never fetches - see
-        /// ItemMetadataService.GetCachedStatBlock.
-        /// </summary>
-        private TooltipContent BuildStatTooltipContent(int itemId)
-        {
-            if (_getItemStatBlock == null || itemId <= 0)
-            {
-                return TooltipContent.Empty;
-            }
-            return ItemStatTooltipComposer.BuildContent(_getItemStatBlock(itemId));
         }
 
         // --- Decision pills ---

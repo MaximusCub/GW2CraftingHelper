@@ -371,5 +371,119 @@ namespace GW2CraftingHelper.Tests.Services
                 },
                 lines);
         }
+
+        // --- Stat tooltip gate (item-stat-tooltips) ---
+        //
+        // CraftingTreeNode.ItemId is one numeric slot shared by three id
+        // spaces, so the stat lookup - which is keyed by ITEM id - must not
+        // run on a row whose id is a wallet currency or a guild upgrade.
+        // Mirrors CraftingTreeBuilderTests' own
+        // CurrencyNode_NeverResolvesIconOrRarityViaItemMetadata_
+        // EvenWhenIdCollides for the same real collision: id 24 is both a
+        // vendor-offer outputItemId and the currency "Pristine Fractal
+        // Relics".
+
+        private const int CollidingId = 24;
+
+        private static ItemStatBlock CollidingItemStats()
+        {
+            return new ItemStatBlock
+            {
+                ItemId = CollidingId,
+                Name = "Unrelated Item",
+                Rarity = "Legendary",
+                ItemType = "Trophy",
+                VendorValue = 1000
+            };
+        }
+
+        private static CraftingTreeNode StatGateNode(
+            CraftingDecision decision,
+            string name,
+            bool isCostComponent = false,
+            long? subtreeCost = null)
+        {
+            return new CraftingTreeNode
+            {
+                NodeId = 1,
+                ItemId = CollidingId,
+                Name = name,
+                Decision = decision,
+                Quantity = 5,
+                IsCostComponent = isCostComponent,
+                SubtreeCost = subtreeCost
+            };
+        }
+
+        [Fact]
+        public void CurrencyRow_ShowsNoStatBlock_EvenWhenItsIdCollidesWithACachedItem()
+        {
+            var node = StatGateNode(CraftingDecision.Currency, "Pristine Fractal Relics");
+
+            var content = TreeRowTooltipComposer.BuildStatTooltipContent(node, id => CollidingItemStats());
+
+            Assert.True(content.IsEmpty);
+        }
+
+        [Fact]
+        public void GuildUpgradeRow_ShowsNoStatBlock_EvenWhenItsIdCollidesWithACachedItem()
+        {
+            var node = StatGateNode(CraftingDecision.GuildUpgrade, "Guild upgrade (unresolved)");
+
+            var content = TreeRowTooltipComposer.BuildStatTooltipContent(node, id => CollidingItemStats());
+
+            Assert.True(content.IsEmpty);
+        }
+
+        [Fact]
+        public void UnrecognizedIngredientRow_ShowsNoStatBlock()
+        {
+            var node = StatGateNode(CraftingDecision.UnrecognizedIngredient, "Unrecognized ingredient type");
+
+            var content = TreeRowTooltipComposer.BuildStatTooltipContent(node, id => CollidingItemStats());
+
+            Assert.True(content.IsEmpty);
+        }
+
+        [Fact]
+        public void CurrencyCostComponentLeaf_ShowsNoStatBlock_ButItsBarterItemSiblingDoes()
+        {
+            // Both leaves are Decision == BuyFromVendor; only the barter
+            // ITEM carries a SubtreeCost, because a currency component's
+            // cost cell is deliberately blank.
+            var currencyLeaf = StatGateNode(
+                CraftingDecision.BuyFromVendor, "Pristine Fractal Relics", isCostComponent: true);
+            var itemLeaf = StatGateNode(
+                CraftingDecision.BuyFromVendor, "Unrelated Item", isCostComponent: true, subtreeCost: 5000);
+
+            Assert.True(TreeRowTooltipComposer
+                .BuildStatTooltipContent(currencyLeaf, id => CollidingItemStats()).IsEmpty);
+
+            var itemLines = TreeRowTooltipComposer
+                .BuildStatTooltipContent(itemLeaf, id => CollidingItemStats()).ToPlainLines();
+            Assert.Equal("Unrelated Item", itemLines[0]);
+        }
+
+        [Fact]
+        public void OrdinaryItemRow_StillShowsItsStatBlock()
+        {
+            var node = StatGateNode(CraftingDecision.BuyFromTp, "Unrelated Item");
+
+            var lines = TreeRowTooltipComposer
+                .BuildStatTooltipContent(node, id => CollidingItemStats()).ToPlainLines();
+
+            Assert.Equal("Unrelated Item", lines[0]);
+            Assert.Contains("Legendary", lines);
+        }
+
+        [Fact]
+        public void NoLookupOrNoStatsForTheId_ReturnsEmptyContent()
+        {
+            var node = StatGateNode(CraftingDecision.BuyFromTp, "Unrelated Item");
+
+            Assert.True(TreeRowTooltipComposer.BuildStatTooltipContent(node, null).IsEmpty);
+            Assert.True(TreeRowTooltipComposer.BuildStatTooltipContent(node, id => null).IsEmpty);
+            Assert.True(TreeRowTooltipComposer.BuildStatTooltipContent(null, id => CollidingItemStats()).IsEmpty);
+        }
     }
 }
