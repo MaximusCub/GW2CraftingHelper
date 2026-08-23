@@ -2,7 +2,8 @@
 
 > **Status - acted on.** Written 2026-08-23 against master `aa80382`, then
 > implemented by branch `min-width-1436`: the module minimum is now
-> **1436 x 710** and `TreeSectionController.TreePillColumnWidth` is **256**
+> **1436 x 710** (`Services/WindowSizing.cs`) and
+> `PlanRelayoutMath.TreePillColumnWidth` is **256**
 > (section 6's suggestion, taken at the current fonts rather than only
 > after a font bump).
 >
@@ -12,12 +13,19 @@
 > gutter past its complete name, and the depth-24 row - the one vendor-leaf
 > indent level of headroom section 7 recommends - fits **exactly**, with no
 > gutter. (With the report's 240px column, 1436 would have left that
-> depth-24 row 16px of slack instead.) Those three edges are pinned by
-> `PlanRelayoutMathTests.ComputeTreeColumnEdges_DeepestRowInTheGame_*`.
+> depth-24 row 16px of slack instead.) Those edges are pinned by
+> `PlanRelayoutMathTests.ComputeTreeColumnEdges_DeepestRow*`, which read
+> the shipped constants rather than copies of them.
+>
+> The minimum is **fitted to the game client**: on a client narrower than
+> 1436 (an ordinary windowed 1280x720 or 1366x768) the enforced minimum
+> falls back to the client's own width, floor 930, so the resize grip and
+> the right-hand columns stay on-screen. Deep rows ellipsize there as they
+> did before.
 >
 > The **+2pt variant (1472) is a pending maintainer decision and is NOT
-> implemented**; `Module.MinWindowWidth` is a single constant so that bump
-> stays a one-line change. Section 7's "repo assumption looks wrong"
+> implemented**; `WindowSizing.MinWindowWidth` is a single constant so
+> that bump stays a one-line change. Section 7's "repo assumption looks wrong"
 > finding was confirmed and fixed. See the "Minimum width raise
 > (min-width-1436)" section of [`docs/KNOWN-ISSUES.md`](../KNOWN-ISSUES.md).
 

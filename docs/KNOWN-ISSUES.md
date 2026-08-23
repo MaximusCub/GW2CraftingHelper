@@ -11186,7 +11186,7 @@ rule, and the truncation threshold verified by replaying
   (Transcendence, Conflux) reach depth 14 and would only have needed a
   ~1170px window. The chain terminates because Thermocatalytic Reagent is
   vendor-only.
-- **`Module.MinWindowWidth` = 1436, height unchanged at 710.** The
+- **`WindowSizing.MinWindowWidth` = 1436, height unchanged at 710.** The
   research prescribed no height and nothing in the layout derives a height
   from the window width - every renderer takes `panelWidth` only - so the
   vertical budget is exactly what it was. The window/content region
@@ -11208,11 +11208,34 @@ rule, and the truncation threshold verified by replaying
   relying on the resize registry to repair it. The clamp only ever grows a
   window: a user whose saved window is 1100px wide opens at 1436 and keeps
   their saved height, and a saved 1900px window is untouched.
-- **The centered launch position is now clamped at 0.** 1436 is wider than
-  a 1366px screen, where the old centering arithmetic would have produced
-  a negative x and put the title bar (and its close button) off the left
-  edge with nothing left to drag.
-- **`TreeSectionController.TreePillColumnWidth` 240 -> 256.** Measured:
+  `ResizableTabbedWindow` is `sealed` for this reason: the constructor
+  clamp writes `Size`, i.e. it dispatches through the virtual
+  OnResized/RecalculateLayout chain, which a subclass override would
+  receive against a half-constructed instance.
+- **The enforced minimum is fitted to the game client
+  (`WindowSizing.EffectiveMinWindowWidth`).** Blish's
+  `GameService.Graphics.SpriteScreen` is the GW2 CLIENT area, not the
+  monitor, so 1280x720 and 1366x768 are ordinary windowed sizes on any
+  display. Enforcing 1436 there would put the window's right edge - the
+  tree cost column, the right-anchored Generate button, and critically the
+  bottom-right resize grip - off-screen, and with `HandleWindowResize`
+  refusing anything under 1436 the user could not shrink it back: a
+  regression against a configuration that worked before this change. So
+  the enforced minimum is `max(930, min(1436, client width))` - a client
+  narrower than 1436 gets a window exactly its own width and deep tree
+  rows ellipsize there as they did before the raise, which is the honest
+  trade. 930 is the floor because the module was never usable below it.
+  Pinned by `WindowSizingTests`.
+  - *Residual*: the effective minimum is computed once, when the window is
+    built. A player who changes the client's resolution mid-session keeps
+    the minimum their launch resolution earned, so going from fullscreen
+    to a 1280-wide window in the same session still leaves a 1436px
+    window. Recovering needs a Blish restart. Gate item 6.
+- **The centered launch position is now clamped at 0.** Only reachable on
+  a client narrower than even the 930 fallback, where a negative centered
+  x would put the title bar (and its close button) off the left edge with
+  nothing left to drag.
+- **`PlanRelayoutMath.TreePillColumnWidth` 240 -> 256.** Measured:
   the standard CRAFT/TP/VENDOR/IGNORE run is 222px against the 236px
   budget a 240px column leaves, so any slightly wider label pushed the row
   through the tightened-padding pass for no reason. 256 gives it 252px.
@@ -11236,8 +11259,27 @@ The depth-24 line is why the number is 1436 rather than 1428:
 `CraftingTreeBuilder.BuildVendorCostComponentLeaves` can synthesise a leaf
 one `TreeIndentPer` below the recipe graph, and the minimum covers that
 unconditionally. All three rows are pinned by
-`PlanRelayoutMathTests.ComputeTreeColumnEdges_DeepestRowInTheGame_*`,
-against the measured 65px quantity prefix and 174px name.
+`PlanRelayoutMathTests.ComputeTreeColumnEdges_DeepestRow*`, against the
+measured 65px quantity prefix and 174px name.
+
+Those three cases are the PINNED layout (`widestNameEnd` 0), which is the
+worst case but not the layout the renderer produces: `TreeSectionController`
+always passes the scanned `_widestNameEnd`, which pulls the pill/cost block
+LEFT to `widestNameEnd + TableGutterBreathingRoom` and leaves the depth-23
+row 190px rather than 198px.
+`..._DeepestRowInTheScannedLayout_FitsAtTheWindowMinimum` covers that
+configuration, so retuning the breathing room cannot silently ellipsize
+the shipped row.
+
+**Both sides of every one of these numbers now come from one place.** The
+minimum, the 126px window-to-panel chrome and the pill column were
+literals in `Module.cs`/`TreeSectionController.cs` with copies in the
+tests, so a later maintainer taking the +2pt option (1472) or trimming the
+pill column back would have left every "at the window minimum" test
+passing while the shipped window truncated. `Services/WindowSizing.cs`
+(Blish-free) holds the window sizing and
+`PlanRelayoutMath.TreePillColumnWidth` the column; production and tests
+both read them.
 
 ### Correction: the settings panel was never 864px wide
 
@@ -11284,8 +11326,9 @@ to 2 to protect a boundary that is now ~460px away.
 
 - **The +2pt font variant (1472) is a pending maintainer decision.** The
   research measured it at Menomonia 16/14 rather than scaling it, so the
-  number is real, but nothing here changes a font. `MinWindowWidth` is a
-  single constant specifically so that bump is a one-line change.
+  number is real, but nothing here changes a font.
+  `WindowSizing.MinWindowWidth` is a single constant specifically so that
+  bump is a one-line change.
 - **Fitting the whole pill run** (`HAVE 4194304/8388608 NEEDED` and
   friends) needs a ~440px pill column and a ~1612px window, not a wider
   minimum. Out of scope; the "+N" pill and its tooltip continue to state
@@ -11301,23 +11344,33 @@ to 2 to protect a boundary that is now ~460px away.
   total. An eight-digit total would add ~21px and spend the depth-23
   gutter. The depth-24 row would ellipsize by that much in that case; a
   plan that expensive is not reachable from any single item.
-- **Screens narrower than 1436** now get a window wider than their screen
-  (position clamped to the top-left corner). No module-side fix exists
-  short of allowing truncation again, which is the thing being removed.
+- **Clients narrower than 1436** do not get the raise at all: the enforced
+  minimum drops to the client's own width (floor 930) rather than pushing
+  the window's right edge, and the resize grip with it, off-screen. Deep
+  rows ellipsize there exactly as they did before this change - the
+  truncation is not removed on such a client, it is chosen over an
+  unreachable window.
 
 Validation: build 0 errors and the suite green before each commit; 2203
-baseline -> 2207 (+3 tree-width edges, +1 settings two-column threshold;
-zero regressions, one existing settings test corrected in place). Tree
-clean, nothing pushed.
+baseline -> 2218 (+3 tree-width edges pinned, +1 the same edges in the
+scanned layout the renderer produces, +10 `WindowSizing` cases, +1
+settings two-column threshold; zero regressions, one existing settings
+test corrected in place). Tree clean, nothing pushed.
 
 Desktop gate items:
 
 1. The window opens at least 1436px wide on a fresh profile AND with an
    existing narrower saved size - delete nothing, just launch: a session
    that last closed the window at ~930px must come back at 1436, keeping
-   its saved height and position. Then try to drag the left/right edge
-   inward: it must refuse to go below 1436 and must not judder or snap
-   back visibly while dragging.
+   its saved height and position. This is the item that proves the
+   constructed-then-restored ordering, which is INFERRED, not measured:
+   the constructor clamps to 1436 and Blish then restores the saved size,
+   so if a restore wrote the size without invalidating, the window would
+   open below the floor. Watch the first frame specifically - a window
+   that flashes narrow and settles wide is a pass with a note; one that
+   stays narrow is a FAIL. Then try to drag the left/right edge inward: it
+   must refuse to go below 1436 and must not judder or snap back visibly
+   while dragging.
 2. Deep-tree readability, the actual point of the change. Generate
    `+24 Agony Infusion` LIVE (it is the real defining item, not a
    fixture): scroll to the bottom of the Recipe Tree and confirm the
@@ -11338,5 +11391,13 @@ Desktop gate items:
    Plan History, About. Nothing centered is off-center, nothing
    right-anchored has drifted off the panel, and no section has developed
    a dead horizontal band where a fixed-width block used to fill the row.
+6. The narrow-client fallback, launched fresh with the GAME windowed at
+   roughly 1280 wide (not the monitor - the client). The module window
+   must open no wider than the client, its bottom-right resize grip must
+   be visible and grabbable, the Generate button must be on-screen, and
+   dragging the window narrower must still work down to the client width.
+   Deep tree rows are expected to ellipsize here; that is the trade, not a
+   defect. Then restart Blish at full screen and confirm the 1436 minimum
+   is back.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
