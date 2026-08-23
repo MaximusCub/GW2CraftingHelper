@@ -204,6 +204,18 @@ namespace GW2CraftingHelper.Views
         // "nothing to compare", not as "everything changed".
         private SettingsFormState _baseline;
 
+        // False while Build is midway through replacing the row lists.
+        // Blish runs Build off the UI thread (WindowBase2.ShowView does
+        // view.DoLoad(...).ContinueWith(BuildView) with no scheduler),
+        // while UnsavedChangeCount is called from the main thread's tab
+        // handler - so without this, a tab switch landing during a build
+        // would enumerate _rows while AddCurrencyRow appends to it and
+        // throw "Collection was modified" out of Blish's input dispatch.
+        // Volatile so the reader that sees true also sees the finished
+        // lists. Same philosophy as the null-baseline early-out above:
+        // a half-built form has nothing to compare, not everything.
+        private volatile bool _buildComplete;
+
         public SettingsTabContent(ModuleSettings settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -211,6 +223,8 @@ namespace GW2CraftingHelper.Views
 
         public void Build(Container container)
         {
+            _buildComplete = false;
+
             _rows.Clear();
             _currencyNames.Clear();
             _currencyForceVisible = new bool[0];
@@ -291,6 +305,9 @@ namespace GW2CraftingHelper.Views
             ApplyCurrencyFilter();
 
             _baseline = CaptureFormState();
+
+            // Last line, deliberately: it publishes everything above it.
+            _buildComplete = true;
         }
 
         /// <summary>
@@ -337,9 +354,16 @@ namespace GW2CraftingHelper.Views
         /// Returns the count rather than the changed keys because those
         /// keys carry currency and item ids, which are internal-only and
         /// must never reach a caller that might display them.
+        ///
+        /// <para>
+        /// Zero until the tab has finished building once - see
+        /// _buildComplete for the cross-thread reason.
+        /// </para>
         /// </summary>
         public int UnsavedChangeCount()
         {
+            if (!_buildComplete) return 0;
+
             return CaptureFormState().ChangedKeys(_baseline).Count;
         }
 
@@ -1349,13 +1373,37 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
+        /// What a SaveAll actually got to disk. The in-tab Save button
+        /// ignores it and reads the status label instead; a caller saving
+        /// from OUTSIDE the tab has no status label on screen (the save
+        /// bar is unparented the moment the view is torn down), so it has
+        /// to be told in the return value or the failure is silent.
+        /// </summary>
+        public readonly struct SaveOutcome
+        {
+            public SaveOutcome(int invalidCount, bool writeFailed)
+            {
+                InvalidCount = invalidCount;
+                WriteFailed = writeFailed;
+            }
+
+            /// <summary>Entries rejected by their section's parser and left at their persisted value.</summary>
+            public int InvalidCount { get; }
+
+            /// <summary>The currency valuation write itself failed - see the module log.</summary>
+            public bool WriteFailed { get; }
+
+            public bool AllSaved => !WriteFailed && InvalidCount == 0;
+        }
+
+        /// <summary>
         /// Persists every section - currency valuations, Homestead tiers,
         /// logging policy, snapshot refresh interval - in place of the four
         /// per-section Save buttons. Each section keeps its own per-row
         /// error labels and its own "invalid rows are left as previously
         /// persisted" contract; only the confirmation is shared.
         /// </summary>
-        public void SaveAll()
+        public SaveOutcome SaveAll()
         {
             bool valuationsSaved = SaveValuations(out int invalidCount);
             invalidCount += SaveHomesteadTiers();
@@ -1377,7 +1425,9 @@ namespace GW2CraftingHelper.Views
                 _baseline = CaptureFormState();
             }
 
-            if (_statusLabel == null) return;
+            var outcome = new SaveOutcome(invalidCount, !valuationsSaved);
+
+            if (_statusLabel == null) return outcome;
 
             if (!valuationsSaved)
             {
@@ -1386,7 +1436,7 @@ namespace GW2CraftingHelper.Views
                 // headline and the per-row errors stay on screen.
                 _statusLabel.Text = "Save failed - see log";
                 _statusLabel.TextColor = ErrorTextColor;
-                return;
+                return outcome;
             }
 
             if (invalidCount == 0)
@@ -1400,6 +1450,8 @@ namespace GW2CraftingHelper.Views
                 _statusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
                 _statusLabel.TextColor = WarningTextColor;
             }
+
+            return outcome;
         }
 
         private void LoadCurrentValuations()
