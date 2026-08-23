@@ -183,8 +183,13 @@ namespace GW2CraftingHelper.Tests.Services
 
             var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
 
-            Assert.Contains(
-                "A vendor cost item's buy-order price is unavailable - its instant-buy price is used", lines);
+            // 83 characters, so the composer's TooltipTextFormat seam splits
+            // it across list entries - the caller joins with newlines, so
+            // rejoining with a space must reproduce the sentence exactly.
+            Assert.StartsWith(
+                "A vendor cost item's buy-order price is unavailable - its instant-buy price is used",
+                string.Join(" ", lines));
+            Assert.All(lines, l => Assert.True(l.Length <= TooltipTextFormat.LineBudgetChars));
         }
 
         [Fact]
@@ -199,8 +204,10 @@ namespace GW2CraftingHelper.Tests.Services
 
             var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
 
-            Assert.Contains(
-                "A vendor cost item's instant-buy price is unavailable - its buy-order price is used", lines);
+            Assert.StartsWith(
+                "A vendor cost item's instant-buy price is unavailable - its buy-order price is used",
+                string.Join(" ", lines));
+            Assert.All(lines, l => Assert.True(l.Length <= TooltipTextFormat.LineBudgetChars));
         }
 
         [Fact]

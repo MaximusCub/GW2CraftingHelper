@@ -39,14 +39,30 @@ namespace GW2CraftingHelper.Views
             };
 
             _window.Moved += OnWindowMoved;
+
+            // Resets _isShowing - and runs the caller's cancel callback -
+            // whenever the window's own Visible=false transition completes,
+            // not just when the Confirm/Cancel StandardButton handlers below
+            // run. WindowBase2's built-in title-bar X button and Escape key
+            // both call Hide() directly (CanClose/CanCloseWithEscape default
+            // true, never overridden here), bypassing those handlers
+            // entirely - without this, dismissing the dialog that way would
+            // leave _isShowing stuck true and every later Show() call, from
+            // every caller of this shared instance, would silently no-op for
+            // the rest of the session. Same subscription, same reason, as
+            // ApiAccessDialog's.
+            _window.Hidden += OnWindowHidden;
         }
 
         // confirmText is required so every caller states its own verb
         // ("Regenerate", "Delete") - a default here would hand an
         // unrelated caller the wrong label on a destructive confirm.
-        public void Show(string message, Action onConfirm, Action onCancel, string confirmText)
+        // Returns false when another caller's dialog is already on screen,
+        // so a caller that arms state for the dialog's lifetime (MainView
+        // disables its Snapshot buttons) knows not to arm it.
+        public bool Show(string message, Action onConfirm, Action onCancel, string confirmText)
         {
-            if (_isShowing) return;
+            if (_isShowing) return false;
             _isShowing = true;
             _onConfirm = onConfirm;
             _onCancel = onCancel;
@@ -84,12 +100,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(btnX, btnY),
                 Parent = _window
             };
-            confirmBtn.Click += (_, __) =>
-            {
-                _isShowing = false;
-                _window.Hide();
-                _onConfirm?.Invoke();
-            };
+            confirmBtn.Click += (_, __) => Dismiss(confirmed: true);
 
             var cancelBtn = new StandardButton()
             {
@@ -98,12 +109,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(btnX + btnW + btnGap, btnY),
                 Parent = _window
             };
-            cancelBtn.Click += (_, __) =>
-            {
-                _isShowing = false;
-                _window.Hide();
-                _onCancel?.Invoke();
-            };
+            cancelBtn.Click += (_, __) => Dismiss(confirmed: false);
 
             // Position: restore saved location, or center on first show
             var screen = GameService.Graphics.SpriteScreen;
@@ -123,19 +129,72 @@ namespace GW2CraftingHelper.Views
             _window.Location = new Point(sx, sy);
 
             _window.Show();
+            return true;
         }
 
+        /// <summary>
+        /// Programmatic close: drops the pending callbacks without running
+        /// either of them. Clearing _isShowing first is what stops
+        /// OnWindowHidden below from reading this as a user cancel.
+        /// </summary>
         public void Hide()
         {
             _isShowing = false;
+            _onConfirm = null;
+            _onCancel = null;
             _window.Hide();
         }
 
         public void Dispose()
         {
+            // Unsubscribe BEFORE hiding: teardown must not fire a caller's
+            // cancel callback into controls the module is already disposing.
+            _window.Hidden -= OnWindowHidden;
             _window.Moved -= OnWindowMoved;
             _window.Hide();
             _window.Dispose();
+        }
+
+        /// <summary>
+        /// The single exit path for both buttons and for the window's own
+        /// X/Escape dismissal. Callbacks are read into locals and cleared
+        /// before either runs, so a callback that reopens the dialog gets a
+        /// clean slate and cannot see the previous request's handlers.
+        /// </summary>
+        private void Dismiss(bool confirmed)
+        {
+            if (!_isShowing)
+            {
+                return;
+            }
+
+            _isShowing = false;
+            var onConfirm = _onConfirm;
+            var onCancel = _onCancel;
+            _onConfirm = null;
+            _onCancel = null;
+
+            _window.Hide();
+
+            if (confirmed)
+            {
+                onConfirm?.Invoke();
+            }
+            else
+            {
+                onCancel?.Invoke();
+            }
+        }
+
+        // Fires on every Visible=false transition, whichever path caused it.
+        // The button handlers and Hide() clear _isShowing before hiding, so
+        // for those this is a no-op and only the title-bar X and Escape key
+        // reach the Dismiss below - which is what makes them behave like
+        // Cancel instead of stranding both _isShowing and whatever state the
+        // caller armed for the dialog's lifetime.
+        private void OnWindowHidden(object sender, EventArgs e)
+        {
+            Dismiss(confirmed: false);
         }
 
         private void OnWindowMoved(object sender, MovedEventArgs e)

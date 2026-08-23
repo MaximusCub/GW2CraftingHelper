@@ -2386,23 +2386,37 @@ namespace GW2CraftingHelper.Views
                 // its own Checked value is preserved either way, only
                 // whether it can be clicked follows Use Own Materials.
                 _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
-                _modalDialog.Show(
+
+                // Undoes the optimistic arm above. Used for both the dialog's
+                // Cancel (which its X/Escape path also runs) and a refused
+                // Show: the shared dialog is one instance, so another tab's
+                // confirm being on screen would otherwise leave this checkbox
+                // disabled with no callback left to re-enable it.
+                Action revert = () =>
+                {
+                    _useOwnMaterials = !_useOwnMaterials;
+                    _suppressToggle = true;
+                    _ownMaterialsCheckbox.Checked = _useOwnMaterials;
+                    _suppressToggle = false;
+                    _ownMaterialsCheckbox.Enabled = true;
+                    _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
+                };
+
+                bool shown = _modalDialog.Show(
                     "This will regenerate the plan. Continue?",
                     () =>
                     {
                         _ownMaterialsCheckbox.Enabled = true;
                         _ = TriggerGenerate();
                     },
-                    () =>
-                    {
-                        _useOwnMaterials = !_useOwnMaterials;
-                        _suppressToggle = true;
-                        _ownMaterialsCheckbox.Checked = _useOwnMaterials;
-                        _suppressToggle = false;
-                        _ownMaterialsCheckbox.Enabled = true;
-                        _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
-                    },
+                    revert,
                     confirmText: "Regenerate");
+
+                if (!shown)
+                {
+                    revert();
+                }
+
                 return;
             }
 
