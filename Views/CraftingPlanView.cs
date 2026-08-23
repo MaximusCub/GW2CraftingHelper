@@ -700,6 +700,12 @@ namespace GW2CraftingHelper.Views
             // longer exists.
             ApplyTreeToolbarVisibility(false);
 
+            // Leaves the tab in the SAME no-plan state a first visit shows,
+            // rather than the blank panel a rolled-back render used to
+            // leave behind - the status strip carries the failure, the
+            // content area says what to do next.
+            ShowEmptyPlanState();
+
             if (_statusBoard.ClearRestoredSeed())
             {
                 SetStatus("Ready");
@@ -1794,6 +1800,10 @@ namespace GW2CraftingHelper.Views
                 {
                     RollBackFailedPlanRender(ex, "on tab visit");
                 }
+            }
+            else
+            {
+                ShowEmptyPlanState();
             }
         }
 
@@ -3189,6 +3199,73 @@ namespace GW2CraftingHelper.Views
             {
                 child.Dispose();
             }
+        }
+
+        // What the tab says when it holds no plan. The default state was
+        // blank parchment plus a small "Ready" on the status strip, which
+        // names no next action - the Log tab already answers the same
+        // question with a dim label in its own empty content panel, and
+        // this is that pattern.
+        private const string EmptyPlanText =
+            "No plan yet. Search for an item above, then click Generate Plan.";
+        private const int EmptyPlanTopGap = 48;
+        private static readonly Color EmptyPlanTextColor = new Color(150, 150, 150);
+
+        /// <summary>
+        /// Parents the empty-state label into the (already emptied) content
+        /// panel. Nothing disposes it explicitly: it is a child of
+        /// _contentPanel like every rendered section, so
+        /// ResetContentPanelToEmpty sweeps it on the first render of a real
+        /// plan - which is the "disposed on first render" the finding asks
+        /// for, through the path that already exists rather than a second
+        /// one that could drift from it.
+        /// <para>
+        /// The gap is a spacer Panel, not a Location: _contentPanel is a
+        /// SingleTopToBottom FlowPanel and positions its own children, the
+        /// same reason CreateSectionHeader emits a topGap panel.
+        /// </para>
+        /// </summary>
+        private void ShowEmptyPlanState()
+        {
+            if (_contentPanel == null) return;
+
+            // Starts from the same "nothing rendered yet" point RenderPlan
+            // does, and for the same reason: this method registers a
+            // relayout closure, and _relayoutActions is cleared ONLY here.
+            // Without it, a tab visit with no plan would leave the previous
+            // visit's closures in the registry, each one writing Size into
+            // a control that visit already disposed. Idempotent - both call
+            // sites reach it with the panel already empty (the rollback
+            // path calls it explicitly first, deliberately, and both the
+            // tree-state reset and the registry clears are repeat-safe).
+            ResetContentPanelToEmpty();
+
+            int panelWidth = _contentPanel.Width - RightEdgePadding;
+            if (panelWidth < 0) panelWidth = 0;
+
+            var topGap = new Panel()
+            {
+                Size = new Point(panelWidth, EmptyPlanTopGap),
+                Parent = _contentPanel
+            };
+
+            var label = new Label()
+            {
+                Text = EmptyPlanText,
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = panelWidth,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextColor = EmptyPlanTextColor,
+                Parent = _contentPanel
+            };
+
+            _relayoutActions.Add(w =>
+            {
+                int width = w > 0 ? w : 0;
+                topGap.Size = new Point(width, EmptyPlanTopGap);
+                label.Width = width;
+            });
         }
 
         private void RenderPlan(PlanViewModel vm)
