@@ -652,6 +652,7 @@ namespace GW2CraftingHelper.Views
             int w = container.ContentRegion.Width;
             int h = container.ContentRegion.Height;
 
+            bool widthChanged = w != _containerWidth;
             _containerWidth = w;
             _containerHeight = h;
 
@@ -666,6 +667,19 @@ namespace GW2CraftingHelper.Views
             // and content panels beneath whatever that needs - the reason
             // those three are not sized here directly.
             ApplyTopRegionLayout();
+
+            // Result rows are ellipsized to the content width at build
+            // time, so a width change has to re-fit them or a widened
+            // window keeps showing "..." on text that now fits. Routed
+            // through the EXISTING search debounce rather than a per-row
+            // resize walk: one rebuild lands 150ms after the drag settles,
+            // so a drag costs nothing per frame, and rows are rebuilt
+            // wholesale on every keystroke already. A height-only drag does
+            // not re-ellipsize anything and returns before arming it.
+            if (widthChanged)
+            {
+                ScheduleSearchRebuild();
+            }
         }
 
         /// <summary>
@@ -1531,6 +1545,53 @@ namespace GW2CraftingHelper.Views
             return null;
         }
 
+        // Left edge of a result row's text column (past the 32px icon at
+        // x=2) and the gap kept clear of the row's right edge.
+        private const int RowTextX = 40;
+        private const int RowTextRightPad = 8;
+
+        /// <summary>
+        /// One result-row text line, ellipsized to the width the row
+        /// actually has and returning whether it had to shorten. Both
+        /// lines of an item row used to be AutoSizeWidth Labels inside a
+        /// fixed-width Panel, so a multi-character breakdown was hard-clipped
+        /// mid-word with nothing to say text had been lost ("...Maximus
+        /// Test 10  Chara"). Same EllipsizeToWidth + tooltip pattern the
+        /// Log tab's rows and the plan's tables use.
+        /// </summary>
+        private static Label CreateRowTextLabel(
+            Panel rowPanel, string text, int panelWidth, int y, Color? color, out bool shortened)
+        {
+            var font = GameService.Content.DefaultFont14;
+            string full = text ?? "";
+            string shown = LabelHelpers.EllipsizeToWidth(font, full, panelWidth - RowTextX - RowTextRightPad);
+            shortened = shown != full;
+
+            var label = new Label()
+            {
+                Text = shown,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(RowTextX, y),
+                Parent = rowPanel
+            };
+            if (color.HasValue)
+            {
+                label.TextColor = color.Value;
+            }
+
+            // The label is the deepest control under the cursor, and Blish
+            // resolves a tooltip on that control alone - it does not bubble
+            // to the row Panel (the swallowed-hover class recorded for
+            // ShoppingListSectionRenderer and the tree row). The Panel gets
+            // it too, from the caller, for the strip beside the text.
+            if (shortened)
+            {
+                TooltipFacility.ApplyPlain(label, full);
+            }
+            return label;
+        }
+
         private void CreateItemRow(SnapshotSearchRow row)
         {
             int panelWidth = _contentPanel?.Width ?? 400;
@@ -1559,14 +1620,8 @@ namespace GW2CraftingHelper.Views
             // are deliberately NOT swept into this: a column of bare
             // numbers under an "Amount" header is already labelled by its
             // header.
-            new Label()
-            {
-                Text = $"{row.TotalCount}x {row.Name}",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(40, 4),
-                Parent = rowPanel
-            };
+            string nameText = $"{row.TotalCount}x {row.Name}";
+            CreateRowTextLabel(rowPanel, nameText, panelWidth, 4, null, out bool nameShortened);
 
             // Same prefix notation as the row's own total above - a
             // breakdown reading "Bank 20   Vault 12" under a total reading
@@ -1576,15 +1631,19 @@ namespace GW2CraftingHelper.Views
                 ? ""
                 : string.Join("   ", row.Breakdown.Select(b => $"{b.Count}x {b.Label}"));
 
-            new Label()
+            CreateRowTextLabel(rowPanel, breakdown, panelWidth, 24, InfoTextColor, out bool breakdownShortened);
+
+            // One tooltip for the row's bare strip, carrying whichever
+            // lines were shortened - assigning per-line here would leave
+            // the later assignment silently winning.
+            if (nameShortened || breakdownShortened)
             {
-                Text = breakdown,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = InfoTextColor,
-                Location = new Point(40, 24),
-                Parent = rowPanel
-            };
+                TooltipFacility.ApplyPlain(
+                    rowPanel,
+                    breakdownShortened && nameShortened
+                        ? nameText + "\n" + breakdown
+                        : (nameShortened ? nameText : breakdown));
+            }
         }
 
         private void CreateWalletRow(SnapshotWalletEntry entry)
@@ -1609,14 +1668,12 @@ namespace GW2CraftingHelper.Views
             // separator stays: wallet balances run to seven figures where
             // an item count does not.
             string name = string.IsNullOrEmpty(entry.CurrencyName) ? "Unknown Currency" : entry.CurrencyName;
-            new Label()
+            string text = $"{entry.Value:N0}x {name}";
+            CreateRowTextLabel(rowPanel, text, panelWidth, 6, null, out bool shortened);
+            if (shortened)
             {
-                Text = $"{entry.Value:N0}x {name}",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(40, 6),
-                Parent = rowPanel
-            };
+                TooltipFacility.ApplyPlain(rowPanel, text);
+            }
         }
 
         // This used to carry its own
