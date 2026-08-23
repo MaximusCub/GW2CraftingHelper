@@ -39,8 +39,8 @@ namespace GW2CraftingHelper.Services
             builder.RarityText(string.IsNullOrEmpty(stats.Name) ? "Unknown Item" : stats.Name, stats.Rarity)
                 .EndLine();
 
-            AppendCombatFacts(builder, stats);
-            AppendUpgradeEffects(builder, stats);
+            bool buffAlreadyShown = AppendCombatFacts(builder, stats);
+            AppendUpgradeEffects(builder, stats, buffAlreadyShown);
             AppendNourishment(builder, stats);
             AppendIdentityBlock(builder, stats);
             AppendFlavor(builder, stats);
@@ -48,8 +48,15 @@ namespace GW2CraftingHelper.Services
             return builder.Build();
         }
 
-        private static void AppendCombatFacts(TooltipContentBuilder builder, ItemStatBlock stats)
+        /// <summary>
+        /// Returns whether one of the attribute lines it emitted already
+        /// says, verbatim, what <see cref="ItemStatBlock.BuffDescription"/>
+        /// says - see <see cref="AppendUpgradeEffects"/>.
+        /// </summary>
+        private static bool AppendCombatFacts(TooltipContentBuilder builder, ItemStatBlock stats)
         {
+            bool buffAlreadyShown = false;
+
             if (stats.MinPower.HasValue && stats.MaxPower.HasValue)
             {
                 builder.Text($"Weapon Strength: {stats.MinPower.Value} - {stats.MaxPower.Value}").EndLine();
@@ -69,7 +76,9 @@ namespace GW2CraftingHelper.Services
                 // attribute type that can be negative; a positive one needs
                 // its "+" added, as the game shows it.
                 string sign = attribute.Value < 0 ? "" : "+";
-                builder.Text($"{sign}{attribute.Value} {attribute.DisplayName}").EndLine();
+                string line = $"{sign}{attribute.Value} {attribute.DisplayName}";
+                builder.Text(line).EndLine();
+                buffAlreadyShown = buffAlreadyShown || line == stats.BuffDescription;
             }
 
             if (stats.StatChoiceCount > 0)
@@ -90,11 +99,22 @@ namespace GW2CraftingHelper.Services
                 string label = stats.InfusionSlotCount == 1 ? "Infusion Slot" : "Infusion Slots";
                 builder.Styled($"{stats.InfusionSlotCount} {label}", TooltipSpanRole.Muted).EndLine();
             }
+
+            return buffAlreadyShown;
         }
 
-        private static void AppendUpgradeEffects(TooltipContentBuilder builder, ItemStatBlock stats)
+        private static void AppendUpgradeEffects(
+            TooltipContentBuilder builder, ItemStatBlock stats, bool buffAlreadyShown)
         {
-            if (!string.IsNullOrEmpty(stats.BuffDescription))
+            // An agony infusion reports the same fact twice - once as
+            // infix_upgrade.buff.description ("+1 Agony Resistance") and
+            // once as an infix_upgrade.attributes entry that renders to the
+            // identical string. The game prints it once, so the buff line
+            // yields to the attribute line that already said it. Only an
+            // exact match is suppressed: a buff description that summarises
+            // several attributes ("+5 Power, +5 Precision") is its own
+            // distinct wording and still belongs.
+            if (!buffAlreadyShown && !string.IsNullOrEmpty(stats.BuffDescription))
             {
                 builder.Styled(stats.BuffDescription, TooltipSpanRole.Bonus).EndLine();
             }

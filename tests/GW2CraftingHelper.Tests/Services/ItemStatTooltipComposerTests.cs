@@ -98,9 +98,34 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("+5% Damage", await LinesFor(RealItemJson.SigilOfForce));
 
             var infusion = await LinesFor(RealItemJson.AgonyInfusion);
-            // Both the buff line and the resolved attribute line say the
-            // same thing on this item - the API reports it twice.
-            Assert.Equal(2, infusion.Count(l => l == "+1 Agony Resistance"));
+            // The API reports this fact twice - once as the infix buff
+            // description, once as a resolved attribute that renders to the
+            // identical string. The game prints it once, and so must we.
+            Assert.Equal(1, infusion.Count(l => l == "+1 Agony Resistance"));
+        }
+
+        [Fact]
+        public void BuffDescriptionSurvivesWhenNoAttributeLineAlreadySaysIt()
+        {
+            // The other half of the de-duplication above: suppression is
+            // exact-match only, so a buff that SUMMARISES several
+            // attributes is its own distinct wording and still belongs.
+            var stats = new ItemStatBlock
+            {
+                Name = "Test Upgrade",
+                Attributes = new[]
+                {
+                    new ItemAttributeLine("Power", 5),
+                    new ItemAttributeLine("Precision", 5)
+                },
+                BuffDescription = "+5 Power, +5 Precision"
+            };
+
+            var lines = ItemStatTooltipComposer.BuildContent(stats).ToPlainLines().ToArray();
+
+            Assert.Contains("+5 Power", lines);
+            Assert.Contains("+5 Precision", lines);
+            Assert.Contains("+5 Power, +5 Precision", lines);
         }
 
         [Fact]
