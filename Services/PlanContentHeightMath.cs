@@ -35,7 +35,6 @@ namespace GW2CraftingHelper.Services
         // row builders - CreateUsedMaterialRow, CreateShoppingRow, etc. use
         // these same constants rather than their own local copies). ---
         public const int UsedMaterialRowHeight = 36;
-        public const int ShoppingHeaderRowHeight = 22;
         public const int ShoppingRowHeight = 36;
         public const int CraftStepRowHeight = 44;
         public const int CTableHeaderRowHeight = 26;
@@ -77,10 +76,16 @@ namespace GW2CraftingHelper.Services
             rows = rows ?? Array.Empty<PlanRowViewModel>();
             switch (sectionType)
             {
+                // Both of these gained a CTableHeaderRowHeight band in
+                // audit batch J's chrome unification: Used Materials had no
+                // header at all, and the Shopping List's was its own 22px
+                // unbanded style. Counted unconditionally, exactly as the
+                // two c-tables below are, because all four renderers emit
+                // the header before looking at the row count.
                 case PlanSectionType.UsedMaterials:
-                    return rows.Count * UsedMaterialRowHeight;
+                    return CTableHeaderRowHeight + rows.Count * UsedMaterialRowHeight;
                 case PlanSectionType.ShoppingList:
-                    return ShoppingHeaderRowHeight + rows.Count * ShoppingRowHeight;
+                    return CTableHeaderRowHeight + rows.Count * ShoppingRowHeight;
                 case PlanSectionType.CraftingSteps:
                     return CraftingStepsBodyHeight(rows);
                 case PlanSectionType.RequiredDisciplines:

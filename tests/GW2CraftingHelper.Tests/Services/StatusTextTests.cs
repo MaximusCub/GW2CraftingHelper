@@ -48,64 +48,6 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Best path restored", StatusText.ForOverrideResolve(isBestPathPreset: true, overrideCount: 0));
         }
 
-        // ---- ForSnapshotAge ----
-
-        [Fact]
-        public void ForSnapshotAge_LessThanOneMinute_ReturnsJustNow()
-        {
-            Assert.Equal("just now", StatusText.ForSnapshotAge(TimeSpan.FromSeconds(30)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_Zero_ReturnsJustNow()
-        {
-            Assert.Equal("just now", StatusText.ForSnapshotAge(TimeSpan.Zero));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_Negative_ClampedToZero_ReturnsJustNow()
-        {
-            // CapturedAt momentarily ahead of the local clock (minor clock
-            // skew) must never render as a negative duration.
-            Assert.Equal("just now", StatusText.ForSnapshotAge(TimeSpan.FromSeconds(-5)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_UnderOneHour_ReturnsMinutesAgo()
-        {
-            Assert.Equal("2m ago", StatusText.ForSnapshotAge(TimeSpan.FromMinutes(2)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_JustUnderOneHour_ReturnsMinutesAgo()
-        {
-            Assert.Equal("59m ago", StatusText.ForSnapshotAge(TimeSpan.FromMinutes(59)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_UnderOneDay_ReturnsHoursAndMinutesAgo()
-        {
-            Assert.Equal("1h 5m ago", StatusText.ForSnapshotAge(TimeSpan.FromMinutes(65)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_ExactlyOneHour_ReturnsHoursAndMinutesAgo()
-        {
-            Assert.Equal("1h 0m ago", StatusText.ForSnapshotAge(TimeSpan.FromHours(1)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_OneDayOrMore_ReturnsDaysAgo()
-        {
-            Assert.Equal("2d ago", StatusText.ForSnapshotAge(TimeSpan.FromDays(2)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_ExactlyOneDay_ReturnsDaysAgo()
-        {
-            Assert.Equal("1d ago", StatusText.ForSnapshotAge(TimeSpan.FromDays(1)));
-        }
-
         // ---- IsStale (the staleness label and Module.Update()'s
         // auto-refresh gate share ONE threshold, sourced from
         // SnapshotRefreshIntervalMinutes - the threshold is a parameter
@@ -149,7 +91,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void ForRefreshFailure_ApiAccessNotReady_ReturnsAccessNotReadyText()
         {
             Assert.Equal(
-                "Refresh failed \u2014 GW2 API access not ready",
+                "Refresh failed: GW2 API access not ready",
                 StatusText.ForRefreshFailure(SnapshotFailureKind.ApiAccessNotReady, failedSourceCount: 5, totalSourceCount: 5));
         }
 
@@ -157,7 +99,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void ForRefreshFailure_NetworkOrApiDown_ReturnsCouldNotReachText()
         {
             Assert.Equal(
-                "Refresh failed \u2014 could not reach the GW2 API",
+                "Refresh failed: could not reach the GW2 API",
                 StatusText.ForRefreshFailure(SnapshotFailureKind.NetworkOrApiDown, failedSourceCount: 5, totalSourceCount: 5));
         }
 
@@ -165,7 +107,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void ForRefreshFailure_PartialFailure_ReturnsCountText()
         {
             Assert.Equal(
-                "Refresh partially failed \u2014 2 of 5 sources",
+                "Refresh partially failed: 2 of 5 sources",
                 StatusText.ForRefreshFailure(SnapshotFailureKind.PartialFailure, failedSourceCount: 2, totalSourceCount: 5));
         }
 
@@ -177,6 +119,99 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(
                 "Refresh failed",
                 StatusText.ForRefreshFailure(SnapshotFailureKind.Unknown, failedSourceCount: 0, totalSourceCount: 0));
+        }
+
+        // ---- Stamp (audit batch J, M10): the ONE shape every timestamped
+        // status line in the module uses. Four sites wrote it by hand with
+        // two different separators before this. ----
+
+        [Fact]
+        public void Stamp_VerbAndTime_UsesTheSingleSeparatorAndFormat()
+        {
+            Assert.Equal(
+                "Plan generated \u2014 Aug 8, 2026 3:00 PM",
+                StatusText.Stamp("Plan generated", new DateTime(2026, 8, 8, 15, 0, 0)));
+        }
+
+        [Fact]
+        public void Stamp_FailureCause_ReadsAsOneClausePerSeparator()
+        {
+            // The cause clause is colon-introduced and the timestamp
+            // dash-introduced, so the composed line never repeats one
+            // separator at two grammatical levels.
+            string cause = StatusText.ForRefreshFailure(
+                SnapshotFailureKind.NetworkOrApiDown, failedSourceCount: 5, totalSourceCount: 5);
+            Assert.Equal(
+                "Refresh failed: could not reach the GW2 API \u2014 Aug 15, 2026 3:41 PM",
+                StatusText.Stamp(cause, new DateTime(2026, 8, 15, 15, 41, 0)));
+        }
+
+        [Fact]
+        public void Stamp_BlankVerb_ReturnsBareTimestampNotADanglingSeparator()
+        {
+            string expected = "Aug 8, 2026 3:00 PM";
+            Assert.Equal(expected, StatusText.Stamp(null, new DateTime(2026, 8, 8, 15, 0, 0)));
+            Assert.Equal(expected, StatusText.Stamp("   ", new DateTime(2026, 8, 8, 15, 0, 0)));
+        }
+
+        // ---- ForSnapshotAgeSuffix (audit batch J, M10): the age suffix
+        // names its subject, so a failure timestamp followed by a snapshot
+        // age can no longer read as one moment. ----
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_Days_NamesItsSubject()
+        {
+            Assert.Equal("snapshot 29d old", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromDays(29)));
+        }
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_Minutes_NamesItsSubject()
+        {
+            Assert.Equal("snapshot 2m old", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromMinutes(2)));
+        }
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_Hours_KeepsTheMinutesComponent()
+        {
+            Assert.Equal(
+                "snapshot 3h 20m old",
+                StatusText.ForSnapshotAgeSuffix(TimeSpan.FromMinutes(200)));
+        }
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_SubMinute_ReadsAsCapturedNotZeroOld()
+        {
+            Assert.Equal("snapshot just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromSeconds(30)));
+        }
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_Zero_ReadsAsCaptured()
+        {
+            Assert.Equal("snapshot just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.Zero));
+        }
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_Negative_ClampedToZero()
+        {
+            // CapturedAt momentarily ahead of the local clock (minor clock
+            // skew) must never render as a negative duration.
+            Assert.Equal("snapshot just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromSeconds(-5)));
+        }
+
+        // The bucket ladder, boundary by boundary - the coverage that used
+        // to sit on a second, caller-less age wording.
+        [Theory]
+        [InlineData(0.5, "snapshot just captured")]
+        [InlineData(1, "snapshot 1m old")]
+        [InlineData(59, "snapshot 59m old")]
+        [InlineData(60, "snapshot 1h 0m old")]
+        [InlineData(65, "snapshot 1h 5m old")]
+        [InlineData(1439, "snapshot 23h 59m old")]
+        [InlineData(1440, "snapshot 1d old")]
+        [InlineData(2880, "snapshot 2d old")]
+        public void ForSnapshotAgeSuffix_BucketLadder(double minutes, string expected)
+        {
+            Assert.Equal(expected, StatusText.ForSnapshotAgeSuffix(TimeSpan.FromMinutes(minutes)));
         }
     }
 

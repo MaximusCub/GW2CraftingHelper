@@ -171,6 +171,8 @@
     <Compile Include="Views\Rendering\PillColors.cs" />
     <Compile Include="Views\Rendering\UsedMaterialsSectionRenderer.cs" />
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />
+    <Compile Include="Views\Rendering\TableHeaderStyle.cs" />
+    <Compile Include="Views\Rendering\UiMetrics.cs" />
     <Compile Include="Views\Rendering\TextRowRenderer.cs" />
     <Compile Include="Views\Rendering\CTableHeaderRenderer.cs" />
     <Compile Include="Views\Rendering\CraftStepsSectionRenderer.cs" />
@@ -180,6 +182,7 @@
     <Compile Include="Views\Rendering\RowRelayoutHelpers.cs" />
     <Compile Include="Views\Rendering\TreeSectionController.cs" />
     <Compile Include="Views\Rendering\TreeToolbarCommands.cs" />
+    <Compile Include="Views\ModalBackdrop.cs" />
     <Compile Include="Views\ModalDialog.cs" />
     <Compile Include="Views\ApiAccessDialog.cs" />
     <Compile Include="Views\LogTabContent.cs" />

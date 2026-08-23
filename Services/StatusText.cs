@@ -1,10 +1,52 @@
 using System;
+using System.Globalization;
 
 namespace GW2CraftingHelper.Services
 {
     public static class StatusText
     {
         public static string Normalize(string status) => status ?? "";
+
+        /// <summary>
+        /// The one timestamp format every user-facing status line uses.
+        /// Invariant culture for the reason LogLineFormat records: the
+        /// module's strings are English-only, and "h:mm tt" yields an EMPTY
+        /// AM/PM designator under some cultures.
+        /// </summary>
+        public const string TimestampFormat = "MMM d, yyyy h:mm tt";
+
+        /// <summary>
+        /// The one separator between a status verb and its timestamp. An
+        /// em-dash rather than the hyphen two of the four call sites used:
+        /// a hyphen is already this module's WITHIN-clause separator
+        /// ("Copy failed - clipboard unavailable", "Refresh failed:
+        /// could not reach the GW2 API"), so reusing it here left a line
+        /// with two identical separators at two different grammatical
+        /// levels. Em-dash is permitted here under the repo's ASCII rule
+        /// (rendered UI text, written as an escape, never a raw glyph).
+        /// </summary>
+        public const string StampSeparator = " \u2014 ";
+
+        /// <summary>
+        /// The shape of every timestamped status line in the module:
+        /// "&lt;Sentence case verb&gt; - &lt;timestamp&gt;", one separator,
+        /// one timestamp format. Four sites wrote this by hand with two
+        /// different separators (Views/MainView's three snapshot lines,
+        /// SettingsTabContent's "Saved", CraftingPlanView's "Plan
+        /// generated"); they now all call here, so no future site can
+        /// invent a fifth spelling.
+        /// <para>
+        /// The verb is written by the caller and is expected to be sentence
+        /// case; a blank verb yields the bare timestamp rather than a
+        /// dangling separator.
+        /// </para>
+        /// </summary>
+        public static string Stamp(string verb, DateTime when)
+        {
+            string trimmedVerb = verb == null ? "" : verb.Trim();
+            string timestamp = when.ToString(TimestampFormat, CultureInfo.InvariantCulture);
+            return trimmedVerb.Length == 0 ? timestamp : trimmedVerb + StampSeparator + timestamp;
+        }
 
         /// <summary>
         /// The re-solve status line for
@@ -23,14 +65,49 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Formats a snapshot's age for the Snapshot tab's staleness
-        /// suffix (d1-snapshot-about-settings.md Feature 1),
-        /// e.g. "Updated - Aug 15, 2026 3:41 PM (2m ago)". A negative age
-        /// (CapturedAt momentarily ahead of the local clock - e.g. minor
-        /// clock skew right after a fetch) is treated as zero rather than
-        /// shown as a negative duration.
+        /// How much time an age is, with no "ago"/"old" framing - the
+        /// bucket ladder behind <see cref="ForSnapshotAgeSuffix"/>. The
+        /// caller handles the sub-minute case; below a minute this reports
+        /// "0m".
         /// </summary>
-        public static string ForSnapshotAge(TimeSpan age)
+        private static string AgeMagnitude(TimeSpan age)
+        {
+            if (age.TotalHours < 1)
+            {
+                return $"{(int)age.TotalMinutes}m";
+            }
+
+            if (age.TotalDays < 1)
+            {
+                return $"{(int)age.TotalHours}h {age.Minutes}m";
+            }
+
+            return $"{(int)age.TotalDays}d";
+        }
+
+        /// <summary>
+        /// The Snapshot header's age suffix, worded so it cannot be read as
+        /// part of the timestamp beside it. The line pairs two different
+        /// moments - when the last refresh ATTEMPT happened and how old the
+        /// snapshot on screen is - and the old
+        /// "Refresh failed: ... - Aug 15, 2026 3:41 PM (29d ago)" put a
+        /// bare relative time immediately after an absolute one, which
+        /// reads as a restatement of that same instant rather than a
+        /// second fact about a different one. "(snapshot 29d old)" names
+        /// its subject, so the two can no longer collapse into one.
+        /// <para>
+        /// The module's only snapshot-age wording. A second one ("2m ago")
+        /// briefly existed beside it and was deleted once this replaced its
+        /// last caller: two formatters over one ladder, with only tests
+        /// holding the older one up, is drift waiting to happen.
+        /// </para>
+        /// <para>
+        /// A negative age (CapturedAt momentarily ahead of the local clock -
+        /// e.g. minor clock skew right after a fetch) is treated as zero
+        /// rather than shown as a negative duration.
+        /// </para>
+        /// </summary>
+        public static string ForSnapshotAgeSuffix(TimeSpan age)
         {
             if (age < TimeSpan.Zero)
             {
@@ -39,20 +116,10 @@ namespace GW2CraftingHelper.Services
 
             if (age.TotalMinutes < 1)
             {
-                return "just now";
+                return "snapshot just captured";
             }
 
-            if (age.TotalHours < 1)
-            {
-                return $"{(int)age.TotalMinutes}m ago";
-            }
-
-            if (age.TotalDays < 1)
-            {
-                return $"{(int)age.TotalHours}h {age.Minutes}m ago";
-            }
-
-            return $"{(int)age.TotalDays}d ago";
+            return $"snapshot {AgeMagnitude(age)} old";
         }
 
         /// <summary>
@@ -75,23 +142,30 @@ namespace GW2CraftingHelper.Services
         /// fix for the "Refresh Failed" dead end (at CHARACTER
         /// SELECT every account data source throws an invalid-token
         /// exception, and the bare status line gave no hint why). Callers
-        /// append " - {time}" themselves, matching the pre-existing
-        /// "Refresh failed - {time}" shape exactly for the Unknown case
+        /// pass the result to <see cref="Stamp"/> as the verb, so the
+        /// Unknown case still reads exactly like every other status line
         /// (nothing more specific to say once no known pattern matched).
         /// ApiAccessNotReady also drives Views/MainView.cs's walkthrough
         /// dialog, but still gets its own status text here so the header
         /// label reads correctly once that dialog is closed.
+        /// <para>
+        /// The cause clause is introduced by a COLON, not the dash it used
+        /// to use: <see cref="StampSeparator"/> now owns the dash, and a
+        /// line carrying both ("Refresh failed - could not reach the GW2
+        /// API - Aug 15, 2026 3:41 PM") gave two unrelated clauses the same
+        /// separator and no way to tell which was which.
+        /// </para>
         /// </summary>
         public static string ForRefreshFailure(SnapshotFailureKind kind, int failedSourceCount, int totalSourceCount)
         {
             switch (kind)
             {
                 case SnapshotFailureKind.ApiAccessNotReady:
-                    return "Refresh failed \u2014 GW2 API access not ready";
+                    return "Refresh failed: GW2 API access not ready";
                 case SnapshotFailureKind.NetworkOrApiDown:
-                    return "Refresh failed \u2014 could not reach the GW2 API";
+                    return "Refresh failed: could not reach the GW2 API";
                 case SnapshotFailureKind.PartialFailure:
-                    return $"Refresh partially failed \u2014 {failedSourceCount} of {totalSourceCount} sources";
+                    return $"Refresh partially failed: {failedSourceCount} of {totalSourceCount} sources";
                 default:
                     return "Refresh failed";
             }

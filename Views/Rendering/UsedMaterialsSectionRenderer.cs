@@ -74,6 +74,19 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
             }
 
+            // Item/Amount column header. This was the one plan table with
+            // a right-hand column and no header naming it (audit batch J,
+            // L2) - the reader had to infer that a bare "12x" column was a
+            // quantity. Unconditional, like the Shopping List's and the two
+            // c-tables', so it can never disagree with
+            // PlanContentHeightMath.SectionBodyHeight, which counts it the
+            // same way. rightXForWidth because the Amount column is no
+            // longer pinned to the panel edge (batch H) - it has to track
+            // the same QtyRightEdge its rows do.
+            CTableHeaderRenderer.CreateCTableHeaderRow(
+                contentFlow, panelWidth, "Item", NameX, "Amount", _sink,
+                rightXForWidth: w => QtyRightEdge(w, maxQtyWidth, widestNameEnd));
+
             for (int i = 0; i < section.Rows.Count; i++)
             {
                 CreateUsedMaterialRow(

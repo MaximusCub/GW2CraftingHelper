@@ -10,7 +10,6 @@ using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -48,6 +47,14 @@ namespace GW2CraftingHelper.Views
         private const int QtyInputX = 240;
         private const int QtyInputWidth = 50;
         private const int RowButtonsX = 320;
+
+        // The row's +/- pair: square, and the same height as every other
+        // button in the module - which is also the height of the search and
+        // quantity boxes they sit beside, so the run now shares one baseline
+        // instead of mixing 28px inputs with 24px buttons.
+        private const int RowButtonSize = UiMetrics.ButtonHeight;
+        private const int RowButtonGap = 8;
+        private const int RowButtonY = 3;
         private const int SuggestionAnchorGap = 12;
 
         private const int RightEdgePadding = 20;
@@ -453,7 +460,17 @@ namespace GW2CraftingHelper.Views
         // call site checks the setting before doing any work, so the
         // disabled cost is a single bool read. Diagnostics only observe -
         // never fed back into any scroll/guard/restore decision.
-        private const string ScrollDiagTag = "[scrolldiag]";
+        // Two spellings of one tag, for two sinks with different shapes:
+        // ModuleLogEntry carries the tag as a FIELD (the Log tab renders it
+        // as "[scrolldiag]" in its own prefix column), while Blish's Logger
+        // has no tag column and needs it inside the message. Every call
+        // site used to prepend the bracketed form to the message text AND
+        // hand it to ModuleLog under the same tag, so every Log tab line
+        // read "[scrolldiag] [scrolldiag] wheel frame=..." - fixed here, in
+        // the one place that writes to both sinks, rather than at fourteen
+        // call sites.
+        private const string ScrollDiagLogTag = "scrolldiag";
+        private const string ScrollDiagTag = "[" + ScrollDiagLogTag + "]";
 
         // Monotonic frame index shared by every scroll-diagnostic log line
         // (wheel handler, SyncRestore, Verify) so a human reading the log can
@@ -495,8 +512,8 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void LogScrollDiag(string message)
         {
-            Logger.Debug(message);
-            ModuleLog.Shared.Write(ModuleLogLevel.Debug, "scrolldiag", message);
+            Logger.Debug($"{ScrollDiagTag} {message}");
+            ModuleLog.Shared.Write(ModuleLogLevel.Debug, ScrollDiagLogTag, message);
         }
 
         #endregion // Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
@@ -630,20 +647,14 @@ namespace GW2CraftingHelper.Views
                 _valueOwnMaterialsCheckbox.Checked = valueOwnMaterials;
             }
 
-            // Culture policy (applies to every ToString(..., CultureInfo.
-            // InvariantCulture) timestamp in this file, not just this one):
-            // this module's UI/log strings are English-only, so timestamp
-            // formatting is pinned to InvariantCulture rather than the
-            // ambient CurrentCulture - matching MainView.cs, Module.cs,
-            // SettingsTabContent.cs and LogTabContent.cs. This file's own
-            // sites predate that policy (they originated the "MMM d, yyyy
-            // h:mm tt" format string) and were converted to match it rather
-            // than left on CurrentCulture, which would go on to produce a
-            // blank AM/PM designator under several locales (e.g. de-DE's
-            // short time pattern has no AM/PM marker) and would disagree
-            // with the Log tab's own InvariantCulture timestamps.
+            // The stamped half goes through StatusText.Stamp, which owns
+            // the module's one timestamp format and its InvariantCulture
+            // policy (English-only strings; several locales' short time
+            // pattern has no AM/PM designator at all). The trailing clause
+            // keeps the hyphen: the dash separates verb from timestamp, a
+            // hyphen separates clauses.
             _statusBoard.SeedRestored(
-                $"Generated {generatedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)} - prices may have changed - Regenerate");
+                StatusText.Stamp("Generated", generatedAt) + " - prices may have changed - Regenerate");
             RenderFromBoard(_statusBoard.Snapshot());
 
             if (_contentPanel == null || _contentPanel.Parent == null) return;
@@ -699,6 +710,12 @@ namespace GW2CraftingHelper.Views
             // row itself would otherwise stay reserved over a plan that no
             // longer exists.
             ApplyTreeToolbarVisibility(false);
+
+            // Leaves the tab in the SAME no-plan state a first visit shows,
+            // rather than the blank panel a rolled-back render used to
+            // leave behind - the status strip carries the failure, the
+            // content area says what to do next.
+            ShowEmptyPlanState();
 
             if (_statusBoard.ClearRestoredSeed())
             {
@@ -917,7 +934,7 @@ namespace GW2CraftingHelper.Views
 
             if (diagEnabled)
             {
-                LogScrollDiag($"{ScrollDiagTag} write writer=SyncRestore frame={ScrollDiagFrame()} before={before:0.0000} after={ratio:0.0000} contentHeight={contentHeight} savedOffset={savedOffset} generation={capturedGeneration}");
+                LogScrollDiag($"write writer=SyncRestore frame={ScrollDiagFrame()} before={before:0.0000} after={ratio:0.0000} contentHeight={contentHeight} savedOffset={savedOffset} generation={capturedGeneration}");
             }
 
             StartScrollVerify(capturedPanel, capturedGeneration, savedOffset, scrollbar);
@@ -971,7 +988,7 @@ namespace GW2CraftingHelper.Views
 
             if (ScrollDiagEnabled)
             {
-                LogScrollDiag($"{ScrollDiagTag} verify-armed frame={ScrollDiagFrame()} savedOffset={savedOffset} generation={capturedGeneration}");
+                LogScrollDiag($"verify-armed frame={ScrollDiagFrame()} savedOffset={savedOffset} generation={capturedGeneration}");
             }
 
             bool VerifyTick(GameTime gameTime)
@@ -988,7 +1005,7 @@ namespace GW2CraftingHelper.Views
                 {
                     if (diagEnabled)
                     {
-                        LogScrollDiag($"{ScrollDiagTag} verify exit reason=stale-generation frame={ScrollDiagFrame()} realFrame={frame} generation={capturedGeneration} liveGeneration={_scrollRestoreGeneration}");
+                        LogScrollDiag($"verify exit reason=stale-generation frame={ScrollDiagFrame()} realFrame={frame} generation={capturedGeneration} liveGeneration={_scrollRestoreGeneration}");
                     }
                     return false;
                 }
@@ -1005,7 +1022,7 @@ namespace GW2CraftingHelper.Views
                     {
                         if (diagEnabled)
                         {
-                            LogScrollDiag($"{ScrollDiagTag} verify exit reason=wheel-observed frame={ScrollDiagFrame()} realFrame={frame}");
+                            LogScrollDiag($"verify exit reason=wheel-observed frame={ScrollDiagFrame()} realFrame={frame}");
                         }
                         return false;
                     }
@@ -1030,14 +1047,14 @@ namespace GW2CraftingHelper.Views
 
                         if (diagEnabled)
                         {
-                            LogScrollDiag($"{ScrollDiagTag} write writer=Verify/zeroReassert frame={ScrollDiagFrame()} realFrame={frame} before={current:0.0000} after={target:0.0000} contentHeight={contentHeight} bounceCount={zeroReassert}");
+                            LogScrollDiag($"write writer=Verify/zeroReassert frame={ScrollDiagFrame()} realFrame={frame} before={current:0.0000} after={target:0.0000} contentHeight={contentHeight} bounceCount={zeroReassert}");
                         }
 
                         if (zeroReassert >= ScrollVerifyZeroReassertCap)
                         {
                             if (diagEnabled)
                             {
-                                LogScrollDiag($"{ScrollDiagTag} verify exit reason=zero-reassert-cap-exceeded frame={ScrollDiagFrame()} realFrame={frame} bounceCount={zeroReassert}");
+                                LogScrollDiag($"verify exit reason=zero-reassert-cap-exceeded frame={ScrollDiagFrame()} realFrame={frame} bounceCount={zeroReassert}");
                             }
                             return false;
                         }
@@ -1050,7 +1067,7 @@ namespace GW2CraftingHelper.Views
                         // re-assert over legitimate user input.
                         if (diagEnabled)
                         {
-                            LogScrollDiag($"{ScrollDiagTag} verify exit reason=user-scroll-detected frame={ScrollDiagFrame()} realFrame={frame} observed={current:0.0000} target={target:0.0000} contentHeight={contentHeight}");
+                            LogScrollDiag($"verify exit reason=user-scroll-detected frame={ScrollDiagFrame()} realFrame={frame} observed={current:0.0000} target={target:0.0000} contentHeight={contentHeight}");
                         }
                         return false;
                     }
@@ -1064,7 +1081,7 @@ namespace GW2CraftingHelper.Views
                         // fighting the restore.
                         if (diagEnabled)
                         {
-                            LogScrollDiag($"{ScrollDiagTag} verify exit reason=stable frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
+                            LogScrollDiag($"verify exit reason=stable frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
                         }
                         return false;
                     }
@@ -1076,7 +1093,7 @@ namespace GW2CraftingHelper.Views
 
                     if (diagEnabled)
                     {
-                        LogScrollDiag($"{ScrollDiagTag} verify exit reason=max-frames frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
+                        LogScrollDiag($"verify exit reason=max-frames frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
                     }
                     return false;
                 }
@@ -1087,7 +1104,7 @@ namespace GW2CraftingHelper.Views
                     Logger.Warn(ex, "Scroll verify stopped by exception");
                     if (diagEnabled)
                     {
-                        LogScrollDiag($"{ScrollDiagTag} verify exit reason=disposed-exception frame={ScrollDiagFrame()} realFrame={frame} error={ex.GetType().Name}");
+                        LogScrollDiag($"verify exit reason=disposed-exception frame={ScrollDiagFrame()} realFrame={frame} error={ex.GetType().Name}");
                     }
                     return false;
                 }
@@ -1226,7 +1243,7 @@ namespace GW2CraftingHelper.Views
 
             if (ScrollDiagEnabled)
             {
-                LogScrollDiag($"{ScrollDiagTag} write writer=WheelWrapFix frame={ScrollDiagFrame()} rawIn={rawIn} intendedDelta={intendedDelta} before={before:0.0000} after={after:0.0000}");
+                LogScrollDiag($"write writer=WheelWrapFix frame={ScrollDiagFrame()} rawIn={rawIn} intendedDelta={intendedDelta} before={before:0.0000} after={after:0.0000}");
             }
 
             StartWheelWrapVerify(scrollbar, after);
@@ -1269,7 +1286,7 @@ namespace GW2CraftingHelper.Views
                         scrollbar.ScrollDistance = target;
                         if (diagEnabled)
                         {
-                            LogScrollDiag($"{ScrollDiagTag} write writer=WheelWrapFix/reassert frame={ScrollDiagFrame()} before={current:0.0000} after={target:0.0000}");
+                            LogScrollDiag($"write writer=WheelWrapFix/reassert frame={ScrollDiagFrame()} before={current:0.0000} after={target:0.0000}");
                         }
                         return false;
                     }
@@ -1311,7 +1328,7 @@ namespace GW2CraftingHelper.Views
             int wheelValue = GameService.Input.Mouse.State.ScrollWheelValue;
             bool verifyLive = _scrollVerifyTicker != null && _scrollVerifyTicker.IsActive;
 
-            LogScrollDiag($"{ScrollDiagTag} wheel frame={ScrollDiagFrame()} sign={System.Math.Sign(wheelValue)} raw={wheelValue} scrollDistance={(scrollbar?.ScrollDistance ?? -1f):0.0000} contentHeight={contentHeight} verifyLive={verifyLive}");
+            LogScrollDiag($"wheel frame={ScrollDiagFrame()} sign={System.Math.Sign(wheelValue)} raw={wheelValue} scrollDistance={(scrollbar?.ScrollDistance ?? -1f):0.0000} contentHeight={contentHeight} verifyLive={verifyLive}");
         }
 
         #endregion // 4. Wheel-wrap correction (continued) - KNOWN-ISSUES #12 (reopened)
@@ -1456,13 +1473,13 @@ namespace GW2CraftingHelper.Views
                 var removeButton = new StandardButton()
                 {
                     Text = "-",
-                    Size = new Point(24, 24),
-                    Location = new Point(nextX, 3),
+                    Size = new Point(RowButtonSize, RowButtonSize),
+                    Location = new Point(nextX, RowButtonY),
                     Parent = rowPanel,
                     BasicTooltipText = "Remove this item from the plan"
                 };
                 removeButton.Click += (_, __) => RemoveItemRow(row);
-                nextX += 24 + 8;
+                nextX += RowButtonSize + RowButtonGap;
             }
 
             if (index == _itemRows.Count - 1)
@@ -1470,8 +1487,8 @@ namespace GW2CraftingHelper.Views
                 var addButton = new StandardButton()
                 {
                     Text = "+",
-                    Size = new Point(24, 24),
-                    Location = new Point(nextX, 3),
+                    Size = new Point(RowButtonSize, RowButtonSize),
+                    Location = new Point(nextX, RowButtonY),
                     Parent = rowPanel,
                     // Sitting next to the quantity field, a bare "+" reads
                     // as a stepper. Say what it actually adds.
@@ -1696,7 +1713,7 @@ namespace GW2CraftingHelper.Views
             _generateButton = new StandardButton()
             {
                 Text = "Generate Plan",
-                Size = new Point(120, 28),
+                Size = new Point(120, UiMetrics.ButtonHeight),
                 Location = new Point(w - 120 - RightEdgePadding, 3),
                 Parent = _controlsPanel
             };
@@ -1795,11 +1812,23 @@ namespace GW2CraftingHelper.Views
                     RollBackFailedPlanRender(ex, "on tab visit");
                 }
             }
+            else if (!boardSnapshot.InFlight)
+            {
+                // Only when nothing is running. A solver started before the
+                // user switched tabs is still in flight on the way back, and
+                // "No plan yet. Search for an item above, then click
+                // Generate Plan." beside a status strip reading
+                // "Generating..." instructs the user to do the thing that is
+                // already happening. The spinner armed above is the whole
+                // message in that case; the content area stays empty until
+                // the render the board's own completion drives.
+                ShowEmptyPlanState();
+            }
         }
 
         // Toolbar row geometry. The five widths are the ones the buttons
         // carried in the section header; only their home changed.
-        private const int TreeToolbarButtonHeight = 24;
+        private const int TreeToolbarButtonHeight = UiMetrics.ButtonHeight;
         private const int TreeToolbarButtonY =
             (TopRegionLayoutMath.TreeToolbarRowHeight - TreeToolbarButtonHeight) / 2;
         private const int TreeToolbarButtonGap = 4;
@@ -2008,7 +2037,15 @@ namespace GW2CraftingHelper.Views
             // when the width genuinely did not change (e.g. a height-only
             // resize, or a duplicate event) so an idle window never pays
             // for a registry walk.
-            if (_currentPlan != null && widthChanged)
+            //
+            // NOT gated on _currentPlan: the empty state registers relayout
+            // closures too (its centered label and the spacer above it are
+            // width-sized), and gating this on a plan left them dead - a
+            // no-plan tab dragged narrower kept the label centered on the
+            // build-time width and overflowed the panel. ReplayRelayout
+            // already returns immediately on an empty registry, which is
+            // the same guard for the same cost.
+            if (widthChanged)
             {
                 _lastRenderedWidth = w;
 
@@ -2026,7 +2063,11 @@ namespace GW2CraftingHelper.Views
             // regression was found under. Bounded to a single in-flight
             // ticker (_resizeSettlePending) so repeated ticks during a drag
             // just extend _lastResizeEventUtc rather than spawning parallel
-            // tickers - see ResizeSettleStep.
+            // tickers - see ResizeSettleStep. Still gated on _currentPlan,
+            // unlike the replay above: every job this pass does (re-ellipsis,
+            // the defensive replay, the scroll verify, the notes re-render)
+            // is about rendered plan content, so a no-plan tab would spawn a
+            // ticker per drag to do nothing.
             if (_currentPlan != null && (widthChanged || heightChanged))
             {
                 _lastResizeEventUtc = DateTime.UtcNow;
@@ -2143,7 +2184,7 @@ namespace GW2CraftingHelper.Views
 
             if (ScrollDiagEnabled)
             {
-                LogScrollDiag($"{ScrollDiagTag} write writer=ResizePreserve frame={ScrollDiagFrame()} before={before:0.0000} after={ratio:0.0000} contentHeight={contentHeight} savedOffset={savedOffsetPx} newHeight={newContentPanelHeight}");
+                LogScrollDiag($"write writer=ResizePreserve frame={ScrollDiagFrame()} before={before:0.0000} after={ratio:0.0000} contentHeight={contentHeight} savedOffset={savedOffsetPx} newHeight={newContentPanelHeight}");
             }
         }
 
@@ -2854,7 +2895,7 @@ namespace GW2CraftingHelper.Views
                     // panel is torn down must not drop the "Plan
                     // generated" text - a later Build() pulls it from the
                     // board instead.
-                    _statusBoard.Finish(myGen, $"Plan generated - {_planGeneratedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}");
+                    _statusBoard.Finish(myGen, StatusText.Stamp("Plan generated", _planGeneratedAt));
 
                     // Plan CONTENT still requires a live panel to render
                     // into - unlike the strip status above, this part of
@@ -3189,6 +3230,73 @@ namespace GW2CraftingHelper.Views
             {
                 child.Dispose();
             }
+        }
+
+        // What the tab says when it holds no plan. The default state was
+        // blank parchment plus a small "Ready" on the status strip, which
+        // names no next action - the Log tab already answers the same
+        // question with a dim label in its own empty content panel, and
+        // this is that pattern.
+        private const string EmptyPlanText =
+            "No plan yet. Search for an item above, then click Generate Plan.";
+        private const int EmptyPlanTopGap = 48;
+        private static readonly Color EmptyPlanTextColor = new Color(150, 150, 150);
+
+        /// <summary>
+        /// Parents the empty-state label into the (already emptied) content
+        /// panel. Nothing disposes it explicitly: it is a child of
+        /// _contentPanel like every rendered section, so
+        /// ResetContentPanelToEmpty sweeps it on the first render of a real
+        /// plan - which is the "disposed on first render" the finding asks
+        /// for, through the path that already exists rather than a second
+        /// one that could drift from it.
+        /// <para>
+        /// The gap is a spacer Panel, not a Location: _contentPanel is a
+        /// SingleTopToBottom FlowPanel and positions its own children, the
+        /// same reason CreateSectionHeader emits a topGap panel.
+        /// </para>
+        /// </summary>
+        private void ShowEmptyPlanState()
+        {
+            if (_contentPanel == null) return;
+
+            // Starts from the same "nothing rendered yet" point RenderPlan
+            // does, and for the same reason: this method registers a
+            // relayout closure, and _relayoutActions is cleared ONLY here.
+            // Without it, a tab visit with no plan would leave the previous
+            // visit's closures in the registry, each one writing Size into
+            // a control that visit already disposed. Idempotent - both call
+            // sites reach it with the panel already empty (the rollback
+            // path calls it explicitly first, deliberately, and both the
+            // tree-state reset and the registry clears are repeat-safe).
+            ResetContentPanelToEmpty();
+
+            int panelWidth = _contentPanel.Width - RightEdgePadding;
+            if (panelWidth < 0) panelWidth = 0;
+
+            var topGap = new Panel()
+            {
+                Size = new Point(panelWidth, EmptyPlanTopGap),
+                Parent = _contentPanel
+            };
+
+            var label = new Label()
+            {
+                Text = EmptyPlanText,
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = panelWidth,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextColor = EmptyPlanTextColor,
+                Parent = _contentPanel
+            };
+
+            _relayoutActions.Add(w =>
+            {
+                int width = w > 0 ? w : 0;
+                topGap.Size = new Point(width, EmptyPlanTopGap);
+                label.Width = width;
+            });
         }
 
         private void RenderPlan(PlanViewModel vm)

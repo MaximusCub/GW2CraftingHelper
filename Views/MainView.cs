@@ -6,7 +6,6 @@ using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -97,9 +96,31 @@ namespace GW2CraftingHelper.Views
         private const int SearchDebounceMs = 150;
         private CancellationTokenSource _searchDebounceCts;
 
+        // Width-driven re-fit of the rows already on screen - see
+        // ScheduleRowRefit. Deliberately NOT the search debounce above: that
+        // one is cancel-and-replace, so routing a resize drag through it
+        // allocated a CancellationTokenSource and threw a cancellation
+        // exception per drag FRAME, and its callback disposes and rebuilds
+        // every row (re-running the search, and putting the scroll position
+        // at risk) to change nothing but text that no longer fits.
+        // _lastRowLayoutWidth is the width the rows on screen were actually
+        // laid out at, so a drag that ends where it started re-fits nothing.
+        private const int ResizeSettleMs = 150;
+        private readonly List<Action<int>> _rowRefitActions = new List<Action<int>>();
+        private int _lastRowLayoutWidth = -1;
+        private bool _rowRefitPending;
+        private long _lastResizeEventTicks;
+
         // Layout constants
         private const int HeaderRowY = 5;
         private const int HeaderHeight = 40;
+
+        // Vertically centred in the 40px header panel, derived rather than
+        // written down: these two buttons were the module's only 30px ones
+        // and dropping them to the shared UiMetrics.ButtonHeight would
+        // otherwise have left them sitting 2px high against the "Account
+        // Snapshot" label beside them.
+        private const int HeaderButtonY = (HeaderHeight - UiMetrics.ButtonHeight) / 2;
 
         // The status label gets its own full-width row beneath the
         // header rather than sharing _headerPanel with the buttons - a
@@ -371,8 +392,8 @@ namespace GW2CraftingHelper.Views
             _clearButton = new StandardButton()
             {
                 Text = "Clear Cache",
-                Size = new Point(100, 30),
-                Location = new Point(w - 220, 5),
+                Size = new Point(100, UiMetrics.ButtonHeight),
+                Location = new Point(w - 220, HeaderButtonY),
                 Parent = _headerPanel,
                 Enabled = _clearCache != null
             };
@@ -383,8 +404,8 @@ namespace GW2CraftingHelper.Views
             _refreshButton = new StandardButton()
             {
                 Text = "Refresh Now",
-                Size = new Point(100, 30),
-                Location = new Point(w - 110, 5),
+                Size = new Point(100, UiMetrics.ButtonHeight),
+                Location = new Point(w - 110, HeaderButtonY),
                 Parent = _headerPanel,
                 Enabled = _refreshAsync != null
             };
@@ -652,12 +673,13 @@ namespace GW2CraftingHelper.Views
             int w = container.ContentRegion.Width;
             int h = container.ContentRegion.Height;
 
+            bool widthChanged = w != _containerWidth;
             _containerWidth = w;
             _containerHeight = h;
 
             _headerPanel.Size = new Point(w, HeaderHeight);
-            _clearButton.Location = new Point(w - 220, 5);
-            _refreshButton.Location = new Point(w - 110, 5);
+            _clearButton.Location = new Point(w - 220, HeaderButtonY);
+            _refreshButton.Location = new Point(w - 110, HeaderButtonY);
             _statusPanel.Size = new Point(w, StatusRowHeight);
 
             // Re-flows the source-filter checkboxes at the new width (a
@@ -666,6 +688,15 @@ namespace GW2CraftingHelper.Views
             // and content panels beneath whatever that needs - the reason
             // those three are not sized here directly.
             ApplyTopRegionLayout();
+
+            // Result rows are ellipsized to the content width at build
+            // time, so a width change has to re-fit them or a widened
+            // window keeps showing "..." on text that now fits. A
+            // height-only drag re-ellipsizes nothing and arms nothing.
+            if (widthChanged)
+            {
+                ScheduleRowRefit();
+            }
         }
 
         /// <summary>
@@ -1019,7 +1050,7 @@ namespace GW2CraftingHelper.Views
                     SetSnapshotActionsEnabled(true);
                     _clearCache();
                     SetSnapshot(null);
-                    var status = $"Cache cleared \u2014 {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
+                    var status = StatusText.Stamp("Cache cleared", DateTime.Now);
                     SetStatus(status);
                     _saveStatus(status);
                 },
@@ -1110,7 +1141,7 @@ namespace GW2CraftingHelper.Views
                 }
 
                 string status = snapshot != null
-                    ? $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}"
+                    ? StatusText.Stamp("Updated", snapshot.CapturedAt.ToLocalTime())
                     : null;
 
                 // Persist BEFORE marshaling, while still on this
@@ -1184,7 +1215,7 @@ namespace GW2CraftingHelper.Views
 
                 var classification = SnapshotFailureClassifier.Classify(ex);
                 string cause = StatusText.ForRefreshFailure(classification.Kind, classification.FailedSourceCount, classification.TotalSourceCount);
-                var status = $"{cause} \u2014 {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
+                var status = StatusText.Stamp(cause, DateTime.Now);
                 _saveStatusThreadSafe(status);
                 MainThreadMarshal.Run(() =>
                 {
@@ -1222,7 +1253,10 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// Composes the header status label's text (base status text plus
         /// a staleness-age suffix, e.g. "Updated - Aug 15, 2026 3:41 PM
-        /// (2m ago)") and recolors it once the snapshot is older than the
+        /// (snapshot 2m old)" - the suffix names its subject so it cannot
+        /// be misread as a restatement of the timestamp beside it, see
+        /// StatusText.ForSnapshotAgeSuffix) and recolors it once the
+        /// snapshot is older than the
         /// SnapshotRefreshIntervalMinutes setting - the same threshold
         /// Module.Update()'s auto-refresh gate reads, re-read (clamped)
         /// on every call here just like that gate does, so a Settings tab
@@ -1249,7 +1283,7 @@ namespace GW2CraftingHelper.Views
             if (_snapshot != null)
             {
                 TimeSpan age = DateTime.UtcNow - _snapshot.CapturedAt;
-                string ageText = StatusText.ForSnapshotAge(age);
+                string ageText = StatusText.ForSnapshotAgeSuffix(age);
                 text = string.IsNullOrEmpty(text) ? ageText : $"{text} ({ageText})";
                 var staleThreshold = TimeSpan.FromMinutes(_settings.GetClampedSnapshotRefreshIntervalMinutes());
                 _statusLabel.TextColor = StatusText.IsStale(age, staleThreshold) ? WarningTextColor : _defaultStatusColor;
@@ -1260,6 +1294,123 @@ namespace GW2CraftingHelper.Views
             }
 
             _statusLabel.Text = text;
+        }
+
+        /// <summary>
+        /// Arms ONE trailing re-fit per resize drag, however many resize
+        /// events that drag produces. Each event only stamps
+        /// <see cref="_lastResizeEventTicks"/>; the pending waiter re-arms
+        /// itself against that stamp until the drag has been quiet for
+        /// <see cref="ResizeSettleMs"/>. Bounded to a single in-flight
+        /// waiter by <see cref="_rowRefitPending"/> - the same shape
+        /// CraftingPlanView's _resizeSettlePending ticker uses, for the same
+        /// reason: a cancel-and-replace timer per drag frame is allocation
+        /// and a thrown cancellation exception per frame, on the UI thread's
+        /// own event path.
+        /// <para>
+        /// Main thread only (the Resized handler), which is what makes the
+        /// flag a plain bool; the ticks stamp crosses to a ThreadPool thread
+        /// and so goes through <see cref="Interlocked"/>.
+        /// </para>
+        /// </summary>
+        private void ScheduleRowRefit()
+        {
+            Interlocked.Exchange(ref _lastResizeEventTicks, DateTime.UtcNow.Ticks);
+
+            if (_rowRefitPending)
+            {
+                return;
+            }
+
+            _rowRefitPending = true;
+            RunRowRefitAfterSettleAsync();
+        }
+
+        /// <summary>
+        /// Waits out the drag, then marshals <see cref="RefitResultRows"/>
+        /// back onto the main thread - Blish HUD's XNA host installs no
+        /// SynchronizationContext, so the continuation after
+        /// <see cref="Task.Delay"/> may resume on a ThreadPool thread (the
+        /// same reason RunSearchDebounceAsync marshals).
+        /// </summary>
+        private async void RunRowRefitAfterSettleAsync()
+        {
+            try
+            {
+                while (true)
+                {
+                    long elapsedMs =
+                        (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastResizeEventTicks)) / TimeSpan.TicksPerMillisecond;
+                    if (elapsedMs >= ResizeSettleMs)
+                    {
+                        break;
+                    }
+
+                    // Clamped: a stamp landing between the two reads above
+                    // can make this negative, which Task.Delay rejects.
+                    int remaining = (int)(ResizeSettleMs - elapsedMs);
+                    await Task.Delay(remaining > 0 ? remaining : 1);
+                }
+
+                // A dropped queue attempt (overlay gone) would otherwise
+                // leave the pending flag set forever and starve every later
+                // drag of a re-fit. Cleared from this thread only in that
+                // case, when no main-thread work can be racing it.
+                if (!MainThreadMarshal.Run(RefitResultRows))
+                {
+                    _rowRefitPending = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                // async void: an escaping exception has no caller to reach
+                // and would take down the host rather than this one wait.
+                _rowRefitPending = false;
+                Logger.Warn(ex, "Snapshot row re-fit wait failed");
+            }
+        }
+
+        /// <summary>
+        /// Re-fits the rows already on screen to the content panel's current
+        /// width, in place: each row's Panel takes the new width and each of
+        /// its text lines is re-ellipsized against it (with its tooltip
+        /// re-decided). No search re-run, no dispose-and-recreate, so the
+        /// user's scroll position is untouched - the reason a width change
+        /// no longer goes through RebuildContent.
+        /// </summary>
+        private void RefitResultRows()
+        {
+            _rowRefitPending = false;
+
+            if (_contentPanel == null || _contentPanel.Parent == null)
+            {
+                return;
+            }
+
+            int width = _contentPanel.Width;
+            if (width == _lastRowLayoutWidth)
+            {
+                return;
+            }
+
+            try
+            {
+                foreach (var refit in _rowRefitActions)
+                {
+                    refit(width);
+                }
+
+                _lastRowLayoutWidth = width;
+            }
+            catch (Exception ex)
+            {
+                // The registry is cleared by RebuildContent, so its closures
+                // outlive their controls only between a fresh Build's
+                // ThreadPool body swapping _contentPanel and that build's own
+                // marshaled RebuildContent tail. Whichever build is current
+                // renders its rows at its own width regardless.
+                Logger.Warn(ex, "Snapshot row re-fit skipped");
+            }
         }
 
         /// <summary>
@@ -1373,6 +1524,13 @@ namespace GW2CraftingHelper.Views
             // supersedes any older still-pending debounced rebuild - avoids
             // a redundant extra rebuild landing a moment after this one.
             CancelSearchDebounce();
+
+            // The rows about to be disposed own every registered re-fit
+            // closure; the fresh ones register their own below. Cleared
+            // before the disposal loop so no window exists in which a
+            // closure could be replayed against a disposed row.
+            _rowRefitActions.Clear();
+            _lastRowLayoutWidth = _contentPanel.Width;
 
             foreach (var child in _contentPanel.Children.ToArray())
             {
@@ -1528,6 +1686,92 @@ namespace GW2CraftingHelper.Views
             return null;
         }
 
+        // Left edge of a result row's text column (past the 32px icon at
+        // x=2) and the gap kept clear of the row's right edge.
+        private const int RowTextX = 40;
+        private const int RowTextRightPad = 8;
+
+        /// <summary>
+        /// One result-row text line, ellipsized to the width the row
+        /// actually has and returning whether it had to shorten. Both
+        /// lines of an item row used to be AutoSizeWidth Labels inside a
+        /// fixed-width Panel, so a multi-character breakdown was hard-clipped
+        /// mid-word with nothing to say text had been lost ("...Maximus
+        /// Test 10  Chara"). Same EllipsizeToWidth + tooltip pattern the
+        /// Log tab's rows and the plan's tables use.
+        /// </summary>
+        private static Label CreateRowTextLabel(
+            Panel rowPanel, string text, int panelWidth, int y, Color? color, out bool shortened)
+        {
+            var label = new Label()
+            {
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(RowTextX, y),
+                Parent = rowPanel
+            };
+            if (color.HasValue)
+            {
+                label.TextColor = color.Value;
+            }
+
+            shortened = FitRowTextLabel(label, text, panelWidth);
+            return label;
+        }
+
+        /// <summary>
+        /// Ellipsizes one line to the row width and re-decides its tooltip,
+        /// returning whether it had to shorten. The single rule, so the
+        /// build-time fit and the resize-time re-fit
+        /// (<see cref="RefitResultRows"/>) cannot drift.
+        /// <para>
+        /// The label is the deepest control under the cursor, and Blish
+        /// resolves a tooltip on that control alone - it does not bubble to
+        /// the row Panel (the swallowed-hover class recorded for
+        /// ShoppingListSectionRenderer and the tree row). The Panel gets one
+        /// too, from the caller, for the strip beside the text. A line that
+        /// now fits has its tooltip cleared rather than left stale.
+        /// </para>
+        /// </summary>
+        private static bool FitRowTextLabel(Label label, string text, int panelWidth)
+        {
+            var font = GameService.Content.DefaultFont14;
+            string full = text ?? "";
+            string shown = LabelHelpers.EllipsizeToWidth(font, full, panelWidth - RowTextX - RowTextRightPad);
+
+            label.Text = shown;
+
+            bool shortened = shown != full;
+            TooltipFacility.ApplyPlain(label, shortened ? full : null);
+            return shortened;
+        }
+
+        /// <summary>
+        /// The row strip's own tooltip, carrying whichever of the row's
+        /// lines were shortened - one assignment, since a per-line one here
+        /// would leave the later assignment silently winning. Cleared when
+        /// neither line is shortened.
+        /// </summary>
+        private static void ApplyRowStripTooltip(
+            Panel rowPanel, string first, bool firstShortened, string second, bool secondShortened)
+        {
+            string text = null;
+            if (firstShortened && secondShortened)
+            {
+                text = first + "\n" + second;
+            }
+            else if (firstShortened)
+            {
+                text = first;
+            }
+            else if (secondShortened)
+            {
+                text = second;
+            }
+
+            TooltipFacility.ApplyPlain(rowPanel, text);
+        }
+
         private void CreateItemRow(SnapshotSearchRow row)
         {
             int panelWidth = _contentPanel?.Width ?? 400;
@@ -1547,28 +1791,42 @@ namespace GW2CraftingHelper.Views
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.
-            new Label()
-            {
-                Text = $"{row.Name} x{row.TotalCount}",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(40, 4),
-                Parent = rowPanel
-            };
+            //
+            // Quantity PREFIX ("30x Mystic Clover"), matching the recipe
+            // tree, the shopping list and Used Materials. This row used to
+            // suffix it ("Mystic Clover x30") and the wallet row below used
+            // a colon ("Spirit Shards: 50"), so one tab spelled the same
+            // fact three ways (audit batch J, M9). Two things are
+            // deliberately NOT swept into this: a tabular Amount column,
+            // whose header already labels its bare numbers, and the
+            // location breakdown below.
+            string nameText = $"{row.TotalCount}x {row.Name}";
+            var nameLabel = CreateRowTextLabel(rowPanel, nameText, panelWidth, 4, null, out bool nameShortened);
 
+            // NOT the prefix notation the name line above uses, and the one
+            // deliberate exemption from M9's sweep beside the tabular Amount
+            // columns: these labels are LOCATIONS, not items
+            // (SnapshotSearchResultBuilder.FormatSourceLabel returns "Bank",
+            // "Material Storage", "Shared Inventory", "Character: <name>").
+            // "20x Bank" parses as twenty banks, and "10x Character:
+            // Maximus Test" collides the multiplier with the label's own
+            // colon. The count follows its location, as it did before.
             string breakdown = row.Breakdown == null || row.Breakdown.Count == 0
                 ? ""
                 : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
 
-            new Label()
+            var breakdownLabel =
+                CreateRowTextLabel(rowPanel, breakdown, panelWidth, 24, InfoTextColor, out bool breakdownShortened);
+
+            ApplyRowStripTooltip(rowPanel, nameText, nameShortened, breakdown, breakdownShortened);
+
+            _rowRefitActions.Add(w =>
             {
-                Text = breakdown,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = InfoTextColor,
-                Location = new Point(40, 24),
-                Parent = rowPanel
-            };
+                rowPanel.Size = new Point(w, ItemRowHeight);
+                bool nameNowShortened = FitRowTextLabel(nameLabel, nameText, w);
+                bool breakdownNowShortened = FitRowTextLabel(breakdownLabel, breakdown, w);
+                ApplyRowStripTooltip(rowPanel, nameText, nameNowShortened, breakdown, breakdownNowShortened);
+            });
         }
 
         private void CreateWalletRow(SnapshotWalletEntry entry)
@@ -1587,15 +1845,22 @@ namespace GW2CraftingHelper.Views
             IconControls.CreateItemIcon(rowPanel, entry.IconUrl, 2, 2);
 
             // Never display raw currency IDs (repo invariant).
+            // Quantity prefix, matching CreateItemRow above and the plan's
+            // own tables - this row used to be the module's only
+            // "Name: value" colon form (audit batch J, M9). The thousands
+            // separator stays: wallet balances run to seven figures where
+            // an item count does not.
             string name = string.IsNullOrEmpty(entry.CurrencyName) ? "Unknown Currency" : entry.CurrencyName;
-            new Label()
+            string text = $"{entry.Value:N0}x {name}";
+            var label = CreateRowTextLabel(rowPanel, text, panelWidth, 6, null, out bool shortened);
+            TooltipFacility.ApplyPlain(rowPanel, shortened ? text : null);
+
+            _rowRefitActions.Add(w =>
             {
-                Text = $"{name}: {entry.Value:N0}",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(40, 6),
-                Parent = rowPanel
-            };
+                rowPanel.Size = new Point(w, WalletRowHeight);
+                bool nowShortened = FitRowTextLabel(label, text, w);
+                TooltipFacility.ApplyPlain(rowPanel, nowShortened ? text : null);
+            });
         }
 
         // This used to carry its own

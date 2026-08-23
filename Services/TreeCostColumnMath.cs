@@ -178,14 +178,25 @@ namespace GW2CraftingHelper.Services
             public readonly CostColumnWidths CostWidths;
             public readonly int WidestNameEnd;
 
-            public TreeColumnScan(CostColumnWidths costWidths, int widestNameEnd)
+            /// <summary>
+            /// Every node in the tree, at every depth, expanded or not -
+            /// which is exactly the number of rows the section renders once
+            /// Expand All is pressed, and so the count the section header
+            /// shows in parentheses like every other countable section
+            /// (audit batch J, L2). It rides this walk rather than a second
+            /// one for the same reason the widths do.
+            /// </summary>
+            public readonly int NodeCount;
+
+            public TreeColumnScan(CostColumnWidths costWidths, int widestNameEnd, int nodeCount)
             {
                 CostWidths = costWidths;
                 WidestNameEnd = widestNameEnd;
+                NodeCount = nodeCount;
             }
 
             public static readonly TreeColumnScan Empty =
-                new TreeColumnScan(CostColumnWidths.Empty, 0);
+                new TreeColumnScan(CostColumnWidths.Empty, 0, 0);
         }
 
         /// <summary>
@@ -236,14 +247,15 @@ namespace GW2CraftingHelper.Services
             if (measureText == null) throw new ArgumentNullException(nameof(measureText));
             if (measureCurrencyRunWidth == null) throw new ArgumentNullException(nameof(measureCurrencyRunWidth));
 
-            int gold = 0, silver = 0, copper = 0, currency = 0, nameEnd = 0;
+            int gold = 0, silver = 0, copper = 0, currency = 0, nameEnd = 0, nodeCount = 0;
             foreach (var root in roots)
             {
                 ScanNode(
                     root, measureText, measureCurrencyRunWidth, measureNameEnd,
-                    ref gold, ref silver, ref copper, ref currency, ref nameEnd);
+                    ref gold, ref silver, ref copper, ref currency, ref nameEnd, ref nodeCount);
             }
-            return new TreeColumnScan(new CostColumnWidths(gold, silver, copper, currency), nameEnd);
+            return new TreeColumnScan(
+                new CostColumnWidths(gold, silver, copper, currency), nameEnd, nodeCount);
         }
 
         // Explicit stack rather than recursion: a solver tree's depth is
@@ -253,7 +265,8 @@ namespace GW2CraftingHelper.Services
         private static void ScanNode(
             CraftingTreeNode root, Func<string, int> measureText, Func<CraftingTreeNode, int> measureCurrencyRunWidth,
             Func<CraftingTreeNode, int, int> measureNameEnd,
-            ref int gold, ref int silver, ref int copper, ref int currency, ref int nameEnd)
+            ref int gold, ref int silver, ref int copper, ref int currency, ref int nameEnd,
+            ref int nodeCount)
         {
             if (root == null) return;
 
@@ -264,6 +277,8 @@ namespace GW2CraftingHelper.Services
                 var pendingNode = pending.Pop();
                 var node = pendingNode.Node;
                 if (node == null) continue;
+
+                nodeCount++;
 
                 // > 0, not merely HasValue: a genuinely zero-and-uncosted
                 // decision renders the unpriceable dash instead of coin

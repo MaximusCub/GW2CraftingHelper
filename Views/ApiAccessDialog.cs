@@ -9,7 +9,7 @@ using MonoGame.Extended.BitmapFonts;
 namespace GW2CraftingHelper.Views
 {
     /// <summary>
-    /// The "GW2 API access is not ready" walkthrough dialog for the
+    /// The "GW2 API access not ready" walkthrough dialog for the
     /// ApiAccessNotReady snapshot-refresh failure kind (at CHARACTER
     /// SELECT, Blish has not yet resolved the
     /// game's Mumble identity, so every account data source call fails
@@ -45,7 +45,22 @@ namespace GW2CraftingHelper.Views
     public class ApiAccessDialog : IDisposable
     {
         private const string WindowId = "GW2CraftingHelper_ApiAccessDialog_7d2c31";
-        private const int WindowWidth = 480;
+
+        // 480 before: at that width the title ran into the title bar's
+        // close X and was clipped mid-word ("GW2 API access is not read|y|X").
+        // Measured against BlishHUD 1.3.0's WindowBase2: the title is drawn
+        // in DefaultFont32 - the largest font in the toolkit, and NOT the
+        // font a title this long was sized against - at a fixed 80px offset
+        // into the left title-bar texture, clipped to that texture's own
+        // bounds, which end 2px short of the right title-bar section; the
+        // exit button then sits 32px plus its own width inside that section's
+        // right edge. So the title's budget is (window width - 80 - the
+        // right section's reserved run), and widening the window buys title
+        // room 1:1. This carries roughly 80px more than the clip needed, on
+        // top of the three characters the title itself dropped, because
+        // Font32's per-character cost is ~15px and neither figure is
+        // available to a unit test.
+        private const int WindowWidth = 560;
         private const int WindowHeight = 300;
         private const int ContentX = 10;
         private const int ContentY = 35;
@@ -74,7 +89,7 @@ namespace GW2CraftingHelper.Views
             {
                 BackgroundColor = new Color(30, 30, 30),
                 Parent = GameService.Graphics.SpriteScreen,
-                Title = "GW2 API access is not ready",
+                Title = "GW2 API access not ready",
                 Id = WindowId,
                 TopMost = true
             };

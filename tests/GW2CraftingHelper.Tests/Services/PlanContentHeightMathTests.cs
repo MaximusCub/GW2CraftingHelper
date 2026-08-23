@@ -32,32 +32,55 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- SectionBodyHeight: simple per-row-count sections ---
 
+        // Used Materials gained an Item/Amount header in audit batch J's
+        // chrome unification, and the Shopping List's own 22px unbanded
+        // header became the shared 26px band. Both are counted the way the
+        // two c-tables already were - unconditionally, because all four
+        // renderers emit the header before looking at the row count.
         [Fact]
-        public void UsedMaterials_HeightIsRowCountTimesRowHeight()
+        public void UsedMaterials_IncludesHeaderRowPlusRows()
         {
             var rows = new List<PlanRowViewModel> { Row(PlanRowType.UsedMaterial), Row(PlanRowType.UsedMaterial), Row(PlanRowType.UsedMaterial) };
-            int expected = 3 * PlanContentHeightMath.UsedMaterialRowHeight;
+            int expected = PlanContentHeightMath.CTableHeaderRowHeight + 3 * PlanContentHeightMath.UsedMaterialRowHeight;
             Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.UsedMaterials, rows));
         }
 
         [Fact]
-        public void UsedMaterials_EmptyRows_HeightIsZero()
+        public void UsedMaterials_EmptyRows_IsTheHeaderAlone()
         {
-            Assert.Equal(0, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.UsedMaterials, new List<PlanRowViewModel>()));
+            Assert.Equal(
+                PlanContentHeightMath.CTableHeaderRowHeight,
+                PlanContentHeightMath.SectionBodyHeight(PlanSectionType.UsedMaterials, new List<PlanRowViewModel>()));
         }
 
         [Fact]
-        public void UsedMaterials_NullRows_HeightIsZero()
+        public void UsedMaterials_NullRows_IsTheHeaderAlone()
         {
-            Assert.Equal(0, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.UsedMaterials, null));
+            Assert.Equal(
+                PlanContentHeightMath.CTableHeaderRowHeight,
+                PlanContentHeightMath.SectionBodyHeight(PlanSectionType.UsedMaterials, null));
         }
 
         [Fact]
         public void ShoppingList_IncludesHeaderRowPlusRows()
         {
             var rows = new List<PlanRowViewModel> { Row(PlanRowType.ShoppingBuy), Row(PlanRowType.ShoppingVendor) };
-            int expected = PlanContentHeightMath.ShoppingHeaderRowHeight + 2 * PlanContentHeightMath.ShoppingRowHeight;
+            int expected = PlanContentHeightMath.CTableHeaderRowHeight + 2 * PlanContentHeightMath.ShoppingRowHeight;
             Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.ShoppingList, rows));
+        }
+
+        // Every table header in the plan is now one band of one height -
+        // the drift this replaced was three styles across six tables.
+        [Theory]
+        [InlineData(PlanSectionType.UsedMaterials)]
+        [InlineData(PlanSectionType.ShoppingList)]
+        [InlineData(PlanSectionType.RequiredDisciplines)]
+        [InlineData(PlanSectionType.RequiredRecipes)]
+        public void EveryHeaderedSection_ReservesTheSameHeaderHeight(PlanSectionType sectionType)
+        {
+            Assert.Equal(
+                PlanContentHeightMath.CTableHeaderRowHeight,
+                PlanContentHeightMath.SectionBodyHeight(sectionType, new List<PlanRowViewModel>()));
         }
 
         [Fact]

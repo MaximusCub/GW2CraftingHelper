@@ -322,11 +322,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // TreeToolbarCommands. Nothing interactive is left in the header,
             // so the suppressToggle guard (and the press-time hover flag it
             // read) went with them.
-            var header = _createSectionHeader(
-                "Recipe Tree", PlanSectionType.RecipeTree, panelWidth, true, null);
-            var treeFlow = header.ContentFlow;
             _treeRoots = treeRoots as List<CraftingTreeNode> ?? new List<CraftingTreeNode>(treeRoots);
-            _treeFlow = treeFlow;
 
             // Column pre-scan: ONE walk of the whole tree per render
             // pass, before any row is built, so every row (including the
@@ -334,9 +330,29 @@ namespace GW2CraftingHelper.Views.Rendering
             // sub-columns and the same gutter-closing block x. Never re-run
             // per row draw or per resize tick - both results are
             // data-derived, not panelWidth-derived.
+            //
+            // Hoisted above the header because the header's title now
+            // carries the tree's node count, which comes out of this same
+            // walk (audit batch J, L2). It reads nothing the header
+            // produces, so the move is ordering only.
             var scan = ScanTreeColumns(_treeRoots);
             _costColumnWidths = scan.CostWidths;
             _widestNameEnd = scan.WidestNameEnd;
+
+            // Parenthesised count, like every other countable section
+            // ("Used Materials (12)", "Shopping List (7)"). The number is
+            // every node at every depth - the rows Expand All reveals -
+            // not the currently visible ones, which would change under the
+            // reader on every caret click. A tree with no roots renders no
+            // section body at all, so it keeps the bare title rather than
+            // advertising "(0)".
+            string title = scan.NodeCount > 0
+                ? $"Recipe Tree ({scan.NodeCount})"
+                : "Recipe Tree";
+            var header = _createSectionHeader(
+                title, PlanSectionType.RecipeTree, panelWidth, true, null);
+            var treeFlow = header.ContentFlow;
+            _treeFlow = treeFlow;
 
             // Column headers over the two columns a tree row's right-hand
             // side actually has. Both track the panel width now (the

@@ -53,12 +53,24 @@ namespace GW2CraftingHelper.Views.Rendering
         // defaults to null - every pre-existing caller (item icons, whose
         // name already renders as adjacent text) is unaffected; only a new
         // caller that opts in by passing it gets a hover tooltip.
+        // What a missing icon says instead of an item name. Assigned only
+        // when the caller supplied no tooltip of its own, so a currency
+        // icon still names its currency.
+        private const string NoIconTooltip = "No icon available for this entry.";
+
+        // The placeholder's mark. ASCII, per this repo's standing finding
+        // that the Blish font does not reliably render the glyphs an
+        // "empty slot" would otherwise want (see CraftingPlanView's
+        // caret comment).
+        private const string NoIconGlyph = "-";
+
         internal static Panel CreateItemIcon(
             Panel parent, string iconUrl, int x, int y, int size = 32, string tooltipText = null)
         {
             // Missing icon: render a neutral empty-slot square, not the
             // alarming red error texture - a data gap is not a failure.
-            Panel icon = string.IsNullOrEmpty(iconUrl)
+            bool missing = string.IsNullOrEmpty(iconUrl);
+            Panel icon = missing
                 ? new Panel()
                 {
                     Size = new Point(size, size),
@@ -74,9 +86,50 @@ namespace GW2CraftingHelper.Views.Rendering
                     Parent = parent
                 };
 
+            // The bare square reads as a HOLE in the icon column rather
+            // than as an entry without an icon - the reported Snapshot
+            // "Spirit Shards" row. A dim centered mark plus a tooltip says
+            // which it is. Deliberately marks the square rather than
+            // collapsing the column for that row: an un-iconed row whose
+            // text starts 32px left of every other row's is a worse
+            // artifact than a quiet placeholder, and the plan's tables
+            // derive their name column from a fixed x that a per-row
+            // collapse would break.
+            //
+            // Built only on the missing path, so the common case allocates
+            // nothing extra.
+            Label placeholderMark = null;
+            if (missing && size > 0)
+            {
+                var font = GameService.Content.DefaultFont14;
+                var glyphSize = font.MeasureString(NoIconGlyph);
+                placeholderMark = new Label()
+                {
+                    Text = NoIconGlyph,
+                    Font = font,
+                    TextColor = new Color(110, 110, 110),
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(
+                        (size - (int)System.Math.Ceiling(glyphSize.Width)) / 2,
+                        (size - (int)System.Math.Ceiling(glyphSize.Height)) / 2),
+                    Parent = icon
+                };
+            }
+
             // An icon's tooltip is almost always an item name, which is
-            // unbounded - through the facility, not assigned raw.
-            TooltipFacility.ApplyPlain(icon, tooltipText);
+            // unbounded - through the facility, not assigned raw. Stamped
+            // on the placeholder mark as well as the square: Blish resolves
+            // a tooltip on the deepest control under the cursor and never
+            // bubbles to the parent, so the mark would otherwise swallow
+            // the hover in the exact middle of the square.
+            string resolvedTooltip =
+                missing && string.IsNullOrEmpty(tooltipText) ? NoIconTooltip : tooltipText;
+            TooltipFacility.ApplyPlain(icon, resolvedTooltip);
+            if (placeholderMark != null)
+            {
+                TooltipFacility.ApplyPlain(placeholderMark, resolvedTooltip);
+            }
             return icon;
         }
     }

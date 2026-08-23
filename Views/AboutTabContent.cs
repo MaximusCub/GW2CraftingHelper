@@ -52,7 +52,13 @@ namespace GW2CraftingHelper.Views
         private static readonly Logger Logger = Logger.GetLogger<AboutTabContent>();
 
         private const string ModuleDisplayName = "GW2 Crafting Helper";
-        private const string UnknownText = "unknown";
+        // The ONE phrasing for a value the module could not resolve.
+        // Three lived here - "unknown" for a version, "Not set in
+        // manifest.json" for the source URL, "Not listed in manifest.json"
+        // for the author - so one screen answered the same question three
+        // ways, and two of the three named an implementation detail the
+        // reader has no way to act on (audit batch J, L7).
+        private const string NotAvailableText = "Not available";
         private const string BlishHudDependencyNamespace = "bh.blishhud";
 
         // The Blish HUD MIT-license credit line, verified against
@@ -144,8 +150,8 @@ namespace GW2CraftingHelper.Views
 
             AddSpacer(panelWidth);
 
-            AddValueRow("Source:", string.IsNullOrWhiteSpace(info.Url) ? "Not set in manifest.json" : info.Url, panelWidth, copyable: true);
-            AddValueRow("Author:", info.AuthorDisplay ?? "Not listed in manifest.json", panelWidth);
+            AddValueRow("Source:", string.IsNullOrWhiteSpace(info.Url) ? NotAvailableText : info.Url, panelWidth, copyable: true);
+            AddValueRow("Author:", info.AuthorDisplay ?? NotAvailableText, panelWidth);
             AddValueRow("Built with:", $"Blish HUD {info.BlishVersionRange ?? FallbackBlishHudVersionRange}", panelWidth);
 
             // "License:" (this project's own license) and "Credits:" (the
@@ -160,7 +166,7 @@ namespace GW2CraftingHelper.Views
             // either without updating this comment.
             AddValueRow("License:", "MIT (see LICENSE in the repo)", panelWidth);
             AddValueRow("Credits:", BlishHudCreditLine, panelWidth, copyable: true);
-            AddValueRow("Data directory:", string.IsNullOrWhiteSpace(_dataDirectoryPath) ? "Not available" : _dataDirectoryPath, panelWidth, copyable: true);
+            AddValueRow("Data directory:", string.IsNullOrWhiteSpace(_dataDirectoryPath) ? NotAvailableText : _dataDirectoryPath, panelWidth, copyable: true);
 
             AddSpacer(panelWidth);
             AddLabeledInfoSection("Disclaimer:", ArenaNetDisclaimerText, panelWidth);
@@ -394,7 +400,7 @@ namespace GW2CraftingHelper.Views
                 return new AboutInfo
                 {
                     Name = name,
-                    Version = ReadVersionText(manifest) ?? UnknownText,
+                    Version = ReadVersionText(manifest) ?? NotAvailableText,
                     Description = manifest.Description ?? "",
                     Url = manifest.Url ?? "",
                     AuthorDisplay = ResolveAuthorDisplay(manifest.Author, manifest.Contributors),
@@ -535,7 +541,7 @@ namespace GW2CraftingHelper.Views
                         return new AboutInfo
                         {
                             Name = string.IsNullOrWhiteSpace(dto.Name) ? ModuleDisplayName : dto.Name,
-                            Version = string.IsNullOrWhiteSpace(dto.Version) ? UnknownText : dto.Version,
+                            Version = string.IsNullOrWhiteSpace(dto.Version) ? NotAvailableText : dto.Version,
                             Description = dto.Description ?? "",
                             Url = dto.Url ?? "",
                             AuthorDisplay = authorDisplay,
@@ -596,7 +602,7 @@ namespace GW2CraftingHelper.Views
             return new AboutInfo
             {
                 Name = ModuleDisplayName,
-                Version = UnknownText,
+                Version = NotAvailableText,
                 Description = "",
                 Url = "",
                 AuthorDisplay = null,

@@ -326,9 +326,9 @@ namespace GW2CraftingHelper.Views
             // A currency with a curated
             // default (see CurrencyDecisionDefaults) is used automatically
             // even when its box is left blank - "unset" now means "use the
-            // default, if any", not "excluded". Use Clear to suppress a
+            // default, if any", not "excluded". Tick Ignore to suppress a
             // default entirely.
-            AddInfoLine("Some currencies show a default estimate and are valued automatically unless cleared.", panelWidth);
+            AddInfoLine("Some currencies show a default estimate and are valued automatically unless ignored.", panelWidth);
             // What the "Plan Defaults" section header used to introduce: it
             // owned three info lines and no controls at all, so it is a note
             // under the pricing section it points at, not a section.
@@ -893,7 +893,10 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(CurrencyFilterWidth, 26),
                 Location = new Point(CellNameX, CellInputY),
-                PlaceholderText = "Filter currencies...",
+                // "Search {scope}..." - the one placeholder shape the
+                // module's other three search boxes use (audit batch J,
+                // M12). This box was the lone "Filter ..." spelling.
+                PlaceholderText = "Search currencies...",
                 Parent = rowPanel
             };
             _currencyFilterInput.TextChanged += (_, __) => ApplyCurrencyFilter();
@@ -951,7 +954,7 @@ namespace GW2CraftingHelper.Views
             // Feature 1 spec: the estimate is labeled as such, with
             // attribution/editable/clearable spelled out on hover.
             TooltipFacility.ApplyPlain(input, hasDefault
-                ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here, or use Clear to suppress it."
+                ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here, or tick Ignore to suppress it."
                 : "Coin value of one unit, in copper.");
 
             var defaultLabel = new Label()
@@ -964,7 +967,7 @@ namespace GW2CraftingHelper.Views
                 Parent = cellPanel
             };
             TooltipFacility.ApplyPlain(defaultLabel, hasDefault
-                ? "This currency is valued automatically at its default estimate unless you type your own amount or check Clear."
+                ? "This currency is valued automatically at its default estimate unless you type your own amount or tick Ignore."
                 : null);
 
             var errorLabel = new Label()
@@ -981,15 +984,28 @@ namespace GW2CraftingHelper.Views
             Checkbox clearCheckbox = null;
             if (hasDefault)
             {
+                // "Clear" named an ACTION this control does not perform:
+                // it is a persistent three-state flag that suppresses the
+                // curated default, not a button that empties the box beside
+                // it (audit batch J, M12). "Ignore" names the state.
+                //
+                // Not the longer "Ignore default": the cell reserves
+                // SettingsCurrencyGridLayout.CellClearWidth (70px) for this
+                // control, and widening that pushes MinColumnWidth past half
+                // the 884px content region the 930px window minimum leaves,
+                // dropping the whole grid from two columns to one at
+                // minimum width. "Ignore" fits the existing budget; the tag
+                // slot immediately right of it ("default 3600" / "ignored")
+                // and the tooltip carry the rest of the meaning.
                 clearCheckbox = new Checkbox()
                 {
-                    Text = "Clear",
+                    Text = "Ignore",
                     Location = new Point(CellClearX, CellTextY),
                     Parent = cellPanel
                 };
                 TooltipFacility.ApplyPlain(
                     clearCheckbox,
-                    "Suppress this currency's default estimate - it will not be valued unless you enter your own amount.");
+                    "Ignore this currency's default estimate - it will not be valued unless you enter your own amount.");
             }
 
             // Appended in the same step as the row it names - the filter
@@ -1076,7 +1092,7 @@ namespace GW2CraftingHelper.Views
 
             row.ClearCheckbox.Checked = isCleared;
             row.DefaultLabel.Text = isCleared
-                ? "cleared"
+                ? "ignored"
                 : hasOverride
                     ? $"was {row.DefaultCopperPerUnit}"
                     : $"default {row.DefaultCopperPerUnit}";
@@ -1116,7 +1132,7 @@ namespace GW2CraftingHelper.Views
             var saveButton = new StandardButton()
             {
                 Text = "Save",
-                Size = new Point(80, 28),
+                Size = new Point(80, UiMetrics.ButtonHeight),
                 Location = new Point(NameColumnX, 6),
                 BasicTooltipText = "Save every section on this tab.",
                 Parent = barPanel
@@ -1163,7 +1179,7 @@ namespace GW2CraftingHelper.Views
 
             if (invalidCount == 0)
             {
-                _statusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
+                _statusLabel.Text = StatusText.Stamp("Saved", DateTime.Now);
                 _statusLabel.TextColor = SuccessTextColor;
             }
             else
