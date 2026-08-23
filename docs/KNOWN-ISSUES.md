@@ -10384,3 +10384,292 @@ mouse opt-out working). The bottom/right edge-clamp cases and the
 wiki right-click-on-name behavior were not staged live; both are
 pinned by TooltipLayoutMath tests and the review round's
 label-handler verification respectively.
+
+## Audit batch J: consistency sweep (audit-j-consistency)
+
+The last audit batch, deliberately: every item here is a vocabulary or
+chrome decision, and running it last let it adopt the words batches
+A-K had already settled rather than inventing a tenth spelling that
+would then have to be swept again. Each finding was re-located against
+this HEAD before it was touched - the audit's own line numbers are
+stale and three of its claims no longer held.
+
+### Audit findings
+
+- **M9, quantity notation - DONE.** The Snapshot tab spelled a quantity
+  three ways: the recipe tree's prefix ("47x Mystic Clover"), the item
+  row's suffix ("Mystic Clover x30") and the wallet row's colon
+  ("Spirit Shards: 50"). All three are the tree's prefix form now,
+  including the per-source breakdown line under an item ("20x Bank
+  12x Vault") - which was the third spelling sitting on the same row
+  as the second. Tabular Amount columns keep bare numbers: a column
+  under an "Amount" header is already labelled by its header. The
+  wallet row keeps its thousands separator, since balances run to
+  seven figures where an item count does not.
+- **M10, status lines - DONE.** `StatusText.Stamp(verb, when)` is now
+  the only place a "&lt;verb&gt; &lt;separator&gt; &lt;timestamp&gt;"
+  line is composed; MainView's cache-cleared/updated/failed lines,
+  SettingsTabContent's "Saved", CraftingPlanView's "Plan generated" and
+  the restored-plan seed all call it. Separator is the em-dash (the
+  majority spelling; the hyphen was already in use as the module's
+  WITHIN-clause separator, so reusing it gave one line two identical
+  separators at two grammatical levels), and `ForRefreshFailure`'s cause
+  clause moved to a colon for the same reason.
+  The Snapshot line's two-times-read-as-one confusion is fixed by
+  `ForSnapshotAgeSuffix`: "(snapshot 29d old)" instead of a bare
+  "(29d ago)" straight after an absolute timestamp. It shares
+  `ForSnapshotAge`'s bucket ladder through a private `AgeMagnitude`, so
+  the two wordings cannot drift about when minutes become hours - pinned
+  by a Theory that asserts the agreement directly. Placement was NOT
+  touched: which row a status lives in was settled by batches F/I/G.
+- **M12, label vocabulary - DONE**, all four parts. Placeholders are one
+  "Search {scope}..." shape (the Log tab's bare "Search..." names its
+  scope; Settings' "Filter currencies..." was the lone "Filter"
+  spelling). The Log toolbar is textbox-then-dropdown, matching the
+  Snapshot search row it used to mirror; nothing else on the row moved,
+  since the Follow checkbox's offset is the same sum. "Clear view" ->
+  "Clear View", the only sentence-case button label in a module of Title
+  Case ones.
+  The per-currency "Clear" checkbox named an ACTION it does not perform
+  - it is a persistent flag that suppresses the curated default
+  estimate, not a button that empties the box beside it. It reads
+  "Ignore" now, with the tag slot showing "ignored" and the tooltip and
+  section info line reworded. NOT the longer "Ignore default": the
+  cell's total extent is what decides whether the currency grid gets two
+  columns at the 930px window minimum (2 * MinColumnWidth = 848 against
+  an 864px settings panel), so the four extra pixels came out of the
+  input-to-checkbox gap instead, leaving MinColumnWidth untouched - now
+  pinned by a test asserting two columns at that minimum.
+- **L1, plan empty state - DONE.** A dim centered "No plan yet. Search
+  for an item above, then click Generate Plan." replaces the blank
+  parchment. It is an ordinary child of the content panel, so the first
+  real render sweeps it through `ResetContentPanelToEmpty` rather than a
+  second disposal path that could drift; the gap above it is a spacer
+  Panel because the content panel is a SingleTopToBottom FlowPanel that
+  positions its own children. `ShowEmptyPlanState` resets the content
+  panel first, which is load-bearing rather than defensive: it registers
+  a relayout closure and `_relayoutActions` is cleared only there, so a
+  no-plan tab visit would otherwise leave the previous visit's closures
+  writing `Size` into controls that visit had already disposed. Also
+  shown after a rolled-back plan render, which used to leave the tab
+  blank.
+- **L2, counts - DONE; L2, Used Materials header - DONE (the audit's
+  "batch H already did this" was wrong).** Rule adopted: ALL-COUNTABLE.
+  Every section whose body is a list of like rows names how many,
+  because that count is what a COLLAPSED header owes the reader (three
+  rows or ninety?), and because the alternative - dropping the five
+  counts that already existed - throws information away to buy
+  tidiness. The Recipe Tree gains "(N)". Total Cost keeps none under
+  the same rule, deliberately: its body is a fixed formula band plus an
+  optional currency table, not a list, so any number in its header
+  would be counting one of its parts.
+  The tree's N is every node at every depth - what Expand All reveals -
+  not the rows currently on screen, which would change under the reader
+  on every caret click. It rides the existing whole-tree pre-scan
+  (`TreeCostColumnMath.ScanColumns` gained a `NodeCount`, five new
+  tests) rather than a second walk; the scan is simply hoisted above the
+  header call it now feeds, and reads nothing the header produces.
+  Used Materials was verified at this HEAD and had NO header row - batch
+  H pulled its Amount column in beside the names but never named it. It
+  has an Item/Amount header now, on the shared c-table renderer.
+- **L3, chrome drift - DONE**, with the inventory re-taken at this HEAD
+  rather than trusted from the audit. Three header styles across six
+  tables: banded/Font14/white/26px on Required Recipes, Required
+  Disciplines, the Recipe Tree (banded by batch D) and the Total Cost
+  currency table; unbanded/Font12/#999999/22px on the Shopping List; and
+  nothing at all on Used Materials.
+  **The band wins**, and `Views/Rendering/TableHeaderStyle` owns the
+  tokens all three builders read. Three grounds: it is what four of the
+  five existing headers already do, so unifying the other way would
+  rewrite the majority to match the minority; it is the more recent
+  deliberate decision (batch D chose it AFTER the lighter treatment
+  existed, which is why the audit's own suggestion of the Shopping
+  List's style is superseded); and every data row in this module already
+  carries a 2px divider and usually an icon, so an unbanded grey header
+  reads as a faint first data row - which is the complaint. The cost is
+  stated rather than hidden: the Shopping List's header grows four
+  pixels and Used Materials gains one, and both are paid for in
+  `PlanContentHeightMath.SectionBodyHeight` in the same commit, counted
+  unconditionally exactly as the two c-tables already were. The new
+  Shopping band is bounded by its own last column, the rule batch H's
+  fix round established for every other band, and resolves to exactly
+  the panel width whenever the columns are still pinned.
+  Buttons: 30 (Snapshot's two), 28 (the Log tab's three, Save, Generate
+  Plan) and 24 (the five tree actions - re-checked, they did move to the
+  strip in batch E but kept their 24 - and the item row's +/- pair)
+  become one `UiMetrics.ButtonHeight = 28` applied at the construction
+  sites. 28 is both the majority and the height of this module's TextBox
+  and Dropdown controls, so a button sharing a row with either now
+  shares its baseline. The Snapshot pair's y is derived from the header
+  height rather than rewritten; the tree toolbar's y already derived
+  from its row height.
+- **L5, missing wallet icon - DONE**, root cause first. `IconUrl` is
+  empty for that entry. Live it comes from
+  `Gw2AccountSnapshotService.ResolveCurrencyDetailsAsync`, which
+  resolves the v2/currencies icon for every wallet row, so the captured
+  hole is the seeded fixture
+  `docs/dev-notes/m38-plan/m37-item29-snapshot.json`, which carries
+  `"IconUrl": ""` for currency 23. The fixture is left as-is (inventing
+  an icon URL would be inventing data), because the state is reachable
+  live anyway whenever that currencies fetch fails or a currency is
+  absent from its cache - so the fix is the general no-icon case, not
+  one row. `IconControls` already degraded a missing icon to a neutral
+  square instead of Blish's magenta missing-texture; the square just
+  read as a HOLE. It now carries a dim centered ASCII mark and, when the
+  caller supplied no tooltip of its own, "No icon available for this
+  entry." - stamped on the mark as well as the square, since Blish
+  resolves a tooltip on the deepest control under the cursor. Marking
+  rather than collapsing the column: an un-iconed row whose text starts
+  32px left of every other row's is the worse artifact, and the plan's
+  tables anchor their name column to a fixed x a per-row collapse would
+  break. Built only on the missing path.
+- **L7, About wording - DONE.** "unknown" (version), "Not set in
+  manifest.json" (source URL) and "Not listed in manifest.json" (author)
+  all become the single `NotAvailableText` the data-directory row
+  already used, "Not available". Two of the three named an
+  implementation detail the reader cannot act on.
+
+### Photography findings
+
+- **P1, ModalDialog did not block background input - DONE.**
+  `Views/ModalBackdrop` is a bare capturing `Control` raised beneath the
+  dialog for its lifetime. Measured against BlishHUD 1.3.0, not assumed:
+  `Container.TriggerMouseInput` walks children by ZIndex descending then
+  sibling index descending and BREAKS on the first whose bounds hold the
+  cursor and whose own `TriggerMouseInput` returns non-null - which
+  `Control.TriggerMouseInput` does for anything carrying the Mouse or
+  MouseWheel capture flag. `CaptureType.Filter` is the one flag that
+  loop steps past, so the backdrop must not carry it. That is the entire
+  mechanism; it paints nothing.
+  **It covers the module window, not the screen.** A capturing control
+  also stops Guild Wars 2 itself from seeing the click, and a confirm
+  left open swallowing every click in the game is not a trade a HUD
+  overlay should make for a two-button dialog. Other modules' windows
+  and the game stay live.
+  Z-order is not a constant - a window's ZIndex is
+  `5 + Screen.WINDOW_BASEZINDEX + its rank among windows ordered by
+  (TopMost, LastInteraction)` - so the backdrop tracks
+  `dialog.ZIndex - 1` on every frame it is visible, and is constructed
+  on the FIRST `Show()` rather than in the constructor so that on the
+  tie that arithmetic can produce with a non-TopMost module window it is
+  the later SpriteScreen child and wins the sibling-index tiebreak.
+  Module hands the blocked surface over as a lambda because the module
+  window is built after the dialog. Dropped on every exit path the
+  dialog has - both buttons, `Hide()`, and the title-bar X / Escape
+  route through `Dismiss` - before the callbacks run. ApiAccessDialog is
+  deliberately NOT given one: it is an error dialog with Retry/Close,
+  not a confirm gating destructive state.
+- **P2, Snapshot breakdown hard-clip - DONE.** Both lines of an item row
+  (and the wallet row) run through `LabelHelpers.EllipsizeToWidth`, and
+  a shortened line carries the full text through the tooltip facility's
+  plain path - stamped on the Label itself as well as the row Panel,
+  because Blish resolves a tooltip on the deepest control under the
+  cursor and does not bubble. A width change re-fits the rows through
+  the EXISTING 150ms search debounce rather than a per-row resize walk,
+  so a drag costs nothing per frame and a widened window stops showing
+  "..." on text that now fits; a height-only drag arms nothing.
+- **P3, doubled log tag - DONE, at the root.** Two sinks with different
+  shapes: `ModuleLogEntry` carries the tag as a FIELD, which
+  `LogLineFormat` renders in the row's own prefix column, while Blish's
+  `Logger` has no tag column and needs it inside the message. All
+  fourteen call sites prepended the bracketed form to the message AND
+  handed the same tag to ModuleLog. `LogScrollDiag` - the single method
+  writing to both - now adds the bracketed form for Blish's Logger only.
+  Class sweep over every `ModuleLog.Shared.Write` in the tree: no other
+  site embeds its own tag in its message (the "[TypeName]" runs in
+  Module.cs and RecipeClientFactory are exception type names, not tags),
+  so this was the sole instance.
+- **P4, ApiAccessDialog title/close-X collision - DONE.** Two changes,
+  because either alone leaves no margin: the window is 560 wide (was
+  480) and the title drops the word carrying none ("GW2 API access not
+  ready"). Measured rather than guessed: `WindowBase2` draws the title
+  in DefaultFont32 - the largest font in the toolkit, not the one a
+  title this long was sized against - at a fixed 80px offset into the
+  left title-bar texture, clipped to that texture's bounds, which stop
+  2px short of the right section; the exit button sits 32px plus its own
+  width inside that section's right edge. The title's budget therefore
+  scales 1:1 with window width. Everything inside the dialog derives
+  from `ContentWidth`, so the checklist simply wraps to fewer lines and
+  the buttons re-center.
+- **P5 - SKIPPED, already resolved by batch D.** Verified at this HEAD:
+  `CreatePlanHeader` emits `" x {vm.TargetQuantity} needed"`, with a
+  comment recording why it is "needed" rather than a bare count. No work
+  done.
+
+### Validation
+
+Build 0 errors and the full suite green per commit. Suite 2168 baseline
+-> 2192 (24 new Blish-free tests: 11 on `StatusText`'s stamp and the two
+age wordings including the agreement Theory, 5 on the tree scan's node
+count, 1 pinning two currency columns at the window minimum, and the
+rest folded into the reworked `PlanContentHeightMath` header
+assertions). No new test references Blish.
+
+Height-math check: two renderer-emitted heights DO change in this batch,
+and both are paid for in `PlanContentHeightMath.SectionBodyHeight` in
+the same commit as the renderer - the Shopping List's header (22 -> the
+shared 26) and Used Materials' new header (0 -> 26). Nothing else in the
+batch moves a height: the empty-state label lives outside every
+section's math, the button-height change is bounded by rows whose
+heights are fixed constants, and the tree's node count is text.
+
+### What the desktop gate should look at
+
+1. **Modal really blocks:** open the Snapshot tab's Clear Cache confirm
+   and click the Crafting Plan tab's "+" add-row button behind it, the
+   tab strip, and the module window's own title bar. None may respond.
+   Then click OUTSIDE the module window - the game and any other
+   module's window must still respond. Cancel, and confirm the module
+   window is live again. Repeat for the Log tab's Delete Log File and
+   the plan's regenerate confirm, and dismiss one with Escape and one
+   with the title-bar X - both must release the block.
+2. **Snapshot breakdown ellipsizes:** find (or filter to) an item held
+   by several characters so the breakdown line is long, at the 930px
+   minimum width. The line must end in "..." rather than a clipped
+   word, and hovering it - and the row's own name line, and the bare
+   strip beside them - must show the full text. Then drag the window
+   wider: about a fifth of a second after the drag settles the rows must
+   re-fit and the "..." disappear on lines that now fit.
+3. **Log tags single:** turn diagnostics on, scroll the Crafting Plan
+   tab, then read the Log tab at Debug+. Every scrolldiag line must show
+   "[scrolldiag]" exactly once, in the dim prefix column. Copy a few
+   lines and confirm the clipboard text matches.
+4. **About wording:** the About tab's Source, Author, Version and Data
+   directory rows must each read either a real value or "Not available"
+   - no "unknown", no "Not set in manifest.json".
+5. **Snapshot quantity notation:** item rows read "30x Mystic Clover",
+   wallet rows "50x Spirit Shards", breakdown lines "20x Bank" - no
+   suffix "x30" and no "Name: value" colon anywhere on the tab. The
+   Spirit Shards row's icon slot must show the dim placeholder mark with
+   its "No icon available" tooltip rather than an empty hole.
+6. **Empty plan state:** open the Crafting Plan tab with no plan (a
+   fresh profile, or after a plan fails to restore). The dim "No plan
+   yet..." line must be centered in the content area, and must vanish
+   the instant the first plan renders. Generate, then switch tabs away
+   and back - the plan must still be there and the empty state must NOT
+   reappear.
+7. **Chrome, the two visible costs:** the Shopping List's header is now
+   a dark band with white Font14 labels like every other table, and Used
+   Materials has an Item/Amount header it did not have. Confirm both
+   bands stop just past their own last column rather than running to the
+   panel edge, at 930px and at 1400px+, and that the rows below them did
+   not shift out of their section (nothing overlapping the next section
+   header, no gap). Also confirm the Recipe Tree header reads "Recipe
+   Tree (N)" and that N does not change when branches are expanded or
+   collapsed.
+8. **Button heights:** on the Snapshot header, the Log toolbar, the plan
+   controls row and the Recipe Tree strip, every button must be the same
+   height and share a baseline with the textboxes and dropdowns beside
+   it. The item row's "+"/"-" pair must line up with the quantity box,
+   not sit short of it.
+9. **Settings "Ignore":** the per-currency checkbox reads "Ignore",
+   fits without touching the tag beside it, and ticking it still shows
+   "ignored" in that tag and still suppresses the default on save. At
+   the 930px window minimum the currency grid must still be TWO columns.
+10. **API-access dialog title:** force the ApiAccessNotReady path (press
+    Refresh Now at character select). The title must read "GW2 API
+    access not ready" in full with clear space before the close X, and
+    the checklist must wrap inside the wider window with the buttons
+    centered.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
